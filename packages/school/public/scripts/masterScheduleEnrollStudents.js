@@ -383,13 +383,14 @@
       const statusLabel = clean(row.enrollmentStatus) === 'completed'
         ? '<span class="badge bg-success-subtle text-success border">Enrolled</span>'
         : (clean(row.enrollmentStatus) === 'draft' ? '<span class="badge bg-info-subtle text-info border">Queued (draft)</span>' : '<span class="badge bg-light text-dark border">Pending</span>');
+      const enrollLocked = clean(row.enrollmentStatus) === 'completed' || clean(row.enrollmentStatus) === 'draft';
       return `<tr data-queue-row="${index}" data-queue-tbody="${escapeHtml(tbodyId)}">
           <td>${formatStudentDisplay(row.label, row.studentId)}</td>
           <td><select class="form-select form-select-sm js-schedule-enroll-funder">${funderSelect}</select></td>
           <td><select class="form-select form-select-sm js-schedule-enroll-claim"><option value="">—</option></select></td>
           <td><textarea class="form-control form-control-sm js-schedule-enroll-reason" rows="2" placeholder="Optional start note">${reasonVal}</textarea></td>
           <td>${statusLabel}</td>
-          <td class="text-end"><button type="button" class="btn btn-sm btn-success js-schedule-enroll-play" data-index="${index}" ${clean(row.enrollmentStatus) === 'completed' ? 'disabled' : ''}><i class="bi bi-play-fill"></i></button></td>
+          <td class="text-end"><button type="button" class="btn btn-sm btn-success js-schedule-enroll-play" data-index="${index}" ${enrollLocked ? 'disabled' : ''}><i class="bi bi-play-fill"></i></button></td>
         </tr>`;
     }
 
@@ -481,16 +482,22 @@
       if (typeof deps.setPendingEnrollMetaForClass === 'function') {
         deps.setPendingEnrollMetaForClass(classId, enrollmentMetaFromPrepare(flowState.prepare));
       }
+      deps.refreshScheduleViewWithHolidays?.();
+      deps.syncPartialModalFromTimelineDrafts?.();
     }
 
     async function runEnrollmentForRow(index) {
       const row = readQueueRowFromDom(index, flowState.queue, 'scheduleEnrollQueueTbody');
-      if (!row || clean(row.enrollmentStatus) === 'completed') return;
+      const status = clean(row?.enrollmentStatus);
+      if (!row || status === 'completed' || status === 'draft') return;
+      if (row._enrollmentInFlight === true) return;
+      row._enrollmentInFlight = true;
       const settings = groupClient.groupEnrollmentSettingsFromEntry?.(row) || row;
       const payload = groupClient.buildGroupEnginePayload?.(flowState.prepare?.classId, row.studentId, settings) || {};
       if (flowState.prepare?.sessionMode === 'staged') {
-        storePendingEnrollmentDraft(payload, row);
         row.enrollmentStatus = 'draft';
+        storePendingEnrollmentDraft(payload, row);
+        row._enrollmentInFlight = false;
         renderQueueModal();
         await deps.uiAlert?.('Enrollment queued as draft. It will be saved when you save staged sessions.', 'Enroll students', { icon: 'info' });
         return;
@@ -513,6 +520,8 @@
         await deps.uiAlert?.(data.message || 'Enrollment completed.', 'Enroll students', { icon: 'success' });
       } catch (error) {
         await deps.uiAlert?.(error.message || 'Enrollment failed.', 'Enroll students', { icon: 'warning' });
+      } finally {
+        row._enrollmentInFlight = false;
       }
     }
 

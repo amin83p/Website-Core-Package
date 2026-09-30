@@ -21,7 +21,7 @@
   const lockedPersonId = scheduleAccess.lockedPersonId || (typeof prefillId !== 'undefined' ? prefillId : '') || '';
   const lockedPersonName = scheduleAccess.lockedPersonName || (typeof prefillName !== 'undefined' ? prefillName : '') || '';
 %>
-<% if (canSelectAnyPerson) { %>
+<% if (canSelectAnyPerson || canDragCreateSessions) { %>
 <link rel="stylesheet" href="/styles/schedule-viewer-admin.css">
 <% } %>
 
@@ -372,6 +372,7 @@
 
 <% if (canDragCreateSessions) { %>
 <%- include('school/partials/sessionEnrollmentCalendarModal') %>
+<%- include('school/schedule/partials/scheduleSaveDraftWorkModal') %>
 
 <div id="scheduleSavedBulkEditOverlay" class="session-enrollment-stage-overlay d-none" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="scheduleSavedBulkEditOverlayTitle">
   <div class="session-enrollment-stage-backdrop" data-saved-bulk-edit-dismiss="1" aria-hidden="true"></div>
@@ -477,6 +478,8 @@
 <script type="application/json" id="masterScheduleViewerConfig"><%- JSON.stringify(typeof masterScheduleViewerClientConfig !== 'undefined' ? masterScheduleViewerClientConfig : {}).replace(/</g, '\u003c') %></script>
 <% if (canDragCreateSessions) { %>
 <script src="/scripts/masterScheduleViewerStaging.js"></script>
+<script src="/scripts/masterScheduleDraftSaveWork.js"></script>
+<script src="/scripts/masterScheduleDraftSaveOrchestrator.js"></script>
 <% } %>
 <% if (canSelectAnyPerson) { %>
 <script src="/scripts/masterScheduleViewerAdmin.js"></script>

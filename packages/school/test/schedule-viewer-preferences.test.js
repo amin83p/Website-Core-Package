@@ -295,7 +295,7 @@ test('schedule routes expose viewer-preferences endpoints', () => {
 test('personSchedule loads person chip color admin assets only for canSelectAnyPerson', () => {
   const view = read('MVC/views/school/schedule/personSchedule.ejs');
   const adminJs = read('public/scripts/masterScheduleViewerAdmin.js');
-  assert.match(view, /if \(canSelectAnyPerson\) \{ %>\s*<link rel="stylesheet" href="\/styles\/schedule-viewer-admin\.css"/s);
+  assert.match(view, /if \(canSelectAnyPerson \|\| canDragCreateSessions\) \{ %>\s*<link rel="stylesheet" href="\/styles\/schedule-viewer-admin\.css"/s);
   assert.match(view, /if \(canSelectAnyPerson\) \{ %>\s*<script src="\/scripts\/masterScheduleViewerAdmin\.js"><\/script>/s);
   assert.match(adminJs, /schedule-person-chip-color-popover/);
   assert.match(adminJs, /chipBgColor/);

@@ -70,6 +70,11 @@ router.post('/api/commit-staged-sessions',
   requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
   ctrl.postCommitStagedSessions);
+router.post('/api/commit-staged-sessions/precheck',
+  requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
+  requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
+  ctrl.postCommitStagedSessionsPrecheck);
 
 const enrollStudentsRollingAccess = [
   requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
@@ -106,6 +111,14 @@ router.post('/api/enroll-students/program-registrations/finalize',
   ...enrollStudentsProgramAccess,
   trackActionState(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.CREATE, enrollStudentsProgramMutationActionState),
   ctrl.postEnrollStudentsProgramRegistrationFinalize);
+router.post('/api/enroll-students/validate-pending-commit',
+  ...enrollStudentsRollingAccess,
+  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
+  ctrl.postValidatePendingEnrollmentsCommit);
+router.post('/api/enroll-students/execute-pending-commit',
+  ...enrollStudentsRollingAccess,
+  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
+  ctrl.postExecutePendingEnrollmentsCommit);
 
 router.get('/api/session-management-policy',
   requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),

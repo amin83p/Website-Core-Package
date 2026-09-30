@@ -44,6 +44,9 @@ function buildMasterScheduleViewerClientConfig({
     api: {
       viewerPreferences: '/school/schedules/api/viewer-preferences',
       commitStagedSessions: '/school/schedules/api/commit-staged-sessions',
+      commitStagedSessionsPrecheck: '/school/schedules/api/commit-staged-sessions/precheck',
+      validatePendingEnrollmentsCommit: '/school/schedules/api/enroll-students/validate-pending-commit',
+      executePendingEnrollmentsCommit: '/school/schedules/api/enroll-students/execute-pending-commit',
       updateClassSessionSchedule: '/school/schedules/api/update-class-session-schedule',
       sessionManagementPolicy: '/school/schedules/api/session-management-policy',
       updateClassSessionStatus: '/school/schedules/api/update-class-session-status',

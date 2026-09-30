@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const root = path.join(__dirname, '..');
+const repoRoot = path.join(root, '..', '..');
 const scheduleEnrollStudentsService = require('../MVC/services/school/scheduleEnrollStudentsService');
 const schoolDataService = require('../MVC/services/school/schoolDataService');
 
@@ -49,11 +50,49 @@ test('master schedule viewer wires enroll students rail handler', () => {
   assert.match(enroll, /bindEnrollStudentsRail\?\.\(startEnrollStudentsFlow\)/);
 });
 
-test('staging commit sends pendingEnrollments from schedule state', () => {
+test('staging save opens draft work selection modal instead of inline commit', () => {
   const staging = read('public/scripts/masterScheduleViewerStaging.js');
-  assert.match(staging, /pendingEnrollments/);
-  assert.match(staging, /getPendingEnrollStudentsForClass/);
-  assert.match(staging, /clearPendingEnrollStudentsForClass/);
+  assert.match(staging, /MasterScheduleDraftSaveWork\.openSaveDraftWorkModal/);
+  assert.doesNotMatch(staging, /pendingEnrollments:\s*pendingEnrollments/);
+});
+
+test('staged save orchestration is wired for admin master schedule', () => {
+  const viewer = read('public/scripts/masterScheduleViewer.js');
+  const personSchedule = read('MVC/views/school/schedule/personSchedule.ejs');
+  const draftWork = read('public/scripts/masterScheduleDraftSaveWork.js');
+  const orchestrator = read('public/scripts/masterScheduleDraftSaveOrchestrator.js');
+  const modal = read('MVC/views/school/schedule/partials/scheduleSaveDraftWorkModal.ejs');
+  const routeSource = read('MVC/routes/scheduleRoutes.js');
+  const clientConfig = read('MVC/services/school/masterScheduleViewerClientConfig.js');
+  assert.match(personSchedule, /scheduleSaveDraftWorkModal/);
+  assert.match(personSchedule, /masterScheduleDraftSaveWork\.js/);
+  assert.match(personSchedule, /masterScheduleDraftSaveOrchestrator\.js/);
+  assert.match(viewer, /MasterScheduleDraftSaveOrchestrator\.install/);
+  assert.match(viewer, /MasterScheduleDraftSaveWork\.install/);
+  assert.match(viewer, /SCHEDULE_COMMIT_STAGED_PRECHECK_API/);
+  assert.match(draftWork, /canSelectEnrollmentRow/);
+  assert.match(draftWork, /openSaveDraftWorkModal/);
+  assert.match(orchestrator, /runSelectedDraftSave/);
+  assert.match(orchestrator, /global\.location\.reload/);
+  assert.match(modal, /btn_scheduleSaveDraftWorkApply/);
+  assert.match(modal, /schedule-save-draft-work-modal/);
+  assert.match(draftWork, /buildStagedSessionsCalendarHtml/);
+  assert.match(draftWork, /draft-save-cal-grid/);
+  assert.match(draftWork, /data-staged-session-ids/);
+  assert.doesNotMatch(draftWork, /js-draft-save-session/);
+  const pkgAdminCss = read('public/styles/schedule-viewer-admin.css');
+  const servedAdminCss = fs.readFileSync(path.join(repoRoot, 'public/styles/schedule-viewer-admin.css'), 'utf8');
+  assert.match(pkgAdminCss, /draft-save-cal-grid/);
+  assert.equal(pkgAdminCss, servedAdminCss);
+  assert.match(draftWork, /draft-save-enrollment-summary-line1/);
+  assert.match(draftWork, /js-draft-save-enrollment-remove/);
+  assert.match(draftWork, /draftSaveWorkClassAccordion/);
+  assert.match(routeSource, /\/api\/commit-staged-sessions\/precheck/);
+  assert.match(routeSource, /postCommitStagedSessionsPrecheck/);
+  assert.match(routeSource, /\/api\/enroll-students\/validate-pending-commit/);
+  assert.match(routeSource, /\/api\/enroll-students\/execute-pending-commit/);
+  assert.match(clientConfig, /commitStagedSessionsPrecheck/);
+  assert.match(clientConfig, /validatePendingEnrollmentsCommit/);
 });
 
 test('parseSessionsFromBody rejects insufficient sessions', () => {
@@ -167,6 +206,105 @@ test('parsePendingEnrollmentsFromBody normalizes student entries', () => {
   assert.equal(rows[0].studentId, 'STU/1');
 });
 
+test('validatePendingEnrollmentsProgramRegistration rejects registration after first session', async () => {
+  const originalGetById = schoolDataService.getDataById;
+  const originalGetSessions = schoolDataService.getClassSessions;
+  const originalFetch = schoolDataService.fetchData;
+  const classData = {
+    id: 'CLASS/1',
+    orgId: 'ORG-1',
+    registrationMode: 'rolling',
+    allowedProgramTerms: [{ programId: 'PROG/1', programName: 'Program A' }]
+  };
+  schoolDataService.getDataById = async (entityType) => {
+    if (entityType === 'students') {
+      return { id: 'STU/1', orgId: 'ORG-1', name: 'Student One' };
+    }
+    return null;
+  };
+  schoolDataService.getClassSessions = async () => ([
+    { sessionId: 'SES/1', date: '2026-04-01' },
+    { sessionId: 'SES/2', date: '2026-04-08' }
+  ]);
+  schoolDataService.fetchData = async (entityType) => {
+    if (entityType !== 'studentProgramRegistrations') return [];
+    return [{
+      id: 'REG/1',
+      orgId: 'ORG-1',
+      programId: 'PROG/1',
+      status: 'registered',
+      registrationDate: '2026-04-10'
+    }];
+  };
+  try {
+    const result = await scheduleEnrollStudentsService.validatePendingEnrollmentsProgramRegistration({
+      classData,
+      pendingEnrollments: [{
+        studentId: 'STU/1',
+        studentLabel: 'Student One',
+        selectedSessionIds: ['SES/1', 'SES/2']
+      }],
+      reqUser: { id: 'USER-1', activeOrgId: 'ORG-1' },
+      accessContext: {}
+    });
+    assert.equal(result.ok, false);
+    assert.match(result.issues[0].message, /after the first selected session/i);
+  } finally {
+    schoolDataService.getDataById = originalGetById;
+    schoolDataService.getClassSessions = originalGetSessions;
+    schoolDataService.fetchData = originalFetch;
+  }
+});
+
+test('validatePendingEnrollmentsProgramRegistration passes when registration is on or before first session', async () => {
+  const originalGetById = schoolDataService.getDataById;
+  const originalGetSessions = schoolDataService.getClassSessions;
+  const originalFetch = schoolDataService.fetchData;
+  const classData = {
+    id: 'CLASS/1',
+    orgId: 'ORG-1',
+    registrationMode: 'rolling',
+    allowedProgramTerms: [{ programId: 'PROG/1', programName: 'Program A' }]
+  };
+  schoolDataService.getDataById = async (entityType) => {
+    if (entityType === 'students') {
+      return { id: 'STU/1', orgId: 'ORG-1', name: 'Student One' };
+    }
+    return null;
+  };
+  schoolDataService.getClassSessions = async () => ([
+    { sessionId: 'SES/1', date: '2026-04-05' }
+  ]);
+  schoolDataService.fetchData = async (entityType) => {
+    if (entityType !== 'studentProgramRegistrations') return [];
+    return [{
+      id: 'REG/1',
+      orgId: 'ORG-1',
+      programId: 'PROG/1',
+      status: 'registered',
+      registrationDate: '2026-04-01'
+    }];
+  };
+  try {
+    const result = await scheduleEnrollStudentsService.validatePendingEnrollmentsProgramRegistration({
+      classData,
+      pendingEnrollments: [{
+        studentId: 'STU/1',
+        studentLabel: 'Student One',
+        selectedSessionIds: ['SES/1']
+      }],
+      reqUser: { id: 'USER-1', activeOrgId: 'ORG-1' },
+      accessContext: {}
+    });
+    assert.equal(result.ok, true);
+    assert.deepEqual(result.issues, []);
+  } finally {
+    schoolDataService.getDataById = originalGetById;
+    schoolDataService.getClassSessions = originalGetSessions;
+    schoolDataService.fetchData = originalFetch;
+  }
+});
+
 test('rollingEnrollmentGroupClient builds session_cap payload', () => {
   const client = require('../public/scripts/rollingEnrollmentGroupClient.js');
   const payload = client.buildGroupEnginePayload('CLASS/1', 'STU/1', {
@@ -195,12 +333,16 @@ test('draft enrollment manage UI is wired in viewer, staging, and modals', () =>
   assert.match(menuPartial, /btn_scheduleDraftContextManagePendingEnrollmentsBulk/);
   assert.match(modals, /scheduleEnrollPendingManageModal/);
   assert.match(viewer, /buildScheduleDraftEnrollmentBadge/);
+  assert.match(viewer, /stripDraftSessionSoloDisplayForPendingEnrollments/);
+  assert.match(viewer, /suppressSoloForPendingDraftEnrollment/);
   assert.match(viewer, /canManagePendingEnrollmentsForDraftContext/);
   assert.match(viewer, /pendingEnrollMetaByClassId/);
   assert.match(staging, /openPendingEnrollmentManageModal/);
-  assert.match(staging, /classHasPendingEnrollments/);
   assert.match(staging, /prunePendingEnrollmentsForClass/);
   assert.match(enroll, /openPendingEnrollmentManageModal/);
   assert.match(enroll, /setPendingEnrollMetaForClass/);
+  assert.match(enroll, /storePendingEnrollmentDraft[\s\S]*refreshScheduleViewWithHolidays/);
+  assert.match(enroll, /status === 'draft'/);
+  assert.match(enroll, /enrollLocked/);
   assert.match(calendar, /buildScheduleDraftEnrollmentBadge/);
 });

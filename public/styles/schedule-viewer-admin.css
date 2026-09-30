@@ -48,3 +48,300 @@
     border-color: var(--schedule-person-tab-border);
     box-shadow: 0 0 0 2px var(--schedule-person-tab-text), 0 0.35rem 0.9rem rgba(15, 23, 42, 0.16);
 }
+
+/* Save staged work modal */
+.schedule-save-draft-work-modal .modal-content {
+    border: 0;
+    box-shadow: 0 1rem 2.5rem rgba(15, 23, 42, 0.18);
+}
+.schedule-save-draft-work-modal .modal-body {
+    max-height: min(72vh, 680px);
+    padding-top: 0.75rem;
+}
+.schedule-save-draft-work-body .accordion {
+    --bs-accordion-border-width: 0;
+    --bs-accordion-btn-padding-x: 0.85rem;
+    --bs-accordion-body-padding-x: 0.85rem;
+}
+.schedule-save-draft-work-body .schedule-save-draft-class {
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.65rem;
+    overflow: hidden;
+    margin-bottom: 0.65rem;
+    background: #fff;
+}
+.schedule-save-draft-work-body .schedule-save-draft-class:last-child {
+    margin-bottom: 0;
+}
+.schedule-save-draft-work-body .schedule-save-draft-class > .accordion-header .accordion-button {
+    font-size: 0.95rem;
+    padding-top: 0.7rem;
+    padding-bottom: 0.7rem;
+}
+.schedule-save-draft-work-body .accordion-button:not(.collapsed) {
+    background: #f8fafc;
+    color: inherit;
+    box-shadow: none;
+}
+.schedule-save-draft-work-body .accordion-button:focus {
+    box-shadow: 0 0 0 0.15rem rgba(var(--bs-primary-rgb), 0.2);
+}
+.draft-save-class-meta {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--bs-secondary-color);
+}
+.draft-save-section-panel {
+    background: #f8fafc;
+    border-radius: 0.5rem;
+    margin: 0 0.15rem 0.35rem;
+}
+.draft-save-nested-accordion .accordion-item {
+    background: transparent;
+}
+.draft-save-nested-accordion .accordion-button {
+    font-size: 0.84rem;
+    font-weight: 600;
+    padding-top: 0.45rem;
+    padding-bottom: 0.45rem;
+    background: transparent;
+}
+.draft-save-nested-accordion .accordion-button:not(.collapsed) {
+    background: transparent;
+}
+
+/* Staged sessions — month calendar (read-only) */
+#scheduleSaveDraftWorkModal .draft-save-calendar-host {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+}
+#scheduleSaveDraftWorkModal .draft-save-month-block {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.55rem;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+#scheduleSaveDraftWorkModal .draft-save-month-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    padding: 0.45rem 0.65rem;
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    border-bottom: 1px solid #e2e8f0;
+    color: #0f172a;
+}
+#scheduleSaveDraftWorkModal .draft-save-cal-grid {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
+    gap: 1px;
+    background: #e2e8f0;
+}
+#scheduleSaveDraftWorkModal .draft-save-cal-dow {
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    text-align: center;
+    padding: 0.35rem 0.15rem;
+    background: #f8fafc;
+    color: #64748b;
+}
+#scheduleSaveDraftWorkModal .draft-save-cal-cell {
+    min-height: 4.25rem;
+    background: #fff;
+    padding: 0.25rem 0.3rem 0.35rem;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.2rem;
+}
+#scheduleSaveDraftWorkModal .draft-save-cal-cell.is-outside {
+    background: #f8fafc;
+    min-height: 2rem;
+}
+#scheduleSaveDraftWorkModal .draft-save-cal-cell.has-sessions {
+    background: linear-gradient(180deg, rgba(var(--bs-primary-rgb), 0.04) 0%, #fff 45%);
+}
+#scheduleSaveDraftWorkModal .draft-save-cal-day-num {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #334155;
+    line-height: 1.1;
+}
+#scheduleSaveDraftWorkModal .draft-save-cal-session-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.15rem;
+    flex: 1;
+    min-height: 0;
+}
+#scheduleSaveDraftWorkModal .draft-save-cal-session-chip {
+    display: block;
+    font-size: 0.62rem;
+    font-weight: 600;
+    line-height: 1.25;
+    padding: 0.12rem 0.28rem;
+    border-radius: 0.25rem;
+    background: rgba(var(--bs-primary-rgb), 0.12);
+    color: #1e40af;
+    border: 1px solid rgba(var(--bs-primary-rgb), 0.22);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+#scheduleSaveDraftWorkModal .draft-save-cal-empty {
+    padding: 0.5rem 0.25rem;
+}
+
+.draft-save-session-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(9.5rem, 1fr));
+    gap: 0.5rem;
+}
+.draft-save-session-tile {
+    position: relative;
+    display: block;
+    margin: 0;
+    cursor: pointer;
+    user-select: none;
+}
+.draft-save-session-tile-inner {
+    display: flex;
+    align-items: stretch;
+    gap: 0.55rem;
+    min-height: 4.75rem;
+    padding: 0.45rem 0.5rem 0.45rem 0.45rem;
+    border: 1px solid #dbe3ec;
+    border-radius: 0.55rem;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
+}
+.draft-save-session-tile:hover .draft-save-session-tile-inner {
+    border-color: rgba(var(--bs-primary-rgb), 0.45);
+    box-shadow: 0 0.2rem 0.55rem rgba(15, 23, 42, 0.08);
+}
+.draft-save-session-tile.is-checked .draft-save-session-tile-inner {
+    border-color: rgba(var(--bs-success-rgb), 0.55);
+    box-shadow: 0 0 0 2px rgba(var(--bs-success-rgb), 0.12);
+    background: linear-gradient(180deg, rgba(var(--bs-success-rgb), 0.06) 0%, #fff 55%);
+}
+.draft-save-session-tile .draft-save-session-check {
+    position: absolute;
+    top: 0.35rem;
+    right: 0.35rem;
+    margin: 0;
+    z-index: 1;
+}
+.draft-save-session-cal {
+    flex: 0 0 3rem;
+    width: 3rem;
+    border-radius: 0.4rem;
+    overflow: hidden;
+    text-align: center;
+    border: 1px solid #dbeafe;
+    background: #fff;
+    line-height: 1;
+}
+.draft-save-session-cal-month {
+    display: block;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #fff;
+    background: linear-gradient(180deg, #3b82f6 0%, #2563eb 100%);
+    padding: 0.2rem 0.15rem;
+}
+.draft-save-session-cal-day {
+    display: block;
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: #0f172a;
+    padding: 0.28rem 0.1rem 0.32rem;
+}
+.draft-save-session-tile-body {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding-right: 1.1rem;
+}
+.draft-save-session-weekday {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #334155;
+}
+.draft-save-session-time {
+    font-size: 0.72rem;
+    color: var(--bs-secondary-color);
+    margin-top: 0.2rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.draft-save-session-time i {
+    margin-right: 0.15rem;
+    opacity: 0.85;
+}
+.draft-save-enrollment-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+}
+.draft-save-enrollment-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.35rem 0.5rem;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.5rem;
+    background: #fff;
+}
+.draft-save-enrollment-row.is-disabled {
+    opacity: 0.65;
+    background: #f1f5f9;
+}
+.draft-save-enrollment-row-main {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem;
+    flex: 1;
+    min-width: 0;
+}
+.draft-save-enrollment-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 0.12rem;
+    min-width: 0;
+    cursor: pointer;
+    margin: 0;
+}
+.draft-save-enrollment-student {
+    font-weight: 700;
+    font-size: 0.88rem;
+    color: #0f172a;
+    line-height: 1.25;
+}
+.draft-save-enrollment-summary-line1,
+.draft-save-enrollment-summary-line2 {
+    display: block;
+    font-size: 0.76rem;
+    line-height: 1.35;
+    color: var(--bs-secondary-color);
+}
+.draft-save-enrollment-summary-line2 {
+    font-size: 0.72rem;
+}
+.draft-save-enrollment-remove {
+    flex-shrink: 0;
+    line-height: 1;
+}
+.draft-save-enrollment-hint {
+    font-size: 0.72rem;
+    color: var(--bs-danger);
+    padding-left: 1.65rem;
+}

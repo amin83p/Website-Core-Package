@@ -325,16 +325,17 @@ test('evaluateEnrollmentGapBatchConflicts is available after scheduleController 
 });
 
 test('postCommitStagedSessions uses lightweight master schedule conflict path', () => {
+  const stagedCommitSource = fs.readFileSync(
+    path.join(__dirname, '../MVC/services/school/scheduleStagedCommitService.js'),
+    'utf8'
+  );
   const controllerSource = fs.readFileSync(
     path.join(__dirname, '../MVC/controllers/school/scheduleController.js'),
     'utf8'
   );
-  assert.match(controllerSource, /evaluateMasterScheduleStagedSessionConflicts/);
-  const commitBlock = controllerSource.slice(
-    controllerSource.indexOf('async function postCommitStagedSessions'),
-    controllerSource.indexOf('function parseBulkDeleteSessionsFromBody')
-  );
-  assert.doesNotMatch(commitBlock, /evaluateEnrollmentGapBatchConflicts/);
+  assert.match(stagedCommitSource, /evaluateMasterScheduleStagedSessionConflicts/);
+  assert.doesNotMatch(stagedCommitSource, /evaluateEnrollmentGapBatchConflicts/);
+  assert.match(controllerSource, /scheduleStagedCommitService\.precheckStagedSessionsForCommit/);
 });
 
 test('postCommitStagedSessions returns viewer events for created sessions', () => {
@@ -494,16 +495,17 @@ test('commitStagedSessions creates same-day session when times do not overlap', 
 });
 
 test('postCommitStagedSessions blocks duplicate class dates before commit', () => {
+  const stagedCommitSource = fs.readFileSync(
+    path.join(__dirname, '../MVC/services/school/scheduleStagedCommitService.js'),
+    'utf8'
+  );
   const controllerSource = fs.readFileSync(
     path.join(__dirname, '../MVC/controllers/school/scheduleController.js'),
     'utf8'
   );
-  const commitBlock = controllerSource.slice(
-    controllerSource.indexOf('async function postCommitStagedSessions'),
-    controllerSource.indexOf('function parseBulkDeleteSessionsFromBody')
-  );
-  assert.match(commitBlock, /findDuplicateClassSessionConflicts/);
-  assert.match(commitBlock, /buildDuplicateClassDateMessage/);
+  assert.match(stagedCommitSource, /findDuplicateClassSessionConflicts/);
+  assert.match(stagedCommitSource, /buildDuplicateClassDateMessage/);
+  assert.match(controllerSource, /scheduleStagedCommitService\.precheckStagedSessionsForCommit/);
 });
 
 test('class edit form normalizes session dates for session builder display', () => {
@@ -557,10 +559,13 @@ test('commitStagedSessions returns createdCount 0 when dates already exist', asy
 test('master schedule UI keeps drafts on zero-created save and uses commit timeout', () => {
   const { readMasterScheduleViewerJs } = require('./helpers/scheduleViewerSource');
   const source = readMasterScheduleViewerJs();
+  const orchestrator = fs.readFileSync(
+    path.join(__dirname, '..', 'public/scripts/masterScheduleDraftSaveOrchestrator.js'),
+    'utf8'
+  );
   assert.match(source, /fetchWithScheduleTimeout/);
   assert.match(source, /SCHEDULE_COMMIT_TIMEOUT_MS/);
-  assert.match(source, /if \(createdCount > 0\)/);
-  assert.match(source, /Nothing Saved|No new sessions were saved/);
+  assert.match(orchestrator, /if \(createdCount > 0\)/);
   assert.match(source, /bindScheduleDraftUnloadGuard/);
   const unloadGuardBlock = source.slice(
     source.indexOf('function bindScheduleDraftUnloadGuard'),
@@ -570,4 +575,17 @@ test('master schedule UI keeps drafts on zero-created save and uses commit timeo
   assert.match(source, /restoreScheduleDraftBackup/);
   assert.match(source, /schedulePersistDraftBackup/);
   assert.match(source, /SCHEDULE_DRAFT_BACKUP_KEY/);
+});
+
+test('scheduleStagedCommitService and precheck controller hook exist', () => {
+  const stagedCommit = require('../MVC/services/school/scheduleStagedCommitService');
+  assert.equal(typeof stagedCommit.precheckStagedSessionsForCommit, 'function');
+  assert.equal(typeof stagedCommit.commitStagedSessionsToClass, 'function');
+  const controllerSource = fs.readFileSync(
+    path.join(__dirname, '..', 'MVC/controllers/school/scheduleController.js'),
+    'utf8'
+  );
+  assert.match(controllerSource, /postCommitStagedSessionsPrecheck/);
+  assert.match(controllerSource, /postValidatePendingEnrollmentsCommit/);
+  assert.match(controllerSource, /postExecutePendingEnrollmentsCommit/);
 });

@@ -339,7 +339,243 @@ async function finalizeProgramRegistration({
 function parsePendingEnrollmentsFromBody(body = {}) {
   const raw = body?.pendingEnrollments ?? body?.pendingEnrollmentDrafts;
   if (!Array.isArray(raw)) return [];
-  return raw.map((row) => ({ ...(row || {}) })).filter((row) => toPublicId(row?.studentId));
+  return raw.map((row) => ({ ...(row || {}) })).filter((row) => pendingEntryStudentId(row));
+}
+
+function pendingEntryStudentId(entry = {}) {
+  return toPublicId(entry?.studentId || entry?.students?.[0]?.studentId);
+}
+
+function pendingEntryStudentLabel(entry = {}) {
+  const label = String(entry?.studentLabel || '').trim();
+  if (label) return label;
+  return pendingEntryStudentId(entry);
+}
+
+async function resolveFirstSessionDateForSelectedIds(classData, selectedSessionIds, reqUser) {
+  const idSet = new Set(
+    (Array.isArray(selectedSessionIds) ? selectedSessionIds : [])
+      .map((id) => toPublicId(id))
+      .filter(Boolean)
+  );
+  if (!idSet.size) return '';
+  const sessions = await schoolDataService.getClassSessions(classData.id, reqUser);
+  const dates = (Array.isArray(sessions) ? sessions : [])
+    .filter((row) => idSet.has(toPublicId(row?.sessionId || row?.id)))
+    .map((row) => normalizeDateOnly(row?.date))
+    .filter(Boolean)
+    .sort();
+  return dates[0] || '';
+}
+
+async function validatePendingEnrollmentsProgramRegistration({
+  classData,
+  pendingEnrollments,
+  reqUser,
+  accessContext
+}) {
+  const issues = [];
+  const choices = buildRollingProgramChoices(classData);
+  const allowedProgramIds = new Set(choices.map((c) => c.programId));
+
+  for (const entry of Array.isArray(pendingEnrollments) ? pendingEnrollments : []) {
+    const studentId = pendingEntryStudentId(entry);
+    if (!studentId) continue;
+    const studentLabel = pendingEntryStudentLabel(entry);
+    const selectedSessionIds = Array.isArray(entry?.selectedSessionIds) ? entry.selectedSessionIds : [];
+    const firstSessionDate = await resolveFirstSessionDateForSelectedIds(classData, selectedSessionIds, reqUser);
+    if (!firstSessionDate) {
+      issues.push({
+        studentId,
+        studentLabel,
+        code: 'missing_sessions',
+        message: `Could not find class sessions for the selected enrollment dates (${studentLabel}).`,
+        remediation: 'Include all linked staged sessions in your save selection, save staged sessions first, then retry enrollments.'
+      });
+      continue;
+    }
+    const student = await schoolDataService.getDataById('students', studentId, reqUser, accessContext);
+    if (!student) {
+      issues.push({
+        studentId,
+        studentLabel,
+        code: 'student_not_found',
+        message: `Student ${studentLabel} was not found.`,
+        remediation: 'Remove this enrollment from your selection or choose a valid student using Enroll Students.'
+      });
+      continue;
+    }
+    const registration = await findApprovedProgramRegistration(classData, student, reqUser);
+    if (!registration) {
+      issues.push({
+        studentId,
+        studentLabel,
+        code: 'program_registration_missing',
+        message: `No approved program registration is on file for ${studentLabel}.`,
+        remediation: 'Open Enroll Students, complete program registration for this student, queue the draft again, then retry saving.'
+      });
+      continue;
+    }
+    if (!allowedProgramIds.has(registration.programId)) {
+      issues.push({
+        studentId,
+        studentLabel,
+        code: 'program_not_allowed',
+        message: `Program registration for ${studentLabel} (${registration.label || registration.programId}) is no longer allowed for this class.`,
+        remediation: 'Update the student\'s program registration to an allowed program for this class, then retry.'
+      });
+      continue;
+    }
+    if (registration.registrationDate && firstSessionDate && registration.registrationDate > firstSessionDate) {
+      issues.push({
+        studentId,
+        studentLabel,
+        code: 'registration_date_after_session',
+        message: `Program registration date (${registration.registrationDate}) is after the first selected session (${firstSessionDate}) for ${studentLabel}.`,
+        remediation: 'Correct the program registration date so it is on or before the first session date, then retry.'
+      });
+    }
+  }
+
+  return issues.length ? { ok: false, issues } : { ok: true, issues: [] };
+}
+
+async function validatePendingEnrollmentsClassEnrollment({
+  classData,
+  pendingEnrollments,
+  reqUser,
+  accessContext
+}) {
+  const rollingEnrollmentEngineService = require('./rollingEnrollmentEngineService');
+  const issues = [];
+  const classId = toPublicId(classData?.id);
+
+  for (const entry of Array.isArray(pendingEnrollments) ? pendingEnrollments : []) {
+    const studentId = pendingEntryStudentId(entry);
+    if (!studentId) continue;
+    const studentLabel = pendingEntryStudentLabel(entry);
+    const selectedSessionIds = Array.isArray(entry?.selectedSessionIds) ? entry.selectedSessionIds : [];
+    try {
+      const rawRequest = {
+        classId,
+        ...entry,
+        studentId,
+        pendingStagedSessions: []
+      };
+      const normalized = rollingEnrollmentEngineService.normalizeEnrollmentEngineRequest(rawRequest, classData);
+      await rollingEnrollmentEngineService.assertEnrollmentAlignmentForCreate(classData, normalized, reqUser);
+
+      const sessions = await schoolDataService.getClassSessions(classData.id, reqUser);
+      const idSet = new Set(selectedSessionIds.map((id) => toPublicId(id)).filter(Boolean));
+      const capSessions = (Array.isArray(sessions) ? sessions : [])
+        .filter((row) => idSet.has(toPublicId(row?.sessionId || row?.id)))
+        .map((row) => ({
+          classId,
+          sessionId: toPublicId(row?.sessionId || row?.id),
+          date: normalizeDateOnly(row?.date),
+          start: String(row?.startTime || row?.start || '').trim(),
+          end: String(row?.endTime || row?.end || '').trim()
+        }))
+        .filter((row) => row.sessionId && row.date);
+      if (capSessions.length) {
+        const capResult = await checkOneOnOneSessionOccupancy({
+          classData,
+          sessions: capSessions,
+          reqUser
+        });
+        if (capResult?.blocked) {
+          const conflict = (capResult.conflicts || [])[0];
+          issues.push({
+            studentId,
+            studentLabel,
+            code: 'session_capacity',
+            message: conflict
+              ? `Session capacity conflict for ${studentLabel} on ${conflict.date || 'a selected session'}.`
+              : `Session capacity conflict for ${studentLabel}.`,
+            remediation: 'Remove occupied sessions from the enrollment selection, choose different sessions, or adjust enrollments on those sessions before retrying.'
+          });
+        }
+      }
+    } catch (error) {
+      issues.push({
+        studentId,
+        studentLabel,
+        code: 'enrollment_validation',
+        message: error.message || `Class enrollment check failed for ${studentLabel}.`,
+        remediation: 'Review enrollment dates, session targets, and class rules in Enroll Students, update the draft, then retry saving.'
+      });
+    }
+  }
+
+  return issues.length ? { ok: false, issues } : { ok: true, issues: [] };
+}
+
+async function validatePendingEnrollmentsForCommit({
+  classData,
+  pendingEnrollments,
+  reqUser,
+  accessContext
+}) {
+  const programResult = await validatePendingEnrollmentsProgramRegistration({
+    classData,
+    pendingEnrollments,
+    reqUser,
+    accessContext
+  });
+  if (!programResult.ok) {
+    return { ok: false, step: 'programRegistration', issues: programResult.issues };
+  }
+  const enrollmentResult = await validatePendingEnrollmentsClassEnrollment({
+    classData,
+    pendingEnrollments,
+    reqUser,
+    accessContext
+  });
+  if (!enrollmentResult.ok) {
+    return { ok: false, step: 'classEnrollment', issues: enrollmentResult.issues };
+  }
+  return { ok: true, issues: [] };
+}
+
+async function executePendingEnrollmentsForCommit({
+  classData,
+  pendingEnrollments,
+  reqUser,
+  req,
+  buildEngineHooks
+}) {
+  const rollingEnrollmentEngineService = require('./rollingEnrollmentEngineService');
+  const classId = toPublicId(classData?.id);
+  const hooks = typeof buildEngineHooks === 'function' ? buildEngineHooks(req, classData) : {};
+  let refreshedClass = classData;
+
+  for (const entry of Array.isArray(pendingEnrollments) ? pendingEnrollments : []) {
+    const studentId = pendingEntryStudentId(entry);
+    if (!studentId) continue;
+    refreshedClass = await schoolDataService.getDataById('classes', classId, reqUser, schoolDataService.buildRouteAccessContext(req))
+      || refreshedClass;
+    const engineResult = await rollingEnrollmentEngineService.execute({
+      classData: refreshedClass,
+      reqUser,
+      rawRequest: {
+        classId,
+        ...entry,
+        studentId,
+        pendingStagedSessions: []
+      },
+      hooks
+    });
+    if (engineResult?.summary?.failed > 0) {
+      const failRow = (engineResult.results || []).find((row) => row?.ok === false);
+      const error = new Error(failRow?.message || `Enrollment failed for student ${studentId}.`);
+      error.step = 'applyEnrollment';
+      error.studentId = studentId;
+      error.remediation = 'Fix the enrollment issue shown, update the draft if needed, and retry from Save staged work.';
+      throw error;
+    }
+  }
+
+  return { ok: true, classData: refreshedClass };
 }
 
 module.exports = {
@@ -350,7 +586,12 @@ module.exports = {
   buildProgramRegistrationRows,
   finalizeProgramRegistration,
   parsePendingEnrollmentsFromBody,
+  pendingEntryStudentId,
   buildRollingProgramChoices,
   summarizeSessionWindow,
-  normalizeDateOnly
+  normalizeDateOnly,
+  validatePendingEnrollmentsProgramRegistration,
+  validatePendingEnrollmentsClassEnrollment,
+  validatePendingEnrollmentsForCommit,
+  executePendingEnrollmentsForCommit
 };

@@ -22,6 +22,7 @@ const classSessionCapacityService = require('../../services/school/classSessionC
 const scheduleSessionContextService = require('../../services/school/scheduleSessionContextService');
 const scheduleViewerPreferencesService = require('../../services/school/scheduleViewerPreferencesService');
 const scheduleEnrollStudentsService = require('../../services/school/scheduleEnrollStudentsService');
+const scheduleStagedCommitService = require('../../services/school/scheduleStagedCommitService');
 const { buildMasterScheduleViewerClientConfig } = require('../../services/school/masterScheduleViewerClientConfig');
 const holidayController = require('./holidayController');
 const rollingEnrollmentSessionAlignmentService = require('../../services/school/rollingEnrollmentSessionAlignmentService');
@@ -2468,94 +2469,35 @@ async function getSessionEnrollmentList(req, res) {
 async function postCommitStagedSessions(req, res) {
     try {
         const classId = normalizeId(req.body?.classId);
-        if (!classId) throw new Error('classId is required.');
         const personId = normalizeId(req.body?.personId);
+        if (!classId) throw new Error('classId is required.');
         if (!personId) throw new Error('personId is required.');
 
-        const capabilities = await scheduleAccessService.buildScheduleCapabilities(req.user, {
-            accessScope: req?.accessScope || '',
-            ipAddress: req?.ip || ''
+        const { accessContext, classData } = await scheduleStagedCommitService.assertMasterScheduleStagedCommitAccess(req, {
+            classId,
+            personId
         });
-        if (!capabilities.canDragCreateSessions) {
-            throw new Error('You do not have permission to save staged sessions from Master Schedule.');
-        }
-
-        const accessContext = schoolDataService.buildRouteAccessContext(req);
-        const classData = await schoolDataService.getDataById('classes', classId, req.user, accessContext);
-        if (!classData) throw new Error('Class not found.');
-        if (!isUserInstructorOnClass(classData, personId)) {
-            throw new Error('Selected person is not an instructor on this class.');
-        }
 
         const pendingStagedSessions = rollingEnrollmentSessionAlignmentService.parsePendingStagedSessions(req.body);
         if (!pendingStagedSessions.length) {
             throw new Error('No staged sessions to save.');
         }
 
-        const duplicateClassConflicts = await rollingEnrollmentSessionAlignmentService.findDuplicateClassSessionConflicts({
+        await scheduleStagedCommitService.precheckStagedSessionsForCommit({
             classData,
-            sessionsToAdd: pendingStagedSessions,
+            personId,
+            pendingStagedSessions,
             reqUser: req.user
         });
-        if (duplicateClassConflicts.length) {
-            throw new Error(rollingEnrollmentSessionAlignmentService.buildDuplicateClassDateMessage(duplicateClassConflicts));
-        }
-
-        // Lazy require avoids circular dependency:
-        // scheduleController -> sessionConflictDetectionService -> scheduleController
-        const sessionConflictDetectionService = require('../../services/school/sessionConflictDetectionService');
-        const conflictResult = await sessionConflictDetectionService.evaluateMasterScheduleStagedSessionConflicts({
-            classData,
-            proposedSessions: pendingStagedSessions,
-            teacherId: personId,
-            reqUser: req.user
-        });
-        if (conflictResult.hasConflicts) {
-            throw new Error(sessionConflictDetectionService.buildConflictBlockingMessage(conflictResult.allConflicts));
-        }
 
         const extendCycleEndDate = req.body?.extendCycleEndDate === true
             || String(req.body?.extendCycleEndDate || '').trim().toLowerCase() === 'true';
-        const appendResult = await rollingEnrollmentSessionAlignmentService.commitStagedSessions({
+        const appendResult = await scheduleStagedCommitService.commitStagedSessionsToClass({
             classData,
-            sessionsToAdd: pendingStagedSessions,
+            pendingStagedSessions,
             extendCycleEndDate,
             reqUser: req.user
         });
-
-        const pendingEnrollments = scheduleEnrollStudentsService.parsePendingEnrollmentsFromBody(req.body);
-        const enrollmentResults = [];
-        if (pendingEnrollments.length) {
-            const rollingEnrollmentEngineService = require('../../services/school/rollingEnrollmentEngineService');
-            const { buildRollingEnrollmentEngineHooks } = require('./classRollingEnrollmentController');
-            const refreshedClass = await schoolDataService.getDataById('classes', classId, req.user, accessContext) || classData;
-            for (const entry of pendingEnrollments) {
-                try {
-                    const engineResult = await rollingEnrollmentEngineService.execute({
-                        classData: refreshedClass,
-                        reqUser: req.user,
-                        rawRequest: {
-                            classId,
-                            ...entry,
-                            pendingStagedSessions: []
-                        },
-                        hooks: buildRollingEnrollmentEngineHooks(req, refreshedClass)
-                    });
-                    enrollmentResults.push({
-                        studentId: String(entry?.studentId || '').trim(),
-                        ok: engineResult?.summary?.failed === 0,
-                        summary: engineResult?.summary || null,
-                        results: engineResult?.results || []
-                    });
-                } catch (enrollmentError) {
-                    enrollmentResults.push({
-                        studentId: String(entry?.studentId || '').trim(),
-                        ok: false,
-                        error: enrollmentError.message || 'Enrollment failed.'
-                    });
-                }
-            }
-        }
 
         const createdSessions = Array.isArray(appendResult.createdSessions) ? appendResult.createdSessions : [];
         const sessionDates = [
@@ -2606,14 +2548,170 @@ async function postCommitStagedSessions(req, res) {
                 createdSessions,
                 events: commitEvents,
                 fingerprint,
-                enrollmentResults,
                 cycleEndDateExtended: appendResult.cycleEndDateExtended === true,
                 previousCycleEndDate: appendResult.previousCycleEndDate || '',
                 newCycleEndDate: appendResult.newCycleEndDate || ''
             }
         });
     } catch (error) {
-        return res.status(400).json({ status: 'error', message: error.message || 'Unable to save staged sessions.' });
+        return res.status(400).json({
+            status: 'error',
+            step: error?.step || 'saveSessions',
+            message: error.message || 'Unable to save staged sessions.',
+            remediation: error?.remediation || '',
+            issues: Array.isArray(error?.issues) ? error.issues : []
+        });
+    }
+}
+
+async function postCommitStagedSessionsPrecheck(req, res) {
+    try {
+        const classId = normalizeId(req.body?.classId);
+        const personId = normalizeId(req.body?.personId);
+        if (!classId) throw new Error('classId is required.');
+        if (!personId) throw new Error('personId is required.');
+
+        const { classData } = await scheduleStagedCommitService.assertMasterScheduleStagedCommitAccess(req, {
+            classId,
+            personId
+        });
+        const pendingStagedSessions = rollingEnrollmentSessionAlignmentService.parsePendingStagedSessions(req.body);
+        await scheduleStagedCommitService.precheckStagedSessionsForCommit({
+            classData,
+            personId,
+            pendingStagedSessions,
+            reqUser: req.user
+        });
+        return res.json({ status: 'success', message: 'No staged session conflicts detected.' });
+    } catch (error) {
+        return res.status(400).json({
+            status: 'error',
+            step: error?.step || 'sessionConflicts',
+            message: error.message || 'Staged session conflict check failed.',
+            remediation: error?.remediation || '',
+            issues: Array.isArray(error?.issues) ? error.issues : []
+        });
+    }
+}
+
+async function postValidatePendingEnrollmentsCommit(req, res) {
+    try {
+        const classId = normalizeId(req.body?.classId);
+        const personId = normalizeId(req.body?.personId);
+        if (!classId) throw new Error('classId is required.');
+        await scheduleStagedCommitService.assertMasterScheduleStagedCommitAccess(req, { classId, personId });
+
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        const classData = await schoolDataService.getDataById('classes', classId, req.user, accessContext);
+        if (!classData) throw new Error('Class not found.');
+
+        const pendingEnrollments = scheduleEnrollStudentsService.parsePendingEnrollmentsFromBody(req.body);
+        if (!pendingEnrollments.length) {
+            throw new Error('No pending enrollments to validate.');
+        }
+
+        const phase = String(req.body?.phase || 'all').trim().toLowerCase();
+        if (phase === 'programregistration' || phase === 'all') {
+            const programResult = await scheduleEnrollStudentsService.validatePendingEnrollmentsProgramRegistration({
+                classData,
+                pendingEnrollments,
+                reqUser: req.user,
+                accessContext
+            });
+            if (!programResult.ok) {
+                return res.status(400).json({
+                    status: 'error',
+                    step: 'programRegistration',
+                    message: 'Program registration validation failed for one or more students.',
+                    remediation: 'Use Enroll Students to update program registrations, then retry saving selected enrollments.',
+                    issues: programResult.issues || []
+                });
+            }
+        }
+        if (phase === 'classenrollment' || phase === 'all') {
+            const enrollmentResult = await scheduleEnrollStudentsService.validatePendingEnrollmentsClassEnrollment({
+                classData,
+                pendingEnrollments,
+                reqUser: req.user,
+                accessContext
+            });
+            if (!enrollmentResult.ok) {
+                return res.status(400).json({
+                    status: 'error',
+                    step: 'classEnrollment',
+                    message: 'Class enrollment validation failed for one or more students.',
+                    remediation: 'Review enrollment settings and session capacity, update drafts, then retry.',
+                    issues: enrollmentResult.issues || []
+                });
+            }
+        }
+
+        return res.json({ status: 'success', message: 'Pending enrollments validated.' });
+    } catch (error) {
+        return res.status(400).json({
+            status: 'error',
+            step: error?.step || 'programRegistration',
+            message: error.message || 'Unable to validate pending enrollments.',
+            remediation: error?.remediation || '',
+            issues: Array.isArray(error?.issues) ? error.issues : []
+        });
+    }
+}
+
+async function postExecutePendingEnrollmentsCommit(req, res) {
+    try {
+        const classId = normalizeId(req.body?.classId);
+        const personId = normalizeId(req.body?.personId);
+        if (!classId) throw new Error('classId is required.');
+        await scheduleStagedCommitService.assertMasterScheduleStagedCommitAccess(req, { classId, personId });
+
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        let classData = await schoolDataService.getDataById('classes', classId, req.user, accessContext);
+        if (!classData) throw new Error('Class not found.');
+
+        const pendingEnrollments = scheduleEnrollStudentsService.parsePendingEnrollmentsFromBody(req.body);
+        if (!pendingEnrollments.length) {
+            throw new Error('No pending enrollments to apply.');
+        }
+
+        const validation = await scheduleEnrollStudentsService.validatePendingEnrollmentsForCommit({
+            classData,
+            pendingEnrollments,
+            reqUser: req.user,
+            accessContext
+        });
+        if (!validation.ok) {
+            return res.status(400).json({
+                status: 'error',
+                step: validation.step || 'classEnrollment',
+                message: 'Enrollment validation failed before apply.',
+                remediation: 'Fix the reported issues and retry.',
+                issues: validation.issues || []
+            });
+        }
+
+        const { buildRollingEnrollmentEngineHooks } = require('./classRollingEnrollmentController');
+        await scheduleEnrollStudentsService.executePendingEnrollmentsForCommit({
+            classData,
+            pendingEnrollments,
+            reqUser: req.user,
+            req,
+            buildEngineHooks: buildRollingEnrollmentEngineHooks
+        });
+
+        return res.json({
+            status: 'success',
+            message: `${pendingEnrollments.length} enrollment(s) applied.`,
+            data: { appliedCount: pendingEnrollments.length }
+        });
+    } catch (error) {
+        return res.status(400).json({
+            status: 'error',
+            step: error?.step || 'applyEnrollment',
+            message: error.message || 'Unable to apply pending enrollments.',
+            remediation: error?.remediation || '',
+            issues: Array.isArray(error?.issues) ? error.issues : []
+        });
     }
 }
 
@@ -2908,6 +3006,9 @@ module.exports = {
     getSessionAttendanceList,
     getSessionEnrollmentList,
     postCommitStagedSessions,
+    postCommitStagedSessionsPrecheck,
+    postValidatePendingEnrollmentsCommit,
+    postExecutePendingEnrollmentsCommit,
     postEnrollStudentsPrepare,
     postEnrollStudentsSessionCapacityCheck,
     postEnrollStudentsStudentPickerExclusions,

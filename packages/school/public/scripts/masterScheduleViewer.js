@@ -29,6 +29,9 @@
       : {};
     const SCHEDULE_VIEWER_PREFS_API = String(cfg.api?.viewerPreferences || '/school/schedules/api/viewer-preferences');
     const SCHEDULE_COMMIT_STAGED_API = String(cfg.api?.commitStagedSessions || '/school/schedules/api/commit-staged-sessions');
+    const SCHEDULE_COMMIT_STAGED_PRECHECK_API = String(cfg.api?.commitStagedSessionsPrecheck || '/school/schedules/api/commit-staged-sessions/precheck');
+    const SCHEDULE_VALIDATE_PENDING_ENROLL_API = String(cfg.api?.validatePendingEnrollmentsCommit || '/school/schedules/api/enroll-students/validate-pending-commit');
+    const SCHEDULE_EXECUTE_PENDING_ENROLL_API = String(cfg.api?.executePendingEnrollmentsCommit || '/school/schedules/api/enroll-students/execute-pending-commit');
     const SCHEDULE_COMMIT_TIMEOUT_MS = Number(cfg.constants?.commitTimeoutMs) || 120000;
     const SCHEDULE_DRAFT_BACKUP_KEY = String(cfg.constants?.draftBackupKey || 'schoolMasterViewer.scheduleDraftBackup');
     const SCHEDULE_UPDATE_CLASS_SESSION_SCHEDULE_API = String(cfg.api?.updateClassSessionSchedule || '/school/schedules/api/update-class-session-schedule');
@@ -322,7 +325,8 @@
         const soloStudentId = String(event?.soloStudentId || '').trim();
         const soloPersonId = String(event?.soloStudentPersonId || '').trim();
         const readableSoloName = soloName && !isScheduleOpaqueLabel(soloName, soloStudentId, soloPersonId) ? soloName : '';
-        if (readableSoloName && (event?.isOneOnOneClass || event?.soloStudentId)) return readableSoloName;
+        const suppressSoloForPendingDraftEnrollment = event?.isDraft === true && stagedSessionHasPendingEnrollment(event);
+        if (!suppressSoloForPendingDraftEnrollment && readableSoloName && (event?.isOneOnOneClass || event?.soloStudentId)) return readableSoloName;
         if (isReportScheduleEvent(event)) {
             const reportTitle = getScheduleReportTitle(event);
             const classLabel = getScheduleReportClassLabel(event);
@@ -421,6 +425,7 @@
         return text;
     }
     function scheduleSoloStudentHtml(event) {
+        if (event?.isDraft === true && stagedSessionHasPendingEnrollment(event)) return '';
         const rawName = normalizeScheduleTooltipValue(event?.soloStudentName || event?.singleStudentName);
         const name = rawName && !isScheduleOpaqueLabel(rawName, event?.soloStudentId, event?.soloStudentPersonId) ? rawName : '';
         if (!name) return '';
@@ -1288,6 +1293,7 @@
                     ? payload.pendingEnrollMetaByClassId
                     : {};
             }
+            stripAllDraftSessionSoloDisplayForPendingEnrollments();
         } catch (_) { /* storage unavailable */ }
     }
 
@@ -3766,6 +3772,42 @@
             .some((sid) => String(sid || '').trim() === sessionId));
     }
 
+    function stripDraftSessionSoloDisplayForPendingEnrollments(classId) {
+        const cid = String(classId || '').trim();
+        if (!cid || !classHasPendingEnrollments(cid)) return 0;
+        const linkedSessionIds = new Set();
+        getPendingEnrollStudentsForClass(cid).forEach((entry) => {
+            (Array.isArray(entry?.selectedSessionIds) ? entry.selectedSessionIds : []).forEach((sid) => {
+                const id = String(sid || '').trim();
+                if (id) linkedSessionIds.add(id);
+            });
+        });
+        if (!linkedSessionIds.size) return 0;
+        let cleared = 0;
+        Object.values(scheduleState.draftEventsByPersonId || {}).forEach((rows) => {
+            (Array.isArray(rows) ? rows : []).forEach((ev) => {
+                if (ev?.isDraft !== true) return;
+                if (String(ev?.classId || '').trim() !== cid) return;
+                const sid = String(ev?.sessionId || ev?.id || '').trim();
+                if (!linkedSessionIds.has(sid)) return;
+                if (ev.soloStudentName || ev.singleStudentName || ev.soloStudentId || ev.soloStudentPersonId) {
+                    delete ev.soloStudentName;
+                    delete ev.singleStudentName;
+                    delete ev.soloStudentId;
+                    delete ev.soloStudentPersonId;
+                    cleared += 1;
+                }
+            });
+        });
+        return cleared;
+    }
+
+    function stripAllDraftSessionSoloDisplayForPendingEnrollments() {
+        Object.keys(scheduleState.pendingEnrollStudentsByClassId || {}).forEach((classId) => {
+            stripDraftSessionSoloDisplayForPendingEnrollments(classId);
+        });
+    }
+
     function replacePendingEnrollStudentsForClass(classId, entries) {
         const id = String(classId || '').trim();
         if (!id) return;
@@ -3776,6 +3818,7 @@
             return;
         }
         scheduleState.pendingEnrollStudentsByClassId[id] = rows;
+        stripDraftSessionSoloDisplayForPendingEnrollments(id);
         if (canDragCreateSessions) schedulePersistDraftBackup();
     }
 
@@ -3825,14 +3868,23 @@
         return Array.isArray(rows) ? rows.slice() : [];
     }
 
+    function pendingEnrollEntryStudentId(entry) {
+        return String(entry?.students?.[0]?.studentId || entry?.studentId || '').trim();
+    }
+
     function appendPendingEnrollStudentForClass(classId, entry) {
         const id = String(classId || '').trim();
         if (!id || !entry || typeof entry !== 'object') return;
+        const studentId = pendingEnrollEntryStudentId(entry);
         if (!scheduleState.pendingEnrollStudentsByClassId) scheduleState.pendingEnrollStudentsByClassId = {};
         if (!Array.isArray(scheduleState.pendingEnrollStudentsByClassId[id])) {
             scheduleState.pendingEnrollStudentsByClassId[id] = [];
         }
+        if (studentId && scheduleState.pendingEnrollStudentsByClassId[id].some((row) => pendingEnrollEntryStudentId(row) === studentId)) {
+            return;
+        }
         scheduleState.pendingEnrollStudentsByClassId[id].push({ ...entry });
+        stripDraftSessionSoloDisplayForPendingEnrollments(id);
         if (canDragCreateSessions) schedulePersistDraftBackup();
     }
 
@@ -7285,7 +7337,50 @@ if (canLoadAllSchedules) {
         }
     }
 
-    bindScheduleViewbarStickyOffset();
+    if (canDragCreateSessions && typeof global.MasterScheduleDraftSaveOrchestrator?.install === 'function') {
+        const draftSaveOrchestratorExports = global.MasterScheduleDraftSaveOrchestrator.install({
+            fetchWithScheduleTimeout,
+            SCHEDULE_COMMIT_STAGED_API,
+            SCHEDULE_COMMIT_STAGED_PRECHECK_API,
+            SCHEDULE_VALIDATE_PENDING_ENROLL_API,
+            SCHEDULE_EXECUTE_PENDING_ENROLL_API,
+            scheduleState,
+            uiAlert,
+            uiConfirm,
+            escapeHtml,
+            activeSchedulePerson,
+            getScheduleRange,
+            selectedScheduleRole,
+            appendSavedClassSessionsToState,
+            acknowledgeLocalScheduleMutation,
+            getActiveDraftSelectionSet,
+            schedulePersistDraftBackup: () => { if (canDragCreateSessions) schedulePersistDraftBackup(); },
+            clearScheduleDraftBackup,
+            countAllPendingDraftSessions,
+            getPendingEnrollStudentsForClass,
+            replacePendingEnrollStudentsForClass
+        });
+        if (draftSaveOrchestratorExports?.runSelectedDraftSave) {
+            global.MasterScheduleDraftSaveOrchestrator.runSelectedDraftSave = draftSaveOrchestratorExports.runSelectedDraftSave;
+        }
+    }
+    if (canDragCreateSessions && typeof global.MasterScheduleDraftSaveWork?.install === 'function') {
+        global.MasterScheduleDraftSaveWork.install({
+            scheduleState,
+            uiAlert,
+            uiConfirm,
+            escapeHtml,
+            showBootstrapModal: showScheduleBootstrapModal,
+            hideBootstrapModal: hideScheduleBootstrapModal,
+            activeSchedulePerson,
+            getPendingEnrollStudentsForClass,
+            getPendingEnrollMetaForClass,
+            removePendingEnrollStudentAt,
+            refreshScheduleViewWithHolidays,
+            syncPartialModalFromTimelineDrafts,
+            runSelectedDraftSave: global.MasterScheduleDraftSaveOrchestrator?.runSelectedDraftSave
+        });
+    }
     if (canSelectAnyPerson && typeof global.installMasterScheduleEnrollStudents === 'function') {
         global.installMasterScheduleEnrollStudents({
             uiAlert,

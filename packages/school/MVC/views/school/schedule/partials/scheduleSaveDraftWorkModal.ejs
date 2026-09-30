@@ -1,0 +1,21 @@
+<div class="modal fade" id="scheduleSaveDraftWorkModal" tabindex="-1" aria-hidden="true" aria-labelledby="scheduleSaveDraftWorkModalTitle">
+  <div class="modal-dialog modal-dialog-centered modal-xl modal-dialog-scrollable schedule-save-draft-work-modal">
+    <div class="modal-content">
+      <div class="modal-header border-bottom-0 pb-0">
+        <div>
+          <h5 class="modal-title" id="scheduleSaveDraftWorkModalTitle"><i class="bi bi-check2-square me-2"></i>Save staged work</h5>
+          <p class="small text-muted mb-0 mt-1">Staged sessions are shown on the calendar and will be saved for each class. Select draft enrollments to include in the save.</p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body pt-3">
+        <div id="scheduleSaveDraftWorkModalBody" class="schedule-save-draft-work-body"></div>
+        <div class="small text-danger d-none mt-3" id="scheduleSaveDraftWorkModalError" role="alert"></div>
+      </div>
+      <div class="modal-footer border-top-0 pt-0">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-success btn-sm" id="btn_scheduleSaveDraftWorkApply"><i class="bi bi-cloud-upload me-1"></i>Save selected</button>
+      </div>
+    </div>
+  </div>
+</div>
