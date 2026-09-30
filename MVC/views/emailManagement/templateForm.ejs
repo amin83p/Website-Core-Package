@@ -1175,7 +1175,7 @@
       pickEventBtn.addEventListener('click', () => {
         if (!window.GenericPicker || typeof window.GenericPicker.open !== 'function') return;
         const excludeQuery = currentTemplateId
-          ? ('&excludeTemplateId=' + encodeURIComponent(currentTemplateId))
+          ? ('?excludeTemplateId=' + encodeURIComponent(currentTemplateId))
           : '';
         const pickerBaseConfig = {
           title: 'Select Email Event',

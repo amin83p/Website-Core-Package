@@ -137,3 +137,14 @@ test('template save context includes packageName from selected event', () => {
   assert.equal(context.sectionId, 'SCHOOL_SESSION_ACCESS');
   assert.equal(context.operationId, 'NOTIFY');
 });
+
+test('email template event picker uses query string for excludeTemplateId on edit', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const source = fs.readFileSync(
+    path.join(__dirname, '../MVC/views/emailManagement/templateForm.ejs'),
+    'utf8'
+  );
+  assert.match(source, /\?excludeTemplateId=/);
+  assert.doesNotMatch(source, /'&excludeTemplateId='/);
+});
