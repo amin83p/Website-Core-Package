@@ -165,14 +165,22 @@ const newsRepository = {
       json: async () => newsModel.logView(newsId, logData),
       mongo: async () => {
         const collection = getMongoCollection('news');
-        const row = await collection.findOne(resolveMongoIdFilter(newsId));
-        if (!row) throw new Error('News item not found');
-        const views = Array.isArray(row.views) ? row.views : [];
-        views.push({
-          ...(logData || {}),
-          viewedAt: new Date().toISOString()
-        });
-        await collection.updateOne({ _id: row._id }, { $set: { views } });
+        const filter = resolveMongoIdFilter(newsId);
+        const row = await collection.findOne(filter);
+        if (!row) return false;
+
+        const logEntry = {
+          ...(logData && typeof logData === 'object' ? logData : {}),
+          timestamp: (logData && logData.timestamp) || new Date().toISOString()
+        };
+        const analytics = Array.isArray(row.analytics) ? row.analytics.slice() : [];
+        analytics.push(logEntry);
+        const trimmedAnalytics = analytics.length > 2000 ? analytics.slice(-2000) : analytics;
+
+        const metrics = row.metrics && typeof row.metrics === 'object' ? { ...row.metrics } : {};
+        metrics.views = Math.max(0, Number(metrics.views) || 0) + 1;
+
+        await collection.updateOne(filter, { $set: { analytics: trimmedAnalytics, metrics } });
         return true;
       }
     }, 'core.news.logView');

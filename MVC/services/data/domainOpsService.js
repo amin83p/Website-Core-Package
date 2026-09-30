@@ -243,17 +243,24 @@ const domainOpsService = {
     return item.visibility === 'public' ? item : null;
   },
 
-  async logNewsView(newsId, user) {
+  async logNewsView(newsId, user, meta = {}) {
+    const articleVisibility = String(meta.articleVisibility || 'public').trim().toLowerCase();
+    const resolvedUserId = user ? toPublicId(user.id || user.userId || user._id) : null;
+    const isGuest = !resolvedUserId;
+    const publicGuestView = isGuest && articleVisibility === 'public';
     const logEntry = {
       timestamp: new Date().toISOString(),
-      userId: user ? user.id : null,
+      userId: resolvedUserId || null,
       userName: user
         ? String(user.displayName || user.name || user.username || user.email || '').trim()
         : null,
-      userRole: user ? (user.role || 'user') : 'guest',
-      orgId: user ? user.activeOrgId : 'public'
+      userRole: user ? (user.role || user.primaryOrgRole || 'user') : 'guest',
+      orgId: user ? (user.activeOrgId || 'public') : 'public',
+      articleVisibility,
+      publicGuestView
     };
-    return await newsRepository.logView(newsId, logEntry);
+    const ok = await newsRepository.logView(newsId, logEntry);
+    return ok;
   },
 
   async getPublicContactMessageStatus(code, email) {

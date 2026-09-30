@@ -13,6 +13,10 @@ const registry = require('../packages/school/MVC/services/school/notificationCen
 test('notification centre evaluator registry exposes all planned rule types', () => {
   assert.ok(registry.getEvaluator('session_not_final'));
   assert.ok(registry.getEvaluator('session_attendance_incomplete'));
+  assert.ok(registry.getEvaluator('session_without_book_report'));
+  assert.ok(registry.getEvaluator('session_without_notes'));
+  assert.ok(registry.getEvaluator('session_with_cases'));
+  assert.ok(registry.getEvaluator('session_with_activities'));
   assert.ok(registry.getEvaluator('timesheet_not_submitted'));
   assert.equal(registry.getEvaluator('unknown_type'), null);
 });

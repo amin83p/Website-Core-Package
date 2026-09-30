@@ -165,9 +165,19 @@
         </div>
       </div>
 
-      <div class="button-row mt-4 pt-3 border-top">
+      <div class="button-row mt-4 pt-3 border-top d-flex flex-wrap align-items-center gap-2">
         <button type="submit" class="btn btn-filled btn-primary btn-md"><%= editing ? 'Save Changes' : 'Create Rule' %></button>
         <a href="/school/notification-center" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+        <% if (editing && row.id && !row.legacyKey && access?.canConfigure) { %>
+          <button
+            type="button"
+            class="btn btn-outline-danger btn-md ms-auto js-nc-delete-rule-form"
+            data-delete-url="/school/notification-center/rules/<%= row.id %>/delete"
+            data-rule-label="<%= row.label || row.ruleType || 'rule' %>"
+          >
+            <i class="bi bi-trash me-1"></i>Delete rule
+          </button>
+        <% } %>
       </div>
     </form>
   </div>
@@ -247,6 +257,52 @@
           icon: 'warning',
           size: 'md'
         });
+      }
+    });
+  }
+
+  const deleteRuleBtn = document.querySelector('.js-nc-delete-rule-form');
+  if (deleteRuleBtn) {
+    deleteRuleBtn.addEventListener('click', async () => {
+      const deleteUrl = String(deleteRuleBtn.getAttribute('data-delete-url') || '').trim();
+      const ruleLabel = String(deleteRuleBtn.getAttribute('data-rule-label') || '').trim() || 'this rule';
+      if (!deleteUrl || typeof showMessageModal !== 'function') return;
+
+      const choice = await showMessageModal({
+        title: 'Delete rule',
+        icon: 'warning',
+        message: `Delete rule “${ruleLabel}”? This cannot be undone. Past run results may still appear in Recent run results.`,
+        size: 'md',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary btn-md' },
+          { text: 'Delete', class: 'btn-danger btn-md' }
+        ]
+      });
+      if (choice !== 'Delete') return;
+
+      const csrfToken = typeof resolveCsrfToken === 'function' ? resolveCsrfToken() : '';
+      const headers = { Accept: 'application/json', 'X-AJAX-Request': '1' };
+      if (csrfToken) {
+        headers['x-csrf-token'] = csrfToken;
+        headers['csrf-token'] = csrfToken;
+      }
+
+      deleteRuleBtn.disabled = true;
+      try {
+        const response = await fetch(deleteUrl, { method: 'POST', headers, credentials: 'same-origin' });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload.status !== 'ok') {
+          throw new Error(payload.message || 'Could not delete this rule.');
+        }
+        window.location.href = '/school/notification-center?ruleDeleted=1';
+      } catch (error) {
+        await showMessageModal({
+          title: 'Delete failed',
+          message: error?.message || 'Could not delete this rule.',
+          icon: 'error',
+          size: 'md'
+        });
+        deleteRuleBtn.disabled = false;
       }
     });
   }

@@ -20,9 +20,18 @@ const SESSION_DATE_RANGE_TYPES = Object.freeze([
   'timesheet_period'
 ]);
 
+const NOTIFICATION_RULE_TYPE_LABELS = Object.freeze({
+  session_without_book_report: 'Sessions without Book Reports',
+  session_without_notes: 'Sessions without Notes',
+  session_with_cases: 'Sessions with Cases',
+  session_with_activities: 'Sessions with Activities'
+});
+
 function formatNotificationTokenLabel(value) {
   const text = cleanString(value, { max: 200, allowEmpty: true });
   if (!text) return '';
+  const labeled = NOTIFICATION_RULE_TYPE_LABELS[text.toLowerCase()];
+  if (labeled) return labeled;
   return text
     .split(/[_\s]+/)
     .filter(Boolean)
@@ -33,6 +42,10 @@ function formatNotificationTokenLabel(value) {
 const NOTIFICATION_RULE_TYPES = Object.freeze([
   'session_not_final',
   'session_attendance_incomplete',
+  'session_without_book_report',
+  'session_without_notes',
+  'session_with_cases',
+  'session_with_activities',
   'timesheet_not_submitted'
 ]);
 
@@ -346,6 +359,7 @@ async function listNotificationRulesByOrg(orgId) {
 
 module.exports = {
   NOTIFICATION_RULE_TYPES,
+  NOTIFICATION_RULE_TYPE_LABELS,
   SESSION_DATE_RANGE_TYPES,
   formatNotificationTokenLabel,
   LEGACY_SESSION_RULE_KEY,

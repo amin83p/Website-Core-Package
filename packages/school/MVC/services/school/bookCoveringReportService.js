@@ -197,6 +197,46 @@ function findReportByDailyWindow(list, {
   return dailyRows[0];
 }
 
+function findReportForSessionFromOrgRows({
+  classData,
+  session,
+  orgRows = [],
+  reqUser
+} = {}) {
+  if (!classData?.id || !session?.sessionId) return null;
+
+  const sessionDate = normalizeDate(session.date);
+  if (!sessionDate) return null;
+
+  const classId = clean(classData.id);
+  const sessionId = clean(session.sessionId);
+  const teacherId = resolveTeacherId(session, classData);
+  const periodWindow = bookCoveringPeriodService.resolvePeriodWindow({
+    periodType: PERIOD_TYPES.DAILY,
+    anchorDate: sessionDate
+  });
+
+  const rows = Array.isArray(orgRows) ? orgRows : [];
+  let matched = findReportLinkedToSession(rows, { classId, sessionId });
+  if (!matched) {
+    matched = findReportByDailyWindow(rows, {
+      classId,
+      periodStartDate: periodWindow.periodStartDate,
+      periodEndDate: periodWindow.periodEndDate,
+      teacherId,
+      sessionId
+    });
+  }
+
+  return matched || null;
+}
+
+function hasSubmittedBookReportForSession({ classData, session, orgRows = [], reqUser } = {}) {
+  const report = findReportForSessionFromOrgRows({ classData, session, orgRows, reqUser });
+  if (!report) return false;
+  return clean(report.status || REPORT_STATUSES.DRAFT).toLowerCase() === REPORT_STATUSES.SUBMITTED;
+}
+
 async function findReportForSession({
   classData,
   session,
@@ -220,7 +260,7 @@ async function findReportForSession({
   const rows = await schoolDataService.fetchAllData('bookCoveringReports', {}, reqUser, accessContext);
   const orgRows = (Array.isArray(rows) ? rows : []).filter((row) => idsEqual(row.orgId, orgId));
 
-  let matched = findReportLinkedToSession(orgRows, { classId, sessionId });
+  let matched = findReportForSessionFromOrgRows({ classData, session, orgRows, reqUser });
   if (!matched && teacherId) {
     matched = await findDuplicateReport({
       orgId,
@@ -232,15 +272,6 @@ async function findReportForSession({
       sessionId,
       reqUser,
       accessContext
-    });
-  }
-  if (!matched) {
-    matched = findReportByDailyWindow(orgRows, {
-      classId,
-      periodStartDate: periodWindow.periodStartDate,
-      periodEndDate: periodWindow.periodEndDate,
-      teacherId,
-      sessionId
     });
   }
 
@@ -484,6 +515,8 @@ module.exports = {
   enrichReports,
   findDuplicateReport,
   findReportForSession,
+  findReportForSessionFromOrgRows,
+  hasSubmittedBookReportForSession,
   getSessionBookCoveringSummary,
   buildReportSummary,
   isReportSessionLocked,

@@ -36,7 +36,12 @@
 
 }) %>
 
-
+<% if (String(filters?.ruleDeleted || '') === '1') { %>
+  <div class="alert alert-success alert-dismissible fade show" role="alert">
+    Notification rule deleted.
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+  </div>
+<% } %>
 
 <%- include('partials/tablePages-search', {
 
@@ -139,6 +144,16 @@
                 <% if (access?.canConfigure) { %>
 
                   <a href="/school/notification-center/rules/<%= rule.id %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a>
+
+                <% } %>
+
+                <% if (access?.canConfigure && !rule.legacyKey) { %>
+
+                  <button type="button" class="btn btn-outline-danger btn-sm js-nc-delete-rule" data-rule-id="<%= rule.id %>" data-rule-label="<%= rule.label || rule.ruleType || 'rule' %>" data-delete-url="/school/notification-center/rules/<%= rule.id %>/delete">
+
+                    <i class="bi bi-trash me-2"></i>Delete rule
+
+                  </button>
 
                 <% } %>
 
@@ -448,6 +463,28 @@
 
   }
 
+  async function deleteNotificationRuleByUrl(deleteUrl) {
+
+    const response = await fetch(deleteUrl, {
+
+      method: 'POST',
+
+      headers: resolveCsrfHeaders(),
+
+      credentials: 'same-origin'
+
+    });
+
+    const payload = await response.json().catch(() => ({}));
+
+    if (!response.ok || payload.status !== 'ok') {
+
+      throw new Error(payload.message || 'Could not delete this rule.');
+
+    }
+
+  }
+
   function syncNcRecentRunsBulkUi() {
 
     const tbody = document.querySelector('#nc-recent-runs-table tbody');
@@ -585,6 +622,66 @@
   });
 
   syncNcRecentRunsBulkUi();
+
+  document.querySelectorAll('.js-nc-delete-rule').forEach((button) => {
+
+    button.addEventListener('click', async () => {
+
+      const ruleId = String(button.getAttribute('data-rule-id') || '').trim();
+
+      const ruleLabel = String(button.getAttribute('data-rule-label') || '').trim() || 'this rule';
+
+      const deleteUrl = String(button.getAttribute('data-delete-url') || '').trim();
+
+      if (!deleteUrl) return;
+
+      const choice = await showMessageModal({
+
+        title: 'Delete rule',
+
+        icon: 'warning',
+
+        message: `Delete rule “${ruleLabel}”? This cannot be undone. Past run results may still appear in Recent run results.`,
+
+        size: 'md',
+
+        buttons: [
+
+          { text: 'Cancel', class: 'btn-secondary btn-md' },
+
+          { text: 'Delete', class: 'btn-danger btn-md' }
+
+        ]
+
+      });
+
+      if (choice !== 'Delete') return;
+
+      button.disabled = true;
+
+      try {
+
+        await deleteNotificationRuleByUrl(deleteUrl);
+
+        const ruleRow = ruleId ? document.querySelector(`tr[data-entity-row-id="${ruleId}"]`) : null;
+
+        if (ruleRow) ruleRow.remove();
+
+        window.location.href = '/school/notification-center?ruleDeleted=1';
+
+      } catch (error) {
+
+        const message = error?.message || 'Could not delete this rule.';
+
+        await showMessageModal({ title: 'Delete failed', message, icon: 'error', size: 'md' });
+
+        button.disabled = false;
+
+      }
+
+    });
+
+  });
 
   document.querySelectorAll('.js-nc-delete-rule-runs').forEach((button) => {
 

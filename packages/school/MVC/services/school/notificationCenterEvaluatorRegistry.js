@@ -2,11 +2,12 @@
 
 const sessionUncompletedNotificationService = require('./sessionUncompletedNotificationService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
-const sessionAttendanceEditAccessService = require('./sessionAttendanceEditAccessService');
 const schoolDataService = require('./schoolDataService');
+const notificationCenterSessionRuleScanService = require('./notificationCenterSessionRuleScanService');
 const personDisplayNameService = require('./personDisplayNameService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { buildBrandedEmailLayout, escapeHtml, NEWS_INK, NEWS_MUTED, NEWS_LINE } = requireCoreModule('MVC/utils/brandedEmailLayout');
 
 function cleanText(value) {
   return String(value || '').trim();
@@ -136,6 +137,46 @@ async function evaluateTimesheetNotSubmitted({ orgId, rule, reqUser }) {
   return { findings, metadata: { periodId, deadline } };
 }
 
+async function evaluateSessionWithoutBookReport({ orgId, rule, asOfDate, reqUser }) {
+  return notificationCenterSessionRuleScanService.evaluateSessionsByPredicate({
+    orgId,
+    rule,
+    asOfDate,
+    reqUser,
+    predicate: notificationCenterSessionRuleScanService.evaluateSessionWithoutBookReport
+  });
+}
+
+async function evaluateSessionWithoutNotes({ orgId, rule, asOfDate, reqUser }) {
+  return notificationCenterSessionRuleScanService.evaluateSessionsByPredicate({
+    orgId,
+    rule,
+    asOfDate,
+    reqUser,
+    predicate: notificationCenterSessionRuleScanService.evaluateSessionWithoutNotes
+  });
+}
+
+async function evaluateSessionWithCases({ orgId, rule, asOfDate, reqUser }) {
+  return notificationCenterSessionRuleScanService.evaluateSessionsByPredicate({
+    orgId,
+    rule,
+    asOfDate,
+    reqUser,
+    predicate: notificationCenterSessionRuleScanService.evaluateSessionWithCases
+  });
+}
+
+async function evaluateSessionWithActivities({ orgId, rule, asOfDate, reqUser }) {
+  return notificationCenterSessionRuleScanService.evaluateSessionsByPredicate({
+    orgId,
+    rule,
+    asOfDate,
+    reqUser,
+    predicate: notificationCenterSessionRuleScanService.evaluateSessionWithActivities
+  });
+}
+
 const EVALUATORS = Object.freeze({
   session_not_final: {
     evaluate: evaluateSessionNotFinal,
@@ -143,6 +184,22 @@ const EVALUATORS = Object.freeze({
   },
   session_attendance_incomplete: {
     evaluate: evaluateSessionAttendanceIncomplete,
+    groupFindings: groupFindingsByRecipient
+  },
+  session_without_book_report: {
+    evaluate: evaluateSessionWithoutBookReport,
+    groupFindings: groupFindingsByRecipient
+  },
+  session_without_notes: {
+    evaluate: evaluateSessionWithoutNotes,
+    groupFindings: groupFindingsByRecipient
+  },
+  session_with_cases: {
+    evaluate: evaluateSessionWithCases,
+    groupFindings: groupFindingsByRecipient
+  },
+  session_with_activities: {
+    evaluate: evaluateSessionWithActivities,
     groupFindings: groupFindingsByRecipient
   },
   timesheet_not_submitted: {
@@ -193,14 +250,31 @@ async function buildBatchPreview({
     };
   }
   const listText = items.map((item) => `- ${item.title}`).join('\n');
-  const listHtml = `<ul>${items.map((item) => `<li>${item.title}</li>`).join('')}</ul>`;
+  const listHtml = [
+    `<ul style="margin:0;padding:0 0 0 20px;color:${NEWS_INK};">`,
+    items.map((item) => `<li style="margin:0 0 8px;line-height:1.5;">${escapeHtml(item.title)}</li>`).join(''),
+    '</ul>'
+  ].join('');
   const intro = `You have ${items.length} item(s) that need your attention. Please review and complete them when you are ready.`;
+  const org = escapeHtml(orgName || 'School');
+  const bodyInner = [
+    `<p style="margin:0 0 14px;">Hi ${escapeHtml(name)},</p>`,
+    `<p style="margin:0 0 16px;color:${NEWS_MUTED};">${escapeHtml(intro)}</p>`,
+    `<div style="padding:14px 16px;border:1px solid ${NEWS_LINE};border-radius:14px;background:rgba(248,251,255,0.9);">${listHtml}</div>`,
+    `<p style="margin:20px 0 0;color:${NEWS_MUTED};">Thank you,<br><strong style="color:${NEWS_INK};">${org}</strong></p>`
+  ].join('');
+  const htmlBody = buildBrandedEmailLayout({
+    baseUrl,
+    eyebrow: 'School notification',
+    title: rule.label || 'School reminder',
+    bodyHtml: bodyInner
+  });
   return {
     recipientPersonId,
     recipientName: name,
     subject: `${rule.label || 'School reminder'} (${items.length} item(s))`,
     plainText: `Hi ${name},\n\n${intro}\n\n${listText}\n\nThank you,\n${orgName || 'School'}\n`,
-    htmlBody: `<div style="font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;"><p>Hi ${name},</p><p>${intro}</p>${listHtml}<p>Thank you,<br>${orgName || 'School'}</p></div>`,
+    htmlBody,
     smsText: `${rule.label || 'Reminder'}: ${items.length} item(s) need attention.`
   };
 }
@@ -210,6 +284,10 @@ module.exports = {
   buildBatchPreview,
   evaluateSessionNotFinal,
   evaluateSessionAttendanceIncomplete,
+  evaluateSessionWithoutBookReport,
+  evaluateSessionWithoutNotes,
+  evaluateSessionWithCases,
+  evaluateSessionWithActivities,
   evaluateTimesheetNotSubmitted,
   groupFindingsByRecipient
 };

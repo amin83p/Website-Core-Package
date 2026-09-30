@@ -9,6 +9,15 @@ const teacherIdentityService = require('./teacherIdentityService');
 const { SESSION_DATE_RANGE_TYPES } = require('./sessionAccessPolicyService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 
+const {
+  buildBrandedEmailLayout,
+  NEWS_BLUE,
+  NEWS_TEAL,
+  NEWS_INK,
+  NEWS_MUTED,
+  NEWS_LINE
+} = requireCoreModule('MVC/utils/brandedEmailLayout');
+
 function resolveAppDisplayName() {
   try {
     const appBrandingService = requireCoreModule('MVC/services/appBrandingService');
@@ -313,7 +322,7 @@ function buildSessionListHtml(entries = [], { baseUrl = '', sessionTimingByKey =
   const timingMap = sessionTimingByKey instanceof Map ? sessionTimingByKey : null;
   const groups = groupEntriesByClassTitle(entries);
   if (!groups.length) {
-    return '<p style="margin:0;color:#6c757d;">No sessions listed.</p>';
+    return `<p style="margin:0;color:${NEWS_MUTED};">No sessions listed.</p>`;
   }
   const blocks = groups.map(([className, classEntries]) => {
     const rows = classEntries.map((entry) => {
@@ -323,23 +332,23 @@ function buildSessionListHtml(entries = [], { baseUrl = '', sessionTimingByKey =
       const sessionUrl = resolveAbsoluteSessionUrl(entry?.classData || {}, session, baseUrl);
       const timing = escapeHtml(timingMap?.get(sessionKey)?.timingLabel || '');
       const linkCell = sessionUrl
-        ? `<a href="${escapeHtml(sessionUrl)}" style="color:#1a4480;text-decoration:underline;font-weight:600;">${formal ? label : `${buildEmailIcon('link')}${label}`}</a>`
+        ? `<a href="${escapeHtml(sessionUrl)}" style="color:${NEWS_BLUE};text-decoration:none;font-weight:700;border-bottom:1px solid rgba(29,95,184,0.35);">${formal ? label : `${buildEmailIcon('link')}${label}`}</a>`
         : `${formal ? label : `${buildEmailIcon('session')}${label}`}`;
       return [
         '<tr>',
-        `<td style="padding:10px 14px;border-bottom:1px solid #e9ecef;vertical-align:top;width:20px;color:#495057;font-weight:600;">&#8226;</td>`,
-        `<td style="padding:10px 14px;border-bottom:1px solid #e9ecef;vertical-align:top;">`,
-        `<div style="font-size:14px;line-height:1.5;color:#212529;">${linkCell}</div>`,
-        timing ? `<div style="font-size:13px;line-height:1.45;color:#5c6770;margin-top:6px;font-style:italic;">${formal ? timing : `${buildEmailIcon('clock')}${timing}`}</div>` : '',
+        `<td style="padding:12px 16px;border-bottom:1px solid ${NEWS_LINE};vertical-align:top;width:20px;color:${NEWS_TEAL};font-weight:700;">&#8226;</td>`,
+        `<td style="padding:12px 16px;border-bottom:1px solid ${NEWS_LINE};vertical-align:top;">`,
+        `<div style="font-size:14px;line-height:1.55;color:${NEWS_INK};">${linkCell}</div>`,
+        timing ? `<div style="font-size:13px;line-height:1.45;color:${NEWS_MUTED};margin-top:6px;">${formal ? timing : `${buildEmailIcon('clock')}${timing}`}</div>` : '',
         '</td>',
         '</tr>'
       ].join('');
     }).join('');
     return [
-      `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 18px;border:1px solid #ced4da;background:#ffffff;">`,
+      `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 18px;border:1px solid ${NEWS_LINE};background:#ffffff;border-radius:16px;overflow:hidden;">`,
       '<tr>',
-      `<td style="padding:10px 14px;background:#eef2f7;border-bottom:1px solid #ced4da;">`,
-      `<p style="margin:0;font-size:15px;font-weight:700;color:#1b1b1b;letter-spacing:0.01em;">${formal ? escapeHtml(className) : `${buildEmailIcon('class')}${escapeHtml(className)}`}</p>`,
+      `<td style="padding:12px 16px;background:rgba(8,127,140,0.12);border-bottom:1px solid ${NEWS_LINE};">`,
+      `<p style="margin:0;font-size:14px;font-weight:800;color:${NEWS_TEAL};letter-spacing:0.02em;">${formal ? escapeHtml(className) : `${buildEmailIcon('class')}${escapeHtml(className)}`}</p>`,
       '</td>',
       '</tr>',
       '<tr>',
@@ -387,34 +396,19 @@ async function buildTeacherReviewEmailContent({
     '',
     appName
   ].join('\n');
-  const htmlBody = [
-    '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background:#eceff3;padding:28px 16px;">',
-    '<tr><td align="center">',
-    '<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width:640px;background:#ffffff;border:1px solid #ced4da;">',
-    '<tr>',
-    '<td style="padding:22px 28px;background:#1a4480;border-bottom:3px solid #0f2f5c;">',
-    '<p style="margin:0 0 6px;font-size:11px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#c9d7ef;">Official notice</p>',
-    '<h1 style="margin:0;font-size:20px;font-weight:700;line-height:1.35;color:#ffffff;font-family:Georgia,\'Times New Roman\',serif;">Session completion reminder</h1>',
-    '</td>',
-    '</tr>',
-    '<tr>',
-    '<td style="padding:28px;font-family:Georgia,\'Times New Roman\',Times,serif;font-size:15px;line-height:1.65;color:#1b1b1b;">',
-    `<p style="margin:0 0 18px;">Dear ${escapeHtml(name)},</p>`,
-    `<p style="margin:0 0 16px;">This message is to inform you that <strong>${sessionCount}</strong> session(s) under your responsibility require review and completion. Please review the classes and sessions listed below and use the provided links to open each session in the system.</p>`,
-    `<p style="margin:0 0 22px;">When you have verified attendance and related requirements, please mark each session complete in accordance with your organization&rsquo;s procedures.</p>`,
+  const bodyInner = [
+    `<p style="margin:0 0 16px;">Hi ${escapeHtml(name)},</p>`,
+    `<p style="margin:0 0 14px;color:${NEWS_MUTED};">You have <strong style="color:${NEWS_INK};">${sessionCount}</strong> session(s) that need review and completion. Open each session below, verify the details, and mark it complete when you are ready.</p>`,
     listHtml,
-    `<p style="margin:24px 0 0;">Thank you for your prompt attention to this matter.</p>`,
-    `<p style="margin:18px 0 0;">Sincerely,<br><strong>${escapeHtml(org)}</strong></p>`,
-    '</td>',
-    '</tr>',
-    '<tr>',
-    `<td style="padding:14px 28px;background:#f8f9fa;border-top:1px solid #dee2e6;text-align:center;font-family:Arial,Helvetica,sans-serif;">`,
-    `<p style="margin:0;font-size:12px;color:#5c6770;letter-spacing:0.03em;">This notification was sent by <strong style="color:#1b1b1b;">${escapeHtml(appName)}</strong></p>`,
-    '</td>',
-    '</tr>',
-    '</table>',
-    '</td></tr></table>'
+    `<p style="margin:22px 0 0;">Thank you for your attention.</p>`,
+    `<p style="margin:16px 0 0;color:${NEWS_MUTED};">— <strong style="color:${NEWS_INK};">${escapeHtml(org)}</strong></p>`
   ].join('');
+  const htmlBody = buildBrandedEmailLayout({
+    baseUrl,
+    eyebrow: 'School notification',
+    title: 'Session completion reminder',
+    bodyHtml: bodyInner
+  });
   return { plainText, htmlBody, sessionCount, listText, listHtml };
 }
 

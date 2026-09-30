@@ -57,6 +57,8 @@ test('School notification centre routes, services, repositories, and views are w
   assert.match(controller, /canDeleteOutbox/);
   assert.match(controller, /canDeleteRuns/);
   assert.match(routes, /router\.get\('\/'/);
+  assert.match(routes, /router\.post\('\/rules\/:id\/delete'/);
+  assert.match(routes, /OPERATIONS\.CONFIGURE[\s\S]*notificationCenterController\.deleteRule/);
   assert.match(routes, /router\.post\('\/rules\/:id\/run'/);
   assert.match(routes, /schedule-email/);
   assert.match(routes, /\/outbox'/);
@@ -65,6 +67,9 @@ test('School notification centre routes, services, repositories, and views are w
   assert.match(routes, /OPERATIONS\.DELETE[\s\S]*deleteRun/);
   assert.doesNotMatch(routes, /runs\/:id\/dispatch/);
   assert.match(controller, /syncAllRulesForOrg/);
+  assert.match(controller, /notificationCenterRuleService\.deleteRule/);
+  assert.match(controller, /ruleDeleted=1/);
+  assert.match(controller, /deleteRule,/);
   assert.doesNotMatch(controller, /disableNotificationCenterScheduledTasks/);
   assert.match(controller, /notificationCenterComposeService/);
   assert.match(controller, /applyGenericFilter/);
@@ -116,6 +121,10 @@ test('School notification centre routes, services, repositories, and views are w
   assert.match(listView, /ncDeleteSelectedRuns/);
   assert.match(listView, /canRemoveRunResults/);
   assert.match(listView, /js-nc-delete-rule-runs/);
+  assert.match(listView, /js-nc-delete-rule/);
+  assert.match(listView, /Delete rule/);
+  assert.match(listView, /!rule\.legacyKey/);
+  assert.match(listView, /ruleDeleted/);
   assert.match(listView, /Delete run results/);
   assert.match(listView, /runs\/<%= run\.id %>\/delete/);
   assert.match(listView, /js-nc-delete-run-form/);
@@ -127,6 +136,9 @@ test('School notification centre routes, services, repositories, and views are w
   assert.match(runRulePartial, /showLoading/);
   assert.match(runRulePartial, /hideLoading/);
   assert.match(listView, /bi-envelope-fill/);
+  assert.match(ruleForm, /js-nc-delete-rule-form/);
+  assert.match(ruleForm, /Delete rule/);
+  assert.match(ruleForm, /!row\.legacyKey/);
   assert.match(ruleForm, /scheduleEnabled/);
   assert.match(ruleForm, /Scheduled evaluation/);
   assert.match(ruleForm, /daysOfWeek/);
@@ -142,5 +154,10 @@ test('School notification centre routes, services, repositories, and views are w
   const registry = readText('packages/school/MVC/services/school/notificationCenterEvaluatorRegistry.js');
   assert.match(registry, /session_not_final/);
   assert.match(registry, /session_attendance_incomplete/);
+  assert.match(registry, /session_without_book_report/);
+  assert.match(registry, /session_without_notes/);
+  assert.match(registry, /session_with_cases/);
+  assert.match(registry, /session_with_activities/);
   assert.match(registry, /timesheet_not_submitted/);
+  assert.match(ruleModel, /Sessions without Book Reports/);
 });

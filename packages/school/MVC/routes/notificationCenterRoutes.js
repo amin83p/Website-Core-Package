@@ -53,6 +53,13 @@ router.post('/rules/save',
   notificationCenterController.saveRule
 );
 
+router.post('/rules/:id/delete',
+  requireAuth,
+  requireNotificationCenterOperation(OPERATIONS.CONFIGURE),
+  trackActionState(SECTION, OPERATIONS.CONFIGURE, { requireToken: false, keepActive: true }),
+  notificationCenterController.deleteRule
+);
+
 router.post('/rules/:id/run',
   requireAuth,
   requireNotificationCenterOperation(OPERATIONS.UPDATE),

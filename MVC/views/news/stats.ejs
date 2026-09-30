@@ -145,7 +145,9 @@
                     <span class="news-stats-viewer-avatar"><%= (String(viewer.userName || '?').charAt(0) || '?').toUpperCase() %></span>
                     <div>
                       <strong class="news-stats-viewer-name"><%= viewer.userName || viewer.userId || 'Guest' %></strong>
-                      <% if (!viewer.isGuest && viewer.userId) { %>
+                      <% if (viewer.isGuest && viewer.isPublicGuest) { %>
+                        <small class="news-stats-viewer-id">Viewed without signing in (public article)</small>
+                      <% } else if (!viewer.isGuest && viewer.userId) { %>
                         <small class="news-stats-viewer-id"><%= viewer.userId %></small>
                       <% } %>
                     </div>

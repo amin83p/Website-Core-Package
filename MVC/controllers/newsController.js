@@ -435,7 +435,9 @@ async function viewArticle(req, res) {
 
         // 4. ✅ FIX: Save to DB (Log View + Update Counter)
         // We use the service to handle the persistence asynchronously
-        dataService.logNewsView(item.id, user).catch(err => console.error("Analytics Error:", err));
+        dataService.logNewsView(item.id, user, {
+            articleVisibility: item.visibility || 'public'
+        }).catch(err => console.error("Analytics Error:", err));
 
         // ... (rest of sidebars logic: latestNews, relatedNews) ...
         const latestNews = allNews
@@ -653,7 +655,44 @@ function formatVisitRoleLabel(role) {
         .join(' ');
 }
 
-function buildArticleVisitLogPage(analytics, query = {}) {
+function normalizeVisitLogEntry(entry = {}) {
+    const row = entry && typeof entry === 'object' ? entry : {};
+    return {
+        timestamp: row.timestamp || row.viewedAt || '',
+        userId: row.userId,
+        userName: row.userName,
+        userRole: row.userRole,
+        orgId: row.orgId,
+        articleVisibility: row.articleVisibility,
+        publicGuestView: row.publicGuestView === true
+    };
+}
+
+function resolveArticleVisitAnalytics(item = {}) {
+    const source = item && typeof item === 'object' ? item : {};
+    const primary = (Array.isArray(source.analytics) ? source.analytics : []).map(normalizeVisitLogEntry);
+    const legacy = (Array.isArray(source.views) ? source.views : []).map(normalizeVisitLogEntry);
+    const merged = [...primary, ...legacy];
+    merged.sort((left, right) => {
+        const leftTime = Date.parse(left.timestamp || '') || 0;
+        const rightTime = Date.parse(right.timestamp || '') || 0;
+        return rightTime - leftTime;
+    });
+    return merged;
+}
+
+function resolveGuestVisitLabels({ isGuest, articleVisibility = 'public', entryVisibility = '', publicGuestView = false } = {}) {
+    if (!isGuest) return null;
+    const vis = String(entryVisibility || articleVisibility || 'public').trim().toLowerCase();
+    const isPublicGuest = publicGuestView === true || vis === 'public';
+    if (isPublicGuest) {
+        return { userName: 'Guest (public)', userRoleLabel: 'Public guest' };
+    }
+    return { userName: 'Guest', userRoleLabel: 'Guest' };
+}
+
+function buildArticleVisitLogPage(analytics, query = {}, options = {}) {
+    const articleVisibility = String(options.articleVisibility || 'public').trim().toLowerCase();
     const logs = Array.isArray(analytics) ? analytics : [];
     let limit = Number.parseInt(query.limit, 10);
     if (!Number.isFinite(limit) || limit <= 0) {
@@ -668,14 +707,25 @@ function buildArticleVisitLogPage(analytics, query = {}) {
         const userId = userIdRaw != null && String(userIdRaw).trim() !== '' ? String(userIdRaw).trim() : null;
         const viewedAt = entry.timestamp || entry.viewedAt || '';
         const isGuest = !userId;
+        const guestLabels = resolveGuestVisitLabels({
+            isGuest,
+            articleVisibility,
+            entryVisibility: entry.articleVisibility,
+            publicGuestView: entry.publicGuestView === true
+        });
         return {
             userId: userId || '',
-            userName: isGuest ? 'Guest' : String(entry.userName || entry.displayName || '').trim(),
+            userName: guestLabels
+                ? guestLabels.userName
+                : String(entry.userName || entry.displayName || '').trim(),
             userRole: isGuest ? 'guest' : String(entry.userRole || 'user').trim(),
-            userRoleLabel: isGuest ? 'Guest' : formatVisitRoleLabel(entry.userRole || 'user'),
+            userRoleLabel: guestLabels
+                ? guestLabels.userRoleLabel
+                : formatVisitRoleLabel(entry.userRole || 'user'),
             viewedAt,
             orgId: entry.orgId != null ? String(entry.orgId) : '',
             isGuest,
+            isPublicGuest: Boolean(guestLabels && guestLabels.userRoleLabel === 'Public guest'),
             _sortTime: viewedAt ? Date.parse(viewedAt) : 0,
             _index: index
         };
@@ -695,17 +745,25 @@ function buildArticleVisitLogPage(analytics, query = {}) {
     };
 }
 
-async function enrichVisitLogNames(rows, actor) {
+async function enrichVisitLogNames(rows, actor, options = {}) {
+    const articleVisibility = String(options.articleVisibility || 'public').trim().toLowerCase();
     const list = Array.isArray(rows) ? rows : [];
     const userCache = new Map();
     const enriched = [];
 
     for (const row of list) {
         if (row.isGuest || !row.userId) {
+            const guestLabels = resolveGuestVisitLabels({
+                isGuest: true,
+                articleVisibility,
+                entryVisibility: row.articleVisibility,
+                publicGuestView: row.isPublicGuest === true || row.publicGuestView === true
+            });
             enriched.push({
                 ...row,
-                userName: 'Guest',
-                userRoleLabel: formatVisitRoleLabel('guest')
+                userName: guestLabels?.userName || 'Guest',
+                userRoleLabel: guestLabels?.userRoleLabel || formatVisitRoleLabel('guest'),
+                isPublicGuest: guestLabels?.userRoleLabel === 'Public guest'
             });
             continue;
         }
@@ -748,7 +806,7 @@ async function showStats(req, res) {
         // 1. Calculate History (Last 7 Days)
         // Note: Ideally you use real dates from item.analytics. 
         // If analytics is empty (old articles), we simulate based on totalViews for visual consistency.
-        const logs = Array.isArray(item.analytics) ? item.analytics : [];
+        const logs = resolveArticleVisitAnalytics(item);
         const dates = [];
         const viewHistory = [];
         let remaining = totalViews;
@@ -799,8 +857,8 @@ async function showStats(req, res) {
             wordCount: wordCount     // ✅ NEW: Real Value
         };
 
-        const visitLogPage = buildArticleVisitLogPage(logs, req.query);
-        const recentViewers = await enrichVisitLogNames(visitLogPage.rows, req.user);
+        const visitLogPage = buildArticleVisitLogPage(logs, req.query, { articleVisibility: visibility });
+        const recentViewers = await enrichVisitLogNames(visitLogPage.rows, req.user, { articleVisibility: visibility });
 
         res.render('news/stats', {
             title: 'News Analytics',
@@ -874,6 +932,8 @@ module.exports = {
     uploadMedia,
     listNewsMediaLibrary,
     buildArticleVisitLogPage,
+    resolveArticleVisitAnalytics,
+    resolveGuestVisitLabels,
     formatVisitRoleLabel,
     resolveUserDisplayName
 };

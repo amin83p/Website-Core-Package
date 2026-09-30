@@ -404,6 +404,47 @@ async function saveRule(req, res) {
 
 
 
+async function deleteRule(req, res) {
+
+  try {
+
+    const orgId = getActiveOrgIdOrThrow(req.user);
+
+    const access = await notificationCenterAccessService.buildAccessFlags(req.user, req.ip);
+
+    if (!access.canConfigure) throw new Error('Not authorized to configure notification rules.');
+
+    const ruleId = String(req.params.id || '').trim();
+
+    await notificationCenterRuleService.deleteRule(orgId, ruleId, req.user);
+
+    const actor = {
+      actor: {
+        userId: String(req.user?.id || req.user?.userId || '').trim(),
+        displayName: String(req.user?.displayName || req.user?.name || req.user?.email || 'Notification Centre').trim()
+      }
+    };
+    await syncAllRulesForOrg(orgId, req.user, {
+      ...actor,
+      schedulingTimezone: String(req.orgTimeZone || req.user?.activeOrgTimeZone || '').trim()
+    });
+
+    if (wantsJson(req)) return res.json({ status: 'ok' });
+
+    return res.redirect('/school/notification-center?ruleDeleted=1');
+
+  } catch (error) {
+
+    if (wantsJson(req)) return res.status(400).json({ status: 'error', message: error.message });
+
+    return res.status(400).render('error', { title: 'Error', message: error.message, error, user: req.user });
+
+  }
+
+}
+
+
+
 async function runRuleNow(req, res) {
 
   try {
@@ -815,6 +856,8 @@ module.exports = {
   showRuleForm,
 
   saveRule,
+
+  deleteRule,
 
   runRuleNow,
 
