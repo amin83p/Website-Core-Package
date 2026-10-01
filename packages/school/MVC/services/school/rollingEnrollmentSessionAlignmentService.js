@@ -163,6 +163,137 @@ function computeHourAllocation(countableSessions = [], targetHours = 0) {
   };
 }
 
+function normalizeOccupiedSessionIdSet(input) {
+  const set = new Set();
+  if (input instanceof Set) {
+    input.forEach((id) => {
+      const token = toPublicId(id);
+      if (token) set.add(token);
+    });
+    return set;
+  }
+  (Array.isArray(input) ? input : []).forEach((id) => {
+    const token = toPublicId(id);
+    if (token) set.add(token);
+  });
+  return set;
+}
+
+function resolveOccupiedSessionIdsFromSessions(sessions = [], { excludePersonId = '' } = {}) {
+  const exclude = toPublicId(excludePersonId);
+  const occupied = new Set();
+  (Array.isArray(sessions) ? sessions : []).forEach((session) => {
+    const sessionId = getSessionId(session);
+    if (!sessionId) return;
+    const roster = Array.isArray(session?.roster) ? session.roster : [];
+    const hasOtherOccupant = roster.some((row) => {
+      const personId = toPublicId(row?.personId);
+      if (!personId) return false;
+      if (exclude && idsEqual(personId, exclude)) return false;
+      return true;
+    });
+    if (hasOtherOccupant) occupied.add(sessionId);
+  });
+  return occupied;
+}
+
+/**
+ * Default 1-on-1 "unmark" (active) sessions: earliest selectable countable sessions
+ * from start date until session or hour cap is reached.
+ */
+function computeOneOnOneUnmarkSessionIdsForCap({
+  sessions = [],
+  startDate = '',
+  endDate = '',
+  targetHours = 0,
+  targetSessionCount = 0,
+  statusMap = {},
+  occupiedSessionIds = null
+} = {}) {
+  const hourTarget = classEnrollmentSessionApplicabilityService.normalizeTargetHours(targetHours);
+  const sessionTarget = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(targetSessionCount);
+  const warnings = [];
+  if (!hourTarget && !sessionTarget) {
+    return {
+      sessionIds: [],
+      allocatedHours: 0,
+      allocatedSessionCount: 0,
+      gapHours: 0,
+      gapCount: 0,
+      warnings: ['no_cap']
+    };
+  }
+
+  const listed = listSessionsInWindow({ sessions, startDate, endDate, statusMap });
+  const occupied = occupiedSessionIds === null || occupiedSessionIds === undefined
+    ? resolveOccupiedSessionIdsFromSessions(sessions)
+    : (occupiedSessionIds instanceof Set
+      ? occupiedSessionIds
+      : normalizeOccupiedSessionIdSet(occupiedSessionIds));
+  const selectableCountable = listed.countableSessions.filter((row) => {
+    const sessionId = toPublicId(row?.sessionId);
+    return sessionId && !occupied.has(sessionId);
+  });
+
+  if (!selectableCountable.length) {
+    warnings.push('no_selectable_sessions');
+    return {
+      sessionIds: [],
+      allocatedHours: 0,
+      allocatedSessionCount: 0,
+      gapHours: hourTarget || 0,
+      gapCount: sessionTarget || 0,
+      warnings
+    };
+  }
+
+  const sessionIds = [];
+  let allocatedHours = 0;
+
+  if (hourTarget > 0) {
+    selectableCountable.forEach((row) => {
+      if (allocatedHours >= hourTarget) return;
+      const sessionId = toPublicId(row.sessionId);
+      if (!sessionId) return;
+      const hours = Number(row?.durationHours || 0);
+      sessionIds.push(sessionId);
+      allocatedHours = classEnrollmentSessionApplicabilityService.roundTargetHours(allocatedHours + hours);
+    });
+    const availableHours = sumCountableHours(selectableCountable);
+    const gapHours = allocatedHours < hourTarget
+      ? classEnrollmentSessionApplicabilityService.roundTargetHours(hourTarget - allocatedHours)
+      : 0;
+    if (gapHours > 0) warnings.push('insufficient_hours');
+    return {
+      sessionIds,
+      allocatedHours,
+      allocatedSessionCount: sessionIds.length,
+      gapHours,
+      gapCount: 0,
+      warnings
+    };
+  }
+
+  const take = Math.min(sessionTarget, selectableCountable.length);
+  for (let i = 0; i < take; i += 1) {
+    const sessionId = toPublicId(selectableCountable[i]?.sessionId);
+    if (sessionId) sessionIds.push(sessionId);
+  }
+  allocatedHours = sumCountableHours(selectableCountable.slice(0, sessionIds.length));
+  const gapCount = sessionIds.length < sessionTarget
+    ? sessionTarget - sessionIds.length
+    : 0;
+  if (gapCount > 0) warnings.push('insufficient_sessions');
+  return {
+    sessionIds,
+    allocatedHours,
+    allocatedSessionCount: sessionIds.length,
+    gapHours: 0,
+    gapCount,
+    warnings
+  };
+}
+
 function evaluateHourAlignment({
   sessions = [],
   startDate = '',
@@ -1301,6 +1432,8 @@ module.exports = {
   resolveDisplaySessionTarget,
   resolveDisplayHourTarget,
   computeHourAllocation,
+  computeOneOnOneUnmarkSessionIdsForCap,
+  resolveOccupiedSessionIdsFromSessions,
   sumCountableHours,
   validatePlannedNaSelection,
   validatePlannedNaSelectionForHours,

@@ -4350,6 +4350,22 @@ async function manageSession(req, res) {
         const conductEditLocked = !conductEditAccess.editable && !canOverrideCompletedSections;
         const curriculumEditLocked = !curriculumEditAccess.editable && !canOverrideCompletedSections;
         const studentCasesEditLocked = !studentCasesEditAccess.editable && !canOverrideCompletedSections;
+        const canRevertCompletedSessionStatus = await schoolAdminAccessService.canRevertCompletedSessionStatusAsync(req.user);
+        const isCompletedSessionForStatusPolicy = sessionStatusPolicyService.isSessionCompletionStatusByMap(
+            completedSessionStatusMap,
+            session
+        );
+        const anyCompletedSectionEditWindowExpired = !attendanceEditAccess.editable
+            || !notesEditAccess.editable
+            || !gradebookEditAccess.editable
+            || !conductEditAccess.editable
+            || !curriculumEditAccess.editable
+            || !studentCasesEditAccess.editable;
+        const completedStatusRevertLocked = Boolean(
+            isCompletedSessionForStatusPolicy
+            && !canRevertCompletedSessionStatus
+            && anyCompletedSectionEditWindowExpired
+        );
         const timesheetMetadataLockActive = isTimesheetSessionLock;
         const timesheetDeletionLockActive = isTimesheetSessionLock;
         const isReadOnly = !canEditSession || (isAdministrativeSessionLock && !canOverride);
@@ -4706,6 +4722,8 @@ async function manageSession(req, res) {
             curriculumEditLocked,
             studentCasesEditAccess,
             studentCasesEditLocked,
+            canRevertCompletedSessionStatus,
+            completedStatusRevertLocked,
             timesheetMetadataLockActive,
             timesheetDeletionLockActive,
             canEditSessionMetadata: canOverride,

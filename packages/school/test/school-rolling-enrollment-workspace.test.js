@@ -154,6 +154,60 @@ test('buildEnrollmentSessionPickerPayloadSync uses persisted sessions without re
   assert.equal(payload.enrollmentAlignment.alignmentStatus, 'overage_requires_na');
 });
 
+test('buildEnrollmentSessionPickerPayloadSync suggests unmark ids for one-on-one hour cap', () => {
+  const pickerService = require('../MVC/services/school/sessionEnrollmentPickerService');
+  const sessions = [
+    { sessionId: 'SES_H1', date: '2026-01-05', status: 'scheduled', durationHours: 3 },
+    { sessionId: 'SES_H2', date: '2026-01-12', status: 'scheduled', durationHours: 3 },
+    { sessionId: 'SES_H3', date: '2026-01-19', status: 'scheduled', durationHours: 3 }
+  ];
+  const payload = pickerService.buildEnrollmentSessionPickerPayloadSync({
+    classData: {
+      id: 'CLS_PICKER_1ON1',
+      orgId: 'ORG_900000',
+      registrationMode: 'rolling',
+      enrollment: { maxCapacity: 1 }
+    },
+    persistedSessions: sessions,
+    statusMap: STATUS_MAP,
+    startDate: '2026-01-01',
+    endDate: '',
+    targetHours: 6,
+    sessionCapacityType: 'one_on_one',
+    viewPreset: 'week',
+    anchorDate: '2026-01-05'
+  });
+  assert.deepEqual(payload.suggestedUnmarkSessionIds, ['SES_H1', 'SES_H2']);
+});
+
+test('buildEnrollmentSessionPickerPayloadSync applies suggested unmark to summary when selection empty', () => {
+  const pickerService = require('../MVC/services/school/sessionEnrollmentPickerService');
+  const sessions = [
+    { sessionId: 'SES_H1', date: '2026-01-05', status: 'scheduled', durationHours: 3 },
+    { sessionId: 'SES_H2', date: '2026-01-12', status: 'scheduled', durationHours: 3 }
+  ];
+  const payload = pickerService.buildEnrollmentSessionPickerPayloadSync({
+    classData: {
+      id: 'CLS_PICKER_1ON1',
+      orgId: 'ORG_900000',
+      registrationMode: 'rolling',
+      enrollment: { maxCapacity: 1 }
+    },
+    persistedSessions: sessions,
+    statusMap: STATUS_MAP,
+    startDate: '2026-01-01',
+    endDate: '',
+    targetHours: 6,
+    sessionCapacityType: 'one_on_one',
+    selectedSessionIds: [],
+    viewPreset: 'week',
+    anchorDate: '2026-01-05'
+  });
+  assert.equal(payload.summary.selectedCount, 2);
+  assert.equal(payload.summary.selectedHours, 6);
+  assert.equal(payload.allEvents.filter((row) => row.selected).length, 2);
+});
+
 test('filterSessionsInEnrollmentWindow scopes sessions to enrollment dates', () => {
   const sessions = [
     scheduledSession('SES_EARLY', '2025-12-15'),

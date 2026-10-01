@@ -249,6 +249,44 @@ async function canEditAssigneeTimingAsync(user) {
   return false;
 }
 
+async function canRevertCompletedSessionStatusAsync(user) {
+  if (!user) return false;
+  const orgId = user?.activeOrgId;
+  const operationId = OPERATIONS.UPDATE;
+  const sectionId = SECTIONS.SCHOOL_SESSIONS;
+
+  const authority = await adminAuthorityService.resolveAdminAuthorityAsync({
+    user,
+    sectionId,
+    operationId,
+    orgId,
+    section: { id: sectionId, category: 'SCHOOL' }
+  });
+  if (isFamilyABypassAdminAuthority(authority)) {
+    return true;
+  }
+  if (authority.isOperationAdminForRequest) {
+    return true;
+  }
+
+  const evaluation = await accessService.evaluateAccess({
+    user,
+    sectionId,
+    operationId,
+    orgId,
+    ipAddress: ''
+  });
+  if (!evaluation?.allowed) return false;
+  if (isFamilyABypassAdminAuthority(evaluation.adminContext || {})) {
+    return true;
+  }
+  const scopeId = String(
+    evaluation.scopeId || evaluation.effectiveAccess?.operation?.scopeId || ''
+  ).trim();
+  const scopeMode = scopeId ? await effectiveAccessResolverService.getScopeMode(scopeId) : '';
+  return isFamilyBReadAllOrgOrAdminScope(scopeMode);
+}
+
 module.exports = {
   isSuperAdmin,
   isAdminForSection,
@@ -279,5 +317,6 @@ module.exports = {
   isAttendancesAdminViewerAsync,
   canViewStatHolidayPayWarningsPanelAsync,
   canEditAssigneeTimingAsync,
+  canRevertCompletedSessionStatusAsync,
   isFamilyABypassAdminAuthority
 };

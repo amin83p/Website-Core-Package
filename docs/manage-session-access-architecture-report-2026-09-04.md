@@ -315,6 +315,7 @@ When a session reaches a **completion status** (per org session status policy), 
 | `conduct` | `completedSessionConductEdit` | Class Conduct Before Reports | Class admin |
 | `curriculum` | `completedSessionCurriculumEdit` | Curriculum | Class admin |
 | `studentcases` | `completedSessionStudentCasesEdit` | Student Cases | Class admin |
+| Status revert (completed → non-completed) | Same window targets as above (any expired blocks teachers) | Session status | Admin Family A; `SCHOOL_SESSIONS` UPDATE with organization or admin scope (Family B) |
 
 Window types include end of week, end of month, timesheet period end, and days after session. When a policy is disabled, a fixed one-day grace applies.
 

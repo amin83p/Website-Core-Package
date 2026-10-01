@@ -2876,10 +2876,20 @@
     }
     state.enrollmentAlignment = data.enrollmentAlignment || null;
     if (Array.isArray(data.selectableSessionIds)) state.selectableSessionIds = data.selectableSessionIds;
+    if (Array.isArray(data.suggestedUnmarkSessionIds) && data.suggestedUnmarkSessionIds.length) {
+      data.suggestedUnmarkSessionIds.forEach((sessionId) => {
+        const token = String(sessionId || '').trim();
+        if (token) state.selectedSet.add(token);
+      });
+      allEvents.forEach((row) => {
+        const token = String(row?.sessionId || '').trim();
+        if (token && state.selectedSet.has(token)) row.selected = true;
+      });
+    }
     syncPresetButtons();
     syncViewModeButtons();
     renderCalendar();
-    updateSummary(data.summary);
+    updateSummary(Number(data?.summary?.selectedCount || 0) > 0 ? data.summary : null);
     if (isPartialMode() && options.scrollToFirstStaged !== false) {
       scrollPartialToFirstStagedSession();
     }
@@ -3222,7 +3232,10 @@
     }
     summaryEl = qs('sessionEnrollmentCalendarSummary');
     if (!summaryEl) return;
-    const summary = serverSummary || core.summarizeSelectionFromEvents(allEvents, state.selectedSet);
+    const localSummary = core.summarizeSelectionFromEvents(allEvents, state.selectedSet);
+    const summary = (serverSummary && Number(serverSummary.selectedCount || 0) > 0)
+      ? serverSummary
+      : localSummary;
     const count = Number(summary?.selectedCount || 0);
     const hours = Number(summary?.selectedHours || 0);
     const start = String(summary?.selectionStartDate || '').trim();

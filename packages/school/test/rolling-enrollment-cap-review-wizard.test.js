@@ -61,7 +61,16 @@ test('one-on-one enrollment advances to unmark sessions step', () => {
 test('wizard step meta exposes unmark step for one-on-one path', () => {
   const meta = functionSource('getEnrollmentWizardStepMeta', 'renderEnrollmentWizardStepIndicator');
   assert.match(meta, /enrollWizardPath === 'oneOnOne'/);
-  assert.match(meta, /id: 'unmarkSessions', label: 'Unmark Sessions'/);
+  assert.match(meta, /id: 'unmarkSessions', label: 'Review sessions'/);
+});
+
+test('one-on-one unmark step auto-selects sessions from cap allocation', () => {
+  const prepare = functionSource('prepareUnmarkSessionsStep', 'renderUnmarkSessionTable');
+  assert.match(prepare, /refreshAutoUnmarkSelectionIfNeeded/);
+  assert.match(prepare, /pre-selected/);
+  assert.match(viewSource, /function computeAutoUnmarkSessionIds\(/);
+  assert.match(viewSource, /function refreshAutoUnmarkSelectionIfNeeded\(/);
+  assert.match(viewSource, /RollingEnrollmentAlignmentClient\.computeOneOnOneUnmarkSessionIdsForCap/);
 });
 
 test('form step shows Next only for one-on-one session capacity', () => {
@@ -80,8 +89,8 @@ test('unmark step primary action requires at least one selected session', () => 
 test('group cap hint does not route through cap review Next copy', () => {
   const hint = functionSource('updateSessionCountHint', 'getEnrollmentWizardStepMeta');
   assert.match(hint, /isOneOnOneSessionCapacityEnrollment\(\)/);
-  assert.match(hint, /Use Next to pick sessions to unmark/);
-  assert.doesNotMatch(hint, /Use Next to review and optionally manage sessions/);
+  assert.match(hint, /Use Next to review pre-selected sessions/);
+  assert.doesNotMatch(hint, /Use Next to pick sessions to unmark/);
 });
 
 test('syncEnrollmentWizardPathFromCap routes one-on-one only', () => {
@@ -127,7 +136,7 @@ test('enrollment picker calendar modal passes cycle end date', () => {
 
 test('unmark step hides inline session table panel', () => {
   assert.match(viewSource, /id="unmarkSessionsTablePanel"[^>]*class="[^"]*\bd-none\b/);
-  assert.match(viewSource, /Choose empty sessions for this student/);
+  assert.match(viewSource, /pre-selected for/);
 });
 
 test('unmark occupancy helpers and occupied row styling exist', () => {

@@ -8,6 +8,7 @@ const schoolDependencyService = require('./schoolDependencyService');
 const schoolDeletionGuardService = require('./schoolDeletionGuardService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const sessionAttendanceEditAccessService = require('./sessionAttendanceEditAccessService');
+const schoolAdminAccessService = require('./schoolAdminAccessService');
 const makeupSessionAllocationService = require('./makeupSessionAllocationService');
 const bookCoveringReportService = require('./bookCoveringReportService');
 
@@ -87,6 +88,7 @@ const ERROR_CODES = Object.freeze({
   DELETE: 'SESSION_DELETE_BLOCKED',
   DATE_MOVE: 'SESSION_DATE_MOVE_BLOCKED',
   TIME_CHANGE: 'SESSION_TIME_CHANGE_BLOCKED',
+  COMPLETED_STATUS_REVERT: 'SESSION_COMPLETED_STATUS_REVERT_BLOCKED',
   GENERIC: 'SESSION_OPERATION_BLOCKED'
 });
 
@@ -602,6 +604,108 @@ async function assertDeletionGuardBlockers({
   });
 }
 
+async function hasAnyExpiredCompletedSectionEditWindow({
+  orgId = '',
+  session,
+  orgTimeZone = '',
+  statusMap,
+  policy = null
+}) {
+  const resolvedOrgId = toPublicId(orgId);
+  const sectionTargets = Object.values(sessionAttendanceEditAccessService.SECTION_EDIT_TARGETS || {});
+  let resolvedPolicy = policy;
+  for (const targetDef of sectionTargets) {
+    const targetKey = targetDef?.key || 'attendance';
+    // eslint-disable-next-line no-await-in-loop
+    const access = await sessionAttendanceEditAccessService.resolveSessionSectionEditAccess({
+      orgId: resolvedOrgId,
+      session,
+      policy: resolvedPolicy,
+      orgTimeZone,
+      target: targetKey,
+      statusMap
+    });
+    if (!resolvedPolicy && access?.policy) {
+      resolvedPolicy = access.policy;
+    }
+    if (!access.editable) {
+      return true;
+    }
+  }
+  return false;
+}
+
+async function isCompletedStatusRevertLockedForSession({
+  session,
+  orgId = '',
+  orgTimeZone = '',
+  reqUser,
+  statusMap = null,
+  canRevertCompletedStatus = null
+}) {
+  const resolvedOrgId = toPublicId(orgId);
+  const effectiveStatusMap = statusMap instanceof Map
+    ? statusMap
+    : await sessionStatusPolicyService.getStatusMap(resolvedOrgId, { includeInactive: true });
+  if (!sessionStatusPolicyService.isSessionCompletionStatusByMap(effectiveStatusMap, session)) {
+    return false;
+  }
+  const canRevert = canRevertCompletedStatus === null
+    ? await schoolAdminAccessService.canRevertCompletedSessionStatusAsync(reqUser)
+    : Boolean(canRevertCompletedStatus);
+  if (canRevert) return false;
+  return hasAnyExpiredCompletedSectionEditWindow({
+    orgId: resolvedOrgId,
+    session,
+    orgTimeZone,
+    statusMap: effectiveStatusMap
+  });
+}
+
+async function assertCompletedStatusRevertAllowed({
+  session,
+  proposedChanges = {},
+  orgId = '',
+  orgTimeZone = '',
+  reqUser,
+  statusMap = null
+}) {
+  const resolvedOrgId = toPublicId(orgId);
+  const effectiveStatusMap = statusMap instanceof Map
+    ? statusMap
+    : await sessionStatusPolicyService.getStatusMap(resolvedOrgId, { includeInactive: true });
+  if (!sessionStatusPolicyService.isSessionCompletionStatusByMap(effectiveStatusMap, session)) {
+    return;
+  }
+  const proposedStatus = sessionStatusPolicyService.normalizeStatusCode(proposedChanges?.status);
+  if (!proposedStatus) return;
+  if (sessionStatusPolicyService.isSessionCompletionStatusByMap(effectiveStatusMap, {
+    status: proposedStatus,
+    notes: session?.notes
+  })) {
+    return;
+  }
+  const locked = await isCompletedStatusRevertLockedForSession({
+    session,
+    orgId: resolvedOrgId,
+    orgTimeZone,
+    reqUser,
+    statusMap: effectiveStatusMap
+  });
+  if (!locked) return;
+
+  throw new SessionOperationBlockedError({
+    code: ERROR_CODES.COMPLETED_STATUS_REVERT,
+    operation: SESSION_OPERATIONS.CHANGE_STATUS,
+    blockers: [{
+      code: ERROR_CODES.COMPLETED_STATUS_REVERT,
+      label: 'Completed session edit window',
+      count: 1
+    }],
+    message: 'Session status cannot be changed from a completed status after the completed session edit window has ended. Contact an administrator if you need an override.'
+  });
+}
+
 async function assertInstructionalEditAllowed({
   operation,
   session,
@@ -734,6 +838,17 @@ async function assertSessionOperationAllowed({
   const operationResult = policy.operations[resolvedOperation] || { allowed: true, blockers: [] };
   assertOperationPermissionResult(resolvedOperation, operationResult);
 
+  if (resolvedOperation === SESSION_OPERATIONS.CHANGE_STATUS) {
+    await assertCompletedStatusRevertAllowed({
+      session,
+      proposedChanges,
+      orgId: resolvedOrgId,
+      orgTimeZone,
+      reqUser,
+      statusMap
+    });
+  }
+
   const timesheetScopes = resolveTimesheetScopesForOperation(resolvedOperation, proposedChanges, session);
   if (timesheetScopes.length) {
     schoolDependencyService.assertSessionTimesheetLockAllowsMutationScopes(session, timesheetScopes, 'This session');
@@ -782,9 +897,17 @@ async function buildSessionManagementFlagsForClassSessions({
   allSessions = null,
   reqUser,
   source = 'master_schedule',
-  accessContext = {}
+  accessContext = {},
+  orgId = '',
+  orgTimeZone = ''
 }) {
   const classRow = classData || await schoolDataService.getDataById('classes', toPublicId(classId), reqUser, accessContext);
+  const resolvedOrgId = toPublicId(orgId || classRow?.orgId || reqUser?.activeOrgId);
+  const resolvedOrgTimeZone = String(orgTimeZone || reqUser?.activeOrgTimeZone || '').trim();
+  const statusMap = resolvedOrgId
+    ? await sessionStatusPolicyService.getStatusMap(resolvedOrgId, { includeInactive: true })
+    : new Map();
+  const canRevertCompletedStatus = await schoolAdminAccessService.canRevertCompletedSessionStatusAsync(reqUser);
   const batch = await prefetchClassSessionActivityData({
     classId,
     classData: classRow,
@@ -822,11 +945,25 @@ async function buildSessionManagementFlagsForClassSessions({
       source
     });
     const permissions = evaluateOperationPermissions({ activity, structuralLocks });
+    let canChangeStatus = permissions.operations[SESSION_OPERATIONS.CHANGE_STATUS].allowed;
+    if (canChangeStatus && resolvedOrgId) {
+      const revertLocked = await isCompletedStatusRevertLockedForSession({
+        session,
+        orgId: resolvedOrgId,
+        orgTimeZone: resolvedOrgTimeZone,
+        reqUser,
+        statusMap,
+        canRevertCompletedStatus
+      });
+      if (revertLocked) {
+        canChangeStatus = false;
+      }
+    }
     flagsBySessionId.set(sessionId, {
       canDelete: permissions.operations[SESSION_OPERATIONS.DELETE].allowed,
       canChangeDate: permissions.operations[SESSION_OPERATIONS.CHANGE_DATE].allowed,
       canChangeTime: permissions.operations[SESSION_OPERATIONS.CHANGE_TIME].allowed,
-      canChangeStatus: permissions.operations[SESSION_OPERATIONS.CHANGE_STATUS].allowed,
+      canChangeStatus,
       blockers: permissions.operations[SESSION_OPERATIONS.DELETE].blockers
     });
   }

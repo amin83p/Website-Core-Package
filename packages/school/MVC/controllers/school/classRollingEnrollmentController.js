@@ -3087,6 +3087,7 @@ async function postEnrollmentSessionPicker(req, res) {
       statusMapOverride: (req.body?.statusMap && typeof req.body.statusMap === 'object')
         ? req.body.statusMap
         : null,
+      sessionCapacityType: String(req.body?.sessionCapacityType || '').trim(),
       reqUser: req.user
     });
 
@@ -3101,7 +3102,8 @@ async function postEnrollmentSessionPicker(req, res) {
         selectableSessionIds: payload.selectableSessionIds,
         summary: payload.summary,
         enrollmentAlignment: payload.enrollmentAlignment,
-        studentId: payload.studentId
+        studentId: payload.studentId,
+        suggestedUnmarkSessionIds: payload.suggestedUnmarkSessionIds || []
       }
     });
   } catch (error) {

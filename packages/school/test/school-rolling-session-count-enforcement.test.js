@@ -304,3 +304,84 @@ test('evaluateAlignment is ok when scheduled hours match hour target', () => {
   assert.equal(result.availableHours, 20);
   assert.equal(result.allocatedSessionCount, 4);
 });
+
+test('computeOneOnOneUnmarkSessionIdsForCap selects sessions until hour target is reached', () => {
+  const sessions = Array.from({ length: 12 }, (_, index) => scheduledSession(
+    `SES_${index + 1}`,
+    `2026-09-${String(index + 1).padStart(2, '0')}`,
+    3
+  ));
+  const result = alignmentService.computeOneOnOneUnmarkSessionIdsForCap({
+    sessions,
+    startDate: '2026-09-01',
+    endDate: '',
+    targetHours: 35
+  });
+  assert.equal(result.sessionIds.length, 12);
+  assert.equal(result.allocatedHours, 36);
+  assert.equal(result.sessionIds[0], 'SES_1');
+  assert.equal(result.sessionIds[11], 'SES_12');
+});
+
+test('computeOneOnOneUnmarkSessionIdsForCap hour target 22 selects eight sessions', () => {
+  const sessions = Array.from({ length: 12 }, (_, index) => scheduledSession(
+    `SES_${index + 1}`,
+    `2026-09-${String(index + 1).padStart(2, '0')}`,
+    3
+  ));
+  const result = alignmentService.computeOneOnOneUnmarkSessionIdsForCap({
+    sessions,
+    startDate: '2026-09-01',
+    endDate: '',
+    targetHours: 22
+  });
+  assert.equal(result.sessionIds.length, 8);
+  assert.equal(result.allocatedHours, 24);
+});
+
+test('computeOneOnOneUnmarkSessionIdsForCap session target selects first N selectable sessions', () => {
+  const sessions = Array.from({ length: 10 }, (_, index) => scheduledSession(
+    `SES_${index + 1}`,
+    `2026-09-${String(index + 1).padStart(2, '0')}`,
+    3
+  ));
+  const result = alignmentService.computeOneOnOneUnmarkSessionIdsForCap({
+    sessions,
+    startDate: '2026-09-01',
+    endDate: '',
+    targetSessionCount: 5
+  });
+  assert.deepEqual(result.sessionIds, ['SES_1', 'SES_2', 'SES_3', 'SES_4', 'SES_5']);
+  assert.equal(result.allocatedSessionCount, 5);
+});
+
+test('computeOneOnOneUnmarkSessionIdsForCap skips occupied sessions in chronological order', () => {
+  const sessions = [
+    scheduledSession('SES_001', '2026-09-01', 3),
+    { ...scheduledSession('SES_002', '2026-09-02', 3), roster: [{ personId: 'PERSON_OTHER' }] },
+    scheduledSession('SES_003', '2026-09-03', 3),
+    scheduledSession('SES_004', '2026-09-04', 3)
+  ];
+  const result = alignmentService.computeOneOnOneUnmarkSessionIdsForCap({
+    sessions,
+    startDate: '2026-09-01',
+    endDate: '',
+    targetSessionCount: 2
+  });
+  assert.deepEqual(result.sessionIds, ['SES_001', 'SES_003']);
+});
+
+test('computeOneOnOneUnmarkSessionIdsForCap reports insufficient hours when schedule is short', () => {
+  const result = alignmentService.computeOneOnOneUnmarkSessionIdsForCap({
+    sessions: [
+      scheduledSession('SES_001', '2026-09-01', 3),
+      scheduledSession('SES_002', '2026-09-02', 3)
+    ],
+    startDate: '2026-09-01',
+    endDate: '',
+    targetHours: 20
+  });
+  assert.equal(result.sessionIds.length, 2);
+  assert.equal(result.gapHours, 14);
+  assert.ok(result.warnings.includes('insufficient_hours'));
+});

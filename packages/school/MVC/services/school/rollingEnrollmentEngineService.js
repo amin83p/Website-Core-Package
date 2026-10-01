@@ -284,14 +284,48 @@ async function augmentEnrollmentPayloadForSessionCapacity({
   );
   enrollmentPayload.sessionCapacityType = effectiveSessionCapacityType;
   if (effectiveSessionCapacityType !== 'one_on_one') return enrollmentPayload;
-  const activeSessionIds = rollingEnrollmentSessionAlignmentService.sanitizePlannedNaSessionIds(
+
+  let activeSessionIds = rollingEnrollmentSessionAlignmentService.sanitizePlannedNaSessionIds(
     studentEntry?.unmarkSessionIds || normalized?.unmarkSessionIds || []
   );
-  if (!activeSessionIds.length) return enrollmentPayload;
+  const targetHours = classEnrollmentSessionApplicabilityService.normalizeTargetHours(
+    normalized?.targetHours || enrollmentPayload?.targetHours
+  );
+  const targetSessionCount = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(
+    normalized?.targetSessionCount || enrollmentPayload?.targetSessionCount
+  );
+
   let sessions = Array.isArray(classData?.sessions) ? classData.sessions : [];
   if (!sessions.length) {
     sessions = await schoolDataService.getClassSessions(classData?.id, reqUser);
   }
+
+  if (!activeSessionIds.length && (targetHours > 0 || targetSessionCount > 0)) {
+    const activeOrgId = toPublicId(classData?.orgId || reqUser?.activeOrgId || '');
+    const statusMap = await sessionStatusPolicyService.getStatusMap(activeOrgId, { includeInactive: true });
+    const occupiedSessionIds = rollingEnrollmentSessionAlignmentService.resolveOccupiedSessionIdsFromSessions(
+      sessions,
+      { excludePersonId: enrollmentPayload?.personId || studentEntry?.personId || '' }
+    );
+    const allocation = rollingEnrollmentSessionAlignmentService.computeOneOnOneUnmarkSessionIdsForCap({
+      sessions,
+      startDate: normalized.startDate,
+      endDate: normalized.endDate,
+      targetHours,
+      targetSessionCount,
+      statusMap,
+      occupiedSessionIds
+    });
+    activeSessionIds = rollingEnrollmentSessionAlignmentService.sanitizePlannedNaSessionIds(allocation.sessionIds);
+    if (activeSessionIds.length) {
+      if (studentEntry && typeof studentEntry === 'object') {
+        studentEntry.unmarkSessionIds = activeSessionIds;
+      }
+      normalized.unmarkSessionIds = activeSessionIds;
+    }
+  }
+
+  if (!activeSessionIds.length) return enrollmentPayload;
   enrollmentPayload.plannedNotApplicableSessionIds = rollingEnrollmentSessionAlignmentService.computeOneOnOneExcludedSessionIds({
     sessions,
     startDate: normalized.startDate,

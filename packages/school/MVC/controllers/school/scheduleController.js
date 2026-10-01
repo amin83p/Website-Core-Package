@@ -1631,7 +1631,9 @@ async function buildEventsForPersonAndRange({
             allSessions: Array.isArray(sessions) ? sessions : [],
             reqUser,
             source: 'master_schedule',
-            accessContext
+            accessContext,
+            orgId: activeOrgId,
+            orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || ''
         });
 
         for (const session of sessions || []) {

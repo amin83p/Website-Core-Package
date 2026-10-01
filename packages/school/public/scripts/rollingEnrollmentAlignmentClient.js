@@ -224,6 +224,105 @@
     };
   }
 
+  function normalizeOccupiedSessionIdSet(input) {
+    const set = new Set();
+    if (input instanceof Set) {
+      input.forEach((id) => {
+        const token = String(id || '').trim();
+        if (token) set.add(token);
+      });
+      return set;
+    }
+    (Array.isArray(input) ? input : []).forEach((id) => {
+      const token = String(id || '').trim();
+      if (token) set.add(token);
+    });
+    return set;
+  }
+
+  function computeOneOnOneUnmarkSessionIdsForCap({
+    sessions = [],
+    startDate = '',
+    endDate = '',
+    targetHours = 0,
+    targetSessionCount = 0,
+    statusMap = {},
+    occupiedSessionIds = null
+  } = {}) {
+    const hourTarget = normalizeTargetHours(targetHours);
+    const sessionTarget = normalizeTargetSessionCount(targetSessionCount);
+    const warnings = [];
+    if (!hourTarget && !sessionTarget) {
+      return {
+        sessionIds: [],
+        allocatedHours: 0,
+        allocatedSessionCount: 0,
+        gapHours: 0,
+        gapCount: 0,
+        warnings
+      };
+    }
+    const listed = listSessionsInWindow({ sessions, startDate, endDate, statusMap });
+    const occupied = occupiedSessionIds === null || occupiedSessionIds === undefined
+      ? new Set()
+      : normalizeOccupiedSessionIdSet(occupiedSessionIds);
+    const selectableCountable = listed.countableSessions.filter((row) => {
+      const sessionId = String(row?.sessionId || '').trim();
+      return sessionId && !occupied.has(sessionId);
+    });
+    if (!selectableCountable.length) {
+      warnings.push('no_selectable_sessions');
+      return {
+        sessionIds: [],
+        allocatedHours: 0,
+        allocatedSessionCount: 0,
+        gapHours: hourTarget || 0,
+        gapCount: sessionTarget || 0,
+        warnings
+      };
+    }
+    const sessionIds = [];
+    let allocatedHours = 0;
+    if (hourTarget > 0) {
+      selectableCountable.forEach((row) => {
+        if (allocatedHours >= hourTarget) return;
+        const sessionId = String(row?.sessionId || '').trim();
+        if (!sessionId) return;
+        const hours = Number(row?.durationHours || 0);
+        sessionIds.push(sessionId);
+        allocatedHours = roundTargetHours(allocatedHours + hours);
+      });
+      const gapHours = allocatedHours < hourTarget
+        ? roundTargetHours(hourTarget - allocatedHours)
+        : 0;
+      if (gapHours > 0) warnings.push('insufficient_hours');
+      return {
+        sessionIds,
+        allocatedHours,
+        allocatedSessionCount: sessionIds.length,
+        gapHours,
+        gapCount: 0,
+        warnings
+      };
+    }
+    const take = Math.min(sessionTarget, selectableCountable.length);
+    for (let i = 0; i < take; i += 1) {
+      const sessionId = String(selectableCountable[i]?.sessionId || '').trim();
+      if (sessionId) sessionIds.push(sessionId);
+    }
+    allocatedHours = sumCountableHours(selectableCountable.slice(0, sessionIds.length));
+    const gapCount = sessionIds.length < sessionTarget ? sessionTarget - sessionIds.length : 0;
+    if (gapCount > 0) warnings.push('insufficient_sessions');
+    return {
+      sessionIds,
+      allocatedHours,
+      allocatedSessionCount: sessionIds.length,
+      gapHours: 0,
+      gapCount,
+      warnings
+    };
+  }
+
   function evaluateHourAlignment({
     sessions = [],
     startDate = '',
@@ -518,6 +617,8 @@
   const api = {
     evaluateAlignment,
     evaluateHourAlignment,
+    computeHourAllocation,
+    computeOneOnOneUnmarkSessionIdsForCap,
     listSessionsInWindow,
     classifySessionForWindow,
     buildAlignmentPayload,

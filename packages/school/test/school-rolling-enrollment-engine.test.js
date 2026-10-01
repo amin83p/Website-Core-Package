@@ -383,6 +383,95 @@ test('execute unmarks selected sessions for one-on-one enrollment', async (t) =>
   assert.deepEqual(clearedSessionIds, ['SES_010']);
 });
 
+test('execute auto-selects one-on-one hour-cap sessions when unmarkSessionIds omitted', async (t) => {
+  const originalGetById = schoolDataService.getDataById;
+  const originalGetSessions = schoolDataService.getClassSessions;
+  const originalCreate = schoolDataService.createClassEnrollmentPeriod;
+  const originalStatusMap = sessionStatusPolicyService.getStatusMap;
+  const originalClear = enrollmentSessionMarksService.clearRosterNaForSessions;
+  const originalGetPeriods = schoolDataService.getClassEnrollmentPeriodsByClassId;
+  const originalAlignment = alignmentService.assertEnrollmentSessionAlignmentForCreate;
+
+  let clearedSessionIds = [];
+  let createdPayload = null;
+  const classSessions = [
+    { id: 'SES_001', sessionId: 'SES_001', date: '2026-01-05', status: 'scheduled', durationHours: 3 },
+    { id: 'SES_002', sessionId: 'SES_002', date: '2026-01-12', status: 'scheduled', durationHours: 3 },
+    { id: 'SES_003', sessionId: 'SES_003', date: '2026-01-19', status: 'scheduled', durationHours: 3 }
+  ];
+
+  schoolDataService.getDataById = async (collection, id) => {
+    if (collection === 'students' && id === 'STU_OK') {
+      return { id: 'STU_OK', orgId: classData.orgId, personId: 'PERSON_OK' };
+    }
+    return null;
+  };
+  schoolDataService.getClassSessions = async () => classSessions;
+  schoolDataService.getClassEnrollmentPeriodsByClassId = async () => [];
+  sessionStatusPolicyService.getStatusMap = async () => new Map([
+    ['scheduled', { code: 'scheduled', countable: true }]
+  ]);
+  alignmentService.assertEnrollmentSessionAlignmentForCreate = () => ({
+    enforceSessionCount: true,
+    alignmentStatus: 'ok'
+  });
+  schoolDataService.createClassEnrollmentPeriod = async (payload) => {
+    createdPayload = payload;
+    return {
+      period: {
+        id: 'EP_003',
+        status: 'active',
+        studentId: 'STU_OK',
+        personId: 'PERSON_OK',
+        sessionCapacityType: 'one_on_one',
+        plannedNotApplicableSessionIds: payload.plannedNotApplicableSessionIds || []
+      }
+    };
+  };
+  enrollmentSessionMarksService.clearRosterNaForSessions = async ({ sessionIds }) => {
+    clearedSessionIds = sessionIds.slice();
+    return { updatedCount: sessionIds.length };
+  };
+
+  t.after(() => {
+    schoolDataService.getDataById = originalGetById;
+    schoolDataService.getClassSessions = originalGetSessions;
+    schoolDataService.createClassEnrollmentPeriod = originalCreate;
+    sessionStatusPolicyService.getStatusMap = originalStatusMap;
+    enrollmentSessionMarksService.clearRosterNaForSessions = originalClear;
+    schoolDataService.getClassEnrollmentPeriodsByClassId = originalGetPeriods;
+    alignmentService.assertEnrollmentSessionAlignmentForCreate = originalAlignment;
+  });
+
+  await engineService.execute({
+    classData: {
+      ...classData,
+      billingMode: 'no_charge',
+      sessions: classSessions
+    },
+    reqUser: { activeOrgId: classData.orgId },
+    rawRequest: {
+      classId: classData.id,
+      studentId: 'STU_OK',
+      enrollmentMode: 'hour_cap',
+      startDate: '2026-01-01',
+      targetHours: 6,
+      status: 'active',
+      sessionCapacityType: 'one_on_one',
+      funder: { funderId: 'self', funderType: 'self' }
+    },
+    hooks: {
+      assertPrerequisites: async () => {}
+    }
+  });
+
+  assert.deepEqual(clearedSessionIds.sort(), ['SES_001', 'SES_002']);
+  assert.deepEqual(
+    (createdPayload?.plannedNotApplicableSessionIds || []).sort(),
+    ['SES_003']
+  );
+});
+
 test('rolling enrollment UI builds engine payload and calls execute endpoint', () => {
   const uiSource = require('fs').readFileSync(
     require('path').join(__dirname, '../MVC/views/school/class/rollingEnrollment.ejs'),

@@ -286,7 +286,8 @@ function buildEnrollmentSessionPickerPayloadSync({
   periodRows = [],
   students = [],
   excludeStudentId = '',
-  activeOrgId = ''
+  activeOrgId = '',
+  sessionCapacityType = ''
 } = {}) {
   if (!classData?.id) throw new Error('classData is required.');
 
@@ -329,9 +330,32 @@ function buildEnrollmentSessionPickerPayloadSync({
     (Array.isArray(alignment?.sessions) ? alignment.sessions : []).map((row) => [String(row.sessionId || '').trim(), row])
   );
 
+  const effectiveSessionCapacityType = classSessionCapacityService.resolveEffectiveSessionCapacityType(
+    classData,
+    sessionCapacityType
+  );
+  const capSet = normalizedTargetHours > 0 || normalizedTargetSessions > 0;
+  let suggestedUnmarkSessionIds = [];
+  if (effectiveSessionCapacityType === 'one_on_one' && capSet) {
+    const allocation = rollingEnrollmentSessionAlignmentService.computeOneOnOneUnmarkSessionIdsForCap({
+      sessions: mergedSessions,
+      startDate: enrollmentStart,
+      endDate: enrollmentEnd,
+      targetHours: normalizedTargetHours,
+      targetSessionCount: normalizedTargetSessions,
+      statusMap: policyStatusMap
+    });
+    suggestedUnmarkSessionIds = rollingEnrollmentSessionAlignmentService.sanitizePlannedNaSessionIds(
+      allocation.sessionIds
+    );
+  }
+
   const selectedSet = new Set(
     rollingEnrollmentSessionAlignmentService.sanitizePlannedNaSessionIds(selectedSessionIds)
   );
+  if (effectiveSessionCapacityType === 'one_on_one' && capSet && !selectedSet.size && suggestedUnmarkSessionIds.length) {
+    suggestedUnmarkSessionIds.forEach((sessionId) => selectedSet.add(sessionId));
+  }
 
   const classId = toPublicId(classData.id);
   const sessionMaxStudents = classSessionCapacityService.resolveSessionMaxStudents(classData);
@@ -417,7 +441,8 @@ function buildEnrollmentSessionPickerPayloadSync({
       availableCount: Number(alignment?.availableCount || 0),
       availableHours: Number(alignment?.availableHours || 0)
     },
-    studentId: toPublicId(studentId)
+    studentId: toPublicId(studentId),
+    suggestedUnmarkSessionIds
   };
 }
 
@@ -435,6 +460,7 @@ async function buildEnrollmentSessionPickerPayload({
   anchorDate = '',
   persistedSessions = null,
   statusMapOverride = null,
+  sessionCapacityType = '',
   reqUser
 } = {}) {
   if (!classData?.id) throw new Error('classData is required.');
@@ -501,7 +527,8 @@ async function buildEnrollmentSessionPickerPayload({
     periodRows,
     students,
     excludeStudentId: studentId,
-    activeOrgId
+    activeOrgId,
+    sessionCapacityType
   });
 }
 

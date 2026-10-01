@@ -1745,8 +1745,14 @@
         const timesheetDeletionLockActiveFlag = typeof timesheetDeletionLockActive !== 'undefined'
             ? timesheetDeletionLockActive === true
             : false;
-        const statusControlDisabled = isReadOnly || isMergedSessionRow || timesheetMetadataLockActiveFlag;
+        const completedStatusRevertLockedFlag = typeof completedStatusRevertLocked !== 'undefined'
+            && completedStatusRevertLocked === true;
+        const statusControlDisabled = isReadOnly || isMergedSessionRow || timesheetMetadataLockActiveFlag
+            || completedStatusRevertLockedFlag;
         const statusControlDisabledAttr = statusControlDisabled ? 'disabled' : '';
+        const statusControlDisabledTitle = completedStatusRevertLockedFlag
+            ? 'Session status cannot be changed after the completed session edit window has ended. Contact an administrator.'
+            : '';
         const isInstructionalInactive = isMakeupRequiredInactive || isMergedSessionInactive;
         const mergedPartnerReference = (typeof mergedPartnerSessionReference !== 'undefined' && mergedPartnerSessionReference && typeof mergedPartnerSessionReference === 'object')
             ? mergedPartnerSessionReference
@@ -1950,7 +1956,7 @@
                     <span id="sessionStatusButtonLabel"><%= smCurrentStatusLabel %></span>
                 </div>
                 <% } else { %>
-                <button type="button" id="sessionStatusButton" class="btn session-status-button session-status-button--action-required" <%= statusControlDisabledAttr ? 'disabled' : '' %>>
+                <button type="button" id="sessionStatusButton" class="btn session-status-button session-status-button--action-required" <%= statusControlDisabledAttr ? 'disabled' : '' %><%= statusControlDisabledTitle ? ` title="${statusControlDisabledTitle}"` : '' %>>
                     <span id="sessionStatusButtonLabel"><%= smCurrentStatusLabel %></span>
                     <i class="bi bi-pencil-square" aria-hidden="true"></i>
                 </button>
