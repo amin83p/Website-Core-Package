@@ -611,6 +611,20 @@ router.post('/:id/sessions/:sessionId/report-assignments',
 router.get('/:id/sessions/:sessionId/book-covering-reports/summary',
   requireBookCoveringOperationAny([OPERATIONS.READ, OPERATIONS.READ_ALL]),
   classCtrl.getBookCoveringSummaryForSession);
+router.get('/:id/sessions/:sessionId/book-covering-reports/assigned-books',
+  requireBookCoveringOperationAny([OPERATIONS.READ, OPERATIONS.READ_ALL]),
+  classCtrl.listSessionBookCoveringAssignedBooks);
+router.get('/:id/sessions/:sessionId/book-covering-reports/assigned-books/:bookId',
+  requireBookCoveringOperationAny([OPERATIONS.READ, OPERATIONS.READ_ALL]),
+  classCtrl.getSessionBookCoveringAssignedBookDetail);
+router.post('/:id/sessions/:sessionId/book-covering-reports/entries',
+  requireBookCoveringOperationAny([OPERATIONS.CREATE, OPERATIONS.UPDATE]),
+  trackActionState(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.UPDATE, sessionReportAssignmentActionState),
+  classCtrl.upsertSessionBookCoveringEntry);
+router.delete('/:id/sessions/:sessionId/book-covering-reports/entries/:bookId',
+  requireAccess(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.DELETE, sessionReportAssignmentActionState),
+  classCtrl.deleteSessionBookCoveringEntry);
 router.post('/:id/sessions/:sessionId/book-covering-reports',
   requireAccess(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.CREATE),
   trackActionState(SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING, OPERATIONS.CREATE, sessionReportAssignmentActionState),

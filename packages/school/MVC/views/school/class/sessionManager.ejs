@@ -1385,6 +1385,24 @@
         padding-left: 0.5rem;
         padding-right: 0.5rem;
     }
+    .session-book-covering-cta-row .session-book-covering-add-btn {
+        flex: 3 1 0;
+        min-width: 0;
+    }
+    .session-book-covering-cta-row .session-book-covering-full-btn {
+        flex: 1 1 0;
+        min-width: 0;
+        font-size: 0.88rem;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+    .session-book-covering-cover-thumb {
+        width: 40px;
+        height: 52px;
+        object-fit: cover;
+        border-radius: 0.25rem;
+        border: 1px solid var(--bs-border-color);
+    }
     .session-panel-open-btn--primary {
         box-shadow: none;
     }
@@ -2997,63 +3015,59 @@
                             <div class="small text-muted mt-1">Report daily book coverage for assigned class books.</div>
                         </div>
                         <div class="d-flex flex-wrap align-items-center gap-2">
-                        <% if (canCreateBookCoveringReport && !isReadOnly) { %>
-                        <button type="button" class="btn btn-outline-primary btn-sm" id="btnCreateSessionBookCoveringReport"
-                            data-edit-url="<%= sessionBookCoveringSummary?.editUrl || '' %>">
-                            <% if (sessionBookCoveringSummary) { %>
-                            <i class="bi bi-journal-text me-1"></i>Open book covering report
-                            <i class="bi bi-box-arrow-up-right ms-1 small opacity-75" title="Opens in a new tab"></i>
-                            <% } else { %>
-                            <i class="bi bi-journal-plus me-1"></i>Book covering report
-                            <i class="bi bi-box-arrow-up-right ms-1 small opacity-75" title="Opens in a new tab"></i>
-                            <% } %>
-                        </button>
-                        <% } %>
-                        <% if (canDeleteBookCoveringReport && sessionBookCoveringSummary && !isReadOnly) { %>
-                        <button type="button" class="btn btn-outline-danger btn-sm" id="btnDeleteSessionBookCoveringReport"
-                            data-report-id="<%= sessionBookCoveringSummary.id %>">
+                        <button type="button" class="btn btn-outline-danger btn-sm<%= (canDeleteBookCoveringReport && sessionBookCoveringSummary && !isReadOnly) ? '' : ' d-none' %>" id="btnDeleteSessionBookCoveringReport"
+                            data-report-id="<%= sessionBookCoveringSummary?.id || '' %>">
                             <i class="bi bi-trash me-1"></i>Delete report
                         </button>
-                        <% } %>
                         </div>
                     </div>
-                    <div class="card-body py-3" id="sessionBookCoveringSummaryPanel">
-                        <% if (sessionBookCoveringSummary) { %>
-                        <div class="session-book-covering-summary-content">
-                            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                    <% if (canCreateBookCoveringReport && !isReadOnly) { %>
+                    <div class="session-panel-cta-zone session-panel-cta-zone--primary">
+                        <div class="session-gradebook-cta-row session-book-covering-cta-row">
+                            <button type="button" class="btn btn-outline-primary session-panel-open-btn session-book-covering-add-btn w-100" id="btnOpenSessionBookCoveringWizard">
+                                <i class="bi bi-journal-plus me-2"></i>Add Book Report
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary session-panel-open-btn session-book-covering-full-btn w-100" id="btnCreateSessionBookCoveringReport"
+                                data-edit-url="<%= sessionBookCoveringSummary?.editUrl || '' %>">
+                                <i class="bi bi-box-arrow-up-right me-1"></i>Full report
+                            </button>
+                        </div>
+                    </div>
+                    <% } %>
+                    <div class="card-body p-0">
+                        <div class="px-4 py-3 border-bottom" id="sessionBookCoveringMetaPanel">
+                            <% if (sessionBookCoveringSummary) { %>
+                            <div class="d-flex flex-wrap align-items-center gap-2">
                                 <span class="badge <%= sessionBookCoveringSummary.status === 'submitted' ? 'bg-success' : 'bg-secondary' %>">
                                     <%= sessionBookCoveringSummary.statusLabel %>
                                 </span>
                                 <span class="small text-muted">
                                     <%= sessionBookCoveringSummary.periodStartDate || '—' %>
                                     · <%= sessionBookCoveringSummary.bookCount %> book(s)
-                                    <% if (sessionBookCoveringSummary.status !== 'submitted') { %>
-                                    · <%= sessionBookCoveringSummary.coveredBookCount %> with coverage entered
-                                    <% } %>
                                 </span>
                             </div>
                             <% if (sessionBookCoveringSummary.notesPreview) { %>
-                            <div class="small text-muted mb-2"><%= sessionBookCoveringSummary.notesPreview %></div>
+                            <div class="small text-muted mt-2"><%= sessionBookCoveringSummary.notesPreview %></div>
                             <% } %>
-                            <% if ((sessionBookCoveringSummary.entries || []).length) { %>
-                            <ul class="list-unstyled small mb-0">
-                                <% sessionBookCoveringSummary.entries.forEach((entryRow) => { %>
-                                <li class="mb-1">
-                                    <span class="fw-semibold"><%= entryRow.bookTitle %></span>
-                                    <span class="text-muted"> — <%= entryRow.coverageBrief %></span>
-                                    <% if (entryRow.notePreview) { %>
-                                    <span class="text-muted"> · <%= entryRow.notePreview %></span>
-                                    <% } %>
-                                </li>
-                                <% }) %>
-                            </ul>
-                            <% } else if (sessionBookCoveringSummary.status !== 'submitted') { %>
-                            <div class="small text-muted">No books selected yet. Open the report to choose books and enter coverage.</div>
+                            <% } else { %>
+                            <div class="text-muted small" id="sessionBookCoveringSummaryEmpty">No book covering report for this session yet. Use Add Book Report to record coverage.</div>
                             <% } %>
                         </div>
-                        <% } else { %>
-                        <div class="text-muted small" id="sessionBookCoveringSummaryEmpty">No book covering report for this session yet.</div>
-                        <% } %>
+                        <div class="table-responsive">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="ps-4" style="width:3.5rem;"></th>
+                                        <th>Book</th>
+                                        <th>Coverage</th>
+                                        <th class="text-end pe-4">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="sessionBookCoveringEntriesBody">
+                                    <tr><td colspan="4" class="text-center py-4 text-muted">No book coverage entries yet.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
                 </div>
                 <% } %>
@@ -3683,6 +3697,11 @@
 <script src="/scripts/schoolAutosave.js"></script>
 <script src="/scripts/sessionAttendanceTimingDetailClient.js"></script>
 <%- include('school/sessionStudentCase/partials/sessionStudentCaseModalAssets') %>
+<% if (typeof canViewBookCoveringReport !== 'undefined' && canViewBookCoveringReport && isInstructionalInactive !== true) { %>
+<%- include('school/class/partials/sessionBookCoveringQuickReportModals') %>
+<script src="/scripts/bookCoveringTocUtils.js"></script>
+<script src="/scripts/sessionBookCoveringQuickReport.js"></script>
+<% } %>
 
 <script>
 let detailsModalInstance = null;
@@ -7203,62 +7222,104 @@ document.addEventListener('DOMContentLoaded', () => {
         badge.title = submitted ? 'Book covering report submitted' : 'Book covering report draft';
     }
 
-    function renderSessionBookCoveringSummaryHtml(summary) {
+    function renderSessionBookCoveringMetaHtml(summary) {
         if (!summary || !summary.id) {
-            return '<div class="text-muted small" id="sessionBookCoveringSummaryEmpty">No book covering report for this session yet.</div>';
+            return '<div class="text-muted small" id="sessionBookCoveringSummaryEmpty">No book covering report for this session yet. Use Add Book Report to record coverage.</div>';
         }
         const submitted = String(summary.status || '').trim().toLowerCase() === 'submitted';
         const statusLabel = summary.statusLabel || (submitted ? 'Submitted' : 'Draft');
         const periodStart = String(summary.periodStartDate || '—');
         const bookCount = Number(summary.bookCount || 0);
-        const coveredBookCount = Number(summary.coveredBookCount || 0);
         const notesPreview = String(summary.notesPreview || '').trim();
-        const entries = Array.isArray(summary.entries) ? summary.entries : [];
-        let html = '<div class="session-book-covering-summary-content">';
-        html += '<div class="d-flex flex-wrap align-items-center gap-2 mb-2">';
+        let html = '<div class="d-flex flex-wrap align-items-center gap-2">';
         html += `<span class="badge ${submitted ? 'bg-success' : 'bg-secondary'}">${attendanceAttachmentEscape(statusLabel)}</span>`;
-        html += `<span class="small text-muted">${attendanceAttachmentEscape(periodStart)} · ${bookCount} book(s)`;
-        if (!submitted) {
-            html += ` · ${coveredBookCount} with coverage entered`;
-        }
-        html += '</span></div>';
+        html += `<span class="small text-muted">${attendanceAttachmentEscape(periodStart)} · ${bookCount} book(s)</span></div>`;
         if (notesPreview) {
-            html += `<div class="small text-muted mb-2">${attendanceAttachmentEscape(notesPreview)}</div>`;
+            html += `<div class="small text-muted mt-2">${attendanceAttachmentEscape(notesPreview)}</div>`;
         }
-        if (entries.length) {
-            html += '<ul class="list-unstyled small mb-0">';
-            entries.forEach((entryRow) => {
-                const bookTitle = attendanceAttachmentEscape(String(entryRow.bookTitle || entryRow.bookId || 'Book'));
-                const coverageBrief = attendanceAttachmentEscape(String(entryRow.coverageBrief || ''));
-                const notePreview = attendanceAttachmentEscape(String(entryRow.notePreview || '').trim());
-                html += '<li class="mb-1"><span class="fw-semibold">' + bookTitle + '</span>';
-                if (coverageBrief) html += '<span class="text-muted"> — ' + coverageBrief + '</span>';
-                if (notePreview) html += '<span class="text-muted"> · ' + notePreview + '</span>';
-                html += '</li>';
-            });
-            html += '</ul>';
-        } else if (!submitted) {
-            html += '<div class="small text-muted">No books selected yet. Open the report to choose books and enter coverage.</div>';
-        }
-        html += '</div>';
         return html;
+    }
+
+    function renderSessionBookCoveringEntriesHtml(summary) {
+        const entries = Array.isArray(summary?.entries) ? summary.entries : [];
+        if (!entries.length) {
+            return '<tr><td colspan="4" class="text-center py-4 text-muted">No book coverage entries yet.</td></tr>';
+        }
+        const canEdit = Boolean(sessionCanCreateBookCoveringReport);
+        const canDelete = Boolean(sessionCanDeleteBookCoveringReport);
+        return entries.map((entryRow) => {
+            const bookId = attendanceAttachmentEscape(String(entryRow.bookId || ''));
+            const bookTitle = attendanceAttachmentEscape(String(entryRow.bookTitle || entryRow.bookId || 'Book'));
+            const coverageBrief = attendanceAttachmentEscape(String(entryRow.coverageBrief || ''));
+            const coverUrl = String(entryRow.coverPhotoUrl || '').trim();
+            const coverCell = coverUrl
+                ? `<img src="${attendanceAttachmentEscape(coverUrl)}" alt="" class="session-book-covering-cover-thumb">`
+                : '<span class="text-muted"><i class="bi bi-book"></i></span>';
+            const actionButtons = [];
+            if (canEdit) {
+                actionButtons.push(
+                    `<button type="button" class="btn btn-outline-primary student-case-action-btn js-bc-edit-entry" data-book-id="${bookId}" title="Edit book coverage" aria-label="Edit book coverage"><i class="bi bi-pencil-square" aria-hidden="true"></i></button>`
+                );
+            }
+            if (canDelete) {
+                actionButtons.push(
+                    `<button type="button" class="btn btn-outline-danger student-case-action-btn js-bc-delete-entry" data-book-id="${bookId}" title="Delete book coverage" aria-label="Delete book coverage"><i class="bi bi-trash" aria-hidden="true"></i></button>`
+                );
+            }
+            const actions = actionButtons.length
+                ? `<div class="student-case-row-actions" role="group" aria-label="Book coverage actions">${actionButtons.join('')}</div>`
+                : '<span class="text-muted small">—</span>';
+            return (
+                '<tr data-book-id="' + bookId + '">' +
+                '<td class="ps-4">' + coverCell + '</td>' +
+                '<td class="fw-semibold">' + bookTitle + '</td>' +
+                '<td class="small text-muted">' + coverageBrief + '</td>' +
+                '<td class="text-end pe-4">' + actions + '</td>' +
+                '</tr>'
+            );
+        }).join('');
+    }
+
+    function bindSessionBookCoveringEntryActions(summary) {
+        const tbody = document.getElementById('sessionBookCoveringEntriesBody');
+        if (!tbody) return;
+        tbody.querySelectorAll('.js-bc-edit-entry').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const bookId = String(btn.dataset.bookId || '').trim();
+                const entry = (summary?.entries || []).find((row) => String(row.bookId) === bookId);
+                if (window.SessionBookCoveringQuickReport) {
+                    window.SessionBookCoveringQuickReport.open({ bookId, entry });
+                }
+            });
+        });
+        tbody.querySelectorAll('.js-bc-delete-entry').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                deleteSessionBookCoveringEntry(String(btn.dataset.bookId || '').trim()).catch((error) => {
+                    showStudentCaseMessage('Delete Failed', error.message, 'error');
+                });
+            });
+        });
+    }
+
+    function renderSessionBookCoveringSummaryHtml(summary) {
+        return renderSessionBookCoveringMetaHtml(summary);
     }
 
     function applySessionBookCoveringSummary(summary) {
         syncSessionBookCoveringNavBadge(summary);
-        const panel = document.getElementById('sessionBookCoveringSummaryPanel');
-        if (panel) {
-            panel.innerHTML = renderSessionBookCoveringSummaryHtml(summary);
+        const metaPanel = document.getElementById('sessionBookCoveringMetaPanel');
+        if (metaPanel) {
+            metaPanel.innerHTML = renderSessionBookCoveringMetaHtml(summary);
+        }
+        const tbody = document.getElementById('sessionBookCoveringEntriesBody');
+        if (tbody) {
+            tbody.innerHTML = renderSessionBookCoveringEntriesHtml(summary);
+            bindSessionBookCoveringEntryActions(summary);
         }
         const button = document.getElementById('btnCreateSessionBookCoveringReport');
         if (button) {
             const editUrl = String(summary?.editUrl || '').trim();
             button.dataset.editUrl = editUrl;
-            if (editUrl) {
-                button.innerHTML = '<i class="bi bi-journal-text me-1"></i>Open book covering report<i class="bi bi-box-arrow-up-right ms-1 small opacity-75" title="Opens in a new tab"></i>';
-            } else {
-                button.innerHTML = '<i class="bi bi-journal-plus me-1"></i>Book covering report<i class="bi bi-box-arrow-up-right ms-1 small opacity-75" title="Opens in a new tab"></i>';
-            }
         }
         const deleteButton = document.getElementById('btnDeleteSessionBookCoveringReport');
         if (deleteButton) {
@@ -7270,6 +7331,34 @@ document.addEventListener('DOMContentLoaded', () => {
                 deleteButton.dataset.reportId = '';
             }
         }
+    }
+
+    async function deleteSessionBookCoveringEntry(bookId) {
+        const token = String(bookId || '').trim();
+        if (!token) throw new Error('Book id is required.');
+        const confirmed = await sessionConfirmBox({
+            title: 'Remove book coverage',
+            icon: 'warning',
+            html: true,
+            message: '<p class="mb-0">Remove this book coverage entry from the session report?</p>',
+            confirmText: 'Remove',
+            confirmClass: 'btn-danger'
+        });
+        if (!confirmed) return;
+        const res = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/book-covering-reports/entries/${encodeURIComponent(token)}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                'x-ajax-request': 'true',
+                'Accept': 'application/json'
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({ actionStateId })
+        });
+        const result = await res.json().catch(() => ({ status: 'error', message: 'Unable to read server response.' }));
+        if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Could not remove book coverage.');
+        applySessionBookCoveringSummary(result.summary || null);
+        await showStudentCaseMessage('Entry Removed', result.message || 'Book coverage removed.', 'success');
     }
 
     async function deleteSessionBookCoveringReport(reportId) {
@@ -7370,6 +7459,30 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             createSessionBookCoveringReport().catch((error) => showStudentCaseMessage('Report Failed', error.message, 'error'));
         });
+        if (window.SessionBookCoveringQuickReport) {
+            window.SessionBookCoveringQuickReport.init({
+                classId: sessionManagerClassId,
+                sessionId: sessionManagerSessionId,
+                actionStateId,
+                messageBox: (title, message, icon) => showStudentCaseMessage(
+                    typeof title === 'object' && title !== null ? title.title : title,
+                    typeof title === 'object' && title !== null ? title.message : message,
+                    typeof title === 'object' && title !== null ? title.icon : icon
+                ),
+                onSaved: (summary) => {
+                    applySessionBookCoveringSummary(summary);
+                    return Promise.resolve();
+                }
+            });
+            document.getElementById('btnOpenSessionBookCoveringWizard')?.addEventListener('click', () => {
+                window.SessionBookCoveringQuickReport.open();
+            });
+        }
+    }
+    if (sessionCanViewBookCoveringReport && sessionBookCoveringSummaryInitial) {
+        applySessionBookCoveringSummary(sessionBookCoveringSummaryInitial);
+    } else if (sessionCanViewBookCoveringReport) {
+        applySessionBookCoveringSummary(null);
     }
     if (sessionCanDeleteBookCoveringReport) {
         document.getElementById('btnDeleteSessionBookCoveringReport')?.addEventListener('click', () => {

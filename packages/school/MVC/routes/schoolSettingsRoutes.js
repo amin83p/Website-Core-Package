@@ -56,6 +56,11 @@ router.post('/autosave',
   trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, settingsMutationActionState),
   ctrl.saveAutosavePolicy);
 
+router.post('/upload-limits',
+  requireAccess(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, settingsMutationActionState),
+  ctrl.saveUploadLimitsPolicy);
+
 router.post('/session-access',
   requireAccess(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_SETTINGS, OPERATIONS.UPDATE, settingsMutationActionState),

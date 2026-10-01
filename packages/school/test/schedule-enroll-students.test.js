@@ -46,8 +46,13 @@ test('master schedule viewer wires enroll students rail handler', () => {
   assert.match(viewer, /installMasterScheduleEnrollStudents/);
   assert.match(viewer, /bindEnrollStudentsRail/);
   assert.match(viewer, /enroll-students[\s\S]*enrollStudentsRailHandler/);
+  assert.match(viewer, /bindClaimNumbersRail/);
+  assert.match(viewer, /claim-numbers[\s\S]*claimNumbersRailHandler/);
   assert.match(viewer, /pendingEnrollStudentsByClassId/);
   assert.match(enroll, /bindEnrollStudentsRail\?\.\(startEnrollStudentsFlow\)/);
+  assert.match(enroll, /bindClaimNumbersRail\?\.\(startClaimNumbersFlow\)/);
+  assert.match(enroll, /startClaimNumbersFlow/);
+  assert.match(enroll, /StudentClaimNumbersManager/);
 });
 
 test('staging save opens draft work selection modal instead of inline commit', () => {
@@ -83,6 +88,7 @@ test('staged save orchestration is wired for admin master schedule', () => {
   const pkgAdminCss = read('public/styles/schedule-viewer-admin.css');
   const servedAdminCss = fs.readFileSync(path.join(repoRoot, 'public/styles/schedule-viewer-admin.css'), 'utf8');
   assert.match(pkgAdminCss, /draft-save-cal-grid/);
+  assert.match(pkgAdminCss, /rolling-claim-actions/);
   assert.equal(pkgAdminCss, servedAdminCss);
   assert.match(draftWork, /draft-save-enrollment-summary-line1/);
   assert.match(draftWork, /js-draft-save-enrollment-remove/);

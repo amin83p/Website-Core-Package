@@ -219,6 +219,70 @@ test('class routes expose session book covering shortcut', () => {
   assert.match(classRoutes, /book-covering-reports/);
   assert.match(classRoutes, /createBookCoveringForSession/);
   assert.match(classRoutes, /deleteBookCoveringForSession/);
+  assert.match(classRoutes, /assigned-books/);
+  assert.match(classRoutes, /upsertSessionBookCoveringEntry/);
+  assert.match(classRoutes, /deleteSessionBookCoveringEntry/);
+});
+
+test('removeSessionReportEntry removes report document when last entry deleted', () => {
+  const serviceSource = fs.readFileSync(
+    path.join(ROOT, 'packages/school/MVC/services/school/bookCoveringReportService.js'),
+    'utf8'
+  );
+  const block = serviceSource.split('async function removeSessionReportEntry')[1]?.split('module.exports')[0] || '';
+  assert.match(block, /if \(!entries\.length\)/);
+  assert.match(block, /deleteReport\(report\.id/);
+  assert.match(block, /return null;/);
+});
+
+test('book covering report model supports page_numbers coverage with unit TOC validation', () => {
+  const toc = [
+    { id: 'TOC-1', label: 'Unit 1', startPage: 10, endPage: 12, level: 1 },
+    { id: 'TOC-2', label: 'Unit 2', startPage: 20, endPage: 22, level: 1 }
+  ];
+  const entry = bookCoveringReportModel.sanitizeEntry({
+    bookId: 'BK-1',
+    unitCoverage: { mode: 'toc_pick', tocEntryIds: ['TOC-1'] },
+    pageCoverage: { mode: 'page_numbers', pageNumbers: [10, 11, 12] }
+  }, 'daily', 0);
+  assert.deepEqual(entry.pageCoverage.pageNumbers, [10, 11, 12]);
+  bookCoveringReportModel.validatePageNumbersAgainstBookToc(entry, toc);
+  assert.throws(() => {
+    bookCoveringReportModel.validatePageNumbersAgainstBookToc({
+      bookId: 'BK-1',
+      unitCoverage: { mode: 'toc_pick', tocEntryIds: ['TOC-1'] },
+      pageCoverage: { mode: 'page_numbers', pageNumbers: [99] }
+    }, toc);
+  }, /not within the selected unit page ranges/);
+});
+
+test('book covering service formats page_numbers coverage brief', () => {
+  const service = require('../MVC/services/school/bookCoveringReportService');
+  const brief = service.formatEntryCoverageBrief({
+    unitCoverage: { mode: 'toc_pick', tocEntryIds: ['A', 'B'] },
+    pageCoverage: { mode: 'page_numbers', pageNumbers: [10, 11, 12, 20] }
+  });
+  assert.match(brief, /2 TOC unit\(s\)/);
+  assert.match(brief, /pages 10–12, 20/);
+});
+
+test('manage session view wires quick book covering wizard', () => {
+  const view = fs.readFileSync(
+    path.join(ROOT, 'packages/school/MVC/views/school/class/sessionManager.ejs'),
+    'utf8'
+  );
+  assert.match(view, /btnOpenSessionBookCoveringWizard/);
+  assert.match(view, /sessionBookCoveringEntriesBody/);
+  assert.match(view, /sessionBookCoveringQuickReportModals/);
+  assert.match(view, /sessionBookCoveringQuickReport\.js/);
+  assert.match(view, /book-covering-reports\/entries/);
+});
+
+test('session book covering quick report client loads assigned books on demand', () => {
+  const client = fs.readFileSync(path.join(ROOT, 'public/scripts/sessionBookCoveringQuickReport.js'), 'utf8');
+  assert.match(client, /assigned-books/);
+  assert.match(client, /\$\{apiBase\(\)\}\/entries/);
+  assert.match(client, /page_numbers/);
 });
 
 test('book covering report form template avoids nested EJS output tags', () => {
@@ -269,6 +333,11 @@ test('book covering report form uses multi-step wizard with covers and overall n
   assert.match(wizardJs, /js-usage-frequency.*type="radio"/s);
   assert.match(wizardJs, /js-next-four-weeks.*type="radio"/s);
   assert.doesNotMatch(wizardJs, /form-select js-usage-frequency/);
+  assert.match(wizardJs, /js-page-numbers-list/);
+  assert.match(wizardJs, /page_numbers/);
+  assert.match(wizardJs, /BookCoveringPagePicker/);
+  assert.match(view, /bookCoveringPagePickerModal/);
+  assert.match(view, /bookCoveringTocUtils/);
   assert.match(wizardJs, /js-toc-units-list/);
   assert.match(wizardJs, /js-toc-remove/);
   assert.doesNotMatch(wizardJs, /alert\(/);
@@ -296,7 +365,8 @@ test('session manager includes book covering report button and summary panel', (
   assert.match(view, /btnCreateSessionBookCoveringReport/);
   assert.match(view, /btnDeleteSessionBookCoveringReport/);
   assert.match(view, /book-covering-reports/);
-  assert.match(view, /sessionBookCoveringSummaryPanel/);
+  assert.match(view, /sessionBookCoveringMetaPanel/);
+  assert.match(view, /sessionBookCoveringEntriesBody/);
   assert.match(view, /session-panel-book-covering/);
   assert.match(view, /sessionBookCoveringNavBadge/);
   assert.match(view, /data-edit-url/);

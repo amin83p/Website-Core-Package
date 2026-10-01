@@ -1,0 +1,276 @@
+<div class="modal fade session-bc-modal-root" id="sessionBookCoveringBookPickerModal" tabindex="-1" aria-labelledby="sessionBookCoveringBookPickerTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable session-bc-modal-dialog">
+    <div class="modal-content session-bc-modal-content">
+      <div class="modal-header session-bc-modal-header">
+        <div>
+          <h5 class="modal-title fw-bold mb-0" id="sessionBookCoveringBookPickerTitle"><i class="bi bi-journal-plus me-2 text-primary"></i>Choose a book</h5>
+          <p class="small text-muted mb-0 mt-1">Select an assigned class book to record coverage.</p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body session-bc-modal-body">
+        <div id="sessionBookCoveringBookPickerLoading" class="text-center text-muted py-5 d-none">
+          <span class="spinner-border spinner-border-sm me-2"></span>Loading assigned books…
+        </div>
+        <div id="sessionBookCoveringBookPickerEmpty" class="text-center text-muted py-5 d-none">No active books are assigned to this class.</div>
+        <div id="sessionBookCoveringBookPickerGrid" class="row g-3"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade session-bc-modal-root" id="sessionBookCoveringWizardModal" tabindex="-1" aria-labelledby="sessionBookCoveringWizardTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable session-bc-modal-dialog">
+    <div class="modal-content session-bc-modal-content">
+      <div class="modal-header session-bc-modal-header">
+        <div class="pe-3">
+          <h5 class="modal-title fw-bold mb-0" id="sessionBookCoveringWizardTitle"><i class="bi bi-journal-richtext me-2 text-primary"></i>Book coverage</h5>
+          <div class="small text-muted mt-1" id="sessionBookCoveringWizardSubtitle"></div>
+          <nav class="session-bc-step-nav mt-2" aria-label="Coverage steps">
+            <span class="session-bc-step-pill is-active" data-bc-step="Detail">1. Book</span>
+            <span class="session-bc-step-pill" data-bc-step="Units">2. Units</span>
+            <span class="session-bc-step-pill" data-bc-step="Pages">3. Pages</span>
+          </nav>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body session-bc-modal-body">
+        <div id="sessionBookCoveringWizardStepDetail" class="session-bc-wizard-step">
+          <div class="session-bc-book-detail-card">
+            <div id="sessionBookCoveringWizardCover" class="session-bc-wizard-cover"></div>
+            <div class="session-bc-book-detail-meta" id="sessionBookCoveringWizardMeta"></div>
+          </div>
+        </div>
+        <div id="sessionBookCoveringWizardStepUnits" class="session-bc-wizard-step d-none">
+          <p class="session-bc-step-help mb-2">Select one or more units from the table of contents. You can pick across multiple columns.</p>
+          <div id="sessionBookCoveringUnitPicker" class="session-bc-unit-picker"></div>
+        </div>
+        <div id="sessionBookCoveringWizardStepPages" class="session-bc-wizard-step d-none">
+          <p class="session-bc-step-help mb-2">Tap page numbers you covered within each selected unit.</p>
+          <div id="sessionBookCoveringPagePicker" class="session-bc-page-picker"></div>
+        </div>
+      </div>
+      <div class="modal-footer session-bc-modal-footer flex-wrap gap-2 justify-content-between">
+        <div>
+          <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="btnSessionBookCoveringBackToDetail">Back</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm d-none" id="btnSessionBookCoveringBackToUnits">Back</button>
+        </div>
+        <div class="d-flex flex-wrap gap-2 ms-auto">
+          <button type="button" class="btn btn-primary btn-sm" id="btnSessionBookCoveringPickUnits">
+            <i class="bi bi-list-nested me-1"></i>Pick units
+          </button>
+          <button type="button" class="btn btn-primary btn-sm d-none" id="btnSessionBookCoveringToPages">Next <i class="bi bi-arrow-right ms-1"></i></button>
+          <button type="button" class="btn btn-success btn-sm d-none" id="btnSessionBookCoveringSaveEntry">
+            <i class="bi bi-save me-1"></i>Save coverage
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .session-bc-modal-content {
+    border: 0;
+    border-radius: 0.75rem;
+    box-shadow: 0 1rem 2.5rem rgba(15, 23, 42, 0.18);
+    overflow: hidden;
+  }
+  .session-bc-modal-header {
+    background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+    border-bottom: 1px solid var(--bs-border-color-translucent);
+    padding: 1rem 1.25rem;
+  }
+  .session-bc-modal-body {
+    padding: 1.25rem;
+    background: #fff;
+  }
+  .session-bc-modal-footer {
+    background: #f8fafc;
+    border-top: 1px solid var(--bs-border-color-translucent);
+    padding: 0.75rem 1.25rem;
+  }
+  .session-bc-step-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+  .session-bc-step-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--bs-secondary-color);
+    background: #eef2f7;
+    border: 1px solid transparent;
+  }
+  .session-bc-step-pill.is-active {
+    color: #fff;
+    background: var(--bs-primary);
+  }
+  .session-bc-step-pill.is-done {
+    color: var(--bs-primary);
+    background: rgba(var(--bs-primary-rgb), 0.12);
+    border-color: rgba(var(--bs-primary-rgb), 0.25);
+  }
+  .session-bc-step-help {
+    font-size: 0.875rem;
+    color: var(--bs-secondary-color);
+    margin-bottom: 0;
+  }
+  .session-bc-book-pick {
+    cursor: pointer;
+    text-align: center;
+    padding: 0.85rem 0.65rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.65rem;
+    height: 100%;
+    background: #fff;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+  }
+  .session-bc-book-pick:hover {
+    border-color: #93c5fd;
+    box-shadow: 0 0.25rem 0.75rem rgba(37, 99, 235, 0.1);
+    transform: translateY(-1px);
+  }
+  .session-bc-book-pick-cover {
+    width: 100%;
+    max-width: 110px;
+    aspect-ratio: 3 / 4;
+    object-fit: cover;
+    border-radius: 0.35rem;
+    margin: 0 auto 0.5rem;
+    display: block;
+    box-shadow: 0 0.15rem 0.45rem rgba(15, 23, 42, 0.12);
+  }
+  .session-bc-book-pick-placeholder {
+    width: 100%;
+    max-width: 110px;
+    aspect-ratio: 3 / 4;
+    margin: 0 auto 0.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #f1f5f9;
+    border-radius: 0.35rem;
+    font-size: 1.75rem;
+    color: var(--bs-secondary-color);
+  }
+  .session-bc-book-detail-card {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    padding: 1rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.65rem;
+    background: #f8fafc;
+  }
+  .session-bc-wizard-cover img {
+    width: 110px;
+    height: auto;
+    border-radius: 0.35rem;
+    border: 1px solid var(--bs-border-color);
+    box-shadow: 0 0.15rem 0.45rem rgba(15, 23, 42, 0.1);
+  }
+  .session-bc-book-detail-meta {
+    flex: 1;
+    min-width: 12rem;
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+  .session-bc-book-detail-meta > div {
+    margin-bottom: 0.25rem;
+  }
+  .session-bc-unit-picker {
+    max-height: min(52vh, 440px);
+    overflow-y: auto;
+    padding: 0.15rem;
+  }
+  .session-bc-unit-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.6rem;
+  }
+  @media (max-width: 992px) {
+    .session-bc-unit-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+  @media (max-width: 576px) {
+    .session-bc-unit-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+  .session-bc-unit-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.55rem;
+    margin: 0;
+    padding: 0.65rem 0.7rem;
+    border: 2px solid #e2e8f0;
+    border-radius: 0.6rem;
+    background: #fff;
+    cursor: pointer;
+    min-height: 100%;
+    transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .session-bc-unit-card:hover {
+    border-color: #93c5fd;
+    box-shadow: 0 0.15rem 0.45rem rgba(37, 99, 235, 0.08);
+  }
+  .session-bc-unit-card:has(.js-bc-unit-pick:checked) {
+    border-color: var(--bs-primary);
+    background: rgba(var(--bs-primary-rgb), 0.06);
+    box-shadow: 0 0 0 0.12rem rgba(var(--bs-primary-rgb), 0.15);
+  }
+  .session-bc-unit-card .form-check-input {
+    margin-top: 0.15rem;
+    flex-shrink: 0;
+  }
+  .session-bc-unit-card-body {
+    flex: 1;
+    min-width: 0;
+  }
+  .session-bc-unit-title {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    line-height: 1.35;
+    word-break: break-word;
+  }
+  .session-bc-unit-pages {
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color);
+    margin-top: 0.15rem;
+  }
+  .session-bc-unit-level {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--bs-secondary-color);
+    margin-bottom: 0.15rem;
+  }
+  .session-bc-page-picker {
+    max-height: min(52vh, 440px);
+    overflow-y: auto;
+    padding-right: 0.15rem;
+  }
+  .session-bc-page-picker .session-bc-page-unit {
+    padding: 0.75rem;
+    margin-bottom: 0.65rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 0.6rem;
+    background: #f8fafc;
+  }
+  .session-bc-page-picker .session-bc-page-unit:last-child {
+    margin-bottom: 0;
+  }
+  .session-bc-page-toggle.active {
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+    color: #fff;
+  }
+</style>

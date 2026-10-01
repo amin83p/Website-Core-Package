@@ -91,6 +91,13 @@ const SCHOOL_SETTINGS_GROUPS = Object.freeze([
     description: 'Find multiple student records linked to the same person in this organization.',
     icon: 'bi-people',
     order: 47
+  }),
+  Object.freeze({
+    key: 'upload-limits',
+    title: 'File Upload Limits',
+    description: 'Configure maximum upload sizes for school library and other file workflows.',
+    icon: 'bi-cloud-upload',
+    order: 48
   })
 ]);
 

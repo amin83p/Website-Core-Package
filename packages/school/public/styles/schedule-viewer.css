@@ -1242,6 +1242,9 @@ button.schedule-loaded-at-chip.is-stale:focus {
     gap: 0.25rem;
     pointer-events: auto;
 }
+.schedule-admin-week-rail-inner [data-schedule-admin-action="claim-numbers"] {
+    margin-top: 0.65rem;
+}
 .schedule-calendar-card-body.is-month-view .schedule-admin-week-rail,
 #scheduleContainer.d-none .schedule-admin-week-rail {
     display: none !important;

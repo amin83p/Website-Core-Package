@@ -13,6 +13,7 @@ const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const uploadMiddleware = requireCoreModule('MVC/middleware/upload');
 const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
 const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
+const uploadLimitsPolicyService = require('../../services/school/uploadLimitsPolicyService');
 const {
   getActiveOrgIdOrThrow,
   assertCreateOrgContextOrThrow,
@@ -82,11 +83,49 @@ function buildBookFileFromUpload(file) {
 }
 
 function buildCoverPhotoFromUpload(file) {
-  return buildBookFileFromUpload(file);
+  return enrichBookFileAssetFromUpload(buildBookFileFromUpload(file));
 }
 
 function buildDigitalPdfFromUpload(file) {
-  return buildBookFileFromUpload(file);
+  return enrichBookFileAssetFromUpload(buildBookFileFromUpload(file));
+}
+
+function enrichBookFileAssetFromUpload(asset) {
+  return bookModel.enrichBookFileAsset(asset);
+}
+
+async function prepareBookForEditForm(row, reqUser) {
+  let bookItem = { ...row };
+  const mediaPatch = {};
+  const enrichedCover = bookModel.enrichBookFileAsset(bookItem.coverPhoto);
+  const enrichedPdf = bookModel.enrichBookFileAsset(bookItem.digitalPdf);
+  if (enrichedCover && (!bookItem.coverPhoto?.url && enrichedCover.url)) {
+    mediaPatch.coverPhoto = enrichedCover;
+    bookItem.coverPhoto = enrichedCover;
+  }
+  if (enrichedPdf && (!bookItem.digitalPdf?.url && enrichedPdf.url)) {
+    mediaPatch.digitalPdf = enrichedPdf;
+    bookItem.digitalPdf = enrichedPdf;
+  }
+
+  if (Object.keys(mediaPatch).length && bookItem.id) {
+    try {
+      const updated = await schoolDataService.updateData('books', bookItem.id, {
+        ...mediaPatch,
+        audit: {
+          lastUpdateUser: String(reqUser?.id || 'SYSTEM'),
+          lastUpdateDateTime: new Date().toISOString()
+        }
+      }, reqUser);
+      if (updated && typeof updated === 'object') {
+        bookItem = { ...bookItem, ...updated };
+      }
+    } catch (_) {
+      // Keep enriched in-memory values even if persistence fails.
+    }
+  }
+
+  return bookItem;
 }
 
 function bookAssetNeedsRelocation(asset = {}) {
@@ -109,12 +148,12 @@ async function relocateBookAssetIfNeeded(book, orgId, reqUser, { folderKey, fiel
       destinationScopeKey: orgId,
       destinationDir: targetRelativeDir
     });
-    const relocated = {
+    const relocated = bookModel.enrichBookFileAsset({
       ...asset,
       path: moved.path,
       url: moved.url,
       fileName: String(moved.fileName || asset.fileName || '').trim()
-    };
+    });
     await schoolDataService.updateData('books', bookId, {
       [fieldName]: relocated,
       audit: {
@@ -279,11 +318,14 @@ exports.listBooks = async (req, res) => {
 exports.showCreateForm = async (req, res) => {
   try {
     await assertCreateOrgContextOrThrow(req.user, { scopeLabel: 'books' });
+    const orgId = getActiveOrgIdOrThrow(req.user);
     const copyFromId = String(req.query?.copyFrom || '').trim();
+    const bookPdfMaxUploadMb = await uploadLimitsPolicyService.resolveMaxFileSizeMb(orgId, 'bookPdf');
     return res.render('school/book/bookForm', {
       title: 'New Book',
       bookItem: null,
       copyFromId,
+      bookPdfMaxUploadMb,
       includeModal: true,
       user: req.user,
       actionStateId: req.actionStateId
@@ -299,10 +341,13 @@ exports.showEditForm = async (req, res) => {
     const row = await schoolDataService.getDataById('books', req.params.id, req.user);
     if (!row) throw new Error('Book not found.');
     assertOrgAccess(row, orgId);
+    const bookItem = await prepareBookForEditForm(row, req.user);
+    const bookPdfMaxUploadMb = await uploadLimitsPolicyService.resolveMaxFileSizeMb(orgId, 'bookPdf');
     return res.render('school/book/bookForm', {
       title: 'Edit Book',
-      bookItem: row,
+      bookItem,
       copyFromId: '',
+      bookPdfMaxUploadMb,
       includeModal: true,
       user: req.user,
       actionStateId: req.actionStateId
@@ -401,7 +446,7 @@ exports.uploadCoverPhoto = async (req, res) => {
 
 exports.uploadDigitalPdf = async (req, res) => {
   try {
-    getActiveOrgIdOrThrow(req.user);
+    const orgId = getActiveOrgIdOrThrow(req.user);
     const file = req.file;
     if (!file) throw new Error('No PDF file was uploaded.');
     const mime = String(file.mimetype || '').trim().toLowerCase();
@@ -411,10 +456,33 @@ exports.uploadDigitalPdf = async (req, res) => {
     }
     const digitalPdf = buildDigitalPdfFromUpload(file);
     if (!digitalPdf) throw new Error('PDF upload failed.');
+    const stagedBookId = String(req.body?.bookId || '').trim();
+    let responsePdf = digitalPdf;
+    if (stagedBookId && !/book_unsaved/i.test(stagedBookId)) {
+      try {
+        const existing = await schoolDataService.getDataById('books', stagedBookId, req.user);
+        if (existing && idsEqual(existing.orgId, orgId)) {
+          const pdfBookPageOne = existing.pdfBookPageOne || 1;
+          await schoolDataService.updateData('books', stagedBookId, {
+            digitalPdf,
+            pdfBookPageOne,
+            audit: {
+              lastUpdateUser: String(req.user?.id || 'SYSTEM'),
+              lastUpdateDateTime: new Date().toISOString()
+            }
+          }, req.user);
+          let saved = { ...existing, id: stagedBookId, digitalPdf, pdfBookPageOne };
+          saved = await relocateDigitalPdfIfNeeded(saved, orgId, req.user);
+          responsePdf = saved.digitalPdf || digitalPdf;
+        }
+      } catch (_) {
+        // Staged upload still returned to client; user can save from the form.
+      }
+    }
     return res.json({
       status: 'success',
       message: 'Digital PDF uploaded.',
-      digitalPdf
+      digitalPdf: responsePdf
     });
   } catch (error) {
     return res.status(400).json({ status: 'error', message: error.message });

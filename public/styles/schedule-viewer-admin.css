@@ -345,3 +345,39 @@
     color: var(--bs-danger);
     padding-left: 1.65rem;
 }
+
+/* Student claim numbers modal (shared with rolling enrollment UI) */
+#rollingStudentClaimNumbersModal.rolling-student-manage-modal .modal-header {
+    border-bottom: 1px solid #e8edf3;
+    background: #f8fafc;
+}
+#rollingStudentClaimNumbersModal .rolling-student-manage-summary {
+    border: 1px solid #e8edf3;
+    border-radius: 0.5rem;
+    background: #f8fafc;
+    padding: 0.75rem 0.85rem;
+    margin-bottom: 1rem;
+}
+#rollingStudentClaimNumbersModal .claim-number-row-editor {
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    background: #f8fafc;
+}
+#rollingStudentClaimNumbersModal .rolling-claim-actions {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.25rem;
+    white-space: nowrap;
+}
+#rollingStudentClaimNumbersModal .rolling-claim-actions .btn {
+    flex: 0 0 auto;
+}
+#rollingStudentClaimNumbersModal th.rolling-claim-actions-col,
+#rollingStudentClaimNumbersModal td.rolling-claim-actions-col {
+    width: 1%;
+    white-space: nowrap;
+}
+

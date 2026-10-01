@@ -525,6 +525,19 @@
       }
     }
 
+    function studentLabelFromPickerItem(item) {
+      if (!item || typeof item !== 'object') return '';
+      const displayName = clean(item.displayName);
+      if (displayName) return displayName;
+      const name = item.name;
+      if (typeof name === 'string' && clean(name)) return clean(name);
+      if (name && typeof name === 'object') {
+        const full = `${clean(name.first)} ${clean(name.last)}`.trim();
+        if (full) return full;
+      }
+      return clean(item.label || item.id);
+    }
+
     async function openStudentPicker(prepareData, excludeStudentIds) {
       if (!global.GenericPicker || typeof global.GenericPicker.open !== 'function') {
         await deps.uiAlert?.('Student picker is unavailable.', 'Enroll students', { icon: 'warning' });
@@ -540,7 +553,7 @@
           const selected = multiselect && Array.isArray(item) ? item : [item];
           flowState.students = selected.map((row) => ({
             studentId: clean(row.id),
-            studentLabel: clean(row.name || row.label || row.displayName || row.id)
+            studentLabel: studentLabelFromPickerItem(row)
           })).filter((row) => row.studentId);
           void openProgramRegistrationStep();
         },
@@ -548,6 +561,38 @@
       }) || {
         title: 'Select students',
         multiselect,
+        apiEndpoint: '/school/students/api/data',
+        onSelect: () => {}
+      };
+      global.GenericPicker.open(global.GenericPickerPresets?.normalizeConfig?.(base) || base);
+    }
+
+    async function startClaimNumbersFlow() {
+      configureStudentClaimNumbersManager();
+      const mgr = global.StudentClaimNumbersManager;
+      if (!mgr || typeof mgr.open !== 'function') {
+        await deps.uiAlert?.('Claim number management is unavailable.', 'Manage Claim Numbers', { icon: 'warning' });
+        return;
+      }
+      if (!global.GenericPicker || typeof global.GenericPicker.open !== 'function') {
+        await deps.uiAlert?.('Student picker is unavailable.', 'Manage Claim Numbers', { icon: 'warning' });
+        return;
+      }
+      const base = global.GenericPickerPresets?.student?.({
+        title: 'Select student',
+        multiselect: false,
+        onSelect: (item) => {
+          if (!item) return;
+          const studentId = clean(item.id);
+          if (!studentId) return;
+          void mgr.open({
+            studentId,
+            studentLabel: studentLabelFromPickerItem(item) || studentId
+          });
+        }
+      }) || {
+        title: 'Select student',
+        multiselect: false,
         apiEndpoint: '/school/students/api/data',
         onSelect: () => {}
       };
@@ -694,6 +739,7 @@
 
     configureStudentClaimNumbersManager();
     deps.bindEnrollStudentsRail?.(startEnrollStudentsFlow);
+    deps.bindClaimNumbersRail?.(startClaimNumbersFlow);
 
     global.MasterScheduleEnrollStudents = {
       openPendingEnrollmentManageModal

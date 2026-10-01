@@ -35,7 +35,8 @@ const UNIT_COVERAGE_MODES = Object.freeze({
 const PAGE_COVERAGE_MODES = Object.freeze({
   PAGES_TEXT: 'pages_text',
   PAGE_COUNT: 'page_count',
-  TOC_PICK: 'toc_pick'
+  TOC_PICK: 'toc_pick',
+  PAGE_NUMBERS: 'page_numbers'
 });
 
 const USAGE_FREQUENCIES = Object.freeze({
@@ -106,18 +107,63 @@ function sanitizeUnitCoverage(input = {}, periodType) {
   return result;
 }
 
+function normalizePageNumbers(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  const out = [];
+  value.forEach((raw) => {
+    const n = Number(raw);
+    if (!Number.isFinite(n) || !Number.isInteger(n) || n < 1) return;
+    if (seen.has(n)) return;
+    seen.add(n);
+    out.push(n);
+  });
+  return out.sort((a, b) => a - b);
+}
+
+function expandTocEntryPageNumbers(tocRow = {}) {
+  const start = Number(tocRow.startPage);
+  if (!Number.isFinite(start) || start < 1) return [];
+  let end = Number(tocRow.endPage);
+  if (!Number.isFinite(end) || end < start) end = start;
+  const pages = [];
+  for (let page = start; page <= end; page += 1) pages.push(page);
+  return pages;
+}
+
+function allowedPageNumbersForUnitTocIds(bookToc = [], unitTocEntryIds = []) {
+  const tocRows = Array.isArray(bookToc) ? bookToc : [];
+  const idSet = new Set((Array.isArray(unitTocEntryIds) ? unitTocEntryIds : []).map((id) => String(id).trim()).filter(Boolean));
+  const allowed = new Set();
+  tocRows.forEach((row) => {
+    const id = String(row?.id || '').trim();
+    if (!idSet.has(id)) return;
+    expandTocEntryPageNumbers(row).forEach((page) => allowed.add(page));
+  });
+  return allowed;
+}
+
 function sanitizePageCoverage(input = {}) {
   const mode = String(input.mode || '').trim().toLowerCase();
   const normalizedMode = VALID_PAGE_MODES.has(mode) ? mode : PAGE_COVERAGE_MODES.PAGES_TEXT;
-  const result = { mode: normalizedMode, tocEntryIds: [] };
+  const result = { mode: normalizedMode, tocEntryIds: [], pageNumbers: [] };
   if (normalizedMode === PAGE_COVERAGE_MODES.PAGES_TEXT) {
     result.pagesText = cleanString(input.pagesText, { max: 500, allowEmpty: false });
     if (!result.pagesText) throw new Error('Pages covered text is required.');
+    delete result.tocEntryIds;
+    delete result.pageNumbers;
   } else if (normalizedMode === PAGE_COVERAGE_MODES.PAGE_COUNT) {
     result.pageCount = cleanNonNegativeInt(input.pageCount, { fieldLabel: 'Page count', allowEmpty: false });
+    delete result.tocEntryIds;
+    delete result.pageNumbers;
+  } else if (normalizedMode === PAGE_COVERAGE_MODES.PAGE_NUMBERS) {
+    result.pageNumbers = normalizePageNumbers(input.pageNumbers);
+    if (!result.pageNumbers.length) throw new Error('Select at least one page covered.');
+    delete result.tocEntryIds;
   } else {
     result.tocEntryIds = normalizeTocEntryIds(input.tocEntryIds);
     if (!result.tocEntryIds.length) throw new Error('Select at least one page range from the table of contents.');
+    delete result.pageNumbers;
   }
   return result;
 }
@@ -250,13 +296,43 @@ function validateTocEntryIdsAgainstBook(entries, bookToc = []) {
   );
   for (const entry of entries) {
     const unitIds = entry?.unitCoverage?.tocEntryIds || [];
-    const pageIds = entry?.pageCoverage?.tocEntryIds || [];
+    const pageIds = entry?.pageCoverage?.mode === PAGE_COVERAGE_MODES.TOC_PICK
+      ? (entry?.pageCoverage?.tocEntryIds || [])
+      : [];
     const allIds = [...unitIds, ...pageIds];
     for (const id of allIds) {
       if (!validIds.has(String(id))) {
         throw new Error(`TOC entry "${id}" is not valid for book ${entry.bookId}.`);
       }
     }
+  }
+}
+
+function validatePageNumbersAgainstBookToc(entry, bookToc = []) {
+  const pageMode = String(entry?.pageCoverage?.mode || '').trim();
+  if (pageMode !== PAGE_COVERAGE_MODES.PAGE_NUMBERS) return;
+  const unitMode = String(entry?.unitCoverage?.mode || '').trim();
+  if (unitMode !== UNIT_COVERAGE_MODES.TOC_PICK) {
+    throw new Error('Page number coverage requires units selected from the table of contents.');
+  }
+  const unitIds = entry?.unitCoverage?.tocEntryIds || [];
+  const pageNumbers = entry?.pageCoverage?.pageNumbers || [];
+  const allowed = allowedPageNumbersForUnitTocIds(bookToc, unitIds);
+  if (!allowed.size) {
+    throw new Error('Selected units do not define any page numbers.');
+  }
+  for (const page of pageNumbers) {
+    if (!allowed.has(Number(page))) {
+      throw new Error(`Page ${page} is not within the selected unit page ranges.`);
+    }
+  }
+}
+
+function validateEntriesPageNumbersAgainstBooks(entries, bookTocByBookId = {}) {
+  for (const entry of entries) {
+    const bookId = String(entry?.bookId || '').trim();
+    const bookToc = bookTocByBookId[bookId] || [];
+    validatePageNumbersAgainstBookToc(entry, bookToc);
   }
 }
 
@@ -346,6 +422,11 @@ module.exports = {
   normalizeReportStatus,
   sanitizeEntry,
   validateTocEntryIdsAgainstBook,
+  validatePageNumbersAgainstBookToc,
+  validateEntriesPageNumbersAgainstBooks,
+  allowedPageNumbersForUnitTocIds,
+  expandTocEntryPageNumbers,
+  normalizePageNumbers,
   getAllBookCoveringReports,
   getBookCoveringReportById,
   addBookCoveringReport,

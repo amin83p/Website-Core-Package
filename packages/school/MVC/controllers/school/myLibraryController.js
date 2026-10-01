@@ -2,6 +2,7 @@
 
 const schoolDataService = require('../../services/school/schoolDataService');
 const libraryCirculationService = require('../../services/school/libraryCirculationService');
+const bookModel = require('../../models/school/bookModel');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const { getActiveOrgIdOrThrow } = requireCoreModule('MVC/utils/orgContextUtils');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
@@ -17,7 +18,7 @@ async function enrichMyLoans(loans, reqUser) {
       bookTitle: book?.title || '',
       copyCode: copy?.copyCode || '',
       hasDigitalAccess: libraryCirculationService.isDigitalAccessValid(loan),
-      digitalPdfUrl: book?.digitalPdf?.url || book?.digitalPdf?.path || ''
+      digitalPdfUrl: bookModel.resolveBookFileAssetPublicUrl(book?.digitalPdf)
     });
   }
   return output;
@@ -85,7 +86,7 @@ exports.apiOpenDigital = async (req, res) => {
     }
 
     const book = await schoolDataService.getDataById('books', loan.bookId, req.user);
-    const url = String(book?.digitalPdf?.url || book?.digitalPdf?.path || '').trim();
+    const url = bookModel.resolveBookFileAssetPublicUrl(book?.digitalPdf);
     if (!url) throw new Error('Digital PDF is not available.');
 
     return res.json({

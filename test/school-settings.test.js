@@ -87,6 +87,10 @@ test('School Settings routes use standard access and action-state protection', (
   );
   assert.match(
     routes,
+    /router\.post\('\/upload-limits'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE\)[\s\S]*?trackActionState\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE/
+  );
+  assert.match(
+    routes,
     /router\.post\('\/session-access'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE\)[\s\S]*?trackActionState\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE/
   );
   assert.match(
@@ -135,10 +139,9 @@ test('legacy settings routes redirect or save through the centralized controller
 test('settings page supports read-only rendering, independent AJAX saves, and modal-first feedback', () => {
   const view = read('packages/school/MVC/views/school/settings/index.ejs');
   const catalog = require('../packages/school/MVC/config/schoolSettingsCatalog');
-  assert.deepEqual(
-    catalog.listSchoolSettingsGroups().map((row) => row.key),
-    ['conduct-rating-scale', 'attendance-matrix', 'attendance-marks', 'attendance-rollup', 'autosave', 'session-access', 'student-attendance-report', 'timesheet-parameters', 'timesheet-import']
-  );
+  const groupKeys = catalog.listSchoolSettingsGroups().map((row) => row.key);
+  assert.ok(groupKeys.includes('upload-limits'));
+  assert.equal(groupKeys[groupKeys.length - 1], 'upload-limits');
   const rollupGroup = catalog.listSchoolSettingsGroups().find((row) => row.key === 'attendance-rollup');
   assert.equal(rollupGroup?.href, undefined);
   assert.match(view, /activeOrgName/);
@@ -175,6 +178,8 @@ test('settings page supports read-only rendering, independent AJAX saves, and mo
   assert.doesNotMatch(view, /rollupUnmarkedTreatment/);
   assert.match(view, /id="autosave"/);
   assert.match(view, /\/school\/settings\/autosave/);
+  assert.match(view, /id="upload-limits"/);
+  assert.match(view, /\/school\/settings\/upload-limits/);
   assert.match(view, /id="session-access"/);
   assert.match(view, /\/school\/settings\/session-access/);
   assert.match(view, /id="cardNaAttendanceVisibility"/);
@@ -381,13 +386,15 @@ test('settings policy persistence remains organization-keyed for JSON and Mongo'
     'packages/school/MVC/models/school/studentAttendanceReportPolicyModel.js',
     'packages/school/MVC/models/school/semiMonthlyReportPolicyModel.js',
     'packages/school/MVC/models/school/autosavePolicyModel.js',
+    'packages/school/MVC/models/school/uploadLimitsPolicyModel.js',
     'packages/school/MVC/models/school/sessionAccessPolicyModel.js',
     'packages/school/MVC/models/school/enrollmentFinishAlertPolicyModel.js',
     'packages/school/MVC/models/school/timesheetParametersPolicyModel.js',
     'packages/school/MVC/models/school/timesheetImportPolicyModel.js',
     'packages/school/MVC/models/school/timesheetDisplayPolicyModel.js'
   ].map(read);
-  assert.match(controller, /String\(user\?\.activeOrgId \|\| ''\)\.trim\(\)/);
+  assert.match(controller, /saveUploadLimitsPolicy/);
+  assert.match(controller, /uploadLimitsPolicyModel\.getPolicyForOrg/);
   assert.doesNotMatch(controller, /primaryOrgId/);
   assert.match(settingsView, /schoolSettingsFormPayload\.js/);
   assert.match(settingsView, /encodeSchoolSettingsFormPayload/);

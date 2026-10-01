@@ -5,6 +5,8 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
+const coreFilesService = requireCoreModule('MVC/services/coreFilesService');
+const uploadPathUtils = requireCoreModule('MVC/utils/uploadPathUtils');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/books.json');
 
@@ -212,8 +214,8 @@ function normalizeStoredBook(row = {}) {
     active: cleanBoolean(row.active, true),
     sortOrder: cleanSortOrder(row.sortOrder, 100),
     tableOfContents: normalizeTableOfContents(parseTableOfContentsInput(row.tableOfContents), totalPages),
-    coverPhoto: sanitizeCoverPhoto(parseCoverPhotoInput(row.coverPhoto)),
-    digitalPdf: sanitizeDigitalPdf(parseDigitalPdfInput(row.digitalPdf)),
+    coverPhoto: enrichBookFileAsset(sanitizeCoverPhoto(parseCoverPhotoInput(row.coverPhoto))),
+    digitalPdf: enrichBookFileAsset(sanitizeDigitalPdf(parseDigitalPdfInput(row.digitalPdf))),
     pdfBookPageOne: row.pdfBookPageOne === null || row.pdfBookPageOne === undefined || row.pdfBookPageOne === ''
       ? null
       : normalizePdfBookPageOne(row.pdfBookPageOne),
@@ -260,12 +262,37 @@ function parseDigitalPdfInput(value) {
   return parseBookFileInput(value, 'digital PDF');
 }
 
+function resolveBookFileAssetPublicUrl(asset = {}) {
+  if (!asset || typeof asset !== 'object') return '';
+  const directUrl = cleanString(asset.url, { max: 600, allowEmpty: true });
+  if (directUrl) return directUrl;
+  const pathValue = cleanString(asset.path || asset.storagePath, { max: 600, allowEmpty: true });
+  if (!pathValue) return '';
+  if (pathValue.startsWith('/')) return pathValue;
+  const relativeUploadPath = uploadPathUtils.extractRelativeUploadPath(pathValue);
+  if (relativeUploadPath) {
+    return `${uploadPathUtils.UPLOADS_URL_PREFIX}/${relativeUploadPath}`;
+  }
+  return coreFilesService.fromDiskPathToUploadsUrl(pathValue) || pathValue;
+}
+
+function enrichBookFileAsset(value) {
+  const sanitized = sanitizeBookFileAsset(value);
+  if (!sanitized) return null;
+  const publicUrl = resolveBookFileAssetPublicUrl(sanitized);
+  if (!publicUrl || sanitized.url === publicUrl) return sanitized;
+  return { ...sanitized, url: publicUrl };
+}
+
 function sanitizeBookFileAsset(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
   const fileName = cleanString(value.fileName || value.filename, { max: 260, allowEmpty: false });
   const originalName = cleanString(value.originalName || value.name, { max: 260, allowEmpty: true });
   const pathValue = cleanString(value.path || value.storagePath, { max: 600, allowEmpty: true });
-  const url = cleanString(value.url, { max: 600, allowEmpty: true });
+  let url = cleanString(value.url, { max: 600, allowEmpty: true });
+  if (!url && pathValue) {
+    url = resolveBookFileAssetPublicUrl({ path: pathValue });
+  }
   if (!fileName && !url && !pathValue) return null;
   const uploadedAt = cleanString(value.uploadedAt, { max: 40, allowEmpty: true }) || new Date().toISOString();
   const pathForName = pathValue || url || '';
@@ -453,6 +480,8 @@ module.exports = {
   normalizePdfBookPageOne,
   mapBookPageToPdfPage,
   sanitizeBookFileAsset,
+  resolveBookFileAssetPublicUrl,
+  enrichBookFileAsset,
   sanitizeCoverPhoto,
   sanitizeDigitalPdf,
   parseCoverPhotoInput,

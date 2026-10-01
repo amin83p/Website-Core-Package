@@ -1,26 +1,95 @@
 <div class="modal fade" id="bookTocPickerModal" tabindex="-1" aria-labelledby="bookTocPickerModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
+    <div class="modal-content session-bc-modal-content">
+      <div class="modal-header session-bc-modal-header">
         <div>
-          <h5 class="modal-title" id="bookTocPickerModalLabel"><i class="bi bi-list-nested me-2"></i>Pick from table of contents</h5>
-          <div class="small text-muted" id="bookTocPickerSubtitle"></div>
+          <h5 class="modal-title fw-bold mb-0" id="bookTocPickerModalLabel"><i class="bi bi-list-nested me-2 text-primary"></i>Pick from table of contents</h5>
+          <div class="small text-muted mt-1" id="bookTocPickerSubtitle"></div>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body">
+      <div class="modal-body session-bc-modal-body">
         <div id="bookTocPickerTree" class="book-toc-picker-tree"></div>
         <div id="bookTocPickerEmpty" class="text-center text-muted py-4 d-none">No table of contents entries for this book.</div>
       </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" id="bookTocPickerConfirmBtn">Apply selection</button>
+      <div class="modal-footer session-bc-modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="bookTocPickerConfirmBtn">Apply selection</button>
       </div>
     </div>
   </div>
 </div>
 
 <style>
+  .session-bc-modal-content {
+    border: 0;
+    border-radius: 0.75rem;
+    box-shadow: 0 1rem 2.5rem rgba(15, 23, 42, 0.12);
+    overflow: hidden;
+  }
+  .session-bc-modal-header {
+    background: linear-gradient(180deg, #f8fafc 0%, #fff 100%);
+    border-bottom: 1px solid var(--bs-border-color-translucent);
+    padding: 1rem 1.25rem;
+  }
+  .session-bc-modal-body {
+    padding: 1.25rem;
+    background: #fff;
+  }
+  .session-bc-modal-footer {
+    background: #f8fafc;
+    border-top: 1px solid var(--bs-border-color-translucent);
+    padding: 0.75rem 1.25rem;
+  }
+  .session-bc-unit-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+    gap: 0.65rem;
+  }
+  .session-bc-unit-card {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+    margin: 0;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid var(--bs-border-color-translucent);
+    border-radius: 0.5rem;
+    cursor: pointer;
+    transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+  }
+  .session-bc-unit-card:has(.js-toc-pick:checked) {
+    border-color: rgba(var(--bs-primary-rgb), 0.55);
+    background: rgba(var(--bs-primary-rgb), 0.06);
+    box-shadow: 0 0 0 1px rgba(var(--bs-primary-rgb), 0.15);
+  }
+  .session-bc-unit-card-body {
+    flex: 1;
+    min-width: 0;
+  }
+  .session-bc-unit-title {
+    font-weight: 600;
+    font-size: 0.875rem;
+    line-height: 1.35;
+  }
+  .session-bc-unit-pages {
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color);
+    margin-top: 0.15rem;
+  }
+  .session-bc-unit-level {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--bs-secondary-color);
+    margin-bottom: 0.15rem;
+  }
+  .session-bc-page-picker .session-bc-page-toggle.active {
+    background: var(--bs-primary);
+    border-color: var(--bs-primary);
+    color: #fff;
+  }
   .book-toc-picker-tree .toc-picker-row {
     display: flex;
     align-items: flex-start;

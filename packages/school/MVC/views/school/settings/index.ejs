@@ -4,6 +4,7 @@
   const attendanceItemsJson = JSON.stringify(attendanceItems || []).replace(/</g, '\\u003c');
   const autosavePolicyJson = JSON.stringify(typeof autosavePolicy !== 'undefined' ? autosavePolicy : { defaultMinutes: 5, sections: {} }).replace(/</g, '\\u003c');
   const autosaveSectionsJson = JSON.stringify(typeof autosaveSections !== 'undefined' ? autosaveSections : []).replace(/</g, '\\u003c');
+  const uploadLimitsPolicyJson = JSON.stringify(typeof uploadLimitsPolicy !== 'undefined' ? uploadLimitsPolicy : { sections: {} }).replace(/</g, '\\u003c');
   const sessionAccessPolicyJson = JSON.stringify(typeof sessionAccessPolicy !== 'undefined' ? sessionAccessPolicy : {}).replace(/</g, '\\u003c');
   const sessionNotificationEmailDefaultBodyJson = JSON.stringify(
     typeof sessionNotificationEmailDefaultBody !== 'undefined' ? sessionNotificationEmailDefaultBody : ''
@@ -2151,6 +2152,96 @@
           <div id="duplicateStudentRegResults" class="d-none"></div>
         </div>
       </section>
+
+      <section class="school-settings-panel card border-0 shadow-sm" id="upload-limits" role="tabpanel" aria-labelledby="settings-tab-upload-limits" tabindex="0" hidden>
+        <header class="school-settings-panel-header card-header px-4 py-3">
+          <div class="d-flex align-items-center gap-3">
+            <span class="school-settings-nav-icon"><i class="bi bi-cloud-upload" aria-hidden="true"></i></span>
+            <div>
+              <h2 class="h5 fw-bold mb-1">File Upload Limits</h2>
+              <p class="small text-muted mb-0">Configure maximum upload sizes for school library and other file workflows.</p>
+            </div>
+          </div>
+        </header>
+        <div class="card-body p-4">
+          <p class="small text-muted">
+            Limits apply to the active organization. Uploads use the effective limit shown below; the general app default
+            (<%= typeof uploadLimitsPolicy !== 'undefined' && uploadLimitsPolicy?.sections?.bookPdf?.globalDefaultMb != null ? uploadLimitsPolicy.sections.bookPdf.globalDefaultMb : 50 %> MB)
+            applies to most other uploads but book PDFs can be configured higher here.
+          </p>
+          <div class="alert alert-danger d-none js-settings-error" id="uploadLimitsSettingsError" role="alert"></div>
+          <form id="uploadLimitsSettingsForm" novalidate>
+            <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+            <div class="table-responsive">
+              <table class="table table-sm align-middle school-settings-table">
+                <thead class="table-light">
+                  <tr>
+                    <th>Section</th>
+                    <th style="min-width:10rem;">Max size (MB)</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% const uploadLimitCatalogRows = typeof uploadLimitSections !== 'undefined' ? uploadLimitSections : []; %>
+                  <% uploadLimitCatalogRows.forEach(function (catalogRow) {
+                    const policyRow = (typeof uploadLimitsPolicy !== 'undefined' && uploadLimitsPolicy?.sections?.[catalogRow.key])
+                      ? uploadLimitsPolicy.sections[catalogRow.key]
+                      : {};
+                    const storedMb = policyRow.maxFileSizeMb != null && String(policyRow.maxFileSizeMb).trim() !== ''
+                      ? policyRow.maxFileSizeMb
+                      : '';
+                    const effectiveMb = policyRow.effectiveMaxFileSizeMb != null
+                      ? policyRow.effectiveMaxFileSizeMb
+                      : catalogRow.defaultMaxMb;
+                    const inputId = catalogRow.key === 'bookPdf' ? 'uploadLimitBookPdfMaxMb' : ('uploadLimit_' + catalogRow.key);
+                    const inputName = catalogRow.key === 'bookPdf' ? 'bookPdfMaxFileSizeMb' : ('section_' + catalogRow.key + '_maxFileSizeMb');
+                  %>
+                  <tr>
+                    <td>
+                      <div class="fw-semibold"><%= catalogRow.title %></div>
+                      <% if (catalogRow.description) { %>
+                        <div class="small text-muted"><%= catalogRow.description %></div>
+                      <% } %>
+                    </td>
+                    <td>
+                      <input
+                        class="form-control form-control-sm js-upload-limit-max-mb"
+                        type="number"
+                        min="<%= catalogRow.minMb %>"
+                        max="<%= catalogRow.adminMaxMb %>"
+                        step="1"
+                        id="<%= inputId %>"
+                        name="<%= inputName %>"
+                        data-section-key="<%= catalogRow.key %>"
+                        value="<%= storedMb %>"
+                        placeholder="<%= effectiveMb %>"
+                        <%= canUpdateFlag ? '' : 'disabled' %>
+                      >
+                      <div class="form-text">
+                        Effective: <strong class="js-upload-limit-effective" data-section-key="<%= catalogRow.key %>"><%= effectiveMb %></strong> MB
+                        <% if (storedMb === '') { %>
+                          <span class="text-muted">(default)</span>
+                        <% } else { %>
+                          <span class="text-muted">(org override)</span>
+                        <% } %>
+                      </div>
+                    </td>
+                    <td class="small text-muted"><%= catalogRow.notes || '' %></td>
+                  </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+            <% if (canUpdateFlag) { %>
+              <div class="d-flex justify-content-end">
+                <button class="btn btn-primary" type="submit" id="btnSaveUploadLimitsSettings">
+                  <i class="bi bi-save me-1"></i>Save Upload Limits
+                </button>
+              </div>
+            <% } %>
+          </form>
+        </div>
+      </section>
     </main>
   </div>
 </div>
@@ -2247,6 +2338,7 @@
   let conductLevels = <%- conductLevelsJson %>;
   let attendanceItems = <%- attendanceItemsJson %>;
   let autosavePolicy = <%- autosavePolicyJson %>;
+  let uploadLimitsPolicy = <%- uploadLimitsPolicyJson %>;
   const autosaveSections = <%- autosaveSectionsJson %>;
   let sessionAccessPolicy = <%- sessionAccessPolicyJson %>;
   const sessionNotificationEmailTokens = <%- sessionNotificationEmailTokensJson %>;
@@ -3598,6 +3690,32 @@
     if (!result) return;
     autosavePolicy = result.policy && typeof result.policy === 'object' ? result.policy : autosavePolicy;
     renderAutosaveSections();
+    await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
+  });
+
+  document.getElementById('uploadLimitsSettingsForm')?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = document.getElementById('btnSaveUploadLimitsSettings');
+    if (!button) return;
+    const bookPdfInput = document.getElementById('uploadLimitBookPdfMaxMb');
+    const payload = {
+      actionStateId: event.currentTarget.elements.actionStateId?.value || '',
+      bookPdfMaxFileSizeMb: bookPdfInput?.value ?? ''
+    };
+    const result = await postSettings('/school/settings/upload-limits', payload, button, 'uploadLimitsSettingsError');
+    if (!result) return;
+    uploadLimitsPolicy = result.policy && typeof result.policy === 'object' ? result.policy : uploadLimitsPolicy;
+    const bookRow = uploadLimitsPolicy?.sections?.bookPdf;
+    if (bookPdfInput && bookRow) {
+      const stored = bookRow.maxFileSizeMb != null && String(bookRow.maxFileSizeMb).trim() !== ''
+        ? String(bookRow.maxFileSizeMb)
+        : '';
+      bookPdfInput.value = stored;
+      const effectiveEl = document.querySelector('.js-upload-limit-effective[data-section-key="bookPdf"]');
+      if (effectiveEl && bookRow.effectiveMaxFileSizeMb != null) {
+        effectiveEl.textContent = String(bookRow.effectiveMaxFileSizeMb);
+      }
+    }
     await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
   });
 

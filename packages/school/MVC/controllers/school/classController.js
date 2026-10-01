@@ -4903,6 +4903,93 @@ async function createBookCoveringForSession(req, res) {
     }
 }
 
+async function resolveSessionBookCoveringContext(req) {
+    const { id: classId, sessionId } = req.params;
+    const accessContext = bookCoveringAccessService.buildRouteAccessContext(req);
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, accessContext);
+    const sessions = await schoolDataService.getClassSessions(classId, req.user);
+    const { session } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
+    if (!session) throw new Error('Session not found.');
+    assertSessionScopeForRequest(req, classData, session);
+    return { classData, session, accessContext };
+}
+
+async function listSessionBookCoveringAssignedBooks(req, res) {
+    try {
+        const { classData, accessContext } = await resolveSessionBookCoveringContext(req);
+        const books = await bookCoveringReportService.listAssignedBooksForSession(
+            classData,
+            req.user,
+            accessContext
+        );
+        return res.json({ status: 'success', books, actionStateId: req.actionStateId });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
+async function getSessionBookCoveringAssignedBookDetail(req, res) {
+    try {
+        const { classData, accessContext } = await resolveSessionBookCoveringContext(req);
+        const book = await bookCoveringReportService.getAssignedBookDetailForSession(
+            classData,
+            req.params.bookId,
+            req.user,
+            accessContext
+        );
+        return res.json({ status: 'success', book, actionStateId: req.actionStateId });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
+async function upsertSessionBookCoveringEntry(req, res) {
+    try {
+        const { classData, session, accessContext } = await resolveSessionBookCoveringContext(req);
+        const body = req.body && typeof req.body === 'object' ? req.body : {};
+        const report = await bookCoveringReportService.upsertSessionReportEntry({
+            classData,
+            session,
+            entryPayload: body.entry || body,
+            reqUser: req.user,
+            accessContext
+        });
+        const summary = await bookCoveringReportService.buildReportSummary(report, req.user, accessContext);
+        return res.json({
+            status: 'success',
+            message: 'Book coverage saved.',
+            summary,
+            actionStateId: req.actionStateId
+        });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
+async function deleteSessionBookCoveringEntry(req, res) {
+    try {
+        const { classData, session, accessContext } = await resolveSessionBookCoveringContext(req);
+        const report = await bookCoveringReportService.removeSessionReportEntry({
+            classData,
+            session,
+            bookId: req.params.bookId,
+            reqUser: req.user,
+            accessContext
+        });
+        const summary = report
+            ? await bookCoveringReportService.buildReportSummary(report, req.user, accessContext)
+            : null;
+        return res.json({
+            status: 'success',
+            message: 'Book coverage removed.',
+            summary,
+            actionStateId: req.actionStateId
+        });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
 async function listSessionReportInstances(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
@@ -6853,7 +6940,7 @@ module.exports = {
   getClassTemplate,
   checkConflicts,
   previewTeacherAssignmentImpact,
-  saveSession, saveSessionGradebooks, getGradebookMakeupSources, getGradebookMakeupActivities, postGradebookMakeupFrom, manageSession, previewClassSessionDelete, uploadSessionFile, createMakeupSession, deleteLinkedMakeupSession, listMergeEligibleTeachers, previewSessionMerge, executeSessionMerge, unmergeSession, assignReportToSession, getBookCoveringSummaryForSession, createBookCoveringForSession, deleteBookCoveringForSession, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
+  saveSession, saveSessionGradebooks, getGradebookMakeupSources, getGradebookMakeupActivities, postGradebookMakeupFrom, manageSession, previewClassSessionDelete, uploadSessionFile, createMakeupSession, deleteLinkedMakeupSession, listMergeEligibleTeachers, previewSessionMerge, executeSessionMerge, unmergeSession, assignReportToSession, getBookCoveringSummaryForSession, createBookCoveringForSession, deleteBookCoveringForSession, listSessionBookCoveringAssignedBooks, getSessionBookCoveringAssignedBookDetail, upsertSessionBookCoveringEntry, deleteSessionBookCoveringEntry, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
   saveSessionConduct,
   setSessionLock,
   showFinalGradesPage,

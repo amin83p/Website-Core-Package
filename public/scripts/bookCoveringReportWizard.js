@@ -145,6 +145,31 @@
       return Array.isArray(book?.bookTableOfContents) ? book.bookTableOfContents : [];
     }
 
+    function resolvePageCoverageMode(entry) {
+      const mode = String(entry?.pageCoverage?.mode || '').trim();
+      if (mode === 'page_numbers' || (Array.isArray(entry?.pageCoverage?.pageNumbers) && entry.pageCoverage.pageNumbers.length)) {
+        return 'page_numbers';
+      }
+      if (mode === 'page_count' || mode === 'toc_pick') return mode;
+      return 'pages_text';
+    }
+
+    function renderPageNumbersSummaryHtml(entry) {
+      const pages = Array.isArray(entry?.pageCoverage?.pageNumbers) ? entry.pageCoverage.pageNumbers : [];
+      if (!pages.length) {
+        return '<div class="small text-muted covering-toc-selected-empty">No pages selected yet.</div>';
+      }
+      const utils = window.BookCoveringTocUtils;
+      const label = utils ? utils.formatPageNumbersDisplay(pages) : pages.join(', ');
+      return '<div class="small"><span class="text-muted">Pages covered:</span> <span class="fw-semibold">' + escapeHtml(label) + '</span></div>';
+    }
+
+    function refreshPageNumbersList(panel, entry) {
+      const listEl = panel.querySelector('.js-page-numbers-list');
+      if (!listEl) return;
+      listEl.innerHTML = renderPageNumbersSummaryHtml(entry);
+    }
+
     function resolveTocEntryLabel(tocEntries, id) {
       const row = tocEntries.find((entry) => String(entry?.id || '') === String(id));
       if (!row) return String(id || '');
@@ -324,7 +349,7 @@
         const panelId = 'wizardStepBook_' + bookId.replace(/[^a-zA-Z0-9_-]/g, '_');
         const entry = findEntry(bookId);
         const unitMode = entry.unitCoverage?.mode || 'count';
-        const pageMode = entry.pageCoverage?.mode || 'pages_text';
+        const pageMode = resolvePageCoverageMode(entry);
         const daily = isDaily();
         return (
           '<div class="wizard-step-panel d-none" id="' + panelId + '" data-book-id="' + escapeHtml(bookId) + '">' +
@@ -347,13 +372,19 @@
           '<div class="d-flex flex-wrap gap-3 mb-2">' +
           '<label><input type="radio" class="form-check-input me-1 js-page-mode" name="pageMode_' + index + '" value="pages_text" ' + (pageMode === 'pages_text' ? 'checked' : '') + (isReadOnly ? ' disabled' : '') + '> Pages covered</label>' +
           '<label><input type="radio" class="form-check-input me-1 js-page-mode" name="pageMode_' + index + '" value="page_count" ' + (pageMode === 'page_count' ? 'checked' : '') + (isReadOnly ? ' disabled' : '') + '> Number of pages</label>' +
-          '<label><input type="radio" class="form-check-input me-1 js-page-mode" name="pageMode_' + index + '" value="toc_pick" ' + (pageMode === 'toc_pick' ? 'checked' : '') + (isReadOnly ? ' disabled' : '') + '> Pick from TOC</label>' +
+          '<label><input type="radio" class="form-check-input me-1 js-page-mode" name="pageMode_' + index + '" value="toc_pick" ' + (pageMode === 'toc_pick' ? 'checked' : '') + (isReadOnly ? ' disabled' : '') + '> Page ranges from TOC</label>' +
+          '<label><input type="radio" class="form-check-input me-1 js-page-mode" name="pageMode_' + index + '" value="page_numbers" ' + (pageMode === 'page_numbers' ? 'checked' : '') + (isReadOnly ? ' disabled' : '') + '> Individual pages</label>' +
           '</div>' +
           '<input type="text" class="form-control js-pages-text mb-2" value="' + escapeHtml(entry.pageCoverage?.pagesText || '') + '" placeholder="e.g. 12-15, 18" ' + (pageMode !== 'pages_text' ? 'style="display:none"' : '') + (isReadOnly ? ' disabled' : '') + '>' +
           '<input type="number" min="0" step="1" class="form-control js-page-count mb-2" value="' + escapeHtml(entry.pageCoverage?.pageCount === null || entry.pageCoverage?.pageCount === undefined ? '' : String(entry.pageCoverage.pageCount)) + '" placeholder="Number of pages (0 if less than one page)" ' + (pageMode !== 'page_count' ? 'style="display:none"' : '') + (isReadOnly ? ' disabled' : '') + '>' +
           '<div class="js-toc-pages-picker-wrap' + (pageMode === 'toc_pick' ? '' : ' d-none') + '">' +
-          '<button type="button" class="btn btn-outline-secondary btn-sm js-pick-toc-pages" ' + (isReadOnly ? 'disabled' : '') + '><i class="bi bi-list-nested me-1"></i>Pick pages from TOC</button>' +
+          '<button type="button" class="btn btn-outline-secondary btn-sm js-pick-toc-pages" ' + (isReadOnly ? 'disabled' : '') + '><i class="bi bi-list-nested me-1"></i>Pick page ranges from TOC</button>' +
           '<div class="js-toc-pages-list covering-toc-selected-host mt-2">' + renderTocSelectedListHtml(book.bookTableOfContents || [], entry.pageCoverage?.tocEntryIds, 'pages') + '</div>' +
+          '</div>' +
+          '<div class="js-page-numbers-picker-wrap' + (pageMode === 'page_numbers' ? '' : ' d-none') + '">' +
+          '<p class="small text-muted mb-2">Select units above, then pick individual pages (matches session quick report).</p>' +
+          '<button type="button" class="btn btn-outline-secondary btn-sm js-pick-page-numbers" ' + (isReadOnly ? 'disabled' : '') + '><i class="bi bi-ui-checks-grid me-1"></i>Pick pages</button>' +
+          '<div class="js-page-numbers-list covering-toc-selected-host mt-2">' + renderPageNumbersSummaryHtml(entry) + '</div>' +
           '</div></div>' +
           (daily ? '' : (
             '<div class="mb-3"><label class="form-label fw-semibold">How many times did you use this book for this period?</label>' +
@@ -400,8 +431,11 @@
             panel.querySelector('.js-pages-text').style.display = mode === 'pages_text' ? '' : 'none';
             panel.querySelector('.js-page-count').style.display = mode === 'page_count' ? '' : 'none';
             const pagesWrap = panel.querySelector('.js-toc-pages-picker-wrap');
+            const pageNumbersWrap = panel.querySelector('.js-page-numbers-picker-wrap');
             if (pagesWrap) pagesWrap.classList.toggle('d-none', mode !== 'toc_pick');
+            if (pageNumbersWrap) pageNumbersWrap.classList.toggle('d-none', mode !== 'page_numbers');
             if (mode === 'toc_pick') refreshTocPagesList(panel, book, entry);
+            if (mode === 'page_numbers') refreshPageNumbersList(panel, entry);
           });
         });
 
@@ -433,8 +467,32 @@
           });
         });
 
+        panel.querySelector('.js-pick-page-numbers')?.addEventListener('click', async () => {
+          if (!window.BookCoveringPagePicker) return;
+          const unitMode = panel.querySelector('.js-unit-mode:checked')?.value || entry.unitCoverage?.mode || 'count';
+          const unitIds = unitMode === 'toc_pick'
+            ? (entry.unitCoverage?.tocEntryIds || [])
+            : [];
+          if (!unitIds.length) {
+            await showWizardMessage('Pick units from the table of contents before selecting individual pages.', 'Units required');
+            return;
+          }
+          BookCoveringPagePicker.open({
+            bookTitle: book.bookTitle,
+            tableOfContents: book.bookTableOfContents || [],
+            selectedUnitIds: unitIds,
+            selectedPageNumbers: entry.pageCoverage?.pageNumbers || [],
+            onConfirm: (pages) => {
+              entry.pageCoverage.mode = 'page_numbers';
+              entry.pageCoverage.pageNumbers = pages;
+              refreshPageNumbersList(panel, entry);
+            }
+          });
+        });
+
         refreshTocUnitsList(panel, book, entry);
         refreshTocPagesList(panel, book, entry);
+        refreshPageNumbersList(panel, entry);
 
         panel._entryRef = entry;
         panel._bookId = bookId;
@@ -447,7 +505,8 @@
       const book = getBookById(bookId) || {};
       const entry = panel._entryRef || findEntry(bookId);
       const unitMode = panel.querySelector('.js-unit-mode:checked')?.value || 'count';
-      const pageMode = panel.querySelector('.js-page-mode:checked')?.value || 'pages_text';
+      const pageMode = panel.querySelector('.js-page-mode:checked')?.value || resolvePageCoverageMode(entry);
+      const preservedPageNumbers = Array.isArray(entry.pageCoverage?.pageNumbers) ? entry.pageCoverage.pageNumbers.slice() : [];
       entry.bookAssignmentId = book.bookAssignmentId || book.id || entry.bookAssignmentId || '';
       entry.bookId = bookId;
       entry.note = String(panel.querySelector('.js-entry-note')?.value || '').trim();
@@ -467,6 +526,9 @@
       }
       if (pageMode === 'page_count') {
         entry.pageCoverage.pageCount = readNonNegativeIntField(panel.querySelector('.js-page-count')?.value);
+      }
+      if (pageMode === 'page_numbers') {
+        entry.pageCoverage.pageNumbers = preservedPageNumbers;
       }
       if (!isDaily()) {
         entry.usageFrequency = String(panel.querySelector('.js-usage-frequency:checked')?.value || '').trim();
@@ -514,7 +576,7 @@
       syncEntryFromPanel(panel);
       const entry = panel._entryRef;
       const unitMode = entry.unitCoverage?.mode || 'count';
-      const pageMode = entry.pageCoverage?.mode || 'pages_text';
+      const pageMode = resolvePageCoverageMode(entry);
       if (unitMode === 'count' && !isNonNegativeIntField(entry.unitCoverage?.unitCount)) {
         await showWizardMessage('Please enter the number of units covered (use 0 if less than one full unit).', 'Units covered');
         return false;
@@ -534,6 +596,16 @@
       if (pageMode === 'toc_pick' && !(entry.pageCoverage?.tocEntryIds || []).length) {
         await showWizardMessage('Please pick page ranges from the table of contents.', 'Pages covered');
         return false;
+      }
+      if (pageMode === 'page_numbers') {
+        if (unitMode !== 'toc_pick' || !(entry.unitCoverage?.tocEntryIds || []).length) {
+          await showWizardMessage('Please pick units from the table of contents before recording individual pages.', 'Units covered');
+          return false;
+        }
+        if (!(entry.pageCoverage?.pageNumbers || []).length) {
+          await showWizardMessage('Please pick the pages you covered.', 'Pages covered');
+          return false;
+        }
       }
       if (!isDaily()) {
         if (!entry.usageFrequency) {

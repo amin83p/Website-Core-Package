@@ -1,0 +1,22 @@
+<div class="modal fade" id="bookCoveringPagePickerModal" tabindex="-1" aria-labelledby="bookCoveringPagePickerModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content session-bc-modal-content">
+      <div class="modal-header session-bc-modal-header">
+        <div>
+          <h5 class="modal-title fw-bold mb-0" id="bookCoveringPagePickerModalLabel"><i class="bi bi-file-earmark-text me-2 text-primary"></i>Pick pages covered</h5>
+          <div class="small text-muted mt-1" id="bookCoveringPagePickerSubtitle"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body session-bc-modal-body">
+        <p class="session-bc-step-help mb-2">Tap page numbers you covered within each selected unit.</p>
+        <div id="bookCoveringPagePickerHost" class="session-bc-page-picker"></div>
+        <div id="bookCoveringPagePickerEmpty" class="text-center text-muted py-4 d-none">Select units from the table of contents before picking pages.</div>
+      </div>
+      <div class="modal-footer session-bc-modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="bookCoveringPagePickerConfirmBtn">Apply selection</button>
+      </div>
+    </div>
+  </div>
+</div>

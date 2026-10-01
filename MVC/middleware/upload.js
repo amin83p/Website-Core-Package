@@ -41,7 +41,10 @@ function formatUploadMiddlewareError(error) {
   if (!error) return 'Upload failed.';
   if (error instanceof multer.MulterError) {
     if (error.code === 'LIMIT_FILE_SIZE') {
-      return `One or more files exceed the upload limit of ${coreFilesService.getMaxUploadFileMb()} MB per file.`;
+      const limitMb = Number.isFinite(Number(error.limit)) && Number(error.limit) > 0
+        ? Math.round(Number(error.limit) / (1024 * 1024))
+        : coreFilesService.getMaxUploadFileMb();
+      return `One or more files exceed the upload limit of ${limitMb} MB per file.`;
     }
     if (error.code === 'LIMIT_FILE_COUNT') return 'Too many files were selected for upload.';
     if (error.code === 'LIMIT_UNEXPECTED_FILE') return 'Unexpected upload field. Please select files again.';
@@ -51,7 +54,12 @@ function formatUploadMiddlewareError(error) {
 }
 
 // Upload factory (compatibility adapter signature preserved)
-function upload(fixedCategory = 'misc', isDynamic = false, forceGlobal = false) {
+function upload(fixedCategory = 'misc', isDynamic = false, forceGlobal = false, uploadOptions = {}) {
+  const options = uploadOptions && typeof uploadOptions === 'object' ? uploadOptions : {};
+  const parsedMaxMb = Number.parseInt(String(options.maxFileSizeMb ?? '').trim(), 10);
+  const maxFileMb = Number.isFinite(parsedMaxMb) && parsedMaxMb > 0
+    ? parsedMaxMb
+    : coreFilesService.getMaxUploadFileMb();
   const storage = multer.diskStorage({
     destination: (req, file, cb) => {
       try {
@@ -77,7 +85,7 @@ function upload(fixedCategory = 'misc', isDynamic = false, forceGlobal = false) 
 
   const uploader = multer({
     storage,
-    limits: { fileSize: coreFilesService.getMaxUploadFileMb() * 1024 * 1024 },
+    limits: { fileSize: maxFileMb * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
       // Check if user is a super admin
       const isSuperAdmin = adminAuthorityService.isSuperAdmin(req.user);
@@ -89,6 +97,10 @@ function upload(fixedCategory = 'misc', isDynamic = false, forceGlobal = false) 
 
       const ext = path.extname(file.originalname).toLowerCase();
       const mimeType = file.mimetype;
+
+      if (ext === '.pdf') {
+        return cb(null, true);
+      }
 
       if (ALLOWED_EXTENSIONS.has(ext) && ALLOWED_MIME_TYPES.has(mimeType)) {
         return cb(null, true);

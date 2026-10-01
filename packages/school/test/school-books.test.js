@@ -23,6 +23,19 @@ test('access constants declare SCHOOL_BOOKS', () => {
   assert.equal(accessConstants.SECTIONS.SCHOOL_BOOKS, 'SCHOOL_BOOKS');
 });
 
+test('book routes use org-scoped upload limit policy for PDF uploads', () => {
+  const source = fs.readFileSync(BOOK_ROUTES, 'utf8');
+  assert.match(source, /bookPdfUpload/);
+  assert.match(source, /uploadLimitsPolicyService\.resolveMaxFileSizeMb/);
+  assert.doesNotMatch(source, /getSchoolBookPdfMaxUploadFileMb/);
+});
+
+test('book controller resolves PDF max upload size from upload limits policy', () => {
+  const source = fs.readFileSync(BOOK_CONTROLLER, 'utf8');
+  assert.match(source, /uploadLimitsPolicyService\.resolveMaxFileSizeMb/);
+  assert.doesNotMatch(source, /getSchoolBookPdfMaxUploadFileMb/);
+});
+
 test('book routes register list and CRUD handlers', () => {
   const source = fs.readFileSync(BOOK_ROUTES, 'utf8');
   assert.match(source, /SECTIONS\.SCHOOL_BOOKS/);
@@ -57,6 +70,7 @@ test('book form view includes TOC editor and AJAX save', () => {
   assert.match(source, /tab-media/);
   assert.match(source, /tab-toc/);
   assert.match(source, /hid_tableOfContents/);
+  assert.match(source, /bookInitialTocData/);
   assert.match(source, /hid_coverPhoto/);
   assert.match(source, /hid_digitalPdf/);
   assert.match(source, /pdfBookPageOne/);
@@ -299,4 +313,13 @@ test('bookModel stores digital PDF with page-one mapping', () => {
   });
   assert.equal(sanitized.pdfBookPageOne, 12);
   assert.equal(sanitized.digitalPdf.fileName, 'book.pdf');
+});
+
+test('bookModel resolves public URL from stored path when url is missing', () => {
+  const enriched = bookModel.enrichBookFileAsset({
+    fileName: 'book.pdf',
+    path: 'uploads/ORG_1/school/books/BK-9/pdf/book.pdf'
+  });
+  assert.ok(enriched);
+  assert.match(enriched.url, /\/uploads\//);
 });

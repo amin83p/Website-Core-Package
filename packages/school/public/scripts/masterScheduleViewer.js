@@ -3904,6 +3904,11 @@
         enrollStudentsRailHandler = typeof handler === 'function' ? handler : null;
     }
 
+    let claimNumbersRailHandler = null;
+    function bindClaimNumbersRail(handler) {
+        claimNumbersRailHandler = typeof handler === 'function' ? handler : null;
+    }
+
     function showScheduleBootstrapModal(modalEl) {
         if (!modalEl || !window.bootstrap?.Modal) return;
         window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -5073,6 +5078,9 @@
             const action = String(actionEl.getAttribute('data-schedule-admin-action') || '').trim();
             if (action === 'enroll-students' && typeof enrollStudentsRailHandler === 'function') {
                 void enrollStudentsRailHandler();
+            }
+            if (action === 'claim-numbers' && typeof claimNumbersRailHandler === 'function') {
+                void claimNumbersRailHandler();
             }
         });
     }
@@ -7389,6 +7397,7 @@ if (canLoadAllSchedules) {
             showBootstrapModal: showScheduleBootstrapModal,
             hideBootstrapModal: hideScheduleBootstrapModal,
             bindEnrollStudentsRail,
+            bindClaimNumbersRail,
             countActiveScheduleSelectedSessions,
             countActiveDraftSelectedSessions,
             getSelectedSavedClassSessionEvents,

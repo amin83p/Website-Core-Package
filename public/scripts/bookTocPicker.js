@@ -38,25 +38,53 @@
       return;
     }
     empty?.classList.add('d-none');
-    tree.innerHTML = rows.map((entry) => {
-      const id = String(entry?.id || '').trim();
-      const level = Number(entry?.level || 1);
-      const label = escapeHtml(entry?.label || id);
-      const start = entry?.startPage;
-      const end = entry?.endPage;
-      const pageLabel = start
-        ? (end && end !== start ? `pp. ${start}–${end}` : `p. ${start}`)
-        : '';
-      const checked = selectedIds.has(id) ? 'checked' : '';
-      return (
-        '<div class="toc-picker-row">' +
-        '<input type="checkbox" class="form-check-input mt-1 js-toc-pick" value="' + escapeHtml(id) + '" ' + checked + '>' +
-        '<div class="toc-picker-label" style="--toc-level:' + Math.max(0, level - 1) + '">' +
-        '<div class="fw-semibold">' + label + '</div>' +
-        (mode === 'pages' && pageLabel ? '<div class="toc-picker-pages">' + escapeHtml(pageLabel) + '</div>' : '') +
-        '</div></div>'
+    if (mode === 'units') {
+      tree.innerHTML = (
+        '<div class="session-bc-unit-grid">' +
+        rows.map((entry) => {
+          const id = String(entry?.id || '').trim();
+          const level = Number(entry?.level || 1);
+          const label = escapeHtml(entry?.label || id);
+          const start = entry?.startPage;
+          const end = entry?.endPage;
+          const pageLabel = start
+            ? (end && end !== start ? `pp. ${start}–${end}` : `p. ${start}`)
+            : '';
+          const checked = selectedIds.has(id) ? ' checked' : '';
+          const levelHint = level > 1 ? '<span class="session-bc-unit-level">Level ' + level + '</span>' : '';
+          return (
+            '<label class="session-bc-unit-card">' +
+            '<input type="checkbox" class="form-check-input js-toc-pick mt-1" value="' + escapeHtml(id) + '"' + checked + '>' +
+            '<div class="session-bc-unit-card-body">' +
+            levelHint +
+            '<div class="session-bc-unit-title">' + label + '</div>' +
+            (pageLabel ? '<div class="session-bc-unit-pages">' + escapeHtml(pageLabel) + '</div>' : '') +
+            '</div></label>'
+          );
+        }).join('') +
+        '</div>'
       );
-    }).join('');
+    } else {
+      tree.innerHTML = rows.map((entry) => {
+        const id = String(entry?.id || '').trim();
+        const level = Number(entry?.level || 1);
+        const label = escapeHtml(entry?.label || id);
+        const start = entry?.startPage;
+        const end = entry?.endPage;
+        const pageLabel = start
+          ? (end && end !== start ? `pp. ${start}–${end}` : `p. ${start}`)
+          : '';
+        const checked = selectedIds.has(id) ? 'checked' : '';
+        return (
+          '<div class="toc-picker-row">' +
+          '<input type="checkbox" class="form-check-input mt-1 js-toc-pick" value="' + escapeHtml(id) + '" ' + checked + '>' +
+          '<div class="toc-picker-label" style="--toc-level:' + Math.max(0, level - 1) + '">' +
+          '<div class="fw-semibold">' + label + '</div>' +
+          (pageLabel ? '<div class="toc-picker-pages">' + escapeHtml(pageLabel) + '</div>' : '') +
+          '</div></div>'
+        );
+      }).join('');
+    }
 
     tree.querySelectorAll('.js-toc-pick').forEach((input) => {
       input.addEventListener('change', () => {

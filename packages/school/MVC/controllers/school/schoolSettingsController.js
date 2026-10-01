@@ -49,6 +49,8 @@ const reportFunderPdfService = require('../../services/school/reportFunderPdfSer
 const overallReportService = require('../../services/school/overallReportService');
 const { listSchoolSettingsGroups } = require('../../config/schoolSettingsCatalog');
 const { listAutosaveSections } = require('../../config/autosaveSectionCatalog');
+const uploadLimitsPolicyModel = require('../../models/school/uploadLimitsPolicyModel');
+const { listUploadLimitSections } = require('../../config/uploadLimitsSectionCatalog');
 const { userCanUpdateSchoolSettings } = require('../../services/school/schoolSettingsAccessService');
 const studentDuplicateProfileService = require('../../services/school/studentDuplicateProfileService');
 
@@ -408,6 +410,7 @@ async function loadSettingsPageData(req) {
     timesheetImportPolicy,
     timesheetDisplayPolicy,
     enrollmentFinishAlertPolicy,
+    uploadLimitsPolicy,
     canUpdate
   ] = await Promise.all([
     conductRatingScalePolicyModel.getPolicyForOrg(activeOrgId),
@@ -422,6 +425,7 @@ async function loadSettingsPageData(req) {
     timesheetImportPolicyModel.getPolicyForOrg(activeOrgId),
     timesheetDisplayPolicyModel.getPolicyForOrg(activeOrgId),
     enrollmentFinishAlertPolicyModel.getPolicyForOrg(activeOrgId),
+    uploadLimitsPolicyModel.getPolicyForOrg(activeOrgId),
     userCanUpdateSchoolSettings(req.user, req.ip)
   ]);
   const studentAttendanceReportLabels = await resolveStudentAttendanceReportLabels(
@@ -506,6 +510,8 @@ async function loadSettingsPageData(req) {
     sessionNotificationEmailDefaultBody: sessionAccessPolicyService.DEFAULT_POLICY
       .uncompletedSessionNotification.channels.email.bodyTemplate,
     autosaveSections: listAutosaveSections(),
+    uploadLimitsPolicy,
+    uploadLimitSections: listUploadLimitSections(),
     studentAttendanceReportPolicy,
     semiMonthlyReportPolicy,
     timesheetParametersPolicy,
@@ -1194,6 +1200,27 @@ async function saveAutosavePolicy(req, res) {
   }
 }
 
+async function saveUploadLimitsPolicy(req, res) {
+  try {
+    const activeOrgId = activeOrgIdOrThrow(req.user);
+    const policy = await uploadLimitsPolicyModel.savePolicyForOrg(
+      activeOrgId,
+      req.body || {},
+      req.user?.id
+    );
+    return res.json({
+      status: 'success',
+      message: 'File upload limit settings were updated.',
+      policy
+    });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 500).json({
+      status: 'error',
+      message: error?.message || 'Failed to save file upload limit settings.'
+    });
+  }
+}
+
 function redirectLegacyConductSettings(_req, res) {
   return res.redirect('/school/settings#conduct-rating-scale');
 }
@@ -1224,6 +1251,7 @@ module.exports = {
   saveTimesheetDisplayPolicy,
   scanDuplicateStudentProfilesApi,
   saveAutosavePolicy,
+  saveUploadLimitsPolicy,
   saveSessionAccessPolicy,
   previewSessionAccessTestNotification,
   sendSessionAccessTestNotification,

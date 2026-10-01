@@ -27,6 +27,7 @@
 
   <% if (includeModal) { %><%- include('partials/modal_GenericPicker', { user }) %><% } %>
   <%- include('school/library/partials/bookTocPickerModal') %>
+  <%- include('school/library/partials/bookCoveringPagePickerModal') %>
 
   <div class="form-container wide" style="max-width: 1400px;">
     <div id="coveringWizardGuide" class="mb-3">
@@ -412,7 +413,9 @@
 </style>
 
 <script src="/scripts/wizardStepRail.js"></script>
+<script src="/scripts/bookCoveringTocUtils.js"></script>
 <script src="/scripts/bookTocPicker.js"></script>
+<script src="/scripts/bookCoveringPagePicker.js"></script>
 <script src="/scripts/bookCoveringReportWizard.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {

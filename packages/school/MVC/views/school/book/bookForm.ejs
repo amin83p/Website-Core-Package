@@ -14,11 +14,13 @@
 
   const initCoverPhoto = JSON.stringify(item.coverPhoto || null);
 
-  const coverPhotoUrl = item.coverPhoto && item.coverPhoto.url ? item.coverPhoto.url : '';
+  const coverPhotoUrl = item.coverPhoto && (item.coverPhoto.url || item.coverPhoto.path) ? (item.coverPhoto.url || item.coverPhoto.path) : '';
 
   const initDigitalPdf = JSON.stringify(item.digitalPdf || null);
 
-  const digitalPdfUrl = item.digitalPdf && item.digitalPdf.url ? item.digitalPdf.url : '';
+  const digitalPdfUrl = item.digitalPdf && (item.digitalPdf.url || item.digitalPdf.path) ? (item.digitalPdf.url || item.digitalPdf.path) : '';
+
+  const hasDigitalPdf = Boolean(item.digitalPdf && (item.digitalPdf.url || item.digitalPdf.path || item.digitalPdf.fileName));
 
   const digitalPdfName = item.digitalPdf && (item.digitalPdf.originalName || item.digitalPdf.fileName) ? (item.digitalPdf.originalName || item.digitalPdf.fileName) : '';
 
@@ -88,7 +90,7 @@
 
       <input type="hidden" name="actionStateId" value="<%= asid %>">
 
-      <input type="hidden" name="tableOfContents" id="hid_tableOfContents" value='<%- initTableOfContents %>'>
+      <input type="hidden" name="tableOfContents" id="hid_tableOfContents" value="<%= initTableOfContents.replace(/&/g, '&amp;').replace(/"/g, '&quot;') %>">
 
       <input type="hidden" name="coverPhoto" id="hid_coverPhoto" value='<%- initCoverPhoto %>'>
 
@@ -356,9 +358,9 @@
 
                   <input type="file" id="digitalPdfInput" class="form-control size-md" accept="application/pdf,.pdf">
 
-                  <div class="form-text small">One PDF per book. Replace the file by uploading again.</div>
+                  <div class="form-text small">One PDF per book. Replace the file by uploading again.<% if (typeof bookPdfMaxUploadMb !== 'undefined' && bookPdfMaxUploadMb) { %> Maximum size: <%= bookPdfMaxUploadMb %> MB.<% } %></div>
 
-                  <div id="digitalPdfFileWrap" class="mt-3<%= digitalPdfUrl ? '' : ' d-none' %>">
+                  <div id="digitalPdfFileWrap" class="mt-3<%= hasDigitalPdf ? '' : ' d-none' %>">
 
                     <div class="border rounded p-3 bg-light-subtle">
 
@@ -370,7 +372,7 @@
 
                       <% } else { %>
 
-                        <a href="#" target="_blank" rel="noopener" class="small d-none" id="digitalPdfOpenLink">Open current PDF</a>
+                        <a href="#" target="_blank" rel="noopener" class="small<%= hasDigitalPdf ? '' : ' d-none' %>" id="digitalPdfOpenLink">Open current PDF</a>
 
                       <% } %>
 
@@ -380,7 +382,7 @@
 
                   <div class="d-flex gap-2 mt-3">
 
-                    <button type="button" class="btn btn-outline-danger btn-sm<%= digitalPdfUrl ? '' : ' d-none' %>" id="btnRemoveDigitalPdf">
+                    <button type="button" class="btn btn-outline-danger btn-sm<%= hasDigitalPdf ? '' : ' d-none' %>" id="btnRemoveDigitalPdf">
 
                       <i class="bi bi-trash me-1"></i> Remove PDF
 
@@ -492,7 +494,7 @@
 
 </div>
 
-
+<script type="application/json" id="bookInitialTocData"><%- initTableOfContents.replace(/<\//g, '\\u003c/') %></script>
 
 <script>
 
@@ -539,6 +541,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const hiddenPdf = document.getElementById('hid_digitalPdf');
 
   const hiddenRemovePdf = document.getElementById('hid_removeDigitalPdf');
+
+  const actionStateIdInput = document.getElementById('bookForm')?.querySelector('input[name="actionStateId"]');
 
   const pdfBookPageOneInput = document.getElementById('pdfBookPageOne');
 
@@ -1010,7 +1014,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   try {
 
-    initialRows = JSON.parse(hiddenToc.value || '[]');
+    const tocDataEl = document.getElementById('bookInitialTocData');
+
+    const raw = tocDataEl ? tocDataEl.textContent : (hiddenToc?.value || '[]');
+
+    initialRows = JSON.parse(raw || '[]');
 
     if (!Array.isArray(initialRows)) initialRows = [];
 
@@ -1029,6 +1037,20 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
 
     syncEmptyState();
+
+  }
+
+
+
+  function resolveAssetPublicUrl(asset) {
+
+    if (!asset || typeof asset !== 'object') return '';
+
+    const url = String(asset.url || '').trim();
+
+    if (url) return url;
+
+    return String(asset.path || '').trim();
 
   }
 
@@ -1066,7 +1088,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     hiddenCover.value = coverPhoto ? JSON.stringify(coverPhoto) : '';
 
-    syncCoverPreview(coverPhoto?.url || '');
+    syncCoverPreview(resolveAssetPublicUrl(coverPhoto) || coverPhoto?.url || '');
 
   }
 
@@ -1076,7 +1098,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const initialCover = JSON.parse(hiddenCover.value || 'null');
 
-    if (initialCover && initialCover.url) {
+    if (initialCover && (initialCover.url || initialCover.path)) {
 
       setCoverPhotoState(initialCover, false);
 
@@ -1115,6 +1137,8 @@ document.addEventListener('DOMContentLoaded', () => {
       fd.append('coverPhoto', file);
 
       fd.append('bookId', bookIdForUpload);
+
+      if (actionStateIdInput?.value) fd.append('actionStateId', actionStateIdInput.value);
 
       const response = await fetch('/school/library/books/api/upload-cover', {
 
@@ -1178,9 +1202,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (pdfOpenLink) {
 
-        pdfOpenLink.href = digitalPdf.url || '#';
+        const href = resolveAssetPublicUrl(digitalPdf);
 
-        pdfOpenLink.classList.toggle('d-none', !digitalPdf.url);
+        pdfOpenLink.href = href || '#';
+
+        pdfOpenLink.classList.toggle('d-none', !href);
 
       }
 
@@ -1294,9 +1320,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       const fd = new FormData();
 
-      fd.append('digitalPdf', file);
+      if (actionStateIdInput?.value) fd.append('actionStateId', actionStateIdInput.value);
 
       fd.append('bookId', bookIdForUpload);
+
+      fd.append('digitalPdf', file);
 
       const response = await fetch('/school/library/books/api/upload-pdf', {
 

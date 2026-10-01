@@ -42,6 +42,7 @@ test('admin Master Schedule week rail markup and sync wiring', () => {
   assert.match(view, /data-schedule-admin-action="enroll-students"/);
   assert.match(view, /data-schedule-admin-action="move-enrollments"/);
   assert.match(view, /data-schedule-admin-action="delete-enrollment"/);
+  assert.match(view, /data-schedule-admin-action="claim-numbers"/);
   assert.match(view, /schedule-view-icon-btn[\s\S]*Enroll Students/);
   const nonAdminBlock = view.split('<% if (canSelectAnyPerson) { %>')[0];
   assert.doesNotMatch(nonAdminBlock, /scheduleAdminWeekRail/);

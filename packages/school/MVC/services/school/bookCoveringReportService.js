@@ -7,8 +7,11 @@ const { requireCoreModule } = require('../../services/school/schoolCoreContracts
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const {
   PERIOD_TYPES,
+  normalizePeriodType,
   REPORT_STATUSES,
-  validateTocEntryIdsAgainstBook
+  validateTocEntryIdsAgainstBook,
+  validatePageNumbersAgainstBookToc,
+  sanitizeEntry
 } = require('../../models/school/bookCoveringReportModel');
 const { resolveTeacherId, resolveTeacherName } = require('./sessionReportAssignmentService');
 
@@ -93,6 +96,29 @@ function isCountValue(value) {
   return Number.isFinite(n) && Number.isInteger(n) && n >= 0;
 }
 
+function formatPageNumbersBrief(pageNumbers = []) {
+  const pages = (Array.isArray(pageNumbers) ? pageNumbers : [])
+    .map((n) => Number(n))
+    .filter((n) => Number.isFinite(n) && n >= 1)
+    .sort((a, b) => a - b);
+  if (!pages.length) return '';
+  if (pages.length === 1) return `page ${pages[0]}`;
+  const runs = [];
+  let runStart = pages[0];
+  let runEnd = pages[0];
+  for (let i = 1; i < pages.length; i += 1) {
+    if (pages[i] === runEnd + 1) {
+      runEnd = pages[i];
+    } else {
+      runs.push(runStart === runEnd ? String(runStart) : `${runStart}–${runEnd}`);
+      runStart = pages[i];
+      runEnd = pages[i];
+    }
+  }
+  runs.push(runStart === runEnd ? String(runStart) : `${runStart}–${runEnd}`);
+  return `pages ${runs.join(', ')}`;
+}
+
 function formatEntryCoverageBrief(entry = {}) {
   const parts = [];
   const unitMode = String(entry.unitCoverage?.mode || '').trim();
@@ -108,6 +134,8 @@ function formatEntryCoverageBrief(entry = {}) {
     parts.push(`${entry.pageCoverage.pageCount} page(s)`);
   } else if (pageMode === 'toc_pick' && (entry.pageCoverage?.tocEntryIds || []).length) {
     parts.push(`${entry.pageCoverage.tocEntryIds.length} TOC page range(s)`);
+  } else if (pageMode === 'page_numbers' && (entry.pageCoverage?.pageNumbers || []).length) {
+    parts.push(formatPageNumbersBrief(entry.pageCoverage.pageNumbers));
   }
   return parts.join(', ') || 'No coverage recorded';
 }
@@ -118,20 +146,29 @@ function entryHasCoverage(entry = {}) {
 
 async function buildReportSummary(report, reqUser, accessContext = {}) {
   const entries = Array.isArray(report?.entries) ? report.entries : [];
-  const bookTitleMap = new Map();
+  const bookMetaMap = new Map();
   for (const entry of entries) {
     const bookId = clean(entry.bookId);
-    if (!bookId || bookTitleMap.has(bookId)) continue;
+    if (!bookId || bookMetaMap.has(bookId)) continue;
     const book = await schoolDataService.getDataById('books', bookId, reqUser, accessContext);
-    bookTitleMap.set(bookId, clean(book?.title) || bookId);
+    const coverPhotoUrl = clean(book?.coverPhotoUrl || book?.coverPhoto?.url);
+    bookMetaMap.set(bookId, {
+      title: clean(book?.title) || bookId,
+      coverPhotoUrl
+    });
   }
 
   const entrySummaries = entries.map((entry) => {
     const bookId = clean(entry.bookId);
+    const meta = bookMetaMap.get(bookId) || { title: bookId, coverPhotoUrl: '' };
     const coverageBrief = formatEntryCoverageBrief(entry);
     return {
       bookId,
-      bookTitle: bookTitleMap.get(bookId) || bookId,
+      bookAssignmentId: clean(entry.bookAssignmentId),
+      bookTitle: meta.title,
+      coverPhotoUrl: meta.coverPhotoUrl,
+      unitCoverage: entry.unitCoverage || null,
+      pageCoverage: entry.pageCoverage || null,
       coverageBrief,
       hasCoverage: entryHasCoverage(entry),
       notePreview: clean(entry.note).slice(0, 80)
@@ -284,10 +321,11 @@ async function getSessionBookCoveringSummary(classData, session, reqUser, access
   return buildReportSummary(report, reqUser, accessContext);
 }
 
-async function validateEntriesAgainstBooks(entries, orgId, reqUser) {
+async function validateEntriesAgainstBooks(entries, orgId, reqUser, accessContext = {}) {
   for (const entry of entries) {
     const book = await bookAssignmentService.assertBookInOrg(entry.bookId, orgId, reqUser);
     validateTocEntryIdsAgainstBook([entry], book.tableOfContents || []);
+    validatePageNumbersAgainstBookToc(entry, book.tableOfContents || []);
   }
 }
 
@@ -505,6 +543,133 @@ async function deleteReport(id, reqUser, accessContext = {}) {
   return existing;
 }
 
+function resolveCoverPhotoUrl(bookRow) {
+  if (!bookRow || typeof bookRow !== 'object') return '';
+  return clean(bookRow.coverPhotoUrl || bookRow.coverPhoto?.url);
+}
+
+async function listAssignedBooksForSession(classData, reqUser, accessContext = {}) {
+  const orgId = clean(classData?.orgId || reqUser?.activeOrgId);
+  const classId = clean(classData?.id);
+  if (!classId) throw new Error('Class is required.');
+  const rows = await bookAssignmentService.expandAssignedBooksForClass(
+    classId,
+    orgId,
+    reqUser,
+    { activeOnly: true }
+  );
+  return rows.map((row) => ({
+    bookId: String(row.bookId || ''),
+    bookAssignmentId: String(row.bookAssignmentId || row.id || ''),
+    bookTitle: clean(row.bookTitle) || row.bookId,
+    coverPhotoUrl: resolveCoverPhotoUrl(row),
+    sortOrder: Number(row.sortOrder || 0)
+  }));
+}
+
+async function getAssignedBookDetailForSession(classData, bookId, reqUser, accessContext = {}) {
+  const orgId = clean(classData?.orgId || reqUser?.activeOrgId);
+  const classId = clean(classData?.id);
+  const token = clean(bookId);
+  if (!classId || !token) throw new Error('Class and book are required.');
+
+  const assigned = await bookAssignmentService.expandAssignedBooksForClass(
+    classId,
+    orgId,
+    reqUser,
+    { activeOnly: true }
+  );
+  const line = assigned.find((row) => String(row.bookId) === String(token));
+  if (!line) throw new Error('This book is not actively assigned to the class.');
+
+  const book = await bookAssignmentService.assertBookInOrg(token, orgId, reqUser);
+  const digitalPdf = book.digitalPdf && typeof book.digitalPdf === 'object'
+    ? {
+      url: clean(book.digitalPdf.url),
+      path: clean(book.digitalPdf.path),
+      fileName: clean(book.digitalPdf.fileName)
+    }
+    : null;
+
+  return {
+    bookId: String(book.id || token),
+    bookAssignmentId: String(line.bookAssignmentId || line.id || ''),
+    title: clean(book.title) || token,
+    subtitle: clean(book.subtitle),
+    authors: book.authors || [],
+    isbn: clean(book.isbn),
+    publisher: clean(book.publisher),
+    totalPages: book.totalPages ?? null,
+    coverPhotoUrl: resolveCoverPhotoUrl(book),
+    digitalPdf,
+    tableOfContents: Array.isArray(book.tableOfContents) ? book.tableOfContents : []
+  };
+}
+
+async function findOrCreateSessionReport({ classData, session, reqUser, accessContext = {} }) {
+  let report = await findReportForSession({ classData, session, reqUser, accessContext });
+  if (report) return report;
+  const created = await createDraftForSession({ classData, session, reqUser, accessContext });
+  return created.report;
+}
+
+async function upsertSessionReportEntry({
+  classData,
+  session,
+  entryPayload = {},
+  reqUser,
+  accessContext = {}
+}) {
+  const report = await findOrCreateSessionReport({ classData, session, reqUser, accessContext });
+  await assertReportEditable(report, reqUser);
+
+  const orgId = clean(report.orgId || classData.orgId);
+  const periodType = normalizePeriodType(report.periodType);
+  const sanitizedEntry = sanitizeEntry(entryPayload, periodType, 0);
+  await validateEntriesAgainstBooks([sanitizedEntry], orgId, reqUser, accessContext);
+
+  const entries = Array.isArray(report.entries) ? report.entries.slice() : [];
+  const bookId = sanitizedEntry.bookId;
+  const existingIndex = entries.findIndex((row) => String(row.bookId) === String(bookId));
+  if (existingIndex >= 0) entries[existingIndex] = sanitizedEntry;
+  else entries.push(sanitizedEntry);
+
+  const updated = await updateReport(
+    report.id,
+    { entries },
+    reqUser,
+    accessContext
+  );
+  return updated;
+}
+
+async function removeSessionReportEntry({
+  classData,
+  session,
+  bookId,
+  reqUser,
+  accessContext = {}
+}) {
+  const token = clean(bookId);
+  if (!token) throw new Error('Book id is required.');
+  const report = await findReportForSession({ classData, session, reqUser, accessContext });
+  if (!report) throw new Error('Book covering report not found for this session.');
+  await assertReportEditable(report, reqUser);
+
+  const entries = (Array.isArray(report.entries) ? report.entries : [])
+    .filter((row) => String(row.bookId) !== String(token));
+  if (entries.length === (report.entries || []).length) {
+    throw new Error('Book entry not found on this session report.');
+  }
+
+  if (!entries.length) {
+    await deleteReport(report.id, reqUser, accessContext);
+    return null;
+  }
+
+  return updateReport(report.id, { entries }, reqUser, accessContext);
+}
+
 module.exports = {
   createReport,
   updateReport,
@@ -519,6 +684,11 @@ module.exports = {
   hasSubmittedBookReportForSession,
   getSessionBookCoveringSummary,
   buildReportSummary,
+  formatEntryCoverageBrief,
+  listAssignedBooksForSession,
+  getAssignedBookDetailForSession,
+  upsertSessionReportEntry,
+  removeSessionReportEntry,
   isReportSessionLocked,
   assertReportEditable,
   assertNoDuplicateReport
