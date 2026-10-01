@@ -1163,11 +1163,31 @@
     return { startDate: start, endDate: end };
   }
 
+  function readBulkNaWeekdays() {
+    const scope = bulkNaModalEl || qs('sessionEnrollmentBulkNaModal');
+    const selected = [];
+    scope?.querySelectorAll('[data-bulk-na-weekday].active').forEach((btn) => {
+      const n = Number(btn.getAttribute('data-bulk-na-weekday'));
+      if (Number.isFinite(n)) selected.push(n);
+    });
+    return core.normalizeWeekdays(selected);
+  }
+
+  function syncBulkNaWeekdayButtons() {
+    const scope = bulkNaModalEl || qs('sessionEnrollmentBulkNaModal');
+    scope?.querySelectorAll('[data-bulk-na-weekday]').forEach((btn) => {
+      const dow = Number(btn.getAttribute('data-bulk-na-weekday'));
+      const active = Number.isFinite(dow) && dow >= 1 && dow <= 4;
+      btn.classList.toggle('active', active);
+    });
+  }
+
   function collectBulkNaSessionsForForm() {
     const { startDate, endDate } = readBulkNaDateValues();
     const action = readBulkNaAction();
-    if (!startDate || !endDate || startDate > endDate) return [];
-    return core.collectBulkNaSessions(allEvents, state?.pendingMarkChanges, startDate, endDate, action);
+    const weekdays = readBulkNaWeekdays();
+    if (!startDate || !endDate || startDate > endDate || !weekdays.length) return [];
+    return core.collectBulkNaSessions(allEvents, state?.pendingMarkChanges, startDate, endDate, action, weekdays);
   }
 
   function buildBulkPendingPreview(sessions, action, note = '') {
@@ -1177,22 +1197,27 @@
   function refreshBulkNaPreview() {
     syncBulkNaActionButtons();
     const action = readBulkNaAction();
+    const weekdays = readBulkNaWeekdays();
+    const weekdayHint = qs('sessionEnrollmentBulkNaWeekdayHint');
+    weekdayHint?.classList.toggle('d-none', weekdays.length > 0);
     const sessions = collectBulkNaSessionsForForm();
     const count = sessions.length;
     const countEl = qs('sessionEnrollmentBulkNaCount');
     const stageBtn = qs('btn_sessionEnrollmentBulkNaStage');
     if (countEl) {
-      if (!count) {
+      if (!weekdays.length) {
+        countEl.textContent = 'Select at least one weekday.';
+      } else if (!count) {
         countEl.textContent = action === 'unmark'
-          ? 'No N/A sessions in this date range.'
-          : 'No open sessions in this date range.';
+          ? 'No N/A sessions in this date range on the selected weekdays.'
+          : 'No open sessions in this date range on the selected weekdays.';
       } else {
         countEl.textContent = action === 'unmark'
           ? `${count} session(s) will be unmarked from N/A.`
           : `${count} session(s) will be marked N/A.`;
       }
     }
-    if (stageBtn) stageBtn.disabled = count === 0;
+    if (stageBtn) stageBtn.disabled = count === 0 || weekdays.length === 0;
     showBulkNaFormError('');
   }
 
@@ -1214,6 +1239,7 @@
     });
     applyBulkNaInputBounds();
     clampBulkNaDateInputs();
+    syncBulkNaWeekdayButtons();
     refreshBulkNaPreview();
     showBulkNaModalLayer();
   }
@@ -1221,9 +1247,13 @@
   function stageBulkNaChanges() {
     if (!state) return;
     const action = readBulkNaAction();
+    if (!readBulkNaWeekdays().length) {
+      showBulkNaFormError('Select at least one weekday.');
+      return;
+    }
     const sessions = collectBulkNaSessionsForForm();
     if (!sessions.length) {
-      showBulkNaFormError('No sessions match this date range and action.');
+      showBulkNaFormError('No sessions match this date range, weekdays, and action.');
       return;
     }
     const note = String(qs('sessionEnrollmentBulkNaNote')?.value || '').trim();
@@ -2133,6 +2163,13 @@
         const nextAction = String(actionBtn.getAttribute('data-bulk-na-action') || 'mark_na').trim().toLowerCase();
         bulkNaAction = nextAction === 'unmark' ? 'unmark' : 'mark_na';
         syncBulkNaActionButtons(bulkNaAction);
+        refreshBulkNaPreview();
+        return;
+      }
+      const weekdayBtn = event.target.closest('[data-bulk-na-weekday]');
+      if (weekdayBtn) {
+        event.preventDefault();
+        weekdayBtn.classList.toggle('active');
         refreshBulkNaPreview();
         return;
       }

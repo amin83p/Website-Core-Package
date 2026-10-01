@@ -264,6 +264,22 @@ test('collectBulkNaSessions filters by inclusive date range and action eligibili
   assert.deepEqual(toUnmark.map((row) => row.sessionId).sort(), ['S1', 'S2']);
 });
 
+test('collectBulkNaSessions filters by selected weekdays', () => {
+  const core = loadSessionCalendarCore();
+  const events = [
+    { sessionId: 'MON', date: '2026-01-05', durationHours: 1 },
+    { sessionId: 'WED', date: '2026-01-07', durationHours: 1 },
+    { sessionId: 'SAT', date: '2026-01-10', durationHours: 1 }
+  ];
+  const pending = new Map();
+
+  const monWed = core.collectBulkNaSessions(events, pending, '2026-01-01', '2026-01-31', 'mark_na', [1, 3]);
+  assert.deepEqual(monWed.map((row) => row.sessionId), ['MON', 'WED']);
+
+  const none = core.collectBulkNaSessions(events, pending, '2026-01-01', '2026-01-31', 'mark_na', []);
+  assert.equal(none.length, 0);
+});
+
 test('applyBulkPendingChanges stages mark and unmark entries for bulk actions', () => {
   const core = loadSessionCalendarCore();
   const events = [

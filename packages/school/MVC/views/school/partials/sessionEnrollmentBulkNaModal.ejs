@@ -4,7 +4,7 @@
     <div class="card-header py-2 d-flex align-items-start justify-content-between gap-2">
       <div>
         <h5 class="card-title mb-0" id="sessionEnrollmentBulkNaModalTitle">Bulk N/A by date range</h5>
-        <div class="small text-muted">Stage mark or unmark changes for sessions in a date range.</div>
+        <div class="small text-muted">Stage mark or unmark changes for sessions in a date range on selected weekdays.</div>
       </div>
       <button type="button" class="btn-close" data-bulk-na-dismiss="1" aria-label="Close"></button>
     </div>
@@ -25,6 +25,15 @@
           <label class="form-label small mb-1" for="sessionEnrollmentBulkNaEnd">To</label>
           <input type="date" class="form-control form-control-sm" id="sessionEnrollmentBulkNaEnd">
         </div>
+      </div>
+      <div class="session-stage-section mb-3">
+        <div class="session-stage-label small text-muted mb-1">Weekdays</div>
+        <div class="session-stage-btn-group d-flex flex-wrap gap-2" id="sessionEnrollmentBulkNaWeekdayGroup" role="group" aria-label="Weekdays for bulk N/A">
+          <% ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach((label, idx) => { %>
+            <button type="button" class="btn btn-outline-secondary session-stage-chip session-stage-weekday<%= idx >= 1 && idx <= 4 ? ' active' : '' %>" data-bulk-na-weekday="<%= idx %>"><%= label %></button>
+          <% }) %>
+        </div>
+        <div class="small text-muted mt-1 d-none" id="sessionEnrollmentBulkNaWeekdayHint">Select at least one weekday.</div>
       </div>
       <div class="small mb-2" id="sessionEnrollmentBulkNaCount" role="status">0 session(s) will be affected.</div>
       <div id="sessionEnrollmentBulkNaNoteWrap" class="mb-2">

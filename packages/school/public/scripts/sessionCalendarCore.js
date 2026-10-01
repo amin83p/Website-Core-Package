@@ -2595,13 +2595,30 @@
     return d >= start && d <= end;
   }
 
-  function collectBulkNaSessions(events, pendingMap, startDate, endDate, action) {
+  function sessionWeekdayIndex(dateStr) {
+    const date = normalizeDateOnly(dateStr);
+    if (!date) return null;
+    return new Date(`${date}T12:00:00`).getDay();
+  }
+
+  function resolveBulkNaWeekdayFilter(weekdays) {
+    if (weekdays === undefined || weekdays === null) {
+      return [0, 1, 2, 3, 4, 5, 6];
+    }
+    return normalizeWeekdays(weekdays);
+  }
+
+  function collectBulkNaSessions(events, pendingMap, startDate, endDate, action, weekdays) {
     const normalizedAction = String(action || '').trim().toLowerCase();
+    const allowedWeekdays = resolveBulkNaWeekdayFilter(weekdays);
     return (Array.isArray(events) ? events : []).filter((ev) => {
       const sessionId = String(ev?.sessionId || '').trim();
       const date = normalizeDateOnly(ev?.date);
       if (!sessionId || !date) return false;
       if (!isDateWithinInclusiveRange(date, startDate, endDate)) return false;
+      if (!allowedWeekdays.length) return false;
+      const dow = sessionWeekdayIndex(date);
+      if (dow === null || !allowedWeekdays.includes(dow)) return false;
       const naState = resolveEnrollmentNaState(ev, pendingMap);
       if (normalizedAction === 'mark_na') return naState === 'normal';
       if (normalizedAction === 'unmark') return naState !== 'normal';
