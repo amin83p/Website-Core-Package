@@ -5,6 +5,7 @@ const schoolPersonAccessService = require('./schoolPersonAccessService');
 const programRegistrationViewService = require('./programRegistrationViewService');
 const termRegistrationViewService = require('./termRegistrationViewService');
 const programWithdrawalService = require('./withdrawal/programWithdrawalService');
+const classSessionCapacityService = require('./classSessionCapacityService');
 
 const ACTIVE_REGISTRATION_STATUSES = new Set(['registered', 'draft', 'error', 'planned', 'to_be_confirmed', 'waiting_list', 'active']);
 
@@ -130,6 +131,28 @@ function buildEnrollmentDetailApiUrl(studentId, enrollmentId) {
   return `/school/academic-ledger/student-overview/${encodeURIComponent(normalizedStudentId)}/enrollment-detail/${encodeURIComponent(normalizedEnrollmentId)}`;
 }
 
+function buildClassEnrollmentNavigationUrl({
+  classId = '',
+  studentId = '',
+  classData = null
+} = {}) {
+  const normalizedClassId = toPublicId(classId);
+  if (!normalizedClassId) return '';
+  const registrationMode = classSessionCapacityService.getClassRegistrationModeKey(classData || {});
+  if (registrationMode !== 'rolling') {
+    return `/school/classes/edit/${encodeURIComponent(normalizedClassId)}`;
+  }
+  const params = new URLSearchParams();
+  const normalizedStudentId = toPublicId(studentId);
+  if (normalizedStudentId) {
+    params.set('type', 'exact');
+    params.set('searchFields', 'studentId');
+    params.set('q', normalizedStudentId);
+  }
+  const query = params.toString();
+  return `/school/classes/${encodeURIComponent(normalizedClassId)}/rolling-enrollment${query ? `?${query}` : ''}`;
+}
+
 async function buildClassEnrollmentRows({
   reqUser,
   activeOrgId,
@@ -179,7 +202,11 @@ async function buildClassEnrollmentRows({
         registrationSummary: buildRegistrationSummary(period, registrationMeta, termRowById),
         detailApiUrl: buildEnrollmentDetailApiUrl(studentId, period.id),
         programRegistrationId: String(period?.programRegistrationId || '').trim(),
-        editUrl: classId ? `/school/classes/edit/${encodeURIComponent(classId)}` : ''
+        editUrl: buildClassEnrollmentNavigationUrl({
+          classId,
+          studentId,
+          classData: classRow
+        })
       };
     });
 
@@ -255,6 +282,7 @@ module.exports = {
   buildStudentAcademicOverview,
   buildClassEnrollmentRows,
   buildEnrollmentDetailApiUrl,
+  buildClassEnrollmentNavigationUrl,
   resolveClassTeacherName,
   resolveRegistrationSource,
   registrationSortRank,

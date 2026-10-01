@@ -39,6 +39,15 @@ test('person schedule API returns activeClasses from buildEventsForPersonAndRang
   assert.match(controller, /activeClasses/);
 });
 
+test('buildEventsForPersonAndRange does not reference req outside route handlers', () => {
+  const controller = read('MVC/controllers/school/scheduleController.js');
+  const start = controller.indexOf('async function buildEventsForPersonAndRange');
+  assert.ok(start >= 0, 'buildEventsForPersonAndRange should exist');
+  const nextFn = controller.indexOf('\nasync function ', start + 1);
+  const body = controller.slice(start, nextFn > start ? nextFn : start + 120000);
+  assert.doesNotMatch(body, /\borgTimeZone:\s*req\./);
+});
+
 test('schedule controller uses scheduleAccessService and scoped repository reads', () => {
   const controller = read('MVC/controllers/school/scheduleController.js');
   assert.match(controller, /scheduleAccessService/);

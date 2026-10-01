@@ -10,7 +10,7 @@ const reportPdfRenderService = require('./reportPdfRenderService');
 const reportFunderDocxService = require('./reportFunderDocxService');
 const reportFunderPdfService = require('./reportFunderPdfService');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
-const { getPrefillValue } = require('./reportPrefillKeyUtils');
+const { getPrefillValue, isAutoRefreshPrefillKey } = require('./reportPrefillKeyUtils');
 
 const EPHEMERAL_ASSIGNMENT_ID = 'engine:ephemeral';
 
@@ -146,24 +146,28 @@ function hydrateAnswersFromPrefill(template, instance, options = {}) {
     const looksRating = /session_rating|classEffort|classParticipation|respectsTeachers|respectsStudents|conduct/i.test(
       String(field?.prefillKey || '')
     );
+    const autoRefreshPrefill = isAutoRefreshPrefillKey(field?.prefillKey);
     const currentIsNa = ['n/a', 'na'].includes(String(currentValue ?? '').trim().toLowerCase());
     const canOverwriteNaRating = looksRating && currentIsNa;
-    if (hasCurrentValue && !overwritePrefillFields && !canOverwriteNaRating) return;
-
     const rawPrefill = resolvedPrefill.value;
-    let nextValue = rawPrefill;
+    let nextValuePreview = rawPrefill;
     if (type === 'checkbox') {
-      nextValue = rawPrefill === true || String(rawPrefill).toLowerCase() === 'true' || String(rawPrefill) === '1';
+      nextValuePreview = rawPrefill === true || String(rawPrefill).toLowerCase() === 'true' || String(rawPrefill) === '1';
     } else if (type === 'number') {
       const n = Number(rawPrefill);
-      nextValue = Number.isFinite(n) ? n : '';
+      nextValuePreview = Number.isFinite(n) ? n : '';
     } else if (rawPrefill === undefined || rawPrefill === null) {
-      nextValue = '';
+      nextValuePreview = '';
     } else {
-      nextValue = String(rawPrefill).trim();
+      nextValuePreview = String(rawPrefill).trim();
+    }
+    const prefillOverridden = instance?.derivedOverrides?.[field.id] === true;
+    if (hasCurrentValue && !overwritePrefillFields && !canOverwriteNaRating) {
+      if (prefillOverridden) return;
+      if (!autoRefreshPrefill || stableValueToken(currentValue) === stableValueToken(nextValuePreview)) return;
     }
 
-    currentAnswers[field.id] = nextValue;
+    currentAnswers[field.id] = nextValuePreview;
     changed = true;
   });
 

@@ -285,6 +285,10 @@ test('rolling enrollment student name supports context menu and claim number man
   assert.match(viewSource, /Manage Claim Numbers/);
   assert.match(viewSource, /studentClaimNumbersModal/);
   assert.match(viewSource, /#rollingStudentClaimNumbersModal/);
+  assert.match(viewSource, /Registration Overview/);
+  assert.match(viewSource, /id="rollingStudentContextMenuRegistrationOverview"/);
+  assert.match(viewSource, /function openRollingStudentRegistrationOverviewTab\(/);
+  assert.match(viewSource, /rolling-academic-timeline-class-link/);
   assert.match(viewSource, /Academic Timeline/);
   assert.match(viewSource, /id="rollingStudentContextMenuAcademicTimeline"/);
   assert.match(viewSource, /Student Attendance Report/);

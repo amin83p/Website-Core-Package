@@ -2,6 +2,8 @@ const schoolDataService = require('./schoolDataService');
 const reportService = require('./reportService');
 const reportViewService = require('./reportViewService');
 const reportRuleEngineService = require('./reportRuleEngineService');
+const reportGenerationEngineService = require('./reportGenerationEngineService');
+const { getPrefillValue, isAutoRefreshPrefillKey } = require('./reportPrefillKeyUtils');
 
 function isVisualOnlyField(field = {}) {
   const type = String(field?.type || '').trim().toLowerCase();
@@ -47,7 +49,18 @@ async function persistInstanceAnswers({
     ? instance.prefillSnapshot
     : {};
   fields.forEach((field) => {
-    if (!reportRuleEngineService.isDerivedEditableField(field) || !field?.id) return;
+    if (!field?.id || isVisualOnlyField(field)) return;
+    const autoRefreshKey = isAutoRefreshPrefillKey(field?.prefillKey);
+    if (autoRefreshKey) {
+      const resolved = getPrefillValue(prefillSnapshot, field.prefillKey);
+      if (resolved.found) {
+        const prefillValue = reportGenerationEngineService.coercePrefillValueForField(field, resolved.value);
+        const submitted = studentAnswers[field.id];
+        derivedOverrides[field.id] = stableValueToken(submitted) !== stableValueToken(prefillValue);
+      }
+      return;
+    }
+    if (!reportRuleEngineService.isDerivedEditableField(field)) return;
     const rule = reportRuleEngineService.normalizeCalculationRule(field?.calculationRule || {});
     if (!rule.expression) return;
     try {

@@ -10,7 +10,7 @@ const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSes
 const reportRuleEngineService = require('./reportRuleEngineService');
 const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
-const { getPrefillValue, normalizePrefillKey } = require('./reportPrefillKeyUtils');
+const { getPrefillValue, normalizePrefillKey, isAutoRefreshPrefillKey } = require('./reportPrefillKeyUtils');
 const gradebookSkillCatalogService = require('./gradebookSkillCatalogService');
 const gradebookWeightService = require('./gradebookWeightService');
 const reportFunderDocxService = require('./reportFunderDocxService');
@@ -1052,6 +1052,48 @@ function maxRounded(arr) {
   return Math.max(...arr);
 }
 
+function gradebookSkillShareCount(col = {}) {
+  const count = Array.isArray(col.skills) ? col.skills.length : 0;
+  return count > 0 ? count : 1;
+}
+
+function computeStudentSkillAvgFromBucket(bucket) {
+  const entries = Array.isArray(bucket?.studentGradeEntries) ? bucket.studentGradeEntries : [];
+  if (!entries.length) return null;
+  return gradebookWeightService.computeWeightedAveragePercent(
+    entries.map((entry) => ({
+      weight: entry.weight,
+      totalScore: 100,
+      includeInGradeCalculation: true
+    })),
+    (_activity, index) => ({
+      skip: false,
+      score: entries[index].percent,
+      totalScore: 100
+    })
+  );
+}
+
+function resolveGradebookSkillAvgPercent(weightedAvg, bucket, audience = 'student') {
+  if (audience === 'student') {
+    const fromStudentActivities = computeStudentSkillAvgFromBucket(bucket);
+    if (fromStudentActivities != null && Number.isFinite(Number(fromStudentActivities))) {
+      return fromStudentActivities;
+    }
+  } else if (weightedAvg != null && Number.isFinite(Number(weightedAvg))) {
+    return weightedAvg;
+  }
+  const percents = audience === 'class'
+    ? (Array.isArray(bucket?.classPercents) ? bucket.classPercents : [])
+    : (Array.isArray(bucket?.studentPercents) ? bucket.studentPercents : []);
+  if (percents.length) {
+    return averageRounded(percents);
+  }
+  const earned = audience === 'class' ? bucket?.classEarned : bucket?.studentEarned;
+  const possible = audience === 'class' ? bucket?.classPossible : bucket?.studentPossible;
+  return percentFromEarnedPossible(earned, possible);
+}
+
 function computeReportPeriodGradebookSkillStats(periodSessions, studentPersonId, statusMap = null) {
   const skills = gradebookSkillCatalogService.listGradebookSkills();
   const buckets = new Map();
@@ -1063,7 +1105,8 @@ function computeReportPeriodGradebookSkillStats(periodSessions, studentPersonId,
       classPossible: 0,
       studentEarned: 0,
       studentPossible: 0,
-      studentActivityCount: 0
+      studentActivityCount: 0,
+      studentGradeEntries: []
     });
   });
 
@@ -1084,23 +1127,29 @@ function computeReportPeriodGradebookSkillStats(periodSessions, studentPersonId,
         || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
       const raw = absent ? null : getScoreFromScoresMap(col.scores, pid);
       const total = col.totalScore > 0 ? col.totalScore : 0;
-      let pct = null;
-      if (!absent && raw != null && total > 0) {
-        pct = Math.round((raw / total) * 1000) / 10;
-      }
-      if (!col.includeInCalc || absent || raw == null || total <= 0) return;
+      if (!col.includeInCalc || absent || total <= 0) return;
+      const rawValue = raw != null ? Number(raw) : 0;
+      const pct = Math.round((rawValue / total) * 1000) / 10;
+      const skillShare = gradebookSkillShareCount(col);
+      const earnedShare = rawValue / skillShare;
+      const possibleShare = total / skillShare;
 
       col.skills.forEach((skillId) => {
         const bucket = buckets.get(skillId);
         if (!bucket) return;
         bucket.classPercents.push(pct);
-        bucket.classEarned += raw;
-        bucket.classPossible += total;
+        bucket.classEarned += earnedShare;
+        bucket.classPossible += possibleShare;
         if (targetStudent && idsEqual(pid, targetStudent)) {
           bucket.studentActivityCount += 1;
           bucket.studentPercents.push(pct);
-          bucket.studentEarned += raw;
-          bucket.studentPossible += total;
+          bucket.studentEarned += earnedShare;
+          bucket.studentPossible += possibleShare;
+          bucket.studentGradeEntries.push({
+            colId: col.id,
+            percent: pct,
+            weight: gradebookWeightService.resolveActivityWeight(col)
+          });
         }
       });
     });
@@ -1111,12 +1160,7 @@ function computeReportPeriodGradebookSkillStats(periodSessions, studentPersonId,
   skills.forEach((skill) => {
     const bucket = buckets.get(skill.id);
     const skillCols = cols.filter((col) => col.includeInCalc && Array.isArray(col.skills) && col.skills.includes(skill.id));
-    const studentAvg = targetStudent
-      ? gradebookWeightService.computeWeightedAveragePercent(
-        skillCols,
-        (col) => resolveGradebookColumnScore(col, targetStudent, statusMap, periodSessions)
-      )
-      : null;
+    const studentAvg = targetStudent ? computeStudentSkillAvgFromBucket(bucket) : null;
     const classAvg = gradebookWeightService.computeWeightedAveragePercent(
       skillCols,
       (col) => {
@@ -1126,17 +1170,15 @@ function computeReportPeriodGradebookSkillStats(periodSessions, studentPersonId,
       }
     );
     flatMap[`class_gradebook_skill_${skill.id}_activity_count`] = skillCols.length;
-    flatMap[`class_gradebook_skill_${skill.id}_avg_percent`] = classAvg != null
-      ? classAvg
-      : percentFromEarnedPossible(bucket.classEarned, bucket.classPossible);
+    const resolvedClassAvg = resolveGradebookSkillAvgPercent(classAvg, bucket, 'class');
+    const resolvedStudentAvg = resolveGradebookSkillAvgPercent(studentAvg, bucket, 'student');
+    flatMap[`class_gradebook_skill_${skill.id}_avg_percent`] = resolvedClassAvg;
     flatMap[`class_gradebook_skill_${skill.id}_min_percent`] = minRounded(bucket.classPercents);
     flatMap[`class_gradebook_skill_${skill.id}_max_percent`] = maxRounded(bucket.classPercents);
     flatMap[`class_gradebook_skill_${skill.id}_points_earned`] = Math.round(bucket.classEarned * 100) / 100;
     flatMap[`class_gradebook_skill_${skill.id}_points_possible`] = Math.round(bucket.classPossible * 100) / 100;
     flatMap[`student_gradebook_skill_${skill.id}_activity_count`] = bucket.studentActivityCount;
-    flatMap[`student_gradebook_skill_${skill.id}_avg_percent`] = studentAvg != null
-      ? studentAvg
-      : percentFromEarnedPossible(bucket.studentEarned, bucket.studentPossible);
+    flatMap[`student_gradebook_skill_${skill.id}_avg_percent`] = resolvedStudentAvg;
     flatMap[`student_gradebook_skill_${skill.id}_min_percent`] = minRounded(bucket.studentPercents);
     flatMap[`student_gradebook_skill_${skill.id}_max_percent`] = maxRounded(bucket.studentPercents);
     flatMap[`student_gradebook_skill_${skill.id}_points_earned`] = Math.round(bucket.studentEarned * 100) / 100;
@@ -1145,9 +1187,7 @@ function computeReportPeriodGradebookSkillStats(periodSessions, studentPersonId,
       skill_id: skill.id,
       skill_name: skill.label,
       activity_count: bucket.studentActivityCount,
-      avg_percent: studentAvg != null
-        ? studentAvg
-        : percentFromEarnedPossible(bucket.studentEarned, bucket.studentPossible),
+      avg_percent: resolvedStudentAvg,
       min_percent: minRounded(bucket.studentPercents),
       max_percent: maxRounded(bucket.studentPercents),
       points_earned: Math.round(bucket.studentEarned * 100) / 100,
@@ -1188,6 +1228,26 @@ function resolveGradebookColumnScore(col, personId, statusMap = null, periodSess
   const raw = getScoreFromScoresMap(col.scores, pid);
   if (raw == null || total <= 0) return { skip: true };
   return { skip: false, score: raw, totalScore: total };
+}
+
+function resolveGradebookColumnScoreForSkillAverage(col, personId, statusMap = null, periodSessions = null) {
+  const resolved = resolveGradebookColumnScore(col, personId, statusMap, periodSessions);
+  if (!resolved.skip) return resolved;
+  const ses = col?.session;
+  const pid = toPublicId(personId);
+  if (!ses || !pid) return { skip: true };
+  const effectiveStatusMap = statusMap instanceof Map ? statusMap : new Map();
+  const forceNotApplicable = sessionForcesNotApplicableAttendance(ses, effectiveStatusMap);
+  const att = forceNotApplicable
+    ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+    : rosterAttendanceLower(ses, pid);
+  const absent = attendanceMatrixMetricsService.isAbsentLikeStatus(att)
+    || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
+  const total = Number(col.totalScore) > 0 ? Number(col.totalScore) : 0;
+  if (absent || total <= 0) return { skip: true };
+  const raw = getScoreFromScoresMap(col.scores, pid);
+  if (raw != null) return { skip: true };
+  return { skip: false, score: 0, totalScore: total };
 }
 
 function computeGradebookColumnClassPercent(col, statusMap = null) {
@@ -3301,6 +3361,9 @@ function mergeTemplateData(template, instance, assignment = null, options = {}) 
   const useScope = respectSnapshotKeys && ctx.active;
   const prefill = instance?.prefillSnapshot && typeof instance.prefillSnapshot === 'object' ? instance.prefillSnapshot : {};
   const answers = instance?.answers && typeof instance.answers === 'object' ? instance.answers : {};
+  const derivedOverrides = instance?.derivedOverrides && typeof instance.derivedOverrides === 'object'
+    ? instance.derivedOverrides
+    : {};
   const sharedRaw = assignment?.sharedAnswers && typeof assignment.sharedAnswers === 'object' ? assignment.sharedAnswers : {};
   const studentTargeted = isStudentTargetedScope(assignment?.reportScope);
 
@@ -3331,6 +3394,13 @@ function mergeTemplateData(template, instance, assignment = null, options = {}) 
     } else {
       const answerValue = answers[field.id];
       const hasAnswer = answerValue !== undefined && answerValue !== null && String(answerValue) !== '';
+      if (hasAnswer && isAutoRefreshPrefillKey(field.prefillKey) && derivedOverrides[field.id] !== true) {
+        const resolvedAuto = getPrefillValue(prefill, field.prefillKey);
+        if (resolvedAuto.found) {
+          merged[field.id] = resolvedAuto.value;
+          return;
+        }
+      }
       if (hasAnswer) {
         merged[field.id] = answerValue;
         return;
@@ -3879,6 +3949,7 @@ async function buildLockSnapshot({ template, instance, assignment = null, reqUse
 
 module.exports = {
   buildStudentSessionRatingSummary,
+  computeReportPeriodGradebookSkillStats,
   buildPrefillSnapshot,
   getSortedClbLevelHistory,
   getLatestClbLevelEntry,

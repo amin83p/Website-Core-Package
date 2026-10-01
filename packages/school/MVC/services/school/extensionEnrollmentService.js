@@ -11,6 +11,34 @@ let dependencies = {
 
 const EXTENSION_KINDS = new Set(['additional_sessions', 'additional_hours', 'extended_end_date']);
 
+function formatExtensionReasonStart(kind, {
+  reason = '',
+  additionalSessions = 0,
+  additionalHours = 0,
+  newEndDate = ''
+} = {}) {
+  const note = String(reason || '').trim();
+  const normalizedKind = String(kind || '').trim().toLowerCase();
+  let detail = '';
+  if (normalizedKind === 'additional_sessions') {
+    const count = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(additionalSessions);
+    detail = count
+      ? `Additional ${count} session${count === 1 ? '' : 's'}`
+      : 'Additional sessions';
+  } else if (normalizedKind === 'additional_hours') {
+    const hours = classEnrollmentSessionApplicabilityService.normalizeTargetHours(additionalHours);
+    detail = hours
+      ? `Additional ${hours} hour${hours === 1 ? '' : 's'}`
+      : 'Additional hours';
+  } else if (normalizedKind === 'extended_end_date') {
+    const end = normalizeDateOnly(newEndDate);
+    detail = end ? `End date extended to ${end}` : 'Extended end date';
+  } else {
+    detail = 'Extension';
+  }
+  return note ? `Extension (${detail}): ${note}` : `Extension (${detail})`;
+}
+
 function normalizeDateOnly(value) {
   const token = String(value || '').trim();
   if (!token) return '';
@@ -83,7 +111,12 @@ async function createExtensionEnrollment({
     claimNumberId: String(source.claimNumberId || '').trim(),
     enrollmentKind: 'extension',
     extensionOfPeriodId: source.id,
-    reasonStart: `Extension (${kind}): ${note}`,
+    reasonStart: formatExtensionReasonStart(kind, {
+      reason: note,
+      additionalSessions,
+      additionalHours,
+      newEndDate
+    }),
     notes: note,
     targetSessionCount: 0,
     targetHours: 0,
@@ -148,6 +181,7 @@ function __resetDependenciesForTest() {
 
 module.exports = {
   EXTENSION_KINDS,
+  formatExtensionReasonStart,
   createExtensionEnrollment,
   __setDependenciesForTest,
   __resetDependenciesForTest

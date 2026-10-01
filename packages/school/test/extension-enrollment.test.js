@@ -74,12 +74,24 @@ test('createExtensionEnrollment creates additional_sessions extension and audits
     assert.equal(result.extensionPeriod.enrollmentKind, 'extension');
     assert.equal(result.extensionPeriod.extensionOfPeriodId, sourcePeriod.id);
     assert.equal(result.extensionPeriod.targetSessionCount, 3);
+    assert.equal(
+      result.extensionPeriod.reasonStart,
+      'Extension (Additional 3 sessions): Student needs more sessions after excused absences'
+    );
     const source = mocks.periodStore.get(sourcePeriod.id);
     assert.equal(source.enrollmentExtensions.length, 1);
     assert.equal(source.enrollmentExtensions[0].extensionKind, 'additional_sessions');
   } finally {
     extensionService.__resetDependenciesForTest();
   }
+});
+
+test('formatExtensionReasonStart uses new end date for extended_end_date', () => {
+  const label = extensionService.formatExtensionReasonStart('extended_end_date', {
+    reason: 'Long excused absence.',
+    newEndDate: '2026-06-30'
+  });
+  assert.equal(label, 'Extension (End date extended to 2026-06-30): Long excused absence.');
 });
 
 test('createExtensionEnrollment rejects extended_end_date before source end', async () => {
@@ -126,4 +138,16 @@ test('createExtensionEnrollment requires reason', async () => {
   } finally {
     extensionService.__resetDependenciesForTest();
   }
+});
+
+test('rolling enrollment extension submit uses requestJson POST signature', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const viewSource = fs.readFileSync(
+    path.join(__dirname, '../MVC/views/school/class/rollingEnrollment.ejs'),
+    'utf8'
+  );
+  assert.match(viewSource, /async function submitExtensionEnrollment\(\)/);
+  assert.doesNotMatch(viewSource, /\/extension',\s*\{\s*method:\s*'POST'/);
+  assert.match(viewSource, /\/extension`[\s\S]*?'POST'[\s\S]*?payload/);
 });

@@ -24,7 +24,7 @@
           <td class="ps-3">
             <div class="fw-bold">
               <% if (row.editUrl) { %>
-                <a href="<%= row.editUrl %>" class="text-decoration-none"><%= row.classTitle || row.classId %></a>
+                <a href="<%= row.editUrl %>" class="text-decoration-none text-primary" target="_blank" rel="noopener noreferrer"><%= row.classTitle || row.classId %></a>
               <% } else { %>
                 <%= row.classTitle || row.classId %>
               <% } %>

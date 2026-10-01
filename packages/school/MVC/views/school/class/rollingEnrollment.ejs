@@ -520,6 +520,16 @@
     text-decoration: none;
     padding: 0;
   }
+  #rollingStudentAcademicTimelineModal .rolling-academic-timeline-class-link {
+    color: inherit;
+    text-decoration: none;
+    font-weight: 700;
+  }
+  #rollingStudentAcademicTimelineModal .rolling-academic-timeline-class-link:hover,
+  #rollingStudentAcademicTimelineModal .rolling-academic-timeline-class-link:focus-visible {
+    color: var(--bs-primary);
+    text-decoration: underline;
+  }
   #rollingStudentAcademicTimelineModal .rolling-academic-timeline-registration-trigger:hover,
   #rollingStudentAcademicTimelineModal .rolling-academic-timeline-registration-trigger:focus-visible {
     text-decoration: underline;
@@ -2309,6 +2319,9 @@
     <i class="bi bi-card-checklist"></i><span>Manage Claim Numbers</span>
   </button>
   <div class="rolling-student-context-menu-divider" aria-hidden="true"></div>
+  <button type="button" class="rolling-student-context-menu-item" data-action="registration-overview" id="rollingStudentContextMenuRegistrationOverview">
+    <i class="bi bi-person-vcard" aria-hidden="true"></i> Registration Overview
+  </button>
   <button type="button" class="rolling-student-context-menu-item" data-action="academic-timeline" id="rollingStudentContextMenuAcademicTimeline">
     <i class="bi bi-clock-history"></i><span>Academic Timeline</span>
   </button>
@@ -6656,6 +6669,13 @@
       btn.disabled = !editable;
       btn.classList.toggle('disabled', !editable);
     });
+    const overviewBtn = qs('rollingStudentContextMenuRegistrationOverview');
+    if (overviewBtn) {
+      overviewBtn.disabled = canViewStudentAcademicOverview !== true;
+      overviewBtn.title = overviewBtn.disabled
+        ? 'You do not have permission to view the registration overview.'
+        : 'Open Student Registration Overview';
+    }
     const timelineBtn = qs('rollingStudentContextMenuAcademicTimeline');
     if (timelineBtn) {
       const viewable = canViewStudentAcademicOverview === true;
@@ -7280,11 +7300,16 @@
     const classRowsHtml = classes.length
       ? classes.map((row) => {
         const periodLabel = [row.startDate || '-', row.endDate || '-'].join(' to ');
+        const classNavUrl = String(row.editUrl || '').trim();
+        const classTitle = htmlEscape(row.classTitle || row.classId || '-');
+        const classTitleHtml = classNavUrl
+          ? '<a href="' + htmlEscape(classNavUrl) + '" class="rolling-academic-timeline-class-link" target="_blank" rel="noopener noreferrer">' + classTitle + '</a>'
+          : '<div class="fw-bold">' + classTitle + '</div>';
         const registrationTrigger = row.enrollmentId
           ? '<button type="button" class="btn btn-link rolling-academic-timeline-registration-trigger" data-student-id="' + htmlEscape(studentId) + '" data-enrollment-id="' + htmlEscape(row.enrollmentId) + '">View details</button>'
           : '';
         return '<tr>'
-          + '<td class="ps-3"><div class="fw-bold">' + htmlEscape(row.classTitle || row.classId || '-') + '</div>'
+          + '<td class="ps-3"><div class="fw-bold">' + classTitleHtml + '</div>'
           + '<div class="x-small text-muted font-monospace">' + htmlEscape(row.classId || '') + '</div></td>'
           + '<td>' + htmlEscape(row.teacherName || '-') + '</td>'
           + '<td>' + htmlEscape(row.programLabel || row.programId || '-') + '</td>'
@@ -7322,6 +7347,21 @@
       throw new Error(result?.message || 'Failed to load academic timeline.');
     }
     return result;
+  }
+
+  function openRollingStudentRegistrationOverviewTab(context = {}) {
+    hideRollingStudentContextMenu();
+    if (canViewStudentAcademicOverview !== true) {
+      showMsg('Permission', 'warning', 'You do not have permission to view the registration overview.');
+      return;
+    }
+    const studentId = String(context?.studentId || '').trim();
+    if (!studentId) {
+      showMsg('Registration Overview', 'warning', 'Student id is missing.');
+      return;
+    }
+    const overviewUrl = `/school/academic-ledger/student-overview/${encodeURIComponent(studentId)}`;
+    window.open(overviewUrl, '_blank', 'noopener,noreferrer');
   }
 
   async function openRollingStudentAcademicTimelineModal(context = {}) {
@@ -13433,10 +13473,17 @@
       startDate: String(qs('extension_startDate')?.value || '').trim(),
       reason: String(qs('extension_reason')?.value || '').trim()
     };
-    const result = await requestJson(`/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/extension`, {
-      method: 'POST',
-      body: JSON.stringify(payload)
-    });
+    let result;
+    try {
+      result = await requestJson(
+        `/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/extension`,
+        'POST',
+        payload
+      );
+    } catch (error) {
+      await showMsg('Extension failed', 'warning', error?.message || 'Unable to create extension enrollment.');
+      return;
+    }
     if (!result || result.status !== 'success') return;
     bootstrap.Modal.getInstance(document.getElementById('extensionEnrollmentModal'))?.hide();
     await showMsg('Extension created', 'success', 'Extension enrollment was created successfully.');
@@ -13455,10 +13502,17 @@
       await showMsg('Note required', 'warning', 'Enter a note explaining why this session is N/A.');
       return;
     }
-    const result = await requestJson(`/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/session-marks`, {
-      method: 'POST',
-      body: JSON.stringify({ changes: [{ sessionId, action, note }] })
-    });
+    let result;
+    try {
+      result = await requestJson(
+        `/school/classes/api/enrollment-periods/${encodeURIComponent(periodId)}/session-marks`,
+        'POST',
+        { changes: [{ sessionId, action, note }] }
+      );
+    } catch (error) {
+      await showMsg('Update failed', 'warning', error?.message || 'Unable to update session mark.');
+      return;
+    }
     if (!result || result.status !== 'success') return;
     await openEnrollmentSessionManagerModal(periodId);
     await loadRows();
@@ -14094,6 +14148,10 @@
       studentId: rollingStudentContextState.studentId,
       studentLabel: rollingStudentContextState.studentLabel
     });
+  });
+  qs('rollingStudentContextMenuRegistrationOverview')?.addEventListener('click', () => {
+    if (!rollingStudentContextState) return;
+    openRollingStudentRegistrationOverviewTab(rollingStudentContextState);
   });
   qs('rollingStudentContextMenuAcademicTimeline')?.addEventListener('click', () => {
     if (!rollingStudentContextState) return;

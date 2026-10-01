@@ -1431,7 +1431,8 @@ async function buildEventsForPersonAndRange({
     activeOrgId,
     statusMap = null,
     accessContext = {},
-    skipEnrichment = false
+    skipEnrichment = false,
+    orgTimeZone = ''
 }) {
     const listScope = scheduleAccessService.resolveListScope(reqUser, accessContext);
     const assignmentListScope = await buildReportAssignmentListScope(reqUser, accessContext, listScope);
@@ -1633,7 +1634,7 @@ async function buildEventsForPersonAndRange({
             source: 'master_schedule',
             accessContext,
             orgId: activeOrgId,
-            orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || ''
+            orgTimeZone: orgTimeZone || reqUser?.activeOrgTimeZone || ''
         });
 
         for (const session of sessions || []) {
@@ -1916,7 +1917,8 @@ async function getMyScheduleData(req, res) {
             reqUser: req.user,
             activeOrgId,
             statusMap,
-            accessContext: schoolDataService.buildRouteAccessContext(req)
+            accessContext: schoolDataService.buildRouteAccessContext(req),
+            orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || ''
         });
 
         const yearlyEvents = result.events || [];
@@ -2085,7 +2087,8 @@ async function getPersonSchedule(req, res) {
             reqUser: req.user,
             activeOrgId,
             statusMap,
-            accessContext: schoolDataService.buildRouteAccessContext(req)
+            accessContext: schoolDataService.buildRouteAccessContext(req),
+            orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || ''
         });
 
         const availableRoles = viewerScheduleAccess.canSelectAnyPerson
@@ -2156,7 +2159,8 @@ async function getPersonScheduleVersion(req, res) {
             activeOrgId,
             statusMap,
             accessContext: schoolDataService.buildRouteAccessContext(req),
-            skipEnrichment: true
+            skipEnrichment: true,
+            orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || ''
         });
 
         const events = filterEventsWithCasesIfRequested(
@@ -2309,7 +2313,8 @@ async function getGlobalSchedule(req, res) {
                 reqUser: req.user,
                 activeOrgId,
                 statusMap,
-                accessContext: schoolDataService.buildRouteAccessContext(req)
+                accessContext: schoolDataService.buildRouteAccessContext(req),
+                orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || ''
             });
             const personName = String(result?.personName || personId).trim() || personId;
             let personEvents = Array.isArray(result?.events) ? result.events : [];

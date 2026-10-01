@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 const {
   resolveRegistrationSource,
   buildEnrollmentDetailApiUrl,
+  buildClassEnrollmentNavigationUrl,
   resolveClassTeacherName
 } = require('../MVC/services/school/studentAcademicOverviewService');
 const {
@@ -88,6 +89,26 @@ test('resolveClassTeacherName falls back to first instructor', () => {
 test('buildEnrollmentDetailApiUrl encodes student and enrollment ids', () => {
   const url = buildEnrollmentDetailApiUrl('STU/1', 'CEP:9');
   assert.equal(url, '/school/academic-ledger/student-overview/STU%2F1/enrollment-detail/CEP%3A9');
+});
+
+test('buildClassEnrollmentNavigationUrl opens rolling enrollment for rolling classes', () => {
+  const url = buildClassEnrollmentNavigationUrl({
+    classId: 'CLASS/9',
+    studentId: 'STU/1',
+    classData: { registrationMode: 'rolling' }
+  });
+  assert.match(url, /\/school\/classes\/CLASS%2F9\/rolling-enrollment\?/);
+  assert.match(url, /searchFields=studentId/);
+  assert.match(url, /q=STU%2F1/);
+});
+
+test('buildClassEnrollmentNavigationUrl keeps class form for non-rolling classes', () => {
+  const url = buildClassEnrollmentNavigationUrl({
+    classId: 'CLASS/9',
+    studentId: 'STU/1',
+    classData: { registrationMode: 'term' }
+  });
+  assert.equal(url, '/school/classes/edit/CLASS%2F9');
 });
 
 test('academic ledger exposes student overview data API', () => {

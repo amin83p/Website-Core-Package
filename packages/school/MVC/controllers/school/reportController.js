@@ -310,7 +310,10 @@ async function buildPrefillRefreshPreview({ instance, template, assignment, reqU
     const newRawValue = newResolved.value;
     const oldValue = coercePrefillValueForField(field, oldRawValue);
     const newValue = coercePrefillValueForField(field, newRawValue);
-    if (stableValueToken(oldRawValue) === stableValueToken(newRawValue)) return;
+    const currentValue = currentMerged[field.id];
+    const prefillChanged = stableValueToken(oldRawValue) !== stableValueToken(newRawValue);
+    const differsFromCurrent = stableValueToken(newValue) !== stableValueToken(currentValue);
+    if (!prefillChanged && !differsFromCurrent) return;
 
     if (!changesByKey.has(prefillKey)) {
       changesByKey.set(prefillKey, {
@@ -327,9 +330,10 @@ async function buildPrefillRefreshPreview({ instance, template, assignment, reqU
       type,
       oldValue,
       newValue,
-      currentValue: currentMerged[field.id],
+      currentValue,
       oldRawValue,
-      newRawValue
+      newRawValue,
+      skippedDueToOverride: instance?.derivedOverrides?.[field.id] === true
     });
   });
 
@@ -1409,12 +1413,16 @@ async function buildInstanceEditorRenderContext(req) {
       'student_session_rating_span_respects_teachers_percent',
       'student_session_rating_span_respects_students_percent'
     ].some((key) => String(prevPrefill[key] ?? '') !== String(freshPrefill?.[key] ?? ''));
+    const gradebookSkillPrefillChanged = Object.keys(freshPrefill || {}).some((key) => (
+      key.startsWith('student_gradebook_skill_')
+      && String(prevPrefill[key] ?? '') !== String(freshPrefill[key] ?? '')
+    ));
     latestInstance = {
       ...latestInstance,
       prefillSnapshot: freshPrefill
     };
     const hydrated = hydrateInitialAnswersFromPrefill(template, latestInstance);
-    if (hydrated.changed || ratingPrefillChanged) {
+    if (hydrated.changed || ratingPrefillChanged || gradebookSkillPrefillChanged) {
       latestInstance = await schoolDataService.updateData('reportInstances', latestInstance.id, {
         ...(hydrated.changed ? { answers: hydrated.answers } : {}),
         prefillSnapshot: freshPrefill,
@@ -1846,9 +1854,7 @@ async function applyInstancePrefillRefresh(req, res) {
       (change.fields || []).forEach((fieldChange) => {
         if (!fieldChange?.fieldId) return;
         nextAnswers[fieldChange.fieldId] = fieldChange.newValue;
-        if (change.expressionDriven) {
-          nextDerivedOverrides[fieldChange.fieldId] = false;
-        }
+        nextDerivedOverrides[fieldChange.fieldId] = false;
       });
     });
 

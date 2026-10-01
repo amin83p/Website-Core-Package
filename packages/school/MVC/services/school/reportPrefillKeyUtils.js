@@ -6,6 +6,13 @@ function normalizePrefillKey(rawKey = '') {
   return key;
 }
 
+function isAutoRefreshPrefillKey(rawKey = '') {
+  const key = normalizePrefillKey(rawKey);
+  if (!key) return false;
+  if (key === 'gradebook_skill_rows') return true;
+  return /^(student|class)_(gradebook|exam)_/.test(key);
+}
+
 function getPrefillValue(prefill = {}, rawKey = '') {
   const key = normalizePrefillKey(rawKey);
   if (!key || !prefill || typeof prefill !== 'object') {
@@ -19,5 +26,6 @@ function getPrefillValue(prefill = {}, rawKey = '') {
 
 module.exports = {
   normalizePrefillKey,
-  getPrefillValue
+  getPrefillValue,
+  isAutoRefreshPrefillKey
 };
