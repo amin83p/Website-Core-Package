@@ -22,6 +22,7 @@ const classSessionCapacityService = require('../../services/school/classSessionC
 const scheduleSessionContextService = require('../../services/school/scheduleSessionContextService');
 const scheduleViewerPreferencesService = require('../../services/school/scheduleViewerPreferencesService');
 const scheduleEnrollStudentsService = require('../../services/school/scheduleEnrollStudentsService');
+const scheduleMoveSessionsService = require('../../services/school/scheduleMoveSessionsService');
 const scheduleStagedCommitService = require('../../services/school/scheduleStagedCommitService');
 const { buildMasterScheduleViewerClientConfig } = require('../../services/school/masterScheduleViewerClientConfig');
 const holidayController = require('./holidayController');
@@ -2722,6 +2723,54 @@ async function postExecutePendingEnrollmentsCommit(req, res) {
     }
 }
 
+async function postMoveSessionsPreview(req, res) {
+    try {
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        const sessionIds = scheduleMoveSessionsService.parseSelectedSessionIds(req.body || {});
+        const preview = await scheduleMoveSessionsService.buildMovePreview({
+            classId: req.body?.classId,
+            targetClassId: req.body?.targetClassId,
+            startTime: req.body?.startTime,
+            sessionIds,
+            reqUser: req.user,
+            accessContext
+        });
+        return res.json({ status: 'success', data: preview });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message || 'Unable to preview the session move.' });
+    }
+}
+
+async function postMoveSessionsApply(req, res) {
+    try {
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        const sessionIds = scheduleMoveSessionsService.parseSelectedSessionIds(req.body || {});
+        const { buildRollingEnrollmentEngineHooks } = require('./classRollingEnrollmentController');
+        const result = await scheduleMoveSessionsService.applyMoveSessions({
+            classId: req.body?.classId,
+            targetClassId: req.body?.targetClassId,
+            startTime: req.body?.startTime,
+            sessionIds,
+            previewHash: req.body?.previewHash,
+            reqUser: req.user,
+            req,
+            accessContext,
+            buildEngineHooks: buildRollingEnrollmentEngineHooks
+        });
+        return res.json({
+            status: 'success',
+            message: 'Sessions and enrollments were moved.',
+            data: result
+        });
+    } catch (error) {
+        return res.status(400).json({
+            status: 'error',
+            message: error.message || 'Unable to move sessions.',
+            blockers: error.preview?.blockers || []
+        });
+    }
+}
+
 async function postEnrollStudentsPrepare(req, res) {
     try {
         const accessContext = schoolDataService.buildRouteAccessContext(req);
@@ -3017,6 +3066,8 @@ module.exports = {
     postValidatePendingEnrollmentsCommit,
     postExecutePendingEnrollmentsCommit,
     postEnrollStudentsPrepare,
+    postMoveSessionsPreview,
+    postMoveSessionsApply,
     postEnrollStudentsSessionCapacityCheck,
     postEnrollStudentsStudentPickerExclusions,
     postEnrollStudentsProgramRegistrations,

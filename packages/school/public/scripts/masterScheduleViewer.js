@@ -3735,7 +3735,7 @@
         const person = activeSchedulePerson();
         if (!person?.id) return [];
         const keys = Array.from(getActiveScheduleSelectionSet());
-        if (keys.length < 2) return [];
+        if (keys.length < 1) return [];
         const classId = activeScheduleSelectedClassId();
         if (!classId) return [];
         const events = getScheduleEventsForPerson(person.id);
@@ -3951,6 +3951,11 @@
     let enrollStudentsRailHandler = null;
     function bindEnrollStudentsRail(handler) {
         enrollStudentsRailHandler = typeof handler === 'function' ? handler : null;
+    }
+
+    let moveSessionsRailHandler = null;
+    function bindMoveSessionsRail(handler) {
+        moveSessionsRailHandler = typeof handler === 'function' ? handler : null;
     }
 
     let claimNumbersRailHandler = null;
@@ -5127,6 +5132,9 @@
             const action = String(actionEl.getAttribute('data-schedule-admin-action') || '').trim();
             if (action === 'enroll-students' && typeof enrollStudentsRailHandler === 'function') {
                 void enrollStudentsRailHandler();
+            }
+            if (action === 'move-enrollments' && typeof moveSessionsRailHandler === 'function') {
+                void moveSessionsRailHandler();
             }
             if (action === 'claim-numbers' && typeof claimNumbersRailHandler === 'function') {
                 void claimNumbersRailHandler();
@@ -7461,6 +7469,19 @@ if (canLoadAllSchedules) {
             refreshScheduleViewWithHolidays,
             syncPartialModalFromTimelineDrafts,
             schedulePersistDraftBackup: () => { if (canDragCreateSessions) schedulePersistDraftBackup(); }
+        });
+    }
+    if (canSelectAnyPerson && typeof global.installMasterScheduleMoveSessions === 'function') {
+        global.installMasterScheduleMoveSessions({
+            uiAlert,
+            escapeHtml,
+            showBootstrapModal: showScheduleBootstrapModal,
+            hideBootstrapModal: hideScheduleBootstrapModal,
+            bindMoveSessionsRail,
+            countActiveScheduleSelectedSessions,
+            countActiveDraftSelectedSessions,
+            getSelectedSavedClassSessionEvents,
+            refreshScheduleViewWithHolidays
         });
     }
     bindScheduleAdminWeekRail();

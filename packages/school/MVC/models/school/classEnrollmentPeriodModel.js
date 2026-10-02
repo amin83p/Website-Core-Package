@@ -473,7 +473,9 @@ async function updateEnrollmentPeriod(id, data, options = {}) {
       ...existing,
       ...data,
       orgId: existing.orgId,
-      classId: existing.classId,
+      classId: options.allowClassChange === true
+        ? (cleanId(data?.classId, { max: 64, allowEmpty: false }) || existing.classId)
+        : existing.classId,
       studentId: existing.studentId
     };
     const sanitized = sanitizePeriodInput(mergedInput, { isUpdate: true });

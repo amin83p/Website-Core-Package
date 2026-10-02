@@ -119,6 +119,17 @@ router.post('/api/enroll-students/execute-pending-commit',
   ...enrollStudentsRollingAccess,
   trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
   ctrl.postExecutePendingEnrollmentsCommit);
+router.post('/api/move-sessions/preview',
+  ...enrollStudentsRollingAccess,
+  requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
+  ctrl.postMoveSessionsPreview);
+router.post('/api/move-sessions/apply',
+  ...enrollStudentsRollingAccess,
+  requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE),
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE, { requireToken: true, keepActive: true }),
+  ctrl.postMoveSessionsApply);
 
 router.get('/api/session-management-policy',
   requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
