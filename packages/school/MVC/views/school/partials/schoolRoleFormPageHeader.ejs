@@ -1,0 +1,22 @@
+<%
+  const editFlag = typeof isEdit !== 'undefined' && isEdit === true;
+  const displayName = String(typeof entityDisplayName !== 'undefined' ? entityDisplayName : '').trim();
+  const recordId = String(typeof entityRecordId !== 'undefined' ? entityRecordId : '').trim();
+  const iconClass = String(typeof headerIcon !== 'undefined' ? headerIcon : 'bi-person-vcard').trim();
+  const resolvedNewHeading = String(typeof newHeading !== 'undefined' ? newHeading : 'New Record').trim();
+  const resolvedListUrl = String(typeof listUrl !== 'undefined' ? listUrl : '#').trim();
+  const resolvedBackLabel = String(typeof backLabel !== 'undefined' ? backLabel : 'Back to List').trim();
+%>
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <h1 class="page-heading size-md m-0">
+    <i class="<%= iconClass %> me-2"></i>
+    <% if (editFlag) { %>Edit <%= displayName %><% } else { %><%= resolvedNewHeading %><% } %>
+  </h1>
+  <div class="text-end">
+    <a href="<%= resolvedListUrl %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> <%= resolvedBackLabel %></a>
+    <% if (editFlag && recordId) { %>
+      <div class="mt-2"><span class="badge bg-primary border font-monospace">ID: <%= recordId %></span></div>
+    <% } %>
+  </div>
+</div>
+

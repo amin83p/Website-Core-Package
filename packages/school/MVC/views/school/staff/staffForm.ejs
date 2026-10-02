@@ -8,12 +8,16 @@
 %>
 
 <div class="sections-page">
-  <div class="d-flex align-items-center justify-content-between mb-4">
-    <h1 class="page-heading size-md m-0"><i class="bi bi-people-fill me-2"></i><% if (isEdit) { %>Edit Staff: <%= entityDisplayName %> <small class="text-muted fw-normal">(<%= entityRecordId %>)</small><% } else { %>New Staff<% } %></h1>
-    <a href="/school/staff" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to List</a>
-  </div>
+  <%- include('school/partials/schoolRoleFormPageHeader', {
+    isEdit,
+    entityDisplayName,
+    entityRecordId,
+    headerIcon: 'bi-people-fill',
+    newHeading: 'New Staff',
+    listUrl: '/school/staff'
+  }) %>
 
-  <div class="form-container wide" style="max-width: 1300px;">
+  <div class="form-container wide" style="max-width: 1400px;">
     <form id="staffForm" action="<%= (isEdit ? '/school/staff/edit/' + routeId : '/school/staff/new') + (asid ? ('?actionStateId=' + encodeURIComponent(asid)) : '') %>" method="POST" enctype="multipart/form-data">
       <input type="hidden" name="actionStateId" id="hid_actionStateId" value="<%= asid %>">
       <input type="hidden" name="attachments" id="hid_attachments" value="[]">
@@ -27,7 +31,7 @@
       <script type="application/json" id="comp_departments"><%- JSON.stringify(departments || []) %></script>
       <script type="application/json" id="comp_methods"><%- JSON.stringify(compensationMethods || []) %></script>
 
-      <ul class="nav nav-tabs mb-4" role="tablist">
+      <ul class="nav nav-tabs mb-4" id="staffTabs" role="tablist">
         <li class="nav-item"><button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#tab-person" type="button">Step 1: Person</button></li>
         <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-profile" type="button">Step 2: Profile</button></li>
         <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-admin" type="button">Step 3: Admin</button></li>
@@ -65,6 +69,7 @@
                     <button type="button" class="btn btn-primary" id="btnPickPerson" <%= isEdit ? 'disabled' : '' %>><i class="bi bi-search"></i></button>
                     <button type="button" class="btn <%= canEditLinkedPerson ? 'btn-outline-primary' : 'btn-outline-secondary' %>" id="btnEditPersonProfile" data-link-type="<%= linkedPersonLinkType || 'staff' %>" data-link-id="<%= linkedPersonLinkId || '' %>" data-can-edit-person="<%= canEditLinkedPerson ? 'true' : 'false' %>" title="<%= canEditLinkedPerson ? 'Edit person profile' : 'You do not have permission to edit this person account' %>"><i class="bi <%= canEditLinkedPerson ? 'bi-pencil-square' : 'bi-lock' %>"></i></button>
                   </div>
+                  <div class="form-text small">Links this staff profile to a global person identity.</div>
                 </div>
                 <div class="col-md-4 mb-3">
                   <label class="form-label fw-bold">Staff ID</label>

@@ -26,17 +26,14 @@
 %>
 
 <div class="sections-page">
-  <div class="d-flex align-items-center justify-content-between mb-4">
-    <h1 class="page-heading size-md m-0">
-      <i class="bi bi-person-vcard me-2"></i>
-      <% if (isEdit) { %>
-        Edit Funder: <%= entityDisplayName %> <small class="text-muted fw-normal">(<%= entityRecordId %>)</small>
-      <% } else { %>
-        Add New Funder
-      <% } %>
-    </h1>
-    <a href="/school/funders" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i> Back to List</a>
-  </div>
+  <%- include('school/partials/schoolRoleFormPageHeader', {
+    isEdit,
+    entityDisplayName,
+    entityRecordId,
+    headerIcon: 'bi-person-vcard',
+    newHeading: 'Add New Funder',
+    listUrl: '/school/funders'
+  }) %>
 
   <div class="form-container wide" style="max-width: 1400px;">
     <form
