@@ -50,6 +50,7 @@ const overallReportService = require('../../services/school/overallReportService
 const { listSchoolSettingsGroups } = require('../../config/schoolSettingsCatalog');
 const { listAutosaveSections } = require('../../config/autosaveSectionCatalog');
 const uploadLimitsPolicyModel = require('../../models/school/uploadLimitsPolicyModel');
+const schedulingTimePolicyModel = require('../../models/school/schedulingTimePolicyModel');
 const { listUploadLimitSections } = require('../../config/uploadLimitsSectionCatalog');
 const { userCanUpdateSchoolSettings } = require('../../services/school/schoolSettingsAccessService');
 const studentDuplicateProfileService = require('../../services/school/studentDuplicateProfileService');
@@ -411,6 +412,7 @@ async function loadSettingsPageData(req) {
     timesheetDisplayPolicy,
     enrollmentFinishAlertPolicy,
     uploadLimitsPolicy,
+    schedulingTimePolicy,
     canUpdate
   ] = await Promise.all([
     conductRatingScalePolicyModel.getPolicyForOrg(activeOrgId),
@@ -426,6 +428,7 @@ async function loadSettingsPageData(req) {
     timesheetDisplayPolicyModel.getPolicyForOrg(activeOrgId),
     enrollmentFinishAlertPolicyModel.getPolicyForOrg(activeOrgId),
     uploadLimitsPolicyModel.getPolicyForOrg(activeOrgId),
+    schedulingTimePolicyModel.getPolicyForOrg(activeOrgId),
     userCanUpdateSchoolSettings(req.user, req.ip)
   ]);
   const studentAttendanceReportLabels = await resolveStudentAttendanceReportLabels(
@@ -512,6 +515,7 @@ async function loadSettingsPageData(req) {
     autosaveSections: listAutosaveSections(),
     uploadLimitsPolicy,
     uploadLimitSections: listUploadLimitSections(),
+    schedulingTimePolicy,
     studentAttendanceReportPolicy,
     semiMonthlyReportPolicy,
     timesheetParametersPolicy,
@@ -1221,6 +1225,27 @@ async function saveUploadLimitsPolicy(req, res) {
   }
 }
 
+async function saveSchedulingTimePolicy(req, res) {
+  try {
+    const activeOrgId = activeOrgIdOrThrow(req.user);
+    const policy = await schedulingTimePolicyModel.savePolicyForOrg(
+      activeOrgId,
+      req.body || {},
+      req.user?.id
+    );
+    return res.json({
+      status: 'success',
+      message: 'Scheduling time frame settings were updated.',
+      policy
+    });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 500).json({
+      status: 'error',
+      message: error?.message || 'Failed to save scheduling time frame settings.'
+    });
+  }
+}
+
 function redirectLegacyConductSettings(_req, res) {
   return res.redirect('/school/settings#conduct-rating-scale');
 }
@@ -1252,6 +1277,7 @@ module.exports = {
   scanDuplicateStudentProfilesApi,
   saveAutosavePolicy,
   saveUploadLimitsPolicy,
+  saveSchedulingTimePolicy,
   saveSessionAccessPolicy,
   previewSessionAccessTestNotification,
   sendSessionAccessTestNotification,

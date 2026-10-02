@@ -23,6 +23,65 @@
       return String(value || '').trim();
     }
 
+    function formatHoursLabel(value) {
+      const n = typeof groupClient.normalizeTargetHoursValue === 'function'
+        ? groupClient.normalizeTargetHoursValue(value)
+        : Number.parseFloat(String(value || '').trim());
+      if (!Number.isFinite(n) || n <= 0) return '—';
+      return `${n} h`;
+    }
+
+    function resolveMinTargetHoursFromPrepare(prep) {
+      const p = prep && typeof prep === 'object' ? prep : {};
+      const serverMin = typeof groupClient.normalizeTargetHoursValue === 'function'
+        ? groupClient.normalizeTargetHoursValue(p.minTargetHours)
+        : 0;
+      if (serverMin > 0) return serverMin;
+      if (typeof groupClient.sumSelectedSessionHours === 'function') {
+        return groupClient.sumSelectedSessionHours(p.sessions);
+      }
+      return 0;
+    }
+
+    function buildTargetHoursFieldHtml(row) {
+      const minHours = typeof groupClient.normalizeTargetHoursValue === 'function'
+        ? groupClient.normalizeTargetHoursValue(row?.minTargetHours)
+        : 0;
+      const value = typeof groupClient.normalizeTargetHoursValue === 'function'
+        ? groupClient.normalizeTargetHoursValue(row?.targetHours)
+        : minHours;
+      const minAttr = minHours > 0 ? ` min="${minHours}"` : '';
+      const hint = minHours > 0
+        ? `<div class="form-text py-0">Min ${escapeHtml(formatHoursLabel(minHours))} from selected sessions</div>`
+        : '';
+      return `<div class="js-schedule-enroll-target-hours-wrap">
+        <input type="number" class="form-control form-control-sm js-schedule-enroll-target-hours"${minAttr} step="0.25" value="${value > 0 ? value : ''}">
+        ${hint}
+      </div>`;
+    }
+
+    function validateQueueRowTargetHours(row) {
+      const minHours = typeof groupClient.normalizeTargetHoursValue === 'function'
+        ? groupClient.normalizeTargetHoursValue(row?.minTargetHours)
+        : 0;
+      const targetHours = typeof groupClient.normalizeTargetHoursValue === 'function'
+        ? groupClient.normalizeTargetHoursValue(row?.targetHours)
+        : 0;
+      if (minHours <= 0) {
+        return {
+          ok: false,
+          message: 'Could not compute hours from selected sessions. Check session start and end times.'
+        };
+      }
+      if (!targetHours || targetHours < minHours) {
+        return {
+          ok: false,
+          message: `Target hours must be at least ${formatHoursLabel(minHours)} (sum of selected sessions).`
+        };
+      }
+      return { ok: true };
+    }
+
     function formatStudentDisplay(name, studentId) {
       const id = clean(studentId);
       let label = clean(name);
@@ -178,11 +237,18 @@
       const modalEl = document.getElementById('scheduleEnrollCapacityBlockModal');
       const bodyEl = document.getElementById('scheduleEnrollCapacityBlockBody');
       if (!modalEl || !bodyEl) return;
-      const rows = (Array.isArray(conflicts) ? conflicts : []).map((row) => {
-        const names = (row.students || []).map((s) => clean(s.name)).filter(Boolean).join(', ');
-        return `<div class="border rounded p-2 mb-2"><div class="fw-semibold">${clean(row.date)} ${clean(row.start)}–${clean(row.end)}</div><div class="small text-muted">${names || 'Student enrolled'}</div></div>`;
-      }).join('');
-      bodyEl.innerHTML = rows || '<div class="text-muted small">No details available.</div>';
+      const sessions = (Array.isArray(conflicts) ? conflicts : []).map((row) => ({
+        sessionId: clean(row.sessionId),
+        date: clean(row.date),
+        start: clean(row.start),
+        end: clean(row.end),
+        occupantLabel: (row.students || []).map((s) => clean(s.name)).filter(Boolean).join(', ') || 'Student enrolled'
+      }));
+      const buildCalendar = global.MasterScheduleDraftSaveWork?.buildStagedSessionsCalendarHtmlFromSessions;
+      const calendarInner = typeof buildCalendar === 'function'
+        ? buildCalendar(sessions)
+        : '<div class="draft-save-cal-empty small text-muted">No session details available.</div>';
+      bodyEl.innerHTML = `<div class="draft-save-calendar-host">${calendarInner}</div>`;
       deps.showBootstrapModal?.(modalEl);
     }
 
@@ -288,25 +354,41 @@
 
     function buildQueueFromStudents() {
       const prep = flowState.prepare || {};
-      flowState.queue = flowState.students.map((student) => ({
-        studentId: student.studentId,
-        label: (() => {
-          const id = clean(student.studentId);
-          const name = clean(student.studentLabel);
-          return (name && name !== id) ? name : name || id;
-        })(),
-        startDate: prep.startDate,
-        endDate: prep.endDate,
-        targetSessionCount: String(prep.sessionCount || ''),
-        sessionCapacityType: prep.sessionCapacityType || 'group',
-        status: 'active',
-        funderType: 'self',
-        funderId: 'self',
-        claimNumberId: '',
-        claimNumber: '',
-        reasonStart: '',
-        enrollmentStatus: 'pending'
-      }));
+      const minTargetHours = resolveMinTargetHoursFromPrepare(prep);
+      flowState.queue = flowState.students.map((student) => {
+        const base = typeof groupClient.buildMasterScheduleEnrollmentSettings === 'function'
+          ? groupClient.buildMasterScheduleEnrollmentSettings({
+            startDate: prep.startDate,
+            endDate: prep.endDate,
+            sessionCapacityType: prep.sessionCapacityType,
+            sessions: prep.sessions,
+            minTargetHours
+          })
+          : {
+            startDate: prep.startDate,
+            endDate: prep.endDate,
+            targetSessionCount: '',
+            targetHours: String(minTargetHours || ''),
+            minTargetHours,
+            sessionCapacityType: prep.sessionCapacityType || 'group',
+            status: 'active'
+          };
+        return {
+          studentId: student.studentId,
+          label: (() => {
+            const id = clean(student.studentId);
+            const name = clean(student.studentLabel);
+            return (name && name !== id) ? name : name || id;
+          })(),
+          ...base,
+          funderType: 'self',
+          funderId: 'self',
+          claimNumberId: '',
+          claimNumber: '',
+          reasonStart: '',
+          enrollmentStatus: 'pending'
+        };
+      });
     }
 
     const manageState = {
@@ -321,6 +403,7 @@
         startDate: clean(p.startDate),
         endDate: clean(p.endDate),
         sessionCount: p.sessionCount,
+        minTargetHours: resolveMinTargetHoursFromPrepare(p),
         sessionCapacityType: p.sessionCapacityType || 'group',
         funderOptions: Array.isArray(p.funderOptions) ? p.funderOptions : [],
         classId: clean(p.classId)
@@ -336,12 +419,24 @@
       setText('StartDate', clean(m.startDate) || '—');
       setText('EndDate', clean(m.endDate) || '—');
       setText('SessionCount', String(m.sessionCount ?? '—'));
+      setText('MinTargetHours', formatHoursLabel(m.minTargetHours));
       setText('Capacity', m.sessionCapacityType === 'one_on_one' ? '1 On 1' : 'Group');
     }
 
     function pendingEntryToQueueRow(entry) {
       const studentId = clean(entry?.students?.[0]?.studentId);
       const cap = entry?.students?.[0]?.sessionCapacityType || entry?.sessionCapacityType;
+      const metaMin = typeof groupClient.normalizeTargetHoursValue === 'function'
+        ? groupClient.normalizeTargetHoursValue(manageState.meta?.minTargetHours)
+        : 0;
+      let minTargetHours = typeof groupClient.normalizeTargetHoursValue === 'function'
+        ? groupClient.normalizeTargetHoursValue(entry?.minTargetHours)
+        : 0;
+      if (!minTargetHours) minTargetHours = metaMin;
+      let targetHours = entry?.targetHours != null ? String(entry.targetHours) : '';
+      if (!targetHours && entry?.targetSessionCount && minTargetHours) {
+        targetHours = String(minTargetHours);
+      }
       const settings = groupClient.groupEnrollmentSettingsFromEntry({
         startDate: entry?.startDate,
         endDate: entry?.endDate,
@@ -351,13 +446,15 @@
         claimNumberId: entry?.claimNumberId,
         claimNumber: entry?.claimNumber,
         reasonStart: entry?.reasonStart,
-        targetSessionCount: entry?.targetSessionCount != null ? String(entry.targetSessionCount) : '',
+        targetSessionCount: '',
+        targetHours,
         sessionCapacityType: cap
       });
       return {
         studentId,
         label: clean(entry?.studentLabel) || studentId,
         ...settings,
+        minTargetHours: minTargetHours || metaMin,
         selectedSessionIds: Array.isArray(entry?.selectedSessionIds)
           ? entry.selectedSessionIds.map((sid) => clean(sid)).filter(Boolean)
           : [],
@@ -370,12 +467,14 @@
       const funderOptions = Array.isArray(options.funderOptions) ? options.funderOptions : [];
       const funderSelect = buildFunderSelectHtml(funderOptions, row.funderId);
       const reasonVal = escapeHtml(clean(row.reasonStart));
+      const targetHoursCell = buildTargetHoursFieldHtml(row);
       const tbodyId = clean(options.tbodyId) || 'scheduleEnrollQueueTbody';
       if (mode === 'manage') {
         return `<tr data-queue-row="${index}" data-queue-tbody="${escapeHtml(tbodyId)}">
           <td>${formatStudentDisplay(row.label, row.studentId)}</td>
           <td><select class="form-select form-select-sm js-schedule-enroll-funder">${funderSelect}</select></td>
           <td><select class="form-select form-select-sm js-schedule-enroll-claim"><option value="">—</option></select></td>
+          <td>${targetHoursCell}</td>
           <td><textarea class="form-control form-control-sm js-schedule-enroll-reason" rows="2" placeholder="Optional start note">${reasonVal}</textarea></td>
           <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger js-schedule-enroll-manage-remove" data-index="${index}"><i class="bi bi-trash"></i></button></td>
         </tr>`;
@@ -388,6 +487,7 @@
           <td>${formatStudentDisplay(row.label, row.studentId)}</td>
           <td><select class="form-select form-select-sm js-schedule-enroll-funder">${funderSelect}</select></td>
           <td><select class="form-select form-select-sm js-schedule-enroll-claim"><option value="">—</option></select></td>
+          <td>${targetHoursCell}</td>
           <td><textarea class="form-control form-control-sm js-schedule-enroll-reason" rows="2" placeholder="Optional start note">${reasonVal}</textarea></td>
           <td>${statusLabel}</td>
           <td class="text-end"><button type="button" class="btn btn-sm btn-success js-schedule-enroll-play" data-index="${index}" ${enrollLocked ? 'disabled' : ''}><i class="bi bi-play-fill"></i></button></td>
@@ -432,6 +532,10 @@
         : clean(claimSelect?.value);
       row.claimNumber = '';
       row.reasonStart = clean(tr.querySelector('.js-schedule-enroll-reason')?.value);
+      const hoursInput = tr.querySelector('.js-schedule-enroll-target-hours');
+      if (hoursInput) {
+        row.targetHours = clean(hoursInput.value);
+      }
       return row;
     }
 
@@ -476,6 +580,7 @@
         .filter(Boolean);
       deps.setPendingEnrollStudentsForClass(classId, {
         ...(payload || {}),
+        minTargetHours: row?.minTargetHours,
         studentLabel: clean(row?.label || row?.studentLabel),
         selectedSessionIds
       });
@@ -492,7 +597,14 @@
       if (!row || status === 'completed' || status === 'draft') return;
       if (row._enrollmentInFlight === true) return;
       row._enrollmentInFlight = true;
+      const targetValidation = validateQueueRowTargetHours(row);
+      if (!targetValidation.ok) {
+        row._enrollmentInFlight = false;
+        await deps.uiAlert?.(targetValidation.message, 'Enroll students', { icon: 'warning' });
+        return;
+      }
       const settings = groupClient.groupEnrollmentSettingsFromEntry?.(row) || row;
+      settings.targetSessionCount = '';
       const payload = groupClient.buildGroupEnginePayload?.(flowState.prepare?.classId, row.studentId, settings) || {};
       if (flowState.prepare?.sessionMode === 'staged') {
         row.enrollmentStatus = 'draft';
@@ -631,11 +743,23 @@
       manageState.queue.forEach((row, index) => {
         readQueueRowFromDom(index, manageState.queue, 'scheduleEnrollPendingManageTbody');
       });
-      const entries = manageState.queue.map((row) => ({
-        ...groupClient.buildGroupEnginePayload(classId, row.studentId, groupClient.groupEnrollmentSettingsFromEntry(row)),
-        studentLabel: row.label,
-        selectedSessionIds: Array.isArray(row.selectedSessionIds) ? row.selectedSessionIds.slice() : []
-      }));
+      for (let i = 0; i < manageState.queue.length; i += 1) {
+        const validation = validateQueueRowTargetHours(manageState.queue[i]);
+        if (!validation.ok) {
+          void deps.uiAlert?.(validation.message, 'Manage drafted enrollments', { icon: 'warning' });
+          return;
+        }
+      }
+      const entries = manageState.queue.map((row) => {
+        const settings = groupClient.groupEnrollmentSettingsFromEntry(row);
+        settings.targetSessionCount = '';
+        return {
+          ...groupClient.buildGroupEnginePayload(classId, row.studentId, settings),
+          minTargetHours: row.minTargetHours,
+          studentLabel: row.label,
+          selectedSessionIds: Array.isArray(row.selectedSessionIds) ? row.selectedSessionIds.slice() : []
+        };
+      });
       if (typeof deps.replacePendingEnrollStudentsForClass === 'function') {
         deps.replacePendingEnrollStudentsForClass(classId, entries);
       }
@@ -654,6 +778,12 @@
         : null;
       manageState.classId = cid;
       manageState.meta = meta || enrollmentMetaFromPrepare({ classId: cid });
+      if (!manageState.meta?.minTargetHours && entries[0]?.minTargetHours) {
+        manageState.meta = {
+          ...manageState.meta,
+          minTargetHours: entries[0].minTargetHours
+        };
+      }
       manageState.queue = entries.map((entry) => pendingEntryToQueueRow(entry));
       renderPendingManageModal();
       deps.showBootstrapModal?.(document.getElementById('scheduleEnrollPendingManageModal'));
@@ -685,6 +815,14 @@
           sessions
         });
         flowState.prepare = prepareRes.data;
+        if (resolveMinTargetHoursFromPrepare(flowState.prepare) <= 0) {
+          await deps.uiAlert?.(
+            'Selected sessions are missing valid start and end times, so target hours cannot be calculated.',
+            'Enroll students',
+            { icon: 'warning' }
+          );
+          return;
+        }
         const capRes = await postJson('/school/schedules/api/enroll-students/session-capacity-check', {
           classId: flowState.prepare.classId,
           sessions

@@ -3,6 +3,7 @@
 const schoolDataService = require('./schoolDataService');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
 const classSessionCapacityService = require('./classSessionCapacityService');
+const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
 const scheduleSessionContextService = require('./scheduleSessionContextService');
 const rollingEnrollmentSessionAlignmentService = require('./rollingEnrollmentSessionAlignmentService');
 const rollingEnrollmentFunderService = require('./rollingEnrollmentFunderService');
@@ -104,6 +105,20 @@ function summarizeSessionWindow(sessions = []) {
   };
 }
 
+function sumSelectedSessionDurationHours(sessions = []) {
+  const total = (Array.isArray(sessions) ? sessions : []).reduce(
+    (sum, row) => sum + classEnrollmentSessionApplicabilityService.resolveSessionDurationHours({
+      durationHours: row?.durationHours,
+      start: row?.start,
+      end: row?.end,
+      startTime: row?.startTime || row?.start,
+      endTime: row?.endTime || row?.end
+    }),
+    0
+  );
+  return classEnrollmentSessionApplicabilityService.normalizeTargetHours(total);
+}
+
 async function prepareEnrollStudents({ classId, sessionMode, sessions, reqUser, accessContext }) {
   if (!sessionMode) throw new Error('sessionMode must be saved or staged.');
   if (!Array.isArray(sessions) || sessions.length < 2) {
@@ -117,6 +132,7 @@ async function prepareEnrollStudents({ classId, sessionMode, sessions, reqUser, 
   }
   const classData = await loadClassOrThrow(resolvedClassId, reqUser, accessContext);
   const window = summarizeSessionWindow(sessions);
+  const minTargetHours = sumSelectedSessionDurationHours(sessions);
   const sessionCapacityType = classSessionCapacityService.resolveEffectiveSessionCapacityType(classData, null);
   const maxCapacity = classSessionCapacityService.resolveClassMaxCapacity(classData);
   const funderOptions = await loadActiveFunderOptions(reqUser, classData.orgId);
@@ -127,6 +143,7 @@ async function prepareEnrollStudents({ classId, sessionMode, sessions, reqUser, 
     classId: toPublicId(classData.id),
     className: String(classData?.name || classData?.className || classData.id || '').trim(),
     ...window,
+    minTargetHours,
     sessionCapacityType,
     maxCapacity,
     multiselectStudents: sessionCapacityType !== 'one_on_one' && maxCapacity !== 1,
@@ -589,6 +606,7 @@ module.exports = {
   pendingEntryStudentId,
   buildRollingProgramChoices,
   summarizeSessionWindow,
+  sumSelectedSessionDurationHours,
   normalizeDateOnly,
   validatePendingEnrollmentsProgramRegistration,
   validatePendingEnrollmentsClassEnrollment,

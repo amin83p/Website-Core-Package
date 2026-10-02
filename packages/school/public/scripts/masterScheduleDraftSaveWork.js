@@ -218,9 +218,15 @@
           cells += `<div class="draft-save-cal-cell"><span class="draft-save-cal-day-num">${day}</span></div>`;
           continue;
         }
-        const chips = daySessions.map((session) => (
-          `<span class="draft-save-cal-session-chip" title="${escapeHtml(formatTimeRange(session.start, session.end))}">${escapeHtml(formatTimeRange(session.start, session.end))}</span>`
-        )).join('');
+        const chips = daySessions.map((session) => {
+          const timeLabel = formatTimeRange(session.start, session.end);
+          const occupant = clean(session?.occupantLabel);
+          const title = occupant ? `${timeLabel} — ${occupant}` : timeLabel;
+          const occupantHtml = occupant
+            ? `<span class="draft-save-cal-session-occupant">${escapeHtml(occupant)}</span>`
+            : '';
+          return `<span class="draft-save-cal-session-chip" title="${escapeHtml(title)}">${escapeHtml(timeLabel)}${occupantHtml}</span>`;
+        }).join('');
         cells += `<div class="draft-save-cal-cell has-sessions">
           <span class="draft-save-cal-day-num">${day}</span>
           <div class="draft-save-cal-session-stack">${chips}</div>
@@ -239,9 +245,13 @@
     }
 
     function buildStagedSessionsCalendarHtml(group) {
-      const sessions = sortSessions(group.sessions);
-      const sessionsByDate = buildSessionsByDate(sessions);
-      const monthKeys = enumerateMonthKeysFromSessions(sessions);
+      return buildStagedSessionsCalendarHtmlFromSessions(group?.sessions);
+    }
+
+    function buildStagedSessionsCalendarHtmlFromSessions(sessions) {
+      const sorted = sortSessions(sessions);
+      const sessionsByDate = buildSessionsByDate(sorted);
+      const monthKeys = enumerateMonthKeysFromSessions(sorted);
       if (!monthKeys.length) {
         return '<div class="draft-save-cal-empty small text-muted">No staged session dates.</div>';
       }
@@ -268,8 +278,13 @@
       const funderLabel = funderId === 'self' || !funderId ? 'Self-funded' : funderId;
       const line1 = [windowLabel, modeLabel, capLabel, clean(settings.status) || 'active', funderLabel].join(' · ');
       const line2Parts = [];
-      const target = clean(settings.targetSessionCount);
-      if (target) line2Parts.push(`${target} session${target === '1' ? '' : 's'} targeted`);
+      const targetHours = clean(settings.targetHours || entry?.targetHours);
+      if (mode === 'hour_cap' && targetHours) {
+        line2Parts.push(`${targetHours} h targeted`);
+      } else {
+        const target = clean(settings.targetSessionCount);
+        if (target) line2Parts.push(`${target} session${target === '1' ? '' : 's'} targeted`);
+      }
       const claim = clean(settings.claimNumberId || settings.claimNumber);
       if (claim) line2Parts.push(`Claim ${claim}`);
       const note = clean(settings.reasonStart);
@@ -489,10 +504,12 @@
     }
 
     global.MasterScheduleDraftSaveWork.openSaveDraftWorkModal = openSaveDraftWorkModal;
+    global.MasterScheduleDraftSaveWork.buildStagedSessionsCalendarHtmlFromSessions = buildStagedSessionsCalendarHtmlFromSessions;
 
     return {
       openSaveDraftWorkModal,
       buildDraftSaveWorkItems,
+      buildStagedSessionsCalendarHtmlFromSessions,
       canSelectEnrollmentRow,
       readSelectedSaveDraftWork
     };
@@ -500,6 +517,7 @@
 
   global.MasterScheduleDraftSaveWork = {
     install: installMasterScheduleDraftSaveWork,
-    openSaveDraftWorkModal: null
+    openSaveDraftWorkModal: null,
+    buildStagedSessionsCalendarHtmlFromSessions: null
   };
 })(typeof window !== 'undefined' ? window : globalThis);

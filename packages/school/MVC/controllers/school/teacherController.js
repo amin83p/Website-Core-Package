@@ -29,6 +29,8 @@ const {
   assertOrgAccess
 } = requireCoreModule('MVC/utils/orgContextUtils');
 const { TEACHER_STATUSES, EMPLOYMENT_TYPES, INSTRUCTIONAL_MODES, COMPENSATION_METHODS } = require('../../models/school/teacherModel');
+const teacherTeachingQualificationsService = require('../../services/school/teacherTeachingQualificationsService');
+const teacherAvailabilityService = require('../../services/school/teacherAvailabilityService');
 
 function routeAccess(req) {
   return dataService.buildRouteAccessContext(req);
@@ -497,6 +499,41 @@ exports.listNameMatches = async (req, res) => {
     return res.status(400).json({ status: 'error', message: error.message });
   }
 };
+
+exports.rankTeachersByAvailability = async (req, res) => {
+  try {
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const orgId = String(body.orgId || activeOrgId).trim() || activeOrgId;
+    if (!idsEqual(orgId, activeOrgId)) {
+      const error = new Error('Organization must match your active organization.');
+      error.statusCode = 403;
+      throw error;
+    }
+    const teacherIdsRaw = body.teacherIds;
+    const teacherIds = Array.isArray(teacherIdsRaw)
+      ? teacherIdsRaw
+      : (typeof teacherIdsRaw === 'string' && teacherIdsRaw.trim()
+        ? parseJsonSafe(teacherIdsRaw, [])
+        : []);
+    const result = await teacherAvailabilityService.rankTeachersByAvailability({
+      orgId,
+      startDate: String(body.startDate || '').trim(),
+      endDate: String(body.endDate || body.startDate || '').trim(),
+      departmentId: String(body.departmentId || '').trim(),
+      programId: String(body.programId || '').trim(),
+      teacherIds,
+      reqUser: req.user
+    });
+    return res.json({ status: 'success', ...result });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 400).json({
+      status: 'error',
+      message: error?.message || 'Failed to rank teacher availability.'
+    });
+  }
+};
+
 exports.listTeachers = async (req, res) => {
   try {
     let query = await buildDataServiceQuery(req.query);
@@ -650,8 +687,9 @@ exports.showForm = async (req, res) => {
       }
     }
 
-    const [departments, organizations] = await Promise.all([
+    const [departments, programs, organizations] = await Promise.all([
       dataService.fetchAllData('departments', {}, req.user, routeAccess(req)),
+      dataService.fetchAllData('programs', {}, req.user, routeAccess(req)),
       dataServiceGlobal.fetchData('organizations', {}, req.user)
     ]);
     const organizationLookup = {};
@@ -682,6 +720,7 @@ exports.showForm = async (req, res) => {
       personOrganizations,
       organizationLookup,
       departments,
+      programs: (programs || []).filter((row) => idsEqual(row?.orgId, activeOrgId)),
       statuses: TEACHER_STATUSES,
       employmentTypes: EMPLOYMENT_TYPES,
       instructionalModes: INSTRUCTIONAL_MODES,
@@ -767,6 +806,20 @@ exports.saveTeacher = async (req, res) => {
       existingTeacher?.attachments
     );
 
+    const [programs, departments] = await Promise.all([
+      dataService.fetchAllData('programs', {}, req.user, routeAccess(req)),
+      dataService.fetchAllData('departments', {}, req.user, routeAccess(req))
+    ]);
+
+    const teachingQualifications = teacherTeachingQualificationsService.validateAndSanitize(
+      parseJsonSafe(req.body.teachingQualifications, []),
+      {
+        orgId: existingTeacher?.orgId ? String(existingTeacher.orgId) : String(activeOrgId),
+        programs,
+        departments
+      }
+    );
+
     const payload = {
       personId,
       orgId: existingTeacher?.orgId ? String(existingTeacher.orgId) : String(activeOrgId),
@@ -775,6 +828,7 @@ exports.saveTeacher = async (req, res) => {
       departmentId: String(req.body.departmentId || '').trim(),
       defaultPayRateId: '',
       compensationProfiles: parseJsonSafe(req.body.compensationProfiles, []),
+      teachingQualifications,
       specialization: String(req.body.specialization || '').trim(),
       certification: String(req.body.certification || '').trim(),
       employmentType: String(req.body.employmentType || '').trim(),

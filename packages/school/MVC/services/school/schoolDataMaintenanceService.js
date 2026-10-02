@@ -8,6 +8,7 @@ const conductRatingScalePolicyModel = require('../../models/school/conductRating
 const attendanceMarkAppearancePolicyModel = require('../../models/school/attendanceMarkAppearancePolicyModel');
 const autosavePolicyModel = require('../../models/school/autosavePolicyModel');
 const uploadLimitsPolicyModel = require('../../models/school/uploadLimitsPolicyModel');
+const schedulingTimePolicyModel = require('../../models/school/schedulingTimePolicyModel');
 const sessionAccessPolicyModel = require('../../models/school/sessionAccessPolicyModel');
 const studentAttendanceReportPolicyModel = require('../../models/school/studentAttendanceReportPolicyModel');
 const semiMonthlyReportPolicyModel = require('../../models/school/semiMonthlyReportPolicyModel');
@@ -65,6 +66,7 @@ function resolvePolicyModel(catalogEntry) {
   if (catalogEntry?.policyModel === 'conductRatingScale') return conductRatingScalePolicyModel;
   if (catalogEntry?.policyModel === 'autosave') return autosavePolicyModel;
   if (catalogEntry?.policyModel === 'uploadLimits') return uploadLimitsPolicyModel;
+  if (catalogEntry?.policyModel === 'schedulingTime') return schedulingTimePolicyModel;
   if (catalogEntry?.policyModel === 'sessionAccess') return sessionAccessPolicyModel;
   if (catalogEntry?.policyModel === 'studentAttendanceReport') return studentAttendanceReportPolicyModel;
   if (catalogEntry?.policyModel === 'semiMonthlyReport') return semiMonthlyReportPolicyModel;

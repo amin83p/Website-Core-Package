@@ -5,6 +5,7 @@
   const autosavePolicyJson = JSON.stringify(typeof autosavePolicy !== 'undefined' ? autosavePolicy : { defaultMinutes: 5, sections: {} }).replace(/</g, '\\u003c');
   const autosaveSectionsJson = JSON.stringify(typeof autosaveSections !== 'undefined' ? autosaveSections : []).replace(/</g, '\\u003c');
   const uploadLimitsPolicyJson = JSON.stringify(typeof uploadLimitsPolicy !== 'undefined' ? uploadLimitsPolicy : { sections: {} }).replace(/</g, '\\u003c');
+  const schedulingTimePolicyJson = JSON.stringify(typeof schedulingTimePolicy !== 'undefined' ? schedulingTimePolicy : { dayBounds: { earliestStart: '08:00', latestEnd: '20:00' }, timeFrames: [] }).replace(/</g, '\\u003c');
   const sessionAccessPolicyJson = JSON.stringify(typeof sessionAccessPolicy !== 'undefined' ? sessionAccessPolicy : {}).replace(/</g, '\\u003c');
   const sessionNotificationEmailDefaultBodyJson = JSON.stringify(
     typeof sessionNotificationEmailDefaultBody !== 'undefined' ? sessionNotificationEmailDefaultBody : ''
@@ -72,7 +73,9 @@
     statutoryHolidaySchemesConfig.schemes?.equilibrium_school || { id: 'equilibrium_school', name: 'Equilibrium School Scheme' },
     statutoryHolidaySchemesConfig.schemes?.linc || { id: 'linc', name: 'LINC Scheme', hourMode: 'most_recent' }
   ];
-  const departmentOptionsList = Array.isArray(departmentOptions) ? departmentOptions : [];
+  const departmentOptionsList = (typeof departmentOptions !== 'undefined' && Array.isArray(departmentOptions))
+    ? departmentOptions
+    : [];
   const departmentSchemeAssignmentsMap = statutoryHolidaySchemesConfig.departmentSchemeAssignments
     && typeof statutoryHolidaySchemesConfig.departmentSchemeAssignments === 'object'
     ? statutoryHolidaySchemesConfig.departmentSchemeAssignments
@@ -100,10 +103,10 @@
     ? String(enrollmentFinishAlertPolicy.alertMessage)
     : '';
   const timesheetImportActivityOptionsList = Array.isArray(timesheetImportActivityOptions) ? timesheetImportActivityOptions : [];
-  const statutoryHolidayPublicActivityOptionsList = Array.isArray(statutoryHolidayPublicActivityOptions)
+  const statutoryHolidayPublicActivityOptionsList = (typeof statutoryHolidayPublicActivityOptions !== 'undefined' && Array.isArray(statutoryHolidayPublicActivityOptions))
     ? statutoryHolidayPublicActivityOptions
     : timesheetImportActivityOptionsList;
-  const statutoryHolidayMappingYearOptionsList = Array.isArray(statutoryHolidayMappingYearOptions)
+  const statutoryHolidayMappingYearOptionsList = (typeof statutoryHolidayMappingYearOptions !== 'undefined' && Array.isArray(statutoryHolidayMappingYearOptions))
     ? statutoryHolidayMappingYearOptions
     : [];
   const statutoryHolidayMappingDefaultYearValue = String(
@@ -2242,6 +2245,80 @@
           </form>
         </div>
       </section>
+
+      <section class="school-settings-panel card border-0 shadow-sm" id="scheduling-time-policy" role="tabpanel" aria-labelledby="settings-tab-scheduling-time-policy" tabindex="0" hidden>
+        <header class="school-settings-panel-header card-header px-4 py-3">
+          <div class="d-flex align-items-center gap-3">
+            <span class="school-settings-nav-icon"><i class="bi bi-clock" aria-hidden="true"></i></span>
+            <div>
+              <h2 class="h5 fw-bold mb-1">Scheduling Time Frames</h2>
+              <p class="small text-muted mb-0">Define standard daily time frames and earliest/latest class times for teacher availability.</p>
+            </div>
+          </div>
+        </header>
+        <div class="card-body p-4">
+          <p class="small text-muted mb-3">
+            Time frames must not overlap and must fall within the day bounds. Teacher availability ranking uses these frames for the active organization.
+          </p>
+          <div class="alert alert-danger d-none js-settings-error" id="schedulingTimePolicySettingsError" role="alert"></div>
+          <form id="schedulingTimePolicySettingsForm" novalidate>
+            <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+            <div class="row g-3 mb-4">
+              <div class="col-md-4">
+                <label class="form-label" for="schedulingEarliestStart">Earliest class start</label>
+                <input
+                  type="time"
+                  class="form-control form-control-sm"
+                  id="schedulingEarliestStart"
+                  name="earliestStart"
+                  value="<%= typeof schedulingTimePolicy !== 'undefined' && schedulingTimePolicy?.dayBounds?.earliestStart ? schedulingTimePolicy.dayBounds.earliestStart : '08:00' %>"
+                  <%= canUpdateFlag ? '' : 'disabled' %>
+                >
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="schedulingLatestEnd">Latest class end</label>
+                <input
+                  type="time"
+                  class="form-control form-control-sm"
+                  id="schedulingLatestEnd"
+                  name="latestEnd"
+                  value="<%= typeof schedulingTimePolicy !== 'undefined' && schedulingTimePolicy?.dayBounds?.latestEnd ? schedulingTimePolicy.dayBounds.latestEnd : '20:00' %>"
+                  <%= canUpdateFlag ? '' : 'disabled' %>
+                >
+              </div>
+            </div>
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <h3 class="h6 fw-semibold mb-0">Standard time frames</h3>
+              <% if (canUpdateFlag) { %>
+                <button type="button" class="btn btn-sm btn-outline-primary" id="btnAddSchedulingTimeFrame">
+                  <i class="bi bi-plus-lg me-1"></i>Add frame
+                </button>
+              <% } %>
+            </div>
+            <div class="table-responsive">
+              <table class="table table-sm align-middle school-settings-table" id="schedulingTimeFramesTable">
+                <thead class="table-light">
+                  <tr>
+                    <th>Label</th>
+                    <th style="min-width:8rem;">Start</th>
+                    <th style="min-width:8rem;">End</th>
+                    <% if (canUpdateFlag) { %><th style="width:4rem;"></th><% } %>
+                  </tr>
+                </thead>
+                <tbody id="schedulingTimeFramesBody"></tbody>
+              </table>
+            </div>
+            <input type="hidden" name="timeFrames" id="schedulingTimeFramesJson" value="">
+            <% if (canUpdateFlag) { %>
+              <div class="d-flex justify-content-end mt-3">
+                <button class="btn btn-primary" type="submit" id="btnSaveSchedulingTimePolicy">
+                  <i class="bi bi-save me-1"></i>Save Scheduling Times
+                </button>
+              </div>
+            <% } %>
+          </form>
+        </div>
+      </section>
     </main>
   </div>
 </div>
@@ -2339,6 +2416,7 @@
   let attendanceItems = <%- attendanceItemsJson %>;
   let autosavePolicy = <%- autosavePolicyJson %>;
   let uploadLimitsPolicy = <%- uploadLimitsPolicyJson %>;
+  let schedulingTimePolicy = <%- schedulingTimePolicyJson %>;
   const autosaveSections = <%- autosaveSectionsJson %>;
   let sessionAccessPolicy = <%- sessionAccessPolicyJson %>;
   const sessionNotificationEmailTokens = <%- sessionNotificationEmailTokensJson %>;
@@ -3716,6 +3794,92 @@
         effectiveEl.textContent = String(bookRow.effectiveMaxFileSizeMb);
       }
     }
+    await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
+  });
+
+  function renderSchedulingTimeFramesTable() {
+    const tbody = document.getElementById('schedulingTimeFramesBody');
+    if (!tbody) return;
+    const frames = Array.isArray(schedulingTimePolicy?.timeFrames) ? schedulingTimePolicy.timeFrames : [];
+    tbody.innerHTML = '';
+    frames.forEach((row, index) => {
+      const tr = document.createElement('tr');
+      tr.dataset.frameIndex = String(index);
+      tr.innerHTML = `
+        <td><input type="text" class="form-control form-control-sm js-sched-frame-label" value="${escapeHtmlAttr(row.label || '')}" ${canUpdate ? '' : 'disabled'}></td>
+        <td><input type="time" class="form-control form-control-sm js-sched-frame-start" value="${escapeHtmlAttr(row.startTime || '')}" ${canUpdate ? '' : 'disabled'}></td>
+        <td><input type="time" class="form-control form-control-sm js-sched-frame-end" value="${escapeHtmlAttr(row.endTime || '')}" ${canUpdate ? '' : 'disabled'}></td>
+        ${canUpdate ? '<td><button type="button" class="btn btn-sm btn-outline-danger js-sched-frame-remove" title="Remove"><i class="bi bi-trash"></i></button></td>' : ''}
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function collectSchedulingTimeFramesFromDom() {
+    const rows = document.querySelectorAll('#schedulingTimeFramesBody tr');
+    return Array.from(rows).map((tr, index) => {
+      const label = tr.querySelector('.js-sched-frame-label')?.value || '';
+      const startTime = tr.querySelector('.js-sched-frame-start')?.value || '';
+      const endTime = tr.querySelector('.js-sched-frame-end')?.value || '';
+      const existing = Array.isArray(schedulingTimePolicy?.timeFrames) ? schedulingTimePolicy.timeFrames[index] : null;
+      return {
+        id: existing?.id || '',
+        label: String(label).trim(),
+        startTime: String(startTime).trim(),
+        endTime: String(endTime).trim(),
+        sortOrder: index + 1
+      };
+    });
+  }
+
+  function escapeHtmlAttr(value) {
+    return String(value || '')
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;');
+  }
+
+  renderSchedulingTimeFramesTable();
+
+  document.getElementById('btnAddSchedulingTimeFrame')?.addEventListener('click', () => {
+    const frames = collectSchedulingTimeFramesFromDom();
+    frames.push({ id: '', label: `Frame ${frames.length + 1}`, startTime: '09:00', endTime: '12:00', sortOrder: frames.length + 1 });
+    schedulingTimePolicy = { ...(schedulingTimePolicy || {}), timeFrames: frames };
+    renderSchedulingTimeFramesTable();
+  });
+
+  document.getElementById('schedulingTimeFramesBody')?.addEventListener('click', event => {
+    const btn = event.target.closest('.js-sched-frame-remove');
+    if (!btn) return;
+    const tr = btn.closest('tr');
+    if (!tr) return;
+    const index = Number(tr.dataset.frameIndex);
+    const frames = collectSchedulingTimeFramesFromDom().filter((_, i) => i !== index);
+    schedulingTimePolicy = { ...(schedulingTimePolicy || {}), timeFrames: frames.length ? frames : [{ id: '', label: 'Frame 1', startTime: '09:00', endTime: '12:00', sortOrder: 1 }] };
+    renderSchedulingTimeFramesTable();
+  });
+
+  document.getElementById('schedulingTimePolicySettingsForm')?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const button = document.getElementById('btnSaveSchedulingTimePolicy');
+    if (!button) return;
+    const frames = collectSchedulingTimeFramesFromDom();
+    const payload = {
+      actionStateId: event.currentTarget.elements.actionStateId?.value || '',
+      earliestStart: document.getElementById('schedulingEarliestStart')?.value || '',
+      latestEnd: document.getElementById('schedulingLatestEnd')?.value || '',
+      timeFrames: JSON.stringify(frames)
+    };
+    const result = await postSettings('/school/settings/scheduling-time-policy', payload, button, 'schedulingTimePolicySettingsError');
+    if (!result) return;
+    schedulingTimePolicy = result.policy && typeof result.policy === 'object' ? result.policy : schedulingTimePolicy;
+    if (schedulingTimePolicy?.dayBounds) {
+      const es = document.getElementById('schedulingEarliestStart');
+      const le = document.getElementById('schedulingLatestEnd');
+      if (es) es.value = schedulingTimePolicy.dayBounds.earliestStart || es.value;
+      if (le) le.value = schedulingTimePolicy.dayBounds.latestEnd || le.value;
+    }
+    renderSchedulingTimeFramesTable();
     await showSettingsMessage({ title: 'Settings Saved', message: result.message, icon: 'success' });
   });
 

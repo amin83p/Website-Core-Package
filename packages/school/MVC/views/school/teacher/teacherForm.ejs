@@ -21,10 +21,13 @@
       <input type="hidden" name="newPersonPhones" id="hid_newPersonPhones" value="[]">
       <input type="hidden" name="newPersonAddresses" id="hid_newPersonAddresses" value="[]">
       <input type="hidden" name="compensationProfiles" id="hid_compensationProfiles" value="[]">
+      <input type="hidden" name="teachingQualifications" id="hid_teachingQualifications" value="[]">
       <script type="application/json" id="init_personOrganizations"><%- JSON.stringify(typeof personOrganizations !== 'undefined' ? (personOrganizations || []) : []).replace(/</g, '\\u003c') %></script>
       <script type="application/json" id="init_organizationLookup"><%- JSON.stringify(typeof organizationLookup !== 'undefined' ? (organizationLookup || {}) : {}).replace(/</g, '\\u003c') %></script>
       <script type="application/json" id="init_compensationProfiles"><%- JSON.stringify(t.compensationProfiles || []) %></script>
+      <script type="application/json" id="init_teachingQualifications"><%- JSON.stringify(t.teachingQualifications || []) %></script>
       <script type="application/json" id="comp_departments"><%- JSON.stringify(departments || []) %></script>
+      <script type="application/json" id="teaching_programs"><%- JSON.stringify(programs || []) %></script>
       <script type="application/json" id="comp_methods"><%- JSON.stringify(compensationMethods || []) %></script>
 
       <ul class="nav nav-tabs mb-4" role="tablist">
@@ -258,6 +261,18 @@
                 <label class="form-label fw-bold">Teaching Focus</label>
                 <input type="text" name="teachingFocus" class="form-control size-md" value="<%= t.teachingFocus || '' %>" placeholder="Programs, levels, or subjects focus">
               </div>
+              <div class="col-md-12 mt-2">
+                <div class="card border shadow-sm">
+                  <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <span class="fw-bold"><i class="bi bi-mortarboard me-2"></i>Teaching Qualifications</span>
+                    <button type="button" class="btn btn-sm btn-outline-primary" id="btnAddTeachingQualification"><i class="bi bi-plus-lg"></i> Add Qualification</button>
+                  </div>
+                  <div class="card-body">
+                    <div id="teachingQualificationsList"></div>
+                    <div class="form-text small">Link department and program rows from your catalog. Overlapping date ranges for the same department and program are blocked.</div>
+                  </div>
+                </div>
+              </div>
               <div class="col-md-12">
                 <label class="form-label fw-bold">Internal Notes</label>
                 <textarea name="notes" class="form-control size-md" rows="4" placeholder="Scheduling notes, compliance remarks, internal context..."><%= t.notes || '' %></textarea>
@@ -299,6 +314,9 @@
   const hidCompensationProfiles = document.getElementById('hid_compensationProfiles');
   const compensationProfilesList = document.getElementById('compensationProfilesList');
   const btnAddCompensation = document.getElementById('btnAddCompensation');
+  const hidTeachingQualifications = document.getElementById('hid_teachingQualifications');
+  const teachingQualificationsList = document.getElementById('teachingQualificationsList');
+  const btnAddTeachingQualification = document.getElementById('btnAddTeachingQualification');
   const personRoleSummary = document.getElementById('personRoleSummary');
 
   let newPersonEmails = [{ type: 'primary', email: '', isPrimary: true }];
@@ -307,8 +325,10 @@
   let selectedPersonOrganizations = readJsonSafe(document.getElementById('init_personOrganizations')?.textContent, []);
   const organizationLookup = readJsonSafe(document.getElementById('init_organizationLookup')?.textContent, {});
   const departmentOptions = readJsonSafe(document.getElementById('comp_departments')?.textContent, []);
+  const programOptions = readJsonSafe(document.getElementById('teaching_programs')?.textContent, []);
   const compensationMethods = readJsonSafe(document.getElementById('comp_methods')?.textContent, ['hourly']);
   let compensationProfiles = readJsonSafe(document.getElementById('init_compensationProfiles')?.textContent, []);
+  let teachingQualifications = readJsonSafe(document.getElementById('init_teachingQualifications')?.textContent, []);
 
   function showMsg(opts) {
     if (typeof showMessageModal === 'function') return showMessageModal(opts);
@@ -591,6 +611,88 @@
       compensationProfilesList.appendChild(wrap);
     });
     syncCompensationHiddenState();
+  }
+
+  function programsForDepartment(departmentId) {
+    const deptId = String(departmentId || '').trim();
+    return (programOptions || []).filter((row) => {
+      const rowDept = String(row?.departmentId || '').trim();
+      if (!deptId) return true;
+      if (!rowDept) return true;
+      return rowDept === deptId;
+    });
+  }
+
+  function syncTeachingQualificationsHiddenState() {
+    if (hidTeachingQualifications) hidTeachingQualifications.value = JSON.stringify(teachingQualifications);
+  }
+
+  function renderTeachingQualifications() {
+    if (!teachingQualificationsList) return;
+    teachingQualificationsList.innerHTML = '';
+    if (!Array.isArray(teachingQualifications)) teachingQualifications = [];
+
+    if (!teachingQualifications.length) {
+      teachingQualificationsList.innerHTML = '<div class="text-muted small">No teaching qualifications yet.</div>';
+      syncTeachingQualificationsHiddenState();
+      return;
+    }
+
+    teachingQualifications.forEach((row, idx) => {
+      const deptOptions = ['<option value="">-- Department --</option>']
+        .concat((departmentOptions || []).map((d) => {
+          const id = String(d?.id || '');
+          const selected = String(row.departmentId || '') === id ? 'selected' : '';
+          const label = `${d?.code || d?.id || ''} - ${d?.name || ''}`.trim();
+          return `<option value="${id}" ${selected}>${label}</option>`;
+        }))
+        .join('');
+
+      const programRows = programsForDepartment(row.departmentId);
+      const programOptionsHtml = ['<option value="">-- Program --</option>']
+        .concat(programRows.map((p) => {
+          const id = String(p?.id || '');
+          const selected = String(row.programId || '') === id ? 'selected' : '';
+          const label = `${p?.code || p?.id || ''} - ${p?.name || p?.title || ''}`.trim();
+          return `<option value="${id}" ${selected}>${label}</option>`;
+        }))
+        .join('');
+
+      const wrap = document.createElement('div');
+      wrap.className = 'border rounded p-3 mb-3 bg-white';
+      wrap.innerHTML =
+        `<div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="fw-bold small text-muted">Qualification #${idx + 1}</div>
+          <button type="button" class="btn btn-sm btn-outline-danger tqual-remove"><i class="bi bi-trash"></i></button>
+        </div>
+        <div class="row g-2">
+          <div class="col-md-4"><label class="form-label fw-bold small">Department *</label><select class="form-select size-md tqual-dept">${deptOptions}</select></div>
+          <div class="col-md-4"><label class="form-label fw-bold small">Program *</label><select class="form-select size-md tqual-program">${programOptionsHtml}</select></div>
+          <div class="col-md-2"><label class="form-label fw-bold small">Effective From</label><input type="date" class="form-control size-md tqual-from" value="${row.effectiveFrom || ''}"></div>
+          <div class="col-md-2"><label class="form-label fw-bold small">Effective To</label><input type="date" class="form-control size-md tqual-to" value="${row.effectiveTo || ''}"></div>
+          <div class="col-md-12"><label class="form-label fw-bold small">Notes</label><input type="text" class="form-control size-md tqual-notes" value="${String(row.notes || '').replace(/"/g, '&quot;')}"></div>
+        </div>`;
+
+      const setValue = (key, value) => { teachingQualifications[idx][key] = value; syncTeachingQualificationsHiddenState(); };
+      const deptSelect = wrap.querySelector('.tqual-dept');
+      const programSelect = wrap.querySelector('.tqual-program');
+      deptSelect.addEventListener('change', (e) => {
+        setValue('departmentId', e.target.value);
+        setValue('programId', '');
+        renderTeachingQualifications();
+      });
+      programSelect.addEventListener('change', (e) => setValue('programId', e.target.value));
+      wrap.querySelector('.tqual-from').addEventListener('change', (e) => setValue('effectiveFrom', e.target.value));
+      wrap.querySelector('.tqual-to').addEventListener('change', (e) => setValue('effectiveTo', e.target.value));
+      wrap.querySelector('.tqual-notes').addEventListener('input', (e) => setValue('notes', e.target.value));
+      wrap.querySelector('.tqual-remove').addEventListener('click', () => {
+        teachingQualifications.splice(idx, 1);
+        renderTeachingQualifications();
+      });
+
+      teachingQualificationsList.appendChild(wrap);
+    });
+    syncTeachingQualificationsHiddenState();
   }
 
   function syncPersonModeUI() {
@@ -883,6 +985,19 @@
         renderCompensationProfiles();
       });
     }
+    if (btnAddTeachingQualification) {
+      btnAddTeachingQualification.addEventListener('click', () => {
+        teachingQualifications.push({
+          id: `TQUAL_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+          departmentId: String(document.querySelector('select[name="departmentId"]')?.value || ''),
+          programId: '',
+          effectiveFrom: '',
+          effectiveTo: '',
+          notes: ''
+        });
+        renderTeachingQualifications();
+      });
+    }
 
     form.addEventListener('submit', async function (e) {
       e.preventDefault();
@@ -924,6 +1039,7 @@
 
         syncNewPersonHiddenState();
         syncCompensationHiddenState();
+        syncTeachingQualificationsHiddenState();
         window.schoolPersonAttachments?.sync();
 
         const token = document.getElementById('hid_actionStateId')?.value || '';
@@ -1054,6 +1170,7 @@
     renderNewPersonPhones();
     renderNewPersonAddresses();
     renderCompensationProfiles();
+    renderTeachingQualifications();
     renderPersonRoleSummary();
     syncPersonModeUI();
     syncNewPersonHiddenState();

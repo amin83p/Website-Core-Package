@@ -98,6 +98,13 @@ const SCHOOL_SETTINGS_GROUPS = Object.freeze([
     description: 'Configure maximum upload sizes for school library and other file workflows.',
     icon: 'bi-cloud-upload',
     order: 48
+  }),
+  Object.freeze({
+    key: 'scheduling-time-policy',
+    title: 'Scheduling Time Frames',
+    description: 'Define standard daily time frames and earliest/latest class times for teacher availability.',
+    icon: 'bi-clock',
+    order: 49
   })
 ]);
 

@@ -34,6 +34,11 @@ router.get('/api/name-matches',
   trackActionState(SECTIONS.SCHOOL_TEACHERS, OPERATIONS.CREATE, { requireToken: false, keepActive: true }),
   ctrl.listNameMatches);
 
+router.post('/api/availability-rank',
+  requireAccess(SECTIONS.SCHOOL_TEACHERS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_TEACHERS, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
+  ctrl.rankTeachersByAvailability);
+
 router.get('/:id/attachments/:attId/download',
   requireAccess(SECTIONS.SCHOOL_TEACHERS, OPERATIONS.DOWNLOAD_FILE),
   trackActionState(SECTIONS.SCHOOL_TEACHERS, OPERATIONS.DOWNLOAD_FILE),

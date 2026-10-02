@@ -91,6 +91,10 @@ test('School Settings routes use standard access and action-state protection', (
   );
   assert.match(
     routes,
+    /router\.post\('\/scheduling-time-policy'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE\)[\s\S]*?trackActionState\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE/
+  );
+  assert.match(
+    routes,
     /router\.post\('\/session-access'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE\)[\s\S]*?trackActionState\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.UPDATE/
   );
   assert.match(
@@ -141,7 +145,8 @@ test('settings page supports read-only rendering, independent AJAX saves, and mo
   const catalog = require('../packages/school/MVC/config/schoolSettingsCatalog');
   const groupKeys = catalog.listSchoolSettingsGroups().map((row) => row.key);
   assert.ok(groupKeys.includes('upload-limits'));
-  assert.equal(groupKeys[groupKeys.length - 1], 'upload-limits');
+  assert.ok(groupKeys.includes('scheduling-time-policy'));
+  assert.equal(groupKeys[groupKeys.length - 1], 'scheduling-time-policy');
   const rollupGroup = catalog.listSchoolSettingsGroups().find((row) => row.key === 'attendance-rollup');
   assert.equal(rollupGroup?.href, undefined);
   assert.match(view, /activeOrgName/);
@@ -180,6 +185,8 @@ test('settings page supports read-only rendering, independent AJAX saves, and mo
   assert.match(view, /\/school\/settings\/autosave/);
   assert.match(view, /id="upload-limits"/);
   assert.match(view, /\/school\/settings\/upload-limits/);
+  assert.match(view, /id="scheduling-time-policy"/);
+  assert.match(view, /\/school\/settings\/scheduling-time-policy/);
   assert.match(view, /id="session-access"/);
   assert.match(view, /\/school\/settings\/session-access/);
   assert.match(view, /id="cardNaAttendanceVisibility"/);
@@ -318,6 +325,10 @@ test('settings page renders in editable and read-only modes with valid client Ja
       importTargetStatus: 'draft'
     },
     timesheetImportActivityOptions: [],
+    departmentOptions: [],
+    uploadLimitsPolicy: { sections: {} },
+    uploadLimitSections: require('../packages/school/MVC/config/uploadLimitsSectionCatalog').listUploadLimitSections(),
+    schedulingTimePolicy: require('../packages/school/MVC/services/school/schedulingTimePolicyService').resolvePolicy({}),
     actionStateId: 'state-1',
     schoolSectionDashboardHref: '/dashboard/section-nav/SCHOOL'
   };
@@ -394,6 +405,8 @@ test('settings policy persistence remains organization-keyed for JSON and Mongo'
     'packages/school/MVC/models/school/timesheetDisplayPolicyModel.js'
   ].map(read);
   assert.match(controller, /saveUploadLimitsPolicy/);
+  assert.match(controller, /saveSchedulingTimePolicy/);
+  assert.match(controller, /schedulingTimePolicyModel\.getPolicyForOrg/);
   assert.match(controller, /uploadLimitsPolicyModel\.getPolicyForOrg/);
   assert.doesNotMatch(controller, /primaryOrgId/);
   assert.match(settingsView, /schoolSettingsFormPayload\.js/);

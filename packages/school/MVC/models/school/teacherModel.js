@@ -142,6 +142,41 @@ function sanitizeCompensationProfiles(rawProfiles) {
   return sanitized;
 }
 
+function sanitizeTeachingQualifications(rawQualifications) {
+  const list = Array.isArray(rawQualifications) ? rawQualifications : [];
+  const sanitized = list.map((entry, idx) => {
+    const id = cleanId(entry?.id || `TQUAL_${Date.now()}_${idx + 1}`, { max: 80, allowEmpty: false });
+    const departmentId = cleanId(entry?.departmentId, { max: 64, allowEmpty: false });
+    const programId = cleanId(entry?.programId, { max: 64, allowEmpty: false });
+    const effectiveFrom = cleanDateISO(entry?.effectiveFrom, { allowEmpty: true });
+    const effectiveTo = cleanDateISO(entry?.effectiveTo, { allowEmpty: true });
+    if (effectiveFrom && effectiveTo && effectiveFrom > effectiveTo) {
+      throw new Error('Teaching qualification Effective To cannot be earlier than Effective From.');
+    }
+    return {
+      id: String(id),
+      departmentId: String(departmentId),
+      programId: String(programId),
+      effectiveFrom,
+      effectiveTo,
+      notes: cleanString(entry?.notes, { max: 400, allowEmpty: true })
+    };
+  });
+
+  for (let i = 0; i < sanitized.length; i++) {
+    for (let j = i + 1; j < sanitized.length; j++) {
+      const a = sanitized[i];
+      const b = sanitized[j];
+      if (String(a.departmentId) !== String(b.departmentId)) continue;
+      if (String(a.programId) !== String(b.programId)) continue;
+      if (rangesOverlap(a.effectiveFrom, a.effectiveTo, b.effectiveFrom, b.effectiveTo)) {
+        throw new Error('Teaching qualification date ranges conflict for the same department and program.');
+      }
+    }
+  }
+  return sanitized;
+}
+
 function sanitizeTeacherInput(input, { isUpdate = false } = {}) {
   if (!isPlainObject(input)) throw new Error('Invalid teacher payload.');
 
@@ -167,6 +202,7 @@ function sanitizeTeacherInput(input, { isUpdate = false } = {}) {
     departmentId: cleanId(input.departmentId, { max: 64, allowEmpty: true }),
     defaultPayRateId: cleanId(input.defaultPayRateId, { max: 64, allowEmpty: true }),
     compensationProfiles: sanitizeCompensationProfiles(input.compensationProfiles),
+    teachingQualifications: sanitizeTeachingQualifications(input.teachingQualifications),
     specialization: cleanString(input.specialization, { max: 160, allowEmpty: true }),
     certification: cleanString(input.certification, { max: 200, allowEmpty: true }),
     employmentType,
@@ -316,7 +352,8 @@ module.exports = {
   EMPLOYMENT_TYPES: Object.freeze([...EMPLOYMENT_TYPES]),
   INSTRUCTIONAL_MODES: Object.freeze([...INSTRUCTIONAL_MODES])
   ,
-  COMPENSATION_METHODS: Object.freeze([...COMPENSATION_METHODS])
+  COMPENSATION_METHODS: Object.freeze([...COMPENSATION_METHODS]),
+  sanitizeTeachingQualifications
 };
 
 

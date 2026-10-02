@@ -81,7 +81,9 @@ test('staged save orchestration is wired for admin master schedule', () => {
   assert.match(orchestrator, /global\.location\.reload/);
   assert.match(modal, /btn_scheduleSaveDraftWorkApply/);
   assert.match(modal, /schedule-save-draft-work-modal/);
+  assert.match(draftWork, /buildStagedSessionsCalendarHtmlFromSessions/);
   assert.match(draftWork, /buildStagedSessionsCalendarHtml/);
+  assert.match(draftWork, /h targeted/);
   assert.match(draftWork, /draft-save-cal-grid/);
   assert.match(draftWork, /data-staged-session-ids/);
   assert.doesNotMatch(draftWork, /js-draft-save-session/);
@@ -119,6 +121,14 @@ test('summarizeSessionWindow returns first and last dates', () => {
   assert.equal(window.startDate, '2026-04-02');
   assert.equal(window.endDate, '2026-04-10');
   assert.equal(window.sessionCount, 3);
+});
+
+test('sumSelectedSessionDurationHours totals session durations from times', () => {
+  const total = scheduleEnrollStudentsService.sumSelectedSessionDurationHours([
+    { start: '09:00', end: '10:30' },
+    { start: '14:00', end: '15:00' }
+  ]);
+  assert.equal(total, 2.5);
 });
 
 test('prepareEnrollStudents rejects non-rolling class', async () => {
@@ -328,6 +338,38 @@ test('rollingEnrollmentGroupClient builds session_cap payload', () => {
   assert.equal(payload.students[0].studentId, 'STU/1');
 });
 
+test('rollingEnrollmentGroupClient builds master schedule hour_cap settings from selected sessions', () => {
+  const client = require('../public/scripts/rollingEnrollmentGroupClient.js');
+  assert.equal(client.sumSelectedSessionHours([
+    { start: '09:00', end: '10:00' },
+    { start: '11:00', end: '12:30' }
+  ]), 2.5);
+  const settings = client.buildMasterScheduleEnrollmentSettings({
+    startDate: '2026-04-01',
+    endDate: '2026-04-30',
+    sessionCapacityType: 'group',
+    sessions: [
+      { start: '09:00', end: '10:00' },
+      { start: '11:00', end: '12:00' }
+    ]
+  });
+  assert.equal(settings.targetSessionCount, '');
+  assert.equal(settings.targetHours, '2');
+  assert.equal(settings.minTargetHours, 2);
+  const payload = client.buildGroupEnginePayload('CLASS/1', 'STU/1', settings);
+  assert.equal(payload.enrollmentMode, 'hour_cap');
+  assert.equal(payload.targetHours, 2);
+  assert.equal(payload.targetSessionCount, undefined);
+  const raised = client.buildMasterScheduleEnrollmentSettings({
+    startDate: '2026-04-01',
+    endDate: '2026-04-30',
+    sessions: [{ start: '09:00', end: '10:00' }],
+    minTargetHours: 1,
+    targetHoursOverride: 3
+  });
+  assert.equal(raised.targetHours, '3');
+});
+
 test('draft enrollment manage UI is wired in viewer, staging, and modals', () => {
   const viewer = read('public/scripts/masterScheduleViewer.js');
   const staging = read('public/scripts/masterScheduleViewerStaging.js');
@@ -347,7 +389,15 @@ test('draft enrollment manage UI is wired in viewer, staging, and modals', () =>
   assert.match(staging, /prunePendingEnrollmentsForClass/);
   assert.match(enroll, /openPendingEnrollmentManageModal/);
   assert.match(enroll, /setPendingEnrollMetaForClass/);
-  assert.match(enroll, /storePendingEnrollmentDraft[\s\S]*refreshScheduleViewWithHolidays/);
+  assert.match(enroll, /showCapacityBlockModal/);
+  assert.match(enroll, /buildStagedSessionsCalendarHtmlFromSessions/);
+  assert.match(enroll, /draft-save-calendar-host/);
+  assert.match(enroll, /buildMasterScheduleEnrollmentSettings/);
+  assert.match(enroll, /js-schedule-enroll-target-hours/);
+  assert.match(enroll, /validateQueueRowTargetHours/);
+  assert.match(modals, /scheduleEnrollCapacityBlockBody/);
+  assert.match(modals, /scheduleEnrollQueueMinTargetHours/);
+  assert.match(modals, /Target hours/);
   assert.match(enroll, /status === 'draft'/);
   assert.match(enroll, /enrollLocked/);
   assert.match(calendar, /buildScheduleDraftEnrollmentBadge/);
