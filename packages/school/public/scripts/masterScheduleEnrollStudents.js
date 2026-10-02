@@ -51,12 +51,8 @@
         ? groupClient.normalizeTargetHoursValue(row?.targetHours)
         : minHours;
       const minAttr = minHours > 0 ? ` min="${minHours}"` : '';
-      const hint = minHours > 0
-        ? `<div class="form-text py-0">Min ${escapeHtml(formatHoursLabel(minHours))} from selected sessions</div>`
-        : '';
       return `<div class="js-schedule-enroll-target-hours-wrap">
         <input type="number" class="form-control form-control-sm js-schedule-enroll-target-hours"${minAttr} step="0.25" value="${value > 0 ? value : ''}">
-        ${hint}
       </div>`;
     }
 
@@ -421,6 +417,19 @@
       setText('SessionCount', String(m.sessionCount ?? '—'));
       setText('MinTargetHours', formatHoursLabel(m.minTargetHours));
       setText('Capacity', m.sessionCapacityType === 'one_on_one' ? '1 On 1' : 'Group');
+      const note = document.getElementById(`${prefix}TargetHoursNote`);
+      if (note) {
+        const minHours = typeof groupClient.normalizeTargetHoursValue === 'function'
+          ? groupClient.normalizeTargetHoursValue(m.minTargetHours)
+          : 0;
+        if (minHours > 0) {
+          note.textContent = `Min ${formatHoursLabel(minHours)} from selected sessions.`;
+          note.classList.remove('d-none');
+        } else {
+          note.textContent = '';
+          note.classList.add('d-none');
+        }
+      }
     }
 
     function pendingEntryToQueueRow(entry) {
@@ -560,6 +569,29 @@
       void hydrateQueueClaimSelects(tbodyId, rows);
     }
 
+    function syncQueueRowsFromDom(queue, tbodyId) {
+      (Array.isArray(queue) ? queue : []).forEach((row, index) => {
+        readQueueRowFromDom(index, queue, tbodyId);
+      });
+    }
+
+    function pendingEnrollmentIndexes(queue) {
+      return (Array.isArray(queue) ? queue : [])
+        .map((row, index) => ({ row, index }))
+        .filter(({ row }) => {
+          const status = clean(row?.enrollmentStatus);
+          return row && status !== 'completed' && status !== 'draft';
+        });
+    }
+
+    function syncEnrollAllButton() {
+      const button = document.getElementById('btn_scheduleEnrollAll');
+      if (!button) return;
+      const pending = pendingEnrollmentIndexes(flowState.queue);
+      button.disabled = flowState.enrollAllInFlight === true || pending.length < 1;
+      button.classList.toggle('d-none', (flowState.queue || []).length < 2);
+    }
+
     function renderQueueModal() {
       const prep = flowState.prepare || {};
       setEnrollmentSummaryHeader('scheduleEnrollQueue', enrollmentMetaFromPrepare(prep));
@@ -569,6 +601,7 @@
         meta: prep,
         mode: 'flow'
       });
+      syncEnrollAllButton();
       deps.showBootstrapModal?.(document.getElementById('scheduleEnrollQueueModal'));
     }
 
@@ -591,17 +624,24 @@
       deps.syncPartialModalFromTimelineDrafts?.();
     }
 
-    async function runEnrollmentForRow(index) {
+    async function runEnrollmentForRow(index, options = {}) {
+      const silent = options.silent === true;
+      const skipRender = options.skipRender === true;
+      if (!skipRender) {
+        syncQueueRowsFromDom(flowState.queue, 'scheduleEnrollQueueTbody');
+      }
       const row = readQueueRowFromDom(index, flowState.queue, 'scheduleEnrollQueueTbody');
       const status = clean(row?.enrollmentStatus);
-      if (!row || status === 'completed' || status === 'draft') return;
-      if (row._enrollmentInFlight === true) return;
+      if (!row || status === 'completed' || status === 'draft') return { ok: false, skipped: true };
+      if (row._enrollmentInFlight === true) return { ok: false, skipped: true };
       row._enrollmentInFlight = true;
       const targetValidation = validateQueueRowTargetHours(row);
       if (!targetValidation.ok) {
         row._enrollmentInFlight = false;
-        await deps.uiAlert?.(targetValidation.message, 'Enroll students', { icon: 'warning' });
-        return;
+        if (!silent) {
+          await deps.uiAlert?.(targetValidation.message, 'Enroll students', { icon: 'warning' });
+        }
+        return { ok: false, message: targetValidation.message };
       }
       const settings = groupClient.groupEnrollmentSettingsFromEntry?.(row) || row;
       settings.targetSessionCount = '';
@@ -610,9 +650,11 @@
         row.enrollmentStatus = 'draft';
         storePendingEnrollmentDraft(payload, row);
         row._enrollmentInFlight = false;
-        renderQueueModal();
-        await deps.uiAlert?.('Enrollment queued as draft. It will be saved when you save staged sessions.', 'Enroll students', { icon: 'info' });
-        return;
+        if (!skipRender) renderQueueModal();
+        if (!silent) {
+          await deps.uiAlert?.('Enrollment queued as draft. It will be saved when you save staged sessions.', 'Enroll students', { icon: 'info' });
+        }
+        return { ok: true, staged: true };
       }
       try {
         const res = await fetch(`/school/classes/api/${encodeURIComponent(flowState.prepare.classId)}/rolling-enrollment/execute`, {
@@ -628,13 +670,76 @@
         const data = await res.json().catch(() => ({}));
         if (!res.ok || data.status !== 'success') throw new Error(data.message || 'Enrollment failed.');
         row.enrollmentStatus = 'completed';
-        renderQueueModal();
-        await deps.uiAlert?.(data.message || 'Enrollment completed.', 'Enroll students', { icon: 'success' });
+        if (!skipRender) renderQueueModal();
+        if (!silent) {
+          await deps.uiAlert?.(data.message || 'Enrollment completed.', 'Enroll students', { icon: 'success' });
+        }
+        return { ok: true };
       } catch (error) {
-        await deps.uiAlert?.(error.message || 'Enrollment failed.', 'Enroll students', { icon: 'warning' });
+        if (!silent) {
+          await deps.uiAlert?.(error.message || 'Enrollment failed.', 'Enroll students', { icon: 'warning' });
+        }
+        return { ok: false, message: error.message || 'Enrollment failed.' };
       } finally {
         row._enrollmentInFlight = false;
       }
+    }
+
+    async function runEnrollmentForAll() {
+      if (flowState.enrollAllInFlight === true) return;
+      syncQueueRowsFromDom(flowState.queue, 'scheduleEnrollQueueTbody');
+      const pending = pendingEnrollmentIndexes(flowState.queue);
+      if (!pending.length) return;
+      for (const { row } of pending) {
+        const validation = validateQueueRowTargetHours(row);
+        if (!validation.ok) {
+          const label = clean(row.label) || clean(row.studentId) || 'A student';
+          await deps.uiAlert?.(`${label}: ${validation.message}`, 'Enroll students', { icon: 'warning' });
+          return;
+        }
+      }
+      flowState.enrollAllInFlight = true;
+      syncEnrollAllButton();
+      document.querySelectorAll('#scheduleEnrollQueueTbody .js-schedule-enroll-play').forEach((btn) => {
+        btn.disabled = true;
+      });
+      const failures = [];
+      let completed = 0;
+      let staged = false;
+      try {
+        for (const { row, index } of pending) {
+          const result = await runEnrollmentForRow(index, { silent: true, skipRender: true });
+          if (result?.ok) {
+            completed += 1;
+            if (result.staged) staged = true;
+          } else if (!result?.skipped) {
+            failures.push({
+              label: clean(row.label) || clean(row.studentId) || 'A student',
+              message: result?.message || 'Enrollment failed.'
+            });
+          }
+        }
+      } finally {
+        flowState.enrollAllInFlight = false;
+        renderQueueModal();
+      }
+      if (!failures.length) {
+        const noun = completed === 1 ? 'enrollment' : 'enrollments';
+        await deps.uiAlert?.(
+          staged
+            ? `${completed} ${noun} queued as draft. They will be saved when you save staged sessions.`
+            : `${completed} ${noun} completed.`,
+          'Enroll students',
+          { icon: staged ? 'info' : 'success' }
+        );
+        return;
+      }
+      const detail = failures.map((entry) => `${entry.label}: ${entry.message}`).join(' ');
+      await deps.uiAlert?.(
+        `${completed} enrolled. ${failures.length} failed. ${detail}`,
+        'Enroll students',
+        { icon: 'warning' }
+      );
     }
 
     function studentLabelFromPickerItem(item) {
@@ -841,6 +946,10 @@
         await deps.uiAlert?.(error.message || 'Unable to start Enroll Students.', 'Enroll students', { icon: 'warning' });
       }
     }
+
+    document.getElementById('btn_scheduleEnrollAll')?.addEventListener('click', () => {
+      void runEnrollmentForAll();
+    });
 
     document.getElementById('btn_scheduleEnrollProgramRegNext')?.addEventListener('click', () => {
       if (!allProgramRowsRegistered(flowState.students)) return;

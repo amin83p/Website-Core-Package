@@ -78,8 +78,19 @@
               </tr>
             </thead>
             <tbody id="scheduleEnrollQueueTbody"></tbody>
+            <tfoot>
+              <tr>
+                <td colspan="6" class="border-0"></td>
+                <td class="text-end border-0">
+                  <button type="button" class="btn btn-sm btn-success text-nowrap" id="btn_scheduleEnrollAll">
+                    <i class="bi bi-play-fill"></i> Enroll all
+                  </button>
+                </td>
+              </tr>
+            </tfoot>
           </table>
         </div>
+        <p class="small text-muted mb-0 mt-2 d-none" id="scheduleEnrollQueueTargetHoursNote"></p>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
@@ -121,6 +132,7 @@
             <tbody id="scheduleEnrollPendingManageTbody"></tbody>
           </table>
         </div>
+        <p class="small text-muted mb-0 mt-2 d-none" id="scheduleEnrollPendingManageTargetHoursNote"></p>
       </div>
       <div class="modal-footer d-flex flex-wrap justify-content-between gap-2">
         <button type="button" class="btn btn-outline-danger btn-sm" id="btn_scheduleEnrollPendingManageRemoveAll">Remove all for class</button>

@@ -308,6 +308,15 @@
             </div>
           </div>
         </div>
+        <div class="mb-3">
+          <div class="form-label mb-2">Weekdays</div>
+          <div class="d-flex flex-wrap gap-1" id="scheduleSessionBulkSelectWeekdays" role="group" aria-label="Weekdays">
+            <% ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach((label, idx) => { %>
+            <input type="checkbox" class="btn-check" id="scheduleSessionBulkSelectWeekday<%= idx %>" data-bulk-select-weekday="<%= idx %>" autocomplete="off" checked>
+            <label class="btn btn-outline-secondary btn-sm" for="scheduleSessionBulkSelectWeekday<%= idx %>"><%= label %></label>
+            <% }) %>
+          </div>
+        </div>
         <div class="row g-3">
           <div class="col-sm-6">
             <label class="form-label" for="scheduleSessionBulkSelectCount">Sessions</label>
@@ -318,7 +327,7 @@
             <input type="date" class="form-control form-control-sm" id="scheduleSessionBulkSelectStopDate" aria-label="Stop date for selection" disabled>
           </div>
         </div>
-        <p class="small text-muted mt-3 mb-0" id="scheduleSessionBulkSelectHelp">Use one option: enter a session count starting from the anchor session, or choose an end date to select every matching session through that date. Start times must fall within the anchor session&rsquo;s start&ndash;end time.</p>
+        <p class="small text-muted mt-3 mb-0" id="scheduleSessionBulkSelectHelp">Use one option: enter a session count starting from the anchor session, or choose an end date. Only sessions on the selected weekdays are included, until that count is met or that date is reached. Start times must fall within the anchor session&rsquo;s start&ndash;end time.</p>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>

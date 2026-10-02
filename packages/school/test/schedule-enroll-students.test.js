@@ -394,6 +394,11 @@ test('draft enrollment manage UI is wired in viewer, staging, and modals', () =>
   assert.match(enroll, /draft-save-calendar-host/);
   assert.match(enroll, /buildMasterScheduleEnrollmentSettings/);
   assert.match(enroll, /js-schedule-enroll-target-hours/);
+  assert.doesNotMatch(enroll, /form-text py-0">Min /);
+  assert.match(enroll, /TargetHoursNote/);
+  assert.match(modals, /scheduleEnrollQueueTargetHoursNote/);
+  assert.match(modals, /btn_scheduleEnrollAll/);
+  assert.match(enroll, /runEnrollmentForAll/);
   assert.match(enroll, /validateQueueRowTargetHours/);
   assert.match(modals, /scheduleEnrollCapacityBlockBody/);
   assert.match(modals, /scheduleEnrollQueueMinTargetHours/);

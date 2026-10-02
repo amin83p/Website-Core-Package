@@ -3072,6 +3072,40 @@
         return base.filter((ev) => isClassSessionScheduleEvent(ev));
     }
 
+    function bulkSelectIsoWeekday(dateStr) {
+        const date = normalizeBulkSelectIsoDate(dateStr);
+        if (!date) return null;
+        const dow = new Date(`${date}T12:00:00`).getDay();
+        return Number.isFinite(dow) ? dow : null;
+    }
+
+    function normalizeBulkSelectWeekdays(weekdays) {
+        if (!Array.isArray(weekdays)) return null;
+        const set = new Set();
+        weekdays.forEach((value) => {
+            const n = Number(value);
+            if (Number.isFinite(n) && n >= 0 && n <= 6) set.add(n);
+        });
+        return Array.from(set);
+    }
+
+    function readBulkSelectWeekdays() {
+        const selected = [];
+        document.querySelectorAll('[data-bulk-select-weekday]:checked').forEach((input) => {
+            const n = Number(input.getAttribute('data-bulk-select-weekday'));
+            if (Number.isFinite(n) && n >= 0 && n <= 6) selected.push(n);
+        });
+        return normalizeBulkSelectWeekdays(selected) || [];
+    }
+
+    function setBulkSelectWeekdayChecks(selectedWeekdays) {
+        const selected = new Set(normalizeBulkSelectWeekdays(selectedWeekdays) || [0, 1, 2, 3, 4, 5, 6]);
+        document.querySelectorAll('[data-bulk-select-weekday]').forEach((input) => {
+            const dow = Number(input.getAttribute('data-bulk-select-weekday'));
+            input.checked = selected.has(dow);
+        });
+    }
+
     function readBulkSelectModalSelectionMode() {
         const checked = document.querySelector('input[name="scheduleSessionBulkSelectMode"]:checked');
         return String(checked?.value || 'count').trim() === 'date' ? 'date' : 'count';
@@ -3105,10 +3139,13 @@
         const maxCount = selectionMode === 'count'
             ? Math.max(0, Math.floor(Number(options.maxCount) || 0))
             : 0;
+        const weekdayFilter = normalizeBulkSelectWeekdays(options.weekdays);
+        const weekdaySet = weekdayFilter ? new Set(weekdayFilter) : null;
         const person = activeSchedulePerson();
         if (!anchor || !person?.id) return [];
         if (selectionMode === 'date' && !stopDate) return [];
         if (selectionMode === 'count' && !maxCount) return [];
+        if (weekdayFilter && !weekdayFilter.length) return [];
         const anchorDate = normalizeBulkSelectIsoDate(anchor.date);
         const classId = String(anchor.classId || '').trim();
         const anchorStartMin = timeToMinutes(anchor.start);
@@ -3122,6 +3159,10 @@
                 if (!date) return false;
                 if (compareBulkSelectIsoDates(date, anchorDate) < 0) return false;
                 if (selectionMode === 'date' && compareBulkSelectIsoDates(date, stopDate) > 0) return false;
+                if (weekdaySet) {
+                    const dow = bulkSelectIsoWeekday(date);
+                    if (dow == null || !weekdaySet.has(dow)) return false;
+                }
                 const startMin = timeToMinutes(ev?.start);
                 return startMin >= anchorStartMin && startMin <= anchorEndMin;
             })
@@ -3141,7 +3182,8 @@
             mode: criteria.mode,
             selectionMode,
             stopDate: selectionMode === 'date' ? criteria.stopDate : '',
-            maxCount: selectionMode === 'count' ? criteria.maxCount : 0
+            maxCount: selectionMode === 'count' ? criteria.maxCount : 0,
+            weekdays: Array.isArray(criteria.weekdays) ? criteria.weekdays.slice() : undefined
         };
     }
 
@@ -3238,6 +3280,7 @@
         const anchorDate = normalizeBulkSelectIsoDate(anchorEvent.date);
         const defaultStop = defaultBulkSelectStopDate(anchorDate);
         if (modeCountRadio) modeCountRadio.checked = true;
+        setBulkSelectWeekdayChecks([0, 1, 2, 3, 4, 5, 6]);
         syncBulkSelectModalModeUi();
         if (stopInput) {
             stopInput.min = anchorDate || '';
@@ -3247,7 +3290,8 @@
             mode,
             selectionMode: 'date',
             stopDate: stopInput?.value || defaultStop,
-            maxCount: 0
+            maxCount: 0,
+            weekdays: readBulkSelectWeekdays()
         });
         const defaultCount = Math.min(10, Math.max(1, previewDateMatches.length || 1));
         if (countInput) countInput.value = String(defaultCount);
@@ -3271,9 +3315,14 @@
         const selectionMode = readBulkSelectModalSelectionMode();
         const stopDate = normalizeBulkSelectIsoDate(stopInput?.value);
         const maxCount = Math.floor(Number(countInput?.value) || 0);
+        const weekdays = readBulkSelectWeekdays();
         const anchorDate = normalizeBulkSelectIsoDate(anchor?.date);
-        const criteria = { mode, selectionMode, stopDate, maxCount };
+        const criteria = { mode, selectionMode, stopDate, maxCount, weekdays };
         if (!anchor) return;
+        if (!weekdays.length) {
+            await uiAlert('Select at least one weekday.', 'Select sessions', { icon: 'info' });
+            return;
+        }
         if (selectionMode === 'count' && maxCount < 1) {
             await uiAlert('Enter how many sessions to select (at least 1).', 'Select sessions', { icon: 'info' });
             return;
@@ -3303,7 +3352,7 @@
         if (provisional.reloaded) rangeReloaded = true;
         let matches = collectMatchingSessionsForBulkSelect(anchor, collectOpts);
         if (!matches.length) {
-            await uiAlert('No sessions match the time window and date range.', 'Select sessions', { icon: 'info' });
+            await uiAlert('No sessions match the selected weekdays, time window, and date range.', 'Select sessions', { icon: 'info' });
             return;
         }
         const extents = dateExtentsFromEvents(matches);
@@ -3318,7 +3367,7 @@
         if (rangeReloaded) {
             matches = collectMatchingSessionsForBulkSelect(anchor, collectOpts);
             if (!matches.length) {
-                await uiAlert('No sessions match the time window and date range.', 'Select sessions', { icon: 'info' });
+                await uiAlert('No sessions match the selected weekdays, time window, and date range.', 'Select sessions', { icon: 'info' });
                 return;
             }
         }

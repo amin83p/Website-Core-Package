@@ -11,21 +11,33 @@ function timeToMinutes(value) {
 }
 
 /** Mirrors collectMatchingSessionsForBulkSelect filtering (saved path). */
-function collectMatchingSessionsFixture(anchorEvent, events, { selectionMode = 'count', stopDate, maxCount }) {
+function isoWeekday(dateStr) {
+  const date = String(dateStr || '').trim();
+  if (!date) return null;
+  const dow = new Date(`${date}T12:00:00`).getDay();
+  return Number.isFinite(dow) ? dow : null;
+}
+
+function collectMatchingSessionsFixture(anchorEvent, events, { selectionMode = 'count', stopDate, maxCount, weekdays } = {}) {
   const anchorDate = String(anchorEvent.date || '').trim();
   const classId = String(anchorEvent.classId || '').trim();
   const anchorStartMin = timeToMinutes(anchorEvent.start);
   const anchorEndMin = timeToMinutes(anchorEvent.end);
   const mode = selectionMode === 'date' ? 'date' : 'count';
+  const weekdaySet = Array.isArray(weekdays)
+    ? new Set(weekdays.map((value) => Number(value)).filter((value) => Number.isFinite(value)))
+    : null;
   if (!anchorDate || !classId || anchorEndMin <= anchorStartMin) return [];
   if (mode === 'date' && !stopDate) return [];
   if (mode === 'count' && !(maxCount >= 1)) return [];
+  if (weekdaySet && !weekdaySet.size) return [];
   const candidates = events
     .filter((ev) => String(ev.classId || '').trim() === classId)
     .filter((ev) => {
       const date = String(ev.date || '').trim();
       if (!date || date < anchorDate) return false;
       if (mode === 'date' && date > stopDate) return false;
+      if (weekdaySet && !weekdaySet.has(isoWeekday(date))) return false;
       const startMin = timeToMinutes(ev.start);
       return startMin >= anchorStartMin && startMin <= anchorEndMin;
     })
@@ -65,6 +77,8 @@ test('person schedule includes bulk select modal and saved context Select action
   assert.match(view, /name="scheduleSessionBulkSelectMode"/);
   assert.match(view, /scheduleSessionBulkSelectModeCount/);
   assert.match(view, /scheduleSessionBulkSelectModeDate/);
+  assert.match(view, /data-bulk-select-weekday/);
+  assert.match(view, /scheduleSessionBulkSelectWeekdays/);
 });
 
 test('draft context menu includes bulk Select action', () => {
@@ -82,6 +96,8 @@ test('master schedule viewer wires bulk select helpers and staging dep', () => {
   assert.match(source, /btn_scheduleDraftContextSelect/);
   assert.match(source, /bindScheduleSessionBulkSelectModal/);
   assert.match(source, /readBulkSelectModalSelectionMode/);
+  assert.match(source, /readBulkSelectWeekdays/);
+  assert.match(source, /normalizeBulkSelectWeekdays/);
   assert.match(source, /selectionMode/);
 });
 
@@ -143,4 +159,28 @@ test('bulk select matching includes anchor first and honors maxCount', () => {
   });
   assert.equal(matches.length, 2);
   assert.deepEqual(matches.map((ev) => ev.sessionId), ['a', 'b']);
+});
+
+test('bulk select matching keeps only selected weekdays until count or stop date', () => {
+  const anchor = { date: '2026-06-01', start: '09:00', end: '10:00', classId: 'C1' };
+  const events = [
+    { date: '2026-06-01', start: '09:00', classId: 'C1', sessionId: 'mon-1' },
+    { date: '2026-06-02', start: '09:00', classId: 'C1', sessionId: 'tue' },
+    { date: '2026-06-03', start: '09:00', classId: 'C1', sessionId: 'wed-1' },
+    { date: '2026-06-08', start: '09:00', classId: 'C1', sessionId: 'mon-2' },
+    { date: '2026-06-10', start: '09:00', classId: 'C1', sessionId: 'wed-2' },
+    { date: '2026-06-15', start: '09:00', classId: 'C1', sessionId: 'mon-3' }
+  ];
+  const byCount = collectMatchingSessionsFixture(anchor, events, {
+    selectionMode: 'count',
+    maxCount: 3,
+    weekdays: [1, 3]
+  });
+  assert.deepEqual(byCount.map((ev) => ev.sessionId), ['mon-1', 'wed-1', 'mon-2']);
+  const byDate = collectMatchingSessionsFixture(anchor, events, {
+    selectionMode: 'date',
+    stopDate: '2026-06-10',
+    weekdays: [1]
+  });
+  assert.deepEqual(byDate.map((ev) => ev.sessionId), ['mon-1', 'mon-2']);
 });
