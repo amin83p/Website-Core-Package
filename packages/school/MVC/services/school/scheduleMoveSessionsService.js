@@ -115,6 +115,58 @@ function evaluateCapacityGate({
   return blockers;
 }
 
+function sessionBlockerMessage(code, count, targetCapacity) {
+  const these = count === 1 ? 'This session' : 'These sessions';
+  switch (code) {
+    case 'INVALID_DURATION':
+      return `${these} ${count === 1 ? 'does' : 'do'} not have a valid start and end time.`;
+    case 'END_TIME_OVERFLOW':
+      return `${these} would end after midnight with this start time.`;
+    case 'OUT_OF_CYCLE':
+      return `${these} ${count === 1 ? 'is' : 'are'} outside the target class cycle.`;
+    case 'TIME_MISMATCH':
+      return count === 1
+        ? 'The target class already has a session on this date in this time range, but the start time or length does not match. Resolve that session before continuing.'
+        : 'The target class already has sessions in this time range on these dates, but the start time or length does not match. Resolve those sessions before continuing.';
+    case 'OCCUPIED_ONE_ON_ONE':
+      return count === 1
+        ? 'The matching session already has an enrollment, and the target class capacity is 1. Resolve that enrollment before continuing.'
+        : 'The matching sessions already have an enrollment, and the target class capacity is 1. Resolve those enrollments before continuing.';
+    case 'CAPACITY_EXCEEDED':
+      return count === 1
+        ? `The matching session cannot hold the current enrollments plus the enrollments being moved (capacity ${targetCapacity}). Resolve that before continuing.`
+        : `The matching sessions cannot hold the current enrollments plus the enrollments being moved (capacity ${targetCapacity}). Resolve that before continuing.`;
+    default:
+      return count === 1
+        ? 'Resolve this session before continuing.'
+        : 'Resolve these sessions before continuing.';
+  }
+}
+
+function groupSessionBlockers(rows, targetCapacity) {
+  const grouped = [];
+  const byCode = new Map();
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    let group = byCode.get(row.code);
+    if (!group) {
+      group = { code: row.code, sessions: [] };
+      byCode.set(row.code, group);
+      grouped.push(group);
+    }
+    group.sessions.push({
+      sessionId: row.sessionId,
+      date: row.date,
+      startTime: row.startTime || '',
+      endTime: row.endTime || ''
+    });
+  });
+  return grouped.map((group) => ({
+    code: group.code,
+    message: sessionBlockerMessage(group.code, group.sessions.length, targetCapacity),
+    sessions: group.sessions
+  }));
+}
+
 function studentsCoveringDate(periods, date) {
   const ids = new Set();
   (Array.isArray(periods) ? periods : []).forEach((period) => {
@@ -138,6 +190,7 @@ function evaluateSessionConflicts({
   cycleEndDate = ''
 } = {}) {
   const blockers = [];
+  const sessionBlockers = [];
   const notices = [];
   const plans = [];
   const newStartMin = timeToMinutes(startTime);
@@ -157,35 +210,26 @@ function evaluateSessionConflicts({
     .sort((a, b) => a.date.localeCompare(b.date) || a.sessionId.localeCompare(b.sessionId));
 
   selected.forEach((row) => {
+    const sessionRef = {
+      date: row.date,
+      sessionId: row.sessionId,
+      startTime: sessionStart(row.session),
+      endTime: sessionEnd(row.session)
+    };
     if (!row.duration) {
-      blockers.push({
-        code: 'INVALID_DURATION',
-        message: `Session on ${row.date} does not have a valid start and end time.`,
-        date: row.date,
-        sessionId: row.sessionId
-      });
+      sessionBlockers.push({ code: 'INVALID_DURATION', ...sessionRef });
       return;
     }
     const proposedStart = newStartMin;
     const proposedEnd = newStartMin + row.duration;
     if (proposedEnd > (24 * 60)) {
-      blockers.push({
-        code: 'END_TIME_OVERFLOW',
-        message: `Session on ${row.date} would end after midnight with this start time.`,
-        date: row.date,
-        sessionId: row.sessionId
-      });
+      sessionBlockers.push({ code: 'END_TIME_OVERFLOW', ...sessionRef });
       return;
     }
     const cycleStart = normalizeDateOnly(cycleStartDate);
     const cycleEnd = normalizeDateOnly(cycleEndDate);
     if ((cycleStart && row.date < cycleStart) || (cycleEnd && row.date > cycleEnd)) {
-      blockers.push({
-        code: 'OUT_OF_CYCLE',
-        message: `Session on ${row.date} is outside the target class cycle.`,
-        date: row.date,
-        sessionId: row.sessionId
-      });
+      sessionBlockers.push({ code: 'OUT_OF_CYCLE', ...sessionRef });
       return;
     }
 
@@ -202,12 +246,7 @@ function evaluateSessionConflicts({
     });
     const mismatched = overlaps.filter((session) => session !== exact);
     if (mismatched.length) {
-      blockers.push({
-        code: 'TIME_MISMATCH',
-        message: `Target class already has a session on ${row.date} in this time range, but the start time or length does not match. Resolve that session before continuing.`,
-        date: row.date,
-        sessionId: row.sessionId
-      });
+      sessionBlockers.push({ code: 'TIME_MISMATCH', ...sessionRef });
       return;
     }
     if (exact) {
@@ -215,20 +254,18 @@ function evaluateSessionConflicts({
       const movingStudents = studentsCoveringDate(sourcePeriods, row.date);
       const combined = new Set([...targetStudents, ...movingStudents]);
       if (targetCapacity === 1 && targetStudents.size > 0) {
-        blockers.push({
+        sessionBlockers.push({
           code: 'OCCUPIED_ONE_ON_ONE',
-          message: `The matching session on ${row.date} already has an enrollment, and the target class capacity is 1. Resolve that enrollment before continuing.`,
-          date: row.date,
-          sessionId: sessionIdentity(exact)
+          ...sessionRef,
+          sessionId: sessionIdentity(exact) || row.sessionId
         });
         return;
       }
       if (targetCapacity > 1 && combined.size > targetCapacity) {
-        blockers.push({
+        sessionBlockers.push({
           code: 'CAPACITY_EXCEEDED',
-          message: `The matching session on ${row.date} cannot hold the current enrollments plus the enrollments being moved (capacity ${targetCapacity}). Resolve that before continuing.`,
-          date: row.date,
-          sessionId: sessionIdentity(exact)
+          ...sessionRef,
+          sessionId: sessionIdentity(exact) || row.sessionId
         });
         return;
       }
@@ -254,6 +291,8 @@ function evaluateSessionConflicts({
 
   const reuseCount = plans.filter((row) => row.action === 'reuse').length;
   const createCount = plans.filter((row) => row.action === 'create').length;
+  const groupedBlockers = groupSessionBlockers(sessionBlockers, targetCapacity);
+  blockers.push(...groupedBlockers);
   if (!blockers.length && reuseCount > 0 && createCount > 0) {
     notices.push({
       code: 'PARTIAL_CREATE',

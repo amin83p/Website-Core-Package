@@ -103,6 +103,28 @@ test('group capacity blocks when current enrollments plus moving enrollments exc
   assert.equal(result.blockers.some((row) => row.code === 'CAPACITY_EXCEEDED'), true);
 });
 
+test('session warnings with the same cause are one statement plus each session date', () => {
+  const result = moveService.evaluateSessionConflicts({
+    selectedSessions: [
+      { sessionId: 'SES_1', date: '2026-06-01', startTime: '09:00', endTime: '10:00' },
+      { sessionId: 'SES_2', date: '2026-06-08', startTime: '09:00', endTime: '10:00' }
+    ],
+    targetSessions: [],
+    startTime: '09:00',
+    targetCapacity: 8,
+    sourcePeriods: [],
+    targetPeriods: [],
+    cycleStartDate: '2026-07-01',
+    cycleEndDate: '2026-12-31'
+  });
+  assert.equal(result.blockers.length, 1);
+  assert.equal(result.blockers[0].code, 'OUT_OF_CYCLE');
+  assert.match(result.blockers[0].message, /These sessions are outside the target class cycle/);
+  assert.equal(result.blockers[0].message.includes('2026-06-01'), false);
+  assert.deepEqual(result.blockers[0].sessions.map((row) => row.date), ['2026-06-01', '2026-06-08']);
+  assert.equal(result.blockers[0].sessions[0].startTime, '09:00');
+});
+
 test('fewer exact matches than selected sessions only plans the missing sessions', () => {
   const result = moveService.evaluateSessionConflicts({
     selectedSessions: [

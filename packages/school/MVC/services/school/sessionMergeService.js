@@ -2,6 +2,7 @@
 
 const schoolDataService = require('./schoolDataService');
 const schoolIndexService = require('./schoolIndexService');
+const schoolDependencyService = require('./schoolDependencyService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const sessionConflictDetectionService = require('./sessionConflictDetectionService');
@@ -549,6 +550,437 @@ async function findPartnerSessionForMerge(params = {}) {
   return partner;
 }
 
+function partnerHasTakeoverLink(session = {}) {
+  const linkedClassId = toPublicId(session?.mergedPartner?.linkedClassId);
+  const linkedSessionId = toPublicId(session?.mergedPartner?.linkedSessionId);
+  return Boolean(linkedClassId && linkedSessionId);
+}
+
+function isApprovedTimesheetLocked(session = {}) {
+  return schoolDependencyService.isSessionTimesheetLocked(session)
+    && String(session?.lockReason || '') === 'timesheet_approved';
+}
+
+function partnerAssignmentKey(partner = {}) {
+  return `${toPublicId(partner.classId)}::${toPublicId(partner.sessionId)}`;
+}
+
+function sourceWarningRef(source = {}) {
+  return {
+    classId: toPublicId(source.classId),
+    sessionId: toPublicId(source.sessionId),
+    date: normalizeDateOnly(source.date),
+    startTime: normalizeClock(source.startTime),
+    endTime: normalizeClock(source.endTime)
+  };
+}
+
+function mergeBlockerMessage(code, count) {
+  const these = count === 1 ? 'This session' : 'These sessions';
+  switch (code) {
+    case 'ALREADY_MERGED':
+      return count === 1
+        ? 'This session has already been merged.'
+        : 'These sessions have already been merged.';
+    case 'TIMESHEET_LOCKED':
+      return `${these} ${count === 1 ? 'is' : 'are'} locked by an approved timesheet.`;
+    case 'SAME_TEACHER':
+      return count === 1
+        ? 'The selected teacher is already the main teacher for this session.'
+        : 'The selected teacher is already the main teacher for these sessions.';
+    case 'NO_PARTNER':
+      return count === 1
+        ? 'The selected teacher has no session that fully covers this session.'
+        : 'The selected teacher has no session that fully covers these sessions.';
+    case 'SHARED_PARTNER':
+      return 'These sessions only fit inside the same partner session. Each selected session needs its own covering session.';
+    default:
+      return count === 1
+        ? 'Resolve this session before continuing.'
+        : 'Resolve these sessions before continuing.';
+  }
+}
+
+function groupMergeBlockers(rows) {
+  const grouped = [];
+  const byCode = new Map();
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    let group = byCode.get(row.code);
+    if (!group) {
+      group = { code: row.code, sessions: [] };
+      byCode.set(row.code, group);
+      grouped.push(group);
+    }
+    group.sessions.push({
+      classId: row.classId,
+      sessionId: row.sessionId,
+      date: row.date,
+      startTime: row.startTime,
+      endTime: row.endTime
+    });
+  });
+  return grouped.map((group) => ({
+    code: group.code,
+    message: mergeBlockerMessage(group.code, group.sessions.length),
+    sessions: group.sessions
+  }));
+}
+
+function rankCoveringPartners(source = {}, partners = []) {
+  const sourceStart = normalizeClock(source.startTime);
+  const sourceEnd = normalizeClock(source.endTime);
+  return partners.slice().sort((a, b) => {
+    const aExact = normalizeClock(a.startTime) === sourceStart && normalizeClock(a.endTime) === sourceEnd ? 0 : 1;
+    const bExact = normalizeClock(b.startTime) === sourceStart && normalizeClock(b.endTime) === sourceEnd ? 0 : 1;
+    if (aExact !== bExact) return aExact - bExact;
+    const aLength = timeToMinutes(a.endTime) - timeToMinutes(a.startTime);
+    const bLength = timeToMinutes(b.endTime) - timeToMinutes(b.startTime);
+    if (aLength !== bLength) return aLength - bLength;
+    return partnerAssignmentKey(a).localeCompare(partnerAssignmentKey(b));
+  });
+}
+
+function assignUniqueCoveringPartners(eligible = []) {
+  if (!eligible.length) return [];
+  const order = eligible
+    .map((row, index) => ({ index, count: row.partners.length }))
+    .sort((a, b) => a.count - b.count || a.index - b.index);
+  const used = new Set();
+  const assignment = new Array(eligible.length);
+  function walk(position) {
+    if (position >= order.length) return true;
+    const sourceIndex = order[position].index;
+    const ranked = rankCoveringPartners(eligible[sourceIndex].warning, eligible[sourceIndex].partners);
+    for (const partner of ranked) {
+      const key = partnerAssignmentKey(partner);
+      if (!key || used.has(key)) continue;
+      used.add(key);
+      assignment[sourceIndex] = partner;
+      if (walk(position + 1)) return true;
+      used.delete(key);
+      assignment[sourceIndex] = null;
+    }
+    return false;
+  }
+  return walk(0) ? assignment : null;
+}
+
+function connectedEligibleGroups(eligible = []) {
+  const parent = eligible.map((_, index) => index);
+  function find(index) {
+    let cursor = index;
+    while (parent[cursor] !== cursor) {
+      parent[cursor] = parent[parent[cursor]];
+      cursor = parent[cursor];
+    }
+    return cursor;
+  }
+  function union(left, right) {
+    const leftRoot = find(left);
+    const rightRoot = find(right);
+    if (leftRoot !== rightRoot) parent[leftRoot] = rightRoot;
+  }
+  const firstSourceByPartner = new Map();
+  eligible.forEach((row, index) => {
+    row.partners.forEach((partner) => {
+      const key = partnerAssignmentKey(partner);
+      if (!key) return;
+      if (firstSourceByPartner.has(key)) union(firstSourceByPartner.get(key), index);
+      else firstSourceByPartner.set(key, index);
+    });
+  });
+  const groups = new Map();
+  eligible.forEach((row, index) => {
+    const root = find(index);
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root).push(row);
+  });
+  return [...groups.values()];
+}
+
+function planSessionMergeAssignments({
+  sources = [],
+  mergingTeacherId = ''
+} = {}) {
+  const mergingId = cleanPersonId(mergingTeacherId);
+  const blocked = [];
+  const eligible = [];
+  (Array.isArray(sources) ? sources : []).forEach((source) => {
+    const warning = sourceWarningRef(source);
+    if (source?.alreadyMerged) {
+      blocked.push({ code: 'ALREADY_MERGED', ...warning });
+      return;
+    }
+    if (source?.timesheetLocked) {
+      blocked.push({ code: 'TIMESHEET_LOCKED', ...warning });
+      return;
+    }
+    if (mergingId && idsEqual(source?.mainTeacherId, mergingId)) {
+      blocked.push({ code: 'SAME_TEACHER', ...warning });
+      return;
+    }
+    const partners = Array.isArray(source?.partners) ? source.partners : [];
+    if (!partners.length) {
+      blocked.push({ code: 'NO_PARTNER', ...warning });
+      return;
+    }
+    eligible.push({ warning, partners });
+  });
+
+  let matches = [];
+  if (!blocked.length && eligible.length) {
+    const assignment = assignUniqueCoveringPartners(eligible);
+    if (assignment) {
+      matches = eligible.map((row, index) => ({
+        ...row.warning,
+        sourceClassId: row.warning.classId,
+        sourceSessionId: row.warning.sessionId,
+        partner: assignment[index]
+      }));
+    } else {
+      connectedEligibleGroups(eligible).forEach((group) => {
+        if (assignUniqueCoveringPartners(group)) return;
+        group.forEach((row) => blocked.push({ code: 'SHARED_PARTNER', ...row.warning }));
+      });
+    }
+  }
+
+  const blockers = groupMergeBlockers(blocked);
+  const sourceCount = Array.isArray(sources) ? sources.length : 0;
+  return {
+    canContinue: blockers.length === 0 && matches.length === sourceCount && sourceCount > 0,
+    blockers,
+    matches
+  };
+}
+
+async function rememberClassSessions(classId, reqUser, sessionCache) {
+  const token = toPublicId(classId);
+  if (!token || sessionCache.has(token)) return;
+  const sessions = await schoolDataService.getClassSessions(token, reqUser).catch(() => []);
+  sessionCache.set(token, Array.isArray(sessions) ? sessions : []);
+}
+
+async function listCoveringPartnersForSource({
+  sourceClassId = '',
+  sourceSession = {},
+  resolvedMergingId = '',
+  teacherIdentityLookup = null,
+  statusMap = null,
+  indexRoot = {},
+  candidateClassIds = [],
+  reqUser = null,
+  sessionCache = new Map(),
+  classTitleCache = new Map()
+} = {}) {
+  const sourceSessionId = toPublicId(sourceSession?.sessionId || sourceSession?.id);
+  const sourceDate = normalizeDateOnly(sourceSession?.date);
+  const sourceStart = normalizeClock(sourceSession?.startTime);
+  const sourceEnd = normalizeClock(sourceSession?.endTime);
+  if (!sourceSessionId || !sourceDate || !sourceStart || !sourceEnd || !resolvedMergingId) return [];
+
+  const found = new Map();
+  async function consider(classId, session) {
+    if (!session || partnerHasTakeoverLink(session)) return;
+    const match = evaluatePartnerSessionCandidate({
+      classId,
+      session,
+      sourceClassId,
+      sourceSessionId,
+      sourceStart,
+      sourceEnd,
+      resolvedMergingId,
+      teacherIdentityLookup,
+      statusMap
+    });
+    if (!match) return;
+    const key = partnerAssignmentKey({ classId, sessionId: match.sessionId });
+    if (!key || found.has(key)) return;
+    const classTitle = await loadClassTitle(classId, reqUser, classTitleCache);
+    found.set(key, buildPartnerReference({
+      classId,
+      session,
+      classTitle,
+      statusMap
+    }));
+  }
+
+  const indexKeys = resolveTeacherIndexKeys(indexRoot, resolvedMergingId, teacherIdentityLookup);
+  const dayRows = [];
+  indexKeys.forEach((personKey) => {
+    const personIndex = indexRoot[personKey] && typeof indexRoot[personKey] === 'object'
+      ? indexRoot[personKey]
+      : {};
+    const rows = Array.isArray(personIndex[sourceDate]) ? personIndex[sourceDate] : [];
+    rows.forEach((row) => dayRows.push(row));
+  });
+  for (const indexRow of dayRows) {
+    const classId = toPublicId(indexRow?.classId);
+    const sessionId = toPublicId(indexRow?.sessionId);
+    if (!classId || !sessionId) continue;
+    await rememberClassSessions(classId, reqUser, sessionCache);
+    const session = (sessionCache.get(classId) || []).find((row) => idsEqual(row?.sessionId || row?.id, sessionId));
+    await consider(classId, session);
+  }
+
+  for (const classId of candidateClassIds) {
+    await rememberClassSessions(classId, reqUser, sessionCache);
+    const sessionsOnDate = (sessionCache.get(toPublicId(classId)) || []).filter((row) => normalizeDateOnly(row?.date) === sourceDate);
+    for (const session of sessionsOnDate) {
+      await consider(classId, session);
+    }
+  }
+  return [...found.values()];
+}
+
+async function previewSessionMergeBatch({
+  orgId = '',
+  mergingTeacherId = '',
+  sourceRows = [],
+  reqUser = null
+} = {}) {
+  const mergingId = cleanPersonId(mergingTeacherId);
+  if (!mergingId) {
+    throw new SessionMergeError('Choose a teacher.', {
+      code: 'MERGE_TEACHER_REQUIRED',
+      statusCode: 400
+    });
+  }
+  const rows = Array.isArray(sourceRows) ? sourceRows : [];
+  if (!rows.length) {
+    throw new SessionMergeError('Select at least one saved session.', {
+      code: 'MERGE_SOURCE_INVALID',
+      statusCode: 400
+    });
+  }
+
+  const teacherIdentityLookup = await sessionConflictDetectionService.buildTeacherIdentityLookup({ activeOrgId: orgId, reqUser });
+  const resolvedMergingId = sessionConflictDetectionService.resolveTeacherPersonId(mergingId, teacherIdentityLookup) || mergingId;
+  const teacherIndex = await schoolDataService.getTeacherIndex();
+  const indexRoot = teacherIndex && typeof teacherIndex === 'object' && !Array.isArray(teacherIndex)
+    ? teacherIndex
+    : {};
+  const statusMap = await sessionStatusPolicyService.getStatusMap(orgId, { includeInactive: true });
+  const sessionCache = new Map();
+  const classTitleCache = new Map();
+  const candidateInfo = await collectCandidateClassIdsForTeacher({
+    orgId,
+    personId: resolvedMergingId,
+    reqUser,
+    teacherIdentityLookup,
+    teacherIndex: indexRoot
+  });
+
+  const sources = [];
+  for (const row of rows) {
+    const session = row?.session || {};
+    const classId = toPublicId(row?.classId);
+    const mainTeacherId = sessionDeliveryTeamService.getSessionMainTeacherId(session);
+    const resolvedMain = sessionConflictDetectionService.resolveTeacherPersonId(mainTeacherId, teacherIdentityLookup) || mainTeacherId;
+    const partners = await listCoveringPartnersForSource({
+      sourceClassId: classId,
+      sourceSession: session,
+      resolvedMergingId,
+      teacherIdentityLookup,
+      statusMap,
+      indexRoot,
+      candidateClassIds: candidateInfo.classIds,
+      reqUser,
+      sessionCache,
+      classTitleCache
+    });
+    sources.push({
+      classId,
+      sessionId: toPublicId(session.sessionId || session.id),
+      date: session.date,
+      startTime: session.startTime,
+      endTime: session.endTime,
+      mainTeacherId: resolvedMain,
+      alreadyMerged: isMergedSessionRow(session),
+      timesheetLocked: isApprovedTimesheetLocked(session),
+      partners
+    });
+  }
+
+  const plan = planSessionMergeAssignments({ sources, mergingTeacherId: resolvedMergingId });
+  const mergingTeacherName = await resolvePersonDisplayName(resolvedMergingId, reqUser);
+  return {
+    ...plan,
+    mergingTeacherId: resolvedMergingId,
+    mergingTeacherName: mergingTeacherName || resolvedMergingId
+  };
+}
+
+function writeSessionMergeLink({
+  sourceSession,
+  partnerSession,
+  sourceClassId,
+  sourceSessionId,
+  partnerClassId,
+  partnerSessionId,
+  resolvedMergingId,
+  mergingTeacherName,
+  resolvedPreviousId,
+  previousTeacherName,
+  mergedCode,
+  now,
+  actorId,
+  actorPersonId
+} = {}) {
+  const existingCoTeachers = sessionDeliveryTeamService.getSessionCoTeachers(sourceSession)
+    .filter((row) => !idsEqual(row.personId, resolvedMergingId) && !idsEqual(row.personId, resolvedPreviousId));
+  const coTeachersWithPrevious = [
+    ...existingCoTeachers,
+    {
+      personId: resolvedPreviousId,
+      name: previousTeacherName || resolvedPreviousId,
+      roleLabel: 'Previous Teacher',
+      paid: false,
+      paidHours: 0,
+      canEdit: false
+    }
+  ];
+
+  sourceSession.status = mergedCode;
+  sourceSession.delivery = sessionDeliveryTeamService.applyCoTeachersToDelivery(
+    {
+      ...(sourceSession.delivery || {}),
+      deliveredBy: resolvedMergingId,
+      deliveredByName: mergingTeacherName || resolvedMergingId
+    },
+    coTeachersWithPrevious,
+    { mainTeacherId: resolvedMergingId }
+  );
+  sourceSession.merged = {
+    isMergedSession: true,
+    partnerClassId: toPublicId(partnerClassId),
+    partnerSessionId: toPublicId(partnerSessionId),
+    mergingTeacherId: resolvedMergingId,
+    previousTeacherId: resolvedPreviousId,
+    mergedAt: now,
+    mergedBy: actorId,
+    mergedByPersonId: actorPersonId
+  };
+  sourceSession.audit = {
+    ...(sourceSession.audit || {}),
+    lastUpdateUser: actorId,
+    lastUpdateDateTime: now
+  };
+
+  partnerSession.mergedPartner = {
+    linkedClassId: toPublicId(sourceClassId),
+    linkedSessionId: toPublicId(sourceSessionId),
+    ignoreScheduleConflict: true,
+    linkedAt: now,
+    linkedBy: actorId
+  };
+  partnerSession.audit = {
+    ...(partnerSession.audit || {}),
+    lastUpdateUser: actorId,
+    lastUpdateDateTime: now
+  };
+}
+
 async function executeSessionMerge({
   sourceClassId = '',
   sourceSessionId = '',
@@ -648,58 +1080,22 @@ async function executeSessionMerge({
   const actorId = toPublicId(reqUser?.id || reqUser?.username || '');
   const actorPersonId = toPublicId(reqUser?.personId || reqUser?.id || '');
 
-  const existingCoTeachers = sessionDeliveryTeamService.getSessionCoTeachers(sourceSession)
-    .filter((row) => !idsEqual(row.personId, resolvedMergingId) && !idsEqual(row.personId, resolvedPreviousId));
-  const coTeachersWithPrevious = [
-    ...existingCoTeachers,
-    {
-      personId: resolvedPreviousId,
-      name: previousTeacherName || resolvedPreviousId,
-      roleLabel: 'Previous Teacher',
-      paid: false,
-      paidHours: 0,
-      canEdit: false
-    }
-  ];
-
-  sourceSession.status = mergedCode;
-  sourceSession.delivery = sessionDeliveryTeamService.applyCoTeachersToDelivery(
-    {
-      ...(sourceSession.delivery || {}),
-      deliveredBy: resolvedMergingId,
-      deliveredByName: mergingTeacherName || resolvedMergingId
-    },
-    coTeachersWithPrevious,
-    { mainTeacherId: resolvedMergingId }
-  );
-  sourceSession.merged = {
-    isMergedSession: true,
+  writeSessionMergeLink({
+    sourceSession,
+    partnerSession,
+    sourceClassId: sourceClassToken,
+    sourceSessionId: sourceSessionToken,
     partnerClassId: partnerClassToken,
     partnerSessionId: partnerSessionToken,
-    mergingTeacherId: resolvedMergingId,
-    previousTeacherId: resolvedPreviousId,
-    mergedAt: now,
-    mergedBy: actorId,
-    mergedByPersonId: actorPersonId
-  };
-  sourceSession.audit = {
-    ...(sourceSession.audit || {}),
-    lastUpdateUser: actorId,
-    lastUpdateDateTime: now
-  };
-
-  partnerSession.mergedPartner = {
-    linkedClassId: sourceClassToken,
-    linkedSessionId: sourceSessionToken,
-    ignoreScheduleConflict: true,
-    linkedAt: now,
-    linkedBy: actorId
-  };
-  partnerSession.audit = {
-    ...(partnerSession.audit || {}),
-    lastUpdateUser: actorId,
-    lastUpdateDateTime: now
-  };
+    resolvedMergingId,
+    mergingTeacherName,
+    resolvedPreviousId,
+    previousTeacherName,
+    mergedCode,
+    now,
+    actorId,
+    actorPersonId
+  });
 
   sourceSessions[sourceIndex] = sourceSession;
   partnerSessions[partnerIndex] = partnerSession;
@@ -725,6 +1121,170 @@ async function executeSessionMerge({
     mergingTeacherName: mergingTeacherName || resolvedMergingId,
     previousTeacherId: resolvedPreviousId,
     previousTeacherName: previousTeacherName || resolvedPreviousId
+  };
+}
+
+async function executeSessionMergeBatch({
+  orgId = '',
+  mergingTeacherId = '',
+  matches = [],
+  mergedStatusCode = 'merged_session',
+  reqUser = null
+} = {}) {
+  const mergingId = cleanPersonId(mergingTeacherId);
+  const planned = Array.isArray(matches) ? matches : [];
+  const mergedCode = sessionStatusPolicyService.normalizeStatusCode(mergedStatusCode) || 'merged_session';
+  if (!mergingId || !planned.length) {
+    throw new SessionMergeError('Source sessions and a merging teacher are required.', {
+      code: 'MERGE_PAYLOAD_INVALID',
+      statusCode: 400
+    });
+  }
+
+  const statusMap = await sessionStatusPolicyService.getStatusMap(orgId, { includeInactive: true });
+  if (!statusMap.has(mergedCode)) {
+    throw new SessionMergeError('Invalid merged session status.', { code: 'MERGE_STATUS_INVALID', statusCode: 400 });
+  }
+
+  const teacherIdentityLookup = await sessionConflictDetectionService.buildTeacherIdentityLookup({ activeOrgId: orgId, reqUser });
+  const resolvedMergingId = sessionConflictDetectionService.resolveTeacherPersonId(mergingId, teacherIdentityLookup) || mergingId;
+  const mergingTeacherName = await resolvePersonDisplayName(resolvedMergingId, reqUser);
+  const classIds = new Set();
+  planned.forEach((match) => {
+    const sourceClassId = toPublicId(match?.sourceClassId);
+    const partnerClassId = toPublicId(match?.partner?.classId || match?.partnerClassId);
+    if (sourceClassId) classIds.add(sourceClassId);
+    if (partnerClassId) classIds.add(partnerClassId);
+  });
+
+  const sessionsByClass = new Map();
+  for (const classId of classIds) {
+    const sessions = await schoolDataService.getClassSessions(classId, reqUser);
+    sessionsByClass.set(classId, Array.isArray(sessions) ? sessions : []);
+  }
+
+  const now = new Date().toISOString();
+  const actorId = toPublicId(reqUser?.id || reqUser?.username || '');
+  const actorPersonId = toPublicId(reqUser?.personId || reqUser?.id || '');
+  const nameCache = new Map();
+  async function personName(personId) {
+    const token = cleanPersonId(personId);
+    if (!token) return '';
+    if (nameCache.has(token)) return nameCache.get(token);
+    const name = await resolvePersonDisplayName(token, reqUser);
+    nameCache.set(token, name);
+    return name;
+  }
+
+  const prepared = [];
+  const usedPartners = new Set();
+  for (const match of planned) {
+    const sourceClassId = toPublicId(match?.sourceClassId);
+    const sourceSessionId = toPublicId(match?.sourceSessionId);
+    const partnerClassId = toPublicId(match?.partner?.classId || match?.partnerClassId);
+    const partnerSessionId = toPublicId(match?.partner?.sessionId || match?.partnerSessionId);
+    const partnerKey = partnerAssignmentKey({ classId: partnerClassId, sessionId: partnerSessionId });
+    if (!sourceClassId || !sourceSessionId || !partnerClassId || !partnerSessionId) {
+      throw new SessionMergeError('Source session, partner session, and merging teacher are required.', {
+        code: 'MERGE_PAYLOAD_INVALID',
+        statusCode: 400
+      });
+    }
+    if (usedPartners.has(partnerKey)) {
+      throw new SessionMergeError('Each selected session needs its own covering session.', {
+        code: 'SHARED_PARTNER',
+        statusCode: 409
+      });
+    }
+    usedPartners.add(partnerKey);
+
+    const sourceSession = (sessionsByClass.get(sourceClassId) || [])
+      .find((row) => idsEqual(row?.sessionId || row?.id, sourceSessionId));
+    if (!sourceSession) {
+      throw new SessionMergeError('Source session not found.', { code: 'MERGE_SOURCE_NOT_FOUND', statusCode: 404 });
+    }
+    if (isMergedSessionRow(sourceSession)) {
+      throw new SessionMergeError('This session has already been merged.', { code: 'MERGE_ALREADY_COMPLETED', statusCode: 409 });
+    }
+    if (isApprovedTimesheetLocked(sourceSession)) {
+      throw new SessionMergeError('This session is locked by an approved timesheet.', { code: 'TIMESHEET_LOCKED', statusCode: 409 });
+    }
+
+    const partnerSession = (sessionsByClass.get(partnerClassId) || [])
+      .find((row) => idsEqual(row?.sessionId || row?.id, partnerSessionId));
+    if (!partnerSession) {
+      throw new SessionMergeError('Partner session not found.', { code: 'MERGE_PARTNER_NOT_FOUND', statusCode: 404 });
+    }
+    if (partnerHasTakeoverLink(partnerSession)) {
+      throw new SessionMergeError('That partner session already has a takeover.', { code: 'MERGE_PARTNER_MISMATCH', statusCode: 409 });
+    }
+
+    const cover = evaluatePartnerSessionCandidate({
+      classId: partnerClassId,
+      session: partnerSession,
+      sourceClassId,
+      sourceSessionId,
+      sourceStart: normalizeClock(sourceSession.startTime),
+      sourceEnd: normalizeClock(sourceSession.endTime),
+      resolvedMergingId,
+      teacherIdentityLookup,
+      statusMap
+    });
+    if (!cover) {
+      throw new SessionMergeError('Partner session does not match the teacher\'s schedule at this time.', {
+        code: 'MERGE_PARTNER_MISMATCH',
+        statusCode: 409
+      });
+    }
+
+    const previousTeacherId = sessionDeliveryTeamService.getSessionMainTeacherId(sourceSession);
+    const resolvedPreviousId = sessionConflictDetectionService.resolveTeacherPersonId(previousTeacherId, teacherIdentityLookup) || previousTeacherId;
+    if (idsEqual(resolvedPreviousId, resolvedMergingId)) {
+      throw new SessionMergeError('The selected teacher is already the main teacher for this session.', {
+        code: 'MERGE_SAME_TEACHER',
+        statusCode: 409
+      });
+    }
+    prepared.push({
+      sourceSession,
+      partnerSession,
+      sourceClassId,
+      sourceSessionId,
+      partnerClassId,
+      partnerSessionId,
+      resolvedPreviousId,
+      previousTeacherName: await personName(resolvedPreviousId)
+    });
+  }
+
+  prepared.forEach((row) => {
+    writeSessionMergeLink({
+      sourceSession: row.sourceSession,
+      partnerSession: row.partnerSession,
+      sourceClassId: row.sourceClassId,
+      sourceSessionId: row.sourceSessionId,
+      partnerClassId: row.partnerClassId,
+      partnerSessionId: row.partnerSessionId,
+      resolvedMergingId,
+      mergingTeacherName,
+      resolvedPreviousId: row.resolvedPreviousId,
+      previousTeacherName: row.previousTeacherName,
+      mergedCode,
+      now,
+      actorId,
+      actorPersonId
+    });
+  });
+
+  for (const [classId, sessions] of sessionsByClass) {
+    await schoolDataService.saveClassSessions(classId, sessions, reqUser);
+    await schoolIndexService.rebuildIndexesForClass(classId);
+  }
+
+  return {
+    mergedCount: prepared.length,
+    mergingTeacherId: resolvedMergingId,
+    mergingTeacherName: mergingTeacherName || resolvedMergingId
   };
 }
 
@@ -903,8 +1463,13 @@ module.exports = {
   scanPartnerSessionsForMerge,
   explainPartnerSessionMergeFailure,
   findPartnerSessionForMerge,
+  partnerHasTakeoverLink,
+  planSessionMergeAssignments,
+  previewSessionMergeBatch,
   executeSessionMerge,
+  executeSessionMergeBatch,
   executeSessionUnmerge,
+  writeSessionMergeLink,
   isMergeAddedPreviousTeacherCoTeacher,
   removeMergeAddedCoTeachers,
   buildPartnerReference,

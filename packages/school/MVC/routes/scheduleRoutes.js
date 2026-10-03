@@ -130,6 +130,26 @@ router.post('/api/move-sessions/apply',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE),
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE, { requireToken: true, keepActive: true }),
   ctrl.postMoveSessionsApply);
+router.post('/api/merge-sessions/preview',
+  requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, {
+    requireToken: false,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  ctrl.postMergeSessionsPreview);
+router.post('/api/merge-sessions/apply',
+  requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, {
+    requireToken: false,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  ctrl.postMergeSessionsApply);
 
 router.get('/api/session-management-policy',
   requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),

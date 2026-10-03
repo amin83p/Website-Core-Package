@@ -3958,6 +3958,11 @@
         moveSessionsRailHandler = typeof handler === 'function' ? handler : null;
     }
 
+    let mergeSessionsRailHandler = null;
+    function bindMergeSessionsRail(handler) {
+        mergeSessionsRailHandler = typeof handler === 'function' ? handler : null;
+    }
+
     let claimNumbersRailHandler = null;
     function bindClaimNumbersRail(handler) {
         claimNumbersRailHandler = typeof handler === 'function' ? handler : null;
@@ -5135,6 +5140,9 @@
             }
             if (action === 'move-enrollments' && typeof moveSessionsRailHandler === 'function') {
                 void moveSessionsRailHandler();
+            }
+            if (action === 'merge-sessions' && typeof mergeSessionsRailHandler === 'function') {
+                void mergeSessionsRailHandler();
             }
             if (action === 'claim-numbers' && typeof claimNumbersRailHandler === 'function') {
                 void claimNumbersRailHandler();
@@ -7478,6 +7486,19 @@ if (canLoadAllSchedules) {
             showBootstrapModal: showScheduleBootstrapModal,
             hideBootstrapModal: hideScheduleBootstrapModal,
             bindMoveSessionsRail,
+            countActiveScheduleSelectedSessions,
+            countActiveDraftSelectedSessions,
+            getSelectedSavedClassSessionEvents,
+            refreshScheduleViewWithHolidays
+        });
+    }
+    if (canSelectAnyPerson && typeof global.installMasterScheduleMergeSessions === 'function') {
+        global.installMasterScheduleMergeSessions({
+            uiAlert,
+            escapeHtml,
+            showBootstrapModal: showScheduleBootstrapModal,
+            hideBootstrapModal: hideScheduleBootstrapModal,
+            bindMergeSessionsRail,
             countActiveScheduleSelectedSessions,
             countActiveDraftSelectedSessions,
             getSelectedSavedClassSessionEvents,

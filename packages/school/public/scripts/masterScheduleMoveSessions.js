@@ -40,6 +40,27 @@
       return data;
     }
 
+    function formatSessionDate(value) {
+      const match = clean(value).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      if (!match) return clean(value);
+      const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+      return date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    }
+
+    function formatSessionListItem(session) {
+      const date = formatSessionDate(session?.date);
+      const start = clean(session?.startTime).slice(0, 5);
+      const end = clean(session?.endTime).slice(0, 5);
+      if (date && start && end) return `${date} · ${start}–${end}`;
+      if (date && start) return `${date} · ${start}`;
+      return date || clean(session?.sessionId);
+    }
+
     function setAlert(id, rows, kind) {
       const el = document.getElementById(id);
       if (!el) return;
@@ -51,7 +72,14 @@
       }
       el.classList.remove('d-none', 'alert-warning', 'alert-info', 'alert-danger');
       el.classList.add(kind === 'info' ? 'alert-info' : 'alert-warning');
-      el.innerHTML = list.map((row) => `<div>${escapeHtml(row.message || row)}</div>`).join('');
+      el.innerHTML = list.map((row, index) => {
+        const message = escapeHtml(typeof row === 'string' ? row : (row.message || ''));
+        const sessions = Array.isArray(row?.sessions) ? row.sessions : [];
+        const gap = index < list.length - 1 ? ' class="mb-2"' : '';
+        if (!sessions.length) return `<div${gap}>${message}</div>`;
+        const items = sessions.map((session) => `<li>${escapeHtml(formatSessionListItem(session))}</li>`).join('');
+        return `<div${gap}>${message}<ul class="mb-0 mt-1 ps-3">${items}</ul></div>`;
+      }).join('');
     }
 
     function showStep(step) {

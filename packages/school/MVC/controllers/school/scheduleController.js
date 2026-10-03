@@ -23,6 +23,7 @@ const scheduleSessionContextService = require('../../services/school/scheduleSes
 const scheduleViewerPreferencesService = require('../../services/school/scheduleViewerPreferencesService');
 const scheduleEnrollStudentsService = require('../../services/school/scheduleEnrollStudentsService');
 const scheduleMoveSessionsService = require('../../services/school/scheduleMoveSessionsService');
+const scheduleMergeSessionsService = require('../../services/school/scheduleMergeSessionsService');
 const scheduleStagedCommitService = require('../../services/school/scheduleStagedCommitService');
 const { buildMasterScheduleViewerClientConfig } = require('../../services/school/masterScheduleViewerClientConfig');
 const holidayController = require('./holidayController');
@@ -2771,6 +2772,52 @@ async function postMoveSessionsApply(req, res) {
     }
 }
 
+async function postMergeSessionsPreview(req, res) {
+    try {
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        const sessions = scheduleMergeSessionsService.parseSelectedSessions(req.body || {});
+        const preview = await scheduleMergeSessionsService.buildMergePreview({
+            mergingTeacherId: req.body?.teacherId || req.body?.mergingTeacherId,
+            sessions,
+            reqUser: req.user,
+            accessContext
+        });
+        return res.json({ status: 'success', data: preview });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            code: error?.code || '',
+            message: error.message || 'Unable to preview the session merge.'
+        });
+    }
+}
+
+async function postMergeSessionsApply(req, res) {
+    try {
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        const sessions = scheduleMergeSessionsService.parseSelectedSessions(req.body || {});
+        const result = await scheduleMergeSessionsService.applyMergeSessions({
+            mergingTeacherId: req.body?.teacherId || req.body?.mergingTeacherId,
+            sessions,
+            previewHash: req.body?.previewHash,
+            reqUser: req.user,
+            accessContext
+        });
+        return res.json({
+            status: 'success',
+            message: 'Sessions were merged.',
+            data: result
+        });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            code: error?.code || '',
+            message: error.message || 'Unable to merge sessions.',
+            blockers: error.preview?.blockers || []
+        });
+    }
+}
+
 async function postEnrollStudentsPrepare(req, res) {
     try {
         const accessContext = schoolDataService.buildRouteAccessContext(req);
@@ -3068,6 +3115,8 @@ module.exports = {
     postEnrollStudentsPrepare,
     postMoveSessionsPreview,
     postMoveSessionsApply,
+    postMergeSessionsPreview,
+    postMergeSessionsApply,
     postEnrollStudentsSessionCapacityCheck,
     postEnrollStudentsStudentPickerExclusions,
     postEnrollStudentsProgramRegistrations,
