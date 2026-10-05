@@ -7981,6 +7981,7 @@
         .map((row) => String(row?.sessionId || '').trim())
         .filter(Boolean)
     );
+    stagedSessionIds().forEach((id) => selectableIds.add(id));
     return (Array.isArray(sessionIds) ? sessionIds : [])
       .map((id) => String(id || '').trim())
       .filter((id) => selectableIds.has(id));
@@ -8179,6 +8180,31 @@
     syncEnrollmentWizardPrimaryButton();
   }
 
+  function stagedSessionIds() {
+    return (Array.isArray(pendingStagedSessions) ? pendingStagedSessions : [])
+      .map((row) => String(row?.sessionId || '').trim())
+      .filter(Boolean);
+  }
+
+  function revealStagedSessionList() {
+    const host = qs('gapSessionsNoticesHost');
+    if (host) host.classList.toggle('d-none', !pendingStagedSessions.length);
+    updateGapStagedBadge();
+    updateGapSessionsCollapseMeta();
+    updateEnrollmentPickCounter();
+    const collapse = qs('gapSessionsWindowCollapse');
+    if (collapse && pendingStagedSessions.length && window.bootstrap?.Collapse) {
+      window.bootstrap.Collapse.getOrCreateInstance(collapse, { toggle: false }).show();
+      qs('btn_gapSessionsCollapseToggle')?.setAttribute('aria-expanded', 'true');
+    }
+    if (enrollWizardStep === 'unmarkSessions') {
+      qs('unmarkSessionsTablePanel')?.classList.remove('d-none');
+      renderUnmarkSessionTable(buildUnmarkSessionRows(lastAlignmentResult), pendingUnmarkSessionIds);
+      return;
+    }
+    renderGapSessionTable();
+  }
+
   function syncPendingStagedSessionsFromCalendar(sessionsToCreate) {
     pendingStagedSessions = sessionsToCreate.map((row) => ({ ...row }));
     if (pendingStagedSessions.length) {
@@ -8190,6 +8216,8 @@
       pendingGapPreview = null;
     }
     updateGapStagedBadge();
+    const host = qs('gapSessionsNoticesHost');
+    if (host) host.classList.toggle('d-none', !pendingStagedSessions.length);
     refreshEnrollmentSessionViews();
   }
 
@@ -8204,6 +8232,8 @@
       || 0
     );
     if (!badge) return;
+    const host = qs('gapSessionsNoticesHost');
+    if (host) host.classList.toggle('d-none', !count);
     if (!count) {
       setGapStepNotice(badge, { visible: false });
       clearBtn?.classList.add('d-none');
@@ -8378,13 +8408,20 @@
         if (Array.isArray(sessionsToCreate)) {
           syncPendingStagedSessionsFromCalendar(sessionsToCreate);
         }
-        applyEnrollmentSelectionFromIds(selectedSessionIds, { refreshAlignment: false });
+        applyEnrollmentSelectionFromIds(
+          [...(Array.isArray(selectedSessionIds) ? selectedSessionIds : []), ...stagedSessionIds()],
+          { refreshAlignment: false }
+        );
       },
       onSave: ({ selectedSessionIds, sessionsToCreate }) => {
         if (Array.isArray(sessionsToCreate)) {
           syncPendingStagedSessionsFromCalendar(sessionsToCreate);
         }
-        applyEnrollmentSelectionFromIds(selectedSessionIds, { refreshAlignment: true });
+        applyEnrollmentSelectionFromIds(
+          [...(Array.isArray(selectedSessionIds) ? selectedSessionIds : []), ...stagedSessionIds()],
+          { refreshAlignment: true }
+        );
+        revealStagedSessionList();
       }
     });
   }
@@ -8484,18 +8521,25 @@
       targetSessionCount: hasTargetSessionCount() ? Number(qs('inp_targetSessionCount')?.value || 0) : 0,
       targetHours: hasTargetHours() ? Number(qs('inp_targetHours')?.value || 0) : 0,
       selectedSessionIds: selectedUnmarkIds,
-      sessionsToCreate: [],
+      sessionsToCreate: pendingStagedSessions.map((row) => ({ ...row })),
       scheduleDefaults: rollingEnrollmentWorkspace?.scheduleDefaults || lastAlignmentResult?.scheduleDefaults || {},
       persistedSessions: rollingEnrollmentWorkspace?.sessions || [],
       statusMap: rollingEnrollmentWorkspace?.statusMap || null,
       localPickerMode: Boolean(prefetchedPickerData),
       prefetchedPickerData,
       requestJson,
-      onSelectionChange: ({ selectedSessionIds }) => {
-        applyUnmarkSelectionFromIds(selectedSessionIds);
+      onSelectionChange: ({ selectedSessionIds, sessionsToCreate }) => {
+        if (Array.isArray(sessionsToCreate)) {
+          syncPendingStagedSessionsFromCalendar(sessionsToCreate);
+        }
+        applyUnmarkSelectionFromIds([...(selectedSessionIds || []), ...stagedSessionIds()]);
       },
-      onSave: ({ selectedSessionIds }) => {
-        applyUnmarkSelectionFromIds(selectedSessionIds);
+      onSave: ({ selectedSessionIds, sessionsToCreate }) => {
+        if (Array.isArray(sessionsToCreate)) {
+          syncPendingStagedSessionsFromCalendar(sessionsToCreate);
+        }
+        applyUnmarkSelectionFromIds([...(selectedSessionIds || []), ...stagedSessionIds()]);
+        revealStagedSessionList();
       }
     });
   }
@@ -8850,13 +8894,36 @@
     const fromAlignment = (Array.isArray(alignment?.sessions) ? alignment.sessions : [])
       .filter((row) => row.inWindow !== false)
       .map((row) => enrichUnmarkSessionRow(row));
-    if (fromAlignment.length) return fromAlignment;
     const workspaceSessions = Array.isArray(rollingEnrollmentWorkspace?.sessions)
       ? rollingEnrollmentWorkspace.sessions
       : [];
-    return workspaceSessions
-      .filter((row) => !startDate || String(row?.date || '').trim() >= startDate)
-      .map((row) => enrichUnmarkSessionRow(row));
+    const base = fromAlignment.length
+      ? fromAlignment
+      : workspaceSessions
+        .filter((row) => !startDate || String(row?.date || '').trim() >= startDate)
+        .map((row) => enrichUnmarkSessionRow(row));
+    const existing = new Set(base.map((row) => String(row?.sessionId || '').trim()).filter(Boolean));
+    const staged = (Array.isArray(pendingStagedSessions) ? pendingStagedSessions : [])
+      .filter((row) => {
+        const id = String(row?.sessionId || '').trim();
+        return id && !existing.has(id);
+      })
+      .map((row) => enrichUnmarkSessionRow({
+        sessionId: row.sessionId,
+        date: row.date,
+        startTime: row.startTime,
+        endTime: row.endTime,
+        durationHours: row.durationHours,
+        status: 'scheduled',
+        countable: true,
+        isStaged: true,
+        inWindow: true
+      }));
+    return [...base, ...staged].sort((left, right) => {
+      const keyA = `${left?.date || ''}|${left?.startTime || ''}`;
+      const keyB = `${right?.date || ''}|${right?.startTime || ''}`;
+      return keyA.localeCompare(keyB);
+    });
   }
 
   function computeAutoUnmarkSessionIds(alignment = lastAlignmentResult) {
@@ -8941,6 +9008,7 @@
       selectedUnmarkIds: filteredSelectedIds,
       footerTotalsId: 'unmarkSessionsTotals'
     });
+    qs('unmarkSessionsTablePanel')?.classList.remove('d-none');
     updateUnmarkSelectionCounter();
   }
 
@@ -9307,6 +9375,8 @@
         .filter(Boolean)
     );
     pendingIncludedSessionIds = Array.from(selected);
+    stagedSessionIds().forEach((id) => selected.add(id));
+    pendingIncludedSessionIds = Array.from(selected);
     const stagedBefore = pendingStagedSessions.length;
     pendingStagedSessions = (Array.isArray(pendingStagedSessions) ? pendingStagedSessions : [])
       .filter((row) => selected.has(String(row?.sessionId || '').trim()));
@@ -9453,8 +9523,14 @@
 
   function updateEnrollmentPickCounter() {
     const counter = qs('gapEnrollmentPickCounter');
+    if (!counter) return;
     const alignment = lastAlignmentResult;
-    if (!counter || !alignment) return;
+    if (!alignment) {
+      counter.textContent = pendingStagedSessions.length
+        ? `${pendingStagedSessions.length} staged session(s)`
+        : 'No sessions staged';
+      return;
+    }
     const countable = getCountableSessionsFromAlignment(alignment);
     const includedIds = readIncludedEnrollmentSessionIds();
     if (hasTargetHours() || Number(alignment.effectiveTargetHours || alignment.targetHours || 0) > 0) {
