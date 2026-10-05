@@ -3,5 +3,6 @@
   { "id": "CAT_02", "name": "Maintenance", "color": "warning" },
   { "id": "CAT_03", "name": "Events", "color": "success" },
   { "id": "CAT_04", "name": "Policy Updates", "color": "danger" },
-  { "id": "CAT_05", "name": "General", "color": "secondary" }
+  { "id": "CAT_05", "name": "General", "color": "secondary" },
+  { "id": "CAT_06", "name": "Training", "color": "info" }
 ]
