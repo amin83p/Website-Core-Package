@@ -803,29 +803,24 @@
   let editingClbEntryId = '';
   let newFileObjectUrls = [];
   let currentWizardStep = 0;
-  function createRandomEquilibriumEmail() {
-    const alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789';
-    let local = '';
-    for (let i = 0; i < 14; i += 1) {
-      local += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
-    }
-    return `${local}@equilibrium.ab.ca`;
-  }
   function ensurePrimaryNewPersonEmailIfEmpty() {
     if (!Array.isArray(newPersonEmails) || !newPersonEmails.length) {
-      newPersonEmails = [{ type: 'primary', email: createRandomEquilibriumEmail(), isPrimary: true }];
-      return true;
-    }
-    const primary = newPersonEmails.find((row) => row && row.isPrimary) || newPersonEmails[0];
-    if (!primary) {
-      newPersonEmails = [{ type: 'primary', email: createRandomEquilibriumEmail(), isPrimary: true }];
-      return true;
-    }
-    if (!String(primary.email || '').trim()) {
-      primary.email = createRandomEquilibriumEmail();
+      newPersonEmails = [{ type: 'primary', email: '', isPrimary: true }];
       return true;
     }
     return false;
+  }
+  function isNotApplicableEmail(value) {
+    return String(value || '').trim().toUpperCase() === 'N/A';
+  }
+  function applyEmailTypeToRow(row, type) {
+    const nextType = String(type || 'primary').trim().toLowerCase();
+    row.type = nextType;
+    if (nextType === 'na') {
+      row.email = 'N/A';
+      return;
+    }
+    if (isNotApplicableEmail(row.email)) row.email = '';
   }
   let newPersonEmails = [{
     type: 'primary',
@@ -1593,8 +1588,9 @@
           '<option value="primary">Primary</option>' +
           '<option value="work">Work</option>' +
           '<option value="personal">Personal</option>' +
+          '<option value="na">N/A</option>' +
         '</select>' +
-        '<input type="email" class="form-control size-md" placeholder="email@example.com">' +
+        '<input class="form-control size-md" placeholder="email@example.com">' +
         '<button type="button" class="btn btn-outline-danger"><i class="bi bi-x-lg"></i></button>';
 
       const typeSelect = wrap.querySelector('select');
@@ -1602,11 +1598,19 @@
       const removeBtn = wrap.querySelector('button');
 
       typeSelect.value = String(row.type || 'work');
+      const naSelected = typeSelect.value === 'na' || isNotApplicableEmail(row.email);
+      if (naSelected) {
+        row.type = 'na';
+        row.email = 'N/A';
+        typeSelect.value = 'na';
+      }
+      emailInput.type = naSelected ? 'text' : 'email';
+      emailInput.readOnly = naSelected;
       emailInput.value = String(row.email || '');
 
       typeSelect.addEventListener('change', () => {
-        newPersonEmails[index].type = typeSelect.value;
-        syncNewPersonHiddenState();
+        applyEmailTypeToRow(newPersonEmails[index], typeSelect.value);
+        renderNewPersonEmails();
       });
       emailInput.addEventListener('input', () => {
         newPersonEmails[index].email = emailInput.value;

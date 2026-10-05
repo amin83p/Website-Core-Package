@@ -512,16 +512,18 @@ function validateData(person) {
   if (!Array.isArray(person.contact?.emails)) {
     errors.push('Contact emails must be an array.');
   } else {
-    const validEmails = person.contact.emails.filter((e) =>
-      e?.email && emailRegex.test(String(e.email).trim())
-    );
+    const isAcceptedEmail = (value) => {
+      const token = String(value || '').trim();
+      return token.toUpperCase() === 'N/A' || emailRegex.test(token);
+    };
+    const validEmails = person.contact.emails.filter((e) => isAcceptedEmail(e?.email));
 
     if (validEmails.length === 0) {
       errors.push('At least one valid email address is required.');
     }
 
     const primary = person.contact.emails.find((e) => e.isPrimary) || person.contact.emails[0];
-    if (primary && !emailRegex.test(String(primary.email || ''))) {
+    if (primary && !isAcceptedEmail(primary.email)) {
       errors.push('The primary email address is invalid.');
     }
   }

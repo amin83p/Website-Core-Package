@@ -451,13 +451,18 @@ document.addEventListener('DOMContentLoaded', () => {
       const typeSel = document.createElement('select'); 
       typeSel.className = 'form-select size-md bg-light border-end-0'; 
       typeSel.style.maxWidth = '120px';
-      ['primary','work','personal'].forEach(t => {
-        const opt = document.createElement('option'); opt.value = t; opt.textContent = t.charAt(0).toUpperCase() + t.slice(1);
-        if (e.type === t) opt.selected = true; typeSel.appendChild(opt);
+      if (String(e.email || '').trim().toUpperCase() === 'N/A') e.type = 'na';
+      [['primary','Primary'],['work','Work'],['personal','Personal'],['na','N/A']].forEach(([value, label]) => {
+        const opt = document.createElement('option'); opt.value = value; opt.textContent = label;
+        if (e.type === value) opt.selected = true;
+        typeSel.appendChild(opt);
       });
 
-      const emailInput = document.createElement('input'); 
-      emailInput.type = 'email'; 
+      const emailInput = document.createElement('input');
+      const naSelected = typeSel.value === 'na';
+      if (naSelected) e.email = 'N/A';
+      emailInput.type = naSelected ? 'text' : 'email';
+      emailInput.readOnly = naSelected;
       emailInput.className = 'form-control size-md'; 
       emailInput.placeholder = 'email@example.com'; 
       emailInput.value = e.email || '';
@@ -467,7 +472,12 @@ document.addEventListener('DOMContentLoaded', () => {
       removeBtn.className = 'btn btn-outline-danger'; 
       removeBtn.innerHTML = '<i class="bi bi-x-lg"></i>';
 
-      typeSel.addEventListener('change', () => { emails[i].type = typeSel.value; syncHidden(); });
+      typeSel.addEventListener('change', () => {
+        emails[i].type = typeSel.value;
+        if (typeSel.value === 'na') emails[i].email = 'N/A';
+        else if (String(emails[i].email || '').trim().toUpperCase() === 'N/A') emails[i].email = '';
+        renderEmails();
+      });
       emailInput.addEventListener('input', () => { emails[i].email = emailInput.value; syncHidden(); });
       removeBtn.addEventListener('click', () => { emails.splice(i, 1); renderEmails(); syncHidden(); });
 

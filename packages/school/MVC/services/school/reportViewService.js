@@ -1231,7 +1231,7 @@ async function buildAssignmentListContext({
     listAllReportAssignments(reqUser),
     listAllReportTemplates(reqUser),
     schoolDataService.fetchAllData('classes', {}, reqUser),
-    requestedTeacherPersonId ? buildPersonNameMap(reqUser) : Promise.resolve(new Map())
+    buildPersonNameMap(reqUser)
   ]);
 
   const classMap = new Map(
@@ -1280,6 +1280,13 @@ async function buildAssignmentListContext({
         : '';
       const resolvedReportScope = inferAssignmentReportScope(row);
       const classId = toPublicId(row?.classId) || String(row?.classId || '').trim();
+      const teacherNames = (Array.isArray(row?.teacherIds) ? row.teacherIds : [])
+        .map((id) => {
+          const token = toPublicId(id);
+          return personMap.get(token) || String(id || '').trim();
+        })
+        .filter(Boolean)
+        .join(', ');
       return {
         ...row,
         targetRows,
@@ -1291,7 +1298,8 @@ async function buildAssignmentListContext({
         targetStudentCount: Array.isArray(row.targetStudentIds) ? row.targetStudentIds.length : 0,
         classTitle: classTitleMap.get(classId) || classId,
         classLifecycle: classLifecycleMap.get(classId) || buildClassLifecycleSnapshot({}),
-        templateTitle: template?.title || row.templateId
+        templateTitle: template?.title || row.templateId,
+        teacherNames
       };
     })
     .filter((row) => {
@@ -1319,7 +1327,8 @@ async function buildAssignmentListContext({
           targetRow.teacherId,
           targetRow.status
         ].join(' ')).join(' ') : '',
-        Array.isArray(row.teacherIds) ? row.teacherIds.join(' ') : ''
+        Array.isArray(row.teacherIds) ? row.teacherIds.join(' ') : '',
+        row.teacherNames
       ]
         .map((v) => String(v || '').toLowerCase())
         .some((v) => v.includes(q));

@@ -94,8 +94,8 @@
       card.className = 'border rounded p-2 mb-2 bg-white';
       card.innerHTML = (
         '<div class="row g-2 align-items-center">' +
-          '<div class="col-md-3"><select class="form-select form-select-sm email-type"><option value="primary">Primary</option><option value="work">Work</option><option value="personal">Personal</option><option value="other">Other</option></select></div>' +
-          '<div class="col-md-6"><input type="email" class="form-control form-control-sm email-value" placeholder="email@example.com"></div>' +
+          '<div class="col-md-3"><select class="form-select form-select-sm email-type"><option value="primary">Primary</option><option value="work">Work</option><option value="personal">Personal</option><option value="other">Other</option><option value="na">N/A</option></select></div>' +
+          '<div class="col-md-6"><input class="form-control form-control-sm email-value" placeholder="email@example.com"></div>' +
           '<div class="col-md-2"><div class="form-check"><input class="form-check-input email-primary" type="radio" name="schoolPersonProfilePrimaryEmail"><label class="form-check-label small">Primary</label></div></div>' +
           '<div class="col-md-1 text-end"><button type="button" class="btn btn-sm btn-outline-danger btn-remove-email"><i class="bi bi-trash"></i></button></div>' +
         '</div>'
@@ -103,10 +103,22 @@
       const typeEl = card.querySelector('.email-type');
       const valueEl = card.querySelector('.email-value');
       const primaryEl = card.querySelector('.email-primary');
-      typeEl.value = row.type || 'primary';
-      valueEl.value = row.email || '';
+      const naSelected = row.type === 'na' || String(row.email || '').trim().toUpperCase() === 'N/A';
+      if (naSelected) {
+        emails[index].type = 'na';
+        emails[index].email = 'N/A';
+      }
+      typeEl.value = emails[index].type || 'primary';
+      valueEl.type = naSelected ? 'text' : 'email';
+      valueEl.readOnly = naSelected;
+      valueEl.value = emails[index].email || '';
       primaryEl.checked = Boolean(row.isPrimary);
-      typeEl.addEventListener('change', () => { emails[index].type = typeEl.value; syncHiddenState(); });
+      typeEl.addEventListener('change', () => {
+        emails[index].type = typeEl.value;
+        if (typeEl.value === 'na') emails[index].email = 'N/A';
+        else if (String(emails[index].email || '').trim().toUpperCase() === 'N/A') emails[index].email = '';
+        renderEmails();
+      });
       valueEl.addEventListener('input', () => { emails[index].email = valueEl.value; syncHiddenState(); });
       primaryEl.addEventListener('change', () => {
         if (!primaryEl.checked) return;

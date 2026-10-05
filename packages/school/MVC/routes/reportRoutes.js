@@ -632,6 +632,27 @@ router.get('/assignments',
   trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.READ_ALL),
   ctrl.listAssignments);
 
+router.get('/assignments/semi-monthly-wizard',
+  requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE),
+  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE),
+  ctrl.showSemiMonthlyAssignmentWizard);
+router.post('/assignments/semi-monthly-wizard/program-count',
+  requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE),
+  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE, reportAssignmentBulkActionState),
+  ctrl.postSemiMonthlyProgramCount);
+router.post('/assignments/semi-monthly-wizard/resolve-dates',
+  requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE),
+  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE, reportAssignmentBulkActionState),
+  ctrl.postSemiMonthlyResolveDates);
+router.post('/assignments/semi-monthly-wizard/preview',
+  requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE),
+  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE, reportAssignmentBulkActionState),
+  ctrl.postSemiMonthlyPreview);
+router.post('/assignments/semi-monthly-wizard/apply',
+  requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE),
+  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE, reportAssignmentMutationActionState),
+  ctrl.postSemiMonthlyApply);
+
 router.get('/assignments/new',
   requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE),
   trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE),

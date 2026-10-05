@@ -1,0 +1,199 @@
+<%- include('partials/tablePages-start', {
+  title,
+  user,
+  tableName: 'Semi_Monthly_Report_Assignment_Wizard',
+  headerManageBtns: [
+    `<a href="/school/reports/assignments" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Report Assignments</a>`
+  ]
+}) %>
+
+<style>
+  #smmrWizardGuide .wizard-step-rail {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding-bottom: 0.25rem;
+    scroll-behavior: smooth;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  #smmrWizardGuide .wizard-step-rail::-webkit-scrollbar { display: none; }
+  #smmrWizardGuide .wizard-step-pill {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    border: 1px solid #c8d1dc;
+    background: #f8fafc;
+    color: #17324d;
+    font-weight: 600;
+    font-size: 0.9rem;
+    border-radius: 999px;
+    padding: 0.35rem 0.8rem;
+    transition: all 0.2s ease;
+    pointer-events: none;
+  }
+  #smmrWizardGuide .wizard-step-pill.active {
+    background: #17324d;
+    color: #fff;
+    border-color: #17324d;
+  }
+  #smmrWizardGuide .wizard-step-pill.completed {
+    background: #e8f5ee;
+    border-color: #95d5b2;
+    color: #1b6f4a;
+  }
+  #smmrWizardGuide .wizard-progress {
+    height: 0.35rem;
+    background: #e8edf3;
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  #smmrWizardGuide .wizard-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #17324d 0%, #2f5d8a 100%);
+    width: 0;
+    transition: width 0.25s ease;
+  }
+  .smmr-wizard-controls {
+    background: #f8fafc;
+    border: 1px solid #d5dee8;
+    border-radius: 0.75rem;
+    padding: 0.75rem 1rem;
+  }
+</style>
+
+<div class="card border-0 shadow-sm mb-3" id="smmrWizardGuide">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+      <div>
+        <div class="fw-bold text-primary">Semi-Monthly Report Assignment Wizard</div>
+        <div class="text-muted small">Assign the configured semi-monthly templates across matching classes.</div>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-light text-dark border" id="smmrWizardStepBadge">Step 1 of 5</span>
+        <span class="badge bg-primary-subtle text-primary border border-primary-subtle" id="smmrWizardProgressPct">20%</span>
+      </div>
+    </div>
+    <div class="wizard-progress mb-3"><div class="wizard-progress-bar" id="smmrWizardProgressBar" style="width: 20%"></div></div>
+    <div class="wizard-step-rail" id="smmrWizardStepPills">
+      <button type="button" class="wizard-step-pill active" data-smmr-pill="scope">1. Scope and programs</button>
+      <button type="button" class="wizard-step-pill" data-smmr-pill="dates">2. Dates</button>
+      <button type="button" class="wizard-step-pill" data-smmr-pill="task">3. Task settings</button>
+      <button type="button" class="wizard-step-pill" data-smmr-pill="tiles">4. Classes</button>
+      <button type="button" class="wizard-step-pill" data-smmr-pill="run">5. Summary</button>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <div data-smmr-step="scope">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label" for="smmrReportScope">Report scope</label>
+          <select class="form-select" id="smmrReportScope">
+            <% (Array.isArray(reportScopeDefinitions) ? reportScopeDefinitions : []).forEach((scope) => { %>
+            <option value="<%= scope.value %>"><%= scope.label %></option>
+            <% }) %>
+          </select>
+        </div>
+        <div class="col-md-8 d-flex align-items-end">
+          <button type="button" class="btn btn-outline-primary" id="btn_smmrAddProgram">Add program</button>
+        </div>
+      </div>
+      <div class="table-responsive border rounded mt-3">
+        <table class="table table-sm align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th>Program</th>
+              <th>Matching classes</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="smmrProgramTbody">
+            <tr><td colspan="3" class="text-muted">No programs added.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="d-none" data-smmr-step="dates">
+      <p class="small text-muted">The end date is the day the report is assigned. If that day has no session for every class, the wizard uses the nearest earlier day in the same month that does.</p>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label" for="smmrStartDate">Period start</label>
+          <input type="date" class="form-control" id="smmrStartDate">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="smmrEndDate">Period end</label>
+          <input type="date" class="form-control" id="smmrEndDate">
+        </div>
+      </div>
+      <div class="alert alert-info py-2 small mt-3 d-none" id="smmrDateNotice"></div>
+    </div>
+
+    <div class="d-none" data-smmr-step="task">
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label" for="smmrHoursBeforeEnd">Hours before the session ends</label>
+          <input type="number" class="form-control" id="smmrHoursBeforeEnd" min="0.25" step="0.25" value="1">
+          <div class="form-text">1 hour assigns the report to the last hour of the session.</div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="smmrAllocatedHours">Allocated hours</label>
+          <input type="number" class="form-control" id="smmrAllocatedHours" min="0" step="0.25" value="1">
+        </div>
+      </div>
+      <div class="form-check mt-3">
+        <input class="form-check-input" type="checkbox" id="smmrConflictPermitted">
+        <label class="form-check-label" for="smmrConflictPermitted">Conflict (intentional overlap permitted)</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="smmrTimesheetReflection">
+        <label class="form-check-label" for="smmrTimesheetReflection">Timesheet (reflect on timesheet)</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="smmrConductRequired" checked>
+        <label class="form-check-label" for="smmrConductRequired">Class conduct (require before filling)</label>
+      </div>
+    </div>
+
+    <div class="d-none" data-smmr-step="tiles">
+      <p class="small mb-3" id="smmrTileRange"></p>
+      <div class="row g-3" id="smmrClassTiles"></div>
+    </div>
+
+    <div class="d-none" data-smmr-step="run">
+      <div id="smmrSummary"></div>
+      <div class="progress mt-3 d-none" id="smmrProgressWrap">
+        <div class="progress-bar" id="smmrProgressBar" role="progressbar" style="width: 0%">0%</div>
+      </div>
+      <div class="mt-3 d-none" id="smmrResult"></div>
+    </div>
+  </div>
+  <div class="card-footer smmr-wizard-controls d-flex justify-content-between gap-2">
+    <button type="button" class="btn btn-outline-secondary btn-md d-none" id="btn_smmrBack"><i class="bi bi-arrow-left me-1"></i>Back</button>
+    <button type="button" class="btn btn-primary btn-md ms-auto" id="btn_smmrNext">Next<i class="bi bi-arrow-right ms-1"></i></button>
+  </div>
+</div>
+
+<div class="modal fade" id="smmrStudentModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="smmrStudentModalTitle">Students</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="smmrStudentModalBody"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-primary btn-sm" data-bs-dismiss="modal">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/tablePages-end') %>
+<%- include('partials/modal_GenericPicker') %>
+<script src="/scripts/wizardStepRail.js"></script>
+<script src="/scripts/semiMonthlyReportAssignmentWizard.js"></script>

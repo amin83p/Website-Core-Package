@@ -14,6 +14,7 @@ const reportIntegrityService = require('../../services/school/reportIntegritySer
 const reportViewService = require('../../services/school/reportViewService');
 const reportAssignmentBulkRowService = require('../../services/school/reportAssignmentBulkRowService');
 const reportAssignmentStudentEligibilityService = require('../../services/school/reportAssignmentStudentEligibilityService');
+const semiMonthlyReportAssignmentWizardService = require('../../services/school/semiMonthlyReportAssignmentWizardService');
 const reportRuleEngineService = require('../../services/school/reportRuleEngineService');
 const reportInstanceSaveService = require('../../services/school/reportInstanceSaveService');
 const reportMatrixService = require('../../services/school/reportMatrixService');
@@ -945,6 +946,87 @@ async function previewAssignmentTargetRows(req, res) {
     return res.json({ status: 'success', ...payload });
   } catch (error) {
     return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function showSemiMonthlyAssignmentWizard(req, res) {
+  try {
+    await assertCreateOrgContextOrThrow(req.user);
+    res.render('school/report/semiMonthlyAssignmentWizard', {
+      title: 'Semi-Monthly Report Assignment Wizard',
+      reportScopeDefinitions: reportScopePolicy.REPORT_SCOPE_DEFINITIONS,
+      user: req.user,
+      actionStateId: req.actionStateId,
+      includeModal: true
+    });
+  } catch (error) {
+    res.status(400).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+}
+
+async function postSemiMonthlyProgramCount(req, res) {
+  try {
+    const data = await semiMonthlyReportAssignmentWizardService.countProgramClasses({
+      reportScope: req.body?.reportScope,
+      programId: req.body?.programId,
+      reqUser: req.user
+    });
+    return res.json({ status: 'success', data });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message || 'Unable to count classes.' });
+  }
+}
+
+async function postSemiMonthlyResolveDates(req, res) {
+  try {
+    const data = await semiMonthlyReportAssignmentWizardService.resolveDates({
+      reportScope: req.body?.reportScope,
+      programIds: req.body?.programIds,
+      startDate: req.body?.startDate,
+      endDate: req.body?.endDate,
+      reqUser: req.user
+    });
+    return res.json({ status: 'success', data });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message || 'Unable to resolve the assignment date.' });
+  }
+}
+
+async function postSemiMonthlyPreview(req, res) {
+  try {
+    const data = await semiMonthlyReportAssignmentWizardService.previewTiles({
+      reportScope: req.body?.reportScope,
+      programIds: req.body?.programIds,
+      startDate: req.body?.startDate,
+      verifiedEndDate: req.body?.verifiedEndDate,
+      hoursBeforeEnd: req.body?.hoursBeforeEnd,
+      reqUser: req.user
+    });
+    return res.json({ status: 'success', data });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message || 'Unable to preview class sessions.' });
+  }
+}
+
+async function postSemiMonthlyApply(req, res) {
+  try {
+    const data = await semiMonthlyReportAssignmentWizardService.applyClassTemplate({
+      classId: req.body?.classId,
+      templateId: req.body?.templateId,
+      reportScope: req.body?.reportScope,
+      reportStartDate: req.body?.reportStartDate,
+      verifiedEndDate: req.body?.verifiedEndDate,
+      hoursBeforeEnd: req.body?.hoursBeforeEnd,
+      conflictPermitted: req.body?.conflictPermitted,
+      timesheetReflection: req.body?.timesheetReflection,
+      conductRequiredBeforeFill: req.body?.conductRequiredBeforeFill,
+      allocatedHours: req.body?.allocatedHours,
+      targetStudentIds: req.body?.targetStudentIds,
+      reqUser: req.user
+    });
+    return res.json({ status: 'success', data });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message || 'Unable to assign the report.' });
   }
 }
 
@@ -2636,6 +2718,11 @@ module.exports = {
   generateAssignmentTargetRows,
   previewAssignmentTargetRows,
   getAssignmentEligibleStudents,
+  showSemiMonthlyAssignmentWizard,
+  postSemiMonthlyProgramCount,
+  postSemiMonthlyResolveDates,
+  postSemiMonthlyPreview,
+  postSemiMonthlyApply,
   saveAssignment,
   deleteAssignment,
   getAssignmentDeletePreview,

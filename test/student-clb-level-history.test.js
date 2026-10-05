@@ -465,10 +465,9 @@ test('student form create defaults cover DOB, email, admission, country, fee, an
   assert.match(source, /s\.countryOfOrigin\s*\|\|\s*defaultCountryOfOrigin/);
   assert.match(source, /defaultFeeCategory\s*=\s*'Domestic'/);
   assert.match(source, /s\.feeCategory\s*\|\|\s*defaultFeeCategory/);
-  assert.match(source, /createRandomEquilibriumEmail/);
   assert.match(source, /ensurePrimaryNewPersonEmailIfEmpty/);
-  assert.match(source, /@equilibrium\.ab\.ca/);
-  assert.match(source, /for\s*\(\s*let\s+i\s*=\s*0;\s*i\s*<\s*14;/);
+  assert.match(source, /option value="na">N\/A/);
+  assert.doesNotMatch(source, /createRandomEquilibriumEmail/);
   assert.match(source, /selectedMode === 'new'[\s\S]*?ensurePrimaryNewPersonEmailIfEmpty\(\)/);
   assert.match(source, /firstSkillInput\.value\s*=\s*'-'/);
   assert.match(source, /getClbEditorInput\(group,\s*CLB_SKILLS\[0\]\)/);
