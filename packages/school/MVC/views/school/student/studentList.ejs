@@ -24,6 +24,7 @@
       <tr>
         <th class="ps-4">Student Info</th>
         <th>Contact</th>
+        <th>Claim Number</th>
         <th>Fee Category</th>
         <th class="text-center">Status</th>
         <th class="text-end pe-4">Actions</th>
@@ -31,7 +32,7 @@
     </thead>
     <tbody>
       <% if(data.length === 0) { %>
-         <tr><td colspan="5" class="text-center py-4 text-muted">No students found.</td></tr>
+         <tr><td colspan="6" class="text-center py-4 text-muted">No students found.</td></tr>
       <% } %>
       <% data.forEach(item => { %>
         <tr>
@@ -45,6 +46,7 @@
               <div><i class="bi bi-envelope me-1"></i><%= item.email %></div>
               <div><i class="bi bi-telephone me-1"></i><%= item.phone %></div>
           </td>
+          <td class="small font-monospace"><%= item.primaryClaimNumber || '—' %></td>
           <td class="fw-bold text-dark"><%= item.feeCategory %></td>
           <td class="text-center">
              <% 

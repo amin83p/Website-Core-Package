@@ -205,7 +205,25 @@
         ].join(' | ');
         return `<span class="badge border ms-1 ${classMap[tone] || classMap.muted}" title="${escapeHtml(title)}"><i class="bi bi-exclamation-diamond-fill me-1"></i>${escapeHtml(label)}</span>`;
     }
-                                                                                    
+    function buildScheduleCoTeacherBadgesHtml(event, { inline = false } = {}) {
+        if (String(event?.eventType || '').trim().toLowerCase() !== 'class_session') return '';
+        if (event?.hasCoTeachers !== true) return '';
+        const viewerIsCoTeacher = event.viewerIsSessionCoTeacher === true;
+        const coTeacherTitle = viewerIsCoTeacher ? 'You are a co-teacher on this session' : 'Co-teacher on this session';
+        const coTeacherIconClass = viewerIsCoTeacher ? 'text-primary' : 'text-secondary';
+        const coTeacherIcon = `<span class="schedule-co-teacher-badge ${coTeacherIconClass}" title="${escapeHtml(coTeacherTitle)}" aria-label="${escapeHtml(coTeacherTitle)}"><i class="bi bi-people-fill" aria-hidden="true"></i></span>`;
+        let paymentIcon = '';
+        if (viewerIsCoTeacher) {
+            const paid = event.viewerCoTeacherPaid !== false;
+            const payTitle = paid ? 'Paid co-teacher' : 'Unpaid co-teacher';
+            const payClass = paid ? 'text-success' : 'text-warning-emphasis';
+            const payBi = paid ? 'bi-cash-coin' : 'bi-cash-stack';
+            paymentIcon = `<span class="schedule-co-teacher-badge ${payClass}" title="${escapeHtml(payTitle)}" aria-label="${escapeHtml(payTitle)}"><i class="bi ${payBi}" aria-hidden="true"></i></span>`;
+        }
+        const layoutClass = inline ? 'schedule-co-teacher-badges schedule-co-teacher-badges--inline' : 'schedule-co-teacher-badges';
+        return `<span class="${layoutClass}">${coTeacherIcon}${paymentIcon}</span>`;
+    }
+
     function prefsHaveSavedWorkspace(prefs) {
         if (!prefs || typeof prefs !== 'object') return false;
         return Boolean(
@@ -556,6 +574,12 @@
         if (event?.hasOverlap) addDetail('Conflict', 'Overlaps another scheduled item');
         if (window.ScheduleCompletionDisplay && window.ScheduleCompletionDisplay.isMakeupRequiredDisplayEvent(event)) {
             addDetail('Make-up', window.ScheduleCompletionDisplay.MAKEUP_DISPLAY_TEXT);
+        }
+        if (event?.hasCoTeachers === true) {
+            addDetail('Co-teachers', 'Yes');
+            if (event.viewerIsSessionCoTeacher === true) {
+                addDetail('Your co-teacher pay', event.viewerCoTeacherPaid !== false ? 'Paid' : 'Unpaid');
+            }
         }
         return detailParts.join('\n');
     }
@@ -3980,6 +4004,27 @@
         claimNumbersRailHandler = typeof handler === 'function' ? handler : null;
     }
 
+    let personScheduleNoteRailHandler = null;
+    function bindPersonScheduleNoteRail(handler) {
+        personScheduleNoteRailHandler = typeof handler === 'function' ? handler : null;
+    }
+
+    const activeSchedulePersonChangeListeners = new Set();
+    function bindActiveSchedulePersonChangeListener(handler) {
+        if (typeof handler !== 'function') return;
+        activeSchedulePersonChangeListeners.add(handler);
+    }
+
+    function notifyActiveSchedulePersonChanged() {
+        activeSchedulePersonChangeListeners.forEach((handler) => {
+            try {
+                void handler();
+            } catch (_error) {
+                // ignore listener errors
+            }
+        });
+    }
+
     function showScheduleBootstrapModal(modalEl) {
         if (!modalEl || !window.bootstrap?.Modal) return;
         window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -5164,6 +5209,9 @@
             }
             if (action === 'claim-numbers' && typeof claimNumbersRailHandler === 'function') {
                 void claimNumbersRailHandler();
+            }
+            if (action === 'person-schedule-note' && typeof personScheduleNoteRailHandler === 'function') {
+                void personScheduleNoteRailHandler();
             }
         });
     }
@@ -6535,6 +6583,7 @@ if (canLoadAllSchedules) {
         scheduleState.activePersonId = personId || scheduleState.activePersonId;
         if (previousActivePersonId !== scheduleState.activePersonId) {
             queueScheduleWorkspaceAutoPersist();
+            notifyActiveSchedulePersonChanged();
         }
         resetScheduleActiveClassFilter();
         syncScheduleActiveClassesForActivePerson();
@@ -6734,6 +6783,7 @@ if (canLoadAllSchedules) {
                 const makeupBadge = scd ? scd.buildMakeupRequiredBadge(ev) : '';
                 const detailsUrl = String(ev?.detailsUrl || '').trim();
                 const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
+                const coTeacherBadges = buildScheduleCoTeacherBadgesHtml(ev, { inline: true });
                 const openButton = detailsUrl
                     ? `<a class="btn btn-sm btn-outline-primary event-open" href="${escapeHtml(detailsUrl)}" target="_blank" rel="noopener">Open</a>`
                     : `<span class="text-muted small">No details</span>`;
@@ -6747,6 +6797,7 @@ if (canLoadAllSchedules) {
                                 <span class="badge ${leaveEvent ? 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' : (String(ev?.role || '').toLowerCase() === 'student' ? 'bg-primary-subtle text-primary border' : 'bg-info-subtle text-info-emphasis border')}">${escapeHtml(leaveEvent ? 'Approved Leave' : (ev?.role || '-'))}</span>
                                 ${statusBadge}
                                 ${makeupBadge}
+                                ${coTeacherBadges}
                                 ${caseBadge}
                                 <span class="text-muted">${Number(ev?.duration || 0).toFixed(2)} h</span>
                             </div>
@@ -6836,6 +6887,7 @@ if (canLoadAllSchedules) {
                 const detailsUrl = getEventDetailsUrl(ev);
                 const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
                 const embeddedReportBadges = buildEmbeddedReportBadgesHtml(ev?.embeddedReports);
+                const coTeacherBadges = buildScheduleCoTeacherBadgesHtml(ev);
         const clickHandler = buildScheduleSessionBlockClickHandler(ev);
                 const tipLabel = buildScheduleEventTooltip(ev, sessionStatusMetaMap, scan);
                 const tipStyle = scheduleStatusTipStyle(ev, sessionStatusMetaMap);
@@ -6856,6 +6908,7 @@ if (canLoadAllSchedules) {
                              ${clickHandler}>
                              ${selectionControl}
                              ${statusChip}
+                             ${coTeacherBadges}
                              ${buildScheduleDraftBadge(ev)}
                              ${buildScheduleDraftEnrollmentBadge(ev)}
                              <div class="schedule-event-title">${isReportScheduleEvent(ev) ? `${buildReportPriorityMarker(ev)} ` : ''}${escapeHtml(eventTitle)}</div>
@@ -6888,6 +6941,7 @@ if (canLoadAllSchedules) {
                 const makeupBadge = scd ? scd.buildMakeupRequiredBadge(ev, { compact: true }) : '';
                 const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
                 const embeddedReportBadges = buildEmbeddedReportBadgesHtml(ev?.embeddedReports);
+                const coTeacherBadges = buildScheduleCoTeacherBadgesHtml(ev);
                 const clickHandler = buildScheduleSessionBlockClickHandler(ev);
                 const tipLabel = buildScheduleEventTooltip(ev, sessionStatusMetaMap, scan);
                 const tipStyle = scheduleStatusTipStyle(ev, sessionStatusMetaMap);
@@ -6905,6 +6959,7 @@ if (canLoadAllSchedules) {
                          ${clickHandler}>
                          ${selectionControl}
                          ${statusChip}
+                         ${coTeacherBadges}
                          ${buildScheduleDraftBadge(ev)}
                          ${buildScheduleDraftEnrollmentBadge(ev)}
                          <div class="schedule-event-title">${isReportScheduleEvent(ev) ? `${buildReportPriorityMarker(ev)} ` : ''}${escapeHtml(eventTitle)}</div>
@@ -7547,6 +7602,17 @@ if (canLoadAllSchedules) {
             countActiveDraftSelectedSessions,
             getSelectedSavedClassSessionEvents,
             refreshScheduleViewWithHolidays
+        });
+    }
+    if (canSelectAnyPerson && typeof global.installMasterSchedulePersonNote === 'function') {
+        global.installMasterSchedulePersonNote({
+            uiAlert,
+            escapeHtml,
+            showBootstrapModal: showScheduleBootstrapModal,
+            hideBootstrapModal: hideScheduleBootstrapModal,
+            bindPersonScheduleNoteRail,
+            bindActiveSchedulePersonChangeListener,
+            activeSchedulePerson
         });
     }
     bindScheduleAdminWeekRail();

@@ -398,6 +398,20 @@ function buildCatalog() {
       }
     },
     {
+      key: 'school.schedulePersonNotes',
+      domain: 'School',
+      section: 'School Schedule Person Notes',
+      source: 'school/schedulePersonNotes.json',
+      collection: 'schoolSchedulePersonNotes',
+      sourceFormat: 'single_object',
+      transformRecord: (record) => ({ ...(record || {}), id: 'schedule-person-notes' }),
+      inverseTransformRecord: (record) => {
+        const next = { ...(record || {}) };
+        if (next.id === 'schedule-person-notes') delete next.id;
+        return next;
+      }
+    },
+    {
       key: 'school.timesheetParametersPolicy',
       domain: 'School',
       section: 'Timesheet Parameters Policy',

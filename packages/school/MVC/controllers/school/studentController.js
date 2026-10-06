@@ -591,7 +591,8 @@ exports.listStudents = async (req, res) => {
                 lastName,
                 name: fullName,
                 email: schoolPersonAccessService.readPersonEmail(person) || 'N/A',
-                phone: person?.contact?.phones?.[0]?.number || 'N/A'
+                phone: person?.contact?.phones?.[0]?.number || 'N/A',
+                primaryClaimNumber: studentListSearchService.resolvePrimaryClaimNumber(student)
             };
         });
 

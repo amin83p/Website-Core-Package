@@ -74,3 +74,25 @@ test('schedule controller builds whitelisted client config', () => {
   assert.match(helper, /scheduleViewerPreferencesService\.extractPreferences/);
   assert.doesNotMatch(helper, /req\.user/);
 });
+
+test('schedule events expose co-teacher card metadata and viewer wires badges', () => {
+  const controller = read('MVC/controllers/school/scheduleController.js');
+  assert.match(controller, /hasCoTeachers:\s*sessionCoTeachers\.length\s*>\s*0/);
+  assert.match(controller, /viewerIsSessionCoTeacher:\s*Boolean\(coTeacherEntry\)/);
+  assert.match(controller, /viewerCoTeacherPaid:/);
+
+  const viewer = readMasterScheduleViewerJs();
+  assert.match(viewer, /function buildScheduleCoTeacherBadgesHtml/);
+  assert.match(viewer, /bi-people-fill/);
+  assert.match(viewer, /buildScheduleCoTeacherBadgesHtml\(ev/);
+  assert.match(viewer, /Your co-teacher pay/);
+
+  const styles = read('public/styles/schedule-viewer.css');
+  assert.match(styles, /\.schedule-co-teacher-badges/);
+});
+
+test('personSchedule includes master schedule person note script', () => {
+  const view = read('MVC/views/school/schedule/personSchedule.ejs');
+  assert.match(view, /data-schedule-admin-action="person-schedule-note"/);
+  assert.match(view, /masterSchedulePersonNote\.js/);
+});

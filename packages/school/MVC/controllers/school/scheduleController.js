@@ -33,6 +33,8 @@ const rollingEnrollmentSessionAlignmentService = require('../../services/school/
 const scheduleSessionMutationService = require('../../services/school/scheduleSessionMutationService');
 const sessionManagementService = require('../../services/school/sessionManagementService');
 const attendanceMarkAppearancePolicyModel = require('../../models/school/attendanceMarkAppearancePolicyModel');
+const schedulePersonNoteModel = require('../../models/school/schedulePersonNoteModel');
+const schedulePersonNoteService = require('../../services/school/schedulePersonNoteService');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const PERIOD_KEYS = Object.freeze(['day', 'week', 'month', 'season', 'year']);
 const PERIOD_LABELS = Object.freeze({
@@ -1641,13 +1643,19 @@ async function buildEventsForPersonAndRange({
             if (!sessionDate || sessionDate < startDate || sessionDate > endDate) continue;
 
             const deliveredBy = resolveLinkedPersonId(session?.delivery?.deliveredBy, teacherPersonMap);
+            const sessionCoTeachers = sessionDeliveryTeamService.getSessionCoTeachers(session);
+            const coTeacherEntry = sessionDeliveryTeamService.findCoTeacherEntry(
+                session,
+                normalizedPersonId,
+                teacherPersonMap
+            );
             const isOnDeliveryTeam = sessionDeliveryTeamService.isPersonOnSessionDelivery(
                 session,
                 normalizedPersonId,
                 teacherPersonMap
             );
             const teacherAssigned = (
-                deliveredBy || sessionDeliveryTeamService.getSessionCoTeachers(session).length
+                deliveredBy || sessionCoTeachers.length
                     ? isOnDeliveryTeam
                     : classHasInstructor
             );
@@ -1729,7 +1737,11 @@ async function buildEventsForPersonAndRange({
                     canChangeDate: true,
                     canChangeTime: true,
                     canChangeStatus: true
-                }
+                },
+                hasCoTeachers: sessionCoTeachers.length > 0,
+                coTeacherCount: sessionCoTeachers.length,
+                viewerIsSessionCoTeacher: Boolean(coTeacherEntry),
+                viewerCoTeacherPaid: coTeacherEntry ? coTeacherEntry.paid !== false : null
             });
         }
     }
@@ -2033,6 +2045,62 @@ async function getScheduleViewerPreferences(req, res) {
             status: 'error',
             message: error.message || 'Failed to load schedule viewer preferences.'
         });
+    }
+}
+
+async function assertMasterScheduleAdminViewer(req) {
+    const { viewerScheduleAccess } = await resolveScheduleViewerAccessContext(req);
+    if (!viewerScheduleAccess.canSelectAnyPerson) {
+        throw new Error('Master schedule admin access is required.');
+    }
+    return viewerScheduleAccess;
+}
+
+async function getPersonScheduleNote(req, res) {
+    try {
+        await assertMasterScheduleAdminViewer(req);
+        const personId = schedulePersonNoteService.normalizePersonId(req.query?.personId);
+        if (!personId) {
+            return res.status(400).json({ status: 'error', message: 'Person is required.' });
+        }
+        const activeOrgId = getActiveScheduleOrgId(req.user);
+        const note = await schedulePersonNoteModel.getNoteForPerson(activeOrgId, personId);
+        return res.json({ status: 'success', note });
+    } catch (error) {
+        const status = String(error.message || '').includes('admin access') ? 403 : 500;
+        return res.status(status).json({
+            status: 'error',
+            message: error.message || 'Failed to load schedule note.'
+        });
+    }
+}
+
+async function savePersonScheduleNote(req, res) {
+    try {
+        await assertMasterScheduleAdminViewer(req);
+        const payload = (req.body && typeof req.body === 'object') ? req.body : {};
+        const personId = schedulePersonNoteService.normalizePersonId(payload.personId);
+        if (!personId) {
+            return res.status(400).json({ status: 'error', message: 'Person is required.' });
+        }
+        const activeOrgId = getActiveScheduleOrgId(req.user);
+        const auditUserId = String(req.user?.id || '').trim() || 'system';
+        const note = await schedulePersonNoteModel.saveNoteForPerson(
+            activeOrgId,
+            personId,
+            payload.note,
+            auditUserId
+        );
+        return res.json({
+            status: 'success',
+            message: 'Schedule note saved.',
+            note
+        });
+    } catch (error) {
+        const message = error.message || 'Failed to save schedule note.';
+        const status = String(message).includes('admin access') ? 403
+            : (String(message).includes('cannot exceed') ? 400 : 500);
+        return res.status(status).json({ status: 'error', message });
     }
 }
 
@@ -3196,6 +3264,8 @@ module.exports = {
     showSchedulePage,
     getScheduleViewerPreferences,
     saveScheduleViewerPreferences,
+    getPersonScheduleNote,
+    savePersonScheduleNote,
     showMySchedulePage,
     getMyScheduleData,
     getScheduleHolidayDatesInRange,

@@ -45,6 +45,15 @@ router.put('/api/viewer-preferences',
   requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
   ctrl.saveScheduleViewerPreferences);
+router.get('/api/person-schedule-note',
+  requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
+  ctrl.getPersonScheduleNote);
+router.put('/api/person-schedule-note',
+  requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
+  requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
+  ctrl.savePersonScheduleNote);
 router.get('/api/school-person-picker',
   requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),

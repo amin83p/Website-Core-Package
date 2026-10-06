@@ -43,10 +43,18 @@ function safeClaimEntries(student) {
       .map((entry) => ({
         number: String(entry.number || '').trim(),
         label: String(entry.label || '').trim(),
-        notes: String(entry.notes || '').trim()
+        notes: String(entry.notes || '').trim(),
+        isPrimary: entry.isPrimary === true
       }))
       .filter((entry) => entry.number || entry.label || entry.notes);
   }
+}
+
+function resolvePrimaryClaimNumber(student) {
+  const entries = safeClaimEntries(student);
+  const primary = entries.find((entry) => entry.isPrimary === true)
+    || (entries.length === 1 ? entries[0] : null);
+  return String(primary?.number || '').trim();
 }
 
 function collectClaimSearchTokens(student) {
@@ -191,6 +199,7 @@ module.exports = {
   STUDENT_LIST_EXTRA_DB_SEARCH_FIELDS,
   buildStudentListSearchHaystack,
   buildSessionStudentCaseRosterEntries,
+  resolvePrimaryClaimNumber,
   studentMatchesListSearch,
   mergeStudentListSearchableFields
 };

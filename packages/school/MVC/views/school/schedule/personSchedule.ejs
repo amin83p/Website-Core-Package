@@ -196,11 +196,33 @@
               <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-admin-action="add-co-teacher" title="Add Co-Teacher" aria-label="Add Co-Teacher"><i class="bi bi-people" aria-hidden="true"></i></button>
               <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-admin-action="delete-enrollment" title="Delete Enrollment" aria-label="Delete Enrollment"><i class="bi bi-person-x" aria-hidden="true"></i></button>
               <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-admin-action="claim-numbers" title="Manage Claim Numbers" aria-label="Manage Claim Numbers"><i class="bi bi-card-checklist" aria-hidden="true"></i></button>
+              <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-admin-action="person-schedule-note" title="Schedule note" aria-label="Schedule note" aria-pressed="false"><i class="bi bi-journal-text" aria-hidden="true"></i></button>
             </div>
           </aside>
           <% } %>
           <div id="visualDisplayArea" class="schedule-visual-area"></div>
         </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="schedulePersonNoteModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header py-2 px-3">
+        <h6 class="modal-title mb-0 fw-semibold" id="schedulePersonNoteModalTitle">Schedule note</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-2" id="schedulePersonNoteMeta"></p>
+        <label class="form-label fw-semibold" for="schedulePersonNoteInput">Note</label>
+        <textarea class="form-control" id="schedulePersonNoteInput" rows="8" maxlength="5000" placeholder="Scheduling notes for this person (visible to master schedule admins in your organization)."></textarea>
+        <div class="form-text">Shared within your organization. Separate from Person Notes on the profile.</div>
+      </div>
+      <div class="modal-footer py-2 px-3">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btn_schedulePersonNoteSave">Save</button>
       </div>
     </div>
   </div>
@@ -507,6 +529,7 @@
 <script src="/scripts/masterScheduleMergeSessions.js"></script>
 <script src="/scripts/masterScheduleTakeOverSessions.js"></script>
 <script src="/scripts/masterScheduleAddCoTeacher.js"></script>
+<script src="/scripts/masterSchedulePersonNote.js"></script>
 <% } %>
 <script src="/scripts/masterScheduleViewer.js"></script>
 

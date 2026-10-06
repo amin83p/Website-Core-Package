@@ -310,6 +310,36 @@
 .schedule-status-chip.status-pending { background: #fff3cd; color: #664d03; border-color: #ffda6a; }
 .schedule-status-chip.status-leave { background: #fff3bf; color: #7a4d00; border-color: #f59f00; }
 .schedule-status-chip.status-overlap { background: #f8d7da; color: #842029; border-color: #f1aeb5; }
+.schedule-co-teacher-badges {
+    position: absolute;
+    top: 4px;
+    right: 4.5rem;
+    z-index: 22;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.1rem 0.28rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.88);
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1);
+    font-size: 0.78rem;
+    line-height: 1;
+}
+.schedule-co-teacher-badges--inline {
+    position: static;
+    z-index: auto;
+    display: inline-flex;
+    vertical-align: middle;
+    margin-left: 0.15rem;
+    padding: 0.05rem 0.2rem;
+    box-shadow: none;
+}
+.schedule-co-teacher-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
 .status-tag-scheduled { background: #e7f1ff; color: #084298; border-color: #b6d4fe; }
 .status-tag-completed { background: #d1e7dd; color: #0f5132; border-color: #a3cfbb; }
 .status-tag-cancelled { background: #f8d7da; color: #842029; border-color: #f1aeb5; }
@@ -1244,6 +1274,11 @@ button.schedule-loaded-at-chip.is-stale:focus {
 }
 .schedule-admin-week-rail-inner [data-schedule-admin-action="claim-numbers"] {
     margin-top: 0.65rem;
+}
+.schedule-admin-week-rail-inner [data-schedule-admin-action="person-schedule-note"].has-schedule-person-note {
+    background-color: var(--bs-warning, #ffc107);
+    border-color: var(--bs-warning-border-subtle, #ffda6a);
+    color: var(--bs-warning-text-emphasis, #664d03);
 }
 .schedule-calendar-card-body.is-month-view .schedule-admin-week-rail,
 #scheduleContainer.d-none .schedule-admin-week-rail {
