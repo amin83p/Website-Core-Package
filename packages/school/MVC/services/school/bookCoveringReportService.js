@@ -144,18 +144,39 @@ function entryHasCoverage(entry = {}) {
   return formatEntryCoverageBrief(entry) !== 'No coverage recorded';
 }
 
+async function resolveBookDisplayMetaForSummary(bookId, orgId, reqUser) {
+  const token = clean(bookId);
+  if (!token) return { title: '', coverPhotoUrl: '' };
+  const scopedOrgId = clean(orgId);
+  if (scopedOrgId) {
+    try {
+      const book = await bookAssignmentService.assertBookInOrg(token, scopedOrgId, reqUser);
+      return {
+        title: clean(book?.title) || token,
+        coverPhotoUrl: resolveCoverPhotoUrl(book)
+      };
+    } catch (_) {
+      // Fall back to org-scoped lookup without route access context.
+    }
+  }
+  const book = await schoolDataService.getDataById('books', token, reqUser);
+  if (book) {
+    return {
+      title: clean(book?.title) || token,
+      coverPhotoUrl: resolveCoverPhotoUrl(book)
+    };
+  }
+  return { title: token, coverPhotoUrl: '' };
+}
+
 async function buildReportSummary(report, reqUser, accessContext = {}) {
   const entries = Array.isArray(report?.entries) ? report.entries : [];
+  const orgId = clean(report?.orgId || reqUser?.activeOrgId);
   const bookMetaMap = new Map();
   for (const entry of entries) {
     const bookId = clean(entry.bookId);
     if (!bookId || bookMetaMap.has(bookId)) continue;
-    const book = await schoolDataService.getDataById('books', bookId, reqUser, accessContext);
-    const coverPhotoUrl = clean(book?.coverPhotoUrl || book?.coverPhoto?.url);
-    bookMetaMap.set(bookId, {
-      title: clean(book?.title) || bookId,
-      coverPhotoUrl
-    });
+    bookMetaMap.set(bookId, await resolveBookDisplayMetaForSummary(bookId, orgId, reqUser));
   }
 
   const entrySummaries = entries.map((entry) => {

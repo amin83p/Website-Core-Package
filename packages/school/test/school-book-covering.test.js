@@ -86,6 +86,45 @@ test('book covering report service uses expandAssignedBooksForClass for session 
   assert.match(serviceSource, /getSessionBookCoveringSummary/);
 });
 
+test('buildReportSummary resolves book titles without book-covering route owner scope', async () => {
+  const schoolDataService = require('../MVC/services/school/schoolDataService');
+  const bookAssignmentService = require('../MVC/services/school/bookAssignmentService');
+  const servicePath = require.resolve('../MVC/services/school/bookCoveringReportService');
+  const originalGetById = schoolDataService.getDataById;
+  const originalAssertBook = bookAssignmentService.assertBookInOrg;
+
+  schoolDataService.getDataById = async (entityType, id, user, accessContext = {}) => {
+    if (entityType === 'books' && accessContext?.scopeId === 'SCP_OWNER') return null;
+    if (entityType === 'books') {
+      return { id, orgId: 'ORG-1', title: 'Resolved Book Title' };
+    }
+    return originalGetById(entityType, id, user, accessContext);
+  };
+  bookAssignmentService.assertBookInOrg = async (bookId) => ({
+    id: bookId,
+    orgId: 'ORG-1',
+    title: 'Resolved Book Title'
+  });
+
+  delete require.cache[servicePath];
+  const service = require('../MVC/services/school/bookCoveringReportService');
+
+  try {
+    const summary = await service.buildReportSummary({
+      id: 'BCR-9',
+      orgId: 'ORG-1',
+      status: 'submitted',
+      periodStartDate: '2026-08-15',
+      entries: [{ bookId: 'BK-9' }]
+    }, { id: 'USER-1', activeOrgId: 'ORG-1' }, { scopeId: 'SCP_OWNER' });
+    assert.equal(summary.entries[0].bookTitle, 'Resolved Book Title');
+  } finally {
+    schoolDataService.getDataById = originalGetById;
+    bookAssignmentService.assertBookInOrg = originalAssertBook;
+    delete require.cache[servicePath];
+  }
+});
+
 test('book covering report service formats entry coverage summaries', () => {
   const service = require('../MVC/services/school/bookCoveringReportService');
   const brief = service.buildReportSummary({
