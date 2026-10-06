@@ -11,13 +11,8 @@ const sessionAccessPolicyService = require('../../services/school/sessionAccessP
 const sessionUncompletedNotificationService = require('../../services/school/sessionUncompletedNotificationService');
 const sessionNotificationDeliveryService = require('../../services/school/sessionNotificationDeliveryService');
 const {
-  validateSessionNotificationEmailWrapperTemplate,
-  WRAPPER_PLACEHOLDER_DEFINITIONS
+  validateSessionNotificationEmailWrapperTemplate
 } = require('../../services/school/sessionNotificationEmailWrapperPlaceholders');
-const {
-  listBuiltinMappingRows,
-  getWrapperContextSources
-} = require('../../services/school/sessionNotificationEmailPlaceholderMappingService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const { requireCoreModule } = require('../../services/school/schoolCoreModuleResolver');
 const emailManagementService = requireCoreModule('MVC/services/emailManagementService');
@@ -506,12 +501,6 @@ async function loadSettingsPageData(req) {
     rollupFormula: attendanceConfig.rollupFormula || defaultAttendanceRollupFormula(),
     autosavePolicy,
     sessionAccessPolicy: enrichedSessionAccessPolicy,
-    sessionNotificationEmailTokens: sessionAccessPolicyService.TEMPLATE_TOKENS,
-    sessionNotificationEmailWrapperTokens: WRAPPER_PLACEHOLDER_DEFINITIONS,
-    sessionNotificationEmailWrapperBuiltinMappings: listBuiltinMappingRows(),
-    sessionNotificationEmailContextSources: getWrapperContextSources(),
-    sessionNotificationEmailDefaultBody: sessionAccessPolicyService.DEFAULT_POLICY
-      .uncompletedSessionNotification.channels.email.bodyTemplate,
     autosaveSections: listAutosaveSections(),
     uploadLimitsPolicy,
     uploadLimitSections: listUploadLimitSections(),
@@ -882,110 +871,24 @@ function buildSessionAccessTestEmailSentMessage(usedSampleData, rangeLabel) {
 }
 
 async function previewSessionAccessTestNotification(req, res) {
-  try {
-    const data = await buildSessionAccessTestNotificationRequest(req);
-    const outcome = await sessionNotificationDeliveryService.previewDigestEmailNotification({
-      policy: data.policy,
-      teacher: data.teacher,
-      context: data.context,
-      orgId: data.activeOrgId,
-      subjectPrefix: '[TEST] '
-    });
-    assertSessionAccessTestEmailOutcome(outcome);
-    if (outcome.status !== 'preview') {
-      const error = new Error('Unable to build the test email preview.');
-      error.statusCode = 500;
-      throw error;
-    }
-
-    return res.json({
-      status: 'success',
-      message: buildSessionAccessTestEmailPreviewMessage(data.usedSampleData, data.rangeLabel),
-      recipient: outcome.recipient,
-      subject: outcome.subject,
-      preview: {
-        html: outcome.html,
-        text: outcome.text
-      },
-      sessionCount: data.sessions.length,
-      usedSampleData: data.usedSampleData,
-      dateRange: { fromDate: data.fromDate, throughDate: data.throughDate, label: data.rangeLabel },
-      warnings: data.warnings
-    });
-  } catch (error) {
-    return res.status(Number(error?.statusCode) || 500).json({
-      status: 'error',
-      message: error?.message || 'Failed to preview session access test email.'
-    });
-  }
+  return res.status(410).json({
+    status: 'error',
+    message: 'Uncompleted session notifications are configured in Notification Centre.'
+  });
 }
 
 async function sendSessionAccessTestNotification(req, res) {
-  try {
-    const data = await buildSessionAccessTestNotificationRequest(req);
-
-    const outcome = await sessionNotificationDeliveryService.sendDigestEmailNotification({
-      policy: data.policy,
-      teacher: data.teacher,
-      context: data.context,
-      orgId: data.activeOrgId,
-      subjectPrefix: '[TEST] '
-    });
-
-    assertSessionAccessTestEmailOutcome(outcome);
-    if (outcome.status !== 'sent') {
-      const error = new Error('Unable to send the test email.');
-      error.statusCode = 500;
-      throw error;
-    }
-
-    return res.json({
-      status: 'success',
-      message: buildSessionAccessTestEmailSentMessage(data.usedSampleData, data.rangeLabel),
-      sessionCount: data.sessions.length,
-      usedSampleData: data.usedSampleData,
-      recipient: outcome.recipient
-    });
-  } catch (error) {
-    return res.status(Number(error?.statusCode) || 500).json({
-      status: 'error',
-      message: error?.message || 'Failed to send session access test email.'
-    });
-  }
+  return res.status(410).json({
+    status: 'error',
+    message: 'Uncompleted session notifications are configured in Notification Centre.'
+  });
 }
 
 async function checkSessionNotificationEmailTemplate(req, res) {
-  try {
-    const activeOrgId = activeOrgIdOrThrow(req.user);
-    const templateId = String(req.query?.templateId || '').trim();
-    const policy = await sessionAccessPolicyModel.getPolicyForOrg(activeOrgId);
-    const customMappings = policy?.uncompletedSessionNotification?.channels?.email?.wrapperPlaceholderMappings || [];
-    let validation = {
-      hasBodyContentSlot: false,
-      warnings: [],
-      unsupportedTokens: []
-    };
-    if (templateId) {
-      const template = await emailManagementService.getTemplateById(templateId, req.user);
-      if (template) {
-        validation = validateSessionNotificationEmailWrapperTemplate(template, { customMappings });
-      }
-    }
-    const warnings = Array.isArray(validation.warnings) ? validation.warnings : [];
-    return res.json({
-      status: 'success',
-      templateId,
-      hasBodyContentSlot: validation.hasBodyContentSlot === true,
-      warnings,
-      unsupportedTokens: Array.isArray(validation.unsupportedTokens) ? validation.unsupportedTokens : [],
-      warning: warnings.join(' ')
-    });
-  } catch (error) {
-    return res.status(Number(error?.statusCode) || 500).json({
-      status: 'error',
-      message: error?.message || 'Unable to check email template.'
-    });
-  }
+  return res.status(410).json({
+    status: 'error',
+    message: 'Uncompleted session notifications are configured in Notification Centre.'
+  });
 }
 
 async function saveTimesheetImportPolicy(req, res) {

@@ -102,9 +102,6 @@ async function deleteRule(orgId, ruleId, reqUser = null) {
   const user = resolveReqUser(orgKey, reqUser);
   const row = await getRule(orgKey, ruleId, user);
   if (!row) throw new Error('Notification rule not found.');
-  if (row.legacyKey === notificationRuleModel.LEGACY_SESSION_RULE_KEY) {
-    throw new Error('The legacy session rule is managed from School Settings until migration is complete.');
-  }
   await schoolDataService.deleteData('notificationRules', ruleId, user);
   return true;
 }

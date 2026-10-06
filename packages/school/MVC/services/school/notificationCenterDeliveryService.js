@@ -4,7 +4,8 @@ const { requireCoreModule } = require('./schoolCoreContracts');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
 const notificationSendLedgerModel = require('../../models/school/notificationSendLedgerModel');
 const sessionNotificationDeliveryService = require('./sessionNotificationDeliveryService');
-const sessionAccessPolicyService = require('./sessionAccessPolicyService');
+const notificationRuleModel = require('../../models/school/notificationRuleModel');
+const { NC_META_SOURCE } = require('./notificationCenterComposeService');
 const {
   getTodayDateKeyInTimezone,
   resolveDefaultTimezone,
@@ -16,6 +17,16 @@ const smsOutboxService = requireCoreModule('MVC/services/smsOutboxService');
 
 function cleanText(value) {
   return String(value || '').trim();
+}
+
+function buildNcEmailOutboxBodies({ preview = {}, channelConfig = {}, resolved = {} } = {}) {
+  const mode = notificationRuleModel.normalizeEmailBodyMode(channelConfig.emailBodyMode);
+  const plainSource = cleanText(resolved.body) || cleanText(preview.plainText);
+  const htmlSource = cleanText(resolved.html) || cleanText(preview.htmlBody);
+  if (mode === 'plain') {
+    return { text: plainSource, html: '' };
+  }
+  return { text: '', html: htmlSource };
 }
 
 async function resolveOrgTimeZone(orgId) {
@@ -104,25 +115,40 @@ async function queueChannelForBatch({
     : cleanText(teacher?.mobile || teacher?.phone);
   if (!to) return { queued: 0, skipped: 1 };
 
-  const entry = channelName === 'email'
-    ? {
+  const meta = {
+    source: NC_META_SOURCE,
+    ruleId: rule.id,
+    runId: run.id,
+    batchId: batch.id,
+    channel: channelName
+  };
+
+  let entry;
+  if (channelName === 'email') {
+    const { text, html } = buildNcEmailOutboxBodies({ preview, channelConfig, resolved });
+    if (!text && !html) return { queued: 0, skipped: 1 };
+    entry = {
       orgId,
       to,
-      subject: resolved.subject || preview.subject,
-      bodyText: resolved.body || preview.plainText,
-      bodyHtml: resolved.html || preview.htmlBody,
+      subject: resolved.subject || preview.subject || rule.label,
+      text,
+      html: html || undefined,
       sendAt,
       dedupeKey: semanticDedupeKey,
-      metadata: { ruleId: rule.id, runId: run.id, batchId: batch.id }
-    }
-    : {
-      orgId,
-      to,
-      body: resolved.body || preview.smsText,
-      sendAt,
-      dedupeKey: semanticDedupeKey,
-      metadata: { ruleId: rule.id, runId: run.id, batchId: batch.id }
+      meta
     };
+  } else {
+    const body = cleanText(resolved.body || preview.smsText || preview.plainText);
+    if (!body) return { queued: 0, skipped: 1 };
+    entry = {
+      orgId,
+      to,
+      body,
+      sendAt,
+      dedupeKey: semanticDedupeKey,
+      meta
+    };
+  }
 
   const created = await outboxService.enqueue(entry);
   if (!created) return { queued: 0, skipped: 1 };
@@ -179,7 +205,6 @@ async function dispatchRunBatches({ orgId, rule, run, user, logger } = {}) {
 async function prepareScheduledRule({ orgId, ruleId, logger, now = new Date() } = {}) {
   const notificationCenterRunService = require('./notificationCenterRunService');
   const notificationCenterRuleService = require('./notificationCenterRuleService');
-  const notificationRuleModel = require('../../models/school/notificationRuleModel');
   const orgKey = cleanText(orgId);
   const rule = await notificationCenterRuleService.getRule(orgKey, ruleId, { activeOrgId: orgKey, id: 'scheduled-task' });
   if (!rule || rule.enabled !== true) return { prepared: 0, skipped: 0 };
@@ -188,24 +213,27 @@ async function prepareScheduledRule({ orgId, ruleId, logger, now = new Date() } 
   if (!notificationRuleModel.isRuleScheduledEvaluationAllowed(rule, todayKey)) {
     return { prepared: 0, skipped: 1, reason: 'outside_activity_window' };
   }
+  const autoQueue = rule?.schedule?.autoQueueOnSchedule === true;
   const run = await notificationCenterRunService.executeRun({
     orgId: orgKey,
     ruleId: rule.id,
     user: { activeOrgId: orgKey, id: 'scheduled-task' },
     trigger: 'scheduled',
     asOfDate: cleanText(now.toISOString().slice(0, 10)),
-    queueDelivery: false
+    queueDelivery: autoQueue
   });
   if (!run) return { prepared: 0, skipped: 1 };
   return {
     prepared: run.batchCount || 0,
     skipped: 0,
     runId: run.id,
-    mode: 'preview'
+    mode: autoQueue ? 'queued' : 'preview'
   };
 }
 
 module.exports = {
+  buildNcEmailOutboxBodies,
   dispatchRunBatches,
-  prepareScheduledRule
+  prepareScheduledRule,
+  queueChannelForBatch
 };

@@ -15,6 +15,22 @@
     selectedDays = [0, 1, 2, 3, 4, 5, 6];
   }
   const selectedSet = new Set(selectedDays.filter((d) => Number.isFinite(d)));
+  const emailCh = row.channels?.email && typeof row.channels.email === 'object' ? row.channels.email : {};
+  const smsCh = row.channels?.sms && typeof row.channels.sms === 'object' ? row.channels.sms : {};
+  const emailBodyMode = String(emailCh.emailBodyMode || 'html').toLowerCase() === 'plain' ? 'plain' : 'html';
+  const placeholderRows = Array.isArray(emailComposePlaceholders) ? emailComposePlaceholders : [];
+  const deliveryTz = typeof orgTimeZone !== 'undefined' && orgTimeZone ? orgTimeZone : 'UTC';
+  const timingModes = Array.isArray(notificationTimingModes) && notificationTimingModes.length
+    ? notificationTimingModes
+    : ['same_day', 'next_day', 'daily_digest'];
+  let timingMode = row.criteria?.notificationTiming?.mode || '';
+  if (!timingMode) {
+    const sw = String(emailCh.sendWhen || '').toLowerCase();
+    timingMode = sw === 'daily_all' ? 'daily_digest' : (sw || 'daily_digest');
+  }
+  timingMode = timingModes.includes(timingMode) ? timingMode : 'daily_digest';
+  const sessionRangeType = row.criteria?.sessionDateRange?.type || 'this_week';
+  const daysBeforeToday = row.criteria?.sessionDateRange?.daysBeforeToday ?? '';
 %>
 
 <div class="sections-page">
@@ -37,11 +53,13 @@
     <form id="notificationRuleForm" method="post" action="/school/notification-center/rules/save">
       <input type="hidden" name="actionStateId" value="<%= asid %>">
       <input type="hidden" name="rule[id]" value="<%= row.id || '' %>">
-      <input type="hidden" name="rule[schedule][autoQueueOnSchedule]" value="false">
 
       <ul class="nav nav-tabs mb-4" id="notificationRuleTabs" role="tablist">
         <li class="nav-item" role="presentation">
           <button class="nav-link active" type="button" data-bs-toggle="tab" data-bs-target="#tab-nc-general" role="tab" aria-controls="tab-nc-general" aria-selected="true">General</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" type="button" data-bs-toggle="tab" data-bs-target="#tab-nc-delivery" role="tab" aria-controls="tab-nc-delivery" aria-selected="false">Delivery</button>
         </li>
         <li class="nav-item" role="presentation">
           <button class="nav-link" type="button" data-bs-toggle="tab" data-bs-target="#tab-nc-schedule" role="tab" aria-controls="tab-nc-schedule" aria-selected="false">Schedule</button>
@@ -53,7 +71,7 @@
 
       <div class="tab-content">
         <div class="tab-pane fade show active" id="tab-nc-general" role="tabpanel">
-          <p class="small text-muted mb-3">Define the rule label and type. Saved rules control what is found when you run them manually or on a schedule. Email is only sent after you review a run and schedule mail.</p>
+          <p class="small text-muted mb-3">Define the rule label and type. Use the <strong>Delivery</strong> tab for outbound channels and send times; use <strong>Email templates</strong> below for optional message copy.</p>
           <div class="row">
             <div class="col-md-6 mb-3">
               <label class="form-label" for="ruleLabel">Label *</label>
@@ -86,12 +104,93 @@
 
           <div class="card border-0 shadow-sm mb-3">
             <div class="card-body">
-              <h6 class="fw-bold text-primary m-0 mb-3"><i class="bi bi-envelope-paper me-1"></i>Email compose</h6>
-              <div class="form-check form-switch">
-                <input class="form-check-input" type="checkbox" role="switch" id="emailChannelEnabled" name="rule[channels][email][enabled]" value="true" <%= row.channels?.email?.enabled !== false ? 'checked' : '' %>>
-                <label class="form-check-label" for="emailChannelEnabled">Allow email scheduling</label>
+              <h6 class="fw-bold text-primary m-0 mb-3"><i class="bi bi-envelope-paper me-1"></i>Email templates</h6>
+              <p class="small text-muted mb-2">Optional templates use <code>{{TOKEN}}</code> placeholders. Leave blank to use built-in copy for the selected rule type (for example, book covering wording for sessions without a submitted book report).</p>
+              <div class="mb-3">
+                <label class="form-label" for="emailSubjectTemplate">Subject template</label>
+                <input class="form-control font-monospace size-md" type="text" id="emailSubjectTemplate" name="rule[channels][email][subjectTemplate]" value="<%= emailCh.subjectTemplate || '' %>" maxlength="500" placeholder="{{RULE_LABEL}} ({{ITEM_COUNT}} item(s))">
               </div>
-              <div class="form-text small">When enabled, operators can schedule emails from run results. Send time is chosen when you compose mail after reviewing a run.</div>
+              <div class="mb-3">
+                <label class="form-label" for="emailBodyTextTemplate">Plain body template</label>
+                <textarea class="form-control font-monospace size-md" id="emailBodyTextTemplate" name="rule[channels][email][bodyTextTemplate]" rows="8" maxlength="20000" placeholder="Hi {{TEACHER_NAME}},&#10;&#10;{{SESSION_LIST}}"><%= emailCh.bodyTextTemplate || '' %></textarea>
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="emailBodyHtmlTemplate">HTML body template</label>
+                <textarea class="form-control font-monospace size-md" id="emailBodyHtmlTemplate" name="rule[channels][email][bodyHtmlTemplate]" rows="8" maxlength="20000" placeholder="<p>Hi {{TEACHER_NAME}},</p>&#10;{{SESSION_LIST_HTML}}"><%= emailCh.bodyHtmlTemplate || '' %></textarea>
+                <div class="form-text small">Inner HTML only; branded wrapper is applied when emails are composed.</div>
+              </div>
+              <% if (placeholderRows.length) { %>
+                <details class="small">
+                  <summary class="fw-semibold text-primary mb-2">Placeholders</summary>
+                  <table class="table table-sm table-bordered mb-0">
+                    <thead><tr><th>Token</th><th>Description</th></tr></thead>
+                    <tbody>
+                      <% placeholderRows.forEach((ph) => { %>
+                        <tr>
+                          <td class="font-monospace text-nowrap"><code>{{<%= ph.token %>}}</code></td>
+                          <td><%= ph.description %></td>
+                        </tr>
+                      <% }); %>
+                    </tbody>
+                  </table>
+                </details>
+              <% } %>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-nc-delivery" role="tabpanel">
+          <p class="small text-muted mb-3">Configure when and how messages are sent. Times use organization timezone: <strong><%= deliveryTz %></strong>. Manual <strong>Run now</strong> still requires review unless you only use scheduled auto-queue below.</p>
+
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+              <h6 class="fw-bold text-primary m-0 mb-3"><i class="bi bi-send-check me-1"></i>Scheduled auto-send</h6>
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="autoQueueOnSchedule" name="rule[schedule][autoQueueOnSchedule]" value="true" <%= row.schedule?.autoQueueOnSchedule === true ? 'checked' : '' %>>
+                <label class="form-check-label" for="autoQueueOnSchedule">Queue messages automatically after scheduled evaluation</label>
+              </div>
+              <div class="form-text small">When enabled, a scheduled run queues email and/or SMS using the settings below. Manual runs are not auto-queued. Requires scheduled evaluation on the <strong>Schedule</strong> tab.</div>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+              <h6 class="fw-bold text-primary m-0 mb-3"><i class="bi bi-envelope me-1"></i>Email delivery</h6>
+              <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" role="switch" id="emailChannelEnabled" name="rule[channels][email][enabled]" value="true" <%= row.channels?.email?.enabled !== false ? 'checked' : '' %>>
+                <label class="form-check-label" for="emailChannelEnabled">Enable email</label>
+              </div>
+              <div class="form-text small mb-3">When enabled, scheduled auto-send can queue email; operators can also schedule email manually from a run review.</div>
+              <label class="form-label d-block">Email body format</label>
+              <div class="d-flex flex-wrap gap-3 mb-3">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="rule[channels][email][emailBodyMode]" id="emailBodyModeHtml" value="html" <%= emailBodyMode === 'html' ? 'checked' : '' %>>
+                  <label class="form-check-label" for="emailBodyModeHtml">HTML (branded layout)</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="rule[channels][email][emailBodyMode]" id="emailBodyModePlain" value="plain" <%= emailBodyMode === 'plain' ? 'checked' : '' %>>
+                  <label class="form-check-label" for="emailBodyModePlain">Plain text only</label>
+                </div>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="emailSendAtTime">Send at time</label>
+                <input class="form-control size-md" type="time" id="emailSendAtTime" name="rule[channels][email][sendAtTime]" value="<%= emailCh.sendAtTime || '18:00' %>">
+              </div>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+              <h6 class="fw-bold text-primary m-0 mb-3"><i class="bi bi-chat-dots me-1"></i>SMS delivery</h6>
+              <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" role="switch" id="smsChannelEnabled" name="rule[channels][sms][enabled]" value="true" <%= smsCh.enabled === true ? 'checked' : '' %>>
+                <label class="form-check-label" for="smsChannelEnabled">Enable SMS</label>
+              </div>
+              <div class="col-md-4">
+                <label class="form-label" for="smsSendAtTime">Send at time</label>
+                <input class="form-control size-md" type="time" id="smsSendAtTime" name="rule[channels][sms][sendAtTime]" value="<%= smsCh.sendAtTime || '18:00' %>">
+              </div>
+              <div class="form-text small mt-2">SMS uses the default short message from the rule type when auto-queued.</div>
             </div>
           </div>
         </div>
@@ -106,7 +205,7 @@
                 <input class="form-check-input" type="checkbox" role="switch" id="scheduleEnabled" name="rule[schedule][scheduleEnabled]" value="true" <%= row.schedule?.scheduleEnabled === true ? 'checked' : '' %>>
                 <label class="form-check-label" for="scheduleEnabled">Enable scheduled evaluation</label>
               </div>
-              <div class="form-text small mb-3">Preview results are stored for later review; email is still scheduled manually from a run. Pause or cancel the linked scheduled task, or disable this rule, to stop automatic runs.</div>
+              <div class="form-text small mb-3">Preview results are stored for review. Use the <strong>Delivery</strong> tab to auto-queue messages after a scheduled run. Pause or cancel the linked scheduled task, or disable this rule, to stop automatic runs.</div>
               <div class="row g-3">
                 <div class="col-md-4">
                   <label class="form-label" for="scheduleRunAtTime">Run at time</label>
@@ -151,15 +250,39 @@
         </div>
 
         <div class="tab-pane fade" id="tab-nc-criteria" role="tabpanel">
-          <p class="small text-muted mb-3">Limit which sessions or periods are included when the rule runs.</p>
-          <div class="row">
-            <div class="col-md-6 mb-3">
-              <label class="form-label" for="sessionDateRange">Session date range</label>
-              <select class="form-select size-md" id="sessionDateRange" name="rule[criteria][sessionDateRange][type]">
-                <% dateRangeTypes.forEach((opt) => { %>
-                  <option value="<%= opt %>" <%= (row.criteria?.sessionDateRange?.type || 'this_week') === opt ? 'selected' : '' %>><%= formatLabel(opt) %></option>
-                <% }); %>
-              </select>
+          <p class="small text-muted mb-3">Limit which sessions are included and when reminders align relative to session dates. Send clock times are on the <strong>Delivery</strong> tab.</p>
+          <div class="card border-0 shadow-sm mb-3" id="ncCriteriaTimingCard">
+            <div class="card-body">
+              <h6 class="fw-bold text-primary m-0 mb-3"><i class="bi bi-clock-history me-1"></i>Session timing</h6>
+              <div class="d-flex flex-column gap-2 mb-2">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="rule[criteria][notificationTiming][mode]" id="ncTimingSameDay" value="same_day" <%= timingMode === 'same_day' ? 'checked' : '' %>>
+                  <label class="form-check-label" for="ncTimingSameDay">Same day as session</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="rule[criteria][notificationTiming][mode]" id="ncTimingNextDay" value="next_day" <%= timingMode === 'next_day' ? 'checked' : '' %>>
+                  <label class="form-check-label" for="ncTimingNextDay">Day after session</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="rule[criteria][notificationTiming][mode]" id="ncTimingDailyDigest" value="daily_digest" <%= timingMode === 'daily_digest' ? 'checked' : '' %>>
+                  <label class="form-check-label" for="ncTimingDailyDigest">Daily digest of uncompleted sessions</label>
+                </div>
+              </div>
+              <p class="small text-muted mb-0 d-none" id="ncTimingRelativeHelp">Eligible sessions are determined when the rule runs; outbound send time uses the Delivery tab.</p>
+              <div class="row g-3 mt-3 d-none" id="ncTimingDigestFields">
+                <div class="col-md-6">
+                  <label class="form-label" for="sessionDateRange">Sessions to include in digest</label>
+                  <select class="form-select size-md" id="sessionDateRange" name="rule[criteria][sessionDateRange][type]">
+                    <% dateRangeTypes.forEach((opt) => { %>
+                      <option value="<%= opt %>" <%= sessionRangeType === opt ? 'selected' : '' %>><%= formatLabel(opt) %></option>
+                    <% }); %>
+                  </select>
+                </div>
+                <div class="col-md-6 d-none" id="ncSessionDaysBeforeRow">
+                  <label class="form-label" for="sessionDaysBeforeToday">Days before today</label>
+                  <input class="form-control size-md" type="number" min="1" max="365" id="sessionDaysBeforeToday" name="rule[criteria][sessionDateRange][daysBeforeToday]" value="<%= daysBeforeToday %>">
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -260,6 +383,38 @@
       }
     });
   }
+
+  const timingCard = document.getElementById('ncCriteriaTimingCard');
+  const ruleTypeSelect = document.getElementById('ruleType');
+  const digestFields = document.getElementById('ncTimingDigestFields');
+  const relativeHelp = document.getElementById('ncTimingRelativeHelp');
+  const daysBeforeRow = document.getElementById('ncSessionDaysBeforeRow');
+  const sessionRangeSelect = document.getElementById('sessionDateRange');
+
+  function selectedTimingMode() {
+    const checked = document.querySelector('input[name="rule[criteria][notificationTiming][mode]"]:checked');
+    return String(checked?.value || 'daily_digest');
+  }
+
+  function refreshCriteriaTimingUi() {
+    if (!timingCard) return;
+    const isTimesheet = String(ruleTypeSelect?.value || '').trim() === 'timesheet_not_submitted';
+    timingCard.classList.toggle('d-none', isTimesheet);
+    if (isTimesheet) return;
+    const mode = selectedTimingMode();
+    const isDigest = mode === 'daily_digest';
+    digestFields?.classList.toggle('d-none', !isDigest);
+    relativeHelp?.classList.toggle('d-none', isDigest);
+    const rangeType = String(sessionRangeSelect?.value || '');
+    daysBeforeRow?.classList.toggle('d-none', !isDigest || rangeType !== 'days_before_today');
+  }
+
+  document.querySelectorAll('input[name="rule[criteria][notificationTiming][mode]"]').forEach((input) => {
+    input.addEventListener('change', refreshCriteriaTimingUi);
+  });
+  ruleTypeSelect?.addEventListener('change', refreshCriteriaTimingUi);
+  sessionRangeSelect?.addEventListener('change', refreshCriteriaTimingUi);
+  refreshCriteriaTimingUi();
 
   const deleteRuleBtn = document.querySelector('.js-nc-delete-rule-form');
   if (deleteRuleBtn) {

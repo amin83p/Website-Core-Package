@@ -9,6 +9,8 @@ const notificationCenterRuleService = require('./notificationCenterRuleService')
 const notificationCenterEvaluatorRegistry = require('./notificationCenterEvaluatorRegistry');
 
 const notificationCenterDeliveryService = require('./notificationCenterDeliveryService');
+const notificationCenterLegacyDeliveryAdapter = require('./notificationCenterLegacyDeliveryAdapter');
+const notificationRuleModel = require('../../models/school/notificationRuleModel');
 
 const schoolDataService = require('./schoolDataService');
 
@@ -168,19 +170,20 @@ async function executeRun({
 
 
     if (queueDelivery) {
-
-      await notificationCenterDeliveryService.dispatchRunBatches({
-
-        orgId: orgKey,
-
-        rule,
-
-        run: updated,
-
-        user
-
-      });
-
+      if (notificationRuleModel.isDailyDigestNotificationTiming(rule)) {
+        await notificationCenterDeliveryService.dispatchRunBatches({
+          orgId: orgKey,
+          rule,
+          run: updated,
+          user
+        });
+      } else {
+        await notificationCenterLegacyDeliveryAdapter.queuePerSessionNotificationsFromRule({
+          orgId: orgKey,
+          rule,
+          now: new Date()
+        });
+      }
     }
 
 

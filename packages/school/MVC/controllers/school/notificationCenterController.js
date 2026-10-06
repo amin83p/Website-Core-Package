@@ -11,10 +11,15 @@ const notificationCenterRunPresentationService = require('../../services/school/
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
 
 const notificationCenterComposeService = require('../../services/school/notificationCenterComposeService');
+const notificationCenterEmailComposeService = require('../../services/school/notificationCenterEmailComposeService');
 
 const notificationRuleModel = require('../../models/school/notificationRuleModel');
 
-const { formatNotificationTokenLabel, SESSION_DATE_RANGE_TYPES } = notificationRuleModel;
+const {
+  formatNotificationTokenLabel,
+  SESSION_DATE_RANGE_TYPES,
+  SESSION_NOTIFICATION_TIMING_MODES
+} = notificationRuleModel;
 
 const { OPERATIONS } = require('../../../config/accessConstants');
 
@@ -151,7 +156,11 @@ async function baseView(req, res, extra = {}) {
 
     sessionDateRangeTypes: SESSION_DATE_RANGE_TYPES,
 
+    notificationTimingModes: SESSION_NOTIFICATION_TIMING_MODES,
+
     formatNotificationTokenLabel,
+
+    emailComposePlaceholders: notificationCenterEmailComposeService.PLACEHOLDER_DEFINITIONS,
 
     orgTimeZone,
 
@@ -178,8 +187,6 @@ async function showHome(req, res) {
   try {
 
     const orgId = getActiveOrgIdOrThrow(req.user);
-
-    await notificationCenterRuleService.syncLegacySessionNotFinalRule(orgId, null, req.user);
 
     const access = await notificationCenterAccessService.buildAccessFlags(req.user, req.ip);
 
@@ -299,7 +306,19 @@ async function showRuleForm(req, res) {
 
     const rule = ruleId === 'new'
 
-      ? { id: '', orgId, enabled: true, ruleType: 'session_not_final', label: '', criteria: {}, channels: { email: { enabled: true }, sms: {} }, schedule: { autoQueueOnSchedule: false } }
+      ? {
+        id: '',
+        orgId,
+        enabled: true,
+        ruleType: 'session_not_final',
+        label: '',
+        criteria: {},
+        channels: {
+          email: { enabled: true, emailBodyMode: 'html', sendAtTime: '18:00' },
+          sms: { enabled: false, sendAtTime: '18:00' }
+        },
+        schedule: { autoQueueOnSchedule: false }
+      }
 
       : await notificationCenterRuleService.getRule(orgId, ruleId, req.user);
 
@@ -353,11 +372,16 @@ async function saveRule(req, res) {
 
     payload.channels.email = emailChannel;
 
-    payload.channels.sms = { enabled: false };
+    const smsChannel = payload.channels.sms && typeof payload.channels.sms === 'object'
+      ? payload.channels.sms
+      : {};
+    smsChannel.enabled = smsChannel.enabled === 'true' || smsChannel.enabled === true;
+    payload.channels.sms = smsChannel;
 
     payload.schedule = payload.schedule && typeof payload.schedule === 'object' ? payload.schedule : {};
 
-    payload.schedule.autoQueueOnSchedule = false;
+    payload.schedule.autoQueueOnSchedule = payload.schedule.autoQueueOnSchedule === 'true'
+      || payload.schedule.autoQueueOnSchedule === true;
     payload.schedule.scheduleEnabled = payload.schedule.scheduleEnabled === 'true' || payload.schedule.scheduleEnabled === true;
     payload.schedule.runAtTime = String(payload.schedule.runAtTime || '').trim().slice(0, 5);
     const rawDays = payload.schedule.daysOfWeek;

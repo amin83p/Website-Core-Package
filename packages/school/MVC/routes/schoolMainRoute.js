@@ -6,6 +6,7 @@ const { registerSchoolUploadCategoryResolvers } = require('../services/school/sc
 const { registerSchoolEmailEvents } = require('../services/school/schoolEmailEventRegistration');
 const { registerSchoolScheduledTasks } = require('../services/school/schoolScheduledTaskRegistration');
 const { syncAllSessionAccessPolicyTasks } = require('../services/school/sessionAccessPolicyTaskSyncService');
+const { migrateAllOrgsSessionNotificationToNc } = require('../services/school/uncompletedSessionNotificationMigrationService');
 const schoolStudentProfileLinkService = require('../services/school/schoolStudentProfileLinkService');
 
 const SCHOOL_MOUNT_GUARD_KEY = '__schoolMainRouteMounted';
@@ -13,7 +14,9 @@ const SCHOOL_MOUNT_GUARD_KEY = '__schoolMainRouteMounted';
 registerSchoolUploadCategoryResolvers();
 registerSchoolEmailEvents();
 registerSchoolScheduledTasks();
-syncAllSessionAccessPolicyTasks().catch(() => null);
+syncAllSessionAccessPolicyTasks()
+  .then(() => migrateAllOrgsSessionNotificationToNc())
+  .catch(() => null);
 
 router.use((req, _res, next) => {
   if (req?.[SCHOOL_MOUNT_GUARD_KEY]) return next('router');

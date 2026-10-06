@@ -446,25 +446,6 @@ function validatePolicyInput(input = {}) {
       throw error;
     }
   });
-  validateChannelSessionDateRanges(normalized.uncompletedSessionNotification);
-  validateNotificationScheduleTimes(normalized.uncompletedSessionNotification);
-  const emailChannel = normalized.uncompletedSessionNotification?.channels?.email || {};
-  if (emailChannel.enabled === true && !usesManagedEmailTemplate(emailChannel)) {
-    const error = new Error('An email template is required when email notifications are enabled.');
-    error.statusCode = 400;
-    throw error;
-  }
-  const templatesToValidate = [emailChannel.bodyTemplate];
-  if (!usesManagedEmailTemplate(emailChannel)) {
-    templatesToValidate.push(emailChannel.subjectTemplate);
-  }
-  templatesToValidate.push(normalized.uncompletedSessionNotification.channels.sms.bodyTemplate);
-  const invalidTokens = findInvalidTemplateTokens(templatesToValidate);
-  if (invalidTokens.length) {
-    const error = new Error(`Unknown template placeholder(s): ${invalidTokens.join(', ')}`);
-    error.statusCode = 400;
-    throw error;
-  }
   return normalized;
 }
 

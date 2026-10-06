@@ -39,7 +39,7 @@ const SCHOOL_SETTINGS_GROUPS = Object.freeze([
   Object.freeze({
     key: 'session-access',
     title: 'Session Access & Edit',
-    description: 'Configure teacher reminders for uncompleted sessions and attendance edit windows after completion.',
+    description: 'Configure attendance edit windows after session completion and related session access options.',
     icon: 'bi-shield-lock',
     order: 35
   }),

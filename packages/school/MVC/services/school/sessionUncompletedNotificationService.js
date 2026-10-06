@@ -641,6 +641,7 @@ module.exports = {
   buildSessionManagerPath,
   buildSessionListText,
   buildSessionListHtml,
+  buildSessionTimingMap,
   buildTeacherReviewEmailContent,
   resolveSessionCompletionTiming,
   groupEntriesByClassTitle,

@@ -117,6 +117,9 @@
       <div class="small text-muted mt-1">
 
         Status: <strong><%= fmt(run.status) %></strong>
+        <% if (rule?.schedule?.autoQueueOnSchedule === true) { %>
+          <span class="badge bg-info-subtle text-info border ms-1">Auto-queue on scheduled runs</span>
+        <% } %>
 
         · <%= run.findingCount || 0 %> finding(s)
 

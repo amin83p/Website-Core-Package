@@ -188,6 +188,62 @@ async function readPolicyDocument() {
   }, 'school.sessionAccessPolicy.readDocument');
 }
 
+async function markSessionNotificationMigrated(activeOrgId, auditUserId = 'migration') {
+  const key = orgKey(activeOrgId);
+  const disabledNotification = sessionAccessPolicyService.resolvePolicy({
+    uncompletedSessionNotification: {
+      enabled: false,
+      channels: {
+        email: { enabled: false },
+        sms: { enabled: false }
+      }
+    }
+  }).uncompletedSessionNotification;
+
+  const applyPatch = (row = {}) => {
+    const base = row && typeof row === 'object' ? row : {};
+    const merged = sessionAccessPolicyService.normalizePolicyFromStored({
+      ...pickStoredPolicyFields(base),
+      uncompletedSessionNotification: disabledNotification
+    });
+    return {
+      ...merged,
+      sessionNotificationMigratedToNcAt: new Date().toISOString(),
+      audit: {
+        ...(base.audit || {}),
+        lastUpdateUser: String(auditUserId || 'migration'),
+        lastUpdateDateTime: new Date().toISOString()
+      }
+    };
+  };
+
+  await runByRepositoryBackend({}, {
+    json: async () => {
+      await queueWrite(async () => {
+        const doc = await readFileParsed();
+        if (!doc.byOrgId || typeof doc.byOrgId !== 'object') doc.byOrgId = {};
+        doc.byOrgId[key] = applyPatch(doc.byOrgId[key]);
+        await fs.mkdir(path.dirname(dataPath), { recursive: true });
+        await fs.writeFile(dataPath, JSON.stringify(doc, null, 2), 'utf8');
+      });
+    },
+    mongo: async () => {
+      const collection = getMongoCollection(MONGO_COLLECTION);
+      const existing = await readMongoDoc();
+      const byOrgId = { ...(existing.byOrgId || {}) };
+      byOrgId[key] = applyPatch(byOrgId[key]);
+      const nowIso = new Date().toISOString();
+      await collection.updateOne(
+        { id: MONGO_DOC_ID },
+        { $set: { id: MONGO_DOC_ID, byOrgId, updatedAt: nowIso } },
+        { upsert: true }
+      );
+    }
+  }, 'school.sessionAccessPolicy.markSessionNotificationMigrated');
+
+  return disabledNotification;
+}
+
 module.exports = {
   DEFAULT_POLICY,
   getPolicyForOrg,
@@ -196,5 +252,7 @@ module.exports = {
   hasStoredPolicyForOrg,
   getStoredPolicyRowForOrg,
   readPolicyDocument,
+  markSessionNotificationMigrated,
+  pickStoredPolicyFields,
   orgKey
 };

@@ -51,6 +51,76 @@ const NOTIFICATION_RULE_TYPES = Object.freeze([
 
 const LEGACY_SESSION_RULE_KEY = 'legacy_session_not_final';
 
+const SESSION_NOTIFICATION_TIMING_MODES = Object.freeze(['same_day', 'next_day', 'daily_digest']);
+
+const SESSION_RULE_TYPES_WITH_TIMING = new Set([
+  'session_not_final',
+  'session_attendance_incomplete',
+  'session_without_book_report',
+  'session_without_notes',
+  'session_with_cases',
+  'session_with_activities'
+]);
+
+function normalizeNotificationTimingMode(value, fallback = 'daily_digest') {
+  const token = cleanString(value, { max: 40, allowEmpty: true }).toLowerCase();
+  if (token === 'daily_all') return 'daily_digest';
+  if (SESSION_NOTIFICATION_TIMING_MODES.includes(token)) return token;
+  return fallback;
+}
+
+function notificationTimingModeToSendWhen(mode) {
+  const normalized = normalizeNotificationTimingMode(mode);
+  return normalized === 'daily_digest' ? 'daily_all' : normalized;
+}
+
+function resolveRuleNotificationTimingMode(rule = {}) {
+  const criteriaMode = rule?.criteria?.notificationTiming?.mode;
+  if (criteriaMode) return normalizeNotificationTimingMode(criteriaMode);
+  const emailSendWhen = cleanString(rule?.channels?.email?.sendWhen, { max: 40, allowEmpty: true }).toLowerCase();
+  if (emailSendWhen) {
+    return normalizeNotificationTimingMode(emailSendWhen === 'daily_all' ? 'daily_digest' : emailSendWhen);
+  }
+  return 'daily_digest';
+}
+
+function isDailyDigestNotificationTiming(rule = {}) {
+  return resolveRuleNotificationTimingMode(rule) === 'daily_digest';
+}
+
+function normalizeSessionDateRange(raw = {}) {
+  const input = isPlainObject(raw) ? raw : {};
+  const type = cleanString(input.type, { max: 40, allowEmpty: true }) || 'this_week';
+  let daysBeforeToday = input.daysBeforeToday;
+  if (daysBeforeToday !== undefined && daysBeforeToday !== null && String(daysBeforeToday).trim() !== '') {
+    const parsed = Number.parseInt(String(daysBeforeToday), 10);
+    daysBeforeToday = Number.isFinite(parsed) ? Math.max(1, Math.min(365, parsed)) : null;
+  } else {
+    daysBeforeToday = null;
+  }
+  return { type, daysBeforeToday };
+}
+
+function normalizeNotificationTiming(raw = {}, ruleType = 'session_not_final') {
+  if (!SESSION_RULE_TYPES_WITH_TIMING.has(ruleType)) {
+    return { mode: 'daily_digest' };
+  }
+  const input = isPlainObject(raw) ? raw : {};
+  return { mode: normalizeNotificationTimingMode(input.mode) };
+}
+
+function applyNotificationTimingToChannels(rule = {}) {
+  if (!rule || typeof rule !== 'object') return rule;
+  if (!SESSION_RULE_TYPES_WITH_TIMING.has(rule.ruleType)) return rule;
+  const sendWhen = notificationTimingModeToSendWhen(resolveRuleNotificationTimingMode(rule));
+  const channels = rule.channels && typeof rule.channels === 'object' ? rule.channels : {};
+  rule.channels = {
+    email: { ...(channels.email || {}), sendWhen },
+    sms: { ...(channels.sms || {}), sendWhen }
+  };
+  return rule;
+}
+
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -83,6 +153,11 @@ function normalizeBoolean(value, fallback = true) {
   return fallback;
 }
 
+function normalizeEmailBodyMode(value) {
+  const token = cleanString(value, { max: 20, allowEmpty: true }).toLowerCase();
+  return token === 'plain' ? 'plain' : 'html';
+}
+
 function normalizeChannelBlock(raw = {}) {
   const input = isPlainObject(raw) ? raw : {};
   return {
@@ -96,6 +171,9 @@ function normalizeChannelBlock(raw = {}) {
     } : { type: 'this_week', daysBeforeToday: null },
     emailTemplateId: cleanId(input.emailTemplateId, { max: 120, allowEmpty: true }) || '',
     emailTemplateName: cleanString(input.emailTemplateName, { max: 200, allowEmpty: true }),
+    subjectTemplate: cleanString(input.subjectTemplate, { max: 500, allowEmpty: true }),
+    bodyTextTemplate: cleanString(input.bodyTextTemplate, { max: 20000, allowEmpty: true }),
+    bodyHtmlTemplate: cleanString(input.bodyHtmlTemplate, { max: 20000, allowEmpty: true }),
     smsTemplateId: cleanId(input.smsTemplateId, { max: 120, allowEmpty: true }) || '',
     smsTemplateName: cleanString(input.smsTemplateName, { max: 200, allowEmpty: true })
   };
@@ -103,8 +181,12 @@ function normalizeChannelBlock(raw = {}) {
 
 function normalizeChannels(raw = {}) {
   const input = isPlainObject(raw) ? raw : {};
+  const emailInput = isPlainObject(input.email) ? input.email : {};
   return {
-    email: normalizeChannelBlock(input.email),
+    email: {
+      ...normalizeChannelBlock(emailInput),
+      emailBodyMode: normalizeEmailBodyMode(emailInput.emailBodyMode)
+    },
     sms: normalizeChannelBlock(input.sms)
   };
 }
@@ -207,7 +289,8 @@ function isRuleScheduledEvaluationAllowed(rule = {}, dateKey = '') {
 function normalizeCriteria(raw = {}, ruleType = 'session_not_final') {
   const input = isPlainObject(raw) ? raw : {};
   const base = {
-    sessionDateRange: isPlainObject(input.sessionDateRange) ? input.sessionDateRange : { type: 'this_week' },
+    sessionDateRange: normalizeSessionDateRange(input.sessionDateRange),
+    notificationTiming: normalizeNotificationTiming(input.notificationTiming, ruleType),
     includeLockedSessions: normalizeBoolean(input.includeLockedSessions, false),
     timesheetPeriodId: cleanId(input.timesheetPeriodId, { max: 120, allowEmpty: true }) || '',
     submissionDeadlineDate: cleanString(input.submissionDeadlineDate, { max: 12, allowEmpty: true }),
@@ -223,12 +306,14 @@ function normalizeCriteria(raw = {}, ruleType = 'session_not_final') {
   if (ruleType === 'session_attendance_incomplete') {
     return {
       sessionDateRange: base.sessionDateRange,
+      notificationTiming: base.notificationTiming,
       includeLockedSessions: base.includeLockedSessions,
       minUnmarkedCount: base.minUnmarkedCount
     };
   }
   return {
     sessionDateRange: base.sessionDateRange,
+    notificationTiming: base.notificationTiming,
     includeLockedSessions: base.includeLockedSessions
   };
 }
@@ -264,6 +349,7 @@ function sanitizeRuleInput(input, { isUpdate = false } = {}) {
     activityDateWindow: normalizeActivityDateWindow(input.activityDateWindow),
     alsoCreateTask: normalizeBoolean(input.alsoCreateTask, false)
   };
+  applyNotificationTimingToChannels(out);
   if (!isUpdate && !out.orgId) throw new Error('Organization is required.');
   if (input.id) out.id = cleanId(input.id, { max: 120, allowEmpty: false });
   return out;
@@ -363,6 +449,13 @@ module.exports = {
   SESSION_DATE_RANGE_TYPES,
   formatNotificationTokenLabel,
   LEGACY_SESSION_RULE_KEY,
+  SESSION_NOTIFICATION_TIMING_MODES,
+  normalizeNotificationTimingMode,
+  notificationTimingModeToSendWhen,
+  resolveRuleNotificationTimingMode,
+  isDailyDigestNotificationTiming,
+  normalizeSessionDateRange,
+  applyNotificationTimingToChannels,
   sanitizeRuleInput,
   normalizeDaysOfWeek,
   normalizeActivityDateWindow,
@@ -372,6 +465,7 @@ module.exports = {
   isRuleScheduledEvaluationAllowed,
   generateRuleId,
   normalizeChannels,
+  normalizeEmailBodyMode,
   normalizeCriteria,
   normalizeSchedule,
   getAllNotificationRules,

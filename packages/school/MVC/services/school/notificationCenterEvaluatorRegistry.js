@@ -1,13 +1,12 @@
 'use strict';
 
 const sessionUncompletedNotificationService = require('./sessionUncompletedNotificationService');
+const notificationCenterEmailComposeService = require('./notificationCenterEmailComposeService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const schoolDataService = require('./schoolDataService');
 const notificationCenterSessionRuleScanService = require('./notificationCenterSessionRuleScanService');
-const personDisplayNameService = require('./personDisplayNameService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
-const { buildBrandedEmailLayout, escapeHtml, NEWS_INK, NEWS_MUTED, NEWS_LINE } = requireCoreModule('MVC/utils/brandedEmailLayout');
 
 function cleanText(value) {
   return String(value || '').trim();
@@ -222,61 +221,15 @@ async function buildBatchPreview({
   orgTimeZone = 'UTC',
   orgName = ''
 } = {}) {
-  const name = await personDisplayNameService.resolvePersonDisplayName(recipientPersonId, {
-    fallback: recipientPersonId
-  });
-  const sessionEntries = items
-    .filter((item) => item?.payload?.session)
-    .map((item) => ({
-      ...(item.payload && typeof item.payload === 'object' ? item.payload : {}),
-      title: item.title
-    }));
-  if (sessionEntries.length) {
-    const emailContent = await sessionUncompletedNotificationService.buildTeacherReviewEmailContent({
-      teacherName: name,
-      orgName,
-      entries: sessionEntries,
-      baseUrl,
-      orgId,
-      orgTimeZone
-    });
-    return {
-      recipientPersonId,
-      recipientName: name,
-      subject: `${rule.label || 'School reminder'} (${items.length} item(s))`,
-      plainText: emailContent.plainText,
-      htmlBody: emailContent.htmlBody,
-      smsText: `${rule.label || 'Reminder'}: ${items.length} item(s) need attention.`
-    };
-  }
-  const listText = items.map((item) => `- ${item.title}`).join('\n');
-  const listHtml = [
-    `<ul style="margin:0;padding:0 0 0 20px;color:${NEWS_INK};">`,
-    items.map((item) => `<li style="margin:0 0 8px;line-height:1.5;">${escapeHtml(item.title)}</li>`).join(''),
-    '</ul>'
-  ].join('');
-  const intro = `You have ${items.length} item(s) that need your attention. Please review and complete them when you are ready.`;
-  const org = escapeHtml(orgName || 'School');
-  const bodyInner = [
-    `<p style="margin:0 0 14px;">Hi ${escapeHtml(name)},</p>`,
-    `<p style="margin:0 0 16px;color:${NEWS_MUTED};">${escapeHtml(intro)}</p>`,
-    `<div style="padding:14px 16px;border:1px solid ${NEWS_LINE};border-radius:14px;background:rgba(248,251,255,0.9);">${listHtml}</div>`,
-    `<p style="margin:20px 0 0;color:${NEWS_MUTED};">Thank you,<br><strong style="color:${NEWS_INK};">${org}</strong></p>`
-  ].join('');
-  const htmlBody = buildBrandedEmailLayout({
-    baseUrl,
-    eyebrow: 'School notification',
-    title: rule.label || 'School reminder',
-    bodyHtml: bodyInner
-  });
-  return {
+  return notificationCenterEmailComposeService.buildEmailPreview({
+    rule,
     recipientPersonId,
-    recipientName: name,
-    subject: `${rule.label || 'School reminder'} (${items.length} item(s))`,
-    plainText: `Hi ${name},\n\n${intro}\n\n${listText}\n\nThank you,\n${orgName || 'School'}\n`,
-    htmlBody,
-    smsText: `${rule.label || 'Reminder'}: ${items.length} item(s) need attention.`
-  };
+    items,
+    orgId,
+    baseUrl,
+    orgTimeZone,
+    orgName
+  });
 }
 
 module.exports = {

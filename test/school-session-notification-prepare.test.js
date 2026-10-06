@@ -98,40 +98,6 @@ test('validatePolicyInput accepts cross-midnight prepare and send times', () => 
   assert.equal(normalized.uncompletedSessionNotification.channels.email.sendAtTime, '01:00');
 });
 
-test('validatePolicyInput accepts short cross-midnight gap when at least 10 minutes apart', () => {
-  sessionAccessPolicyService.validatePolicyInput({
-    uncompletedSessionNotification: {
-      enabled: true,
-      channels: {
-        email: {
-          enabled: true,
-          emailTemplateId: 'TPL_1',
-          prepareAtTime: '23:55',
-          sendAtTime: '00:06'
-        }
-      }
-    }
-  });
-});
-
-test('validatePolicyInput rejects prepare and send times less than 10 minutes apart', () => {
-  assert.throws(() => {
-    sessionAccessPolicyService.validatePolicyInput({
-      uncompletedSessionNotification: {
-        enabled: true,
-        channels: {
-          email: {
-            enabled: true,
-            emailTemplateId: 'TPL_1',
-            prepareAtTime: '08:00',
-            sendAtTime: '08:05'
-          }
-        }
-      }
-    });
-  }, /at least 10 minutes apart/i);
-});
-
 test('prepareUncompletedSessionEmailsForOrg enqueues outbox rows instead of sending', async () => {
   const teacherId = 'TEA_1';
   sessionUncompletedNotificationService.listUncompletedSessionsForOrg = async () => ([
@@ -414,57 +380,29 @@ test('prepareUncompletedSessionEmailsForOrg additive mode creates unique outbox 
   assert.match(enqueued[1].dedupeKey, /::RUN_B$/);
 });
 
-test('syncSessionAccessPolicyTasks upserts prepare and dispatch definitions for email and SMS', async () => {
-  const scheduledTaskDefinitionService = require('../MVC/services/scheduledTaskDefinitionService');
+test('syncSessionAccessPolicyTasks disables legacy session notification scheduled tasks', async () => {
   const scheduledTaskDefinitionRepository = require('../MVC/repositories/scheduledTaskDefinitionRepository');
-  const originalUpsert = scheduledTaskDefinitionService.upsertDefinition;
   const originalList = scheduledTaskDefinitionRepository.list;
-  let captured = [];
-  scheduledTaskDefinitionService.upsertDefinition = async (payload) => {
-    captured.push(payload);
-    return { id: `STD_${captured.length}`, ...payload };
+  const originalUpdate = scheduledTaskDefinitionRepository.update;
+  const disabled = [];
+  scheduledTaskDefinitionRepository.list = async () => ([
+    { id: 'T1', source: 'school.sessionAccessPolicy', sourceRef: 'ORG_SCHOOL:email:prepare', enabled: true },
+    { id: 'T2', source: 'school.sessionAccessPolicy', sourceRef: 'ORG_SCHOOL:email:dispatch', enabled: true }
+  ]);
+  scheduledTaskDefinitionRepository.update = async (id, patch) => {
+    disabled.push({ id, patch });
+    return { id, ...patch };
   };
-  scheduledTaskDefinitionRepository.list = async () => [];
 
   try {
-    await sessionAccessPolicyTaskSyncService.syncSessionAccessPolicyTasks('ORG_SCHOOL', {
-      uncompletedSessionNotification: {
-        enabled: true,
-        channels: {
-          email: {
-            enabled: true,
-            sendWhen: 'daily_all',
-            prepareAtTime: '02:00',
-            sendAtTime: '08:00'
-          },
-          sms: {
-            enabled: true,
-            sendWhen: 'same_day',
-            prepareAtTime: '02:15',
-            sendAtTime: '08:30'
-          }
-        }
-      }
-    });
-
-    assert.equal(captured.length, 4);
-    const emailPrepare = captured.find((row) => row.taskKey === 'school.uncompletedSessionEmail.prepare');
-    const emailDispatch = captured.find((row) => row.taskKey === 'school.uncompletedSessionEmail.dispatch');
-    const smsPrepare = captured.find((row) => row.taskKey === 'school.uncompletedSessionSms.prepare');
-    const smsDispatch = captured.find((row) => row.taskKey === 'school.uncompletedSessionSms.dispatch');
-    assert.ok(emailPrepare);
-    assert.ok(emailDispatch);
-    assert.ok(smsPrepare);
-    assert.ok(smsDispatch);
-    assert.equal(emailPrepare.runAtTime, '02:00');
-    assert.equal(emailDispatch.runAtTime, '08:00');
-    assert.equal(emailPrepare.enabled, true);
-    assert.equal(emailDispatch.input.sendWhen, 'daily_all');
-    assert.equal(smsPrepare.runAtTime, '02:15');
-    assert.equal(smsDispatch.runAtTime, '08:30');
+    const result = await sessionAccessPolicyTaskSyncService.syncSessionAccessPolicyTasks('ORG_SCHOOL', {});
+    assert.equal(result.legacyNotificationTasksDisabled, true);
+    assert.equal(disabled.length, 2);
+    assert.equal(disabled[0].patch.enabled, false);
+    assert.equal(disabled[0].patch.paused, true);
   } finally {
-    scheduledTaskDefinitionService.upsertDefinition = originalUpsert;
     scheduledTaskDefinitionRepository.list = originalList;
+    scheduledTaskDefinitionRepository.update = originalUpdate;
   }
 });
 
@@ -493,15 +431,12 @@ test('app wiring starts core scheduler and registers handlers', () => {
   assert.match(schoolRouteSource, /syncAllSessionAccessPolicyTasks/);
 });
 
-test('school settings UI includes prepareAtTime fields and schedule gap warnings', () => {
+test('school settings session access links to Notification Centre for reminders', () => {
   const settingsView = fs.readFileSync(
     path.join(__dirname, '..', 'packages', 'school', 'MVC', 'views', 'school', 'settings', 'index.ejs'),
     'utf8'
   );
-  assert.match(settingsView, /sessionNotificationEmailPrepareAtTime/);
-  assert.match(settingsView, /sessionNotificationSmsPrepareAtTime/);
-  assert.match(settingsView, /sessionNotificationEmailScheduleWarning/);
+  assert.doesNotMatch(settingsView, /id="cardSessionNotification"/);
+  assert.match(settingsView, /notification-center/);
   assert.match(settingsView, /isSessionAccessScheduleValid/);
-  assert.match(settingsView, /at least 10 minutes apart/i);
-  assert.doesNotMatch(settingsView, /later than Prepare.*on the same day/i);
 });
