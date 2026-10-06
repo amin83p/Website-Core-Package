@@ -3970,6 +3970,11 @@
         takeOverSessionsRailHandler = typeof handler === 'function' ? handler : null;
     }
 
+    let addCoTeacherRailHandler = null;
+    function bindAddCoTeacherRail(handler) {
+        addCoTeacherRailHandler = typeof handler === 'function' ? handler : null;
+    }
+
     let claimNumbersRailHandler = null;
     function bindClaimNumbersRail(handler) {
         claimNumbersRailHandler = typeof handler === 'function' ? handler : null;
@@ -5153,6 +5158,9 @@
             }
             if (action === 'take-over-sessions' && typeof takeOverSessionsRailHandler === 'function') {
                 void takeOverSessionsRailHandler();
+            }
+            if (action === 'add-co-teacher' && typeof addCoTeacherRailHandler === 'function') {
+                void addCoTeacherRailHandler();
             }
             if (action === 'claim-numbers' && typeof claimNumbersRailHandler === 'function') {
                 void claimNumbersRailHandler();
@@ -7522,6 +7530,19 @@ if (canLoadAllSchedules) {
             showBootstrapModal: showScheduleBootstrapModal,
             hideBootstrapModal: hideScheduleBootstrapModal,
             bindTakeOverSessionsRail,
+            countActiveScheduleSelectedSessions,
+            countActiveDraftSelectedSessions,
+            getSelectedSavedClassSessionEvents,
+            refreshScheduleViewWithHolidays
+        });
+    }
+    if (canSelectAnyPerson && typeof global.installMasterScheduleAddCoTeacher === 'function') {
+        global.installMasterScheduleAddCoTeacher({
+            uiAlert,
+            escapeHtml,
+            showBootstrapModal: showScheduleBootstrapModal,
+            hideBootstrapModal: hideScheduleBootstrapModal,
+            bindAddCoTeacherRail,
             countActiveScheduleSelectedSessions,
             countActiveDraftSelectedSessions,
             getSelectedSavedClassSessionEvents,

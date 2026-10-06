@@ -193,6 +193,7 @@
               <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-admin-action="move-enrollments" title="Move Sessions/Enrollments" aria-label="Move Sessions/Enrollments"><i class="bi bi-arrow-left-right" aria-hidden="true"></i></button>
               <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-admin-action="merge-sessions" title="Merge Sessions" aria-label="Merge Sessions"><i class="bi bi-intersect" aria-hidden="true"></i></button>
               <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-admin-action="take-over-sessions" title="Take Over" aria-label="Take Over"><i class="bi bi-person-check" aria-hidden="true"></i></button>
+              <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-admin-action="add-co-teacher" title="Add Co-Teacher" aria-label="Add Co-Teacher"><i class="bi bi-people" aria-hidden="true"></i></button>
               <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-admin-action="delete-enrollment" title="Delete Enrollment" aria-label="Delete Enrollment"><i class="bi bi-person-x" aria-hidden="true"></i></button>
               <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-admin-action="claim-numbers" title="Manage Claim Numbers" aria-label="Manage Claim Numbers"><i class="bi bi-card-checklist" aria-hidden="true"></i></button>
             </div>
@@ -480,6 +481,7 @@
 <%- include('school/schedule/partials/scheduleMoveSessionsModal') %>
 <%- include('school/schedule/partials/scheduleMergeSessionsModal') %>
 <%- include('school/schedule/partials/scheduleTakeOverSessionsModal') %>
+<%- include('school/schedule/partials/scheduleAddCoTeacherModal') %>
 <% } %>
 <%- include('partials/tablePages-end') %>
 
@@ -504,6 +506,7 @@
 <script src="/scripts/masterScheduleMoveSessions.js"></script>
 <script src="/scripts/masterScheduleMergeSessions.js"></script>
 <script src="/scripts/masterScheduleTakeOverSessions.js"></script>
+<script src="/scripts/masterScheduleAddCoTeacher.js"></script>
 <% } %>
 <script src="/scripts/masterScheduleViewer.js"></script>
 

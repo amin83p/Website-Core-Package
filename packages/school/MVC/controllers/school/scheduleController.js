@@ -25,6 +25,7 @@ const scheduleEnrollStudentsService = require('../../services/school/scheduleEnr
 const scheduleMoveSessionsService = require('../../services/school/scheduleMoveSessionsService');
 const scheduleMergeSessionsService = require('../../services/school/scheduleMergeSessionsService');
 const scheduleTakeOverSessionsService = require('../../services/school/scheduleTakeOverSessionsService');
+const scheduleAddCoTeacherService = require('../../services/school/scheduleAddCoTeacherService');
 const scheduleStagedCommitService = require('../../services/school/scheduleStagedCommitService');
 const { buildMasterScheduleViewerClientConfig } = require('../../services/school/masterScheduleViewerClientConfig');
 const holidayController = require('./holidayController');
@@ -2860,6 +2861,61 @@ async function postTakeOverSessionsApply(req, res) {
     }
 }
 
+async function postAddCoTeacherPreview(req, res) {
+    try {
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        const sessions = scheduleAddCoTeacherService.parseSelectedSessions(req.body || {});
+        const preview = await scheduleAddCoTeacherService.buildAddCoTeacherPreview({
+            teacherId: req.body?.teacherId,
+            sessions,
+            paid: req.body?.paid,
+            paidHours: req.body?.paidHours,
+            action: req.body?.action,
+            reqUser: req.user,
+            accessContext
+        });
+        return res.json({ status: 'success', data: preview });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            code: error?.code || '',
+            message: error.message || 'Unable to preview the co-teacher.'
+        });
+    }
+}
+
+async function postAddCoTeacherApply(req, res) {
+    try {
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        const sessions = scheduleAddCoTeacherService.parseSelectedSessions(req.body || {});
+        const result = await scheduleAddCoTeacherService.applyAddCoTeacher({
+            teacherId: req.body?.teacherId,
+            sessions,
+            paid: req.body?.paid,
+            paidHours: req.body?.paidHours,
+            action: req.body?.action,
+            previewHash: req.body?.previewHash,
+            reqUser: req.user,
+            accessContext
+        });
+        const message = result.change === 'remove'
+            ? 'Co-teacher was removed.'
+            : (result.change === 'update' ? 'Co-teacher was updated.' : 'Co-teacher was added.');
+        return res.json({
+            status: 'success',
+            message,
+            data: result
+        });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            code: error?.code || '',
+            message: error.message || 'Unable to add a co-teacher.',
+            blockers: error.preview?.blockers || []
+        });
+    }
+}
+
 async function postEnrollStudentsPrepare(req, res) {
     try {
         const accessContext = schoolDataService.buildRouteAccessContext(req);
@@ -3161,6 +3217,8 @@ module.exports = {
     postMergeSessionsApply,
     postTakeOverSessionsPreview,
     postTakeOverSessionsApply,
+    postAddCoTeacherPreview,
+    postAddCoTeacherApply,
     postEnrollStudentsSessionCapacityCheck,
     postEnrollStudentsStudentPickerExclusions,
     postEnrollStudentsProgramRegistrations,
