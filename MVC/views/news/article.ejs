@@ -88,40 +88,13 @@
   </section>
 
   <div class="row g-2 g-lg-3 align-items-start news-article-layout-row" id="articleLayoutRow">
-    <aside class="news-sidebar-col col-lg-2 d-none d-lg-block" id="leftSidebar">
-      <div class="news-sticky-stack">
-        <div class="news-glass-card">
-          <div class="news-widget-title"><i class="bi bi-clock-history"></i>Latest News</div>
-          <% if (latestItems.length) { %>
-            <div class="news-mini-list">
-              <% latestItems.forEach((news) => { %>
-                <a href="/news/article/<%= news.hrefToken %>" class="news-mini-card">
-                  <% if (news.image) { %>
-                    <img src="<%= news.image %>" alt="<%= news.title %>">
-                  <% } else { %>
-                    <span class="news-mini-icon"><i class="bi bi-newspaper"></i></span>
-                  <% } %>
-                  <span>
-                    <strong><%= news.title %></strong>
-                    <small><%= news.dateLabel %></small>
-                  </span>
-                </a>
-              <% }) %>
-            </div>
-          <% } else { %>
-            <p class="news-muted mb-0">No other news available.</p>
-          <% } %>
-        </div>
-      </div>
-    </aside>
-
-    <main class="col-lg-8 col-md-12 transition-all" id="mainColumn">
+    <main class="col-lg-9 col-md-12 transition-all" id="mainColumn">
       <article class="news-article-card" id="articleContent">
         <div class="reading-toolbar">
           <button class="tool-btn" id="btnDecreaseFont" title="Decrease Font"><i class="bi bi-fonts" style="font-size: 0.8rem;"></i></button>
           <button class="tool-btn" id="btnIncreaseFont" title="Increase Font"><i class="bi bi-fonts" style="font-size: 1.2rem;"></i></button>
           <div class="vr mx-2 text-muted"></div>
-          <button class="tool-btn" id="btnFocusMode" title="Focus Mode (Hide Sidebars)"><i class="bi bi-arrows-fullscreen"></i></button>
+          <button class="tool-btn" id="btnFocusMode" title="Focus Mode (Hide Sidebar)"><i class="bi bi-arrows-fullscreen"></i></button>
           <button class="tool-btn" id="btnReaderMode" title="Reader View"><i class="bi bi-book"></i></button>
           <!-- Intentionally browser-native: reader/article pages print the current article view. -->
           <button class="tool-btn" title="Print" data-print-native="article" onclick="window.print()"><i class="bi bi-printer"></i></button>
@@ -150,8 +123,31 @@
       </div>
     </main>
 
-    <aside class="news-sidebar-col col-lg-2 d-none d-lg-block" id="rightSidebar">
+    <aside class="news-sidebar-col col-lg-3 d-none d-lg-block" id="rightSidebar">
       <div class="news-sticky-stack">
+        <div class="news-glass-card">
+          <div class="news-widget-title"><i class="bi bi-clock-history"></i>Latest News</div>
+          <% if (latestItems.length) { %>
+            <div class="news-mini-list">
+              <% latestItems.forEach((news) => { %>
+                <a href="/news/article/<%= news.hrefToken %>" class="news-mini-card">
+                  <% if (news.image) { %>
+                    <img src="<%= news.image %>" alt="<%= news.title %>">
+                  <% } else { %>
+                    <span class="news-mini-icon"><i class="bi bi-newspaper"></i></span>
+                  <% } %>
+                  <span>
+                    <strong><%= news.title %></strong>
+                    <small><%= news.dateLabel %></small>
+                  </span>
+                </a>
+              <% }) %>
+            </div>
+          <% } else { %>
+            <p class="news-muted mb-0">No other news available.</p>
+          <% } %>
+        </div>
+
         <div class="news-glass-card">
           <div class="news-widget-title"><i class="bi bi-fire"></i>Related Stories</div>
           <% if (relatedItems.length) { %>
@@ -516,14 +512,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const bodyText = document.getElementById('articleBodyContent');
     const mainCol = document.getElementById('mainColumn');
-    const leftBar = document.getElementById('leftSidebar');
     const rightBar = document.getElementById('rightSidebar');
     const btnIncrease = document.getElementById('btnIncreaseFont');
     const btnDecrease = document.getElementById('btnDecreaseFont');
     const btnFocus = document.getElementById('btnFocusMode');
     const btnReader = document.getElementById('btnReaderMode');
     const layoutRow = document.getElementById('articleLayoutRow');
-    if (!bodyText || !mainCol || !leftBar || !rightBar || !btnIncrease || !btnDecrease || !btnFocus || !btnReader || !layoutRow) return;
+    if (!bodyText || !mainCol || !rightBar || !btnIncrease || !btnDecrease || !btnFocus || !btnReader || !layoutRow) return;
 
     const minFont = 14;
     const maxFont = 24;
@@ -549,19 +544,16 @@ document.addEventListener('DOMContentLoaded', () => {
     btnFocus.addEventListener('click', () => {
         state.isFocus = !state.isFocus;
         if (state.isFocus) {
-            leftBar.classList.remove('d-lg-block');
             rightBar.classList.remove('d-lg-block');
-            leftBar.classList.add('d-none');
             rightBar.classList.add('d-none');
-            mainCol.classList.remove('col-lg-8');
-            mainCol.classList.add('col-lg-10', 'mx-auto');
+            mainCol.classList.remove('col-lg-9');
+            mainCol.classList.add('col-lg-12');
             btnFocus.classList.add('active');
             btnFocus.innerHTML = '<i class="bi bi-fullscreen-exit"></i>';
         } else {
-            leftBar.classList.add('d-none', 'd-lg-block');
             rightBar.classList.add('d-none', 'd-lg-block');
-            mainCol.classList.add('col-lg-8');
-            mainCol.classList.remove('col-lg-10', 'mx-auto');
+            mainCol.classList.add('col-lg-9');
+            mainCol.classList.remove('col-lg-12');
             btnFocus.classList.remove('active');
             btnFocus.innerHTML = '<i class="bi bi-arrows-fullscreen"></i>';
         }

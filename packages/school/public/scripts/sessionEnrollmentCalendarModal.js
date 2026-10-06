@@ -3494,17 +3494,43 @@
       const summary = core.summarizeSelectionFromEvents(allEvents, state.selectedSet);
       let sessionsToCreate = Array.isArray(state.sessionsToCreate) ? state.sessionsToCreate.slice() : [];
       if (isPartialMode()) {
+        const priorById = new Map(
+          (Array.isArray(state.sessionsToCreate) ? state.sessionsToCreate : [])
+            .map((row) => [String(row?.sessionId || '').trim(), row])
+            .filter(([id]) => id)
+        );
+        const defaults = state.scheduleDefaults && typeof state.scheduleDefaults === 'object' ? state.scheduleDefaults : {};
         const stagedFromEvents = allEvents
           .filter((ev) => ev?.isStaged === true)
-            .map((ev) => ({
-            sessionId: String(ev?.sessionId || '').trim(),
+            .map((ev) => {
+            const sessionId = String(ev?.sessionId || '').trim();
+            const prior = priorById.get(sessionId) || {};
+            const eventTeacherName = String(ev?.teacherName || '').trim();
+            const usableEventName = eventTeacherName && eventTeacherName !== 'Teacher' && eventTeacherName !== 'Session'
+              ? eventTeacherName
+              : '';
+            const teacherId = String(
+              prior?.delivery?.deliveredBy || prior?.teacherId || defaults.teacherId || ''
+            ).trim();
+            const teacherName = String(
+              prior?.delivery?.deliveredByName || prior?.teacherName || usableEventName || defaults.teacherName || ''
+            ).trim();
+            return {
+            sessionId,
             date: core.normalizeDateOnly(ev?.date),
             startTime: String(ev?.start || ev?.startTime || '').trim(),
             endTime: String(ev?.end || ev?.endTime || '').trim(),
             durationHours: Number(ev?.durationHours || 0),
-            stagingAttemptId: String(ev?.stagingAttemptId || '').trim(),
+            stagingAttemptId: String(ev?.stagingAttemptId || prior?.stagingAttemptId || '').trim(),
+            teacherId,
+            teacherName,
+            delivery: {
+              deliveredBy: teacherId,
+              deliveredByName: teacherName
+            },
             isStaged: true
-          }))
+          };
+          })
           .filter((row) => row.sessionId && row.date);
         if (stagedFromEvents.length) sessionsToCreate = stagedFromEvents;
       }

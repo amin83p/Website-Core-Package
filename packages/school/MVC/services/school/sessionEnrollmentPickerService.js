@@ -175,10 +175,17 @@ function buildManageSessionUrl(classId, sessionId) {
 
 function resolveTeacherName(session = {}, classData = {}) {
   const delivery = session?.delivery && typeof session.delivery === 'object' ? session.delivery : {};
+  const teacherId = String(delivery.deliveredBy || session?.teacherId || '').trim();
+  const instructors = Array.isArray(classData?.instructors) ? classData.instructors : [];
+  if (teacherId) {
+    const match = instructors.find((row) => String(row?.personId || '').trim() === teacherId);
+    const instructorName = String(match?.name || '').trim();
+    if (instructorName) return instructorName;
+  }
   const fromDelivery = String(delivery.deliveredByName || '').trim();
-  if (fromDelivery) return fromDelivery;
+  if (fromDelivery && teacherId) return fromDelivery;
   const resolved = rollingEnrollmentSessionAlignmentService.resolveDefaultTeacherFromClass(classData, {});
-  return String(resolved?.teacherName || '').trim() || 'Teacher';
+  return String(resolved?.teacherName || fromDelivery || '').trim() || 'Teacher';
 }
 
 function sessionScheduleKey(row = {}) {

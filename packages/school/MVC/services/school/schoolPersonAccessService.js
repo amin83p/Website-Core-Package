@@ -254,7 +254,112 @@ async function restorePersonOrganizations({ personId, organizations = [], reqUse
   return updated;
 }
 
+function resolveActiveClassInstructor(classData = {}) {
+  const instructors = Array.isArray(classData?.instructors) ? classData.instructors : [];
+  const active = instructors.find((row) => normalizeText(row?.status).toLowerCase() === 'active') || instructors[0] || null;
+  return {
+    teacherId: normalizeId(active?.personId),
+    teacherName: normalizeText(active?.name)
+  };
+}
+
+function isTimesheetApprovedSessionLock(session = {}) {
+  const locked = session?.locked === true || String(session?.locked) === 'true';
+  return locked && normalizeText(session?.lockReason) === 'timesheet_approved';
+}
+
+function applyCanonicalTeacherNames({
+  classData = {},
+  sessions = [],
+  nameByPersonId = new Map(),
+  fillMissingTeacher = true
+} = {}) {
+  const fallback = resolveActiveClassInstructor(classData);
+  const nameFor = (personId, snapshot = '') => {
+    const id = normalizeId(personId);
+    const canonical = id ? normalizeText(nameByPersonId.get(id)) : '';
+    if (canonical) return canonical;
+    if (id && idsEqual(id, fallback.teacherId) && fallback.teacherName) return fallback.teacherName;
+    return normalizeText(snapshot);
+  };
+  const instructors = (Array.isArray(classData?.instructors) ? classData.instructors : []).map((row) => {
+    const personId = normalizeId(row?.personId);
+    const nextName = nameFor(personId, row?.name);
+    if (!nextName || nextName === normalizeText(row?.name)) return row;
+    return { ...row, personId, name: nextName };
+  });
+  const incomingNames = {};
+  let blankFilled = 0;
+  const nextSessions = (Array.isArray(sessions) ? sessions : []).map((session) => {
+    const row = session && typeof session === 'object' ? { ...session } : {};
+    const delivery = row.delivery && typeof row.delivery === 'object' ? { ...row.delivery } : {};
+    const incomingName = normalizeText(delivery.deliveredByName);
+    const incomingKey = incomingName || '(blank)';
+    incomingNames[incomingKey] = (incomingNames[incomingKey] || 0) + 1;
+    let teacherId = normalizeId(delivery.deliveredBy);
+    if (!teacherId && fillMissingTeacher && !isTimesheetApprovedSessionLock(row) && fallback.teacherId) {
+      teacherId = fallback.teacherId;
+      blankFilled += 1;
+    }
+    if (teacherId) delivery.deliveredBy = teacherId;
+    const nextName = nameFor(teacherId, teacherId ? incomingName : '');
+    if (nextName) delivery.deliveredByName = nextName;
+    else if (!teacherId) delivery.deliveredByName = '';
+    if (Array.isArray(delivery.coTeachers)) {
+      delivery.coTeachers = delivery.coTeachers.map((coTeacher) => {
+        const personId = normalizeId(coTeacher?.personId);
+        const nextCoName = nameFor(personId, coTeacher?.name);
+        if (!personId || !nextCoName || nextCoName === normalizeText(coTeacher?.name)) return coTeacher;
+        return { ...coTeacher, personId, name: nextCoName };
+      });
+    }
+    row.delivery = delivery;
+    return row;
+  });
+  const outgoingNames = {};
+  nextSessions.forEach((row) => {
+    const key = normalizeText(row?.delivery?.deliveredByName) || '(blank)';
+    outgoingNames[key] = (outgoingNames[key] || 0) + 1;
+  });
+  return { sessions: nextSessions, instructors, blankFilled, incomingNames, outgoingNames };
+}
+
+async function applyCanonicalTeacherNamesToClassSessions({
+  classData = {},
+  sessions = [],
+  reqUser,
+  fillMissingTeacher = true
+} = {}) {
+  const ids = new Set();
+  const addId = (value) => {
+    const id = normalizeId(value);
+    if (id) ids.add(id);
+  };
+  addId(resolveActiveClassInstructor(classData).teacherId);
+  (Array.isArray(classData?.instructors) ? classData.instructors : []).forEach((row) => addId(row?.personId));
+  (Array.isArray(sessions) ? sessions : []).forEach((session) => {
+    addId(session?.delivery?.deliveredBy);
+    (Array.isArray(session?.delivery?.coTeachers) ? session.delivery.coTeachers : []).forEach((row) => addId(row?.personId));
+  });
+  let personById = new Map();
+  if (ids.size) {
+    try {
+      personById = await buildPersonByIdMap({ reqUser, personIds: [...ids] });
+    } catch (_) {
+      personById = new Map();
+    }
+  }
+  const nameByPersonId = new Map();
+  personById.forEach((person, id) => {
+    const name = formatPersonName(person, '');
+    if (name) nameByPersonId.set(normalizeId(id), name);
+  });
+  return applyCanonicalTeacherNames({ classData, sessions, nameByPersonId, fillMissingTeacher });
+}
+
 module.exports = {
+  applyCanonicalTeacherNames,
+  applyCanonicalTeacherNamesToClassSessions,
   buildPersonByIdMap,
   ensurePersonHasSchoolRole,
   formatPersonName,
@@ -263,6 +368,7 @@ module.exports = {
   listPickerPersons,
   readPersonEmail,
   removePersonSchoolRole,
+  resolveActiveClassInstructor,
   restorePersonOrganizations,
   toPickerRow
 };

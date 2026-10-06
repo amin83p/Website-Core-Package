@@ -185,10 +185,7 @@ function buildUniqueAccountName(existingOrgAccounts, baseName) {
 }
 
 function resolvePersonDisplayName(person, fallback) {
-  const first = String(person?.name?.first || '').trim();
-  const last = String(person?.name?.last || '').trim();
-  const full = `${first} ${last}`.trim();
-  return full || String(fallback || '').trim() || 'Teacher';
+  return schoolPersonAccessService.formatPersonName(person, fallback || 'Teacher');
 }
 
 function buildTeacherSearchHaystack(teacher) {
@@ -567,6 +564,8 @@ exports.listTeachers = async (req, res) => {
         ...teacher,
         firstName: person?.name?.first || person?.firstName || 'Unknown',
         lastName: person?.name?.last || person?.lastName || 'Person',
+        preferredName: person?.name?.preferred || person?.preferredName || '',
+        displayName: schoolPersonAccessService.formatPersonName(person, ''),
         email: schoolPersonAccessService.readPersonEmail(person) || 'N/A',
         phone: person?.contact?.phones?.[0]?.number || 'N/A',
         departmentName: deptById.get(String(teacher.departmentId || '')) || '-'
@@ -633,6 +632,8 @@ exports.listArchivedTeachers = async (req, res) => {
         ...teacher,
         firstName: person?.name?.first || person?.firstName || 'Unknown',
         lastName: person?.name?.last || person?.lastName || 'Person',
+        preferredName: person?.name?.preferred || person?.preferredName || '',
+        displayName: schoolPersonAccessService.formatPersonName(person, ''),
         email: schoolPersonAccessService.readPersonEmail(person) || 'N/A',
         phone: person?.contact?.phones?.[0]?.number || 'N/A',
         departmentName: deptById.get(String(teacher.departmentId || '')) || '-'

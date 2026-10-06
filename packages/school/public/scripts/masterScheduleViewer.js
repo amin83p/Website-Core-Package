@@ -639,6 +639,8 @@
             .join(' ');
     }
     function resolvePersonPickerName(item) {
+        const preferred = String(item?.preferredName || item?.name?.preferred || '').trim();
+        if (preferred) return preferred;
         const nameValue = item?.displayName || item?.fullName || item?.label || item?.name || '';
         if (nameValue && typeof nameValue === 'object') {
             const objectName = `${nameValue.first || ''} ${nameValue.middle || ''} ${nameValue.last || ''}`.replace(/\s+/g, ' ').trim();
@@ -3963,6 +3965,11 @@
         mergeSessionsRailHandler = typeof handler === 'function' ? handler : null;
     }
 
+    let takeOverSessionsRailHandler = null;
+    function bindTakeOverSessionsRail(handler) {
+        takeOverSessionsRailHandler = typeof handler === 'function' ? handler : null;
+    }
+
     let claimNumbersRailHandler = null;
     function bindClaimNumbersRail(handler) {
         claimNumbersRailHandler = typeof handler === 'function' ? handler : null;
@@ -5143,6 +5150,9 @@
             }
             if (action === 'merge-sessions' && typeof mergeSessionsRailHandler === 'function') {
                 void mergeSessionsRailHandler();
+            }
+            if (action === 'take-over-sessions' && typeof takeOverSessionsRailHandler === 'function') {
+                void takeOverSessionsRailHandler();
             }
             if (action === 'claim-numbers' && typeof claimNumbersRailHandler === 'function') {
                 void claimNumbersRailHandler();
@@ -7499,6 +7509,19 @@ if (canLoadAllSchedules) {
             showBootstrapModal: showScheduleBootstrapModal,
             hideBootstrapModal: hideScheduleBootstrapModal,
             bindMergeSessionsRail,
+            countActiveScheduleSelectedSessions,
+            countActiveDraftSelectedSessions,
+            getSelectedSavedClassSessionEvents,
+            refreshScheduleViewWithHolidays
+        });
+    }
+    if (canSelectAnyPerson && typeof global.installMasterScheduleTakeOverSessions === 'function') {
+        global.installMasterScheduleTakeOverSessions({
+            uiAlert,
+            escapeHtml,
+            showBootstrapModal: showScheduleBootstrapModal,
+            hideBootstrapModal: hideScheduleBootstrapModal,
+            bindTakeOverSessionsRail,
             countActiveScheduleSelectedSessions,
             countActiveDraftSelectedSessions,
             getSelectedSavedClassSessionEvents,

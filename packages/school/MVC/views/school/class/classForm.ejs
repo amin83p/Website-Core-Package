@@ -2752,12 +2752,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const resolveTeacherPickerSelection = (item) => {
         const personId = item?.personId || item?.id || '';
-        const displayName = `${item?.firstName || ''} ${item?.lastName || ''}`.trim() || item?.name || personId;
+        const displayName = String(item?.displayName || item?.preferredName || '').trim()
+            || `${item?.firstName || ''} ${item?.lastName || ''}`.trim()
+            || item?.name
+            || personId;
         return { personId, displayName };
     };
 
     const teacherPickerRenderer = (item) => {
-        const displayName = `${item?.firstName || ''} ${item?.lastName || ''}`.trim() || item?.personId || item?.id || 'Teacher';
+        const displayName = String(item?.displayName || item?.preferredName || '').trim()
+            || `${item?.firstName || ''} ${item?.lastName || ''}`.trim()
+            || item?.personId
+            || item?.id
+            || 'Teacher';
         const secondary = [item?.employeeNumber, item?.departmentName].filter(Boolean).join(' | ');
         const badgeId = item?.personId || item?.id || '';
         return `

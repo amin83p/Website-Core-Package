@@ -24,6 +24,7 @@ const scheduleViewerPreferencesService = require('../../services/school/schedule
 const scheduleEnrollStudentsService = require('../../services/school/scheduleEnrollStudentsService');
 const scheduleMoveSessionsService = require('../../services/school/scheduleMoveSessionsService');
 const scheduleMergeSessionsService = require('../../services/school/scheduleMergeSessionsService');
+const scheduleTakeOverSessionsService = require('../../services/school/scheduleTakeOverSessionsService');
 const scheduleStagedCommitService = require('../../services/school/scheduleStagedCommitService');
 const { buildMasterScheduleViewerClientConfig } = require('../../services/school/masterScheduleViewerClientConfig');
 const holidayController = require('./holidayController');
@@ -769,12 +770,7 @@ function hasSessionDeliveryMatch(classRow, personId, teacherPersonMap = new Map(
 }
 
 function buildPersonDisplayName(person, fallbackId = '') {
-    const fullName = `${person?.name?.first || ''} ${person?.name?.last || ''}`.trim();
-    if (fullName) return fullName;
-    if (person?.displayName) return String(person.displayName).trim();
-    if (person?.fullName) return String(person.fullName).trim();
-    if (typeof person?.name === 'string') return String(person.name).trim();
-    return String(fallbackId || person?.id || '').trim();
+    return schoolPersonAccessService.formatPersonName(person, fallbackId || person?.id || '');
 }
 
 function isOpaqueDisplayLabel(label, ...candidateIds) {
@@ -2818,6 +2814,52 @@ async function postMergeSessionsApply(req, res) {
     }
 }
 
+async function postTakeOverSessionsPreview(req, res) {
+    try {
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        const sessions = scheduleTakeOverSessionsService.parseSelectedSessions(req.body || {});
+        const preview = await scheduleTakeOverSessionsService.buildTakeOverPreview({
+            teacherId: req.body?.teacherId,
+            sessions,
+            reqUser: req.user,
+            accessContext
+        });
+        return res.json({ status: 'success', data: preview });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            code: error?.code || '',
+            message: error.message || 'Unable to preview the session take over.'
+        });
+    }
+}
+
+async function postTakeOverSessionsApply(req, res) {
+    try {
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        const sessions = scheduleTakeOverSessionsService.parseSelectedSessions(req.body || {});
+        const result = await scheduleTakeOverSessionsService.applyTakeOverSessions({
+            teacherId: req.body?.teacherId,
+            sessions,
+            previewHash: req.body?.previewHash,
+            reqUser: req.user,
+            accessContext
+        });
+        return res.json({
+            status: 'success',
+            message: 'Sessions were taken over.',
+            data: result
+        });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            code: error?.code || '',
+            message: error.message || 'Unable to take over sessions.',
+            blockers: error.preview?.blockers || []
+        });
+    }
+}
+
 async function postEnrollStudentsPrepare(req, res) {
     try {
         const accessContext = schoolDataService.buildRouteAccessContext(req);
@@ -3117,6 +3159,8 @@ module.exports = {
     postMoveSessionsApply,
     postMergeSessionsPreview,
     postMergeSessionsApply,
+    postTakeOverSessionsPreview,
+    postTakeOverSessionsApply,
     postEnrollStudentsSessionCapacityCheck,
     postEnrollStudentsStudentPickerExclusions,
     postEnrollStudentsProgramRegistrations,

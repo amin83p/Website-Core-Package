@@ -494,11 +494,31 @@
 
 </div>
 
+<% if (typeof includeModal !== 'undefined' && includeModal) { %>
+  <%- include('partials/modal_GenericPicker', { user }) %>
+<% } %>
+
 <script type="application/json" id="bookInitialTocData"><%- initTableOfContents.replace(/<\//g, '\\u003c/') %></script>
 
 <script>
 
 document.addEventListener('DOMContentLoaded', () => {
+
+  async function showBookMessage(opts = {}) {
+    const payload = {
+      title: String(opts.title || 'Notice'),
+      icon: String(opts.icon || 'info'),
+      message: String(opts.message || ''),
+      buttons: Array.isArray(opts.buttons) && opts.buttons.length
+        ? opts.buttons
+        : [{ text: String(opts.buttonText || 'OK'), class: String(opts.buttonClass || 'btn-primary') }]
+    };
+    if (typeof showMessageModal === 'function') {
+      return showMessageModal(payload);
+    }
+    const plain = String(payload.message || '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '');
+    alert(plain || payload.title);
+  }
 
   const MAX_TOC_LEVEL = 6;
 
@@ -961,13 +981,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const msg = 'Select a different book to copy from.';
 
       if (!silent) {
-
-        if (typeof showMessageModal === 'function') {
-
-          await showMessageModal({ title: 'Copy From Book', icon: 'warning', message: msg, buttons: [{ text: 'Close', class: 'btn-warning' }] });
-
-        } else alert(msg);
-
+        await showBookMessage({ title: 'Copy From Book', icon: 'warning', message: msg, buttonText: 'Close', buttonClass: 'btn-warning' });
       }
 
       return;
@@ -998,11 +1012,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         : 'Book fields were copied. ISBN, cover photo, and PDF were not copied — update those for the new edition.';
 
-      if (typeof showMessageModal === 'function') {
-
-        await showMessageModal({ title: 'Template Applied', icon: 'success', message, buttons: [{ text: 'OK', class: 'btn-success' }] });
-
-      } else alert(message);
+      await showBookMessage({ title: 'Template Applied', icon: 'success', message, buttonClass: 'btn-success' });
 
     }
 
@@ -1380,11 +1390,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
-  document.getElementById('btnCopyFromBook')?.addEventListener('click', () => {
+  document.getElementById('btnCopyFromBook')?.addEventListener('click', async () => {
 
     if (!window.GenericPicker || !window.GenericPickerPresets) {
 
-      alert('Book picker is not available.');
+      await showBookMessage({
+        title: 'Copy From Book',
+        icon: 'warning',
+        message: 'Book picker is not available on this page.',
+        buttonText: 'Close',
+        buttonClass: 'btn-warning'
+      });
 
       return;
 
@@ -1416,11 +1432,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
           const msg = error.message || 'Failed to copy book data.';
 
-          if (typeof showMessageModal === 'function') {
-
-            await showMessageModal({ title: 'Copy Failed', icon: 'error', message: msg, buttons: [{ text: 'Close', class: 'btn-danger' }] });
-
-          } else alert(msg);
+          await showBookMessage({ title: 'Copy Failed', icon: 'error', message: msg, buttonText: 'Close', buttonClass: 'btn-danger' });
 
         }
 
@@ -1506,7 +1518,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       if (result.status !== 'success') throw new Error(result.message || 'Save failed.');
 
-      if (result.warning && typeof showMessageModal === 'function') {
+      if (result.warning) {
 
         const warningMessage = [
 
@@ -1518,7 +1530,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         ].filter(Boolean).join('<br><br>');
 
-        await showMessageModal({
+        await showBookMessage({
 
           title: 'Book Saved',
 
@@ -1526,7 +1538,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
           message: warningMessage,
 
-          buttons: [{ text: 'OK', class: 'btn-warning' }]
+          buttonText: 'OK',
+
+          buttonClass: 'btn-warning'
 
         });
 
@@ -1546,25 +1560,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
       }
 
-      if (typeof showMessageModal === 'function') {
+      await showBookMessage({
 
-        await showMessageModal({
+        title: 'Unable to save book',
 
-          title: 'Unable to save book',
+        icon: 'error',
 
-          icon: 'error',
+        message: error.message || 'Save failed.',
 
-          message: error.message || 'Save failed.',
+        buttonText: 'Close',
 
-          buttons: [{ text: 'Close', class: 'btn-danger' }]
+        buttonClass: 'btn-danger'
 
-        });
-
-      } else {
-
-        alert(error.message || 'Save failed.');
-
-      }
+      });
 
     }
 

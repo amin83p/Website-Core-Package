@@ -690,6 +690,7 @@ function extractScheduleDefaults(classData = {}) {
     ? classData.schedule.current
     : {};
   const daysOfWeek = normalizeDaysOfWeek(schedule.daysOfWeek);
+  const teacher = resolveDefaultTeacherFromClass(classData, {});
   return {
     daysOfWeek,
     dayNames: daysOfWeek.map((idx) => Object.keys(DAY_NAME_TO_INDEX).find((name) => DAY_NAME_TO_INDEX[name] === idx)).filter(Boolean),
@@ -698,7 +699,9 @@ function extractScheduleDefaults(classData = {}) {
     room: cleanText(schedule.room || classData?.room || ''),
     exceptionDates: Array.isArray(schedule.exceptionDates)
       ? schedule.exceptionDates.map((row) => normalizeDateOnly(row)).filter(Boolean)
-      : []
+      : [],
+    teacherId: teacher.teacherId,
+    teacherName: teacher.teacherName
   };
 }
 
@@ -782,7 +785,12 @@ function resolveDefaultTeacherFromClass(classData = {}, batchSpec = {}) {
   }
   const fromPrimary = toPublicId(classData?.primaryTeacherId);
   if (fromPrimary) {
-    return { teacherId: fromPrimary, teacherName: '' };
+    const instructors = Array.isArray(classData?.instructors) ? classData.instructors : [];
+    const match = instructors.find((row) => idsEqual(toPublicId(row?.personId), fromPrimary));
+    return {
+      teacherId: fromPrimary,
+      teacherName: cleanText(match?.name || '')
+    };
   }
   const instructors = Array.isArray(classData?.instructors) ? classData.instructors : [];
   const active = instructors.find((row) => String(row?.status || '').trim().toLowerCase() === 'active') || instructors[0] || null;
@@ -1311,7 +1319,17 @@ async function commitStagedSessions({
   extendCycleEndDate = false
 } = {}) {
   if (!classData?.id) throw new Error('classData.id is required.');
-  const stagedRows = parsePendingStagedSessions({ pendingStagedSessions: sessionsToAdd });
+  const parsedRows = parsePendingStagedSessions({ pendingStagedSessions: sessionsToAdd });
+  const schoolPersonAccessService = require('./schoolPersonAccessService');
+  const labeledRows = parsedRows.length
+    ? await schoolPersonAccessService.applyCanonicalTeacherNamesToClassSessions({
+      classData,
+      sessions: parsedRows,
+      reqUser,
+      fillMissingTeacher: true
+    })
+    : { sessions: [] };
+  const stagedRows = labeledRows.sessions;
   if (!stagedRows.length) {
     return {
       createdCount: 0,

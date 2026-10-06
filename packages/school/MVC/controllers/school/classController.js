@@ -70,6 +70,7 @@ const sessionIdService = require('../../services/school/sessionIdService');
 const sessionConductService = require('../../services/school/sessionConductService');
 const schoolFileService = require('../../services/school/schoolFileService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
+const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const schoolRepositories = require('../../repositories/school');
 const classCycleLinkResolutionService = require('../../services/school/classCycleLinkResolutionService');
 const classDeletePreparationService = require('../../services/school/classDeletePreparationService');
@@ -1136,7 +1137,7 @@ function mergeGradebookScorePersonsIntoEnrichedRoster(enrichedRoster, session, p
         if (seen.has(String(pid))) return;
         seen.add(String(pid));
         const person = persons.find((p) => idsEqual(p.id, pid));
-        const displayName = person ? `${person.name?.first || ''} ${person.name?.last || ''}`.trim() : 'Unknown Student';
+        const displayName = schoolPersonAccessService.formatPersonName(person, '') || 'Unknown Student';
         enrichedRoster.push({
             personId: pid,
             attendance: 'absent',
@@ -1746,7 +1747,7 @@ async function buildEnrichedSessionRosterForMutation({
     const enrichedRoster = workingSession.roster.map((r) => {
         const pid = cleanPersonId(r.personId);
         const person = persons.find((p) => idsEqual(p.id, pid));
-        const displayName = person ? `${person.name?.first || ''} ${person.name?.last || ''}`.trim() : 'Unknown Student';
+        const displayName = schoolPersonAccessService.formatPersonName(person, '') || 'Unknown Student';
         const baseRow = {
             ...attendanceMatrixMetricsService.normalizeLegacyAbsenceExcusedRecord(r),
             personId: pid,
@@ -3163,7 +3164,7 @@ async function showEditForm(req, res) {
     }));
 
     // Data Service handles all file logic now!
-    const sessionsData = normalizeClassSessionsForForm(
+    let sessionsData = normalizeClassSessionsForForm(
         await schoolDataService.getClassSessions(req.params.id, req.user)
     );
 
@@ -3190,6 +3191,17 @@ async function showEditForm(req, res) {
                 );
             }
         });
+    }
+
+    const canonicalTeachers = await schoolPersonAccessService.applyCanonicalTeacherNamesToClassSessions({
+        classData,
+        sessions: sessionsData,
+        reqUser: req.user,
+        fillMissingTeacher: true
+    });
+    sessionsData = canonicalTeachers.sessions;
+    if (Array.isArray(canonicalTeachers.instructors) && canonicalTeachers.instructors.length) {
+        classData.instructors = canonicalTeachers.instructors;
     }
 
     const canAccessRollingEnrollmentPage = await canAccessRollingEnrollment(req.user);
@@ -3373,7 +3385,14 @@ async function addClass(req, res) {
     });
     if (sendGuardedResponse(req, res, guardResult, 'Class creation is already in progress. Please wait.')) return;
     const incomingSessionsRaw = req.body.sessions ? JSON.parse(req.body.sessions) : [];
-    const sessions = normalizeIncomingSessions(incomingSessionsRaw);
+    const postedInstructors = parseData(req.body.instructors) || [];
+    const canonicalTeachers = await schoolPersonAccessService.applyCanonicalTeacherNamesToClassSessions({
+        classData: { instructors: postedInstructors },
+        sessions: normalizeIncomingSessions(incomingSessionsRaw),
+        reqUser: req.user,
+        fillMissingTeacher: true
+    });
+    const sessions = canonicalTeachers.sessions;
     const fallbackTeacherId = resolveFallbackTeacherIdFromBody(req.body);
     const createConflicts = await detectSessionConflicts({
         classId: '',
@@ -3406,8 +3425,15 @@ async function addClass(req, res) {
     item.audit.createUser = req.user?.id;
     item.audit.createDateTime = new Date().toISOString();
 
+    const instructorNameById = new Map(
+        (Array.isArray(canonicalTeachers.instructors) ? canonicalTeachers.instructors : [])
+            .map((row) => [cleanPersonId(row?.personId), String(row?.name || '').trim()])
+            .filter(([personId, name]) => personId && name)
+    );
     for (let inst of item.instructors) {
         inst.personId = cleanPersonId(inst.personId);
+        const canonicalName = instructorNameById.get(inst.personId);
+        if (canonicalName) inst.name = canonicalName;
     }
 
     const createdClass = await schoolDataService.addData('classes', item, req.user);
@@ -3445,7 +3471,14 @@ async function editClass(req, res) {
     });
     if (sendGuardedResponse(req, res, guardResult, 'Class update is already in progress. Please wait.')) return;
     const incomingSessionsRaw = req.body.sessions ? JSON.parse(req.body.sessions) : [];
-    const sessions = normalizeIncomingSessions(incomingSessionsRaw, classId);
+    const postedInstructors = parseData(req.body.instructors) || existing?.instructors || [];
+    const canonicalTeachers = await schoolPersonAccessService.applyCanonicalTeacherNamesToClassSessions({
+        classData: { id: classId, instructors: postedInstructors },
+        sessions: normalizeIncomingSessions(incomingSessionsRaw, classId),
+        reqUser: req.user,
+        fillMissingTeacher: true
+    });
+    const sessions = canonicalTeachers.sessions;
     const fallbackTeacherId = resolveFallbackTeacherIdFromBody(req.body);
     const updateConflicts = await detectSessionConflicts({
         classId,
@@ -3511,8 +3544,15 @@ async function editClass(req, res) {
     if (updates.status !== existing.status) updates.statusHistory.push({ status: updates.status, date: new Date().toISOString(), updatedBy: req.user?.id, reason: 'Updated via form' });
     updates.enrollment.students = existing.enrollment?.students || [];
 
+    const instructorNameById = new Map(
+        (Array.isArray(canonicalTeachers.instructors) ? canonicalTeachers.instructors : [])
+            .map((row) => [cleanPersonId(row?.personId), String(row?.name || '').trim()])
+            .filter(([personId, name]) => personId && name)
+    );
     for (let inst of updates.instructors) {
         inst.personId = cleanPersonId(inst.personId);
+        const canonicalName = instructorNameById.get(inst.personId);
+        if (canonicalName) inst.name = canonicalName;
     }
 
     await schoolDataService.updateData('classes', classId, updates, req.user);
@@ -3913,8 +3953,8 @@ async function manageSession1(req, res) {
 
         const enrichedRoster = session.roster.map(r => {
             const pid = cleanPersonId(r.personId);
-            const person = persons.find((p) => idsEqual(p.id, pid));
-            const displayName = person ? `${person.name?.first || ''} ${person.name?.last || ''}`.trim() : 'Unknown Student';
+        const person = persons.find((p) => idsEqual(p.id, pid));
+        const displayName = schoolPersonAccessService.formatPersonName(person, '') || 'Unknown Student';
             return {
                 ...r,
                 personId: pid,
@@ -3974,6 +4014,15 @@ async function manageSession1(req, res) {
         }));
         const canViewSchoolSettings = await userCanViewSchoolSettings(req.user, req.ip);
         const attendanceAccessSm1 = await attendanceAccessService.buildAttendanceAccess(req.user, req.ip);
+        const canonicalSessionTeacher = await schoolPersonAccessService.applyCanonicalTeacherNamesToClassSessions({
+            classData,
+            sessions: [session],
+            reqUser: req.user,
+            fillMissingTeacher: true
+        });
+        if (canonicalSessionTeacher.sessions[0]?.delivery) {
+            session.delivery = canonicalSessionTeacher.sessions[0].delivery;
+        }
 
         res.render('school/class/sessionManager', {
             title: `Manage Session: ${session.date}`,
@@ -4677,6 +4726,15 @@ async function manageSession(req, res) {
         const { inline: sessionGradebooksInline } = sessionGradebookMakeupService.partitionGradebooksForSessionManagerClient(
             session.gradebooks
         );
+        const canonicalSessionTeacher = await schoolPersonAccessService.applyCanonicalTeacherNamesToClassSessions({
+            classData,
+            sessions: [session],
+            reqUser: req.user,
+            fillMissingTeacher: true
+        });
+        if (canonicalSessionTeacher.sessions[0]?.delivery) {
+            session.delivery = canonicalSessionTeacher.sessions[0].delivery;
+        }
         res.render('school/class/sessionManager', {
             title: `Manage Session: ${session.date}`,
             classData,

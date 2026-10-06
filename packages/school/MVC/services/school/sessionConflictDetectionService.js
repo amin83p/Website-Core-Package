@@ -382,6 +382,7 @@ async function detectSessionConflicts({
   fallbackTeacherId = '',
   includeExternalScheduleConflicts = false,
   externalFocusSessionIds = [],
+  excludeSessionKeys = [],
   instructorPersonId = '',
   startDate = '',
   endDate = ''
@@ -447,6 +448,11 @@ async function detectSessionConflicts({
       });
     });
   });
+  const excludeSessionKeySet = new Set(
+    (Array.isArray(excludeSessionKeys) ? excludeSessionKeys : [])
+      .map((key) => String(key || '').trim())
+      .filter(Boolean)
+  );
   const conflicts = [];
 
   const normalizedSessions = parsedSessions.map((session, index) => {
@@ -593,7 +599,9 @@ async function detectSessionConflicts({
       if (!tid) return;
       const teacherDay = teacherDayMap.get(`${tid}::${ses.date}`) || [];
       teacherDay.forEach((existingSes) => {
-        if (classId && idsEqual(existingSes.classId, classId)) return;
+        const existingSessionKey = `${toPublicId(existingSes.classId)}::${toPublicId(existingSes.sessionId)}`;
+        if (excludeSessionKeySet.has(existingSessionKey)) return;
+        if (!excludeSessionKeySet.size && classId && idsEqual(existingSes.classId, classId)) return;
 
         const existStart = new Date(`${ses.date}T${existingSes.startTime}`);
         const existEnd = new Date(`${ses.date}T${existingSes.endTime}`);

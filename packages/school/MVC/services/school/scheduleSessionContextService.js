@@ -10,6 +10,7 @@ const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
 const sessionAccessPolicyModel = require('../../models/school/sessionAccessPolicyModel');
 const sessionNaVisibilityService = require('./sessionNaVisibilityService');
+const schoolPersonAccessService = require('./schoolPersonAccessService');
 
 function cleanPersonId(value) {
     return String(value || '').trim();
@@ -90,11 +91,7 @@ async function loadSessionContext(classId, sessionId, reqUser) {
 }
 
 function resolvePersonDisplayName(person, personId) {
-    if (person?.name) {
-        const name = `${person.name.first || ''} ${person.name.last || ''}`.trim();
-        if (name) return name;
-    }
-    return `Person ${personId}`;
+    return schoolPersonAccessService.formatPersonName(person, '') || `Person ${personId}`;
 }
 
 function buildStudentRow(personId, personById, personToStudentMap) {

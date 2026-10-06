@@ -280,6 +280,9 @@ test('book form view includes copy from book control', () => {
   assert.match(source, /btnCopyFromBook/);
   assert.match(source, /api\/template/);
   assert.match(source, /Copy From Book/);
+  assert.match(source, /modal_GenericPicker/);
+  assert.match(source, /showBookMessage/);
+  assert.doesNotMatch(source, /alert\('Book picker is not available\.'\)/);
 });
 
 test('bookModel maps book pages to PDF pages using page-one offset', () => {

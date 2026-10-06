@@ -385,3 +385,41 @@ test('computeOneOnOneUnmarkSessionIdsForCap reports insufficient hours when sche
   assert.equal(result.gapHours, 14);
   assert.ok(result.warnings.includes('insufficient_hours'));
 });
+
+test('extractScheduleDefaults carries the class instructor onto new sessions', () => {
+  const defaults = alignmentService.extractScheduleDefaults({
+    instructors: [{ personId: 'PERSON_01', name: 'Ella', status: 'active' }],
+    schedule: { current: { daysOfWeek: [1], startTime: '15:30', endTime: '17:30' } }
+  });
+  assert.equal(defaults.teacherId, 'PERSON_01');
+  assert.equal(defaults.teacherName, 'Ella');
+});
+
+test('resolveDefaultTeacherFromClass keeps the instructor name when primaryTeacherId is set', () => {
+  const teacher = alignmentService.resolveDefaultTeacherFromClass({
+    primaryTeacherId: 'PERSON_01',
+    instructors: [{ personId: 'PERSON_01', name: 'Ella', status: 'active' }]
+  }, {});
+  assert.equal(teacher.teacherId, 'PERSON_01');
+  assert.equal(teacher.teacherName, 'Ella');
+});
+
+test('applyCanonicalTeacherNames uses the preferred person name and fills a missing teacher', () => {
+  const { applyCanonicalTeacherNames } = require('../MVC/services/school/schoolPersonAccessService');
+  const classData = {
+    instructors: [{ personId: '760360', name: 'Ella', status: 'active' }]
+  };
+  const nameByPersonId = new Map([['760360', 'Ella']]);
+  const result = applyCanonicalTeacherNames({
+    classData,
+    nameByPersonId,
+    sessions: [
+      { sessionId: 'SES-1', delivery: { deliveredBy: '760360', deliveredByName: 'Ella' } },
+      { sessionId: 'SES-2', delivery: { deliveredBy: '760360', deliveredByName: 'Elahe Ghorbanchian' } },
+      { sessionId: 'SES-3', delivery: {} }
+    ]
+  });
+  assert.equal(result.blankFilled, 1);
+  assert.deepEqual(result.sessions.map((row) => row.delivery.deliveredByName), ['Ella', 'Ella', 'Ella']);
+  assert.deepEqual(result.sessions.map((row) => row.delivery.deliveredBy), ['760360', '760360', '760360']);
+});

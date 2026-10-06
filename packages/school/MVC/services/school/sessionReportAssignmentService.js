@@ -51,13 +51,18 @@ function resolveTeacherId(session = {}, classData = {}) {
 }
 
 function resolveTeacherName(session = {}, classData = {}) {
+  const teacherId = clean(resolveTeacherId(session, classData));
+  const instructors = Array.isArray(classData?.instructors) ? classData.instructors : [];
+  const match = instructors.find((row) => clean(row?.personId) && clean(row.personId) === teacherId);
+  const instructorName = clean(match?.name);
+  if (instructorName) return instructorName;
   return clean(
     session?.delivery?.deliveredByName
     || session?.deliveredByName
     || session?.teacherName
     || session?.instructorName
     || classData?.instructors?.[0]?.name
-    || resolveTeacherId(session, classData)
+    || teacherId
   );
 }
 

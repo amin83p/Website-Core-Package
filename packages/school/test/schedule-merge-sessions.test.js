@@ -242,7 +242,9 @@ test('merge session takeover is wired to the schedule rail', () => {
   const viewer = fs.readFileSync(path.join(__dirname, '../public/scripts/masterScheduleViewer.js'), 'utf8');
   const script = fs.readFileSync(path.join(__dirname, '../public/scripts/masterScheduleMergeSessions.js'), 'utf8');
   assert.match(view, /data-schedule-admin-action="merge-sessions"/);
-  assert.match(view, /Merge Session\/Take Over/);
+  assert.match(view, /Merge Sessions/);
+  assert.match(view, /data-schedule-admin-action="take-over-sessions"/);
+  assert.match(view, /Take Over/);
   assert.match(view, /scheduleMergeSessionsModal/);
   assert.match(view, /masterScheduleMergeSessions\.js/);
   assert.match(routes, /\/api\/merge-sessions\/preview/);

@@ -293,9 +293,11 @@ async function listSessions(req, query = {}) {
       ))) continue;
 
       const teacher = personById.get(String(resolvedTeacherPersonId || sessionTeacherId || '').trim());
+      const classInstructors = Array.isArray(classRow?.instructors) ? classRow.instructors : [];
+      const classInstructor = classInstructors.find((row) => String(row?.status || '').trim().toLowerCase() === 'active') || classInstructors[0] || null;
       const teacherName = teacher
         ? schoolPersonAccessService.formatPersonName(teacher, '')
-        : (session?.delivery?.deliveredByName || 'Unassigned');
+        : (String(classInstructor?.name || '').trim() || session?.delivery?.deliveredByName || 'Unassigned');
       const normalizedStatus = sessionStatusPolicyService.normalizeSessionStatus(session?.status, session?.notes);
       const statusDefinition = (Array.isArray(statusMeta) ? statusMeta : [])
         .find((row) => normalizeStatusCode(row?.code) === normalizedStatus) || null;
