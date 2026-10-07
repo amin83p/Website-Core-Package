@@ -27,6 +27,7 @@ test('buildMasterScheduleViewerClientConfig whitelists capability flags and sani
   assert.equal(config.initialScheduleViewerPrefs.startDate, '2026-09-01');
   assert.equal(config.initialScheduleViewerPrefs.autoChangeDetector, false);
   assert.equal(config.api.viewerPreferences, '/school/schedules/api/viewer-preferences');
+  assert.equal(config.api.refreshScheduleSessions, '/school/schedules/api/schedule-viewer/refresh-sessions');
   assert.equal(config.constants.commitTimeoutMs, 120000);
   assert.ok(config.initialScheduleRoles.length >= 1);
 });

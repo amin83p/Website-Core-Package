@@ -571,6 +571,7 @@ function mergeRoster(targetRoster, sourceRoster) {
 
 function buildCreatedSession({ classId, sourceSession, plan, existingSessions, teacher }) {
   const sessionId = dependencies.sessionIdService.buildNextSessionId(classId, existingSessions);
+  const status = String(sourceSession?.status || '').trim() || 'scheduled';
   return {
     sessionId,
     date: plan.date,
@@ -579,9 +580,9 @@ function buildCreatedSession({ classId, sourceSession, plan, existingSessions, t
     endTime: plan.endTime,
     durationHours: dependencies.classEnrollmentSessionApplicabilityService.computeDurationHoursFromTimes(plan.startTime, plan.endTime),
     room: String(sourceSession?.room || '').trim(),
-    status: 'scheduled',
-    notes: '',
-    locked: false,
+    status,
+    notes: String(sourceSession?.notes || '').trim(),
+    locked: Boolean(sourceSession?.locked),
     delivery: {
       deliveredBy: teacher.teacherId || null,
       deliveredByName: teacher.teacherName || '',
@@ -694,9 +695,12 @@ async function applyMoveSessions({
   const sourceById = new Map(context.selectedSessions.map((session) => [sessionIdentity(session), session]));
   let targetSessions = context.targetSessions.slice();
   const created = [];
+  const upsertedSessions = [];
   preview.sessionPlans.forEach((plan) => {
     const sourceSession = sourceById.get(plan.sourceSessionId);
     if (!sourceSession) return;
+    const targetClassId = toPublicId(context.targetClass.id);
+    const upsertDate = normalizeDateOnly(plan.date) || sessionDate(sourceSession);
     if (plan.action === 'create') {
       const session = buildCreatedSession({
         classId: context.targetClass.id,
@@ -707,11 +711,21 @@ async function applyMoveSessions({
       });
       targetSessions.push(session);
       created.push(session.sessionId);
+      upsertedSessions.push({
+        classId: targetClassId,
+        sessionId: session.sessionId,
+        date: upsertDate
+      });
       return;
     }
     targetSessions = targetSessions.map((session) => {
       if (!idsEqual(sessionIdentity(session), plan.targetSessionId)) return session;
       return { ...session, roster: mergeRoster(session.roster, sourceSession.roster) };
+    });
+    upsertedSessions.push({
+      classId: targetClassId,
+      sessionId: toPublicId(plan.targetSessionId),
+      date: upsertDate
     });
   });
   await dependencies.schoolDataService.saveClassSessions(
@@ -746,11 +760,20 @@ async function applyMoveSessions({
     reqUser,
     accessContext
   );
+  const sourceClassId = toPublicId(context.sourceClass.id);
+  const removedSessions = context.selectedSessions.map((session) => ({
+    classId: sourceClassId,
+    sessionId: toPublicId(sessionIdentity(session)),
+    date: sessionDate(session)
+  })).filter((row) => row.sessionId && row.date);
+
   return {
     createdSessionIds: created,
     reusedSessionCount: preview.sessionPlans.filter((row) => row.action === 'reuse').length,
     removedSessionCount: removeIds.size,
-    enrollmentCount: preview.enrollments.length
+    enrollmentCount: preview.enrollments.length,
+    removedSessions,
+    upsertedSessions
   };
 }
 

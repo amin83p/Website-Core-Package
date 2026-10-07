@@ -559,6 +559,17 @@ async function applyAddCoTeacher({
   });
   await dependencies.schoolDataService.saveClassSessions(preview.classId, nextSessions, reqUser);
   await dependencies.schoolIndexService.rebuildIndexesForClass(preview.classId);
+  const updatedSessions = nextSessions
+    .filter((session) => selectedIds.has(toPublicId(session?.sessionId || session?.id)))
+    .map((session) => ({
+      classId: preview.classId,
+      sessionId: toPublicId(session?.sessionId || session?.id),
+      coTeachers: dependencies.sessionDeliveryTeamService.getSessionCoTeachers(session)
+        .map((row) => ({
+          personId: toPublicId(row.personId),
+          paid: row.paid !== false
+        }))
+    }));
   return {
     classId: preview.classId,
     updatedCount: selectedIds.size,
@@ -567,7 +578,8 @@ async function applyAddCoTeacher({
     paid: preview.paid,
     paidHours: preview.paidHours,
     action: preview.action,
-    change: preview.change
+    change: preview.change,
+    sessions: updatedSessions
   };
 }
 

@@ -52,10 +52,32 @@
       });
     }
 
+    function normalizeTimeInputValue(value) {
+      const raw = clean(value);
+      if (!raw) return '';
+      const match = raw.match(/^(\d{1,2}):(\d{2})/);
+      if (!match) return raw.slice(0, 5);
+      return `${String(match[1]).padStart(2, '0')}:${match[2]}`;
+    }
+
+    function defaultStartTimeFromSessions(sessions) {
+      const list = Array.isArray(sessions) ? sessions : [];
+      if (!list.length) return '';
+      const first = list[0];
+      return normalizeTimeInputValue(first?.start || first?.startTime);
+    }
+
+    function setMoveStartTimeInput(value) {
+      const timeInput = document.getElementById('scheduleMoveStartTime');
+      if (!timeInput) return;
+      const normalized = normalizeTimeInputValue(value);
+      timeInput.value = normalized;
+    }
+
     function formatSessionListItem(session) {
       const date = formatSessionDate(session?.date);
-      const start = clean(session?.startTime).slice(0, 5);
-      const end = clean(session?.endTime).slice(0, 5);
+      const start = normalizeTimeInputValue(session?.startTime || session?.start);
+      const end = normalizeTimeInputValue(session?.endTime || session?.end);
       if (date && start && end) return `${date} · ${start}–${end}`;
       if (date && start) return `${date} · ${start}`;
       return date || clean(session?.sessionId);
@@ -228,6 +250,7 @@
           const preview = await refreshPreview({ ignoreStartTime: true });
           renderClassStep(preview);
           if (preview?.blockers?.length) return;
+          setMoveStartTimeInput(defaultStartTimeFromSessions(state.sessions));
           showStep('time');
           return;
         }
@@ -249,7 +272,7 @@
         const next = document.getElementById('btn_scheduleMoveNext');
         if (next) next.disabled = true;
         try {
-          await postJson('/school/schedules/api/move-sessions/apply', {
+          const applyRes = await postJson('/school/schedules/api/move-sessions/apply', {
             classId: state.classId,
             targetClassId: state.targetClassId,
             startTime: clean(document.getElementById('scheduleMoveStartTime')?.value),
@@ -257,8 +280,27 @@
             previewHash: preview.previewHash
           });
           deps.hideBootstrapModal?.(document.getElementById('scheduleMoveSessionsModal'));
-          deps.refreshScheduleViewWithHolidays?.();
+          const applyData = applyRes?.data || {};
+          let refreshPromise = Promise.resolve();
+          if (typeof deps.applyScheduleSessionChangesInView === 'function') {
+            refreshPromise = deps.applyScheduleSessionChangesInView({
+              removed: applyData.removedSessions || [],
+              upsertRefs: applyData.upsertedSessions || [],
+              showProgress: true
+            }).catch(async () => {
+              if (typeof deps.reloadLoadedSchedulePersons === 'function') {
+                await deps.reloadLoadedSchedulePersons({ silent: true });
+              } else {
+                deps.refreshScheduleViewWithHolidays?.();
+              }
+            });
+          } else if (typeof deps.reloadLoadedSchedulePersons === 'function') {
+            refreshPromise = deps.reloadLoadedSchedulePersons({ silent: true });
+          } else {
+            deps.refreshScheduleViewWithHolidays?.();
+          }
           await deps.uiAlert?.('Sessions and enrollments were moved.', 'Move Sessions/Enrollments', { icon: 'success' });
+          await refreshPromise;
         } finally {
           if (next) next.disabled = false;
         }
@@ -290,8 +332,7 @@
       state.targetClassId = '';
       state.targetClassTitle = '';
       state.preview = null;
-      const timeInput = document.getElementById('scheduleMoveStartTime');
-      if (timeInput) timeInput.value = '';
+      setMoveStartTimeInput(defaultStartTimeFromSessions(ctx.sessions));
       renderClassStep(null);
       setAlert('scheduleMoveTimeBlockers', [], 'warning');
       setAlert('scheduleMoveTimeNotices', [], 'info');

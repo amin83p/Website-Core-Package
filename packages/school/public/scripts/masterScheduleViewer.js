@@ -40,6 +40,7 @@
     const SCHEDULE_UPDATE_WORK_SESSION_SCHEDULE_API = String(cfg.api?.updateWorkSessionSchedule || '/school/schedules/api/update-work-session-schedule');
     const SCHEDULE_BULK_DELETE_SESSIONS_PREVIEW_API = String(cfg.api?.bulkDeleteSessionsPreview || '/school/schedules/api/bulk-delete-sessions/preview');
     const SCHEDULE_BULK_DELETE_SESSIONS_API = String(cfg.api?.bulkDeleteSessions || '/school/schedules/api/bulk-delete-sessions');
+    const SCHEDULE_REFRESH_SESSIONS_API = String(cfg.api?.refreshScheduleSessions || '/school/schedules/api/schedule-viewer/refresh-sessions');
     const SCHEDULE_DRAGGABLE_BLOCK_SELECTOR = String(cfg.constants?.draggableBlockSelector || '[data-event-type="schedule_draft"], .is-schedule-draft[data-session-id], [data-event-type="class_session"][data-schedule-editable="1"]');
     const scheduleCalendarCore = window.SessionCalendarCore;
     const TIMELINE_START_HOUR = scheduleCalendarCore?.TIMELINE_START_HOUR ?? 7;
@@ -2015,6 +2016,307 @@
             return next;
         });
         return patched;
+    }
+
+    function buildClassSessionCoTeacherEventFields(personId, coTeachers = []) {
+        const pid = String(personId || '').trim();
+        const rows = Array.isArray(coTeachers) ? coTeachers : [];
+        const entry = rows.find((row) => String(row?.personId || '').trim() === pid);
+        return {
+            hasCoTeachers: rows.length > 0,
+            coTeacherCount: rows.length,
+            viewerIsSessionCoTeacher: Boolean(entry),
+            viewerCoTeacherPaid: entry ? entry.paid !== false : null
+        };
+    }
+
+    function patchClassSessionCoTeachersInState(sessionUpdates = [], { action = 'upsert', teacherId = '' } = {}) {
+        const removedTeacherId = String(teacherId || '').trim();
+        const isRemove = String(action || '').trim().toLowerCase() === 'remove';
+        const updates = Array.isArray(sessionUpdates) ? sessionUpdates : [];
+        const touchedPersonIds = new Set();
+        const updateKeys = new Set(
+            updates.map((row) => `${String(row?.classId || '').trim()}::${String(row?.sessionId || '').trim()}`)
+        );
+
+        Object.keys(scheduleState.eventsByPersonId || {}).forEach((personKey) => {
+            const events = scheduleState.eventsByPersonId[personKey];
+            if (!Array.isArray(events)) return;
+            let changed = false;
+            const next = [];
+            events.forEach((ev) => {
+                if (String(ev?.eventType || '').trim().toLowerCase() !== 'class_session') {
+                    next.push(ev);
+                    return;
+                }
+                const sessionKey = `${String(ev?.classId || '').trim()}::${String(ev?.sessionId || '').trim()}`;
+                if (!updateKeys.has(sessionKey)) {
+                    next.push(ev);
+                    return;
+                }
+                const match = updates.find((row) => (
+                    String(row?.classId || '').trim() === String(ev?.classId || '').trim()
+                    && String(row?.sessionId || '').trim() === String(ev?.sessionId || '').trim()
+                ));
+                const coTeachers = Array.isArray(match?.coTeachers) ? match.coTeachers : [];
+                const viewerPersonId = String(ev?.personId || personKey || '').trim();
+                if (
+                    isRemove
+                    && removedTeacherId
+                    && viewerPersonId === removedTeacherId
+                    && ev.viewerIsSessionCoTeacher === true
+                    && !coTeachers.some((row) => String(row?.personId || '').trim() === removedTeacherId)
+                ) {
+                    changed = true;
+                    touchedPersonIds.add(personKey);
+                    return;
+                }
+                next.push({
+                    ...ev,
+                    ...buildClassSessionCoTeacherEventFields(viewerPersonId, coTeachers)
+                });
+                changed = true;
+                touchedPersonIds.add(personKey);
+            });
+            if (changed) scheduleState.eventsByPersonId[personKey] = next;
+        });
+        return touchedPersonIds;
+    }
+
+    function refreshClassSessionCoTeacherBlocksInView(sessionUpdates = []) {
+        const person = activeSchedulePerson();
+        if (!person?.id) return;
+        const updates = Array.isArray(sessionUpdates) ? sessionUpdates : [];
+        const updateKeys = new Set(
+            updates.map((row) => `${String(row?.classId || '').trim()}::${String(row?.sessionId || '').trim()}`)
+        );
+        const events = getScheduleEventsForPerson(person.id).filter((ev) => (
+            String(ev?.eventType || '').trim().toLowerCase() === 'class_session'
+            && updateKeys.has(`${String(ev?.classId || '').trim()}::${String(ev?.sessionId || '').trim()}`)
+        ));
+        if (!events.length) {
+            refreshScheduleActiveView();
+            return;
+        }
+        if (events.length > 12) {
+            refreshScheduleActiveView();
+            return;
+        }
+        let failed = false;
+        events.forEach((ev) => {
+            if (!rerenderScheduleSessionBlockFromState(ev)) failed = true;
+        });
+        if (failed) refreshScheduleActiveView();
+    }
+
+    async function applyClassSessionCoTeacherChangesInView({ sessions = [], action = 'upsert', teacherId = '' } = {}) {
+        const touchedPersonIds = patchClassSessionCoTeachersInState(sessions, { action, teacherId });
+        refreshClassSessionCoTeacherBlocksInView(sessions);
+        const tasks = [...touchedPersonIds].map((personId) => acknowledgeLocalScheduleMutation({ id: personId }));
+        await Promise.all(tasks);
+    }
+
+    function normalizeScheduleSessionRefRow(row = {}) {
+        return {
+            classId: String(row?.classId || '').trim(),
+            sessionId: String(row?.sessionId || row?.id || '').trim(),
+            date: String(row?.date || row?.sessionDate || '').trim()
+        };
+    }
+
+    function listLoadedSchedulePersonIds() {
+        const ids = new Set();
+        scheduleState.persons.forEach((person) => {
+            if (person?.id && scheduleState.loadedPersonIds.has(person.id)) ids.add(person.id);
+        });
+        Object.keys(scheduleState.eventsByPersonId || {}).forEach((personId) => {
+            if (scheduleState.loadedPersonIds.has(personId)) ids.add(personId);
+        });
+        return Array.from(ids);
+    }
+
+    function removeClassSessionsAcrossLoadedPersons(removedRows = []) {
+        const rows = (Array.isArray(removedRows) ? removedRows : [])
+            .map(normalizeScheduleSessionRefRow)
+            .filter((row) => row.classId && row.sessionId);
+        const touched = new Set();
+        if (!rows.length) return touched;
+        const personIds = listLoadedSchedulePersonIds();
+        personIds.forEach((personId) => {
+            const events = Array.isArray(scheduleState.eventsByPersonId[personId])
+                ? scheduleState.eventsByPersonId[personId]
+                : [];
+            const next = events.filter((ev) => {
+                if (String(ev?.eventType || '').trim().toLowerCase() !== 'class_session') return true;
+                const classId = String(ev?.classId || '').trim();
+                const sessionId = String(ev?.sessionId || '').trim();
+                const remove = rows.some((row) => {
+                    if (row.classId !== classId || row.sessionId !== sessionId) return false;
+                    if (!row.date) return true;
+                    return String(ev?.date || '').trim() === row.date;
+                });
+                return !remove;
+            });
+            if (next.length !== events.length) {
+                scheduleState.eventsByPersonId[personId] = next;
+                touched.add(personId);
+            }
+        });
+        return touched;
+    }
+
+    function upsertClassSessionEventsInState(personId, events = []) {
+        const pid = String(personId || '').trim();
+        if (!pid) return false;
+        const incoming = (Array.isArray(events) ? events : []).filter((ev) => (
+            String(ev?.eventType || '').trim().toLowerCase() === 'class_session'
+        ));
+        if (!incoming.length) return false;
+        const existing = Array.isArray(scheduleState.eventsByPersonId[pid]) ? scheduleState.eventsByPersonId[pid] : [];
+        const keyOf = (ev) => buildSavedClassSessionStateKey(ev?.classId, ev?.sessionId, ev?.date);
+        const incomingByKey = new Map();
+        incoming.forEach((ev) => {
+            const key = keyOf(ev);
+            if (key && !key.endsWith('::')) incomingByKey.set(key, ev);
+        });
+        if (!incomingByKey.size) return false;
+        const consumed = new Set();
+        const next = existing.map((ev) => {
+            const key = keyOf(ev);
+            if (incomingByKey.has(key)) {
+                consumed.add(key);
+                return incomingByKey.get(key);
+            }
+            return ev;
+        });
+        incomingByKey.forEach((ev, key) => {
+            if (!consumed.has(key)) next.push(ev);
+        });
+        scheduleState.eventsByPersonId[pid] = next;
+        return true;
+    }
+
+    function refreshClassSessionBlocksInViewForRefs(sessionRefs = []) {
+        const person = activeSchedulePerson();
+        if (!person?.id) return;
+        const refs = (Array.isArray(sessionRefs) ? sessionRefs : [])
+            .map(normalizeScheduleSessionRefRow)
+            .filter((row) => row.classId && row.sessionId);
+        const updateKeys = new Set(refs.map((row) => `${row.classId}::${row.sessionId}`));
+        const events = getScheduleEventsForPerson(person.id).filter((ev) => (
+            String(ev?.eventType || '').trim().toLowerCase() === 'class_session'
+            && updateKeys.has(`${String(ev?.classId || '').trim()}::${String(ev?.sessionId || '').trim()}`)
+        ));
+        if (!events.length) {
+            refreshScheduleActiveView();
+            return;
+        }
+        if (events.length > 12) {
+            refreshScheduleActiveView();
+            return;
+        }
+        let failed = false;
+        events.forEach((ev) => {
+            if (!rerenderScheduleSessionBlockFromState(ev)) failed = true;
+        });
+        if (failed) refreshScheduleActiveView();
+    }
+
+    async function fetchScheduleViewerSessionRefresh({ personIds = [], sessionRefs = [] } = {}) {
+        const ids = (Array.isArray(personIds) ? personIds : []).map((id) => String(id || '').trim()).filter(Boolean);
+        const refs = (Array.isArray(sessionRefs) ? sessionRefs : [])
+            .map(normalizeScheduleSessionRefRow)
+            .filter((row) => row.classId && row.sessionId);
+        if (!ids.length || !refs.length) return { updates: [] };
+        const range = getScheduleRange();
+        const rolesByPersonId = {};
+        scheduleState.persons.forEach((person) => {
+            if (!person?.id || !ids.includes(person.id)) return;
+            rolesByPersonId[person.id] = String(person.selectedRole || selectedScheduleRole() || '').trim();
+        });
+        const res = await fetch(SCHEDULE_REFRESH_SESSIONS_API, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+                'X-AJAX-Request': 'true'
+            },
+            body: JSON.stringify({
+                personIds: ids,
+                startDate: range.startDate,
+                endDate: range.endDate,
+                sessionRefs: refs,
+                rolesByPersonId
+            })
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.status !== 'success') {
+            throw new Error(data.message || `Request failed (${res.status}).`);
+        }
+        return data.data || { updates: [] };
+    }
+
+    async function reloadLoadedSchedulePersons(options = {}) {
+        const silent = options.silent !== false;
+        const personIds = listLoadedSchedulePersonIds();
+        if (!personIds.length) return;
+        await syncScheduleHolidayDates();
+        await Promise.all(personIds.map(async (personId) => {
+            const person = scheduleState.persons.find((row) => row.id === personId)
+                || { id: personId, name: personId };
+            await loadSchedulePerson(person, { silent });
+        }));
+    }
+
+    async function applyScheduleSessionChangesInView({ removed = [], upsertRefs = [], showProgress = false } = {}) {
+        let loadingToken = null;
+        if (showProgress === true && typeof window.showLoading === 'function') {
+            loadingToken = window.showLoading('Updating schedule view...');
+        }
+        try {
+            const removedRows = (Array.isArray(removed) ? removed : [])
+                .map(normalizeScheduleSessionRefRow)
+                .filter((row) => row.classId && row.sessionId);
+            const upsertRows = (Array.isArray(upsertRefs) ? upsertRefs : [])
+                .map(normalizeScheduleSessionRefRow)
+                .filter((row) => row.classId && row.sessionId);
+            const personIds = listLoadedSchedulePersonIds();
+            const touched = removeClassSessionsAcrossLoadedPersons(removedRows);
+            let mergedEventCount = 0;
+            if (removedRows.length > 0 && personIds.length > 0) {
+                refreshScheduleActiveView();
+                await reloadLoadedSchedulePersons({ silent: true });
+                personIds.forEach((personId) => touched.add(personId));
+            } else if (upsertRows.length && personIds.length) {
+                try {
+                    const refresh = await fetchScheduleViewerSessionRefresh({ personIds, sessionRefs: upsertRows });
+                    const updates = Array.isArray(refresh.updates) ? refresh.updates : [];
+                    updates.forEach((row) => {
+                        const pid = String(row?.personId || '').trim();
+                        if (!pid) return;
+                        const events = Array.isArray(row.events) ? row.events : [];
+                        mergedEventCount += events.length;
+                        if (upsertClassSessionEventsInState(pid, events)) touched.add(pid);
+                        const fp = String(row?.fingerprint || '').trim();
+                        if (fp) scheduleState.scheduleFingerprintByPersonId[pid] = fp;
+                    });
+                } catch (_) { /* fall through to reload when patch refresh fails */ }
+                if (mergedEventCount === 0) {
+                    await reloadLoadedSchedulePersons({ silent: true });
+                    personIds.forEach((personId) => touched.add(personId));
+                }
+            }
+            if (removedRows.length || upsertRows.length || touched.size) {
+                refreshScheduleActiveView();
+            }
+            const tasks = [...touched].map((personId) => acknowledgeLocalScheduleMutation({ id: personId }));
+            await Promise.all(tasks);
+        } finally {
+            if (loadingToken != null && typeof window.hideLoading === 'function') {
+                window.hideLoading(loadingToken);
+            }
+        }
     }
 
     function buildSavedClassSessionStateKey(classId, sessionId, date) {
@@ -7549,7 +7851,8 @@ if (canLoadAllSchedules) {
             clearPendingEnrollStudentsForClass,
             refreshScheduleViewWithHolidays,
             syncPartialModalFromTimelineDrafts,
-            schedulePersistDraftBackup: () => { if (canDragCreateSessions) schedulePersistDraftBackup(); }
+            schedulePersistDraftBackup: () => { if (canDragCreateSessions) schedulePersistDraftBackup(); },
+            applyScheduleSessionChangesInView
         });
     }
     if (canSelectAnyPerson && typeof global.installMasterScheduleMoveSessions === 'function') {
@@ -7562,7 +7865,9 @@ if (canLoadAllSchedules) {
             countActiveScheduleSelectedSessions,
             countActiveDraftSelectedSessions,
             getSelectedSavedClassSessionEvents,
-            refreshScheduleViewWithHolidays
+            refreshScheduleViewWithHolidays,
+            applyScheduleSessionChangesInView,
+            reloadLoadedSchedulePersons
         });
     }
     if (canSelectAnyPerson && typeof global.installMasterScheduleMergeSessions === 'function') {
@@ -7601,7 +7906,8 @@ if (canLoadAllSchedules) {
             countActiveScheduleSelectedSessions,
             countActiveDraftSelectedSessions,
             getSelectedSavedClassSessionEvents,
-            refreshScheduleViewWithHolidays
+            refreshScheduleViewWithHolidays,
+            applyClassSessionCoTeacherChangesInView
         });
     }
     if (canSelectAnyPerson && typeof global.installMasterSchedulePersonNote === 'function') {

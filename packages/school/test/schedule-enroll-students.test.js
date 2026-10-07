@@ -12,6 +12,12 @@ function read(relPath) {
   return fs.readFileSync(path.join(root, relPath), 'utf8');
 }
 
+test('schedule routes expose schedule viewer session refresh endpoint', () => {
+  const routeSource = read('MVC/routes/scheduleRoutes.js');
+  assert.match(routeSource, /\/api\/schedule-viewer\/refresh-sessions/);
+  assert.match(routeSource, /postScheduleViewerRefreshSessions/);
+});
+
 test('schedule routes expose enroll-students API endpoints', () => {
   const routeSource = read('MVC/routes/scheduleRoutes.js');
   assert.match(routeSource, /\/api\/enroll-students\/prepare/);
@@ -50,9 +56,14 @@ test('master schedule viewer wires enroll students rail handler', () => {
   assert.match(viewer, /claim-numbers[\s\S]*claimNumbersRailHandler/);
   assert.match(viewer, /pendingEnrollStudentsByClassId/);
   assert.match(enroll, /bindEnrollStudentsRail\?\.\(startEnrollStudentsFlow\)/);
+  assert.match(enroll, /resolveScheduleEnrollActionStateId/);
+  assert.match(enroll, /rolling-enrollment\/execute[\s\S]*X-Action-State-Id/);
   assert.match(enroll, /bindClaimNumbersRail\?\.\(startClaimNumbersFlow\)/);
   assert.match(enroll, /startClaimNumbersFlow/);
   assert.match(enroll, /StudentClaimNumbersManager/);
+  assert.match(enroll, /refreshEnrolledSessionsInView/);
+  assert.match(enroll, /applyScheduleSessionChangesInView/);
+  assert.match(viewer, /applyScheduleSessionChangesInView[\s\S]*installMasterScheduleEnrollStudents/);
 });
 
 test('staging save opens draft work selection modal instead of inline commit', () => {

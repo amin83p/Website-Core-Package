@@ -33,6 +33,10 @@ router.get('/api/person-schedule',
   requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
   ctrl.getPersonSchedule);
+router.post('/api/schedule-viewer/refresh-sessions',
+  requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
+  ctrl.postScheduleViewerRefreshSessions);
 router.get('/api/person-schedule-version',
   requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
@@ -94,7 +98,7 @@ const enrollStudentsProgramAccess = [
   requireAccess(SECTIONS.SCHOOL_PROGRAM_REGISTRATIONS, OPERATIONS.CREATE)
 ];
 const enrollStudentsProgramMutationActionState = {
-  requireToken: true,
+  requireToken: false,
   keepActive: true,
   allowOperationTokenFallback: true,
   allowInactiveTokenFallback: true
@@ -126,7 +130,12 @@ router.post('/api/enroll-students/validate-pending-commit',
   ctrl.postValidatePendingEnrollmentsCommit);
 router.post('/api/enroll-students/execute-pending-commit',
   ...enrollStudentsRollingAccess,
-  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL, {
+    requireToken: false,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   ctrl.postExecutePendingEnrollmentsCommit);
 router.post('/api/move-sessions/preview',
   ...enrollStudentsRollingAccess,
@@ -137,7 +146,12 @@ router.post('/api/move-sessions/apply',
   ...enrollStudentsRollingAccess,
   requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE),
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE),
-  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE, { requireToken: true, keepActive: true }),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.DELETE, {
+    requireToken: false,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   ctrl.postMoveSessionsApply);
 router.post('/api/merge-sessions/preview',
   requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),

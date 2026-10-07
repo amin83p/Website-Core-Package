@@ -323,7 +323,7 @@
         if (next) next.disabled = true;
         try {
           const payment = paymentPayload();
-          await postJson('/school/schedules/api/add-co-teacher/apply', {
+          const applyResult = await postJson('/school/schedules/api/add-co-teacher/apply', {
             teacherId: state.teacherId,
             sessions: state.sessions,
             paid: state.action === 'remove' ? false : payment.paid,
@@ -332,7 +332,15 @@
             previewHash: preview.previewHash
           });
           deps.hideBootstrapModal?.(document.getElementById('scheduleAddCoTeacherModal'));
-          deps.refreshScheduleViewWithHolidays?.();
+          if (typeof deps.applyClassSessionCoTeacherChangesInView === 'function') {
+            await deps.applyClassSessionCoTeacherChangesInView({
+              sessions: applyResult?.data?.sessions || [],
+              action: state.action,
+              teacherId: state.teacherId
+            });
+          } else {
+            deps.refreshScheduleViewWithHolidays?.();
+          }
           await deps.uiAlert?.(successMessage(preview), 'Co-Teacher', { icon: 'success' });
         } finally {
           if (next) next.disabled = false;

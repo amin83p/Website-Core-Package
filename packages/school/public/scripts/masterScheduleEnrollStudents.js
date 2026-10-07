@@ -16,7 +16,8 @@
       prepare: null,
       students: [],
       queue: [],
-      programRegActionStateId: ''
+      programRegActionStateId: '',
+      scheduleEnrollActionStateId: ''
     };
 
     function clean(value) {
@@ -174,8 +175,19 @@
       return options.join('');
     }
 
+    function rememberScheduleEnrollActionStateId(value) {
+      const id = clean(value);
+      if (id) flowState.scheduleEnrollActionStateId = id;
+    }
+
+    function resolveScheduleEnrollActionStateId(body) {
+      return clean(body?.actionStateId)
+        || clean(flowState.programRegActionStateId)
+        || clean(flowState.scheduleEnrollActionStateId);
+    }
+
     async function postJson(url, body) {
-      const actionStateId = clean(body?.actionStateId || flowState.programRegActionStateId);
+      const actionStateId = resolveScheduleEnrollActionStateId(body);
       const payload = { ...(body || {}) };
       if (actionStateId && !payload.actionStateId) payload.actionStateId = actionStateId;
       const res = await fetch(url, {
@@ -193,6 +205,7 @@
       if (!res.ok || data.status !== 'success') {
         throw new Error(data.message || `Request failed (${res.status}).`);
       }
+      rememberScheduleEnrollActionStateId(data.actionStateId || res.headers.get('x-action-state-id'));
       return data;
     }
 
@@ -293,7 +306,7 @@
       const tr = document.querySelector(`tr[data-prog-row="${index}"]`);
       const dateInput = tr?.querySelector('.js-schedule-enroll-reg-date');
       const registrationDate = clean(dateInput?.value || row.registrationDate);
-      if (!clean(flowState.programRegActionStateId)) {
+      if (!resolveScheduleEnrollActionStateId()) {
         await deps.uiAlert?.('Registration token is missing. Close this dialog and open Enroll Students again.', 'Program registration', { icon: 'warning' });
         return;
       }
@@ -343,6 +356,7 @@
         }
         return { ...row, studentLabel: studentLabel || id };
       });
+      rememberScheduleEnrollActionStateId(response.actionStateId);
       flowState.programRegActionStateId = clean(response.actionStateId);
       renderProgramRegRows(flowState.students);
       deps.showBootstrapModal?.(document.getElementById('scheduleEnrollProgramRegModal'));
@@ -592,6 +606,22 @@
       button.classList.toggle('d-none', (flowState.queue || []).length < 2);
     }
 
+    function enrollSessionUpsertRefs() {
+      const classId = clean(flowState.prepare?.classId);
+      const sessions = Array.isArray(flowState.prepare?.sessions) ? flowState.prepare.sessions : [];
+      return sessions.map((row) => ({
+        classId: clean(row?.classId) || classId,
+        sessionId: clean(row?.sessionId || row?.id),
+        date: clean(row?.date)
+      })).filter((row) => row.classId && row.sessionId && row.date);
+    }
+
+    async function refreshEnrolledSessionsInView() {
+      const upsertRefs = enrollSessionUpsertRefs();
+      if (!upsertRefs.length || typeof deps.applyScheduleSessionChangesInView !== 'function') return;
+      return deps.applyScheduleSessionChangesInView({ upsertRefs, showProgress: true });
+    }
+
     function renderQueueModal() {
       const prep = flowState.prepare || {};
       setEnrollmentSummaryHeader('scheduleEnrollQueue', enrollmentMetaFromPrepare(prep));
@@ -657,22 +687,33 @@
         return { ok: true, staged: true };
       }
       try {
+        const actionStateId = resolveScheduleEnrollActionStateId(payload);
+        const executePayload = { ...payload };
+        if (actionStateId && !executePayload.actionStateId) executePayload.actionStateId = actionStateId;
         const res = await fetch(`/school/classes/api/${encodeURIComponent(flowState.prepare.classId)}/rolling-enrollment/execute`, {
           method: 'POST',
           credentials: 'same-origin',
           headers: {
             'Content-Type': 'application/json',
             Accept: 'application/json',
-            'X-AJAX-Request': 'true'
+            'X-AJAX-Request': 'true',
+            ...(actionStateId ? { 'X-Action-State-Id': actionStateId } : {})
           },
-          body: JSON.stringify(payload)
+          body: JSON.stringify(executePayload)
         });
         const data = await res.json().catch(() => ({}));
         if (!res.ok || data.status !== 'success') throw new Error(data.message || 'Enrollment failed.');
         row.enrollmentStatus = 'completed';
         if (!skipRender) renderQueueModal();
+        let refreshPromise = Promise.resolve();
+        if (!options.deferSessionRefresh) {
+          refreshPromise = refreshEnrolledSessionsInView();
+        }
         if (!silent) {
           await deps.uiAlert?.(data.message || 'Enrollment completed.', 'Enroll students', { icon: 'success' });
+        }
+        if (!options.deferSessionRefresh) {
+          await refreshPromise;
         }
         return { ok: true };
       } catch (error) {
@@ -708,7 +749,7 @@
       let staged = false;
       try {
         for (const { row, index } of pending) {
-          const result = await runEnrollmentForRow(index, { silent: true, skipRender: true });
+          const result = await runEnrollmentForRow(index, { silent: true, skipRender: true, deferSessionRefresh: true });
           if (result?.ok) {
             completed += 1;
             if (result.staged) staged = true;
@@ -723,6 +764,7 @@
         flowState.enrollAllInFlight = false;
         renderQueueModal();
       }
+      const refreshPromise = (!staged && completed > 0) ? refreshEnrolledSessionsInView() : Promise.resolve();
       if (!failures.length) {
         const noun = completed === 1 ? 'enrollment' : 'enrollments';
         await deps.uiAlert?.(
@@ -732,6 +774,7 @@
           'Enroll students',
           { icon: staged ? 'info' : 'success' }
         );
+        await refreshPromise;
         return;
       }
       const detail = failures.map((entry) => `${entry.label}: ${entry.message}`).join(' ');
@@ -740,6 +783,7 @@
         'Enroll students',
         { icon: 'warning' }
       );
+      await refreshPromise;
     }
 
     function studentLabelFromPickerItem(item) {
@@ -895,6 +939,8 @@
     }
 
     async function startEnrollStudentsFlow() {
+      flowState.scheduleEnrollActionStateId = '';
+      flowState.programRegActionStateId = '';
       const ctx = resolveSelectionContext();
       if (ctx.error === 'mixed') {
         await deps.uiAlert?.(

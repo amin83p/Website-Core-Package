@@ -325,7 +325,12 @@ router.post('/api/:classId/enrollment-session-picker',
 
 router.post('/api/:classId/rolling-enrollment/execute',
   requireAccess(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
+  trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, {
+    requireToken: false,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   rollingCtrl.postExecuteRollingEnrollment);
 
 router.post('/api/:classId/sessions/preview-batch',

@@ -195,6 +195,7 @@ test('apply creates only missing sessions, keeps matches, moves enrollments, and
       date: '2026-06-08',
       startTime: '09:00',
       endTime: '10:00',
+      status: 'completed',
       roster: [{ personId: 'PER_1', attendance: '' }]
     },
     { sessionId: 'SES_KEEP', date: '2026-07-01', startTime: '09:00', endTime: '10:00', roster: [] }
@@ -267,11 +268,22 @@ test('apply creates only missing sessions, keeps matches, moves enrollments, and
   const reused = targetSave.sessions.find((row) => row.sessionId === 'SES_T');
   assert.equal(reused.startTime, '10:00');
   assert.equal(reused.roster.some((row) => row.personId === 'PER_1'), true);
-  assert.equal(targetSave.sessions.some((row) => row.sessionId === result.createdSessionIds[0]), true);
+  const created = targetSave.sessions.find((row) => row.sessionId === result.createdSessionIds[0]);
+  assert.ok(created);
+  assert.equal(created.status, 'completed');
+  assert.equal(created.date, '2026-06-08');
   const sourceSave = saved.find((row) => row.id === 'CLS_SOURCE');
   assert.deepEqual(sourceSave.sessions.map((row) => row.sessionId), ['SES_KEEP']);
   assert.equal(updates.some((row) => row.id === 'PER_SAME' && row.patch.classId === 'CLS_TARGET' && row.options.allowClassChange === true), true);
   assert.equal(moves.some((row) => row.sourcePeriodId === 'PER_EARLY'), true);
+  assert.deepEqual(result.removedSessions, [
+    { classId: 'CLS_SOURCE', sessionId: 'SES_1', date: '2026-06-01' },
+    { classId: 'CLS_SOURCE', sessionId: 'SES_2', date: '2026-06-08' }
+  ]);
+  assert.deepEqual(result.upsertedSessions, [
+    { classId: 'CLS_TARGET', sessionId: 'SES_T', date: '2026-06-01' },
+    { classId: 'CLS_TARGET', sessionId: result.createdSessionIds[0], date: '2026-06-08' }
+  ]);
 });
 
 test('move sessions wizard is wired to the schedule rail', () => {
@@ -284,4 +296,11 @@ test('move sessions wizard is wired to the schedule rail', () => {
   assert.match(routes, /\/api\/move-sessions\/apply/);
   assert.match(viewer, /move-enrollments/);
   assert.match(viewer, /installMasterScheduleMoveSessions/);
+  assert.match(viewer, /applyScheduleSessionChangesInView[\s\S]*installMasterScheduleMoveSessions/);
+  const moveScript = fs.readFileSync(path.join(__dirname, '../public/scripts/masterScheduleMoveSessions.js'), 'utf8');
+  assert.match(moveScript, /applyScheduleSessionChangesInView/);
+  assert.match(moveScript, /removedSessions/);
+  assert.match(moveScript, /upsertedSessions/);
+  assert.match(moveScript, /defaultStartTimeFromSessions/);
+  assert.match(moveScript, /setMoveStartTimeInput\(defaultStartTimeFromSessions/);
 });

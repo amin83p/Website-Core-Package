@@ -190,6 +190,9 @@ test('a completed session can gain a co-teacher, and a teacher conflict or stale
     });
     assert.equal(result.updatedCount, 1);
     assert.equal(result.paidHours, 2);
+    assert.equal(result.sessions.length, 1);
+    assert.equal(result.sessions[0].sessionId, 'SES_1');
+    assert.equal(result.sessions[0].coTeachers.some((row) => row.personId === 'TCH_NEW' && row.paid === true), true);
     assert.equal(saved[0].status, 'completed');
     assert.equal(saved[0].delivery.deliveredBy, 'TCH_OLD');
     const added = saved[0].delivery.coTeachers.find((row) => row.personId === 'TCH_NEW');
@@ -263,6 +266,7 @@ test('overlapping selected sessions block a new co-teacher, and an existing co-t
       reqUser: { id: 'USER_1' }
     });
     assert.equal(editResult.change, 'update');
+    assert.equal(editResult.sessions[0].coTeachers.find((row) => row.personId === 'TCH_CO').paid, false);
     assert.equal(saved[0].delivery.coTeachers.find((row) => row.personId === 'TCH_CO').paid, false);
     assert.equal(saved[0].delivery.coTeachers.find((row) => row.personId === 'TCH_CO').paidHours, 0);
     assert.equal(saved[0].status, 'completed');
@@ -277,13 +281,14 @@ test('overlapping selected sessions block a new co-teacher, and an existing co-t
     });
     assert.equal(removed.canContinue, true);
     assert.equal(removed.change, 'remove');
-    await scheduleAddCoTeacherService.applyAddCoTeacher({
+    const removeResult = await scheduleAddCoTeacherService.applyAddCoTeacher({
       teacherId: 'TCH_CO',
       sessions: [{ classId: 'CLS_A', sessionId: 'SES_1' }],
       action: 'remove',
       previewHash: removed.previewHash,
       reqUser: { id: 'USER_1' }
     });
+    assert.equal(removeResult.sessions[0].coTeachers.some((row) => row.personId === 'TCH_CO'), false);
     assert.equal(saved[0].delivery.coTeachers.some((row) => row.personId === 'TCH_CO'), false);
     assert.equal(saved[0].delivery.deliveredBy, 'TCH_OLD');
     assert.equal(saved[0].status, 'completed');
@@ -312,6 +317,10 @@ test('add co-teacher sits under take over on the schedule rail', () => {
   assert.match(routes, /\/api\/add-co-teacher\/apply/);
   assert.match(viewer, /add-co-teacher/);
   assert.match(viewer, /installMasterScheduleAddCoTeacher/);
+  assert.match(viewer, /applyClassSessionCoTeacherChangesInView/);
+  assert.match(script, /applyClassSessionCoTeacherChangesInView/);
+  assert.match(script, /applyResult\?\.data\?\.sessions/);
+  assert.doesNotMatch(script, /refreshScheduleViewWithHolidays\?\(\);\s*\n\s*await deps\.uiAlert\?\.\(successMessage/);
   assert.match(script, /scheduleAddCoTeacherHoursWrap/);
   assert.match(script, /row\.sessions/);
 });

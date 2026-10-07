@@ -2995,7 +2995,7 @@ async function postEnrollStudentsPrepare(req, res) {
             reqUser: req.user,
             accessContext
         });
-        return res.json({ status: 'success', data: payload });
+        return res.json({ status: 'success', data: payload, actionStateId: req.actionStateId || '' });
     } catch (error) {
         return res.status(400).json({ status: 'error', message: error.message || 'Unable to prepare Enroll Students.' });
     }
@@ -3013,7 +3013,7 @@ async function postEnrollStudentsSessionCapacityCheck(req, res) {
             sessions,
             reqUser: req.user
         });
-        return res.json({ status: 'success', data: result });
+        return res.json({ status: 'success', data: result, actionStateId: req.actionStateId || '' });
     } catch (error) {
         return res.status(400).json({ status: 'error', message: error.message || 'Unable to evaluate session capacity.' });
     }
@@ -3034,7 +3034,7 @@ async function postEnrollStudentsStudentPickerExclusions(req, res) {
             reqUser: req.user,
             activeOrgId: req.user?.activeOrgId
         });
-        return res.json({ status: 'success', excludeStudentIds });
+        return res.json({ status: 'success', excludeStudentIds, actionStateId: req.actionStateId || '' });
     } catch (error) {
         return res.status(400).json({ status: 'error', message: error.message || 'Unable to load student exclusions.' });
     }
@@ -3260,6 +3260,55 @@ async function postUpdateWorkSessionSchedule(req, res) {
     }
 }
 
+async function postScheduleViewerRefreshSessions(req, res) {
+    try {
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        const personIds = Array.isArray(req.body?.personIds) ? req.body.personIds : [];
+        const startDate = normalizeDateOnly(req.body?.startDate);
+        const endDate = normalizeDateOnly(req.body?.endDate);
+        const sessionRefs = Array.isArray(req.body?.sessionRefs) ? req.body.sessionRefs : [];
+        const rolesByPersonId = req.body?.rolesByPersonId && typeof req.body.rolesByPersonId === 'object'
+            ? req.body.rolesByPersonId
+            : {};
+        const defaultRole = normalizeScheduleRole(req.body?.role || '');
+        if (!startDate || !endDate) {
+            throw new Error('startDate and endDate are required.');
+        }
+        if (!personIds.length) {
+            throw new Error('At least one personId is required.');
+        }
+        if (!sessionRefs.length) {
+            return res.json({ status: 'success', data: { updates: [] } });
+        }
+        const updates = [];
+        for (const rawPersonId of personIds) {
+            const personId = normalizeId(rawPersonId);
+            if (!personId) continue;
+            const role = normalizeScheduleRole(rolesByPersonId[personId] || defaultRole || '');
+            const built = await buildPersonScheduleEventsForSessions({
+                personId,
+                startDate,
+                endDate,
+                role,
+                sessionRefs,
+                reqUser: req.user,
+                accessContext
+            });
+            updates.push({
+                personId,
+                events: built.events || [],
+                fingerprint: built.fingerprint || ''
+            });
+        }
+        return res.json({ status: 'success', data: { updates } });
+    } catch (error) {
+        return res.status(400).json({
+            status: 'error',
+            message: error.message || 'Unable to refresh schedule sessions.'
+        });
+    }
+}
+
 module.exports = {
     showSchedulePage,
     getScheduleViewerPreferences,
@@ -3271,6 +3320,7 @@ module.exports = {
     getScheduleHolidayDatesInRange,
     getPersonSchedule,
     getPersonScheduleVersion,
+    postScheduleViewerRefreshSessions,
     pickerSchoolSchedulePersons,
     listActiveTeacherSchedulePersons,
     listInstructorClassesForSchedule,

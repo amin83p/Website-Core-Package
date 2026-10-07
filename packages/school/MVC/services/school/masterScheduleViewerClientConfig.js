@@ -52,7 +52,8 @@ function buildMasterScheduleViewerClientConfig({
       updateClassSessionStatus: '/school/schedules/api/update-class-session-status',
       updateWorkSessionSchedule: '/school/schedules/api/update-work-session-schedule',
       bulkDeleteSessionsPreview: '/school/schedules/api/bulk-delete-sessions/preview',
-      bulkDeleteSessions: '/school/schedules/api/bulk-delete-sessions'
+      bulkDeleteSessions: '/school/schedules/api/bulk-delete-sessions',
+      refreshScheduleSessions: '/school/schedules/api/schedule-viewer/refresh-sessions'
     },
     constants: {
       commitTimeoutMs: 120000,

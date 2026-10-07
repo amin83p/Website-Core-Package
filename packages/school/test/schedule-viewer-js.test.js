@@ -86,6 +86,12 @@ test('schedule events expose co-teacher card metadata and viewer wires badges', 
   assert.match(viewer, /bi-people-fill/);
   assert.match(viewer, /buildScheduleCoTeacherBadgesHtml\(ev/);
   assert.match(viewer, /Your co-teacher pay/);
+  assert.match(viewer, /function applyClassSessionCoTeacherChangesInView/);
+  assert.match(viewer, /function patchClassSessionCoTeachersInState/);
+  assert.match(viewer, /function applyScheduleSessionChangesInView/);
+  assert.match(viewer, /function removeClassSessionsAcrossLoadedPersons/);
+  assert.match(viewer, /function upsertClassSessionEventsInState/);
+  assert.match(viewer, /SCHEDULE_REFRESH_SESSIONS_API/);
 
   const styles = read('public/styles/schedule-viewer.css');
   assert.match(styles, /\.schedule-co-teacher-badges/);
