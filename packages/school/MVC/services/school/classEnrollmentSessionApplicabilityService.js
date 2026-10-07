@@ -415,7 +415,9 @@ function resolveRollingEnrollmentApplicability({
           return;
         }
 
-        if (hourCap && consumedHours >= targetHours) {
+        const allocatedHours = roundTargetHours(consumedHours + reservedHours);
+        const allocatedCount = consumedCount + reservedCount;
+        if (hourCap && allocatedHours >= targetHours) {
           const next = {
             expected: false,
             reason: APPLICABILITY_REASON.HOUR_CAP_REACHED,

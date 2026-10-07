@@ -1425,52 +1425,111 @@
 }
 
 .schedule-session-context-menu-title-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.35rem 0.45rem;
+  display: block;
   line-height: 1.35;
 }
 
 .schedule-session-context-menu-title {
-  font-weight: 700;
-  font-size: 0.92rem;
-  color: #0f172a;
-}
-
-.schedule-session-context-header-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.22rem;
+  display: inline;
   margin: 0;
   padding: 0;
   border: 0;
   background: transparent;
-  color: #2563eb;
-  font-size: 0.82rem;
-  font-weight: 600;
-  line-height: inherit;
-  white-space: nowrap;
-  cursor: pointer;
-  vertical-align: baseline;
-}
-
-.schedule-session-context-header-link::before {
-  content: "·";
-  margin-right: 0.12rem;
-  color: #94a3b8;
   font-weight: 700;
+  font-size: 0.92rem;
+  color: #0f172a;
+  text-align: left;
+  cursor: default;
 }
 
-.schedule-session-context-header-link:hover,
-.schedule-session-context-header-link:focus {
-  color: #1d4ed8;
+.schedule-session-context-menu-title.is-navigable {
+  cursor: pointer;
+}
+
+.schedule-session-context-menu-title.is-navigable:hover,
+.schedule-session-context-menu-title.is-navigable:focus {
   text-decoration: underline;
 }
 
-.schedule-session-context-header-link i {
-  font-size: 0.78rem;
-  opacity: 0.9;
+.schedule-session-context-header-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.4rem;
+}
+
+.schedule-session-context-header-tools:not(:has(button:not(.d-none))) {
+  display: none;
+}
+
+.schedule-session-context-header-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  margin: 0;
+  padding: 0;
+  border: 1px solid #cbd5e1;
+  border-radius: 0.35rem;
+  background: #fff;
+  color: #334155;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.schedule-session-context-header-icon:hover,
+.schedule-session-context-header-icon:focus {
+  color: #1d4ed8;
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.schedule-session-context-header-icon i {
+  font-size: 0.95rem;
+}
+
+.schedule-session-context-header-icon-info {
+  margin-left: auto;
+}
+
+.schedule-session-info-section + .schedule-session-info-section {
+  margin-top: 1rem;
+}
+
+.schedule-session-info-section h6 {
+  margin: 0 0 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #64748b;
+}
+
+.schedule-session-info-section dl {
+  margin: 0;
+}
+
+.schedule-session-info-row {
+  display: grid;
+  grid-template-columns: 8.5rem 1fr;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.schedule-session-info-row dt,
+.schedule-session-info-row dd {
+  margin: 0;
+}
+
+.schedule-session-info-row dt {
+  color: #64748b;
+  font-weight: 600;
+}
+
+.schedule-session-info-coteacher + .schedule-session-info-coteacher {
+  margin-top: 0.75rem;
 }
 
 .schedule-session-context-menu-meta {

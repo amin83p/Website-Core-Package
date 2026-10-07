@@ -281,6 +281,8 @@ async function listUsers(req, res) {
       includeModal: true,
       includeModal_Table: true,
       includeModal_FileImport: true,
+      includeUserAccountPrintHandout: true,
+      microsoftAuthEnabled: microsoftAuthService.isEnabled(),
       print: true,
       user: req.user || null,
       pagination,

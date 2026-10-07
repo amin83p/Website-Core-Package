@@ -56,6 +56,24 @@
     };
   }
 
+  function readPayloadFromRecord(record, init) {
+    const uaPrintInit = init && typeof init === 'object' ? init : {};
+    const uaOrigin = resolveSiteOrigin(uaPrintInit);
+    return {
+      userId: String(record?.userId || '').trim(),
+      appName: String(uaPrintInit.appName || 'Application').trim(),
+      personName: String(record?.personName || '').trim() || '—',
+      email: String(record?.email || '').trim() || '—',
+      username: String(record?.username || '').trim(),
+      statusLabel: String(record?.statusLabel || '').trim() || '—',
+      loginUrl: `${uaOrigin}/login`,
+      microsoftLoginUrl: `${uaOrigin}/auth/microsoft`,
+      passwordResetUrl: `${uaOrigin}/password-reset`,
+      profileUrl: `${uaOrigin}/profile`,
+      microsoftAuthEnabled: uaPrintInit.microsoftAuthEnabled === true
+    };
+  }
+
   function buildSignInInstructionsHtml(payload) {
     const loginUrl = escapeHtml(payload.loginUrl);
     const microsoftLoginUrl = escapeHtml(payload.microsoftLoginUrl);
@@ -256,7 +274,8 @@
     const apm = global.AppPrintManager;
     const form = options.form || null;
     const initEl = options.initEl || null;
-    if (!apm || !form || !initEl) return null;
+    const record = options.record && typeof options.record === 'object' ? options.record : null;
+    if (!apm || !initEl || (!form && !record)) return null;
 
     let init;
     try {
@@ -265,9 +284,11 @@
       init = {};
     }
 
-    const payload = readPayloadFromForm(form, init, {
-      personNameFieldId: options.personNameFieldId || ''
-    });
+    const payload = record
+      ? readPayloadFromRecord(record, init)
+      : readPayloadFromForm(form, init, {
+        personNameFieldId: options.personNameFieldId || ''
+      });
     const sourcePath = String(options.sourcePath || global.location?.pathname || '/').trim() || '/';
     const view = String(options.view || 'user-account').trim() || 'user-account';
 
@@ -305,6 +326,7 @@
   const api = {
     escapeHtml,
     readPayloadFromForm,
+    readPayloadFromRecord,
     buildSignInInstructionsHtml,
     buildUserAccountPrintDocument,
     openAccountPrintPreview

@@ -1619,6 +1619,12 @@ async function buildEventsForPersonAndRange({
         ? [...candidateClassIds]
         : [...classMap.keys()];
 
+    const scheduleStudentToPersonMap = new Map(
+        (Array.isArray(allStudents) ? allStudents : [])
+            .map((row) => [normalizeId(row?.id), normalizeId(row?.personId)])
+            .filter(([studentId, personId]) => Boolean(studentId && personId))
+    );
+
     const events = [];
 
     for (const classId of classIdsToScan) {
@@ -1626,6 +1632,16 @@ async function buildEventsForPersonAndRange({
         const classHasInstructor = hasInstructorMatchWithTeacherLink(classDef, normalizedPersonId, teacherPersonMap);
         const sessions = await schoolDataService.getClassSessions(classId, reqUser, accessContext);
         classSessionsById.set(classId, Array.isArray(sessions) ? sessions : []);
+        let rollingApplicability = null;
+        if (classSessionCapacityService.getClassRegistrationModeKey(classDef) === 'rolling') {
+            const applicabilityByClass = await classSessionCapacityService.buildRollingApplicabilityByClassId([classDef], {
+                sessionsByClassId: new Map([[String(classDef?.id || classId).trim(), Array.isArray(sessions) ? sessions : []]]),
+                students: allStudents,
+                activeOrgId,
+                reqUser
+            });
+            rollingApplicability = applicabilityByClass.get(String(classDef?.id || classId).trim()) || null;
+        }
         const managementFlagsBySessionId = await sessionManagementService.buildSessionManagementFlagsForClassSessions({
             classId,
             classData: classDef,
@@ -1688,7 +1704,20 @@ async function buildEventsForPersonAndRange({
             const detailsUrl = sessionId
                 ? sessionNavigationService.buildManageSessionHref(classId, { sessionId, date: sessionDate })
                 : '';
-            const soloStudent = resolveSoloStudentForSession(classDef, sessionDate);
+            let soloStudent = resolveSoloStudentForSession(classDef, sessionDate);
+            if (soloStudent && rollingApplicability) {
+                const expectedPersonIds = classSessionCapacityService.resolveSessionEnrollmentPersonIds({
+                    classData: classDef,
+                    session,
+                    studentToPersonMap: scheduleStudentToPersonMap,
+                    statusMap: effectiveStatusMap,
+                    rollingApplicability
+                });
+                const expectedOnSession = Array.from(expectedPersonIds).some((personId) => (
+                    idsEqual(personId, soloStudent.soloStudentPersonId)
+                ));
+                if (!expectedOnSession) soloStudent = null;
+            }
             const resolvedSoloStudentName = soloStudent
                 ? resolveReadableStudentLabel(
                     soloStudent.soloStudentName || resolveStudentNameFromSessionRoster(session, soloStudent) || '',
@@ -1738,8 +1767,19 @@ async function buildEventsForPersonAndRange({
                     canChangeTime: true,
                     canChangeStatus: true
                 },
+                mainTeacherId: deliveredBy || '',
+                mainTeacherName: String(session?.delivery?.deliveredByName || '').trim()
+                    || (deliveredBy ? String(schedulePersonNameById.get(deliveredBy) || '').trim() : ''),
                 hasCoTeachers: sessionCoTeachers.length > 0,
                 coTeacherCount: sessionCoTeachers.length,
+                coTeachers: sessionCoTeachers.map((row) => ({
+                    personId: String(row?.personId || ''),
+                    name: String(row?.name || ''),
+                    roleLabel: String(row?.roleLabel || ''),
+                    canEdit: row?.canEdit === true,
+                    paid: row?.paid !== false,
+                    paidHours: row?.paid === false ? 0 : (row?.paidHours ?? null)
+                })),
                 viewerIsSessionCoTeacher: Boolean(coTeacherEntry),
                 viewerCoTeacherPaid: coTeacherEntry ? coTeacherEntry.paid !== false : null
             });
@@ -2620,6 +2660,7 @@ async function postCommitStagedSessions(req, res) {
             data: {
                 createdCount: appendResult.createdCount,
                 createdSessions,
+                sessionIdRemap: Array.isArray(appendResult.sessionIdRemap) ? appendResult.sessionIdRemap : [],
                 events: commitEvents,
                 fingerprint,
                 cycleEndDateExtended: appendResult.cycleEndDateExtended === true,
@@ -3004,13 +3045,14 @@ async function postEnrollStudentsPrepare(req, res) {
 async function postEnrollStudentsSessionCapacityCheck(req, res) {
     try {
         const accessContext = schoolDataService.buildRouteAccessContext(req);
-        const { sessions } = scheduleEnrollStudentsService.parseSessionsFromBody(req.body || {});
+        const { sessionMode, sessions } = scheduleEnrollStudentsService.parseSessionsFromBody(req.body || {});
         const classId = req.body?.classId || sessions[0]?.classId;
         const classData = await schoolDataService.getDataById('classes', classId, req.user, accessContext);
         if (!classData) throw new Error('Class not found.');
         const result = await scheduleEnrollStudentsService.checkOneOnOneSessionOccupancy({
             classData,
             sessions,
+            sessionMode,
             reqUser: req.user
         });
         return res.json({ status: 'success', data: result, actionStateId: req.actionStateId || '' });

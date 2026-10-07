@@ -63,6 +63,7 @@ test('master schedule viewer wires enroll students rail handler', () => {
   assert.match(enroll, /StudentClaimNumbersManager/);
   assert.match(enroll, /refreshEnrolledSessionsInView/);
   assert.match(enroll, /applyScheduleSessionChangesInView/);
+  assert.match(enroll, /session-capacity-check[\s\S]*sessionMode:\s*ctx\.sessionMode/);
   assert.match(viewer, /applyScheduleSessionChangesInView[\s\S]*installMasterScheduleEnrollStudents/);
 });
 
@@ -140,6 +141,67 @@ test('sumSelectedSessionDurationHours totals session durations from times', () =
     { start: '14:00', end: '15:00' }
   ]);
   assert.equal(total, 2.5);
+});
+
+test('resolveFirstSessionDateForPendingEntry falls back to selectedSessions after id rewrite', async () => {
+  const originalGetSessions = schoolDataService.getClassSessions;
+  schoolDataService.getClassSessions = async () => ([
+    { sessionId: 'SES-271684-0001', date: '2026-04-01', startTime: '09:00', endTime: '10:00' },
+    { sessionId: 'SES-271684-0002', date: '2026-04-02', startTime: '09:00', endTime: '10:00' }
+  ]);
+  try {
+    const date = await scheduleEnrollStudentsService.resolveFirstSessionDateForPendingEntry(
+      { id: 'CLASS/1' },
+      {
+        studentId: 'STU/1',
+        selectedSessionIds: ['DRAFT_1', 'DRAFT_2'],
+        selectedSessions: [
+          { sessionId: 'DRAFT_1', date: '2026-04-01', start: '09:00', end: '10:00' },
+          { sessionId: 'DRAFT_2', date: '2026-04-02', start: '09:00', end: '10:00' }
+        ]
+      },
+      { id: 'USER-1' }
+    );
+    assert.equal(date, '2026-04-01');
+    const resolved = await scheduleEnrollStudentsService.resolvePersistedSessionsForPendingEntry(
+      { id: 'CLASS/1' },
+      {
+        selectedSessionIds: ['DRAFT_1', 'DRAFT_2'],
+        selectedSessions: [
+          { sessionId: 'DRAFT_1', date: '2026-04-01', start: '09:00', end: '10:00' },
+          { sessionId: 'DRAFT_2', date: '2026-04-02', start: '09:00', end: '10:00' }
+        ]
+      },
+      { id: 'USER-1' }
+    );
+    assert.deepEqual(resolved.remappedSessionIds, ['SES-271684-0001', 'SES-271684-0002']);
+  } finally {
+    schoolDataService.getClassSessions = originalGetSessions;
+  }
+});
+
+test('checkOneOnOneSessionOccupancy skips persisted lookup for staged sessions', async () => {
+  const scheduleSessionContextService = require('../MVC/services/school/scheduleSessionContextService');
+  const originalBuild = scheduleSessionContextService.buildSessionEnrollmentList;
+  scheduleSessionContextService.buildSessionEnrollmentList = async () => {
+    throw new Error('Session not found.');
+  };
+  try {
+    const classData = { id: 'CLASS/1', registrationMode: 'rolling', maxCapacity: 1 };
+    const result = await scheduleEnrollStudentsService.checkOneOnOneSessionOccupancy({
+      classData,
+      sessionMode: 'staged',
+      sessions: [
+        { sessionId: 'STAGED/1', date: '2026-04-01', start: '09:00', end: '10:00' },
+        { sessionId: 'STAGED/2', date: '2026-04-02', start: '09:00', end: '10:00' }
+      ],
+      reqUser: { id: 'USER-1' }
+    });
+    assert.equal(result.blocked, false);
+    assert.deepEqual(result.conflicts, []);
+  } finally {
+    scheduleSessionContextService.buildSessionEnrollmentList = originalBuild;
+  }
 });
 
 test('prepareEnrollStudents rejects non-rolling class', async () => {

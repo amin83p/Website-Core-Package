@@ -1795,11 +1795,14 @@
         const smTeacherLabel = String(session.delivery?.deliveredByName || session.delivery?.deliveredBy || '').trim();
         const smCurrentStatusLabel = String(currentSessionStatusMeta?.label || currentSessionStatus || 'Scheduled').trim();
         const canEditSessionMetadataFlag = typeof canEditSessionMetadata !== 'undefined' && canEditSessionMetadata === true;
+        const canEditOneOnOneSessionScheduleFlag = typeof canEditOneOnOneSessionSchedule !== 'undefined' && canEditOneOnOneSessionSchedule === true;
+        const canEditSessionScheduleFields = canEditSessionMetadataFlag || canEditOneOnOneSessionScheduleFlag;
         const canManageReportClassConductFlag = typeof canManageClassConduct !== 'undefined' && canManageClassConduct === true;
         const canViewClassConductPanelFlag = canEditSessionMetadataFlag;
         const canViewSchoolSettingsFlag = typeof canViewSchoolSettings !== 'undefined' && canViewSchoolSettings === true;
         const isTimesheetSessionLock = typeof isSessionLocked !== 'undefined' && isSessionLocked && String(session.lockReason || '') === 'timesheet_approved';
         const metadataDisabledAttr = (isReadOnly || timesheetMetadataLockActiveFlag) ? 'disabled' : '';
+        const scheduleFieldsDisabledAttr = (isReadOnly || timesheetMetadataLockActiveFlag) ? 'disabled' : '';
         const coTeacherControlLocked = isReadOnly || timesheetMetadataLockActiveFlag;
         const canToggleSessionLock = canEditSessionMetadataFlag && !isTimesheetSessionLock;
         const conductScaleDefaultLevels = [
@@ -2006,18 +2009,18 @@
                     </div>
                     <div class="session-info-tile">
                         <div class="session-info-tile-label">Date</div>
-                        <% if (canEditSessionMetadataFlag) { %>
-                            <input type="date" id="sessionDate" class="form-control form-control-sm" value="<%= session.date || '' %>" <%- metadataDisabledAttr %>>
+                        <% if (canEditSessionScheduleFields) { %>
+                            <input type="date" id="sessionDate" class="form-control form-control-sm" value="<%= session.date || '' %>" <%- scheduleFieldsDisabledAttr %>>
                         <% } else { %>
                             <div class="session-info-tile-value"><%= session.date %></div>
                         <% } %>
                     </div>
                     <div class="session-info-tile">
                         <div class="session-info-tile-label">Time</div>
-                        <% if (canEditSessionMetadataFlag) { %>
+                        <% if (canEditSessionScheduleFields) { %>
                             <div class="d-flex gap-2 flex-wrap">
-                                <input type="time" id="sessionStartTime" class="form-control form-control-sm" value="<%= session.startTime || '' %>" aria-label="Start time" <%- metadataDisabledAttr %>>
-                                <input type="time" id="sessionEndTime" class="form-control form-control-sm" value="<%= session.endTime || '' %>" aria-label="End time" <%- metadataDisabledAttr %>>
+                                <input type="time" id="sessionStartTime" class="form-control form-control-sm" value="<%= session.startTime || '' %>" aria-label="Start time" <%- scheduleFieldsDisabledAttr %>>
+                                <input type="time" id="sessionEndTime" class="form-control form-control-sm" value="<%= session.endTime || '' %>" aria-label="End time" <%- scheduleFieldsDisabledAttr %>>
                             </div>
                         <% } else { %>
                             <div class="session-info-tile-value text-nowrap"><%= session.startTime %> – <%= session.endTime %></div>
@@ -4180,6 +4183,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionReportRosterRows = <%- jsonForScript(Array.isArray(session.roster) ? session.roster : []) %>;
     const sessionManagerClassTitle = <%- jsonForScript(classData.title || classData.id || '') %>;
     const sessionCanEditMetadata = <%- jsonForScript(Boolean(canEditSessionMetadataFlag && !timesheetMetadataLockActiveFlag)) %>;
+    const sessionCanEditOneOnOneSchedule = <%- jsonForScript(Boolean(canEditOneOnOneSessionScheduleFlag && !timesheetMetadataLockActiveFlag)) %>;
+    const sessionCanEditScheduleFields = sessionCanEditMetadata || sessionCanEditOneOnOneSchedule;
     const sessionAttendanceReadOnly = <%- jsonForScript(Boolean(attendanceReadOnly)) %>;
     window.sessionAttendanceReadOnly = sessionAttendanceReadOnly;
     const sessionCanUploadAttendanceFiles = <%- jsonForScript(Boolean(typeof canUploadAttendanceFiles !== 'undefined' && canUploadAttendanceFiles)) %>;
@@ -11255,12 +11260,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!sessionNotesSectionReadOnly) {
             payload.notes = notes;
         }
-        if (sessionAutosaveDirty.metadataDirty && sessionCanEditMetadata) {
+        if (sessionAutosaveDirty.metadataDirty && sessionCanEditScheduleFields) {
             payload.date = document.getElementById('sessionDate')?.value || '';
             payload.startTime = document.getElementById('sessionStartTime')?.value || '';
             payload.endTime = document.getElementById('sessionEndTime')?.value || '';
-            payload.teacherId = document.getElementById('sessionTeacherId')?.value || '';
-            payload.teacherName = document.getElementById('sessionTeacherName')?.value || '';
+            if (sessionCanEditMetadata) {
+                payload.teacherId = document.getElementById('sessionTeacherId')?.value || '';
+                payload.teacherName = document.getElementById('sessionTeacherName')?.value || '';
+            }
         }
         if (sessionAutosaveDirty.metadataDirty && (sessionCanManageCoTeachers || sessionCanToggleCoTeacherEdit || sessionCanEditMetadata)) {
             payload.coTeachers = JSON.stringify(Array.isArray(sessionCoTeachersState) ? sessionCoTeachersState : []);
@@ -11376,12 +11383,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!sessionNotesSectionReadOnly) {
             payload.notes = notes;
         }
-        if (sessionCanEditMetadata) {
+        if (sessionCanEditScheduleFields) {
             payload.date = document.getElementById('sessionDate')?.value || '';
             payload.startTime = document.getElementById('sessionStartTime')?.value || '';
             payload.endTime = document.getElementById('sessionEndTime')?.value || '';
-            payload.teacherId = document.getElementById('sessionTeacherId')?.value || '';
-            payload.teacherName = document.getElementById('sessionTeacherName')?.value || '';
+            if (sessionCanEditMetadata) {
+                payload.teacherId = document.getElementById('sessionTeacherId')?.value || '';
+                payload.teacherName = document.getElementById('sessionTeacherName')?.value || '';
+            }
         }
         if (sessionCanManageCoTeachers || sessionCanToggleCoTeacherEdit || sessionCanEditMetadata) {
             payload.coTeachers = JSON.stringify(Array.isArray(sessionCoTeachersState) ? sessionCoTeachersState : []);
@@ -11524,6 +11533,36 @@ document.addEventListener('DOMContentLoaded', () => {
                 ({ result } = await submitSessionSave({ ...payload, forceRemoveMakeups: true }));
                 guarded = await applySaveGuard(result);
                 if (guarded.stop) return { ok: false, skipped: true, reason: 'guard-stop' };
+            }
+
+            if (result.code === 'SESSION_ENROLLMENT_CAP_CONFLICT'
+                || (result.code === 'SESSION_METADATA_CONFLICTS' && sessionCanEditOneOnOneSchedule && !sessionCanEditMetadata)) {
+                const conflictRows = Array.isArray(result?.data?.conflicts) ? result.data.conflicts : [];
+                const detailHtml = conflictRows.length
+                    ? '<div class="mt-3"><strong>Details:</strong><ul class="mt-2 mb-0 text-start">'
+                        + conflictRows.map((row) => {
+                            const date = attendanceAttachmentEscape(row?.date || '-');
+                            const teacher = attendanceAttachmentEscape(row?.teacherName || '-');
+                            const conflictClass = attendanceAttachmentEscape(row?.conflictClass || 'schedule conflict');
+                            const existTime = attendanceAttachmentEscape(row?.existTime || '');
+                            return `<li>${date} | ${teacher} | ${conflictClass}${existTime ? ` (${existTime})` : ''}</li>`;
+                        }).join('')
+                        + '</ul></div>'
+                    : '';
+                const blockMessage = attendanceAttachmentEscape(result.message || 'This schedule change is not allowed.');
+                await sessionMessageBox({
+                    title: result.code === 'SESSION_ENROLLMENT_CAP_CONFLICT' ? 'Enrollment cap' : 'Schedule conflict',
+                    icon: 'warning',
+                    html: true,
+                    message: `${blockMessage}${detailHtml}`,
+                    okClass: 'btn-warning'
+                });
+                return {
+                    ok: false,
+                    skipped: true,
+                    reason: result.code === 'SESSION_ENROLLMENT_CAP_CONFLICT' ? 'enrollment-cap' : 'metadata-conflicts',
+                    message: result.message || blockMessage
+                };
             }
 
             if (result.status === 'warning' && result.code === 'SESSION_METADATA_CONFLICTS') {

@@ -104,6 +104,7 @@ const sessionGradebookMakeupService = require('../../services/school/sessionGrad
 const teachingOutlineSuggestionService = require('../../services/school/teachingOutlineSuggestionService');
 const teachingOutlineCatalogService = require('../../services/school/teachingOutlineCatalogService');
 const sessionConflictDetectionService = require('../../services/school/sessionConflictDetectionService');
+const oneOnOneSessionScheduleService = require('../../services/school/oneOnOneSessionScheduleService');
 const { userCanOpenAttendanceMatrix, getAttendanceAccessForRequest } = require('../../services/school/attendanceMatrixAccessService');
 const attendanceAccessService = require('../../services/school/attendanceAccessService');
 const studentListSearchService = require('../../services/school/studentListSearchService');
@@ -4715,6 +4716,12 @@ async function manageSession(req, res) {
             reqUser: req.user,
             students: rosterIdentityData.students
         });
+        const canEditOneOnOneSessionSchedule = await oneOnOneSessionScheduleService.resolveCanEditOneOnOneSessionSchedule(
+            req,
+            classData,
+            session,
+            { canOverride, canEditSession }
+        );
         const selectableSessionStatusMetaForSession = getSelectableSessionStatusMeta(
             sessionStatusMeta,
             { allowAdminStatuses, capacityMode: sessionCapacityMode }
@@ -4785,6 +4792,7 @@ async function manageSession(req, res) {
             timesheetMetadataLockActive,
             timesheetDeletionLockActive,
             canEditSessionMetadata: canOverride,
+            canEditOneOnOneSessionSchedule,
             canManageClassConduct: Boolean(canOverride) || Boolean(canEditSession),
             canOverrideMakeupDuration,
             canCreateMakeupWhileLocked,
@@ -5968,6 +5976,32 @@ async function saveSession(req, res) {
         if (isAdministrativeSessionLock && !canOverride) {
             throw new Error('This session is locked and cannot be edited. Please contact an administrator.');
         }
+        if (forceMetadataConflicts && !canOverride) {
+            const overrideMessage = 'You cannot override schedule conflicts for this session.';
+            if (req.headers['x-ajax-request']) {
+                return res.status(403).json({ status: 'error', message: overrideMessage });
+            }
+            throw new Error(overrideMessage);
+        }
+
+        const canEditOneOnOneSessionSchedule = !canOverride
+            && await oneOnOneSessionScheduleService.resolveCanEditOneOnOneSessionSchedule(
+                req,
+                classData,
+                originalSession,
+                { canOverride, canEditSession: true }
+            );
+        let teacherOneOnOneScheduleAccess = null;
+        if (canEditOneOnOneSessionSchedule) {
+            teacherOneOnOneScheduleAccess = await oneOnOneSessionScheduleService.resolveTeacherOneOnOneScheduleEditAccess(
+                req,
+                classData,
+                originalSession
+            );
+            if (!teacherOneOnOneScheduleAccess?.allowed) {
+                teacherOneOnOneScheduleAccess = null;
+            }
+        }
 
         // Validate and normalize payload before persisting.
         const normalizedStatus = sessionStatusPolicyService.normalizeStatusCode(status || originalSession.status || '');
@@ -6173,11 +6207,18 @@ async function saveSession(req, res) {
         const probeSessionForTimesheetLock = JSON.parse(JSON.stringify(originalSession || {}));
         probeSessionForTimesheetLock.status = normalizedStatus;
         probeSessionForTimesheetLock.room = normalizedRoom;
-        applyAdminSessionMetadataUpdate(
-            probeSessionForTimesheetLock,
-            normalizedMetadataBody,
-            { canOverride, canManageCoTeachers, canToggleCoTeacherEdit }
-        );
+        if (canOverride) {
+            applyAdminSessionMetadataUpdate(
+                probeSessionForTimesheetLock,
+                normalizedMetadataBody,
+                { canOverride, canManageCoTeachers, canToggleCoTeacherEdit }
+            );
+        } else if (canEditOneOnOneSessionSchedule) {
+            oneOnOneSessionScheduleService.applyTeacherOneOnOneScheduleFields(
+                probeSessionForTimesheetLock,
+                normalizedMetadataBody
+            );
+        }
         const restrictedTimesheetMutationScopes = schoolDependencyService.collectSessionTimesheetRestrictedMutationScopes({
             previousSession: originalSession,
             nextSession: probeSessionForTimesheetLock
@@ -6506,44 +6547,87 @@ async function saveSession(req, res) {
                 req.user
             );
         }
-        const { changed: metadataChanged } = applyAdminSessionMetadataUpdate(
-            originalSession,
-            normalizedMetadataBody,
-            { canOverride, canManageCoTeachers, canToggleCoTeacherEdit }
-        );
+        let metadataChanged = false;
+        if (canOverride) {
+            ({ changed: metadataChanged } = applyAdminSessionMetadataUpdate(
+                originalSession,
+                normalizedMetadataBody,
+                { canOverride, canManageCoTeachers, canToggleCoTeacherEdit }
+            ));
+        } else if (canEditOneOnOneSessionSchedule && teacherOneOnOneScheduleAccess?.allowed) {
+            ({ changed: metadataChanged } = oneOnOneSessionScheduleService.applyTeacherOneOnOneScheduleFields(
+                originalSession,
+                normalizedMetadataBody
+            ));
+        }
         await assertSessionManagerSessionWithinClassWindowOrThrow(classData, originalSession, req.user);
         if (metadataChanged) {
             assertSessionManagerSessionWithinCycleWindowOrThrow(classData, originalSession);
 
             const mergedSessions = sessions.map((row, idx) => (idx === sessionIndex ? originalSession : row));
-            const conflicts = await detectSessionConflicts({
-                classId,
-                sessions: mergedSessions,
-                activeOrgId: classData?.orgId || getActiveOrgIdOrThrow(req.user),
-                reqUser: req.user,
-                fallbackTeacherId: resolveSessionTeacherId(originalSession),
-                includeExternalScheduleConflicts: true,
-                externalFocusSessionIds: [sessionId]
-            });
-            if (Array.isArray(conflicts) && conflicts.length && !forceMetadataConflicts) {
-                const warningMessage = 'Schedule conflicts were detected for the updated session date, time, or teacher.';
-                if (req.headers['x-ajax-request']) {
-                    return res.status(409).json({
-                        status: 'warning',
-                        code: 'SESSION_METADATA_CONFLICTS',
-                        message: warningMessage,
-                        data: {
-                            requiresConfirmation: true,
-                            conflicts: conflicts.slice(0, 12).map((row) => ({
-                                date: row?.date || originalSession.date,
-                                teacherName: row?.teacherName || '',
-                                conflictClass: row?.conflictClass || 'schedule conflict',
-                                existTime: row?.existTime || ''
-                            }))
-                        }
+            if (canEditOneOnOneSessionSchedule && !canOverride && teacherOneOnOneScheduleAccess?.allowed) {
+                try {
+                    await oneOnOneSessionScheduleService.validateTeacherOneOnOneScheduleChange({
+                        classData,
+                        sessions: mergedSessions,
+                        sessionId,
+                        workingSession: originalSession,
+                        reqUser: req.user,
+                        oneOnOneContext: teacherOneOnOneScheduleAccess.oneOnOneContext,
+                        studentToPersonMap: teacherOneOnOneScheduleAccess.studentToPersonMap
                     });
+                } catch (scheduleError) {
+                    if (scheduleError?.name === 'OneOnOneSessionScheduleBlockedError') {
+                        const payload = {
+                            status: 'error',
+                            code: scheduleError.code,
+                            message: scheduleError.message
+                        };
+                        if (scheduleError.code === oneOnOneSessionScheduleService.ERROR_CODES.METADATA_CONFLICTS) {
+                            payload.data = {
+                                conflicts: oneOnOneSessionScheduleService.mapConflictsForClient(
+                                    scheduleError.conflicts,
+                                    originalSession
+                                )
+                            };
+                        }
+                        if (req.headers['x-ajax-request']) {
+                            return res.status(409).json(payload);
+                        }
+                        throw scheduleError;
+                    }
+                    throw scheduleError;
                 }
-                throw new Error(warningMessage);
+            } else {
+                const conflicts = await detectSessionConflicts({
+                    classId,
+                    sessions: mergedSessions,
+                    activeOrgId: classData?.orgId || getActiveOrgIdOrThrow(req.user),
+                    reqUser: req.user,
+                    fallbackTeacherId: resolveSessionTeacherId(originalSession),
+                    includeExternalScheduleConflicts: true,
+                    externalFocusSessionIds: [sessionId]
+                });
+                if (Array.isArray(conflicts) && conflicts.length && !forceMetadataConflicts) {
+                    const warningMessage = 'Schedule conflicts were detected for the updated session date, time, or teacher.';
+                    if (req.headers['x-ajax-request']) {
+                        return res.status(409).json({
+                            status: 'warning',
+                            code: 'SESSION_METADATA_CONFLICTS',
+                            message: warningMessage,
+                            data: {
+                                requiresConfirmation: true,
+                                conflicts: conflicts.slice(0, 12).map((row) => ({
+                                    date: row?.date || originalSession.date,
+                                    teacherName: row?.teacherName || '',
+                                    conflictClass: row?.conflictClass || 'schedule conflict',
+                                    existTime: row?.existTime || ''
+                                }))
+                            }
+                        });
+                    }
+                    throw new Error(warningMessage);
+                }
             }
             originalSession.audit = {
                 ...(originalSession.audit || {}),

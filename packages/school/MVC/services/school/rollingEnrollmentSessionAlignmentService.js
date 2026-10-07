@@ -1402,11 +1402,35 @@ async function commitStagedSessions({
     sessions: working
   });
 
+  const createdKeys = new Set(created.map((row) => sessionScheduleKey(row)).filter((key) => key && key !== '||'));
+  const previousIdsByKey = new Map(
+    created
+      .map((row) => [sessionScheduleKey(row), getSessionId(row)])
+      .filter(([key, id]) => key && key !== '||' && id)
+  );
   const saved = await schoolDataService.saveClassSessions(classData.id, working, reqUser);
+  const createdSessions = (Array.isArray(saved) ? saved : [])
+    .filter((row) => createdKeys.has(sessionScheduleKey(row)));
+  const sessionIdRemap = createdSessions
+    .map((row) => {
+      const key = sessionScheduleKey(row);
+      const previousId = previousIdsByKey.get(key) || '';
+      const sessionId = getSessionId(row);
+      if (!sessionId) return null;
+      return {
+        previousId: previousId && previousId !== sessionId ? previousId : '',
+        sessionId,
+        date: getSessionDate(row),
+        startTime: cleanText(row?.startTime || row?.start || ''),
+        endTime: cleanText(row?.endTime || row?.end || '')
+      };
+    })
+    .filter(Boolean);
   return {
-    createdCount: created.length,
+    createdCount: createdSessions.length,
     sessions: saved,
-    createdSessions: created,
+    createdSessions,
+    sessionIdRemap,
     cycleEndDateExtended,
     previousCycleEndDate,
     newCycleEndDate: normalizeDateOnly(workingClassData?.cycleEndDate),

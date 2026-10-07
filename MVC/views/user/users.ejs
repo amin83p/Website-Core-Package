@@ -62,6 +62,16 @@
             const lastUpdateDateTime = audit.lastUpdateDateTime || u.lastUpdateDateTime;
             const createUser = audit.createUser || u.createUser;
             const lastUpdateUser = audit.lastUpdateUser || u.lastUpdateUser;
+            const personName = person
+              ? [person.name?.first, person.name?.last].filter(Boolean).join(' ')
+              : '';
+            const accountStatusLabels = {
+              pending: 'Pending',
+              active: 'Active',
+              suspended: 'Suspended',
+              deleted: 'Deleted'
+            };
+            const accountStatusLabel = accountStatusLabels[u.status] || u.status || '';
           %>
 
           <tr>
@@ -157,6 +167,16 @@
                   <a href="/users/edit/<%= u.id %>" class="btn btn-outline-primary btn-sm">
                     <i class="bi bi-pencil-square me-2"></i>Edit
                   </a>
+                  <button
+                    type="button"
+                    class="btn btn-outline-secondary btn-sm js-print-user-account"
+                    data-user-id="<%= u.id %>"
+                    data-email="<%= u.email || '' %>"
+                    data-username="<%= u.username || '' %>"
+                    data-person-name="<%= personName %>"
+                    data-status-label="<%= accountStatusLabel %>">
+                    <i class="bi bi-printer me-2"></i>Print account info
+                  </button>
                   <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= u.id %>">
                     <i class="bi bi-trash me-2"></i>Delete
                   </button>
@@ -179,6 +199,37 @@
     filters: null, 
     baseUrlPath: newUrl
 }) %>
+
+<%
+  const printBrandMeta = (typeof appBrand !== 'undefined' && appBrand && typeof appBrand === 'object') ? appBrand : {};
+  const configuredSiteBase = (typeof publicSiteUrl !== 'undefined' && publicSiteUrl)
+    ? String(publicSiteUrl).trim().replace(/\/$/, '')
+    : '';
+%>
+<script type="application/json" id="initUserAccountPrint"><%- JSON.stringify({
+  appName: printBrandMeta.appName || 'Application',
+  siteBase: configuredSiteBase,
+  microsoftAuthEnabled: typeof microsoftAuthEnabled !== 'undefined' && !!microsoftAuthEnabled
+}) %></script>
+<script>
+  document.addEventListener('click', (event) => {
+    const button = event.target.closest('.js-print-user-account');
+    if (!button || !window.UserAccountPrintHandout) return;
+    event.preventDefault();
+    window.UserAccountPrintHandout.openAccountPrintPreview({
+      initEl: document.getElementById('initUserAccountPrint'),
+      sourcePath: location.pathname,
+      view: 'user-account',
+      record: {
+        userId: button.dataset.userId || '',
+        email: button.dataset.email || '',
+        username: button.dataset.username || '',
+        personName: button.dataset.personName || '',
+        statusLabel: button.dataset.statusLabel || ''
+      }
+    });
+  });
+</script>
 
 <%- include('../partials/tablePages-end') %>
 

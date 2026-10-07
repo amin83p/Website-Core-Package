@@ -44,11 +44,12 @@
         body: JSON.stringify(body || {})
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok || data.status !== 'success') {
+      if (!res.ok || (data.status !== 'success' && data.status !== 'warning')) {
         const error = new Error(data.message || `Request failed (${res.status}).`);
         error.step = data.step || 'saveSessions';
         error.remediation = data.remediation || '';
         error.issues = Array.isArray(data.issues) ? data.issues : [];
+        error.warnings = Array.isArray(data.warnings) ? data.warnings : [];
         throw error;
       }
       return data;
@@ -61,11 +62,24 @@
         lines.push(`<span class="text-muted d-block mt-2">${escapeHtml(error.remediation)}</span>`);
       }
       const issues = Array.isArray(error?.issues) ? error.issues : [];
+      const warnings = Array.isArray(error?.warnings) ? error.warnings : [];
       if (issues.length) {
-        lines.push('<ul class="mb-0 mt-2 ps-3">');
+        lines.push('<div class="mt-2"><strong>Errors</strong></div>');
+        lines.push('<ul class="mb-0 mt-1 ps-3">');
         issues.forEach((issue) => {
-          const student = issue?.studentLabel || issue?.studentId || 'Student';
-          lines.push(`<li><strong>${escapeHtml(student)}:</strong> ${escapeHtml(issue?.message || '')}${issue?.remediation ? ` <span class="text-muted">${escapeHtml(issue.remediation)}</span>` : ''}</li>`);
+          const student = issue?.studentLabel || issue?.studentId || '';
+          const prefix = student ? `<strong>${escapeHtml(student)}:</strong> ` : '';
+          lines.push(`<li>${prefix}${escapeHtml(issue?.message || '')}${issue?.remediation ? ` <span class="text-muted">${escapeHtml(issue.remediation)}</span>` : ''}</li>`);
+        });
+        lines.push('</ul>');
+      }
+      if (warnings.length) {
+        lines.push('<div class="mt-2"><strong>Warnings</strong></div>');
+        lines.push('<ul class="mb-0 mt-1 ps-3">');
+        warnings.forEach((issue) => {
+          const student = issue?.studentLabel || issue?.studentId || '';
+          const prefix = student ? `<strong>${escapeHtml(student)}:</strong> ` : '';
+          lines.push(`<li>${prefix}${escapeHtml(issue?.message || '')}${issue?.remediation ? ` <span class="text-muted">${escapeHtml(issue.remediation)}</span>` : ''}</li>`);
         });
         lines.push('</ul>');
       }
@@ -165,7 +179,54 @@
           await deps.acknowledgeLocalScheduleMutation(person, fp);
         }
       }
-      return { createdCount, data: result?.data || {} };
+      return {
+        createdCount,
+        data: result?.data || {},
+        sessionIdRemap: Array.isArray(result?.data?.sessionIdRemap) ? result.data.sessionIdRemap : [],
+        createdSessions: Array.isArray(result?.data?.createdSessions) ? result.data.createdSessions : [],
+        pendingStagedSessions
+      };
+    }
+
+    function remapEnrollmentEntriesAfterSessionCommit(enrollmentEntries, commitResult) {
+      const rows = Array.isArray(enrollmentEntries) ? enrollmentEntries : [];
+      if (!rows.length) return rows;
+      const idMap = new Map();
+      (Array.isArray(commitResult?.sessionIdRemap) ? commitResult.sessionIdRemap : []).forEach((row) => {
+        const previousId = clean(row?.previousId);
+        const nextId = clean(row?.sessionId);
+        if (previousId && nextId) idMap.set(previousId, nextId);
+      });
+      const bySchedule = new Map();
+      (Array.isArray(commitResult?.createdSessions) ? commitResult.createdSessions : []).forEach((row) => {
+        const key = [clean(row?.date), clean(row?.startTime || row?.start), clean(row?.endTime || row?.end)].join('|');
+        const nextId = clean(row?.sessionId || row?.id);
+        if (key !== '||' && nextId) bySchedule.set(key, nextId);
+      });
+      (Array.isArray(commitResult?.pendingStagedSessions) ? commitResult.pendingStagedSessions : []).forEach((staged) => {
+        const previousId = clean(staged?.sessionId);
+        const key = [clean(staged?.date), clean(staged?.startTime || staged?.start), clean(staged?.endTime || staged?.end)].join('|');
+        const nextId = bySchedule.get(key);
+        if (previousId && nextId) idMap.set(previousId, nextId);
+      });
+      if (!idMap.size && !bySchedule.size) return rows;
+      return rows.map((entry) => {
+        const selectedSessions = (Array.isArray(entry?.selectedSessions) ? entry.selectedSessions : []).map((sessionRow) => {
+          const previousId = clean(sessionRow?.sessionId);
+          const key = [clean(sessionRow?.date), clean(sessionRow?.start), clean(sessionRow?.end)].join('|');
+          const nextId = idMap.get(previousId) || bySchedule.get(key) || previousId;
+          return { ...sessionRow, sessionId: nextId };
+        });
+        const selectedSessionIds = (Array.isArray(entry?.selectedSessionIds) ? entry.selectedSessionIds : [])
+          .map((id) => idMap.get(clean(id)) || clean(id))
+          .filter(Boolean);
+        const fromSelectedSessions = selectedSessions.map((sessionRow) => clean(sessionRow?.sessionId)).filter(Boolean);
+        return {
+          ...entry,
+          selectedSessionIds: fromSelectedSessions.length ? fromSelectedSessions : selectedSessionIds,
+          selectedSessions
+        };
+      });
     }
 
     async function runSelectedDraftSave(selection) {
@@ -187,6 +248,7 @@
             ? deps.selectedScheduleRole() || person?.selectedRole || ''
             : '';
 
+          let remappedEnrollmentEntries = enrollmentEntries;
           if (sessionIds.length) {
             const pendingStagedSessions = draftEventsToStagedSessions(classId, sessionIds, person);
             setLoadingNote(`Checking staged session conflicts for ${classLabel}…`, 'Session conflict check');
@@ -197,9 +259,9 @@
             });
 
             setLoadingNote(`Saving staged sessions for ${classLabel}…`, 'Save staged sessions');
-            let extendCycleEndDate = false;
+            let commitResult = null;
             try {
-              await commitSessionsForClass({
+              commitResult = await commitSessionsForClass({
                 person,
                 classId,
                 classLabel,
@@ -217,7 +279,7 @@
               );
               if (!extend) return;
               setLoadingNote(`Saving staged sessions for ${classLabel}…`, 'Save staged sessions');
-              await commitSessionsForClass({
+              commitResult = await commitSessionsForClass({
                 person,
                 classId,
                 classLabel,
@@ -225,13 +287,25 @@
                 extendCycleEndDate: true
               });
             }
+            remappedEnrollmentEntries = remapEnrollmentEntriesAfterSessionCommit(enrollmentEntries, commitResult);
+            if (typeof deps.replacePendingEnrollStudentsForClass === 'function' && remappedEnrollmentEntries.length) {
+              const currentRows = typeof deps.getPendingEnrollStudentsForClass === 'function'
+                ? deps.getPendingEnrollStudentsForClass(classId)
+                : [];
+              const nextRows = currentRows.map((row, index) => {
+                const selectedIndex = enrollmentIndexes.indexOf(index);
+                if (selectedIndex < 0) return row;
+                return remappedEnrollmentEntries[selectedIndex] || row;
+              });
+              deps.replacePendingEnrollStudentsForClass(classId, nextRows);
+            }
           }
 
-          if (enrollmentEntries.length) {
+          if (remappedEnrollmentEntries.length) {
             const baseBody = {
               classId,
               personId: person.id,
-              pendingEnrollments: enrollmentEntries,
+              pendingEnrollments: remappedEnrollmentEntries,
               startDate: range.startDate,
               endDate: range.endDate,
               role: commitRole

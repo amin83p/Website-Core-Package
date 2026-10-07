@@ -245,16 +245,19 @@
 <div id="scheduleSessionContextMenu" class="schedule-session-context-menu d-none" role="menu" aria-hidden="true">
   <div class="schedule-session-context-menu-header" id="scheduleSessionContextMenuHeader">
     <div class="schedule-session-context-menu-title-row">
-      <div class="schedule-session-context-menu-title" id="scheduleSessionContextMenuTitle"></div>
+      <button type="button" class="schedule-session-context-menu-title" id="scheduleSessionContextMenuTitle"></button>
+    </div>
+    <div class="schedule-session-context-header-tools">
       <% if (canOpenRollingEnrollment) { %>
-      <button type="button" class="schedule-session-context-header-link d-none" id="btn_scheduleSessionContextRollingEnrollment" role="menuitem" title="Rolling Enrollment (opens in new tab)">
-        <span>Rolling Enrollment</span>
-        <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>
+      <button type="button" class="schedule-session-context-header-icon d-none" id="btn_scheduleSessionContextRollingEnrollment" role="menuitem" title="Rolling Enrollment (opens in new tab)" aria-label="Rolling Enrollment (opens in new tab)">
+        <i class="bi bi-calendar-week" aria-hidden="true"></i>
       </button>
       <% } %>
-      <button type="button" class="schedule-session-context-header-link d-none" id="btn_scheduleSessionContextOpenSession" role="menuitem" title="Manage Session (opens in new tab)">
-        <span>Manage Session</span>
-        <i class="bi bi-box-arrow-up-right" aria-hidden="true"></i>
+      <button type="button" class="schedule-session-context-header-icon d-none" id="btn_scheduleSessionContextOpenSession" role="menuitem" title="Manage Session (opens in new tab)" aria-label="Manage Session (opens in new tab)">
+        <i class="bi bi-easel2" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="schedule-session-context-header-icon schedule-session-context-header-icon-info d-none" id="btn_scheduleSessionContextInfo" role="menuitem" title="Session info" aria-label="Session info">
+        <i class="bi bi-info-circle" aria-hidden="true"></i>
       </button>
     </div>
     <div class="schedule-session-context-menu-meta" id="scheduleSessionContextMenuMeta"></div>
@@ -357,6 +360,24 @@
       <div class="modal-footer">
         <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
         <button type="button" class="btn btn-primary btn-sm" id="btn_scheduleSessionBulkSelectApply">Apply</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="scheduleSessionContextInfoModal" tabindex="-1" aria-hidden="true" aria-labelledby="scheduleSessionContextInfoModalTitle">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="scheduleSessionContextInfoModalTitle">Session info</h5>
+          <div class="small text-muted" id="scheduleSessionContextInfoModalSubtitle"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="scheduleSessionContextInfoModalBody"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>

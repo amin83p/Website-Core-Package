@@ -2025,6 +2025,14 @@
         return {
             hasCoTeachers: rows.length > 0,
             coTeacherCount: rows.length,
+            coTeachers: rows.map((row) => ({
+                personId: String(row?.personId || ''),
+                name: String(row?.name || ''),
+                roleLabel: String(row?.roleLabel || ''),
+                canEdit: row?.canEdit === true,
+                paid: row?.paid !== false,
+                paidHours: row?.paid === false ? 0 : (row?.paidHours ?? null)
+            })),
             viewerIsSessionCoTeacher: Boolean(entry),
             viewerCoTeacherPaid: entry ? entry.paid !== false : null
         };
@@ -2788,7 +2796,16 @@
         const titleEl = document.getElementById('scheduleSessionContextMenuTitle');
         const metaEl = document.getElementById('scheduleSessionContextMenuMeta');
         if (!titleEl || !metaEl || !event) return;
-        titleEl.textContent = getEventTitle(event);
+        const classLabel = String(event?.className || '').trim();
+        const displayedTitle = (isClassSessionScheduleEvent(event) && classLabel)
+            ? classLabel
+            : getEventTitle(event);
+        titleEl.textContent = displayedTitle;
+        const classId = String(event?.classId || '').trim();
+        const canOpenClassForm = Boolean(classId) && isClassSessionScheduleEvent(event);
+        titleEl.classList.toggle('is-navigable', canOpenClassForm);
+        titleEl.disabled = !canOpenClassForm;
+        titleEl.title = canOpenClassForm ? 'Open class form (opens in new tab)' : '';
         const meta = [
             String(event?.date || '').trim(),
             formatScheduleClockRange(event?.start, event?.end),
@@ -2796,6 +2813,107 @@
         ].filter((part) => part && part !== '—').join(' · ');
         metaEl.textContent = meta;
         metaEl.classList.toggle('d-none', !meta);
+    }
+
+    function appendScheduleSessionInfoRow(rows, label, value) {
+        const cleaned = normalizeScheduleTooltipValue(value);
+        if (!cleaned) return;
+        rows.push(
+            '<div class="schedule-session-info-row"><dt>'
+            + escapeHtml(label)
+            + '</dt><dd>'
+            + escapeHtml(cleaned)
+            + '</dd></div>'
+        );
+    }
+
+    function formatScheduleRegistrationMode(mode) {
+        const token = String(mode || '').trim().toLowerCase();
+        if (token === 'rolling') return 'Rolling';
+        if (token === 'term_based') return 'Term-based';
+        return '';
+    }
+
+    function buildScheduleSessionContextInfoHtml(event) {
+        const lifecycle = event?.classLifecycle && typeof event.classLifecycle === 'object' ? event.classLifecycle : {};
+        const classRows = [];
+        appendScheduleSessionInfoRow(classRows, 'Name', event?.className);
+        appendScheduleSessionInfoRow(classRows, 'Registration', formatScheduleRegistrationMode(lifecycle.registrationMode));
+        const cycleStart = String(lifecycle.cycleStartDate || '').trim();
+        const cycleEnd = String(lifecycle.cycleEndDate || '').trim();
+        if (cycleStart || cycleEnd) {
+            const cycleLabel = [formatScheduleDateLabel(cycleStart), formatScheduleDateLabel(cycleEnd)].filter(Boolean).join(' – ');
+            appendScheduleSessionInfoRow(classRows, 'Cycle', cycleLabel);
+        }
+        if (Number(lifecycle.cycleNo) > 0) {
+            appendScheduleSessionInfoRow(classRows, 'Cycle number', String(lifecycle.cycleNo));
+        }
+        appendScheduleSessionInfoRow(classRows, 'Student', event?.soloStudentName || event?.singleStudentName);
+
+        const sessionRows = [];
+        appendScheduleSessionInfoRow(sessionRows, 'Date', formatScheduleDateLabel(event?.date));
+        const timeLabel = formatScheduleClockRange(event?.start, event?.end);
+        if (timeLabel && timeLabel !== '-') appendScheduleSessionInfoRow(sessionRows, 'Time', timeLabel);
+        const hours = Number(event?.duration);
+        if (Number.isFinite(hours) && hours > 0) {
+            appendScheduleSessionInfoRow(sessionRows, 'Duration', `${hours.toFixed(2)} h`);
+        }
+        appendScheduleSessionInfoRow(sessionRows, 'Status', formatStatusLabel(event?.status));
+        appendScheduleSessionInfoRow(sessionRows, 'Role', event?.roleLabel);
+        if (window.ScheduleCompletionDisplay && window.ScheduleCompletionDisplay.isMakeupRequiredDisplayEvent(event)) {
+            appendScheduleSessionInfoRow(sessionRows, 'Make-up', window.ScheduleCompletionDisplay.MAKEUP_DISPLAY_TEXT);
+        }
+        if (event?.locked === true) appendScheduleSessionInfoRow(sessionRows, 'Locked', 'Yes');
+
+        const section = (title, rows) => {
+            if (!rows.length) return '';
+            return '<section class="schedule-session-info-section"><h6>'
+                + escapeHtml(title)
+                + '</h6><dl>'
+                + rows.join('')
+                + '</dl></section>';
+        };
+        return section('Class', classRows) + section('Session', sessionRows) + buildScheduleSessionCoTeacherInfoHtml(event);
+    }
+
+    function buildScheduleSessionCoTeacherInfoHtml(event) {
+        const rows = Array.isArray(event?.coTeachers) ? event.coTeachers : [];
+        const mainTeacherId = String(event?.mainTeacherId || '').trim();
+        const mainTeacherName = String(event?.mainTeacherName || '').trim();
+        const blocks = [];
+        if (mainTeacherName) {
+            const mainLines = [];
+            appendScheduleSessionInfoRow(mainLines, 'Name', mainTeacherName);
+            appendScheduleSessionInfoRow(mainLines, 'Role', 'Main teacher');
+            blocks.push('<div class="schedule-session-info-coteacher"><dl>' + mainLines.join('') + '</dl></div>');
+        }
+        if (!blocks.length && !rows.length) return '';
+        blocks.push(...rows.filter((row) => {
+            const personId = String(row?.personId || '').trim();
+            return !personId || !mainTeacherId || personId !== mainTeacherId;
+        }).map((row) => {
+            const lines = [];
+            appendScheduleSessionInfoRow(lines, 'Name', row?.name);
+            appendScheduleSessionInfoRow(lines, 'Role', row?.roleLabel);
+            appendScheduleSessionInfoRow(lines, 'Can edit', row?.canEdit === true ? 'Yes' : 'No');
+            appendScheduleSessionInfoRow(lines, 'Pay', row?.paid === false ? 'Unpaid' : 'Paid');
+            if (row?.paid !== false && row?.paidHours != null && row?.paidHours !== '') {
+                const hours = Number(row.paidHours);
+                if (Number.isFinite(hours)) appendScheduleSessionInfoRow(lines, 'Paid hours', `${hours.toFixed(2)} h`);
+            }
+            return '<div class="schedule-session-info-coteacher"><dl>' + lines.join('') + '</dl></div>';
+        }));
+        return '<section class="schedule-session-info-section"><h6>Teachers</h6>' + blocks.join('') + '</section>';
+    }
+
+    function openScheduleSessionContextInfoModal(event) {
+        const modalEl = document.getElementById('scheduleSessionContextInfoModal');
+        const body = document.getElementById('scheduleSessionContextInfoModalBody');
+        const subtitle = document.getElementById('scheduleSessionContextInfoModalSubtitle');
+        if (!modalEl || !body || !event || !window.bootstrap?.Modal) return;
+        if (subtitle) subtitle.textContent = String(event.className || event.title || '').trim();
+        body.innerHTML = buildScheduleSessionContextInfoHtml(event) || '<p class="text-muted mb-0">No details are available for this item.</p>';
+        window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 
     function showScheduleSessionContextMenu(event, mouseEvent) {
@@ -2844,6 +2962,7 @@
                 el.classList.add('d-none');
             });
             document.querySelector('#scheduleSessionContextMenu .schedule-session-context-menu-section-label')?.classList.add('d-none');
+            document.getElementById('btn_scheduleSessionContextInfo')?.classList.add('d-none');
             document.getElementById('scheduleSessionContextStatusList')?.classList.add('d-none');
             document.getElementById('btn_scheduleSessionContextSelect')?.classList.add('d-none');
         } else {
@@ -2871,6 +2990,7 @@
                 el.classList.remove('d-none');
             });
             document.querySelector('#scheduleSessionContextMenu .schedule-session-context-menu-section-label')?.classList.remove('d-none');
+            document.getElementById('btn_scheduleSessionContextInfo')?.classList.remove('d-none');
             document.getElementById('scheduleSessionContextStatusList')?.classList.remove('d-none');
             const mutable = isScheduleEventMutableUnderClassFocus(event);
             ['btn_scheduleSessionContextEdit', 'btn_scheduleSessionContextMove'].forEach((btnId) => {
@@ -3064,6 +3184,17 @@
             const event = scheduleSessionContextEvent;
             hideScheduleSessionContextMenu();
             if (!event) return;
+        document.getElementById('scheduleSessionContextMenuTitle')?.addEventListener('click', (clickEvent) => {
+            const titleEl = clickEvent.currentTarget;
+            if (!titleEl || titleEl.disabled || !titleEl.classList.contains('is-navigable')) return;
+            clickEvent.preventDefault();
+            const event = scheduleSessionContextEvent;
+            hideScheduleSessionContextMenu();
+            const classId = String(event?.classId || '').trim();
+            if (!classId) return;
+            window.open(`/school/classes/edit/${encodeURIComponent(classId)}`, '_blank', 'noopener');
+        });
+
             const manageUrl = buildSessionManagerUrlForEvent(event);
             if (manageUrl) window.open(manageUrl, '_blank', 'noopener');
         });
@@ -3079,6 +3210,13 @@
             clickEvent.preventDefault();
             hideScheduleSessionContextMenu();
             void openScheduleBulkSessionDeleteModal();
+        });
+        document.getElementById('btn_scheduleSessionContextInfo')?.addEventListener('click', (clickEvent) => {
+            clickEvent.preventDefault();
+            const event = scheduleSessionContextEvent;
+            hideScheduleSessionContextMenu();
+            if (!event) return;
+            openScheduleSessionContextInfoModal(event);
         });
         document.getElementById('btn_scheduleSessionContextEditSelected')?.addEventListener('click', (clickEvent) => {
             clickEvent.preventDefault();

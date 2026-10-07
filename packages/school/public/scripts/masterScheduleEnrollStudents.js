@@ -481,6 +481,15 @@
         selectedSessionIds: Array.isArray(entry?.selectedSessionIds)
           ? entry.selectedSessionIds.map((sid) => clean(sid)).filter(Boolean)
           : [],
+        selectedSessions: Array.isArray(entry?.selectedSessions)
+          ? entry.selectedSessions.map((sessionRow) => ({
+            sessionId: clean(sessionRow?.sessionId),
+            date: clean(sessionRow?.date),
+            start: clean(sessionRow?.start || sessionRow?.startTime),
+            end: clean(sessionRow?.end || sessionRow?.endTime)
+          })).filter((sessionRow) => sessionRow.sessionId && sessionRow.date)
+          : [],
+        firstSessionDate: clean(entry?.firstSessionDate || entry?.startDate),
         enrollmentStatus: 'draft'
       };
     }
@@ -638,14 +647,23 @@
     function storePendingEnrollmentDraft(payload, row) {
       const classId = clean(flowState.prepare?.classId);
       if (!classId || typeof deps.setPendingEnrollStudentsForClass !== 'function') return;
-      const selectedSessionIds = (Array.isArray(flowState.prepare?.sessions) ? flowState.prepare.sessions : [])
-        .map((sessionRow) => clean(sessionRow?.sessionId))
-        .filter(Boolean);
+      const selectedSessions = (Array.isArray(flowState.prepare?.sessions) ? flowState.prepare.sessions : [])
+        .map((sessionRow) => ({
+          sessionId: clean(sessionRow?.sessionId),
+          date: clean(sessionRow?.date),
+          start: clean(sessionRow?.start),
+          end: clean(sessionRow?.end)
+        }))
+        .filter((sessionRow) => sessionRow.sessionId && sessionRow.date);
+      const selectedSessionIds = selectedSessions.map((sessionRow) => sessionRow.sessionId);
       deps.setPendingEnrollStudentsForClass(classId, {
         ...(payload || {}),
         minTargetHours: row?.minTargetHours,
         studentLabel: clean(row?.label || row?.studentLabel),
-        selectedSessionIds
+        selectedSessionIds,
+        selectedSessions,
+        startDate: clean(flowState.prepare?.startDate),
+        firstSessionDate: clean(flowState.prepare?.startDate)
       });
       if (typeof deps.setPendingEnrollMetaForClass === 'function') {
         deps.setPendingEnrollMetaForClass(classId, enrollmentMetaFromPrepare(flowState.prepare));
@@ -702,7 +720,35 @@
           body: JSON.stringify(executePayload)
         });
         const data = await res.json().catch(() => ({}));
-        if (!res.ok || data.status !== 'success') throw new Error(data.message || 'Enrollment failed.');
+        const responseStatus = clean(data.status).toLowerCase();
+        if (!res.ok || (responseStatus !== 'success' && responseStatus !== 'warning')) {
+          const issueLines = [
+            ...(Array.isArray(data.issues) ? data.issues : []),
+            ...(Array.isArray(data.warnings) ? data.warnings : [])
+          ].map((issue) => clean(issue?.message)).filter(Boolean);
+          throw new Error([data.message || 'Enrollment failed.', ...issueLines].filter(Boolean).join('\n'));
+        }
+        if (responseStatus === 'warning' || (Array.isArray(data.warnings) && data.warnings.length)) {
+          row.enrollmentStatus = Number(data?.data?.summary?.succeeded || 0) > 0 ? 'completed' : 'pending';
+          if (!skipRender) renderQueueModal();
+          if (!silent) {
+            const warningLines = (Array.isArray(data.warnings) ? data.warnings : [])
+              .map((issue) => clean(issue?.message) + (clean(issue?.remediation) ? ` — ${clean(issue.remediation)}` : ''))
+              .filter(Boolean);
+            const issueLines = (Array.isArray(data.issues) ? data.issues : [])
+              .map((issue) => clean(issue?.message))
+              .filter(Boolean);
+            await deps.uiAlert?.(
+              [data.message || 'Enrollment finished with warnings.', ...issueLines, ...warningLines].filter(Boolean).join('\n'),
+              'Enroll students',
+              { icon: 'warning' }
+            );
+          }
+          if (!options.deferSessionRefresh && row.enrollmentStatus === 'completed') {
+            await refreshEnrolledSessionsInView();
+          }
+          return { ok: row.enrollmentStatus === 'completed', warning: true };
+        }
         row.enrollmentStatus = 'completed';
         if (!skipRender) renderQueueModal();
         let refreshPromise = Promise.resolve();
@@ -906,7 +952,10 @@
           ...groupClient.buildGroupEnginePayload(classId, row.studentId, settings),
           minTargetHours: row.minTargetHours,
           studentLabel: row.label,
-          selectedSessionIds: Array.isArray(row.selectedSessionIds) ? row.selectedSessionIds.slice() : []
+          selectedSessionIds: Array.isArray(row.selectedSessionIds) ? row.selectedSessionIds.slice() : [],
+          selectedSessions: Array.isArray(row.selectedSessions) ? row.selectedSessions.map((sessionRow) => ({ ...sessionRow })) : [],
+          startDate: clean(row.startDate || row.firstSessionDate),
+          firstSessionDate: clean(row.firstSessionDate || row.startDate)
         };
       });
       if (typeof deps.replacePendingEnrollStudentsForClass === 'function') {
@@ -976,6 +1025,7 @@
         }
         const capRes = await postJson('/school/schedules/api/enroll-students/session-capacity-check', {
           classId: flowState.prepare.classId,
+          sessionMode: ctx.sessionMode,
           sessions
         });
         if (capRes?.data?.blocked) {

@@ -3016,15 +3016,54 @@ async function postExecuteRollingEnrollment(req, res) {
       hooks: buildRollingEnrollmentEngineHooks(req, classData)
     });
 
-    const firstSuccess = (Array.isArray(engineResult.results) ? engineResult.results : []).find((row) => row.ok);
+    const resultRows = Array.isArray(engineResult.results) ? engineResult.results : [];
+    const firstSuccess = resultRows.find((row) => row.ok);
+    const failRows = resultRows.filter((row) => !row?.ok);
+    const failed = Number(engineResult?.summary?.failed || 0);
+    const succeeded = Number(engineResult?.summary?.succeeded || 0);
+    const warnings = [];
+    resultRows.forEach((row) => {
+      const ledger = row?.academicLedger;
+      if (!ledger || typeof ledger !== 'object') return;
+      const ledgerStatus = String(ledger.status || '').trim().toLowerCase();
+      if (!ledgerStatus || ledgerStatus === 'posted' || ledgerStatus === 'already_synced') return;
+      const studentId = toPublicId(row?.studentId);
+      warnings.push({
+        studentId,
+        code: `academic_ledger_${ledgerStatus || 'warning'}`,
+        message: String(ledger.message || `Academic ledger status: ${ledgerStatus || 'unknown'}`).trim(),
+        remediation: 'Review class curriculum subjects and program assignment, then sync the academic ledger for this enrollment if needed.'
+      });
+    });
+    if (failed > 0 && succeeded <= 0) {
+      return res.status(400).json({
+        status: 'error',
+        message: failRows.map((row) => String(row?.error || row?.message || '').trim()).filter(Boolean).join(' | ')
+          || 'Enrollment failed.',
+        code: resolveRollingEnrollmentSaveErrorCode(failRows[0]?.error || failRows[0]?.message || ''),
+        issues: failRows.map((row) => ({
+          studentId: toPublicId(row?.studentId),
+          message: String(row?.error || row?.message || 'Enrollment failed.').trim()
+        })),
+        warnings,
+        data: engineResult
+      });
+    }
     const payloadOut = {
-      status: 'success',
-      message: engineResult.summary.failed
-        ? `Enrollment completed with ${engineResult.summary.succeeded} success(es) and ${engineResult.summary.failed} failure(s).`
-        : 'Rolling enrollment executed successfully.',
+      status: failed > 0 ? 'warning' : 'success',
+      message: failed > 0
+        ? `Enrollment completed with ${succeeded} success(es) and ${failed} failure(s).`
+        : (warnings.length
+          ? `Rolling enrollment executed with ${warnings.length} warning(s).`
+          : 'Rolling enrollment executed successfully.'),
       data: engineResult,
       academicLedger: firstSuccess?.academicLedger || null,
-      period: firstSuccess?.period || null
+      period: firstSuccess?.period || null,
+      issues: failRows.map((row) => ({
+        studentId: toPublicId(row?.studentId),
+        message: String(row?.error || row?.message || 'Enrollment failed.').trim()
+      })),
+      warnings
     };
     return res.json(payloadOut);
   } catch (error) {

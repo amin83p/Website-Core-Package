@@ -154,7 +154,10 @@ async function prepareEnrollStudents({ classId, sessionMode, sessions, reqUser, 
   };
 }
 
-async function checkOneOnOneSessionOccupancy({ classData, sessions, reqUser }) {
+async function checkOneOnOneSessionOccupancy({ classData, sessions, reqUser, sessionMode = '' }) {
+  if (String(sessionMode || '').trim().toLowerCase() === 'staged') {
+    return { blocked: false, conflicts: [] };
+  }
   if (!classSessionCapacityService.isRollingCapacityOneClass(classData)) {
     return { blocked: false, conflicts: [] };
   }
@@ -369,6 +372,89 @@ function pendingEntryStudentLabel(entry = {}) {
   return pendingEntryStudentId(entry);
 }
 
+function sessionScheduleMatchKey(session = {}) {
+  return [
+    normalizeDateOnly(session?.date || session?.sessionDate),
+    String(session?.start || session?.startTime || '').trim(),
+    String(session?.end || session?.endTime || '').trim()
+  ].join('|');
+}
+
+function pendingEntrySelectedSessions(entry = {}) {
+  if (Array.isArray(entry?.selectedSessions) && entry.selectedSessions.length) {
+    return entry.selectedSessions
+      .map((row) => ({
+        sessionId: toPublicId(row?.sessionId || row?.id),
+        date: normalizeDateOnly(row?.date),
+        start: String(row?.start || row?.startTime || '').trim(),
+        end: String(row?.end || row?.endTime || '').trim()
+      }))
+      .filter((row) => row.date);
+  }
+  return [];
+}
+
+function resolveFirstSessionDateFromEntryFallback(entry = {}) {
+  const fromSelected = pendingEntrySelectedSessions(entry)
+    .map((row) => row.date)
+    .filter(Boolean)
+    .sort();
+  if (fromSelected.length) return fromSelected[0];
+  return normalizeDateOnly(entry?.startDate || entry?.firstSessionDate || entry?.minSessionDate || '');
+}
+
+async function resolvePersistedSessionsForPendingEntry(classData, entry, reqUser) {
+  const sessions = await schoolDataService.getClassSessions(classData.id, reqUser);
+  const rows = Array.isArray(sessions) ? sessions : [];
+  const byId = new Map(
+    rows
+      .map((row) => [toPublicId(row?.sessionId || row?.id), row])
+      .filter(([id]) => Boolean(id))
+  );
+  const bySchedule = new Map();
+  rows.forEach((row) => {
+    const key = sessionScheduleMatchKey(row);
+    if (key && key !== '||' && !bySchedule.has(key)) bySchedule.set(key, row);
+  });
+
+  const selectedSessionIds = (Array.isArray(entry?.selectedSessionIds) ? entry.selectedSessionIds : [])
+    .map((id) => toPublicId(id))
+    .filter(Boolean);
+  const selectedSessions = pendingEntrySelectedSessions(entry);
+  const resolved = [];
+  const used = new Set();
+
+  selectedSessionIds.forEach((id) => {
+    const match = byId.get(id);
+    if (!match) return;
+    const sid = toPublicId(match?.sessionId || match?.id);
+    if (!sid || used.has(sid)) return;
+    used.add(sid);
+    resolved.push(match);
+  });
+
+  if (resolved.length < Math.max(selectedSessionIds.length, selectedSessions.length)) {
+    selectedSessions.forEach((hint) => {
+      const byHintId = hint.sessionId ? byId.get(hint.sessionId) : null;
+      const byHintSchedule = bySchedule.get(sessionScheduleMatchKey(hint));
+      const match = byHintId || byHintSchedule;
+      if (!match) return;
+      const sid = toPublicId(match?.sessionId || match?.id);
+      if (!sid || used.has(sid)) return;
+      used.add(sid);
+      resolved.push(match);
+    });
+  }
+
+  return {
+    sessions: rows,
+    resolvedSessions: resolved,
+    remappedSessionIds: resolved
+      .map((row) => toPublicId(row?.sessionId || row?.id))
+      .filter(Boolean)
+  };
+}
+
 async function resolveFirstSessionDateForSelectedIds(classData, selectedSessionIds, reqUser) {
   const idSet = new Set(
     (Array.isArray(selectedSessionIds) ? selectedSessionIds : [])
@@ -385,6 +471,27 @@ async function resolveFirstSessionDateForSelectedIds(classData, selectedSessionI
   return dates[0] || '';
 }
 
+async function resolveFirstSessionDateForPendingEntry(classData, entry, reqUser) {
+  const resolved = await resolvePersistedSessionsForPendingEntry(classData, entry, reqUser);
+  const fromPersisted = resolved.resolvedSessions
+    .map((row) => normalizeDateOnly(row?.date))
+    .filter(Boolean)
+    .sort();
+  if (fromPersisted.length) return fromPersisted[0];
+  return resolveFirstSessionDateFromEntryFallback(entry);
+}
+
+function remapPendingEnrollmentSessionIds(entry, remappedSessionIds = []) {
+  const ids = (Array.isArray(remappedSessionIds) ? remappedSessionIds : [])
+    .map((id) => toPublicId(id))
+    .filter(Boolean);
+  if (!ids.length) return entry;
+  return {
+    ...entry,
+    selectedSessionIds: ids
+  };
+}
+
 async function validatePendingEnrollmentsProgramRegistration({
   classData,
   pendingEnrollments,
@@ -399,15 +506,14 @@ async function validatePendingEnrollmentsProgramRegistration({
     const studentId = pendingEntryStudentId(entry);
     if (!studentId) continue;
     const studentLabel = pendingEntryStudentLabel(entry);
-    const selectedSessionIds = Array.isArray(entry?.selectedSessionIds) ? entry.selectedSessionIds : [];
-    const firstSessionDate = await resolveFirstSessionDateForSelectedIds(classData, selectedSessionIds, reqUser);
+    const firstSessionDate = await resolveFirstSessionDateForPendingEntry(classData, entry, reqUser);
     if (!firstSessionDate) {
       issues.push({
         studentId,
         studentLabel,
         code: 'missing_sessions',
-        message: `Could not find class sessions for the selected enrollment dates (${studentLabel}).`,
-        remediation: 'Include all linked staged sessions in your save selection, save staged sessions first, then retry enrollments.'
+        message: `Could not determine the first session date for ${studentLabel}.`,
+        remediation: 'Save the linked staged sessions with this enrollment, or re-open Enroll Students and queue the enrollment against the correct sessions.'
       });
       continue;
     }
@@ -471,21 +577,29 @@ async function validatePendingEnrollmentsClassEnrollment({
     const studentId = pendingEntryStudentId(entry);
     if (!studentId) continue;
     const studentLabel = pendingEntryStudentLabel(entry);
-    const selectedSessionIds = Array.isArray(entry?.selectedSessionIds) ? entry.selectedSessionIds : [];
     try {
+      const resolved = await resolvePersistedSessionsForPendingEntry(classData, entry, reqUser);
+      const remappedEntry = remapPendingEnrollmentSessionIds(entry, resolved.remappedSessionIds);
+      if (!resolved.remappedSessionIds.length) {
+        issues.push({
+          studentId,
+          studentLabel,
+          code: 'missing_sessions',
+          message: `Could not match saved class sessions for ${studentLabel}'s drafted enrollment.`,
+          remediation: 'Save the linked staged sessions first (they must remain selected with this enrollment), then retry. If sessions were already saved, re-draft the enrollment against those saved sessions.'
+        });
+        continue;
+      }
       const rawRequest = {
         classId,
-        ...entry,
+        ...remappedEntry,
         studentId,
         pendingStagedSessions: []
       };
       const normalized = rollingEnrollmentEngineService.normalizeEnrollmentEngineRequest(rawRequest, classData);
       await rollingEnrollmentEngineService.assertEnrollmentAlignmentForCreate(classData, normalized, reqUser);
 
-      const sessions = await schoolDataService.getClassSessions(classData.id, reqUser);
-      const idSet = new Set(selectedSessionIds.map((id) => toPublicId(id)).filter(Boolean));
-      const capSessions = (Array.isArray(sessions) ? sessions : [])
-        .filter((row) => idSet.has(toPublicId(row?.sessionId || row?.id)))
+      const capSessions = resolved.resolvedSessions
         .map((row) => ({
           classId,
           sessionId: toPublicId(row?.sessionId || row?.id),
@@ -571,12 +685,28 @@ async function executePendingEnrollmentsForCommit({
     if (!studentId) continue;
     refreshedClass = await schoolDataService.getDataById('classes', classId, reqUser, schoolDataService.buildRouteAccessContext(req))
       || refreshedClass;
+    const resolved = await resolvePersistedSessionsForPendingEntry(refreshedClass, entry, reqUser);
+    const remappedEntry = remapPendingEnrollmentSessionIds(entry, resolved.remappedSessionIds);
+    if (!resolved.remappedSessionIds.length) {
+      const error = new Error(`Could not match saved class sessions for student ${studentId}.`);
+      error.step = 'applyEnrollment';
+      error.studentId = studentId;
+      error.remediation = 'Save linked staged sessions with this enrollment, or re-draft enrollment against the saved sessions, then retry.';
+      error.issues = [{
+        studentId,
+        studentLabel: pendingEntryStudentLabel(entry),
+        code: 'missing_sessions',
+        message: error.message,
+        remediation: error.remediation
+      }];
+      throw error;
+    }
     const engineResult = await rollingEnrollmentEngineService.execute({
       classData: refreshedClass,
       reqUser,
       rawRequest: {
         classId,
-        ...entry,
+        ...remappedEntry,
         studentId,
         pendingStagedSessions: []
       },
@@ -584,10 +714,18 @@ async function executePendingEnrollmentsForCommit({
     });
     if (engineResult?.summary?.failed > 0) {
       const failRow = (engineResult.results || []).find((row) => row?.ok === false);
-      const error = new Error(failRow?.message || `Enrollment failed for student ${studentId}.`);
+      const detail = String(failRow?.error || failRow?.message || '').trim();
+      const error = new Error(detail || `Enrollment failed for student ${studentId}.`);
       error.step = 'applyEnrollment';
       error.studentId = studentId;
       error.remediation = 'Fix the enrollment issue shown, update the draft if needed, and retry from Save staged work.';
+      error.issues = [{
+        studentId,
+        studentLabel: pendingEntryStudentLabel(entry),
+        code: 'enrollment_apply_failed',
+        message: detail || error.message,
+        remediation: error.remediation
+      }];
       throw error;
     }
   }
@@ -608,6 +746,9 @@ module.exports = {
   summarizeSessionWindow,
   sumSelectedSessionDurationHours,
   normalizeDateOnly,
+  resolveFirstSessionDateForSelectedIds,
+  resolveFirstSessionDateForPendingEntry,
+  resolvePersistedSessionsForPendingEntry,
   validatePendingEnrollmentsProgramRegistration,
   validatePendingEnrollmentsClassEnrollment,
   validatePendingEnrollmentsForCommit,

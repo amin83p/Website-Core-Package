@@ -888,16 +888,18 @@
     return parts.join(' ');
   }
 
-  function computeVerticalDragRange(startOffset, endOffset) {
-    const anchorOffset = Math.max(0, Math.min(TOTAL_MINUTES, Number(startOffset) || 0));
-    let end = Math.max(0, Math.min(TOTAL_MINUTES, Number(endOffset) || 0));
+  function computeVerticalDragRange(startOffset, endOffset, boundsInput) {
+    const bounds = resolveTimelineBounds(boundsInput || {});
+    const totalMinutes = bounds.totalMinutes;
+    const anchorOffset = Math.max(0, Math.min(totalMinutes, Number(startOffset) || 0));
+    let end = Math.max(0, Math.min(totalMinutes, Number(endOffset) || 0));
     if (end <= anchorOffset) {
-      end = Math.min(TOTAL_MINUTES, anchorOffset + TIMELINE_SNAP_MINUTES);
+      end = Math.min(totalMinutes, anchorOffset + TIMELINE_SNAP_MINUTES);
     }
     let durationMinutes = end - anchorOffset;
     durationMinutes = Math.max(TIMELINE_SNAP_MINUTES, durationMinutes);
-    if (anchorOffset + durationMinutes > TOTAL_MINUTES) {
-      durationMinutes = TOTAL_MINUTES - anchorOffset;
+    if (anchorOffset + durationMinutes > totalMinutes) {
+      durationMinutes = totalMinutes - anchorOffset;
     }
     const finalEndOffset = anchorOffset + durationMinutes;
     return {
@@ -908,10 +910,11 @@
     };
   }
 
-  function isSpanOccupiedOnDay(dayCell, startOffset, endOffset) {
+  function isSpanOccupiedOnDay(dayCell, startOffset, endOffset, boundsInput) {
     if (!dayCell) return true;
-    const startMin = timelineMinutesFromOffset(startOffset);
-    const endMin = timelineMinutesFromOffset(endOffset);
+    const bounds = resolveTimelineBounds(boundsInput || {});
+    const startMin = timelineMinutesFromOffset(startOffset, bounds);
+    const endMin = timelineMinutesFromOffset(endOffset, bounds);
     const sessions = dayCell.querySelectorAll('.session-cal-positioned-session[data-timeline-start][data-timeline-end]');
     for (const el of sessions) {
       const sessionStart = Number(el.dataset.timelineStart);
@@ -931,26 +934,32 @@
     if (!verticalRow || !dayCell || dayCell.classList.contains('is-out-of-range')) return null;
     const date = normalizeDateOnly(dayCell.getAttribute('data-cal-date'));
     if (!date) return null;
+    const weekBounds = getTimelineBoundsFromWeekRow(verticalRow.closest('.session-cal-week-row'));
     const daysRow = verticalRow.querySelector('.session-cal-days-row');
     if (!daysRow) return null;
     const trackRect = daysRow.getBoundingClientRect();
     const y = currentClientY - trackRect.top;
-    const snappedEnd = snapTimelineOffsetMinutesForClick(offsetMinutesFromGridY(y, trackRect.height));
-    const range = computeVerticalDragRange(anchorSnappedOffset, snappedEnd);
-    const occupied = isSpanOccupiedOnDay(dayCell, range.anchorOffset, range.endOffset);
-    const startMin = timelineMinutesFromOffset(range.anchorOffset);
-    return {
+    const snappedEnd = snapTimelineOffsetMinutesForClick(
+      offsetMinutesFromGridY(y, trackRect.height, weekBounds),
+      weekBounds
+    );
+    const range = computeVerticalDragRange(anchorSnappedOffset, snappedEnd, weekBounds);
+    const occupied = isSpanOccupiedOnDay(dayCell, range.anchorOffset, range.endOffset, weekBounds);
+    const startMin = timelineMinutesFromOffset(range.anchorOffset, weekBounds);
+    const dragContext = {
       mode: 'vertical',
       date,
       snappedOffsetMinutes: range.anchorOffset,
       endOffsetMinutes: range.endOffset,
       startTime24: minutesToTime24(startMin),
-      startTimeLabel: formatSnappedTimelineLabel(range.anchorOffset),
+      startTimeLabel: formatSnappedTimelineLabel(range.anchorOffset, weekBounds),
       durationMinutes: range.durationMinutes,
       durationHours: range.durationHours,
       durationLabel: formatDurationHrsMins(range.durationMinutes),
+      timelineTotalMinutes: weekBounds.totalMinutes,
       occupied
     };
+    return dragContext;
   }
 
   function resolveVerticalDragContext(container, anchorClientX, anchorClientY, currentClientY, target) {
@@ -990,8 +999,11 @@
     const preview = dayGrid.querySelector('.session-cal-drag-preview');
     const info = dayGrid.querySelector('.session-cal-drag-info');
     if (!preview || !info) return;
-    const topPct = (context.snappedOffsetMinutes / TOTAL_MINUTES) * 100;
-    const heightPct = (context.durationMinutes / TOTAL_MINUTES) * 100;
+    const timelineTotalMinutes = Number(context.timelineTotalMinutes) > 0
+      ? Number(context.timelineTotalMinutes)
+      : TOTAL_MINUTES;
+    const topPct = (context.snappedOffsetMinutes / timelineTotalMinutes) * 100;
+    const heightPct = (context.durationMinutes / timelineTotalMinutes) * 100;
     preview.style.display = 'block';
     preview.style.top = `${topPct}%`;
     preview.style.height = `${heightPct}%`;
@@ -1172,15 +1184,20 @@
       if (!dayCell || dayCell.classList.contains('is-out-of-range')) return null;
       const date = normalizeDateOnly(dayCell.getAttribute('data-cal-date'));
       if (!date) return null;
+      const weekBounds = getTimelineBoundsFromWeekRow(verticalRow.closest('.session-cal-week-row'));
+      const totalMinutes = weekBounds.totalMinutes;
       const fixedDuration = Math.max(TIMELINE_SNAP_MINUTES, Math.round(Number(durationMinutes) || TIMELINE_SNAP_MINUTES));
-      let snappedStart = snapTimelineOffsetMinutesForClick(offsetMinutesFromGridY(y, trackRect.height));
+      let snappedStart = snapTimelineOffsetMinutesForClick(
+        offsetMinutesFromGridY(y, trackRect.height, weekBounds),
+        weekBounds
+      );
       let endOffset = snappedStart + fixedDuration;
-      if (endOffset > TOTAL_MINUTES) {
-        endOffset = TOTAL_MINUTES;
+      if (endOffset > totalMinutes) {
+        endOffset = totalMinutes;
         snappedStart = Math.max(0, endOffset - fixedDuration);
       }
-      const startMin = timelineMinutesFromOffset(snappedStart);
-      const endMin = timelineMinutesFromOffset(endOffset);
+      const startMin = timelineMinutesFromOffset(snappedStart, weekBounds);
+      const endMin = timelineMinutesFromOffset(endOffset, weekBounds);
       return {
         mode: 'vertical',
         date,
@@ -1189,10 +1206,11 @@
         endOffsetMinutes: endOffset,
         startTime24: minutesToTime24(startMin),
         endTime24: minutesToTime24(endMin),
-        startTimeLabel: formatSnappedTimelineLabel(snappedStart),
+        startTimeLabel: formatSnappedTimelineLabel(snappedStart, weekBounds),
         durationMinutes: fixedDuration,
         durationHours: fixedDuration / 60,
         durationLabel: formatDurationHrsMins(fixedDuration),
+        timelineTotalMinutes: totalMinutes,
         occupied: false
       };
     }
@@ -1360,35 +1378,40 @@
     }
 
     function resolveResizeContext(clientY, verticalRow, dayCell, edge, anchorStartOffset, anchorEndOffset) {
+      const weekBounds = getTimelineBoundsFromWeekRow(verticalRow.closest('.session-cal-week-row'));
+      const totalMinutes = weekBounds.totalMinutes;
       const daysRow = verticalRow.querySelector('.session-cal-days-row');
       if (!daysRow) return null;
       const trackRect = daysRow.getBoundingClientRect();
       const y = Math.max(0, Math.min(trackRect.height, clientY - trackRect.top));
-      const snappedOffset = snapTimelineOffsetMinutesForClick(offsetMinutesFromGridY(y, trackRect.height));
+      const snappedOffset = snapTimelineOffsetMinutesForClick(
+        offsetMinutesFromGridY(y, trackRect.height, weekBounds),
+        weekBounds
+      );
       let startOffset = anchorStartOffset;
       let endOffset = anchorEndOffset;
       if (edge === 'bottom') {
         endOffset = Math.max(startOffset + TIMELINE_SNAP_MINUTES, snappedOffset);
-        endOffset = Math.min(TOTAL_MINUTES, endOffset);
+        endOffset = Math.min(totalMinutes, endOffset);
       } else {
         startOffset = Math.min(anchorEndOffset - TIMELINE_SNAP_MINUTES, snappedOffset);
         startOffset = Math.max(0, startOffset);
       }
       let durationMinutes = Math.max(TIMELINE_SNAP_MINUTES, endOffset - startOffset);
-      if (startOffset + durationMinutes > TOTAL_MINUTES) {
+      if (startOffset + durationMinutes > totalMinutes) {
         if (edge === 'bottom') {
-          endOffset = TOTAL_MINUTES;
+          endOffset = totalMinutes;
           startOffset = Math.max(0, endOffset - durationMinutes);
         } else {
-          startOffset = Math.max(0, TOTAL_MINUTES - durationMinutes);
+          startOffset = Math.max(0, totalMinutes - durationMinutes);
           endOffset = startOffset + durationMinutes;
         }
         durationMinutes = endOffset - startOffset;
       }
       const date = normalizeDateOnly(dayCell.getAttribute('data-cal-date'));
       if (!date) return null;
-      const startMin = timelineMinutesFromOffset(startOffset);
-      const endMin = timelineMinutesFromOffset(endOffset);
+      const startMin = timelineMinutesFromOffset(startOffset, weekBounds);
+      const endMin = timelineMinutesFromOffset(endOffset, weekBounds);
       return {
         mode: 'vertical',
         date,
@@ -1397,10 +1420,11 @@
         endOffsetMinutes: endOffset,
         startTime24: minutesToTime24(startMin),
         endTime24: minutesToTime24(endMin),
-        startTimeLabel: formatSnappedTimelineLabel(startOffset),
+        startTimeLabel: formatSnappedTimelineLabel(startOffset, weekBounds),
         durationMinutes,
         durationHours: durationMinutes / 60,
-        durationLabel: formatDurationHrsMins(durationMinutes)
+        durationLabel: formatDurationHrsMins(durationMinutes),
+        timelineTotalMinutes: totalMinutes
       };
     }
 
@@ -2547,16 +2571,21 @@
       const trackRect = daysRow.getBoundingClientRect();
       if (clientY < trackRect.top || clientY > trackRect.bottom) return null;
       const y = clientY - trackRect.top;
-      const snappedOffset = snapTimelineOffsetMinutesForClick(offsetMinutesFromGridY(y, trackRect.height));
+      const weekBounds = getTimelineBoundsFromWeekRow(verticalRow.closest('.session-cal-week-row'));
+      const snappedOffset = snapTimelineOffsetMinutesForClick(
+        offsetMinutesFromGridY(y, trackRect.height, weekBounds),
+        weekBounds
+      );
       if (isSnappedTimeOccupiedOnDay(dayCell, snappedOffset)) return null;
-      const startMin = timelineMinutesFromOffset(snappedOffset);
-      return {
+      const startMin = timelineMinutesFromOffset(snappedOffset, weekBounds);
+      const gridContext = {
         mode: 'vertical',
         date,
         snappedOffsetMinutes: snappedOffset,
         startTime24: minutesToTime24(startMin),
-        startTimeLabel: formatSnappedTimelineLabel(snappedOffset)
+        startTimeLabel: formatSnappedTimelineLabel(snappedOffset, weekBounds)
       };
+      return gridContext;
     }
 
     return null;
