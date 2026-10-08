@@ -4,6 +4,7 @@ const schoolDataService = require('./schoolDataService');
 const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
 const scheduleEnrollStudentsService = require('./scheduleEnrollStudentsService');
+const sessionEnrollmentContextService = require('./sessionEnrollmentContextService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -93,6 +94,20 @@ function formatDateRange(startDate, endDate) {
   const start = normalizeDateOnly(startDate) || '—';
   const end = normalizeDateOnly(endDate);
   return end ? `${start} → ${end}` : `${start} → Open`;
+}
+
+function buildEnrollmentDateFields(period = {}) {
+  const startDate = normalizeDateOnly(period.startDate);
+  const closingDate = sessionEnrollmentContextService.resolveScheduledClosingDate(period);
+  const closedOnDate = sessionEnrollmentContextService.closedOnDateFromPeriod(period);
+  const scheduledClose = sessionEnrollmentContextService.isScheduledEnrollmentClose(period);
+  const endForRange = closingDate || normalizeDateOnly(period.endDate);
+  return {
+    startDate,
+    closingDate: scheduledClose ? closingDate : normalizeDateOnly(period.endDate),
+    closedOnDate,
+    dateRangeLabel: formatDateRange(startDate, endForRange)
+  };
 }
 
 async function resolveStudentLabels(studentIds = [], reqUser) {
@@ -251,6 +266,7 @@ async function buildManageEnrollmentList({
         ? period.transactionSummary.postedTransactionIds.length
         : 0;
       const enrollmentType = resolveEnrollmentType(period);
+      const dateFields = buildEnrollmentDateFields(period);
 
       enrollments.push({
         periodId,
@@ -260,9 +276,11 @@ async function buildManageEnrollmentList({
         studentLabel,
         status,
         statusLabel: formatStatusLabel(status),
-        startDate: normalizeDateOnly(period.startDate),
+        startDate: dateFields.startDate,
         endDate: normalizeDateOnly(period.endDate),
-        dateRangeLabel: formatDateRange(period.startDate, period.endDate),
+        closingDate: dateFields.closingDate,
+        closedOnDate: dateFields.closedOnDate,
+        dateRangeLabel: dateFields.dateRangeLabel,
         ...enrollmentType,
         funderId: String(period.funderId || 'self').trim() || 'self',
         funderType: String(period.funderType || 'self').trim() || 'self',
@@ -336,6 +354,7 @@ module.exports = {
   parseSelectedSessions,
   collectCoveringOpenPeriods,
   buildManageEnrollmentList,
+  buildEnrollmentDateFields,
   listFunderOptionsForClass,
   formatStatusLabel,
   resolveEnrollmentType,

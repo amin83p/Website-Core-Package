@@ -48,6 +48,32 @@
       return key.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
     }
 
+    function formatEnrollmentDateLabel(value) {
+      const token = clean(value);
+      if (!token) return '';
+      if (/^\d{4}-\d{2}-\d{2}$/.test(token)) {
+        const parsed = new Date(`${token}T12:00:00`);
+        if (!Number.isNaN(parsed.getTime())) {
+          return parsed.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+        }
+      }
+      return token;
+    }
+
+    function renderEnrollmentDatesCell(row) {
+      const start = formatEnrollmentDateLabel(row.startDate) || '—';
+      const closingRaw = clean(row.closingDate) || clean(row.endDate);
+      const closing = closingRaw ? formatEnrollmentDateLabel(closingRaw) : 'Open';
+      const closedOn = formatEnrollmentDateLabel(row.closedOnDate);
+      const rangeLine = closingRaw
+        ? `${escapeHtml(start)} → <span class="fw-semibold">${escapeHtml(closing)}</span>`
+        : `${escapeHtml(start)} → Open`;
+      const closedOnLine = closedOn
+        ? `<div class="small text-muted">Closed on ${escapeHtml(closedOn)}</div>`
+        : '';
+      return `<div class="small">${rangeLine}</div>${closedOnLine}`;
+    }
+
     function isOpenEditableEnrollmentStatus(status) {
       return ['active', 'to_be_confirmed', 'waiting_list'].includes(clean(status).toLowerCase());
     }
@@ -186,7 +212,7 @@
             <div class="small text-muted">${typeDetail}</div>
           </td>
           <td><span class="badge text-bg-light border">${escapeHtml(row.statusLabel || formatStatusLabel(row.status))}</span></td>
-          <td><span class="small">${escapeHtml(row.dateRangeLabel || '—')}</span></td>
+          <td>${renderEnrollmentDatesCell(row)}</td>
           <td class="text-end text-nowrap">
             <div class="d-inline-flex gap-1" role="group" aria-label="Enrollment actions">
               <button type="button" class="btn btn-outline-primary btn-sm py-0 px-1" data-manage-enroll-action="edit" data-period-id="${periodId}" title="Edit enrollment" aria-label="Edit enrollment"><i class="bi bi-pencil-square" aria-hidden="true"></i></button>

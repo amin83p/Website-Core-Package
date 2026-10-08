@@ -10,6 +10,24 @@ function read(relPath) {
   return fs.readFileSync(path.join(__dirname, '..', relPath), 'utf8');
 }
 
+test('buildEnrollmentDateFields exposes closing and closed-on from last close snapshot', () => {
+  const fields = manageService.buildEnrollmentDateFields({
+    startDate: '2026-06-01',
+    endDate: '2026-10-21',
+    status: 'completed',
+    transactionSummary: {
+      lastCloseSnapshot: {
+        closedEndDate: '2026-10-21',
+        closedAt: '2026-10-08T18:00:00.000Z'
+      }
+    }
+  });
+  assert.equal(fields.closingDate, '2026-10-21');
+  assert.equal(fields.closedOnDate, '2026-10-08');
+  assert.match(fields.dateRangeLabel, /2026-06-01/);
+  assert.match(fields.dateRangeLabel, /2026-10-21/);
+});
+
 test('collectCoveringOpenPeriods keeps open statuses that cover selected dates', () => {
   const periods = [
     {

@@ -680,6 +680,61 @@
     font-size: 0.68rem;
     line-height: 1.15;
   }
+  .rolling-enrollment-page .rolling-completion-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.2rem;
+    line-height: 1.2;
+    min-width: 6.5rem;
+  }
+  .rolling-enrollment-page .rolling-completion-primary {
+    display: block;
+    width: 100%;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: var(--bs-body-color);
+    white-space: nowrap;
+  }
+  .rolling-enrollment-page .rolling-completion-closing {
+    display: block;
+    width: 100%;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--bs-body-color);
+    white-space: nowrap;
+  }
+  .rolling-enrollment-page .rolling-completion-closed-on {
+    display: block;
+    width: 100%;
+    font-size: 0.68rem;
+    line-height: 1.15;
+    white-space: nowrap;
+  }
+  .rolling-enrollment-page .rolling-completion-session {
+    width: 100%;
+    max-width: 11rem;
+    line-height: 1.15;
+  }
+  .rolling-enrollment-page .rolling-completion-session-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    max-width: 100%;
+    font-size: 0.68rem;
+    font-weight: 500;
+    line-height: 1.15;
+  }
+  .rolling-enrollment-page .rolling-completion-session-link .rolling-completion-session-label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .rolling-enrollment-page .rolling-completion-session-link .bi {
+    flex: 0 0 auto;
+    font-size: 0.72rem;
+  }
   .rolling-enrollment-page .rolling-funder-cell {
     line-height: 1.25;
     min-width: 7.5rem;
@@ -10385,9 +10440,111 @@
   }
 
   function resolvePeriodEndSortValue(row = {}, explicitTargetSessionCount = 0) {
-    if (explicitTargetSessionCount > 0) return '9999-12-31';
     const endDate = String(row?.endDate || '').trim();
-    return endDate || '9999-12-31';
+    if (endDate) return endDate;
+    if (explicitTargetSessionCount > 0) return '9999-12-31';
+    return '9999-12-31';
+  }
+
+  function normalizeEnrollmentDateOnly(value = '') {
+    const token = String(value || '').trim();
+    if (!token) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(token)) return token;
+    const parsed = new Date(token);
+    if (Number.isNaN(parsed.getTime())) return '';
+    return parsed.toISOString().slice(0, 10);
+  }
+
+  function readEnrollmentLastCloseSnapshot(row = {}) {
+    const snap = row?.transactionSummary?.lastCloseSnapshot;
+    return snap && typeof snap === 'object' ? snap : null;
+  }
+
+  function resolveScheduledClosingDateForRow(row = {}) {
+    const endDate = String(row?.endDate || '').trim();
+    const snap = readEnrollmentLastCloseSnapshot(row);
+    return endDate || normalizeEnrollmentDateOnly(snap?.closedEndDate);
+  }
+
+  function rowHasScheduledEnrollmentClose(row = {}) {
+    const status = String(row?.status || '').trim().toLowerCase();
+    const terminalClose = ['completed', 'withdrawn', 'cancelled', 'archived'].includes(status);
+    const snap = readEnrollmentLastCloseSnapshot(row);
+    const closingDate = resolveScheduledClosingDateForRow(row);
+    return Boolean(normalizeEnrollmentDateOnly(snap?.closedEndDate) || (terminalClose && closingDate));
+  }
+
+  function buildClassManageSessionHref(sessionId = '') {
+    const id = String(sessionId || '').trim();
+    if (!id || !classId) return '';
+    return `/school/classes/${encodeURIComponent(classId)}/sessions/${encodeURIComponent(id)}`;
+  }
+
+  function formatEnrollmentCompletionClosedOnRow(row = {}) {
+    const snap = readEnrollmentLastCloseSnapshot(row);
+    if (!snap?.closedAt) return '';
+    const closedOn = normalizeEnrollmentDateOnly(snap.closedAt);
+    if (!closedOn) return '';
+    return '<div class="rolling-completion-closed-on text-muted">Closed on ' + htmlEscape(closedOn) + '</div>';
+  }
+
+  function resolveCompletionSessionDisplayName(completion = {}) {
+    const sessionId = String(completion?.sessionId || '').trim();
+    const displayName = String(completion?.sessionDisplayName || '').trim();
+    if (displayName) return displayName;
+    const rawLabel = String(completion?.sessionLabel || '').trim();
+    const labelWithoutDate = rawLabel.match(/^\d{4}-\d{2}-\d{2}\s*\((.+)\)\s*$/);
+    if (labelWithoutDate) return labelWithoutDate[1].trim();
+    if (rawLabel && rawLabel !== String(completion?.date || '').trim()) return rawLabel;
+    return sessionId;
+  }
+
+  function formatCompletionSessionRow(completion = {}) {
+    const sessionId = String(completion?.sessionId || '').trim();
+    if (!sessionId) return '';
+    const href = buildClassManageSessionHref(sessionId);
+    const displayName = resolveCompletionSessionDisplayName(completion);
+    if (!href) {
+      return '<div class="rolling-completion-session"><span class="rolling-completion-session-label text-muted">' + htmlEscape(displayName) + '</span></div>';
+    }
+    const title = 'Open session in new tab';
+    return '<div class="rolling-completion-session"><a href="' + htmlEscape(href) + '" class="rolling-completion-session-link link-primary" target="_blank" rel="noopener noreferrer" title="' + htmlEscape(title) + '" aria-label="' + htmlEscape(title + ': ' + displayName) + '"><span class="rolling-completion-session-label">' + htmlEscape(displayName) + '</span><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a></div>';
+  }
+
+  function formatEnrollmentPeriodEndDateCell(row = {}, hasEnrollmentTarget = false) {
+    if (hasEnrollmentTarget) return '<span class="text-muted">Target-based</span>';
+    const endDate = String(row?.endDate || '').trim();
+    return endDate ? htmlEscape(endDate) : 'Open';
+  }
+
+  function formatEnrollmentCompletionCell(row = {}, completion = null) {
+    const closingDate = resolveScheduledClosingDateForRow(row);
+    const showClosing = rowHasScheduledEnrollmentClose(row) && Boolean(closingDate);
+    const completionDate = String(completion?.date || '').trim();
+    const lines = [];
+
+    const primaryDate = completionDate || (showClosing ? closingDate : '');
+    if (primaryDate) {
+      lines.push('<div class="rolling-completion-primary">' + htmlEscape(primaryDate) + '</div>');
+    }
+    if (showClosing && closingDate && closingDate !== primaryDate) {
+      lines.push('<div class="rolling-completion-closing">' + htmlEscape(closingDate) + '</div>');
+    }
+    if (showClosing) {
+      const closedOnRow = formatEnrollmentCompletionClosedOnRow(row);
+      if (closedOnRow) lines.push(closedOnRow);
+    }
+    if (completion?.sessionId) {
+      lines.push(formatCompletionSessionRow(completion));
+    }
+    if (!lines.length) return '<span class="text-muted">-</span>';
+    return '<div class="rolling-completion-cell">' + lines.join('') + '</div>';
+  }
+
+  function resolveEnrollmentCompletionSortValue(row = {}, completion = null) {
+    const closingDate = resolveScheduledClosingDateForRow(row);
+    if (rowHasScheduledEnrollmentClose(row) && closingDate) return closingDate;
+    return String(completion?.date || '').trim();
   }
 
   function reapplyActiveTableSort() {
@@ -10503,12 +10660,9 @@
       const targetDisplay = formatEnrollmentCapDisplay(row, 'target');
       const consumedDisplay = formatEnrollmentCapDisplay(row, 'consumed');
       const remainingDisplay = formatEnrollmentCapDisplay(row, 'remaining');
-      const completion = row?.sessionCompletion || (row?.completionDate ? { date: row.completionDate, sessionId: row?.completionSessionId || '', reason: row?.completionReason || '' } : null);
-      const completionHtml = completion?.date
-        ? '<div class="small fw-semibold">' + htmlEscape(String(completion.date || '')) + '</div>'
-          + (completion.sessionId ? '<div class="x-small text-muted font-monospace">' + htmlEscape(String(completion.sessionId)) + '</div>' : '')
-        : '<span class="text-muted">-</span>';
-      const completionSortValue = String(completion?.date || '').trim();
+      const completion = row?.sessionCompletion || (row?.completionDate ? { date: row.completionDate, sessionId: row?.completionSessionId || '', reason: row?.completionReason || '', sessionLabel: row?.completionSessionLabel || '' } : null);
+      const completionHtml = formatEnrollmentCompletionCell(row, completion);
+      const completionSortValue = resolveEnrollmentCompletionSortValue(row, completion);
       const studentSortValue = `${String(studentDisplay.label || '').trim()} ${studentId}`.trim().toLowerCase();
       const endSortValue = resolvePeriodEndSortValue(row, explicitTargetSessionCount || explicitTargetHours);
       const targetSortValue = targetDisplay || '';
@@ -10545,11 +10699,11 @@
             <div class="x-small text-muted font-monospace rolling-student-id-line">${htmlEscape(studentDisplay.recordId || studentId)}</div>
           </td>
           <td data-column="startDate" data-sort-value="${htmlEscape(String(row?.startDate || ''))}">${htmlEscape(String(row?.startDate || '-'))}</td>
-          <td data-column="endDate" data-sort-value="${htmlEscape(endSortValue)}">${hasEnrollmentTarget ? '<span class="text-muted">Target-based</span>' : htmlEscape(String(row?.endDate || 'Open'))}</td>
+          <td data-column="endDate" data-sort-value="${htmlEscape(endSortValue)}">${formatEnrollmentPeriodEndDateCell(row, hasEnrollmentTarget)}</td>
           <td class="text-center small" data-column="target" data-sort-value="${htmlEscape(targetSortValue)}">${targetDisplay ? htmlEscape(targetDisplay) : '<span class="text-muted">-</span>'}</td>
           <td class="text-center small" data-column="consumed" data-sort-value="${htmlEscape(consumedSortValue)}">${consumedDisplay ? htmlEscape(consumedDisplay) : '<span class="text-muted">-</span>'}</td>
           <td class="text-center small" data-column="remaining" data-sort-value="${htmlEscape(remainingSortValue)}">${remainingDisplay ? htmlEscape(remainingDisplay) : '<span class="text-muted">-</span>'}</td>
-          <td data-column="completion" data-sort-value="${htmlEscape(completionSortValue)}">${completionHtml}</td>
+          <td class="rolling-completion-col" data-column="completion" data-sort-value="${htmlEscape(completionSortValue)}">${completionHtml}</td>
           <td class="text-center" data-column="status" data-sort-value="${htmlEscape(status)}">
             <span class="badge ${badgeClass}">${htmlEscape(formatPeriodStatusLabel(status))}</span>
             <div class="x-small text-muted mt-1">Finance: ${htmlEscape(financialStatus)}</div>

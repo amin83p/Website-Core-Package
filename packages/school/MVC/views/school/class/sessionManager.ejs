@@ -2600,6 +2600,8 @@
                                                             aria-label="<%= enrollmentFinishAlertActive ? 'Enrollment nearing finish for ' : (hasEnrollmentNote ? 'Enrollment info (note on file) for ' : 'Enrollment info for ') %><%= student.name %>"
                                                             data-enrollment-period-id="<%= student.enrollmentPeriodId || '' %>"
                                                             data-enrollment-finish-date="<%= student.enrollmentExpectedFinishDate || '' %>"
+                                                            data-enrollment-closing-date="<%= student.enrollmentClosingDate || '' %>"
+                                                            data-enrollment-closed-on="<%= student.enrollmentClosedOnDate || '' %>"
                                                             data-enrollment-notes="<%= (student.enrollmentNotes || '').replace(/"/g, '&quot;') %>"
                                                             data-enrollment-clb-recorded-at="<%= student.enrollmentClbRecordedAt || '' %>"
                                                             data-enrollment-clb-current="<%= encodeURIComponent(JSON.stringify(student.enrollmentClbCurrent || {})) %>"
@@ -3386,11 +3388,14 @@
                 <section class="enrollment-info-section" aria-labelledby="attendanceEnrollmentInfoFinishHeading">
                     <div class="enrollment-info-section-header" id="attendanceEnrollmentInfoFinishHeading">
                         <i class="bi bi-calendar-check" aria-hidden="true"></i>
-                        <span>Expected finishing date</span>
+                        <span>Enrollment closing date</span>
                     </div>
                     <div class="enrollment-info-finish-value" id="attendanceEnrollmentInfoFinishDate">
                         <i class="bi bi-calendar-event" aria-hidden="true"></i>
                         <span id="attendanceEnrollmentInfoFinishDateText">—</span>
+                    </div>
+                    <div class="small text-muted mt-1 d-none" id="attendanceEnrollmentInfoClosedOnWrap">
+                        Closed on <span id="attendanceEnrollmentInfoClosedOnText">—</span>
                     </div>
                 </section>
 
@@ -3401,7 +3406,7 @@
                     </div>
                     <div class="enrollment-info-section-body">
                         <textarea class="form-control" id="attendanceEnrollmentInfoNotes" rows="4" maxlength="1000" placeholder="Add a note for this enrollment..." <%= attendanceReadOnly ? 'disabled' : '' %>></textarea>
-                        <div class="form-text mt-2 mb-0">CLB levels and expected finish date are read-only.</div>
+                        <div class="form-text mt-2 mb-0">CLB levels and enrollment closing date are read-only.</div>
                     </div>
                 </section>
                 <input type="hidden" id="attendanceEnrollmentInfoPeriodId" value="">
@@ -5496,15 +5501,15 @@ document.addEventListener('DOMContentLoaded', () => {
             const days = Number(row.daysUntilFinish);
             const threshold = Number(row.threshold);
             const finishDate = formatEnrollmentFinishDate(row.finishDate);
-            if (!Number.isFinite(days)) return 'Expected finish date threshold met.';
+            if (!Number.isFinite(days)) return 'Enrollment closing date threshold met.';
             const dayLabel = Math.abs(days) === 1 ? 'day' : 'days';
             if (days < 0) {
-                return `Expected finish date (${finishDate}) was ${Math.abs(days)} ${dayLabel} before this session (threshold: ${threshold} ${dayLabel}).`;
+                return `Enrollment closing date (${finishDate}) was ${Math.abs(days)} ${dayLabel} before this session (threshold: ${threshold} ${dayLabel}).`;
             }
             if (days === 0) {
-                return `Expected finish date is this session date (threshold: within ${threshold} ${dayLabel}).`;
+                return `Enrollment closing date is this session date (threshold: within ${threshold} ${dayLabel}).`;
             }
-            return `Expected finish date is ${days} ${dayLabel} after this session (threshold: within ${threshold} ${dayLabel}).`;
+            return `Enrollment closing date is ${days} ${dayLabel} after this session (threshold: within ${threshold} ${dayLabel}).`;
         }
         if (reason === 'sessions') {
             return `Remaining sessions: ${row.remainingSessionCount} (threshold: ${row.threshold} or fewer).`;
@@ -5553,6 +5558,8 @@ document.addEventListener('DOMContentLoaded', () => {
             studentName: studentName || 'Student',
             periodId: String(trigger.dataset.enrollmentPeriodId || '').trim(),
             finishDate: String(trigger.dataset.enrollmentFinishDate || '').trim(),
+            closingDate: String(trigger.dataset.enrollmentClosingDate || trigger.dataset.enrollmentFinishDate || '').trim(),
+            closedOnDate: String(trigger.dataset.enrollmentClosedOn || '').trim(),
             notes: String(trigger.dataset.enrollmentNotes || '').trim(),
             clbRecordedAt: String(trigger.dataset.enrollmentClbRecordedAt || '').trim(),
             clbCurrent: parseEnrollmentInfoJsonAttr(trigger.dataset.enrollmentClbCurrent),
@@ -5594,10 +5601,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 : '';
         }
         renderEnrollmentClbGrid(payload.clbCurrent);
-        const finishLabel = formatEnrollmentFinishDate(payload.finishDate);
+        const closingDisplayDate = payload.closingDate || payload.finishDate;
+        const finishLabel = formatEnrollmentFinishDate(closingDisplayDate);
         if (finishTextEl) finishTextEl.textContent = finishLabel;
         if (finishWrapEl) {
             finishWrapEl.classList.toggle('is-muted', finishLabel === 'Not available');
+        }
+        const closedOnWrapEl = document.getElementById('attendanceEnrollmentInfoClosedOnWrap');
+        const closedOnTextEl = document.getElementById('attendanceEnrollmentInfoClosedOnText');
+        const closedOnLabel = formatEnrollmentFinishDate(payload.closedOnDate);
+        if (closedOnWrapEl && closedOnTextEl) {
+            const showClosedOn = Boolean(String(payload.closedOnDate || '').trim()) && closedOnLabel !== 'Not available';
+            closedOnTextEl.textContent = closedOnLabel;
+            closedOnWrapEl.classList.toggle('d-none', !showClosedOn);
         }
         if (notesEl) {
             notesEl.value = payload.notes;

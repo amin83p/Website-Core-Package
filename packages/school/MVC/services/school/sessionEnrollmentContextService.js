@@ -45,8 +45,41 @@ function findStudentByPersonId(students = [], personId = '') {
   return (Array.isArray(students) ? students : []).find((row) => idsEqual(row?.personId, targetPersonId)) || null;
 }
 
+const TERMINAL_CLOSE_STATUSES = new Set(['completed', 'withdrawn', 'cancelled', 'archived']);
+
+function readLastCloseSnapshot(period = {}) {
+  const summary = period?.transactionSummary;
+  const snap = summary?.lastCloseSnapshot;
+  return snap && typeof snap === 'object' ? snap : null;
+}
+
+function closedOnDateFromPeriod(period = {}) {
+  const snap = readLastCloseSnapshot(period);
+  if (!snap?.closedAt) return '';
+  return normalizeDateOnly(snap.closedAt);
+}
+
+function resolveScheduledClosingDate(period = {}) {
+  const snap = readLastCloseSnapshot(period);
+  return normalizeDateOnly(period?.endDate) || normalizeDateOnly(snap?.closedEndDate);
+}
+
+function isScheduledEnrollmentClose(period = {}) {
+  const snap = readLastCloseSnapshot(period);
+  if (normalizeDateOnly(snap?.closedEndDate)) return true;
+  const status = String(period?.status || '').trim().toLowerCase();
+  if (!TERMINAL_CLOSE_STATUSES.has(status)) return false;
+  if (classEnrollmentSessionApplicabilityService.isAutomaticallyCompletedTargetPeriod(period)) return false;
+  return Boolean(normalizeDateOnly(period?.endDate));
+}
+
 function resolveExpectedFinishDate({ period = null, sessions = [], statusMap = {}, enrichedPeriodRow = null } = {}) {
   if (!period) return '';
+
+  if (isScheduledEnrollmentClose(period)) {
+    const closingDate = resolveScheduledClosingDate(period);
+    if (closingDate) return closingDate;
+  }
 
   const completionDate = normalizeDateOnly(period.completionDate);
   if (completionDate) return completionDate;
@@ -85,6 +118,8 @@ function emptyEnrollmentContext() {
     enrollmentClbGoal: {},
     enrollmentClbRecordedAt: '',
     enrollmentExpectedFinishDate: '',
+    enrollmentClosingDate: '',
+    enrollmentClosedOnDate: '',
     enrollmentNotes: '',
     enrollmentRemainingSessionCount: null,
     enrollmentRemainingHours: null,
@@ -202,10 +237,14 @@ async function buildRosterEnrollmentContextBatch({
       hasSessionTarget,
       hasHourTarget
     });
+    const closingDate = resolveScheduledClosingDate(period);
+    const closedOnDate = closedOnDateFromPeriod(period);
     map.set(personId, {
       ...clbContext,
       enrollmentPeriodId: periodId,
       enrollmentExpectedFinishDate: finishDate,
+      enrollmentClosingDate: isScheduledEnrollmentClose(period) ? closingDate : normalizeDateOnly(period?.endDate),
+      enrollmentClosedOnDate: closedOnDate,
       enrollmentNotes: String(period.notes || '').trim(),
       enrollmentRemainingSessionCount: remainingSessionCount,
       enrollmentRemainingHours: remainingHours,
@@ -254,6 +293,10 @@ async function updateEnrollmentPeriodNotes({ periodId, notes, reqUser, updatedBy
 module.exports = {
   buildClbContextFromStudent,
   resolveExpectedFinishDate,
+  isScheduledEnrollmentClose,
+  resolveScheduledClosingDate,
+  closedOnDateFromPeriod,
+  readLastCloseSnapshot,
   buildRosterEnrollmentContextForPerson,
   buildRosterEnrollmentContextBatch,
   updateEnrollmentPeriodNotes,

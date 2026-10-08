@@ -2,6 +2,7 @@ const schoolDataService = require('./schoolDataService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
 const rollingEnrollmentSessionAlignmentService = require('./rollingEnrollmentSessionAlignmentService');
+const sessionManagementService = require('./sessionManagementService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -89,6 +90,17 @@ async function attachSessionProgressToEnrollmentPeriodRows(periodRows, classData
       sessionId: summary.lastConsumedSession.sessionId,
       reason: 'last_consumed_session'
     } : null)));
+    const completionSessionId = toPublicId(sessionCompletion?.sessionId);
+    const completionSession = completionSessionId
+      ? (Array.isArray(sessions) ? sessions : []).find((session) => toPublicId(session?.sessionId || session?.id) === completionSessionId)
+      : null;
+    const enrichedSessionCompletion = sessionCompletion
+      ? {
+        ...sessionCompletion,
+        sessionLabel: sessionManagementService.buildSessionLabel(completionSession || {}, completionSessionId),
+        sessionDisplayName: completionSessionId || ''
+      }
+      : null;
     return {
       ...row,
       targetSessionCount,
@@ -110,7 +122,7 @@ async function attachSessionProgressToEnrollmentPeriodRows(periodRows, classData
       remainingHours: effectiveTargetHours !== null && consumedHours !== null
         ? Math.max(0, classEnrollmentSessionApplicabilityService.roundTargetHours(effectiveTargetHours - consumedHours))
         : null,
-      sessionCompletion,
+      sessionCompletion: enrichedSessionCompletion,
       hasNonNaAttendanceMarkings
     };
   });
