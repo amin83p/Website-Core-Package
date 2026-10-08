@@ -88,6 +88,44 @@ test('a rolling session has enrollment only when a student is expected', () => {
   assert.equal(empty, false);
 });
 
+test('undo take over restores the previous main teacher without keeping the mistaken teacher as co-teacher', () => {
+  const takenOver = scheduleTakeOverSessionsService.applyTakeOverToSession(sessionRow({ status: 'scheduled' }), {
+    teacherId: 'TCH_NEW',
+    teacherName: 'Noah'
+  });
+  const restored = scheduleTakeOverSessionsService.undoTakeOverFromSession(takenOver);
+  assert.equal(restored.delivery.deliveredBy, 'TCH_OLD');
+  assert.equal(restored.delivery.deliveredByName, 'Ella');
+  assert.equal(restored.delivery.coTeachers.some((row) => row.personId === 'TCH_NEW'), false);
+  const previous = restored.delivery.coTeachers.find((row) => row.roleLabel === 'Previous Teacher');
+  assert.equal(previous, undefined);
+  assert.ok(restored.delivery.coTeachers.some((row) => row.personId === 'TCH_CO'));
+});
+
+test('undo take over preview blocks sessions without a previous teacher co-teacher', async () => {
+  scheduleTakeOverSessionsService.__setDependenciesForTest({
+    schoolDataService: {
+      getDataById: async () => ({ id: 'CLS_A', orgId: 'ORG_1', registrationMode: 'term_based' }),
+      getClassSessions: async () => [sessionRow()],
+      getClassEnrollmentPeriodsByClassId: async () => []
+    },
+    sessionStatusPolicyService: {
+      ...sessionStatusPolicyService,
+      getStatusMap: async () => new Map()
+    }
+  });
+  try {
+    const preview = await scheduleTakeOverSessionsService.buildUndoTakeOverPreview({
+      sessions: [{ classId: 'CLS_A', sessionId: 'SES_1' }],
+      reqUser: { id: 'USER_1' }
+    });
+    assert.equal(preview.canContinue, false);
+    assert.equal(preview.blockers.some((row) => row.code === 'CANNOT_UNDO'), true);
+  } finally {
+    scheduleTakeOverSessionsService.__resetDependenciesForTest();
+  }
+});
+
 test('take over makes the new teacher the main teacher and the previous teacher an unpaid co-teacher', () => {
   const updated = scheduleTakeOverSessionsService.applyTakeOverToSession(sessionRow({ status: 'scheduled' }), {
     teacherId: 'TCH_NEW',
@@ -173,6 +211,8 @@ test('a conflicting teacher schedule blocks take over and a clear schedule is sa
       reqUser: { id: 'USER_1' }
     });
     assert.equal(result.takenOverCount, 1);
+    assert.equal(result.upsertedSessions.length, 1);
+    assert.equal(result.upsertedSessions[0].sessionId, 'SES_1');
     assert.equal(saved[0].delivery.deliveredBy, 'TCH_NEW');
     assert.equal(saved[0].merged, undefined);
     assert.equal(saved[0].status, 'scheduled');
@@ -190,12 +230,24 @@ test('take over is wired beside merge on the schedule rail', () => {
   assert.match(view, /data-schedule-admin-action="merge-sessions"/);
   assert.match(view, /Merge Sessions/);
   assert.match(view, /data-schedule-admin-action="take-over-sessions"/);
-  assert.match(view, /Take Over/);
+  assert.match(view, /Take Over \/ Undo Take Over/);
+  assert.match(view, /btn_scheduleSessionContextUndoTakeOver/);
+  assert.match(view, /Undo Take Over/);
   assert.match(view, /masterScheduleTakeOverSessions\.js/);
   assert.match(routes, /\/api\/take-over-sessions\/preview/);
   assert.match(routes, /\/api\/take-over-sessions\/apply/);
+  assert.match(routes, /\/api\/take-over-sessions\/undo-preview/);
+  assert.match(routes, /\/api\/take-over-sessions\/undo-apply/);
   assert.match(viewer, /take-over-sessions/);
   assert.match(viewer, /installMasterScheduleTakeOverSessions/);
+  assert.match(viewer, /applyScheduleSessionChangesInView[\s\S]*installMasterScheduleTakeOverSessions/);
+  assert.match(script, /applyScheduleSessionChangesInView/);
+  assert.match(script, /take-over-sessions\/undo-apply/);
+  assert.match(script, /canUndoTakeOverScheduleEvent/);
+  assert.match(script, /classifySelectedUndoEligibility/);
+  assert.match(script, /undoTakeOverForSessions/);
+  assert.match(script, /allUndoable/);
+  assert.match(script, /not all in the same take-over state/);
   assert.match(script, /row\.sessions/);
   assert.match(script, /<ul/);
 });

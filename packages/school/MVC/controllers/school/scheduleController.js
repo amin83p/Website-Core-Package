@@ -3014,6 +3014,50 @@ async function postTakeOverSessionsApply(req, res) {
     }
 }
 
+async function postUndoTakeOverSessionsPreview(req, res) {
+    try {
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        const sessions = scheduleTakeOverSessionsService.parseSelectedSessions(req.body || {});
+        const preview = await scheduleTakeOverSessionsService.buildUndoTakeOverPreview({
+            sessions,
+            reqUser: req.user,
+            accessContext
+        });
+        return res.json({ status: 'success', data: preview });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            code: error?.code || '',
+            message: error.message || 'Unable to preview undo take over.'
+        });
+    }
+}
+
+async function postUndoTakeOverSessionsApply(req, res) {
+    try {
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        const sessions = scheduleTakeOverSessionsService.parseSelectedSessions(req.body || {});
+        const result = await scheduleTakeOverSessionsService.applyUndoTakeOver({
+            sessions,
+            previewHash: req.body?.previewHash,
+            reqUser: req.user,
+            accessContext
+        });
+        return res.json({
+            status: 'success',
+            message: 'Take over was undone.',
+            data: result
+        });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            code: error?.code || '',
+            message: error.message || 'Unable to undo take over.',
+            blockers: error.preview?.blockers || []
+        });
+    }
+}
+
 async function postAddCoTeacherPreview(req, res) {
     try {
         const accessContext = schoolDataService.buildRouteAccessContext(req);
@@ -3425,6 +3469,8 @@ module.exports = {
     postMergeSessionsApply,
     postTakeOverSessionsPreview,
     postTakeOverSessionsApply,
+    postUndoTakeOverSessionsPreview,
+    postUndoTakeOverSessionsApply,
     postAddCoTeacherPreview,
     postAddCoTeacherApply,
     postEnrollStudentsSessionCapacityCheck,

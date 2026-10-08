@@ -101,6 +101,10 @@ function blockerMessage(code, count) {
       return 'The selected sessions overlap each other.';
     case 'TEACHER_CONFLICT':
       return 'The selected teacher already has a scheduled session that conflicts with the selected sessions.';
+    case 'CANNOT_UNDO':
+      return count === 1
+        ? 'This session has no take over to undo.'
+        : 'These sessions have no take over to undo.';
     default:
       return count === 1
         ? 'Resolve this session before continuing.'
@@ -169,6 +173,86 @@ function collectTakeOverBlockers({
   }
 
   return groupBlockers(blocked);
+}
+
+function listPreviousTeacherCoTeachers(session = {}) {
+  return dependencies.sessionDeliveryTeamService.getSessionCoTeachers(session)
+    .filter((row) => cleanText(row?.roleLabel) === 'Previous Teacher');
+}
+
+function canUndoTakeOverSession(session = {}) {
+  if (isMergedSession(session)) return false;
+  if (isApprovedTimesheetLocked(session)) return false;
+  return listPreviousTeacherCoTeachers(session).length === 1;
+}
+
+function undoTakeOverFromSession(session = {}) {
+  const previousRows = listPreviousTeacherCoTeachers(session);
+  if (previousRows.length !== 1) {
+    throw new Error('This session has no take over to undo.');
+  }
+  const previousTeacher = previousRows[0];
+  const restoreId = toPublicId(previousTeacher?.personId);
+  const restoreName = cleanText(previousTeacher?.name) || restoreId;
+  const coTeachers = dependencies.sessionDeliveryTeamService.getSessionCoTeachers(session)
+    .filter((row) => !idsEqual(row?.personId, restoreId));
+  const delivery = dependencies.sessionDeliveryTeamService.applyCoTeachersToDelivery(
+    {
+      ...(session.delivery || {}),
+      deliveredBy: restoreId,
+      deliveredByName: restoreName
+    },
+    coTeachers,
+    { mainTeacherId: restoreId }
+  );
+  return {
+    ...session,
+    delivery
+  };
+}
+
+function collectUndoTakeOverBlockers({
+  classIds = [],
+  rows = []
+} = {}) {
+  const blocked = [];
+  const classIdList = [...new Set((Array.isArray(classIds) ? classIds : []).map((id) => toPublicId(id)).filter(Boolean))];
+  if (classIdList.length > 1) {
+    (Array.isArray(rows) ? rows : []).forEach((row) => {
+      blocked.push({ code: 'MULTIPLE_CLASSES', ...sessionRef(row.classId, row.session || row) });
+    });
+  }
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const session = row.session || row;
+    const ref = sessionRef(row.classId, session);
+    if (isMergedSession(session)) {
+      blocked.push({ code: 'ALREADY_MERGED', ...ref });
+    }
+    if (isApprovedTimesheetLocked(session)) {
+      blocked.push({ code: 'TIMESHEET_LOCKED', ...ref });
+    }
+    if (row.isFinal) blocked.push({ code: 'COMPLETED', ...ref });
+    if (row.hasEnrollment === false) blocked.push({ code: 'NO_ENROLLMENT', ...ref });
+    if (!canUndoTakeOverSession(session)) {
+      blocked.push({ code: 'CANNOT_UNDO', ...ref });
+    }
+  });
+  return groupBlockers(blocked);
+}
+
+function buildUpsertedSessionRefs(classId, sessions = [], selectedIds = new Set()) {
+  const normalizedClassId = toPublicId(classId);
+  const refs = [];
+  (Array.isArray(sessions) ? sessions : []).forEach((session) => {
+    const sessionId = toPublicId(session?.sessionId || session?.id);
+    if (!sessionId || !selectedIds.has(sessionId)) return;
+    refs.push({
+      classId: normalizedClassId,
+      sessionId,
+      date: cleanText(session?.date).slice(0, 10)
+    });
+  });
+  return refs;
 }
 
 function applyTakeOverToSession(session = {}, { teacherId = '', teacherName = '' } = {}) {
@@ -427,7 +511,124 @@ async function applyTakeOverSessions({
     classId: preview.classId,
     takenOverCount: selectedIds.size,
     teacherId: preview.teacherId,
-    teacherName: preview.teacherName
+    teacherName: preview.teacherName,
+    upsertedSessions: buildUpsertedSessionRefs(preview.classId, nextSessions, selectedIds)
+  };
+}
+
+async function buildSessionActionRows(loadedClass, reqUser) {
+  const statusMap = loadedClass.classIds.length === 1
+    ? await dependencies.sessionStatusPolicyService.getStatusMap(toPublicId(loadedClass.loaded[0]?.classData?.orgId), { includeInactive: true })
+    : new Map();
+  const periodCache = new Map();
+  const rows = [];
+  for (const row of loadedClass.loaded) {
+    const mode = cleanText(row.classData?.registrationMode).toLowerCase();
+    let periods = [];
+    if (mode === 'rolling' && !periodCache.has(row.classId)) {
+      const listed = await dependencies.schoolDataService.getClassEnrollmentPeriodsByClassId(row.classId, reqUser);
+      periodCache.set(row.classId, Array.isArray(listed) ? listed : []);
+    }
+    periods = periodCache.get(row.classId) || [];
+    const isFinal = dependencies.sessionStatusPolicyService.isFinalStatusByMap(statusMap, {
+      status: row.session?.status,
+      notes: row.session?.notes
+    });
+    rows.push({
+      classId: row.classId,
+      session: row.session,
+      isFinal,
+      hasEnrollment: sessionHasExpectedEnrollment({
+        classData: row.classData,
+        session: row.session,
+        sessions: row.classSessions,
+        periods
+      }),
+      mainTeacherId: toPublicId(row.session?.delivery?.deliveredBy)
+    });
+  }
+  return rows;
+}
+
+async function buildUndoTakeOverPreview({
+  sessions = [],
+  reqUser,
+  accessContext
+} = {}) {
+  const selected = Array.isArray(sessions) ? sessions : [];
+  const loadedClass = await loadTakeOverClass({ sessions: selected, reqUser, accessContext });
+  const rows = await buildSessionActionRows(loadedClass, reqUser);
+  const blocked = collectUndoTakeOverBlockers({
+    classIds: loadedClass.classIds,
+    rows
+  });
+  const review = rows.map((row) => {
+    const previousRows = listPreviousTeacherCoTeachers(row.session);
+    const previousTeacher = previousRows[0] || {};
+    return {
+      ...sessionRef(row.classId, row.session),
+      restoredTeacherId: toPublicId(previousTeacher?.personId),
+      restoredTeacherName: cleanText(previousTeacher?.name),
+      currentTeacherId: toPublicId(row.session?.delivery?.deliveredBy),
+      currentTeacherName: cleanText(row.session?.delivery?.deliveredByName)
+    };
+  });
+  const hashPayload = {
+    classId: loadedClass.classIds.length === 1 ? loadedClass.classIds[0] : '',
+    sessionKeys: selected.map((row) => `${row.classId}::${row.sessionId}`).sort(),
+    restoreKeys: review.map((row) => `${row.sessionId}::${row.restoredTeacherId}`).sort()
+  };
+  return {
+    canContinue: blocked.length === 0 && loadedClass.classIds.length === 1 && review.length === selected.length,
+    blockers: blocked,
+    sessions: review,
+    previewHash: buildTakeOverPreviewHash(hashPayload),
+    classId: loadedClass.classIds[0] || '',
+    orgId: toPublicId(loadedClass.loaded[0]?.classData?.orgId)
+  };
+}
+
+async function applyUndoTakeOver({
+  sessions = [],
+  previewHash = '',
+  reqUser,
+  accessContext
+} = {}) {
+  const preview = await buildUndoTakeOverPreview({
+    sessions,
+    reqUser,
+    accessContext
+  });
+  if (!preview.canContinue) {
+    const error = new Error(preview.blockers[0]?.message || 'Resolve the listed issues before undoing the take over.');
+    error.preview = preview;
+    throw error;
+  }
+  if (!previewHash || previewHash !== preview.previewHash) {
+    throw new Error('Preview is stale. Review the undo again before applying.');
+  }
+  const loadedClass = await loadTakeOverClass({ sessions, reqUser, accessContext });
+  const bucket = loadedClass.buckets.get(preview.classId);
+  const selectedIds = new Set(sessions.map((row) => toPublicId(row.sessionId)));
+  const now = new Date().toISOString();
+  const actorId = toPublicId(reqUser?.id || reqUser?.username || '');
+  const nextSessions = (bucket?.sessions || []).map((session) => {
+    const sessionId = toPublicId(session?.sessionId || session?.id);
+    if (!selectedIds.has(sessionId)) return session;
+    const updated = undoTakeOverFromSession(session);
+    updated.audit = {
+      ...(session.audit || {}),
+      lastUpdateUser: actorId,
+      lastUpdateDateTime: now
+    };
+    return updated;
+  });
+  await dependencies.schoolDataService.saveClassSessions(preview.classId, nextSessions, reqUser);
+  await dependencies.schoolIndexService.rebuildIndexesForClass(preview.classId);
+  return {
+    classId: preview.classId,
+    undoneCount: selectedIds.size,
+    upsertedSessions: buildUpsertedSessionRefs(preview.classId, nextSessions, selectedIds)
   };
 }
 
@@ -451,10 +652,15 @@ module.exports = {
   parseSelectedSessions,
   buildTakeOverPreviewHash,
   collectTakeOverBlockers,
+  collectUndoTakeOverBlockers,
   applyTakeOverToSession,
+  undoTakeOverFromSession,
+  canUndoTakeOverSession,
   sessionHasExpectedEnrollment,
   buildTakeOverPreview,
   applyTakeOverSessions,
+  buildUndoTakeOverPreview,
+  applyUndoTakeOver,
   __setDependenciesForTest,
   __resetDependenciesForTest
 };

@@ -2965,12 +2965,17 @@
             document.getElementById('btn_scheduleSessionContextInfo')?.classList.add('d-none');
             document.getElementById('scheduleSessionContextStatusList')?.classList.add('d-none');
             document.getElementById('btn_scheduleSessionContextSelect')?.classList.add('d-none');
+            document.getElementById('btn_scheduleSessionContextUndoTakeOver')?.classList.add('d-none');
         } else {
             renderScheduleSessionContextMenuHeader(event);
             renderScheduleSessionContextStatusList(event);
             bulkSection?.classList.add('d-none');
             bulkDivider?.classList.add('d-none');
             document.getElementById('btn_scheduleSessionContextSelect')?.classList.toggle('d-none', !isClass);
+            const canUndoTakeOver = isClass
+                && typeof global.canUndoTakeOverScheduleEvent === 'function'
+                && global.canUndoTakeOverScheduleEvent(event);
+            document.getElementById('btn_scheduleSessionContextUndoTakeOver')?.classList.toggle('d-none', !canUndoTakeOver);
             const quickEdit = isClass && isScheduledClassSessionScheduleEditable(event);
             const canMoveDate = isClass && canScheduleSessionChangeDate(event);
             document.getElementById('btn_scheduleSessionContextEdit')?.classList.toggle('d-none', !quickEdit);
@@ -8045,14 +8050,19 @@ if (canLoadAllSchedules) {
     if (canSelectAnyPerson && typeof global.installMasterScheduleTakeOverSessions === 'function') {
         global.installMasterScheduleTakeOverSessions({
             uiAlert,
+            uiConfirm,
             escapeHtml,
             showBootstrapModal: showScheduleBootstrapModal,
             hideBootstrapModal: hideScheduleBootstrapModal,
+            hideScheduleSessionContextMenu,
+            getScheduleSessionContextEvent: () => scheduleSessionContextEvent,
             bindTakeOverSessionsRail,
             countActiveScheduleSelectedSessions,
             countActiveDraftSelectedSessions,
             getSelectedSavedClassSessionEvents,
-            refreshScheduleViewWithHolidays
+            refreshScheduleViewWithHolidays,
+            applyScheduleSessionChangesInView,
+            reloadLoadedSchedulePersons
         });
     }
     if (canSelectAnyPerson && typeof global.installMasterScheduleAddCoTeacher === 'function') {

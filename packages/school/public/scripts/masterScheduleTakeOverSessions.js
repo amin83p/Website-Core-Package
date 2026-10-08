@@ -21,6 +21,52 @@
         : String(value ?? '');
     }
 
+    async function refreshScheduleAfterApply(applyData) {
+      const upsertRefs = Array.isArray(applyData?.upsertedSessions) ? applyData.upsertedSessions : [];
+      let refreshPromise = Promise.resolve();
+      if (upsertRefs.length && typeof deps.applyScheduleSessionChangesInView === 'function') {
+        refreshPromise = deps.applyScheduleSessionChangesInView({
+          upsertRefs,
+          showProgress: true
+        }).catch(async () => {
+          if (typeof deps.reloadLoadedSchedulePersons === 'function') {
+            await deps.reloadLoadedSchedulePersons({ silent: true });
+          } else {
+            deps.refreshScheduleViewWithHolidays?.();
+          }
+        });
+      } else if (typeof deps.reloadLoadedSchedulePersons === 'function') {
+        refreshPromise = deps.reloadLoadedSchedulePersons({ silent: true });
+      } else {
+        deps.refreshScheduleViewWithHolidays?.();
+      }
+      await refreshPromise;
+    }
+
+    function canUndoTakeOverScheduleEvent(event) {
+      if (!event) return false;
+      const classId = clean(event?.classId);
+      const sessionId = clean(event?.sessionId || event?.id);
+      if (!classId || !sessionId) return false;
+      const coTeachers = Array.isArray(event?.coTeachers) ? event.coTeachers : [];
+      const previousTeachers = coTeachers.filter((row) => clean(row?.roleLabel) === 'Previous Teacher');
+      return previousTeachers.length === 1;
+    }
+
+    function classifySelectedUndoEligibility(events) {
+      const list = Array.isArray(events) ? events.filter(Boolean) : [];
+      let undoableCount = 0;
+      list.forEach((event) => {
+        if (canUndoTakeOverScheduleEvent(event)) undoableCount += 1;
+      });
+      const total = list.length;
+      return {
+        events: list,
+        allUndoable: total > 0 && undoableCount === total,
+        anyUndoable: undoableCount > 0
+      };
+    }
+
     async function postJson(url, body) {
       const res = await fetch(url, {
         method: 'POST',
@@ -210,13 +256,13 @@
         const next = document.getElementById('btn_scheduleTakeOverNext');
         if (next) next.disabled = true;
         try {
-          await postJson('/school/schedules/api/take-over-sessions/apply', {
+          const applyRes = await postJson('/school/schedules/api/take-over-sessions/apply', {
             teacherId: state.teacherId,
             sessions: state.sessions,
             previewHash: preview.previewHash
           });
           deps.hideBootstrapModal?.(document.getElementById('scheduleTakeOverSessionsModal'));
-          deps.refreshScheduleViewWithHolidays?.();
+          await refreshScheduleAfterApply(applyRes?.data || {});
           await deps.uiAlert?.('Sessions were taken over.', 'Take Over', { icon: 'success' });
         } finally {
           if (next) next.disabled = false;
@@ -240,6 +286,24 @@
         void deps.uiAlert?.('Select at least one saved class session.', 'Take Over', { icon: 'info' });
         return;
       }
+      const selectedEvents = typeof deps.getSelectedSavedClassSessionEvents === 'function'
+        ? deps.getSelectedSavedClassSessionEvents()
+        : [];
+      const eligibility = classifySelectedUndoEligibility(selectedEvents);
+      if (eligibility.allUndoable) {
+        void undoTakeOverForSessions(ctx.sessions, { sessionCount: eligibility.events.length }).catch(async (error) => {
+          await deps.uiAlert?.(error.message || 'Unable to undo take over.', 'Undo Take Over', { icon: 'warning' });
+        });
+        return;
+      }
+      if (eligibility.anyUndoable) {
+        void deps.uiAlert?.(
+          'Selected sessions are not all in the same take-over state. Undo take over only works when every selected session has been taken over. Clear the selection or choose matching sessions.',
+          'Take Over',
+          { icon: 'info' }
+        );
+        return;
+      }
       state.sessions = ctx.sessions;
       state.teacherId = '';
       state.teacherName = '';
@@ -256,6 +320,63 @@
       if (state.step === 'review') showStep('teacher');
     });
     deps.bindTakeOverSessionsRail?.(openWizard);
+
+    async function undoTakeOverForSessions(sessions, { sessionCount = 0 } = {}) {
+      const refs = (Array.isArray(sessions) ? sessions : [])
+        .map((row) => ({
+          classId: clean(row?.classId),
+          sessionId: clean(row?.sessionId || row?.id)
+        }))
+        .filter((row) => row.classId && row.sessionId);
+      if (!refs.length) {
+        throw new Error('Select at least one saved class session.');
+      }
+      const previewRes = await postJson('/school/schedules/api/take-over-sessions/undo-preview', { sessions: refs });
+      const preview = previewRes.data || {};
+      if (preview.blockers?.length) {
+        throw new Error(preview.blockers[0]?.message || 'Unable to undo take over.');
+      }
+      const count = Number(sessionCount) > 0 ? Number(sessionCount) : refs.length;
+      const countLabel = count === 1 ? 'this session' : `${count} selected sessions`;
+      const confirmed = await deps.uiConfirm?.(
+        `<p>Undo take over for ${escapeHtml(countLabel)}?</p>`
+        + '<p>This restores the previous main teacher and removes the take-over co-teacher row on each session.</p>'
+        + '<p class="mb-0 text-muted small">Timesheet entries are not automatically adjusted. Chained take-overs may require undoing more than once.</p>',
+        'Undo Take Over',
+        { icon: 'warning', confirmText: 'Undo', cancelText: 'Cancel', html: true }
+      );
+      if (confirmed !== true) return;
+      const applyRes = await postJson('/school/schedules/api/take-over-sessions/undo-apply', {
+        sessions: refs,
+        previewHash: preview.previewHash
+      });
+      await refreshScheduleAfterApply(applyRes?.data || {});
+      const successMessage = count === 1
+        ? 'Take over was undone.'
+        : `Take over was undone for ${count} sessions.`;
+      await deps.uiAlert?.(successMessage, 'Undo Take Over', { icon: 'success' });
+    }
+
+    async function undoTakeOverForEvent(event) {
+      return undoTakeOverForSessions([{
+        classId: clean(event?.classId),
+        sessionId: clean(event?.sessionId || event?.id)
+      }], { sessionCount: 1 });
+    }
+
+    document.getElementById('btn_scheduleSessionContextUndoTakeOver')?.addEventListener('click', (clickEvent) => {
+      clickEvent.preventDefault();
+      const event = typeof deps.getScheduleSessionContextEvent === 'function'
+        ? deps.getScheduleSessionContextEvent()
+        : null;
+      deps.hideScheduleSessionContextMenu?.();
+      if (!event) return;
+      void undoTakeOverForEvent(event).catch(async (error) => {
+        await deps.uiAlert?.(error.message || 'Unable to undo take over.', 'Undo Take Over', { icon: 'warning' });
+      });
+    });
+
+    global.canUndoTakeOverScheduleEvent = canUndoTakeOverScheduleEvent;
   }
 
   global.installMasterScheduleTakeOverSessions = installMasterScheduleTakeOverSessions;
