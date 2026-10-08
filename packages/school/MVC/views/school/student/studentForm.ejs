@@ -27,6 +27,12 @@
   const enrollmentRows = Array.isArray(typeof classEnrollmentRows !== 'undefined' ? classEnrollmentRows : null)
     ? classEnrollmentRows
     : [];
+  const reportInstanceRows = Array.isArray(typeof studentReportInstanceRows !== 'undefined' ? studentReportInstanceRows : null)
+    ? studentReportInstanceRows
+    : [];
+  const reportInstancesFullListUrl = String(typeof studentReportInstancesFullListUrl !== 'undefined' ? studentReportInstancesFullListUrl : '').trim()
+    || '/school/reports/person-reports';
+  const reportInstancesAccessNote = String(typeof studentReportInstancesAccessNote !== 'undefined' ? studentReportInstancesAccessNote : '').trim();
 %>
 
 <div class="sections-page">
@@ -68,8 +74,9 @@
         <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-programs" type="button">Step 3: Programs</button></li>
         <% if (isEdit) { %>
         <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-enrollments" type="button">Step 4: Enrollments</button></li>
+        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-reports" type="button">Step 5: Reports</button></li>
         <% } %>
-        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-documents" type="button">Step <%= isEdit ? '5' : '4' %>: Documents</button></li>
+        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-documents" type="button">Step <%= isEdit ? '6' : '4' %>: Documents</button></li>
       </ul>
 
       <div class="card border-0 shadow-sm mb-4">
@@ -543,6 +550,35 @@
                </div>
              </div>
            </div>
+
+           <div class="tab-pane fade" id="tab-reports">
+             <div class="alert alert-light border shadow-sm mb-3">
+               <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+                 <div>
+                   <h6 class="fw-bold mb-2"><i class="bi bi-file-earmark-text me-2"></i>Report instances</h6>
+                   <p class="small text-muted mb-0">
+                     Read-only list of report instances for this student (matched by person id). Open a report to review or continue editing.
+                   </p>
+                 </div>
+                 <a href="<%= reportInstancesFullListUrl %>" class="btn btn-outline-primary btn-sm fw-bold" target="_blank" rel="noopener noreferrer">
+                   <i class="bi bi-box-arrow-up-right me-1"></i>Open full reports list
+                 </a>
+               </div>
+             </div>
+             <% if (reportInstancesAccessNote) { %>
+               <div class="alert alert-warning border shadow-sm mb-3">
+                 <%= reportInstancesAccessNote %>
+               </div>
+             <% } %>
+             <div class="card border-0 shadow-sm">
+               <div class="card-header bg-white border-bottom py-3">
+                 <div class="fw-bold"><i class="bi bi-journal-richtext me-2"></i>Student Reports</div>
+               </div>
+               <div class="card-body p-0">
+                 <%- include('school/partials/studentReportInstancesTable', { reportRows: reportInstanceRows }) %>
+               </div>
+             </div>
+           </div>
            <% } %>
 
            <div class="tab-pane fade" id="tab-documents">
@@ -749,7 +785,7 @@
   const newWrap = document.getElementById('newFilesWrap');
   const newTbody = document.getElementById('newFilesTbody');
   const wizardTabTargets = <%- isEdit
-    ? JSON.stringify(['#tab-general', '#tab-financial', '#tab-programs', '#tab-enrollments', '#tab-documents'])
+    ? JSON.stringify(['#tab-general', '#tab-financial', '#tab-programs', '#tab-enrollments', '#tab-reports', '#tab-documents'])
     : JSON.stringify(['#tab-general', '#tab-financial', '#tab-programs', '#tab-documents']) %>;
   const btnWizardPrev = document.getElementById('btnWizardPrev');
   const btnWizardNext = document.getElementById('btnWizardNext');

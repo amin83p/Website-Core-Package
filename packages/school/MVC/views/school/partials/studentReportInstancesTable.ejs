@@ -1,0 +1,84 @@
+<%
+  const rows = Array.isArray(reportRows) ? reportRows : [];
+%>
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table table-sm align-middle mb-0">
+    <thead class="table-light">
+      <tr>
+        <th class="ps-3">Template</th>
+        <th>Class</th>
+        <th>Session date</th>
+        <th>Teacher</th>
+        <th>Status</th>
+        <th class="pe-3 text-end">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!rows.length) { %>
+        <tr>
+          <td colspan="6" class="text-center text-muted py-4">No report instances found for this student.</td>
+        </tr>
+      <% } %>
+      <% rows.forEach(function(row) { %>
+        <% const status = String(row.status || '').toLowerCase(); %>
+        <% const actionsId = String(row.id || '').trim(); %>
+        <% if (!actionsId) return; %>
+        <tr>
+          <td class="ps-3">
+            <div class="fw-bold text-dark"><%= row.templateTitle || row.templateId || '-' %></div>
+            <div class="small text-muted">v<%= Number(row.templateVersion || 1) %></div>
+            <% if (row.id) { %>
+              <div class="x-small text-muted font-monospace"><%= row.id %></div>
+            <% } %>
+          </td>
+          <td>
+            <div class="fw-semibold"><%= row.classTitle || row.classId || '-' %></div>
+            <% if (row.classId && row.classTitle && row.classTitle !== row.classId) { %>
+              <div class="x-small text-muted font-monospace"><%= row.classId %></div>
+            <% } %>
+          </td>
+          <td><%= row.sessionDate || '-' %></td>
+          <td>
+            <div><%= row.teacherName || '-' %></div>
+            <% if (row.teacherId && row.teacherName && row.teacherName !== row.teacherId) { %>
+              <div class="x-small text-muted font-monospace"><%= row.teacherId %></div>
+            <% } %>
+          </td>
+          <td>
+            <span class="badge <%= status === 'submitted' ? 'bg-success' : (status === 'locked' ? 'bg-dark' : 'bg-warning text-dark') %>">
+              <%= status || '-' %>
+            </span>
+          </td>
+          <td class="table-actions text-end pe-3">
+            <div class="row-actions-wrap">
+              <button
+                type="button"
+                class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                data-row-actions-id="<%= actionsId %>"
+                title="Report Actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= actionsId %>">
+                <% if (row.openV2Url) { %>
+                  <a href="<%= row.openV2Url %>" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener noreferrer">
+                    <i class="bi bi-layout-text-window-reverse me-2"></i>Open V2
+                  </a>
+                <% } %>
+                <% if (row.openUrl) { %>
+                  <a href="<%= row.openUrl %>" class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener noreferrer">
+                    <i class="bi bi-box-arrow-up-right me-2"></i>Open
+                  </a>
+                <% } %>
+                <% if (row.classId) { %>
+                  <a href="/school/classes/edit-wizard/<%= encodeURIComponent(row.classId) %>" class="btn btn-outline-info btn-sm" target="_blank" rel="noopener noreferrer">
+                    <i class="bi bi-diagram-3 me-2"></i>Class
+                  </a>
+                <% } %>
+              </div>
+            </div>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
