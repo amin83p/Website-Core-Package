@@ -4419,6 +4419,11 @@
         enrollStudentsRailHandler = typeof handler === 'function' ? handler : null;
     }
 
+    let manageEnrollmentRailHandler = null;
+    function bindManageEnrollmentRail(handler) {
+        manageEnrollmentRailHandler = typeof handler === 'function' ? handler : null;
+    }
+
     let moveSessionsRailHandler = null;
     function bindMoveSessionsRail(handler) {
         moveSessionsRailHandler = typeof handler === 'function' ? handler : null;
@@ -5634,6 +5639,9 @@
             const action = String(actionEl.getAttribute('data-schedule-admin-action') || '').trim();
             if (action === 'enroll-students' && typeof enrollStudentsRailHandler === 'function') {
                 void enrollStudentsRailHandler();
+            }
+            if (action === 'manage-enrollment' && typeof manageEnrollmentRailHandler === 'function') {
+                void manageEnrollmentRailHandler();
             }
             if (action === 'move-enrollments' && typeof moveSessionsRailHandler === 'function') {
                 void moveSessionsRailHandler();
@@ -7991,6 +7999,19 @@ if (canLoadAllSchedules) {
             syncPartialModalFromTimelineDrafts,
             schedulePersistDraftBackup: () => { if (canDragCreateSessions) schedulePersistDraftBackup(); },
             applyScheduleSessionChangesInView
+        });
+    }
+    if (canSelectAnyPerson && typeof global.installMasterScheduleManageEnrollment === 'function') {
+        global.installMasterScheduleManageEnrollment({
+            uiAlert,
+            uiConfirm,
+            escapeHtml,
+            showBootstrapModal: showScheduleBootstrapModal,
+            hideBootstrapModal: hideScheduleBootstrapModal,
+            bindManageEnrollmentRail,
+            countActiveScheduleSelectedSessions,
+            countActiveDraftSelectedSessions,
+            getSelectedSavedClassSessionEvents
         });
     }
     if (canSelectAnyPerson && typeof global.installMasterScheduleMoveSessions === 'function') {

@@ -1,0 +1,38 @@
+<div class="modal fade" id="closePeriodModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Close Enrollment Period</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="close_periodId">
+        <div class="mb-2">
+          <label class="form-label">End Date *</label>
+          <input type="date" id="close_endDate" class="form-control">
+        </div>
+        <div class="mb-2">
+          <label class="form-label">Status</label>
+          <select id="close_status" class="form-select">
+            <option value="withdrawn">Withdrawn</option>
+            <option value="completed" selected>Completed</option>
+            <option value="cancelled">Cancelled</option>
+            <option value="archived">Archived</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label">Reason *</label>
+          <textarea id="close_reasonEnd" class="form-control" rows="2"></textarea>
+        </div>
+        <div id="close_statusPreview" class="alert alert-light border mt-3 mb-0">
+          Preview the financial effect before applying the status change.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-outline-primary btn-sm" id="btn_previewClosePeriod">Preview</button>
+        <button type="button" class="btn btn-filled btn-danger btn-sm" id="btn_confirmClosePeriod" disabled>Apply Confirmed Change</button>
+      </div>
+    </div>
+  </div>
+</div>

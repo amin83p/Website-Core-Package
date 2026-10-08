@@ -23,6 +23,7 @@ const scheduleSessionContextService = require('../../services/school/scheduleSes
 const scheduleViewerPreferencesService = require('../../services/school/scheduleViewerPreferencesService');
 const scheduleEnrollStudentsService = require('../../services/school/scheduleEnrollStudentsService');
 const scheduleMoveSessionsService = require('../../services/school/scheduleMoveSessionsService');
+const scheduleManageEnrollmentService = require('../../services/school/scheduleManageEnrollmentService');
 const scheduleMergeSessionsService = require('../../services/school/scheduleMergeSessionsService');
 const scheduleTakeOverSessionsService = require('../../services/school/scheduleTakeOverSessionsService');
 const scheduleAddCoTeacherService = require('../../services/school/scheduleAddCoTeacherService');
@@ -2848,6 +2849,49 @@ async function postMoveSessionsPreview(req, res) {
     }
 }
 
+async function postManageEnrollmentsList(req, res) {
+    try {
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        const sessions = scheduleManageEnrollmentService.parseSelectedSessions(req.body || {});
+        const data = await scheduleManageEnrollmentService.buildManageEnrollmentList({
+            sessions,
+            reqUser: req.user,
+            accessContext
+        });
+        return res.json({
+            status: 'success',
+            data,
+            actionStateId: req.actionStateId || res.getHeader?.('x-action-state-id') || ''
+        });
+    } catch (error) {
+        return res.status(400).json({
+            status: 'error',
+            message: error.message || 'Unable to list enrollments for the selected sessions.'
+        });
+    }
+}
+
+async function getManageEnrollmentFunderOptions(req, res) {
+    try {
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        const data = await scheduleManageEnrollmentService.listFunderOptionsForClass({
+            classId: req.query?.classId,
+            reqUser: req.user,
+            accessContext
+        });
+        return res.json({
+            status: 'success',
+            data,
+            actionStateId: req.actionStateId || res.getHeader?.('x-action-state-id') || ''
+        });
+    } catch (error) {
+        return res.status(400).json({
+            status: 'error',
+            message: error.message || 'Unable to load funder options.'
+        });
+    }
+}
+
 async function postMoveSessionsApply(req, res) {
     try {
         const accessContext = schoolDataService.buildRouteAccessContext(req);
@@ -3375,6 +3419,8 @@ module.exports = {
     postEnrollStudentsPrepare,
     postMoveSessionsPreview,
     postMoveSessionsApply,
+    postManageEnrollmentsList,
+    getManageEnrollmentFunderOptions,
     postMergeSessionsPreview,
     postMergeSessionsApply,
     postTakeOverSessionsPreview,

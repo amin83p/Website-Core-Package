@@ -734,6 +734,7 @@ async function executePendingEnrollmentsForCommit({
 }
 
 module.exports = {
+  loadActiveFunderOptions,
   parseSessionsFromBody,
   prepareEnrollStudents,
   checkOneOnOneSessionOccupancy,

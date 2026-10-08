@@ -1,0 +1,36 @@
+<div class="modal fade" id="scheduleManageEnrollmentModal" tabindex="-1" aria-hidden="true" aria-labelledby="scheduleManageEnrollmentModalTitle">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="scheduleManageEnrollmentModalTitle">Manage Enrollment</h5>
+          <div class="small text-muted" id="scheduleManageEnrollmentModalSubtitle">Active enrollments covering the selected sessions</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Student</th>
+                <th>Class</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Dates</th>
+                <th class="text-end">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="scheduleManageEnrollmentTbody">
+              <tr><td colspan="6" class="text-muted p-4 text-center">Select sessions and open Manage Enrollment.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_scheduleManageEnrollmentRefresh">Refresh</button>
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>

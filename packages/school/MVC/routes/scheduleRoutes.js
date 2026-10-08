@@ -137,6 +137,24 @@ router.post('/api/enroll-students/execute-pending-commit',
     allowInactiveTokenFallback: true
   }),
   ctrl.postExecutePendingEnrollmentsCommit);
+router.post('/api/manage-enrollments/list',
+  ...enrollStudentsRollingAccess,
+  trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, {
+    requireToken: false,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  ctrl.postManageEnrollmentsList);
+router.get('/api/manage-enrollments/funder-options',
+  ...enrollStudentsRollingAccess,
+  trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.READ_ALL, {
+    requireToken: false,
+    keepActive: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  ctrl.getManageEnrollmentFunderOptions);
 router.post('/api/move-sessions/preview',
   ...enrollStudentsRollingAccess,
   requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE),
