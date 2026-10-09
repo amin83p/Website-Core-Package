@@ -61,6 +61,7 @@ test('School notification centre routes, services, repositories, and views are w
   assert.match(routes, /OPERATIONS\.CONFIGURE[\s\S]*notificationCenterController\.deleteRule/);
   assert.match(routes, /router\.post\('\/rules\/:id\/run'/);
   assert.match(routes, /schedule-email/);
+  assert.match(routes, /schedule-manager-summary/);
   assert.match(routes, /\/outbox'/);
   assert.match(routes, /\/outbox\/:id\/cancel'/);
   assert.match(routes, /router\.post\('\/runs\/:id\/delete'/);
@@ -81,6 +82,7 @@ test('School notification centre routes, services, repositories, and views are w
   assert.match(ruleForm, /sections-page/);
   assert.match(ruleForm, /form-container wide/);
   assert.match(ruleForm, /formatLabel\(type\)/);
+  assert.match(ruleForm, /tab-nc-managers/);
 
   const ruleModel = readText('packages/school/MVC/models/school/notificationRuleModel.js');
   assert.match(ruleModel, /formatNotificationTokenLabel/);

@@ -12,6 +12,8 @@ const sessionStatusPolicyService = require('../../services/school/sessionStatusP
 
 const notificationCenterComposeService = require('../../services/school/notificationCenterComposeService');
 const notificationCenterEmailComposeService = require('../../services/school/notificationCenterEmailComposeService');
+const notificationCenterManagerSummaryService = require('../../services/school/notificationCenterManagerSummaryService');
+const personDisplayNameService = require('../../services/school/personDisplayNameService');
 
 const notificationRuleModel = require('../../models/school/notificationRuleModel');
 
@@ -317,7 +319,8 @@ async function showRuleForm(req, res) {
           email: { enabled: true, emailBodyMode: 'html', sendAtTime: '18:00' },
           sms: { enabled: false, sendAtTime: '18:00' }
         },
-        schedule: { autoQueueOnSchedule: false }
+        schedule: { autoQueueOnSchedule: false },
+        managerSummary: { enabled: false, recipientPersonIds: [] }
       }
 
       : await notificationCenterRuleService.getRule(orgId, ruleId, req.user);
@@ -325,6 +328,16 @@ async function showRuleForm(req, res) {
     if (!rule) throw new Error('Notification rule not found.');
 
     const isEdit = ruleId !== 'new';
+    const managerIds = Array.isArray(rule?.managerSummary?.recipientPersonIds)
+      ? rule.managerSummary.recipientPersonIds
+      : [];
+    const managerRecipients = await Promise.all(managerIds.map(async (personId) => {
+      const id = String(personId || '').trim();
+      const name = id
+        ? await personDisplayNameService.resolvePersonDisplayName(id, { fallback: id })
+        : '';
+      return { personId: id, name: name || id };
+    }));
 
     return res.render('school/notificationCenter/ruleForm', await baseView(req, res, {
 
@@ -332,7 +345,9 @@ async function showRuleForm(req, res) {
 
       isEdit,
 
-      rule
+      rule,
+
+      managerRecipients
 
     }));
 
@@ -398,6 +413,20 @@ async function saveRule(req, res) {
       || payload.activityDateWindow.enabled === true;
     payload.activityDateWindow.startDate = String(payload.activityDateWindow.startDate || '').trim().slice(0, 10);
     payload.activityDateWindow.endDate = String(payload.activityDateWindow.endDate || '').trim().slice(0, 10);
+
+    payload.managerSummary = payload.managerSummary && typeof payload.managerSummary === 'object'
+      ? payload.managerSummary
+      : {};
+    payload.managerSummary.enabled = payload.managerSummary.enabled === 'true'
+      || payload.managerSummary.enabled === true;
+    const rawManagerIds = payload.managerSummary.recipientPersonIds;
+    if (rawManagerIds !== undefined && rawManagerIds !== null) {
+      payload.managerSummary.recipientPersonIds = Array.isArray(rawManagerIds)
+        ? rawManagerIds
+        : [rawManagerIds];
+    } else {
+      payload.managerSummary.recipientPersonIds = [];
+    }
 
     const saved = await notificationCenterRuleService.saveRule(orgId, payload, req.user);
 
@@ -545,6 +574,20 @@ async function showRun(req, res) {
 
     });
 
+    const managerSummaryRows = notificationCenterManagerSummaryService.buildManagerSummaryRows(run);
+    const managerSummaryPreview = rule?.managerSummary?.enabled
+      ? await notificationCenterManagerSummaryService.buildManagerSummaryPreview({
+        run,
+        rule,
+        orgId,
+        baseUrl: notificationCenterComposeService.resolveRequestBaseUrl(req)
+      })
+      : null;
+    const defaultManagerSendAtLocal = formatMsToDateTimeLocalInput(
+      Date.now() + 3600000,
+      await notificationCenterComposeService.resolveOrgTimeZone(orgId)
+    );
+
     return res.render('school/notificationCenter/runDetail', await baseView(req, res, {
 
       title: `Run review: ${run.ruleLabel || run.id}`,
@@ -555,7 +598,13 @@ async function showRun(req, res) {
 
       presentationTree,
 
-      access
+      access,
+
+      managerSummaryRows,
+
+      managerSummaryPreview,
+
+      defaultManagerSendAtLocal
 
     }));
 
@@ -727,6 +776,46 @@ async function scheduleEmail(req, res) {
 
 
 
+async function scheduleManagerSummary(req, res) {
+  try {
+    const orgId = getActiveOrgIdOrThrow(req.user);
+    const access = await notificationCenterAccessService.buildAccessFlags(req.user, req.ip);
+    if (!access.canDispatch) throw new Error('Not authorized to schedule notification emails.');
+    const runRaw = await notificationCenterRunService.getRun(orgId, req.params.id, req.user);
+    if (!runRaw) throw new Error('Notification run not found.');
+    const run = notificationCenterRunScopeService.filterRunForViewer(runRaw, req.user, access);
+    if (!access.isAdminViewer && !(Array.isArray(run.batches) && run.batches.length)) {
+      throw new Error('Not authorized to view this notification run.');
+    }
+    const rule = await notificationCenterRuleService.getRule(orgId, run.ruleId, req.user);
+    if (!rule) throw new Error('Notification rule not found.');
+    if (rule?.managerSummary?.enabled !== true) {
+      throw new Error('Manager summary is not enabled for this rule.');
+    }
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const timeZone = await notificationCenterComposeService.resolveOrgTimeZone(orgId);
+    const sendAtIso = body.sendAtLocal
+      ? notificationCenterComposeService.parseSendAtLocalInput(body.sendAtLocal, timeZone)
+      : '';
+    const result = await notificationCenterManagerSummaryService.queueManagerSummaryForRun({
+      orgId,
+      rule,
+      run,
+      user: req.user,
+      sendAtIso,
+      baseUrl: notificationCenterComposeService.resolveRequestBaseUrl(req)
+    });
+    if (!result.queued) {
+      throw new Error('Manager summary was not queued (disabled, already sent, or managers missing email).');
+    }
+    if (wantsJson(req)) return res.json({ status: 'ok', result });
+    return res.redirect(`/school/notification-center/outbox?scheduled=1`);
+  } catch (error) {
+    if (wantsJson(req)) return res.status(400).json({ status: 'error', message: error.message });
+    return res.status(400).render('error', { title: 'Error', message: error.message, error, user: req.user });
+  }
+}
+
 async function deleteRun(req, res) {
 
   try {
@@ -890,6 +979,8 @@ module.exports = {
   showComposeEmail,
 
   scheduleEmail,
+
+  scheduleManagerSummary,
 
   showOutbox,
 

@@ -3,7 +3,7 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
-const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/notificationRules.json');
 
@@ -179,6 +179,36 @@ function normalizeChannelBlock(raw = {}) {
   };
 }
 
+function normalizeRecipientPersonIds(raw) {
+  let values = [];
+  if (Array.isArray(raw)) {
+    values = raw;
+  } else if (raw !== undefined && raw !== null && String(raw).trim() !== '') {
+    values = [raw];
+  }
+  return [...new Set(
+    values
+      .map((value) => toPublicId(value))
+      .filter(Boolean)
+  )];
+}
+
+function normalizeManagerSummary(raw = {}) {
+  const input = isPlainObject(raw) ? raw : {};
+  const enabled = normalizeBoolean(input.enabled, false);
+  const recipientPersonIds = normalizeRecipientPersonIds(input.recipientPersonIds);
+  if (enabled && !recipientPersonIds.length) {
+    throw new Error('Select at least one manager recipient when manager summary is enabled.');
+  }
+  return {
+    enabled,
+    recipientPersonIds,
+    subjectTemplate: cleanString(input.subjectTemplate, { max: 500, allowEmpty: true }),
+    bodyTextTemplate: cleanString(input.bodyTextTemplate, { max: 20000, allowEmpty: true }),
+    bodyHtmlTemplate: cleanString(input.bodyHtmlTemplate, { max: 20000, allowEmpty: true })
+  };
+}
+
 function normalizeChannels(raw = {}) {
   const input = isPlainObject(raw) ? raw : {};
   const emailInput = isPlainObject(input.email) ? input.email : {};
@@ -347,7 +377,8 @@ function sanitizeRuleInput(input, { isUpdate = false } = {}) {
     channels: normalizeChannels(input.channels),
     schedule: normalizeSchedule(input.schedule),
     activityDateWindow: normalizeActivityDateWindow(input.activityDateWindow),
-    alsoCreateTask: normalizeBoolean(input.alsoCreateTask, false)
+    alsoCreateTask: normalizeBoolean(input.alsoCreateTask, false),
+    managerSummary: normalizeManagerSummary(input.managerSummary)
   };
   applyNotificationTimingToChannels(out);
   if (!isUpdate && !out.orgId) throw new Error('Organization is required.');
@@ -468,6 +499,8 @@ module.exports = {
   normalizeEmailBodyMode,
   normalizeCriteria,
   normalizeSchedule,
+  normalizeManagerSummary,
+  normalizeRecipientPersonIds,
   getAllNotificationRules,
   getNotificationRuleById,
   addNotificationRule,

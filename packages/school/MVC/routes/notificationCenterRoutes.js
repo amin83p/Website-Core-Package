@@ -95,4 +95,11 @@ router.post('/runs/:id/schedule-email',
   notificationCenterController.scheduleEmail
 );
 
+router.post('/runs/:id/schedule-manager-summary',
+  requireAuth,
+  requireNotificationCenterOperation(OPERATIONS.UPLOAD),
+  trackActionState(SECTION, OPERATIONS.UPLOAD, { requireToken: false, keepActive: true }),
+  notificationCenterController.scheduleManagerSummary
+);
+
 module.exports = router;

@@ -23,7 +23,13 @@ const PLACEHOLDER_DEFINITIONS = Object.freeze([
   { token: 'SESSION_LIST_HTML', description: 'HTML table of sessions (for HTML body).' },
   { token: 'ITEM_LIST', description: 'Plain bullet list of item titles (non-session rules).' },
   { token: 'ITEM_LIST_HTML', description: 'HTML bullet list of item titles.' },
-  { token: 'APP_NAME', description: 'Application display name from branding.' }
+  { token: 'APP_NAME', description: 'Application display name from branding.' },
+  { token: 'MANAGER_NAME', description: 'Manager recipient display name (manager summary).' },
+  { token: 'TEACHER_SUMMARY_LIST', description: 'Plain-text teacher name and item count table (manager summary).' },
+  { token: 'TEACHER_SUMMARY_LIST_HTML', description: 'HTML teacher name and item count table (manager summary).' },
+  { token: 'TEACHER_COUNT', description: 'Number of teachers in the run (manager summary).' },
+  { token: 'TOTAL_ITEM_COUNT', description: 'Total items across all teachers (manager summary).' },
+  { token: 'RUN_DATE', description: 'Run as-of date (manager summary).' }
 ]);
 
 function cleanText(value) {

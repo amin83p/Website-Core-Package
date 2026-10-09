@@ -31,6 +31,7 @@
   timingMode = timingModes.includes(timingMode) ? timingMode : 'daily_digest';
   const sessionRangeType = row.criteria?.sessionDateRange?.type || 'this_week';
   const daysBeforeToday = row.criteria?.sessionDateRange?.daysBeforeToday ?? '';
+  const managerSummaryCfg = row.managerSummary && typeof row.managerSummary === 'object' ? row.managerSummary : {};
 %>
 
 <div class="sections-page">
@@ -66,6 +67,9 @@
         </li>
         <li class="nav-item" role="presentation">
           <button class="nav-link" type="button" data-bs-toggle="tab" data-bs-target="#tab-nc-criteria" role="tab" aria-controls="tab-nc-criteria" aria-selected="false">Criteria</button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" type="button" data-bs-toggle="tab" data-bs-target="#tab-nc-managers" role="tab" aria-controls="tab-nc-managers" aria-selected="false">Managers</button>
         </li>
       </ul>
 
@@ -286,6 +290,58 @@
             </div>
           </div>
         </div>
+
+        <div class="tab-pane fade" id="tab-nc-managers" role="tabpanel">
+          <p class="small text-muted mb-3">Managers receive a compact email with each teacher’s name and item count only. Teacher emails remain detailed. After <strong>scheduled auto-queue</strong> dispatches teacher messages, manager summaries are queued automatically. For manual runs, expand <strong>Manager summary email</strong> on run review and schedule from there.</p>
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body">
+              <h6 class="fw-bold text-primary m-0 mb-3"><i class="bi bi-people me-1"></i>Manager summary email</h6>
+              <div class="form-check form-switch mb-3">
+                <input class="form-check-input" type="checkbox" role="switch" id="managerSummaryEnabled" name="rule[managerSummary][enabled]" value="true" <%= managerSummaryCfg.enabled === true ? 'checked' : '' %>>
+                <label class="form-check-label" for="managerSummaryEnabled">Enable manager summary for this rule</label>
+              </div>
+              <div class="mb-3">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                  <label class="form-label mb-0">Manager recipients</label>
+                  <button type="button" class="btn btn-outline-primary btn-sm" id="btnNcAddManager"><i class="bi bi-person-plus me-1"></i>Add manager</button>
+                </div>
+                <ul class="list-group list-group-flush border rounded" id="ncManagerRecipientList">
+                  <% const managerRecipientRows = Array.isArray(managerRecipients) && managerRecipients.length
+                    ? managerRecipients
+                    : (Array.isArray(managerSummaryCfg.recipientPersonIds)
+                      ? managerSummaryCfg.recipientPersonIds.map((id) => ({ personId: String(id || ''), name: String(id || '') }))
+                      : []); %>
+                  <% if (!managerRecipientRows.length) { %>
+                    <li class="list-group-item text-muted small py-3" id="ncManagerRecipientEmpty">No managers selected.</li>
+                  <% } %>
+                  <% managerRecipientRows.forEach((recipient) => { %>
+                    <li class="list-group-item d-flex align-items-center justify-content-between gap-2 nc-manager-recipient-row" data-person-id="<%= recipient.personId %>">
+                      <div>
+                        <div class="fw-semibold"><%= recipient.name || recipient.personId %></div>
+                        <div class="x-small text-muted font-monospace"><%= recipient.personId %></div>
+                      </div>
+                      <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2 nc-manager-remove" title="Remove" aria-label="Remove manager"><i class="bi bi-x-lg"></i></button>
+                      <input type="hidden" name="rule[managerSummary][recipientPersonIds][]" value="<%= recipient.personId %>">
+                    </li>
+                  <% }); %>
+                </ul>
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="managerSummarySubjectTemplate">Subject template (optional)</label>
+                <input class="form-control font-monospace size-md" type="text" id="managerSummarySubjectTemplate" name="rule[managerSummary][subjectTemplate]" value="<%= managerSummaryCfg.subjectTemplate || '' %>" maxlength="500" placeholder="{{RULE_LABEL}} — manager summary ({{TEACHER_COUNT}} teachers, {{TOTAL_ITEM_COUNT}} items)">
+              </div>
+              <div class="mb-3">
+                <label class="form-label" for="managerSummaryBodyTextTemplate">Plain body template (optional)</label>
+                <textarea class="form-control font-monospace size-md" id="managerSummaryBodyTextTemplate" name="rule[managerSummary][bodyTextTemplate]" rows="6" maxlength="20000" placeholder="Hi {{MANAGER_NAME}},&#10;&#10;{{TEACHER_SUMMARY_LIST}}"><%= managerSummaryCfg.bodyTextTemplate || '' %></textarea>
+              </div>
+              <div class="mb-0">
+                <label class="form-label" for="managerSummaryBodyHtmlTemplate">HTML body template (optional)</label>
+                <textarea class="form-control font-monospace size-md" id="managerSummaryBodyHtmlTemplate" name="rule[managerSummary][bodyHtmlTemplate]" rows="6" maxlength="20000" placeholder="{{TEACHER_SUMMARY_LIST_HTML}}"><%= managerSummaryCfg.bodyHtmlTemplate || '' %></textarea>
+                <div class="form-text small">Use manager summary placeholders listed under Email templates on the General tab.</div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="button-row mt-4 pt-3 border-top d-flex flex-wrap align-items-center gap-2">
@@ -306,11 +362,94 @@
   </div>
 </div>
 
+<%- include('partials/modal_GenericPicker', { user }) %>
+
 <script>
 (function () {
   const form = document.getElementById('notificationRuleForm');
   const enabled = document.getElementById('scheduleEnabled');
   const weekdayWrap = document.getElementById('ncScheduleWeekdays');
+  const managerList = document.getElementById('ncManagerRecipientList');
+  const managerEmpty = document.getElementById('ncManagerRecipientEmpty');
+  const managerEnabled = document.getElementById('managerSummaryEnabled');
+  const btnAddManager = document.getElementById('btnNcAddManager');
+
+  function escapeManagerHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function syncManagerEmptyState() {
+    if (!managerList || !managerEmpty) return;
+    const hasRows = managerList.querySelectorAll('.nc-manager-recipient-row').length > 0;
+    managerEmpty.classList.toggle('d-none', hasRows);
+  }
+
+  function addManagerRecipient(person) {
+    if (!managerList || !person) return;
+    const personId = String(person.id || person.personId || '').trim();
+    if (!personId) return;
+    if (managerList.querySelector(`.nc-manager-recipient-row[data-person-id="${personId}"]`)) return;
+    const name = String(person.displayName || person.name || person.label || personId).trim();
+    const li = document.createElement('li');
+    li.className = 'list-group-item d-flex align-items-center justify-content-between gap-2 nc-manager-recipient-row';
+    li.dataset.personId = personId;
+    li.innerHTML = `<div><div class="fw-semibold">${escapeManagerHtml(name)}</div><div class="x-small text-muted font-monospace">${escapeManagerHtml(personId)}</div></div>`
+      + `<button type="button" class="btn btn-outline-danger btn-sm py-0 px-2 nc-manager-remove" title="Remove" aria-label="Remove manager"><i class="bi bi-x-lg"></i></button>`
+      + `<input type="hidden" name="rule[managerSummary][recipientPersonIds][]" value="${escapeManagerHtml(personId)}">`;
+    managerList.appendChild(li);
+    syncManagerEmptyState();
+  }
+
+  managerList?.addEventListener('click', (event) => {
+    const removeBtn = event.target.closest('.nc-manager-remove');
+    if (!removeBtn) return;
+    removeBtn.closest('.nc-manager-recipient-row')?.remove();
+    syncManagerEmptyState();
+  });
+
+  btnAddManager?.addEventListener('click', () => {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showMessageModal({ title: 'Person picker', message: 'The person picker is not available on this page.', icon: 'warning', size: 'md' });
+      return;
+    }
+    const context = window.GenericPickerContexts?.activeOrganizationScope
+      ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+      : null;
+    const config = window.GenericPickerPresets.person({
+      title: 'Select manager',
+      icon: 'bi-person-badge',
+      apiEndpoint: '/school/schedules/api/school-person-picker',
+      placeholder: 'Search staff...',
+      searchFields: 'id,personId,displayName,name,email,roles,schoolRoles',
+      context,
+      limit: 20,
+      onSelect: (person) => addManagerRecipient(person)
+    });
+    window.GenericPicker.open(config);
+  });
+
+  form?.addEventListener('submit', (event) => {
+    if (!managerEnabled?.checked) return;
+    const rows = managerList?.querySelectorAll('.nc-manager-recipient-row') || [];
+    if (!rows.length) {
+      event.preventDefault();
+      const managersTab = document.querySelector('#notificationRuleTabs [data-bs-target="#tab-nc-managers"]');
+      if (managersTab && typeof bootstrap !== 'undefined') bootstrap.Tab.getOrCreateInstance(managersTab).show();
+      showMessageModal({
+        title: 'Managers required',
+        message: 'Add at least one manager recipient when manager summary is enabled.',
+        icon: 'warning',
+        size: 'md'
+      });
+    }
+  });
+
+  syncManagerEmptyState();
+
   if (form && enabled && weekdayWrap) {
     weekdayWrap.querySelectorAll('.nc-weekday-toggle').forEach((label) => {
       label.addEventListener('click', (event) => {

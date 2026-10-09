@@ -14,6 +14,7 @@ const {
 } = requireCoreModule('MVC/utils/timezoneUtils');
 const emailOutboxService = requireCoreModule('MVC/services/emailOutboxService');
 const smsOutboxService = requireCoreModule('MVC/services/smsOutboxService');
+const notificationCenterManagerSummaryService = require('./notificationCenterManagerSummaryService');
 
 function cleanText(value) {
   return String(value || '').trim();
@@ -199,7 +200,15 @@ async function dispatchRunBatches({ orgId, rule, run, user, logger } = {}) {
     }
   }
 
-  return { queued, skipped, batches: batches.length };
+  const managerSummary = await notificationCenterManagerSummaryService.queueManagerSummaryForRun({
+    orgId: orgKey,
+    rule,
+    run,
+    user,
+    logger
+  });
+
+  return { queued, skipped, batches: batches.length, managerSummary };
 }
 
 async function prepareScheduledRule({ orgId, ruleId, logger, now = new Date() } = {}) {

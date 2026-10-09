@@ -102,6 +102,66 @@
 
   }
 
+  .nc-run-review .nc-manager-summary-panel {
+
+    border: 1px solid var(--bs-border-color);
+
+    border-radius: 10px;
+
+    overflow: hidden;
+
+    background: #fff;
+
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+
+  }
+
+  .nc-run-review .nc-manager-summary-table thead th {
+
+    font-size: 0.75rem;
+
+    text-transform: uppercase;
+
+    letter-spacing: 0.04em;
+
+    border-bottom-width: 1px;
+
+  }
+
+  .nc-run-review .nc-manager-summary-table tbody tr:hover {
+
+    background: rgba(var(--bs-primary-rgb), 0.04);
+
+  }
+
+  .nc-run-review .nc-manager-summary-table tfoot th {
+
+    font-size: 0.875rem;
+
+  }
+
+  .nc-run-review .nc-manager-avatar {
+
+    width: 2rem;
+
+    height: 2rem;
+
+    border-radius: 50%;
+
+    background: rgba(var(--bs-primary-rgb), 0.12);
+
+    color: var(--bs-primary);
+
+    display: inline-flex;
+
+    align-items: center;
+
+    justify-content: center;
+
+    flex-shrink: 0;
+
+  }
+
 </style>
 
 
@@ -145,7 +205,102 @@
 
   </div>
 
-
+  <% if (rule?.managerSummary?.enabled === true && (managerSummaryRows || []).length) {
+    const managerRecipientCount = Array.isArray(rule.managerSummary.recipientPersonIds)
+      ? rule.managerSummary.recipientPersonIds.length
+      : 0;
+    const managerTotalItems = (managerSummaryRows || []).reduce((sum, row) => sum + Number(row.itemCount || 0), 0);
+    const managerPreviewSubject = managerSummaryPreview?.subject || '';
+    const managerPreviewPlain = managerSummaryPreview?.plainText || '';
+  %>
+    <div class="accordion nc-teacher-accordion mb-3" id="ncManagerSummaryAccordion">
+      <div class="accordion-item border-0 shadow-sm mb-3">
+        <h2 class="accordion-header" id="ncManagerSummaryHeading">
+          <button class="accordion-button collapsed py-3" type="button"
+            data-bs-toggle="collapse"
+            data-bs-target="#ncManagerSummaryCollapse"
+            aria-expanded="false"
+            aria-controls="ncManagerSummaryCollapse">
+            <span class="d-flex flex-wrap align-items-center justify-content-between w-100 gap-2 pe-2">
+              <span>
+                <i class="bi bi-people me-2 text-primary"></i>Manager summary email
+                <span class="badge bg-light text-dark border ms-2"><%= managerSummaryRows.length %> teacher(s)</span>
+                <span class="badge bg-light text-dark border ms-1"><%= managerTotalItems %> item(s)</span>
+                <% if (managerRecipientCount) { %>
+                  <span class="badge bg-primary-subtle text-primary border ms-1"><%= managerRecipientCount %> manager(s)</span>
+                <% } %>
+              </span>
+              <span class="nc-ribbon-meta text-muted d-none d-md-inline">Expand to review summary and schedule email</span>
+            </span>
+          </button>
+        </h2>
+        <div id="ncManagerSummaryCollapse" class="accordion-collapse collapse" aria-labelledby="ncManagerSummaryHeading" data-bs-parent="#ncManagerSummaryAccordion">
+          <div class="accordion-body p-0 bg-white">
+            <% if (access?.canDispatch) { %>
+              <div class="px-3 py-2 border-bottom d-flex flex-wrap gap-2 justify-content-between align-items-center">
+                <span class="small text-muted">Managers receive teacher names and item counts only. Teacher emails below remain detailed.</span>
+                <div class="nc-teacher-actions">
+                  <button type="button" class="btn btn-primary btn-sm" id="ncOpenManagerSummaryModalBtn">
+                    <i class="bi bi-envelope-plus me-1"></i> Schedule manager summary
+                  </button>
+                </div>
+              </div>
+            <% } else { %>
+              <div class="px-3 py-2 border-bottom">
+                <span class="small text-muted">Managers receive teacher names and item counts only. Teacher emails below remain detailed.</span>
+              </div>
+            <% } %>
+            <div class="p-3">
+              <h6 class="small fw-bold text-uppercase text-muted mb-3">Run summary</h6>
+              <div class="nc-manager-summary-panel">
+                <div class="table-responsive">
+                  <table class="table table-hover align-middle mb-0 nc-manager-summary-table">
+                    <thead class="table-light">
+                      <tr>
+                        <th class="ps-3 py-2">Teacher</th>
+                        <th class="text-end pe-3 py-2" style="width: 7rem;">Items</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <% managerSummaryRows.forEach((row) => { %>
+                        <tr>
+                          <td class="ps-3">
+                            <span class="d-inline-flex align-items-center gap-2">
+                              <span class="nc-manager-avatar" aria-hidden="true"><i class="bi bi-person-workspace"></i></span>
+                              <span class="fw-medium"><%= row.name %></span>
+                            </span>
+                          </td>
+                          <td class="text-end pe-3">
+                            <span class="badge rounded-pill bg-primary-subtle text-primary border border-primary-subtle px-3"><%= row.itemCount %></span>
+                          </td>
+                        </tr>
+                      <% }); %>
+                    </tbody>
+                    <tfoot class="table-light">
+                      <tr>
+                        <th class="ps-3 py-2 fw-semibold">Total</th>
+                        <th class="text-end pe-3 py-2">
+                          <span class="badge rounded-pill bg-primary text-white px-3"><%= managerTotalItems %></span>
+                        </th>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <% if (access?.canDispatch) { %>
+      <%- include('partials/managerSummaryScheduleModal', {
+        managerPreviewSubject,
+        managerPreviewPlain,
+        managerRecipientCount,
+        defaultManagerSendAtLocal: typeof defaultManagerSendAtLocal !== 'undefined' ? defaultManagerSendAtLocal : ''
+      }) %>
+    <% } %>
+  <% } %>
 
   <% if (!teachers.length) { %>
 
@@ -377,7 +532,6 @@
 <% if (access?.canDispatch && rule?.channels?.email?.enabled !== false) { %>
   <%- include('partials/composeEmailModal') %>
 <% } %>
-
 
 
 <script>
@@ -709,6 +863,74 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
 
+
+  const managerModalEl = document.getElementById('ncManagerScheduleModal');
+  const managerModal = managerModalEl && window.bootstrap?.Modal ? window.bootstrap.Modal.getOrCreateInstance(managerModalEl) : null;
+  const managerOpenBtn = document.getElementById('ncOpenManagerSummaryModalBtn');
+  const managerSummarySubmit = document.getElementById('ncScheduleManagerSummarySubmit');
+  const managerSummaryError = document.getElementById('ncManagerSummaryError');
+  const managerSummarySendAt = document.getElementById('ncManagerSummarySendAt');
+  const managerSummaryPreviewFrame = document.getElementById('ncManagerSummaryPreviewFrame');
+  const managerPreviewHtml = <%- JSON.stringify((rule?.managerSummary?.enabled && (managerSummaryRows || []).length) ? (managerSummaryPreview?.htmlBody || '') : '') %>;
+
+  function setManagerSummaryPreviewHtml(html) {
+    if (!managerSummaryPreviewFrame) return;
+    managerSummaryPreviewFrame.srcdoc = String(html || '');
+  }
+
+  function openManagerSummaryModal() {
+    if (!managerModal) return;
+    managerSummaryError?.classList.add('d-none');
+    managerSummaryError.textContent = '';
+    setManagerSummaryPreviewHtml(managerPreviewHtml);
+    managerModal.show();
+  }
+
+  managerOpenBtn?.addEventListener('click', openManagerSummaryModal);
+
+  document.getElementById('ncManagerPreviewHtmlTab')?.addEventListener('shown.bs.tab', () => {
+    setManagerSummaryPreviewHtml(managerPreviewHtml);
+  });
+
+  async function scheduleManagerSummary() {
+    if (!managerSummarySubmit) return;
+    managerSummarySubmit.disabled = true;
+    managerSummaryError?.classList.add('d-none');
+    const params = new URLSearchParams();
+    if (actionStateId) params.set('actionStateId', actionStateId);
+    if (managerSummarySendAt?.value) params.set('sendAtLocal', managerSummarySendAt.value);
+    try {
+      const response = await fetch(`/school/notification-center/runs/${encodeURIComponent(runId)}/schedule-manager-summary`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'X-AJAX-Request': 'true',
+          'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+        },
+        body: params.toString()
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.status !== 'ok') {
+        throw new Error(payload.message || 'Could not schedule manager summary.');
+      }
+      managerModal?.hide();
+      window.showMessageModal?.({
+        title: 'Manager summary scheduled',
+        icon: 'success',
+        message: 'Manager summary email(s) were added to the scheduled outbox. <a href="/school/notification-center/outbox?scheduled=1">View scheduled emails</a>.',
+        buttons: [{ text: 'OK', class: 'btn-primary' }]
+      });
+    } catch (error) {
+      if (managerSummaryError) {
+        managerSummaryError.textContent = error.message || 'Could not schedule manager summary.';
+        managerSummaryError.classList.remove('d-none');
+      }
+    } finally {
+      managerSummarySubmit.disabled = false;
+    }
+  }
+
+  managerSummarySubmit?.addEventListener('click', scheduleManagerSummary);
 
   updateCount();
 
