@@ -1,0 +1,71 @@
+{
+  "completedStatusLabel": "Completed",
+  "shots": [
+    {
+      "file": "01-dashboard-open-my-schedule.png",
+      "slide": 3,
+      "title": "School dashboard",
+      "hint": "My Schedule Overview card and Open My Schedule button"
+    },
+    {
+      "file": "02-schedule-overview-full.png",
+      "slide": 4,
+      "title": "Schedule Overview",
+      "hint": "Full page: heading, summary, Session Details table"
+    },
+    {
+      "file": "03-filters-anchor-period-load.png",
+      "slide": 5,
+      "title": "Filters",
+      "hint": "Anchor Date, period chip (e.g. Weekly), Load button"
+    },
+    {
+      "file": "04-session-details-table.png",
+      "slide": 6,
+      "title": "Session Details",
+      "hint": "Multiple rows with Status and Role columns"
+    },
+    {
+      "file": "05-open-manage-session.png",
+      "slide": 7,
+      "title": "Open session",
+      "hint": "Row click and Manage Session header"
+    },
+    {
+      "file": "06-manage-session-map.png",
+      "slide": 8,
+      "title": "Manage Session layout",
+      "hint": "Sidebar, Session status, Save session"
+    },
+    {
+      "file": "07-attendance-panel.png",
+      "slide": 9,
+      "title": "Attendance",
+      "hint": "Roster with attendance marks (blur student names)"
+    },
+    {
+      "file": "08-session-notes.png",
+      "slide": 9,
+      "title": "Session & notes",
+      "hint": "Notes area with sample text"
+    },
+    {
+      "file": "09-session-status-picker.png",
+      "slide": 11,
+      "title": "Session status",
+      "hint": "Status picker with Completed selected"
+    },
+    {
+      "file": "10-session-completed-check.png",
+      "slide": 11,
+      "title": "Session completed",
+      "hint": "Check mark on Manage Session title after save"
+    },
+    {
+      "file": "11-verify-schedule-overview.png",
+      "slide": 12,
+      "title": "Verify on schedule",
+      "hint": "Same row showing Completed status after refresh"
+    }
+  ]
+}
