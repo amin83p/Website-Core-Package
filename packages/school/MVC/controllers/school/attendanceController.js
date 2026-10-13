@@ -268,9 +268,12 @@ function resolveDateWindow({ sessions = [], startDate = '', endDate = '', orgTod
 
 function historicalRosterPeriodOverlapsWindow(period, windowStart, windowEnd) {
     const status = String(period?.status || '').trim().toLowerCase();
-    if (!classEnrollmentReadService.HISTORICAL_ROLLING_ROSTER_STATUSES.includes(status)) return false;
+    const historical = classEnrollmentReadService.HISTORICAL_ROLLING_ROSTER_STATUSES.includes(status);
+    const withdrawnScheduledClose = status === 'withdrawn'
+        && classEnrollmentSessionApplicabilityService.isManualScheduledCloseForAttendance(period);
+    if (!historical && !withdrawnScheduledClose) return false;
     const start = normalizeDateOnly(period?.startDate);
-    const end = normalizeDateOnly(period?.endDate) || '9999-12-31';
+    const end = classEnrollmentSessionApplicabilityService.periodEffectiveEndDate(period) || '9999-12-31';
     const ws = normalizeDateOnly(windowStart);
     const we = normalizeDateOnly(windowEnd);
     if (!start || !ws || !we) return false;
@@ -311,7 +314,7 @@ async function resolveAttendanceEnrollmentWindow({ classData, session, studentPe
         personId: studentPersonId,
         session,
         activeOrgId: String(classData?.orgId || reqUser?.activeOrgId || '').trim(),
-        allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES
+        allowedStatuses: classEnrollmentSessionApplicabilityService.ROLLING_ATTENDANCE_WINDOW_STATUSES
     });
 }
 
@@ -758,7 +761,7 @@ async function buildAttendanceMatrixPayload(req, options = {}) {
                 activeOrgId,
                 orgId: classData?.orgId || activeOrgId,
                 reqUser: req.user,
-                allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES,
+                allowedStatuses: classEnrollmentSessionApplicabilityService.ROLLING_ATTENDANCE_WINDOW_STATUSES,
                 forceNotApplicableSessionKeys
             });
             rollingApplicability.personIds.forEach((personId) => activePersonIds.add(String(personId || '').trim()));
@@ -872,7 +875,7 @@ async function buildAttendanceMatrixPayload(req, options = {}) {
                     personId: stu.personId,
                     session: ses,
                     activeOrgId,
-                    allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES
+                    allowedStatuses: classEnrollmentSessionApplicabilityService.ROLLING_ATTENDANCE_WINDOW_STATUSES
                 }));
             }
             return enrollmentWindowStateByKey.get(key);

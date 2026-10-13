@@ -688,21 +688,31 @@
     line-height: 1.2;
     min-width: 6.5rem;
   }
-  .rolling-enrollment-page .rolling-completion-primary {
+  .rolling-enrollment-page .rolling-completion-date-block {
     display: block;
     width: 100%;
+    white-space: nowrap;
+  }
+  .rolling-enrollment-page .rolling-completion-date-kind {
+    display: block;
+    font-size: 0.62rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--bs-secondary);
+    line-height: 1.1;
+  }
+  .rolling-enrollment-page .rolling-completion-primary .rolling-completion-date-value {
     font-size: 0.95rem;
     font-weight: 700;
     color: var(--bs-body-color);
-    white-space: nowrap;
+    line-height: 1.2;
   }
-  .rolling-enrollment-page .rolling-completion-closing {
-    display: block;
-    width: 100%;
+  .rolling-enrollment-page .rolling-completion-closing .rolling-completion-date-value {
     font-size: 0.78rem;
     font-weight: 600;
     color: var(--bs-body-color);
-    white-space: nowrap;
+    line-height: 1.2;
   }
   .rolling-enrollment-page .rolling-completion-closed-on {
     display: block;
@@ -10474,6 +10484,29 @@
     return Boolean(normalizeEnrollmentDateOnly(snap?.closedEndDate) || (terminalClose && closingDate));
   }
 
+  function rowIsAutomaticallyCompletedTargetPeriod(row = {}) {
+    const status = String(row?.status || '').trim().toLowerCase();
+    const reason = String(row?.completionReason || '').trim().toLowerCase();
+    const targetSessionCount = Number.parseInt(String(row?.targetSessionCount || ''), 10);
+    const targetHours = Number(row?.targetHours || 0);
+    const hasCap = (Number.isFinite(targetSessionCount) && targetSessionCount > 0) || targetHours > 0;
+    return hasCap
+      && status === 'completed'
+      && (reason === 'target_session_count_reached' || reason === 'target_hours_reached');
+  }
+
+  function rowIsManualScheduledCloseForAttendance(row = {}) {
+    const status = String(row?.status || '').trim().toLowerCase();
+    if (status !== 'completed' && status !== 'withdrawn') return false;
+    if (rowIsAutomaticallyCompletedTargetPeriod(row)) return false;
+    return rowHasScheduledEnrollmentClose(row);
+  }
+
+  function shouldSuppressTargetCompletionDateForDisplay(row = {}, completionDate = '', closingDate = '') {
+    if (!completionDate || !closingDate || completionDate >= closingDate) return false;
+    return rowIsManualScheduledCloseForAttendance(row);
+  }
+
   function buildClassManageSessionHref(sessionId = '') {
     const id = String(sessionId || '').trim();
     if (!id || !classId) return '';
@@ -10517,18 +10550,34 @@
     return endDate ? htmlEscape(endDate) : 'Open';
   }
 
+  function formatCompletionLabeledDateRow(kindLabel, dateValue, blockClass) {
+    const date = String(dateValue || '').trim();
+    if (!date) return '';
+    const label = String(kindLabel || '').trim();
+    return '<div class="' + htmlEscape(blockClass) + ' rolling-completion-date-block">'
+      + '<span class="rolling-completion-date-kind">' + htmlEscape(label) + '</span>'
+      + '<span class="rolling-completion-date-value">' + htmlEscape(date) + '</span>'
+      + '</div>';
+  }
+
   function formatEnrollmentCompletionCell(row = {}, completion = null) {
     const closingDate = resolveScheduledClosingDateForRow(row);
     const showClosing = rowHasScheduledEnrollmentClose(row) && Boolean(closingDate);
     const completionDate = String(completion?.date || '').trim();
     const lines = [];
 
-    const primaryDate = completionDate || (showClosing ? closingDate : '');
-    if (primaryDate) {
-      lines.push('<div class="rolling-completion-primary">' + htmlEscape(primaryDate) + '</div>');
+    const suppressTargetCompletion = shouldSuppressTargetCompletionDateForDisplay(row, completionDate, closingDate);
+    const showCompletingSessionDate = Boolean(completionDate && !suppressTargetCompletion);
+    const primaryDate = showCompletingSessionDate
+      ? completionDate
+      : (showClosing ? closingDate : completionDate);
+    if (showCompletingSessionDate) {
+      lines.push(formatCompletionLabeledDateRow('Completing session', completionDate, 'rolling-completion-primary'));
+    } else if (showClosing && primaryDate) {
+      lines.push(formatCompletionLabeledDateRow('Enrollment end', primaryDate, 'rolling-completion-primary'));
     }
     if (showClosing && closingDate && closingDate !== primaryDate) {
-      lines.push('<div class="rolling-completion-closing">' + htmlEscape(closingDate) + '</div>');
+      lines.push(formatCompletionLabeledDateRow('Enrollment end', closingDate, 'rolling-completion-closing'));
     }
     if (showClosing) {
       const closedOnRow = formatEnrollmentCompletionClosedOnRow(row);
@@ -10537,6 +10586,7 @@
     if (completion?.sessionId) {
       lines.push(formatCompletionSessionRow(completion));
     }
+
     if (!lines.length) return '<span class="text-muted">-</span>';
     return '<div class="rolling-completion-cell">' + lines.join('') + '</div>';
   }

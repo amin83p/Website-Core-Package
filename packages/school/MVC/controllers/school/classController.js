@@ -1424,7 +1424,7 @@ async function resolveSessionRosterPersonIds({
             activeOrgId,
             orgId: classData?.orgId || activeOrgId,
             reqUser,
-            allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES,
+            allowedStatuses: classEnrollmentSessionApplicabilityService.ROLLING_ATTENDANCE_WINDOW_STATUSES,
             forceNotApplicableSessionKeys: sessionStatusPolicyService.buildForceNotApplicableAttendanceSessionKeys(statusMapForApplicability, effectiveSessions)
         });
         const personIds = new Set();
@@ -1443,6 +1443,36 @@ async function resolveSessionRosterPersonIds({
                 applicabilityByPersonId.set(normalizedPersonId, state);
             }
         });
+
+        (Array.isArray(periodRows) ? periodRows : []).forEach((period) => {
+            if (!classEnrollmentSessionApplicabilityService.isManualScheduledCloseForAttendance(period)) return;
+            const personId = classEnrollmentSessionApplicabilityService.resolveStudentPersonId(period, studentToPersonMap);
+            if (!personId) return;
+            const window = classEnrollmentSessionApplicabilityService.resolveRollingEnrollmentWindowForPerson({
+                periodRows,
+                studentToPersonMap,
+                personId,
+                session,
+                activeOrgId,
+                allowedStatuses: classEnrollmentSessionApplicabilityService.ROLLING_ATTENDANCE_WINDOW_STATUSES
+            });
+            if (!window.withinEnrollmentWindow) return;
+            const normalizedPersonId = cleanPersonId(personId);
+            if (personIds.has(normalizedPersonId)) return;
+            const state = classEnrollmentSessionApplicabilityService.getApplicabilityState(
+                applicability.stateByKey,
+                personId,
+                session,
+                session?.sessionId || session?.id
+            ) || {
+                expected: true,
+                reason: 'date_window',
+                periodId: window.periodId
+            };
+            personIds.add(normalizedPersonId);
+            applicabilityByPersonId.set(normalizedPersonId, state);
+        });
+
         return {
             personIds,
             source: 'canonical_session_applicability',
@@ -1538,7 +1568,7 @@ async function assertSessionRosterEnrollmentWindows({
             personId,
             session,
             activeOrgId,
-            allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES
+            allowedStatuses: classEnrollmentSessionApplicabilityService.ROLLING_ATTENDANCE_WINDOW_STATUSES
         });
         return enrollmentWindow.withinEnrollmentWindow !== true;
     });

@@ -6,6 +6,9 @@ const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 const OPEN_OR_HISTORICAL_STATUSES = new Set(['active', 'planned', 'completed']);
+const ROLLING_ATTENDANCE_WINDOW_STATUSES = new Set(['active', 'planned', 'completed', 'withdrawn']);
+const TERMINAL_CLOSE_STATUSES = new Set(['completed', 'withdrawn', 'cancelled', 'archived']);
+const MANUAL_SCHEDULED_CLOSE_ATTENDANCE_STATUSES = new Set(['completed', 'withdrawn']);
 const ROLLING_DISPLAY_PERIOD_STATUSES = new Set([
   'active',
   'planned',
@@ -145,7 +148,39 @@ function isAutomaticallyCompletedTargetPeriod(period = {}) {
     && (reason === TARGET_SESSION_COMPLETION_REASON || reason === TARGET_HOURS_COMPLETION_REASON);
 }
 
+function readLastCloseSnapshot(period = {}) {
+  const summary = period?.transactionSummary;
+  const snap = summary?.lastCloseSnapshot;
+  return snap && typeof snap === 'object' ? snap : null;
+}
+
+function resolveScheduledClosingDate(period = {}) {
+  const snap = readLastCloseSnapshot(period);
+  return normalizeDateOnly(period?.endDate) || normalizeDateOnly(snap?.closedEndDate);
+}
+
+function isScheduledEnrollmentClose(period = {}) {
+  const snap = readLastCloseSnapshot(period);
+  if (normalizeDateOnly(snap?.closedEndDate)) return true;
+  const status = cleanText(period.status).toLowerCase();
+  if (!TERMINAL_CLOSE_STATUSES.has(status)) return false;
+  if (isAutomaticallyCompletedTargetPeriod(period)) return false;
+  return Boolean(normalizeDateOnly(period?.endDate));
+}
+
+function isManualScheduledCloseForAttendance(period = {}) {
+  const status = cleanText(period.status).toLowerCase();
+  if (!MANUAL_SCHEDULED_CLOSE_ATTENDANCE_STATUSES.has(status)) return false;
+  if (isAutomaticallyCompletedTargetPeriod(period)) return false;
+  return isScheduledEnrollmentClose(period);
+}
+
 function periodEffectiveEndDate(period = {}) {
+  if (isManualScheduledCloseForAttendance(period)) {
+    const closingDate = resolveScheduledClosingDate(period);
+    if (closingDate) return closingDate;
+  }
+
   const targetSessionEnrollment = hasEnrollmentCap(period);
   const endDate = normalizeDateOnly(period.endDate) || '9999-12-31';
   const completionDate = normalizeDateOnly(period.completionDate);
@@ -656,6 +691,8 @@ module.exports = {
   COUNTED_ATTENDANCE_STATUSES,
   OPEN_EDITABLE_STATUSES,
   OPEN_OR_HISTORICAL_STATUSES,
+  ROLLING_ATTENDANCE_WINDOW_STATUSES,
+  TERMINAL_CLOSE_STATUSES,
   ROLLING_DISPLAY_PERIOD_STATUSES,
   OPEN_STATUSES,
   SESSION_COUNT_POLICY,
@@ -678,6 +715,10 @@ module.exports = {
   periodEffectiveEndDate,
   periodCoversSession,
   isAutomaticallyCompletedTargetPeriod,
+  readLastCloseSnapshot,
+  resolveScheduledClosingDate,
+  isScheduledEnrollmentClose,
+  isManualScheduledCloseForAttendance,
   resolveRollingEnrollmentWindowForPerson,
   resolveRollingEnrollmentApplicability,
   resolveRollingEnrollmentApplicabilityWithLeaves,

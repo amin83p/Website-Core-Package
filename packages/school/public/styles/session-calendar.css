@@ -444,6 +444,31 @@
   display: none;
 }
 
+.session-cal-drag-preview-horizontal {
+  position: absolute;
+  top: 4px;
+  height: calc(100% - 8px);
+  background: rgba(25, 135, 84, 0.18);
+  border: 2px solid #198754;
+  border-radius: 0.35rem;
+  box-shadow: 0 0 0 1px rgba(25, 135, 84, 0.25);
+  pointer-events: none;
+  z-index: 9;
+  display: none;
+}
+
+.session-cal-day-cell.is-drag-move-target,
+.session-cal-timeline-day-row.is-drag-move-target {
+  outline: 2px solid rgba(25, 135, 84, 0.4);
+  outline-offset: -2px;
+}
+
+body.is-schedule-draft-moving [data-event-type="class_session"][data-schedule-editable="1"],
+body.is-schedule-draft-moving .is-schedule-draft[data-session-id],
+body.is-schedule-draft-moving [data-event-type="schedule_draft"][data-session-id] {
+  cursor: grabbing;
+}
+
 .session-cal-drag-info {
   position: absolute;
   left: 50%;

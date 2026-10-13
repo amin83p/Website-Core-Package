@@ -992,6 +992,141 @@
       }
       if (info) info.textContent = '';
     });
+    clearTimelineDragOverlays(container);
+    container.querySelectorAll('.session-cal-day-cell.is-drag-move-target, .session-cal-timeline-day-row.is-drag-move-target').forEach((el) => {
+      el.classList.remove('is-drag-move-target');
+    });
+  }
+
+  function clearTimelineDragOverlays(container) {
+    if (!container) return;
+    container.querySelectorAll('.session-cal-timeline-track.is-drag-active').forEach((track) => {
+      track.classList.remove('is-drag-active');
+      const preview = track.querySelector('.session-cal-drag-preview-horizontal');
+      if (preview) preview.remove();
+    });
+  }
+
+  function updateTimelineDragOverlay(track, context) {
+    if (!track || !context) return;
+    let preview = track.querySelector('.session-cal-drag-preview-horizontal');
+    if (!preview) {
+      preview = document.createElement('div');
+      preview.className = 'session-cal-drag-preview-horizontal';
+      preview.setAttribute('aria-hidden', 'true');
+      track.appendChild(preview);
+    }
+    const timelineTotalMinutes = Number(context.timelineTotalMinutes) > 0
+      ? Number(context.timelineTotalMinutes)
+      : TOTAL_MINUTES;
+    const leftPct = (context.snappedOffsetMinutes / timelineTotalMinutes) * 100;
+    const widthPct = (context.durationMinutes / timelineTotalMinutes) * 100;
+    preview.style.display = 'block';
+    preview.style.left = `${leftPct}%`;
+    preview.style.width = `${widthPct}%`;
+    track.classList.add('is-drag-active');
+    if (context.dayRow) context.dayRow.classList.add('is-drag-move-target');
+  }
+
+  function isMoveContextWithinSourceWeek(context, sourceWeekRow) {
+    if (!sourceWeekRow || !context) return false;
+    if (context.mode === 'vertical') {
+      return Boolean(context.dayCell && sourceWeekRow.contains(context.dayCell));
+    }
+    if (context.mode === 'timeline') {
+      return Boolean(context.dayRow && sourceWeekRow.contains(context.dayRow));
+    }
+    return false;
+  }
+
+  function resolveVerticalMoveContext(verticalRow, clientX, clientY, durationMinutes) {
+    if (!verticalRow) return null;
+    const rowHit = resolveDayCellFromDaysRowX(verticalRow, clientX, clientY);
+    if (!rowHit) return null;
+    const { dayCell, y, trackRect } = rowHit;
+    if (!dayCell || dayCell.classList.contains('is-out-of-range')) return null;
+    const date = normalizeDateOnly(dayCell.getAttribute('data-cal-date'));
+    if (!date) return null;
+    const weekBounds = getTimelineBoundsFromWeekRow(verticalRow.closest('.session-cal-week-row'));
+    const totalMinutes = weekBounds.totalMinutes;
+    const fixedDuration = Math.max(TIMELINE_SNAP_MINUTES, Math.round(Number(durationMinutes) || TIMELINE_SNAP_MINUTES));
+    let snappedStart = snapTimelineOffsetMinutesForClick(
+      offsetMinutesFromGridY(y, trackRect.height, weekBounds),
+      weekBounds
+    );
+    let endOffset = snappedStart + fixedDuration;
+    if (endOffset > totalMinutes) {
+      endOffset = totalMinutes;
+      snappedStart = Math.max(0, endOffset - fixedDuration);
+    }
+    const startMin = timelineMinutesFromOffset(snappedStart, weekBounds);
+    const endMin = timelineMinutesFromOffset(endOffset, weekBounds);
+    return {
+      mode: 'vertical',
+      date,
+      dayCell,
+      snappedOffsetMinutes: snappedStart,
+      endOffsetMinutes: endOffset,
+      startTime24: minutesToTime24(startMin),
+      endTime24: minutesToTime24(endMin),
+      startTimeLabel: formatSnappedTimelineLabel(snappedStart, weekBounds),
+      durationMinutes: fixedDuration,
+      durationHours: fixedDuration / 60,
+      durationLabel: formatDurationHrsMins(fixedDuration),
+      timelineTotalMinutes: totalMinutes,
+      occupied: false
+    };
+  }
+
+  function resolveTimelineMoveContext(timelineWeek, clientX, clientY, durationMinutes) {
+    if (!timelineWeek) return null;
+    const dayRows = timelineWeek.querySelectorAll('.session-cal-timeline-day-row:not(.is-out-of-range)');
+    let dayRow = null;
+    for (const row of dayRows) {
+      const rect = row.getBoundingClientRect();
+      if (clientY >= rect.top && clientY <= rect.bottom) {
+        dayRow = row;
+        break;
+      }
+    }
+    if (!dayRow) return null;
+    const date = normalizeDateOnly(dayRow.getAttribute('data-cal-date'));
+    if (!date) return null;
+    const track = dayRow.querySelector('.session-cal-timeline-track');
+    if (!track) return null;
+    const trackRect = track.getBoundingClientRect();
+    if (clientX < trackRect.left || clientX > trackRect.right) return null;
+    const weekBounds = getTimelineBoundsFromWeekRow(timelineWeek);
+    const totalMinutes = weekBounds.totalMinutes;
+    const fixedDuration = Math.max(TIMELINE_SNAP_MINUTES, Math.round(Number(durationMinutes) || TIMELINE_SNAP_MINUTES));
+    const x = clientX - trackRect.left;
+    let snappedStart = snapTimelineOffsetMinutesForClick(
+      offsetMinutesFromGridX(x, trackRect.width, weekBounds),
+      weekBounds
+    );
+    let endOffset = snappedStart + fixedDuration;
+    if (endOffset > totalMinutes) {
+      endOffset = totalMinutes;
+      snappedStart = Math.max(0, endOffset - fixedDuration);
+    }
+    const startMin = timelineMinutesFromOffset(snappedStart, weekBounds);
+    const endMin = timelineMinutesFromOffset(endOffset, weekBounds);
+    return {
+      mode: 'timeline',
+      date,
+      dayRow,
+      timelineTrack: track,
+      snappedOffsetMinutes: snappedStart,
+      endOffsetMinutes: endOffset,
+      startTime24: minutesToTime24(startMin),
+      endTime24: minutesToTime24(endMin),
+      startTimeLabel: formatSnappedTimelineLabel(snappedStart, weekBounds),
+      durationMinutes: fixedDuration,
+      durationHours: fixedDuration / 60,
+      durationLabel: formatDurationHrsMins(fixedDuration),
+      timelineTotalMinutes: totalMinutes,
+      occupied: false
+    };
   }
 
   function updateDragOverlay(dayGrid, context) {
@@ -1159,83 +1294,45 @@
       return state;
     }
 
-    function resolveMoveContext(clientX, clientY, target, durationMinutes, verticalRowHint = null) {
-      const verticalRow = verticalRowHint || target?.closest?.('.session-cal-time-track');
-      if (!verticalRow || !container.contains(verticalRow)) return null;
-      const dayGridFromTarget = target?.closest?.('.session-cal-day-grid');
-      const dayCellFromTarget = target?.closest?.('.session-cal-day-cell');
-      let dayCell = dayGridFromTarget
-        ? dayGridFromTarget.closest('.session-cal-day-cell')
-        : dayCellFromTarget;
-      let y;
-      let trackRect;
-      if (!dayCell) {
-        const rowHit = resolveDayCellFromDaysRowX(verticalRow, clientX, clientY);
-        if (!rowHit) return null;
-        dayCell = rowHit.dayCell;
-        y = rowHit.y;
-        trackRect = rowHit.trackRect;
-      } else {
-        const daysRow = verticalRow.querySelector('.session-cal-days-row');
-        if (!daysRow) return null;
-        trackRect = daysRow.getBoundingClientRect();
-        y = Math.max(0, Math.min(trackRect.height, clientY - trackRect.top));
+    function resolveMoveContextForDragState(clientX, clientY) {
+      if (!dragState) return null;
+      if (dragState.layoutMode === 'timeline') {
+        return resolveTimelineMoveContext(
+          dragState.timelineWeek,
+          clientX,
+          clientY,
+          dragState.durationMinutes
+        );
       }
-      if (!dayCell || dayCell.classList.contains('is-out-of-range')) return null;
-      const date = normalizeDateOnly(dayCell.getAttribute('data-cal-date'));
-      if (!date) return null;
-      const weekBounds = getTimelineBoundsFromWeekRow(verticalRow.closest('.session-cal-week-row'));
-      const totalMinutes = weekBounds.totalMinutes;
-      const fixedDuration = Math.max(TIMELINE_SNAP_MINUTES, Math.round(Number(durationMinutes) || TIMELINE_SNAP_MINUTES));
-      let snappedStart = snapTimelineOffsetMinutesForClick(
-        offsetMinutesFromGridY(y, trackRect.height, weekBounds),
-        weekBounds
+      return resolveVerticalMoveContext(
+        dragState.verticalRow,
+        clientX,
+        clientY,
+        dragState.durationMinutes
       );
-      let endOffset = snappedStart + fixedDuration;
-      if (endOffset > totalMinutes) {
-        endOffset = totalMinutes;
-        snappedStart = Math.max(0, endOffset - fixedDuration);
-      }
-      const startMin = timelineMinutesFromOffset(snappedStart, weekBounds);
-      const endMin = timelineMinutesFromOffset(endOffset, weekBounds);
-      return {
-        mode: 'vertical',
-        date,
-        dayCell,
-        snappedOffsetMinutes: snappedStart,
-        endOffsetMinutes: endOffset,
-        startTime24: minutesToTime24(startMin),
-        endTime24: minutesToTime24(endMin),
-        startTimeLabel: formatSnappedTimelineLabel(snappedStart, weekBounds),
-        durationMinutes: fixedDuration,
-        durationHours: fixedDuration / 60,
-        durationLabel: formatDurationHrsMins(fixedDuration),
-        timelineTotalMinutes: totalMinutes,
-        occupied: false
-      };
     }
 
     function onDocumentPointerMove(event) {
       if (!dragState || event.pointerId !== dragState.pointerId) return;
       const opts = getOptions();
       if (!opts.enabled) return;
-      clearVerticalTimeHover(container);
-      const context = resolveMoveContext(
-        event.clientX,
-        event.clientY,
-        event.target,
-        dragState.durationMinutes,
-        dragState.verticalRow
-      );
+      clearCalendarTimeHover(container);
+      clearDragOverlays(container);
+      const context = resolveMoveContextForDragState(event.clientX, event.clientY);
       if (!context) return;
       dragState.dragged = dragState.dragged
         || Math.abs(event.clientX - dragState.anchorClientX) > 5
         || Math.abs(event.clientY - dragState.anchorClientY) > 5;
       dragState.lastContext = context;
-      const dayGrid = context.dayCell?.querySelector('.session-cal-day-grid')
-        || event.target.closest('.session-cal-day-grid')
-        || dragState.dayGrid;
-      if (dayGrid) updateDragOverlay(dayGrid, context);
+      if (context.mode === 'timeline' && context.timelineTrack) {
+        updateTimelineDragOverlay(context.timelineTrack, context);
+        return;
+      }
+      const dayGrid = context.dayCell?.querySelector('.session-cal-day-grid') || dragState.dayGrid;
+      if (dayGrid) {
+        if (context.dayCell) context.dayCell.classList.add('is-drag-move-target');
+        updateDragOverlay(dayGrid, context);
+      }
     }
 
     function onDocumentPointerUp(event) {
@@ -1247,6 +1344,12 @@
       const context = state.lastContext;
       if (!context) {
         if (typeof opts.onMoveCancelled === 'function') opts.onMoveCancelled();
+        return;
+      }
+
+      if (!isMoveContextWithinSourceWeek(context, state.sourceWeekRow)) {
+        if (typeof opts.onMoveOutOfWeek === 'function') opts.onMoveOutOfWeek(context);
+        else if (typeof opts.onMoveCancelled === 'function') opts.onMoveCancelled();
         return;
       }
 
@@ -1288,36 +1391,65 @@
       if (typeof opts.canStartMove === 'function' && opts.canStartMove(sessionId, block) === false) return;
 
       const positioned = block.closest('.session-cal-positioned-session');
-      const dayGrid = block.closest('.session-cal-day-grid');
-      const dayCell = dayGrid?.closest('.session-cal-day-cell');
-      const verticalRow = block.closest('.session-cal-time-track');
-      if (!positioned || !dayGrid || !dayCell || !verticalRow) return;
+      if (!positioned) return;
 
       const startMin = Number(positioned.dataset.timelineStart);
       const endMin = Number(positioned.dataset.timelineEnd);
       if (!Number.isFinite(startMin) || !Number.isFinite(endMin)) return;
       const durationMinutes = Math.max(TIMELINE_SNAP_MINUTES, endMin - startMin);
-      const anchorSnappedOffset = snapTimelineOffsetMinutes(startMin - (TIMELINE_START_HOUR * 60));
 
-      event.preventDefault();
-      try {
-        block.setPointerCapture(event.pointerId);
-      } catch (_) {}
+      const timelineWeek = block.closest('.session-cal-timeline-time-track');
+      const verticalRow = block.closest('.session-cal-time-track');
+      const dayGrid = block.closest('.session-cal-day-grid');
+      const dayCell = dayGrid?.closest('.session-cal-day-cell');
+      const sourceWeekRow = block.closest('.session-cal-week-row');
 
-      dragState = {
-        pointerId: event.pointerId,
-        block,
-        sessionId,
-        dayGrid,
-        dayCell,
-        verticalRow,
-        anchorClientX: event.clientX,
-        anchorClientY: event.clientY,
-        anchorSnappedOffset,
-        durationMinutes,
-        dragged: false,
-        lastContext: null
-      };
+      if (timelineWeek && container.contains(timelineWeek)) {
+        event.preventDefault();
+        try {
+          block.setPointerCapture(event.pointerId);
+        } catch (_) {}
+
+        dragState = {
+          layoutMode: 'timeline',
+          pointerId: event.pointerId,
+          block,
+          sessionId,
+          timelineWeek,
+          sourceWeekRow,
+          anchorClientX: event.clientX,
+          anchorClientY: event.clientY,
+          durationMinutes,
+          dragged: false,
+          lastContext: null
+        };
+      } else if (dayGrid && dayCell && verticalRow && container.contains(verticalRow)) {
+        const anchorSnappedOffset = snapTimelineOffsetMinutes(startMin - (TIMELINE_START_HOUR * 60));
+
+        event.preventDefault();
+        try {
+          block.setPointerCapture(event.pointerId);
+        } catch (_) {}
+
+        dragState = {
+          layoutMode: 'vertical',
+          pointerId: event.pointerId,
+          block,
+          sessionId,
+          dayGrid,
+          dayCell,
+          verticalRow,
+          sourceWeekRow,
+          anchorClientX: event.clientX,
+          anchorClientY: event.clientY,
+          anchorSnappedOffset,
+          durationMinutes,
+          dragged: false,
+          lastContext: null
+        };
+      } else {
+        return;
+      }
 
       document.body.classList.add('is-schedule-draft-moving');
       const scheduleTip = document.querySelector('.sch-event-tip');
@@ -2893,6 +3025,10 @@
     checkScheduleTimeConflict,
     getSessionDate,
     clearDragOverlays,
+    clearTimelineDragOverlays,
+    resolveVerticalMoveContext,
+    resolveTimelineMoveContext,
+    isMoveContextWithinSourceWeek,
     resolveEnrollmentNaState,
     resolveEnrollmentNaStateForCap,
     isDateWithinInclusiveRange,

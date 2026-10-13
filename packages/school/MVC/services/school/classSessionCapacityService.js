@@ -268,7 +268,7 @@ async function buildRollingApplicabilityByClassId(classRows = [], {
       activeOrgId,
       orgId: classRow?.orgId || activeOrgId,
       reqUser,
-      allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES,
+      allowedStatuses: classEnrollmentSessionApplicabilityService.ROLLING_ATTENDANCE_WINDOW_STATUSES,
       forceNotApplicableSessionKeys: sessionStatusPolicyService.buildForceNotApplicableAttendanceSessionKeys(statusMap, sessions)
     });
     out.set(classId, applicability);

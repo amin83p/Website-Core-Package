@@ -45,32 +45,14 @@ function findStudentByPersonId(students = [], personId = '') {
   return (Array.isArray(students) ? students : []).find((row) => idsEqual(row?.personId, targetPersonId)) || null;
 }
 
-const TERMINAL_CLOSE_STATUSES = new Set(['completed', 'withdrawn', 'cancelled', 'archived']);
-
-function readLastCloseSnapshot(period = {}) {
-  const summary = period?.transactionSummary;
-  const snap = summary?.lastCloseSnapshot;
-  return snap && typeof snap === 'object' ? snap : null;
-}
+const readLastCloseSnapshot = classEnrollmentSessionApplicabilityService.readLastCloseSnapshot;
+const resolveScheduledClosingDate = classEnrollmentSessionApplicabilityService.resolveScheduledClosingDate;
+const isScheduledEnrollmentClose = classEnrollmentSessionApplicabilityService.isScheduledEnrollmentClose;
 
 function closedOnDateFromPeriod(period = {}) {
   const snap = readLastCloseSnapshot(period);
   if (!snap?.closedAt) return '';
   return normalizeDateOnly(snap.closedAt);
-}
-
-function resolveScheduledClosingDate(period = {}) {
-  const snap = readLastCloseSnapshot(period);
-  return normalizeDateOnly(period?.endDate) || normalizeDateOnly(snap?.closedEndDate);
-}
-
-function isScheduledEnrollmentClose(period = {}) {
-  const snap = readLastCloseSnapshot(period);
-  if (normalizeDateOnly(snap?.closedEndDate)) return true;
-  const status = String(period?.status || '').trim().toLowerCase();
-  if (!TERMINAL_CLOSE_STATUSES.has(status)) return false;
-  if (classEnrollmentSessionApplicabilityService.isAutomaticallyCompletedTargetPeriod(period)) return false;
-  return Boolean(normalizeDateOnly(period?.endDate));
 }
 
 function resolveExpectedFinishDate({ period = null, sessions = [], statusMap = {}, enrichedPeriodRow = null } = {}) {

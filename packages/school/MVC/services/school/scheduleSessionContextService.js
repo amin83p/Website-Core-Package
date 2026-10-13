@@ -148,7 +148,7 @@ async function resolveRosterResolution({
             activeOrgId,
             orgId: classData?.orgId || activeOrgId,
             reqUser,
-            allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES,
+            allowedStatuses: classEnrollmentSessionApplicabilityService.ROLLING_ATTENDANCE_WINDOW_STATUSES,
             forceNotApplicableSessionKeys: sessionStatusPolicyService.buildForceNotApplicableAttendanceSessionKeys(statusMap, sessions)
         });
         const personIds = new Set();
@@ -376,7 +376,7 @@ async function buildSessionEnrollmentList({ classId, sessionId, reqUser, asOfDat
             activeOrgId,
             orgId: classData?.orgId || activeOrgId,
             reqUser,
-            allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES,
+            allowedStatuses: classEnrollmentSessionApplicabilityService.ROLLING_ATTENDANCE_WINDOW_STATUSES,
             forceNotApplicableSessionKeys: sessionStatusPolicyService.buildForceNotApplicableAttendanceSessionKeys(statusMap, sessionsForMetrics)
         });
         const seenPersonIds = new Set();
@@ -389,7 +389,7 @@ async function buildSessionEnrollmentList({ classId, sessionId, reqUser, asOfDat
                 personId: pid,
                 session,
                 activeOrgId,
-                allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES
+                allowedStatuses: classEnrollmentSessionApplicabilityService.ROLLING_ATTENDANCE_WINDOW_STATUSES
             });
             if (enrollmentWindow.withinEnrollmentWindow !== true) return;
             seenPersonIds.add(pid);

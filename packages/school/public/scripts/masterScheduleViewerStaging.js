@@ -998,16 +998,21 @@
             applyDraftSessionResize(update);
         }
     
+        function isScheduleWeekGridDragMode(mode) {
+            return mode === 'verticalTimeline' || mode === 'timeline';
+        }
+
         function bindScheduleDragCreate(container, mode) {
             if (!container || !deps.scheduleCalendarCore?.bindCalendarDragCreate) return;
+            const weekGridDragEnabled = isScheduleWeekGridDragMode(mode) && deps.canDragCreateSessions === true;
             deps.scheduleCalendarCore.bindCalendarDragCreate(container, {
-                enabled: mode === 'verticalTimeline' && deps.canDragCreateSessions === true,
+                enabled: weekGridDragEnabled,
                 onDragComplete: openScheduleClassPickerModal,
                 setSuppressGridClick: (value) => { deps.scheduleState.suppressGridClick = value === true; }
             });
             if (deps.scheduleCalendarCore.bindCalendarDragMove) {
                 deps.scheduleCalendarCore.bindCalendarDragMove(container, {
-                    enabled: mode === 'verticalTimeline' && deps.canDragCreateSessions === true,
+                    enabled: weekGridDragEnabled,
                     blockSelector: deps.SCHEDULE_DRAGGABLE_BLOCK_SELECTOR,
                     canStartMove: (sessionId, block) => {
                         if (block?.closest?.('.session-cal-draft-resize-handle')) return false;
@@ -1022,12 +1027,18 @@
                     onMoveConflict: () => {
                         if (typeof deps.uiAlert === 'function') deps.uiAlert('That time slot conflicts with another session.', 'Move session', { icon: 'warning' });
                     },
+                    onMoveOutOfWeek: () => {
+                        if (typeof deps.uiAlert === 'function') {
+                            deps.uiAlert('Drop the session on a day in the same week row. To move to another week, use Move from the session menu.', 'Move session', { icon: 'info' });
+                        }
+                        deps.refreshScheduleActiveView();
+                    },
                     onMoveComplete: (update) => { handleScheduleBlockMoveComplete(update); }
                 });
             }
             if (deps.scheduleCalendarCore.bindCalendarDragResize) {
                 deps.scheduleCalendarCore.bindCalendarDragResize(container, {
-                    enabled: mode === 'verticalTimeline' && deps.canDragCreateSessions === true,
+                    enabled: weekGridDragEnabled,
                     canStartResize: (sessionId, block) => {
                         const ev = deps.resolveScheduleContextEventFromTarget(block) || resolveScheduleDraftEventFromTarget(block);
                         if (ev && !deps.isScheduleEventMutableUnderClassFocus(ev)) return false;

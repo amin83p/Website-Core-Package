@@ -4330,7 +4330,7 @@ async function updateEnrollmentPeriodNotes(req, res) {
         personId,
         session,
         activeOrgId: String(req.user?.activeOrgId || classData?.orgId || '').trim(),
-        allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES
+        allowedStatuses: classEnrollmentSessionApplicabilityService.ROLLING_ATTENDANCE_WINDOW_STATUSES
       });
       if (!idsEqual(window?.periodId, periodId)) {
         throw new Error('Enrollment period is not active for this session.');
