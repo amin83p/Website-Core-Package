@@ -1,0 +1,1934 @@
+{
+  "bookTitle": "Basic Tactics for Listening",
+  "suggestedTotalPages": 109,
+  "tableOfContents": [
+    {
+      "id": "basic-tactics-for-listen-h1-1-main-units-units-1-1",
+      "label": "Main Units (Units 1 - 12)",
+      "startPage": 2,
+      "endPage": 49,
+      "level": 1,
+      "sortOrder": 1
+    },
+    {
+      "id": "basic-tactics-for-listen-u01",
+      "label": "Unit 1: Introductions and Names",
+      "startPage": 2,
+      "endPage": 5,
+      "level": 2,
+      "sortOrder": 2
+    },
+    {
+      "id": "basic-tactics-for-listen-u01-topic",
+      "label": "Topic: Greetings",
+      "startPage": 2,
+      "endPage": 5,
+      "level": 3,
+      "sortOrder": 3
+    },
+    {
+      "id": "basic-tactics-for-listen-u01-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 2,
+      "endPage": 5,
+      "level": 3,
+      "sortOrder": 4
+    },
+    {
+      "id": "basic-tactics-for-listen-u01-listening-skills-i1-listening-for-names",
+      "label": "Listening for names",
+      "startPage": 2,
+      "endPage": 5,
+      "level": 4,
+      "sortOrder": 5
+    },
+    {
+      "id": "basic-tactics-for-listen-u01-listening-skills-i2-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 2,
+      "endPage": 5,
+      "level": 4,
+      "sortOrder": 6
+    },
+    {
+      "id": "basic-tactics-for-listen-u01-listening-skills-i3-listening-for-names",
+      "label": "Listening for names",
+      "startPage": 2,
+      "endPage": 5,
+      "level": 4,
+      "sortOrder": 7
+    },
+    {
+      "id": "basic-tactics-for-listen-u01-listening-skills-i4-listening-and-making",
+      "label": "Listening and making predictions",
+      "startPage": 2,
+      "endPage": 5,
+      "level": 4,
+      "sortOrder": 8
+    },
+    {
+      "id": "basic-tactics-for-listen-u01-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: Linking vowel sounds",
+      "startPage": 2,
+      "endPage": 5,
+      "level": 3,
+      "sortOrder": 9
+    },
+    {
+      "id": "basic-tactics-for-listen-u01-conversation",
+      "label": "Conversation: Meeting new people",
+      "startPage": 2,
+      "endPage": 5,
+      "level": 3,
+      "sortOrder": 10
+    },
+    {
+      "id": "basic-tactics-for-listen-u02",
+      "label": "Unit 2: Describing People",
+      "startPage": 6,
+      "endPage": 9,
+      "level": 2,
+      "sortOrder": 11
+    },
+    {
+      "id": "basic-tactics-for-listen-u02-topic",
+      "label": "Topic: Physical appearance",
+      "startPage": 6,
+      "endPage": 9,
+      "level": 3,
+      "sortOrder": 12
+    },
+    {
+      "id": "basic-tactics-for-listen-u02-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 6,
+      "endPage": 9,
+      "level": 3,
+      "sortOrder": 13
+    },
+    {
+      "id": "basic-tactics-for-listen-u02-listening-skills-i1-listening-for-topic",
+      "label": "Listening for topic",
+      "startPage": 6,
+      "endPage": 9,
+      "level": 4,
+      "sortOrder": 14
+    },
+    {
+      "id": "basic-tactics-for-listen-u02-listening-skills-i2-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 6,
+      "endPage": 9,
+      "level": 4,
+      "sortOrder": 15
+    },
+    {
+      "id": "basic-tactics-for-listen-u02-listening-skills-i3-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 6,
+      "endPage": 9,
+      "level": 4,
+      "sortOrder": 16
+    },
+    {
+      "id": "basic-tactics-for-listen-u02-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: Intonation of yes/no questions and answers",
+      "startPage": 6,
+      "endPage": 9,
+      "level": 3,
+      "sortOrder": 17
+    },
+    {
+      "id": "basic-tactics-for-listen-u02-conversation",
+      "label": "Conversation: Describing someone",
+      "startPage": 6,
+      "endPage": 9,
+      "level": 3,
+      "sortOrder": 18
+    },
+    {
+      "id": "basic-tactics-for-listen-u03",
+      "label": "Unit 3: Clothes",
+      "startPage": 10,
+      "endPage": 13,
+      "level": 2,
+      "sortOrder": 19
+    },
+    {
+      "id": "basic-tactics-for-listen-u03-topic",
+      "label": "Topic: Describing clothes",
+      "startPage": 10,
+      "endPage": 13,
+      "level": 3,
+      "sortOrder": 20
+    },
+    {
+      "id": "basic-tactics-for-listen-u03-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 10,
+      "endPage": 13,
+      "level": 3,
+      "sortOrder": 21
+    },
+    {
+      "id": "basic-tactics-for-listen-u03-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 10,
+      "endPage": 13,
+      "level": 4,
+      "sortOrder": 22
+    },
+    {
+      "id": "basic-tactics-for-listen-u03-listening-skills-i2-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 10,
+      "endPage": 13,
+      "level": 4,
+      "sortOrder": 23
+    },
+    {
+      "id": "basic-tactics-for-listen-u03-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: Plural -s endings",
+      "startPage": 10,
+      "endPage": 13,
+      "level": 3,
+      "sortOrder": 24
+    },
+    {
+      "id": "basic-tactics-for-listen-u03-conversation",
+      "label": "Conversation: Deciding what to wear",
+      "startPage": 10,
+      "endPage": 13,
+      "level": 3,
+      "sortOrder": 25
+    },
+    {
+      "id": "basic-tactics-for-listen-u04",
+      "label": "Unit 4: Routines",
+      "startPage": 14,
+      "endPage": 17,
+      "level": 2,
+      "sortOrder": 26
+    },
+    {
+      "id": "basic-tactics-for-listen-u04-topic",
+      "label": "Topic: Time and numbers",
+      "startPage": 14,
+      "endPage": 17,
+      "level": 3,
+      "sortOrder": 27
+    },
+    {
+      "id": "basic-tactics-for-listen-u04-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 14,
+      "endPage": 17,
+      "level": 3,
+      "sortOrder": 28
+    },
+    {
+      "id": "basic-tactics-for-listen-u04-listening-skills-i1-listening-for-time",
+      "label": "Listening for time",
+      "startPage": 14,
+      "endPage": 17,
+      "level": 4,
+      "sortOrder": 29
+    },
+    {
+      "id": "basic-tactics-for-listen-u04-listening-skills-i2-listening-for-number",
+      "label": "Listening for numbers",
+      "startPage": 14,
+      "endPage": 17,
+      "level": 4,
+      "sortOrder": 30
+    },
+    {
+      "id": "basic-tactics-for-listen-u04-listening-skills-i3-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 14,
+      "endPage": 17,
+      "level": 4,
+      "sortOrder": 31
+    },
+    {
+      "id": "basic-tactics-for-listen-u04-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: Syllable stress in numbers",
+      "startPage": 14,
+      "endPage": 17,
+      "level": 3,
+      "sortOrder": 32
+    },
+    {
+      "id": "basic-tactics-for-listen-u04-conversation",
+      "label": "Conversation: Talking about routines",
+      "startPage": 14,
+      "endPage": 17,
+      "level": 3,
+      "sortOrder": 33
+    },
+    {
+      "id": "basic-tactics-for-listen-u05",
+      "label": "Unit 5: Dates",
+      "startPage": 18,
+      "endPage": 21,
+      "level": 2,
+      "sortOrder": 34
+    },
+    {
+      "id": "basic-tactics-for-listen-u05-topic",
+      "label": "Topic: Calendar",
+      "startPage": 18,
+      "endPage": 21,
+      "level": 3,
+      "sortOrder": 35
+    },
+    {
+      "id": "basic-tactics-for-listen-u05-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 18,
+      "endPage": 21,
+      "level": 3,
+      "sortOrder": 36
+    },
+    {
+      "id": "basic-tactics-for-listen-u05-listening-skills-i1-listening-for-dates",
+      "label": "Listening for dates",
+      "startPage": 18,
+      "endPage": 21,
+      "level": 4,
+      "sortOrder": 37
+    },
+    {
+      "id": "basic-tactics-for-listen-u05-listening-skills-i2-listening-for-dates-",
+      "label": "Listening for dates and times",
+      "startPage": 18,
+      "endPage": 21,
+      "level": 4,
+      "sortOrder": 38
+    },
+    {
+      "id": "basic-tactics-for-listen-u05-listening-skills-i3-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 18,
+      "endPage": 21,
+      "level": 4,
+      "sortOrder": 39
+    },
+    {
+      "id": "basic-tactics-for-listen-u05-listening-skills-i4-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 18,
+      "endPage": 21,
+      "level": 4,
+      "sortOrder": 40
+    },
+    {
+      "id": "basic-tactics-for-listen-u05-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: Ordinal numbers",
+      "startPage": 18,
+      "endPage": 21,
+      "level": 3,
+      "sortOrder": 41
+    },
+    {
+      "id": "basic-tactics-for-listen-u05-conversation",
+      "label": "Conversation: Talking about dates",
+      "startPage": 18,
+      "endPage": 21,
+      "level": 3,
+      "sortOrder": 42
+    },
+    {
+      "id": "basic-tactics-for-listen-u06",
+      "label": "Unit 6: Jobs",
+      "startPage": 22,
+      "endPage": 25,
+      "level": 2,
+      "sortOrder": 43
+    },
+    {
+      "id": "basic-tactics-for-listen-u06-topic",
+      "label": "Topic: Job types",
+      "startPage": 22,
+      "endPage": 25,
+      "level": 3,
+      "sortOrder": 44
+    },
+    {
+      "id": "basic-tactics-for-listen-u06-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 22,
+      "endPage": 25,
+      "level": 3,
+      "sortOrder": 45
+    },
+    {
+      "id": "basic-tactics-for-listen-u06-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 22,
+      "endPage": 25,
+      "level": 4,
+      "sortOrder": 46
+    },
+    {
+      "id": "basic-tactics-for-listen-u06-listening-skills-i2-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 22,
+      "endPage": 25,
+      "level": 4,
+      "sortOrder": 47
+    },
+    {
+      "id": "basic-tactics-for-listen-u06-listening-skills-i3-listening-for-attitu",
+      "label": "Listening for attitudes",
+      "startPage": 22,
+      "endPage": 25,
+      "level": 4,
+      "sortOrder": 48
+    },
+    {
+      "id": "basic-tactics-for-listen-u06-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: Syllable stress in words",
+      "startPage": 22,
+      "endPage": 25,
+      "level": 3,
+      "sortOrder": 49
+    },
+    {
+      "id": "basic-tactics-for-listen-u06-conversation",
+      "label": "Conversation: A new job",
+      "startPage": 22,
+      "endPage": 25,
+      "level": 3,
+      "sortOrder": 50
+    },
+    {
+      "id": "basic-tactics-for-listen-u07",
+      "label": "Unit 7: Favorites",
+      "startPage": 26,
+      "endPage": 29,
+      "level": 2,
+      "sortOrder": 51
+    },
+    {
+      "id": "basic-tactics-for-listen-u07-topic",
+      "label": "Topic: Favorite things",
+      "startPage": 26,
+      "endPage": 29,
+      "level": 3,
+      "sortOrder": 52
+    },
+    {
+      "id": "basic-tactics-for-listen-u07-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 26,
+      "endPage": 29,
+      "level": 3,
+      "sortOrder": 53
+    },
+    {
+      "id": "basic-tactics-for-listen-u07-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 26,
+      "endPage": 29,
+      "level": 4,
+      "sortOrder": 54
+    },
+    {
+      "id": "basic-tactics-for-listen-u07-listening-skills-i2-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 26,
+      "endPage": 29,
+      "level": 4,
+      "sortOrder": 55
+    },
+    {
+      "id": "basic-tactics-for-listen-u07-listening-skills-i3-listening-for-topics",
+      "label": "Listening for topics",
+      "startPage": 26,
+      "endPage": 29,
+      "level": 4,
+      "sortOrder": 56
+    },
+    {
+      "id": "basic-tactics-for-listen-u07-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: Intonation of Wh- questions",
+      "startPage": 26,
+      "endPage": 29,
+      "level": 3,
+      "sortOrder": 57
+    },
+    {
+      "id": "basic-tactics-for-listen-u07-conversation",
+      "label": "Conversation: Favorite TV shows",
+      "startPage": 26,
+      "endPage": 29,
+      "level": 3,
+      "sortOrder": 58
+    },
+    {
+      "id": "basic-tactics-for-listen-u08",
+      "label": "Unit 8: Sports and Exercise",
+      "startPage": 30,
+      "endPage": 33,
+      "level": 2,
+      "sortOrder": 59
+    },
+    {
+      "id": "basic-tactics-for-listen-u08-topic",
+      "label": "Topic: Types of sports",
+      "startPage": 30,
+      "endPage": 33,
+      "level": 3,
+      "sortOrder": 60
+    },
+    {
+      "id": "basic-tactics-for-listen-u08-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 30,
+      "endPage": 33,
+      "level": 3,
+      "sortOrder": 61
+    },
+    {
+      "id": "basic-tactics-for-listen-u08-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 30,
+      "endPage": 33,
+      "level": 4,
+      "sortOrder": 62
+    },
+    {
+      "id": "basic-tactics-for-listen-u08-listening-skills-i2-listening-and-making",
+      "label": "Listening and making predictions",
+      "startPage": 30,
+      "endPage": 33,
+      "level": 4,
+      "sortOrder": 63
+    },
+    {
+      "id": "basic-tactics-for-listen-u08-listening-skills-i3-listening-for-freque",
+      "label": "Listening for frequency",
+      "startPage": 30,
+      "endPage": 33,
+      "level": 4,
+      "sortOrder": 64
+    },
+    {
+      "id": "basic-tactics-for-listen-u08-listening-skills-i4-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 30,
+      "endPage": 33,
+      "level": 4,
+      "sortOrder": 65
+    },
+    {
+      "id": "basic-tactics-for-listen-u08-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: Sentence stress",
+      "startPage": 30,
+      "endPage": 33,
+      "level": 3,
+      "sortOrder": 66
+    },
+    {
+      "id": "basic-tactics-for-listen-u08-conversation",
+      "label": "Conversation: Talking about sports",
+      "startPage": 30,
+      "endPage": 33,
+      "level": 3,
+      "sortOrder": 67
+    },
+    {
+      "id": "basic-tactics-for-listen-u09",
+      "label": "Unit 9: Locations",
+      "startPage": 34,
+      "endPage": 37,
+      "level": 2,
+      "sortOrder": 68
+    },
+    {
+      "id": "basic-tactics-for-listen-u09-topic",
+      "label": "Topic: Objects around the house",
+      "startPage": 34,
+      "endPage": 37,
+      "level": 3,
+      "sortOrder": 69
+    },
+    {
+      "id": "basic-tactics-for-listen-u09-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 34,
+      "endPage": 37,
+      "level": 3,
+      "sortOrder": 70
+    },
+    {
+      "id": "basic-tactics-for-listen-u09-listening-skills-i1-listening-for-locati",
+      "label": "Listening for location",
+      "startPage": 34,
+      "endPage": 37,
+      "level": 4,
+      "sortOrder": 71
+    },
+    {
+      "id": "basic-tactics-for-listen-u09-listening-skills-i2-listening-and-making",
+      "label": "Listening and making predictions",
+      "startPage": 34,
+      "endPage": 37,
+      "level": 4,
+      "sortOrder": 72
+    },
+    {
+      "id": "basic-tactics-for-listen-u09-listening-skills-i3-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 34,
+      "endPage": 37,
+      "level": 4,
+      "sortOrder": 73
+    },
+    {
+      "id": "basic-tactics-for-listen-u09-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: Contracted not",
+      "startPage": 34,
+      "endPage": 37,
+      "level": 3,
+      "sortOrder": 74
+    },
+    {
+      "id": "basic-tactics-for-listen-u09-conversation",
+      "label": "Conversation: Describing locations",
+      "startPage": 34,
+      "endPage": 37,
+      "level": 3,
+      "sortOrder": 75
+    },
+    {
+      "id": "basic-tactics-for-listen-u10",
+      "label": "Unit 10: The Family",
+      "startPage": 38,
+      "endPage": 41,
+      "level": 2,
+      "sortOrder": 76
+    },
+    {
+      "id": "basic-tactics-for-listen-u10-topic",
+      "label": "Topic: Family members",
+      "startPage": 38,
+      "endPage": 41,
+      "level": 3,
+      "sortOrder": 77
+    },
+    {
+      "id": "basic-tactics-for-listen-u10-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 38,
+      "endPage": 41,
+      "level": 3,
+      "sortOrder": 78
+    },
+    {
+      "id": "basic-tactics-for-listen-u10-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 38,
+      "endPage": 41,
+      "level": 4,
+      "sortOrder": 79
+    },
+    {
+      "id": "basic-tactics-for-listen-u10-listening-skills-i2-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 38,
+      "endPage": 41,
+      "level": 4,
+      "sortOrder": 80
+    },
+    {
+      "id": "basic-tactics-for-listen-u10-listening-skills-i3-listening-for-simila",
+      "label": "Listening for similarities",
+      "startPage": 38,
+      "endPage": 41,
+      "level": 4,
+      "sortOrder": 81
+    },
+    {
+      "id": "basic-tactics-for-listen-u10-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: Reduction of do, does, and are",
+      "startPage": 38,
+      "endPage": 41,
+      "level": 3,
+      "sortOrder": 82
+    },
+    {
+      "id": "basic-tactics-for-listen-u10-conversation",
+      "label": "Conversation: Talking about families",
+      "startPage": 38,
+      "endPage": 41,
+      "level": 3,
+      "sortOrder": 83
+    },
+    {
+      "id": "basic-tactics-for-listen-u11",
+      "label": "Unit 11: Entertainment",
+      "startPage": 42,
+      "endPage": 45,
+      "level": 2,
+      "sortOrder": 84
+    },
+    {
+      "id": "basic-tactics-for-listen-u11-topic",
+      "label": "Topic: Invitations",
+      "startPage": 42,
+      "endPage": 45,
+      "level": 3,
+      "sortOrder": 85
+    },
+    {
+      "id": "basic-tactics-for-listen-u11-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 42,
+      "endPage": 45,
+      "level": 3,
+      "sortOrder": 86
+    },
+    {
+      "id": "basic-tactics-for-listen-u11-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 42,
+      "endPage": 45,
+      "level": 4,
+      "sortOrder": 87
+    },
+    {
+      "id": "basic-tactics-for-listen-u11-listening-skills-i2-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 42,
+      "endPage": 45,
+      "level": 4,
+      "sortOrder": 88
+    },
+    {
+      "id": "basic-tactics-for-listen-u11-listening-skills-i3-listening-for-accept",
+      "label": "Listening for acceptances and refusals",
+      "startPage": 42,
+      "endPage": 45,
+      "level": 4,
+      "sortOrder": 89
+    },
+    {
+      "id": "basic-tactics-for-listen-u11-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: Reduction of the vowel sound in can",
+      "startPage": 42,
+      "endPage": 45,
+      "level": 3,
+      "sortOrder": 90
+    },
+    {
+      "id": "basic-tactics-for-listen-u11-conversation",
+      "label": "Conversation: Making invitations",
+      "startPage": 42,
+      "endPage": 45,
+      "level": 3,
+      "sortOrder": 91
+    },
+    {
+      "id": "basic-tactics-for-listen-u12",
+      "label": "Unit 12: Prices",
+      "startPage": 46,
+      "endPage": 49,
+      "level": 2,
+      "sortOrder": 92
+    },
+    {
+      "id": "basic-tactics-for-listen-u12-topic",
+      "label": "Topic: Money",
+      "startPage": 46,
+      "endPage": 49,
+      "level": 3,
+      "sortOrder": 93
+    },
+    {
+      "id": "basic-tactics-for-listen-u12-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 46,
+      "endPage": 49,
+      "level": 3,
+      "sortOrder": 94
+    },
+    {
+      "id": "basic-tactics-for-listen-u12-listening-skills-i1-listening-for-number",
+      "label": "Listening for numbers",
+      "startPage": 46,
+      "endPage": 49,
+      "level": 4,
+      "sortOrder": 95
+    },
+    {
+      "id": "basic-tactics-for-listen-u12-listening-skills-i2-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 46,
+      "endPage": 49,
+      "level": 4,
+      "sortOrder": 96
+    },
+    {
+      "id": "basic-tactics-for-listen-u12-listening-skills-i3-listening-for-compar",
+      "label": "Listening for comparisons",
+      "startPage": 46,
+      "endPage": 49,
+      "level": 4,
+      "sortOrder": 97
+    },
+    {
+      "id": "basic-tactics-for-listen-u12-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: Saying large numbers",
+      "startPage": 46,
+      "endPage": 49,
+      "level": 3,
+      "sortOrder": 98
+    },
+    {
+      "id": "basic-tactics-for-listen-u12-conversation",
+      "label": "Conversation: Talking about prices",
+      "startPage": 46,
+      "endPage": 49,
+      "level": 3,
+      "sortOrder": 99
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-2-main-units-units-13-",
+      "label": "Main Units (Units 13 - 24)",
+      "startPage": 50,
+      "endPage": 97,
+      "level": 1,
+      "sortOrder": 100
+    },
+    {
+      "id": "basic-tactics-for-listen-u13",
+      "label": "Unit 13: Restaurants",
+      "startPage": 50,
+      "endPage": 53,
+      "level": 2,
+      "sortOrder": 101
+    },
+    {
+      "id": "basic-tactics-for-listen-u13-topic",
+      "label": "Topic: Food",
+      "startPage": 50,
+      "endPage": 53,
+      "level": 3,
+      "sortOrder": 102
+    },
+    {
+      "id": "basic-tactics-for-listen-u13-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 50,
+      "endPage": 53,
+      "level": 3,
+      "sortOrder": 103
+    },
+    {
+      "id": "basic-tactics-for-listen-u13-listening-skills-i1-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 50,
+      "endPage": 53,
+      "level": 4,
+      "sortOrder": 104
+    },
+    {
+      "id": "basic-tactics-for-listen-u13-listening-skills-i2-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 50,
+      "endPage": 53,
+      "level": 4,
+      "sortOrder": 105
+    },
+    {
+      "id": "basic-tactics-for-listen-u13-listening-skills-i3-listening-for-attitu",
+      "label": "Listening for attitudes",
+      "startPage": 50,
+      "endPage": 53,
+      "level": 4,
+      "sortOrder": 106
+    },
+    {
+      "id": "basic-tactics-for-listen-u13-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: wasn't and weren't",
+      "startPage": 50,
+      "endPage": 53,
+      "level": 3,
+      "sortOrder": 107
+    },
+    {
+      "id": "basic-tactics-for-listen-u13-conversation",
+      "label": "Conversation: Talking about a meal",
+      "startPage": 50,
+      "endPage": 53,
+      "level": 3,
+      "sortOrder": 108
+    },
+    {
+      "id": "basic-tactics-for-listen-u14",
+      "label": "Unit 14: Small Talk",
+      "startPage": 54,
+      "endPage": 57,
+      "level": 2,
+      "sortOrder": 109
+    },
+    {
+      "id": "basic-tactics-for-listen-u14-topic",
+      "label": "Topic: Greetings and socializing",
+      "startPage": 54,
+      "endPage": 57,
+      "level": 3,
+      "sortOrder": 110
+    },
+    {
+      "id": "basic-tactics-for-listen-u14-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 54,
+      "endPage": 57,
+      "level": 3,
+      "sortOrder": 111
+    },
+    {
+      "id": "basic-tactics-for-listen-u14-listening-skills-i1-listening-for-greeti",
+      "label": "Listening for greetings and conversation endings",
+      "startPage": 54,
+      "endPage": 57,
+      "level": 4,
+      "sortOrder": 112
+    },
+    {
+      "id": "basic-tactics-for-listen-u14-listening-skills-i2-listening-for-topics",
+      "label": "Listening for topics",
+      "startPage": 54,
+      "endPage": 57,
+      "level": 4,
+      "sortOrder": 113
+    },
+    {
+      "id": "basic-tactics-for-listen-u14-listening-skills-i3-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 54,
+      "endPage": 57,
+      "level": 4,
+      "sortOrder": 114
+    },
+    {
+      "id": "basic-tactics-for-listen-u14-listening-skills-i4-listening-for-reacti",
+      "label": "Listening for reactions",
+      "startPage": 54,
+      "endPage": 57,
+      "level": 4,
+      "sortOrder": 115
+    },
+    {
+      "id": "basic-tactics-for-listen-u14-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: Reduction of Wh- questions",
+      "startPage": 54,
+      "endPage": 57,
+      "level": 3,
+      "sortOrder": 116
+    },
+    {
+      "id": "basic-tactics-for-listen-u14-conversation",
+      "label": "Conversation: Meeting with a friend",
+      "startPage": 54,
+      "endPage": 57,
+      "level": 3,
+      "sortOrder": 117
+    },
+    {
+      "id": "basic-tactics-for-listen-u15",
+      "label": "Unit 15: Vacations",
+      "startPage": 58,
+      "endPage": 61,
+      "level": 2,
+      "sortOrder": 118
+    },
+    {
+      "id": "basic-tactics-for-listen-u15-topic",
+      "label": "Topic: Travel",
+      "startPage": 58,
+      "endPage": 61,
+      "level": 3,
+      "sortOrder": 119
+    },
+    {
+      "id": "basic-tactics-for-listen-u15-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 58,
+      "endPage": 61,
+      "level": 3,
+      "sortOrder": 120
+    },
+    {
+      "id": "basic-tactics-for-listen-u15-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 58,
+      "endPage": 61,
+      "level": 4,
+      "sortOrder": 121
+    },
+    {
+      "id": "basic-tactics-for-listen-u15-listening-skills-i2-listening-for-attitu",
+      "label": "Listening for attitudes",
+      "startPage": 58,
+      "endPage": 61,
+      "level": 4,
+      "sortOrder": 122
+    },
+    {
+      "id": "basic-tactics-for-listen-u15-listening-skills-i3-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 58,
+      "endPage": 61,
+      "level": 4,
+      "sortOrder": 123
+    },
+    {
+      "id": "basic-tactics-for-listen-u15-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: Past tense -ed endings",
+      "startPage": 58,
+      "endPage": 61,
+      "level": 3,
+      "sortOrder": 124
+    },
+    {
+      "id": "basic-tactics-for-listen-u15-conversation",
+      "label": "Conversation: Talking about vacations",
+      "startPage": 58,
+      "endPage": 61,
+      "level": 3,
+      "sortOrder": 125
+    },
+    {
+      "id": "basic-tactics-for-listen-u16",
+      "label": "Unit 16: Apartment Living",
+      "startPage": 62,
+      "endPage": 65,
+      "level": 2,
+      "sortOrder": 126
+    },
+    {
+      "id": "basic-tactics-for-listen-u16-topic",
+      "label": "Topic: Rooms and furniture",
+      "startPage": 62,
+      "endPage": 65,
+      "level": 3,
+      "sortOrder": 127
+    },
+    {
+      "id": "basic-tactics-for-listen-u16-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 62,
+      "endPage": 65,
+      "level": 3,
+      "sortOrder": 128
+    },
+    {
+      "id": "basic-tactics-for-listen-u16-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 62,
+      "endPage": 65,
+      "level": 4,
+      "sortOrder": 129
+    },
+    {
+      "id": "basic-tactics-for-listen-u16-listening-skills-i2-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 62,
+      "endPage": 65,
+      "level": 4,
+      "sortOrder": 130
+    },
+    {
+      "id": "basic-tactics-for-listen-u16-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: Contractions of there is and there are",
+      "startPage": 62,
+      "endPage": 65,
+      "level": 3,
+      "sortOrder": 131
+    },
+    {
+      "id": "basic-tactics-for-listen-u16-conversation",
+      "label": "Conversation: Describing apartments",
+      "startPage": 62,
+      "endPage": 65,
+      "level": 3,
+      "sortOrder": 132
+    },
+    {
+      "id": "basic-tactics-for-listen-u17",
+      "label": "Unit 17: Hopes and Plans",
+      "startPage": 66,
+      "endPage": 69,
+      "level": 2,
+      "sortOrder": 133
+    },
+    {
+      "id": "basic-tactics-for-listen-u17-topic",
+      "label": "Topic: The future",
+      "startPage": 66,
+      "endPage": 69,
+      "level": 3,
+      "sortOrder": 134
+    },
+    {
+      "id": "basic-tactics-for-listen-u17-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 66,
+      "endPage": 69,
+      "level": 3,
+      "sortOrder": 135
+    },
+    {
+      "id": "basic-tactics-for-listen-u17-listening-skills-i1-listening-for-plans",
+      "label": "Listening for plans",
+      "startPage": 66,
+      "endPage": 69,
+      "level": 4,
+      "sortOrder": 136
+    },
+    {
+      "id": "basic-tactics-for-listen-u17-listening-skills-i2-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 66,
+      "endPage": 69,
+      "level": 4,
+      "sortOrder": 137
+    },
+    {
+      "id": "basic-tactics-for-listen-u17-listening-skills-i3-listening-for-certai",
+      "label": "Listening for certainty",
+      "startPage": 66,
+      "endPage": 69,
+      "level": 4,
+      "sortOrder": 138
+    },
+    {
+      "id": "basic-tactics-for-listen-u17-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: Reduction of want to, going to, hope to",
+      "startPage": 66,
+      "endPage": 69,
+      "level": 3,
+      "sortOrder": 139
+    },
+    {
+      "id": "basic-tactics-for-listen-u17-conversation",
+      "label": "Conversation: Talking about plans and hopes",
+      "startPage": 66,
+      "endPage": 69,
+      "level": 3,
+      "sortOrder": 140
+    },
+    {
+      "id": "basic-tactics-for-listen-u18",
+      "label": "Unit 18: The Weather",
+      "startPage": 70,
+      "endPage": 73,
+      "level": 2,
+      "sortOrder": 141
+    },
+    {
+      "id": "basic-tactics-for-listen-u18-topic",
+      "label": "Topic: Climate",
+      "startPage": 70,
+      "endPage": 73,
+      "level": 3,
+      "sortOrder": 142
+    },
+    {
+      "id": "basic-tactics-for-listen-u18-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 70,
+      "endPage": 73,
+      "level": 3,
+      "sortOrder": 143
+    },
+    {
+      "id": "basic-tactics-for-listen-u18-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 70,
+      "endPage": 73,
+      "level": 4,
+      "sortOrder": 144
+    },
+    {
+      "id": "basic-tactics-for-listen-u18-listening-skills-i2-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 70,
+      "endPage": 73,
+      "level": 4,
+      "sortOrder": 145
+    },
+    {
+      "id": "basic-tactics-for-listen-u18-listening-skills-i3-listening-and-making",
+      "label": "Listening and making predictions",
+      "startPage": 70,
+      "endPage": 73,
+      "level": 4,
+      "sortOrder": 146
+    },
+    {
+      "id": "basic-tactics-for-listen-u18-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: Intonation of words in a series",
+      "startPage": 70,
+      "endPage": 73,
+      "level": 3,
+      "sortOrder": 147
+    },
+    {
+      "id": "basic-tactics-for-listen-u18-conversation",
+      "label": "Conversation: Talking about the weather",
+      "startPage": 70,
+      "endPage": 73,
+      "level": 3,
+      "sortOrder": 148
+    },
+    {
+      "id": "basic-tactics-for-listen-u19",
+      "label": "Unit 19: Shopping",
+      "startPage": 74,
+      "endPage": 77,
+      "level": 2,
+      "sortOrder": 149
+    },
+    {
+      "id": "basic-tactics-for-listen-u19-topic",
+      "label": "Topic: Stores and salespeople",
+      "startPage": 74,
+      "endPage": 77,
+      "level": 3,
+      "sortOrder": 150
+    },
+    {
+      "id": "basic-tactics-for-listen-u19-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 74,
+      "endPage": 77,
+      "level": 3,
+      "sortOrder": 151
+    },
+    {
+      "id": "basic-tactics-for-listen-u19-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 74,
+      "endPage": 77,
+      "level": 4,
+      "sortOrder": 152
+    },
+    {
+      "id": "basic-tactics-for-listen-u19-listening-skills-i2-listening-and-making",
+      "label": "Listening and making predictions",
+      "startPage": 74,
+      "endPage": 77,
+      "level": 4,
+      "sortOrder": 153
+    },
+    {
+      "id": "basic-tactics-for-listen-u19-listening-skills-i3-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 74,
+      "endPage": 77,
+      "level": 4,
+      "sortOrder": 154
+    },
+    {
+      "id": "basic-tactics-for-listen-u19-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: Contrastive stress",
+      "startPage": 74,
+      "endPage": 77,
+      "level": 3,
+      "sortOrder": 155
+    },
+    {
+      "id": "basic-tactics-for-listen-u19-conversation",
+      "label": "Conversation: Talking to a salesperson",
+      "startPage": 74,
+      "endPage": 77,
+      "level": 3,
+      "sortOrder": 156
+    },
+    {
+      "id": "basic-tactics-for-listen-u20",
+      "label": "Unit 20: Describing Things",
+      "startPage": 78,
+      "endPage": 81,
+      "level": 2,
+      "sortOrder": 157
+    },
+    {
+      "id": "basic-tactics-for-listen-u20-topic",
+      "label": "Topic: Objects and possessions",
+      "startPage": 78,
+      "endPage": 81,
+      "level": 3,
+      "sortOrder": 158
+    },
+    {
+      "id": "basic-tactics-for-listen-u20-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 78,
+      "endPage": 81,
+      "level": 3,
+      "sortOrder": 159
+    },
+    {
+      "id": "basic-tactics-for-listen-u20-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 78,
+      "endPage": 81,
+      "level": 4,
+      "sortOrder": 160
+    },
+    {
+      "id": "basic-tactics-for-listen-u20-listening-skills-i2-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 78,
+      "endPage": 81,
+      "level": 4,
+      "sortOrder": 161
+    },
+    {
+      "id": "basic-tactics-for-listen-u20-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: Syllable stress in adjectives",
+      "startPage": 78,
+      "endPage": 81,
+      "level": 3,
+      "sortOrder": 162
+    },
+    {
+      "id": "basic-tactics-for-listen-u20-conversation",
+      "label": "Conversation: Describing lost items",
+      "startPage": 78,
+      "endPage": 81,
+      "level": 3,
+      "sortOrder": 163
+    },
+    {
+      "id": "basic-tactics-for-listen-u21",
+      "label": "Unit 21: Directions",
+      "startPage": 82,
+      "endPage": 85,
+      "level": 2,
+      "sortOrder": 164
+    },
+    {
+      "id": "basic-tactics-for-listen-u21-topic",
+      "label": "Topic: Streets and places",
+      "startPage": 82,
+      "endPage": 85,
+      "level": 3,
+      "sortOrder": 165
+    },
+    {
+      "id": "basic-tactics-for-listen-u21-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 82,
+      "endPage": 85,
+      "level": 3,
+      "sortOrder": 166
+    },
+    {
+      "id": "basic-tactics-for-listen-u21-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 82,
+      "endPage": 85,
+      "level": 4,
+      "sortOrder": 167
+    },
+    {
+      "id": "basic-tactics-for-listen-u21-listening-skills-i2-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 82,
+      "endPage": 85,
+      "level": 4,
+      "sortOrder": 168
+    },
+    {
+      "id": "basic-tactics-for-listen-u21-listening-skills-i3-listening-for-sequen",
+      "label": "Listening for sequence",
+      "startPage": 82,
+      "endPage": 85,
+      "level": 4,
+      "sortOrder": 169
+    },
+    {
+      "id": "basic-tactics-for-listen-u21-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: Intonation for confirming information",
+      "startPage": 82,
+      "endPage": 85,
+      "level": 3,
+      "sortOrder": 170
+    },
+    {
+      "id": "basic-tactics-for-listen-u21-conversation",
+      "label": "Conversation: Asking for directions",
+      "startPage": 82,
+      "endPage": 85,
+      "level": 3,
+      "sortOrder": 171
+    },
+    {
+      "id": "basic-tactics-for-listen-u22",
+      "label": "Unit 22: People We Know",
+      "startPage": 86,
+      "endPage": 89,
+      "level": 2,
+      "sortOrder": 172
+    },
+    {
+      "id": "basic-tactics-for-listen-u22-topic",
+      "label": "Topic: People and friends",
+      "startPage": 86,
+      "endPage": 89,
+      "level": 3,
+      "sortOrder": 173
+    },
+    {
+      "id": "basic-tactics-for-listen-u22-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 86,
+      "endPage": 89,
+      "level": 3,
+      "sortOrder": 174
+    },
+    {
+      "id": "basic-tactics-for-listen-u22-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 86,
+      "endPage": 89,
+      "level": 4,
+      "sortOrder": 175
+    },
+    {
+      "id": "basic-tactics-for-listen-u22-listening-skills-i2-listening-for-simila",
+      "label": "Listening for similarities and differences",
+      "startPage": 86,
+      "endPage": 89,
+      "level": 4,
+      "sortOrder": 176
+    },
+    {
+      "id": "basic-tactics-for-listen-u22-listening-skills-i3-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 86,
+      "endPage": 89,
+      "level": 4,
+      "sortOrder": 177
+    },
+    {
+      "id": "basic-tactics-for-listen-u22-listening-skills-i4-listening-for-opinio",
+      "label": "Listening for opinions",
+      "startPage": 86,
+      "endPage": 89,
+      "level": 4,
+      "sortOrder": 178
+    },
+    {
+      "id": "basic-tactics-for-listen-u22-listening-skills-i5-listening-for-attitu",
+      "label": "Listening for attitudes",
+      "startPage": 86,
+      "endPage": 89,
+      "level": 4,
+      "sortOrder": 179
+    },
+    {
+      "id": "basic-tactics-for-listen-u22-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: Third person -s",
+      "startPage": 86,
+      "endPage": 89,
+      "level": 3,
+      "sortOrder": 180
+    },
+    {
+      "id": "basic-tactics-for-listen-u22-conversation",
+      "label": "Conversation: Describing people",
+      "startPage": 86,
+      "endPage": 89,
+      "level": 3,
+      "sortOrder": 181
+    },
+    {
+      "id": "basic-tactics-for-listen-u23",
+      "label": "Unit 23: Places",
+      "startPage": 90,
+      "endPage": 93,
+      "level": 2,
+      "sortOrder": 182
+    },
+    {
+      "id": "basic-tactics-for-listen-u23-topic",
+      "label": "Topic: Cities and countries",
+      "startPage": 90,
+      "endPage": 93,
+      "level": 3,
+      "sortOrder": 183
+    },
+    {
+      "id": "basic-tactics-for-listen-u23-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 90,
+      "endPage": 93,
+      "level": 3,
+      "sortOrder": 184
+    },
+    {
+      "id": "basic-tactics-for-listen-u23-listening-skills-i1-listening-for-attitu",
+      "label": "Listening for attitudes",
+      "startPage": 90,
+      "endPage": 93,
+      "level": 4,
+      "sortOrder": 185
+    },
+    {
+      "id": "basic-tactics-for-listen-u23-listening-skills-i2-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 90,
+      "endPage": 93,
+      "level": 4,
+      "sortOrder": 186
+    },
+    {
+      "id": "basic-tactics-for-listen-u23-listening-skills-i3-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 90,
+      "endPage": 93,
+      "level": 4,
+      "sortOrder": 187
+    },
+    {
+      "id": "basic-tactics-for-listen-u23-listening-skills-i4-listening-for-prefer",
+      "label": "Listening for preferences",
+      "startPage": 90,
+      "endPage": 93,
+      "level": 4,
+      "sortOrder": 188
+    },
+    {
+      "id": "basic-tactics-for-listen-u23-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: Sentence stress",
+      "startPage": 90,
+      "endPage": 93,
+      "level": 3,
+      "sortOrder": 189
+    },
+    {
+      "id": "basic-tactics-for-listen-u23-conversation",
+      "label": "Conversation: City living",
+      "startPage": 90,
+      "endPage": 93,
+      "level": 3,
+      "sortOrder": 190
+    },
+    {
+      "id": "basic-tactics-for-listen-u24",
+      "label": "Unit 24: Health",
+      "startPage": 94,
+      "endPage": 97,
+      "level": 2,
+      "sortOrder": 191
+    },
+    {
+      "id": "basic-tactics-for-listen-u24-topic",
+      "label": "Topic: Illnesses",
+      "startPage": 94,
+      "endPage": 97,
+      "level": 3,
+      "sortOrder": 192
+    },
+    {
+      "id": "basic-tactics-for-listen-u24-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 94,
+      "endPage": 97,
+      "level": 3,
+      "sortOrder": 193
+    },
+    {
+      "id": "basic-tactics-for-listen-u24-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 94,
+      "endPage": 97,
+      "level": 4,
+      "sortOrder": 194
+    },
+    {
+      "id": "basic-tactics-for-listen-u24-listening-skills-i2-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 94,
+      "endPage": 97,
+      "level": 4,
+      "sortOrder": 195
+    },
+    {
+      "id": "basic-tactics-for-listen-u24-listening-skills-i3-listening-for-advice",
+      "label": "Listening for advice",
+      "startPage": 94,
+      "endPage": 97,
+      "level": 4,
+      "sortOrder": 196
+    },
+    {
+      "id": "basic-tactics-for-listen-u24-pronunciation-dictation",
+      "label": "Pronunciation & Dictation: Reduction of did you",
+      "startPage": 94,
+      "endPage": 97,
+      "level": 3,
+      "sortOrder": 197
+    },
+    {
+      "id": "basic-tactics-for-listen-u24-conversation",
+      "label": "Conversation: Health issues",
+      "startPage": 94,
+      "endPage": 97,
+      "level": 3,
+      "sortOrder": 198
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio",
+      "label": "Testing Focus Section",
+      "startPage": 98,
+      "endPage": 109,
+      "level": 1,
+      "sortOrder": 199
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u1-1-4",
+      "label": "Units 1 - 4",
+      "startPage": 98,
+      "endPage": 99,
+      "level": 2,
+      "sortOrder": 200
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u1-1-4-testing-focus",
+      "label": "Testing Focus: Picture-based questions",
+      "startPage": 98,
+      "endPage": 99,
+      "level": 3,
+      "sortOrder": 201
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u1-1-4-test-taking-skill",
+      "label": "Test-taking Skill: Focusing on the action",
+      "startPage": 98,
+      "endPage": 99,
+      "level": 3,
+      "sortOrder": 202
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u1-1-4-tasks",
+      "label": "Tasks",
+      "startPage": 98,
+      "endPage": 99,
+      "level": 3,
+      "sortOrder": 203
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u1-1-4-tasks-i1-answering-picture-ba",
+      "label": "Answering picture-based questions",
+      "startPage": 98,
+      "endPage": 99,
+      "level": 4,
+      "sortOrder": 204
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u1-1-4-tasks-i2-matching-questions-w",
+      "label": "Matching questions with the appropriate response",
+      "startPage": 98,
+      "endPage": 99,
+      "level": 4,
+      "sortOrder": 205
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u1-1-4-tasks-i3-comprehension-questi",
+      "label": "Comprehension questions based on short conversations",
+      "startPage": 98,
+      "endPage": 99,
+      "level": 4,
+      "sortOrder": 206
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u2-5-8",
+      "label": "Units 5 - 8",
+      "startPage": 100,
+      "endPage": 101,
+      "level": 2,
+      "sortOrder": 207
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u2-5-8-testing-focus",
+      "label": "Testing Focus: Question/response items",
+      "startPage": 100,
+      "endPage": 101,
+      "level": 3,
+      "sortOrder": 208
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u2-5-8-test-taking-skill",
+      "label": "Test-taking Skill: Reading directions carefully",
+      "startPage": 100,
+      "endPage": 101,
+      "level": 3,
+      "sortOrder": 209
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u2-5-8-tasks",
+      "label": "Tasks",
+      "startPage": 100,
+      "endPage": 101,
+      "level": 3,
+      "sortOrder": 210
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u2-5-8-tasks-i1-matching-statements-",
+      "label": "Matching statements with a photograph",
+      "startPage": 100,
+      "endPage": 101,
+      "level": 4,
+      "sortOrder": 211
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u2-5-8-tasks-i2-matching-questions-w",
+      "label": "Matching questions with the appropriate response",
+      "startPage": 100,
+      "endPage": 101,
+      "level": 4,
+      "sortOrder": 212
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u2-5-8-tasks-i3-comprehension-questi",
+      "label": "Comprehension questions based on a conversation",
+      "startPage": 100,
+      "endPage": 101,
+      "level": 4,
+      "sortOrder": 213
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u3-9-12",
+      "label": "Units 9 - 12",
+      "startPage": 102,
+      "endPage": 103,
+      "level": 2,
+      "sortOrder": 214
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u3-9-12-testing-focus",
+      "label": "Testing Focus: Eliminating answer choices",
+      "startPage": 102,
+      "endPage": 103,
+      "level": 3,
+      "sortOrder": 215
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u3-9-12-test-taking-skill",
+      "label": "Test-taking Skill: Crossing out incorrect answers",
+      "startPage": 102,
+      "endPage": 103,
+      "level": 3,
+      "sortOrder": 216
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u3-9-12-tasks",
+      "label": "Tasks",
+      "startPage": 102,
+      "endPage": 103,
+      "level": 3,
+      "sortOrder": 217
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u3-9-12-tasks-i1-answering-picture-ba",
+      "label": "Answering picture-based questions",
+      "startPage": 102,
+      "endPage": 103,
+      "level": 4,
+      "sortOrder": 218
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u3-9-12-tasks-i2-matching-statements-",
+      "label": "Matching statements with the appropriate response",
+      "startPage": 102,
+      "endPage": 103,
+      "level": 4,
+      "sortOrder": 219
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u3-9-12-tasks-i3-comprehension-questi",
+      "label": "Comprehension questions based on short conversations",
+      "startPage": 102,
+      "endPage": 103,
+      "level": 4,
+      "sortOrder": 220
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u4-13-16",
+      "label": "Units 13 - 16",
+      "startPage": 104,
+      "endPage": 105,
+      "level": 2,
+      "sortOrder": 221
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u4-13-16-testing-focus",
+      "label": "Testing Focus: Time management",
+      "startPage": 104,
+      "endPage": 105,
+      "level": 3,
+      "sortOrder": 222
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u4-13-16-test-taking-skill",
+      "label": "Test-taking Skill: Knowing your time limits",
+      "startPage": 104,
+      "endPage": 105,
+      "level": 3,
+      "sortOrder": 223
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u4-13-16-tasks",
+      "label": "Tasks",
+      "startPage": 104,
+      "endPage": 105,
+      "level": 3,
+      "sortOrder": 224
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u4-13-16-tasks-i1-answering-picture-ba",
+      "label": "Answering picture-based questions",
+      "startPage": 104,
+      "endPage": 105,
+      "level": 4,
+      "sortOrder": 225
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u4-13-16-tasks-i2-matching-questions-w",
+      "label": "Matching questions with the appropriate response",
+      "startPage": 104,
+      "endPage": 105,
+      "level": 4,
+      "sortOrder": 226
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u4-13-16-tasks-i3-comprehension-questi",
+      "label": "Comprehension questions based on short conversations",
+      "startPage": 104,
+      "endPage": 105,
+      "level": 4,
+      "sortOrder": 227
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u5-17-20",
+      "label": "Units 17 - 20",
+      "startPage": 106,
+      "endPage": 107,
+      "level": 2,
+      "sortOrder": 228
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u5-17-20-testing-focus",
+      "label": "Testing Focus: Listening for details",
+      "startPage": 106,
+      "endPage": 107,
+      "level": 3,
+      "sortOrder": 229
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u5-17-20-test-taking-skill",
+      "label": "Test-taking Skill: Taking note of key words",
+      "startPage": 106,
+      "endPage": 107,
+      "level": 3,
+      "sortOrder": 230
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u5-17-20-tasks",
+      "label": "Tasks",
+      "startPage": 106,
+      "endPage": 107,
+      "level": 3,
+      "sortOrder": 231
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u5-17-20-tasks-i1-matching-statements-",
+      "label": "Matching statements with a photograph",
+      "startPage": 106,
+      "endPage": 107,
+      "level": 4,
+      "sortOrder": 232
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u5-17-20-tasks-i2-matching-questions-w",
+      "label": "Matching questions with the appropriate response",
+      "startPage": 106,
+      "endPage": 107,
+      "level": 4,
+      "sortOrder": 233
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u5-17-20-tasks-i3-comprehension-questi",
+      "label": "Comprehension questions based on an advertisement",
+      "startPage": 106,
+      "endPage": 107,
+      "level": 4,
+      "sortOrder": 234
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u6-21-24",
+      "label": "Units 21 - 24",
+      "startPage": 108,
+      "endPage": 109,
+      "level": 2,
+      "sortOrder": 235
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u6-21-24-testing-focus",
+      "label": "Testing Focus: Marking your answer sheet",
+      "startPage": 108,
+      "endPage": 109,
+      "level": 3,
+      "sortOrder": 236
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u6-21-24-test-taking-skill",
+      "label": "Test-taking Skill: Marking the test carefully",
+      "startPage": 108,
+      "endPage": 109,
+      "level": 3,
+      "sortOrder": 237
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u6-21-24-tasks",
+      "label": "Tasks",
+      "startPage": 108,
+      "endPage": 109,
+      "level": 3,
+      "sortOrder": 238
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u6-21-24-tasks-i1-answering-picture-ba",
+      "label": "Answering picture-based questions",
+      "startPage": 108,
+      "endPage": 109,
+      "level": 4,
+      "sortOrder": 239
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u6-21-24-tasks-i2-matching-statements-",
+      "label": "Matching statements with the appropriate response",
+      "startPage": 108,
+      "endPage": 109,
+      "level": 4,
+      "sortOrder": 240
+    },
+    {
+      "id": "basic-tactics-for-listen-h1-3-testing-focus-sectio-u6-21-24-tasks-i3-comprehension-questi",
+      "label": "Comprehension questions based on short conversations",
+      "startPage": 108,
+      "endPage": 109,
+      "level": 4,
+      "sortOrder": 241
+    }
+  ]
+}

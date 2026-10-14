@@ -1,0 +1,115 @@
+{
+  "book_title": "Connectivity Level 2",
+  "table_of_contents": [
+    {
+      "level": "H1",
+      "title": "Main Units",
+      "start_page": 1,
+      "end_page": 122,
+      "units": [
+        {
+          "level": "H2",
+          "unit_number": 1,
+          "title": "Making New Friends",
+          "start_page": 1,
+          "end_page": 12
+        },
+        {
+          "level": "H2",
+          "unit_number": 2,
+          "title": "Sharing Life Experiences",
+          "start_page": 13,
+          "end_page": 24
+        },
+        {
+          "level": "H2",
+          "unit_number": 3,
+          "title": "Talking about Movies",
+          "start_page": 25,
+          "end_page": 36
+        },
+        {
+          "level": "H2",
+          "unit_number": 4,
+          "title": "Away from Home",
+          "start_page": 37,
+          "end_page": 48
+        },
+        {
+          "level": "H2",
+          "unit_number": 5,
+          "title": "Looking Good",
+          "start_page": 49,
+          "end_page": 60
+        },
+        {
+          "level": "H2",
+          "unit_number": 6,
+          "title": "Eating Well",
+          "start_page": 61,
+          "end_page": 72
+        },
+        {
+          "level": "H2",
+          "unit_number": 7,
+          "title": "Driving Around",
+          "start_page": 73,
+          "end_page": 84
+        },
+        {
+          "level": "H2",
+          "unit_number": 8,
+          "title": "Doing the Right Thing",
+          "start_page": 85,
+          "end_page": 96
+        },
+        {
+          "level": "H2",
+          "unit_number": 9,
+          "title": "Enjoying the Arts",
+          "start_page": 97,
+          "end_page": 108
+        },
+        {
+          "level": "H2",
+          "unit_number": 10,
+          "title": "Technology",
+          "start_page": 109,
+          "end_page": 122
+        }
+      ]
+    },
+    {
+      "level": "H1",
+      "title": "Reference & Supplementary Sections",
+      "start_page": 123,
+      "end_page": 153,
+      "sections": [
+        {
+          "level": "H2",
+          "title": "Reference Charts",
+          "start_page": 123,
+          "end_page": 125
+        },
+        {
+          "level": "H2",
+          "title": "Grammar Expander",
+          "start_page": 126,
+          "end_page": 142
+        },
+        {
+          "level": "H2",
+          "title": "Writing Handbook",
+          "start_page": 143,
+          "end_page": 152
+        },
+        {
+          "level": "H2",
+          "title": "Soft Skills Booster",
+          "start_page": 153,
+          "end_page": 153
+        }
+      ]
+    }
+  ]
+}

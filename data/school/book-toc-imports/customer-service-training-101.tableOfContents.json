@@ -1,0 +1,646 @@
+{
+  "bookTitle": "Customer Service Training 101",
+  "suggestedTotalPages": 203,
+  "tableOfContents": [
+    {
+      "id": "customer-service-trainin-h1-1-front-matter",
+      "label": "Front Matter",
+      "startPage": 9,
+      "endPage": 20,
+      "level": 1,
+      "sortOrder": 1
+    },
+    {
+      "id": "customer-service-trainin-h1-1-front-matter-u1-acknowledgments",
+      "label": "Acknowledgments",
+      "startPage": 9,
+      "endPage": 10,
+      "level": 2,
+      "sortOrder": 2
+    },
+    {
+      "id": "customer-service-trainin-h1-1-front-matter-u2-introduction",
+      "label": "Introduction",
+      "startPage": 1,
+      "endPage": 2,
+      "level": 2,
+      "sortOrder": 3
+    },
+    {
+      "id": "customer-service-trainin-h1-1-front-matter-u3-tips-for-the-tra",
+      "label": "Tips for the Trainer",
+      "startPage": 3,
+      "endPage": 10,
+      "level": 2,
+      "sortOrder": 4
+    },
+    {
+      "id": "customer-service-trainin-h1-1-front-matter-u4-tips-for-the-stu",
+      "label": "Tips for the Student",
+      "startPage": 11,
+      "endPage": 20,
+      "level": 2,
+      "sortOrder": 5
+    },
+    {
+      "id": "customer-service-trainin-h1-2-part-i-putting-your-",
+      "label": "PART I: Putting Your Best Face Forward",
+      "startPage": 21,
+      "endPage": 102,
+      "level": 1,
+      "sortOrder": 6
+    },
+    {
+      "id": "customer-service-trainin-ch01",
+      "label": "Chapter 1: Taking Baby Steps: The Basics",
+      "startPage": 21,
+      "endPage": 42,
+      "level": 2,
+      "sortOrder": 7
+    },
+    {
+      "id": "customer-service-trainin-ch01-step-1",
+      "label": "Step 1: First Impressions Matter",
+      "startPage": 26,
+      "endPage": 27,
+      "level": 3,
+      "sortOrder": 8
+    },
+    {
+      "id": "customer-service-trainin-ch01-step-2",
+      "label": "Step 2: Courtesy Counts",
+      "startPage": 28,
+      "endPage": 29,
+      "level": 3,
+      "sortOrder": 9
+    },
+    {
+      "id": "customer-service-trainin-ch01-step-3",
+      "label": "Step 3: Attitude Is Everything",
+      "startPage": 30,
+      "endPage": 32,
+      "level": 3,
+      "sortOrder": 10
+    },
+    {
+      "id": "customer-service-trainin-ch01-step-4",
+      "label": "Step 4: Doing the Right Thing: Ethical Issues",
+      "startPage": 33,
+      "endPage": 36,
+      "level": 3,
+      "sortOrder": 11
+    },
+    {
+      "id": "customer-service-trainin-ch01-key-points",
+      "label": "Key Points",
+      "startPage": 37,
+      "endPage": 37,
+      "level": 3,
+      "sortOrder": 12
+    },
+    {
+      "id": "customer-service-trainin-ch01-practice-lesson",
+      "label": "Practice Lesson",
+      "startPage": 38,
+      "endPage": 38,
+      "level": 3,
+      "sortOrder": 13
+    },
+    {
+      "id": "customer-service-trainin-ch01-think-about",
+      "label": "Think About...",
+      "startPage": 39,
+      "endPage": 40,
+      "level": 3,
+      "sortOrder": 14
+    },
+    {
+      "id": "customer-service-trainin-ch01-quick-quotes",
+      "label": "Quick Quotes",
+      "startPage": 41,
+      "endPage": 42,
+      "level": 3,
+      "sortOrder": 15
+    },
+    {
+      "id": "customer-service-trainin-ch02",
+      "label": "Chapter 2: Tossing the Ball Back and Forth: Effective Communication",
+      "startPage": 43,
+      "endPage": 70,
+      "level": 2,
+      "sortOrder": 16
+    },
+    {
+      "id": "customer-service-trainin-ch02-step-1",
+      "label": "Step 1: Saying What You Mean and Meaning What You Say",
+      "startPage": 48,
+      "endPage": 49,
+      "level": 3,
+      "sortOrder": 17
+    },
+    {
+      "id": "customer-service-trainin-ch02-step-2",
+      "label": "Step 2: What You Don't Say: Nonverbal Communication",
+      "startPage": 50,
+      "endPage": 51,
+      "level": 3,
+      "sortOrder": 18
+    },
+    {
+      "id": "customer-service-trainin-ch02-step-3",
+      "label": "Step 3: Putting Words Together: Grammar Usage",
+      "startPage": 52,
+      "endPage": 53,
+      "level": 3,
+      "sortOrder": 19
+    },
+    {
+      "id": "customer-service-trainin-ch02-step-4",
+      "label": "Step 4: Asking the Correct Questions and Answering the Questions Correctly",
+      "startPage": 54,
+      "endPage": 57,
+      "level": 3,
+      "sortOrder": 20
+    },
+    {
+      "id": "customer-service-trainin-ch02-step-5",
+      "label": "Step 5: When the Customer Says No",
+      "startPage": 58,
+      "endPage": 59,
+      "level": 3,
+      "sortOrder": 21
+    },
+    {
+      "id": "customer-service-trainin-ch02-step-6",
+      "label": "Step 6: Listening Actively",
+      "startPage": 60,
+      "endPage": 62,
+      "level": 3,
+      "sortOrder": 22
+    },
+    {
+      "id": "customer-service-trainin-ch02-key-points",
+      "label": "Key Points",
+      "startPage": 63,
+      "endPage": 64,
+      "level": 3,
+      "sortOrder": 23
+    },
+    {
+      "id": "customer-service-trainin-ch02-practice-lesson",
+      "label": "Practice Lesson",
+      "startPage": 65,
+      "endPage": 66,
+      "level": 3,
+      "sortOrder": 24
+    },
+    {
+      "id": "customer-service-trainin-ch02-think-about",
+      "label": "Think About...",
+      "startPage": 67,
+      "endPage": 68,
+      "level": 3,
+      "sortOrder": 25
+    },
+    {
+      "id": "customer-service-trainin-ch02-quick-quotes",
+      "label": "Quick Quotes",
+      "startPage": 69,
+      "endPage": 70,
+      "level": 3,
+      "sortOrder": 26
+    },
+    {
+      "id": "customer-service-trainin-ch03",
+      "label": "Chapter 3: Jumping in with Both Feet: Relationship Building",
+      "startPage": 71,
+      "endPage": 102,
+      "level": 2,
+      "sortOrder": 27
+    },
+    {
+      "id": "customer-service-trainin-ch03-step-1",
+      "label": "Step 1: Establishing Rapport",
+      "startPage": 78,
+      "endPage": 80,
+      "level": 3,
+      "sortOrder": 28
+    },
+    {
+      "id": "customer-service-trainin-ch03-step-2",
+      "label": "Step 2: Interacting Positively with Customers",
+      "startPage": 81,
+      "endPage": 82,
+      "level": 3,
+      "sortOrder": 29
+    },
+    {
+      "id": "customer-service-trainin-ch03-step-3",
+      "label": "Step 3: Identifying Customers' Needs",
+      "startPage": 83,
+      "endPage": 84,
+      "level": 3,
+      "sortOrder": 30
+    },
+    {
+      "id": "customer-service-trainin-ch03-step-4",
+      "label": "Step 4: Making the Customer Feel Valued",
+      "startPage": 85,
+      "endPage": 86,
+      "level": 3,
+      "sortOrder": 31
+    },
+    {
+      "id": "customer-service-trainin-ch03-step-5",
+      "label": "Step 5: Maintaining Ongoing Relationships",
+      "startPage": 87,
+      "endPage": 88,
+      "level": 3,
+      "sortOrder": 32
+    },
+    {
+      "id": "customer-service-trainin-ch03-step-6",
+      "label": "Step 6: Different Strokes: Handling Different Types of Customers",
+      "startPage": 89,
+      "endPage": 93,
+      "level": 3,
+      "sortOrder": 33
+    },
+    {
+      "id": "customer-service-trainin-ch03-key-points",
+      "label": "Key Points",
+      "startPage": 94,
+      "endPage": 95,
+      "level": 3,
+      "sortOrder": 34
+    },
+    {
+      "id": "customer-service-trainin-ch03-practice-lesson",
+      "label": "Practice Lesson",
+      "startPage": 96,
+      "endPage": 98,
+      "level": 3,
+      "sortOrder": 35
+    },
+    {
+      "id": "customer-service-trainin-ch03-think-about",
+      "label": "Think About...",
+      "startPage": 99,
+      "endPage": 99,
+      "level": 3,
+      "sortOrder": 36
+    },
+    {
+      "id": "customer-service-trainin-ch03-quick-quotes",
+      "label": "Quick Quotes",
+      "startPage": 100,
+      "endPage": 102,
+      "level": 3,
+      "sortOrder": 37
+    },
+    {
+      "id": "customer-service-trainin-h1-3-part-ii-putting-your",
+      "label": "PART II: Putting Your Customers First",
+      "startPage": 103,
+      "endPage": 190,
+      "level": 1,
+      "sortOrder": 38
+    },
+    {
+      "id": "customer-service-trainin-ch04",
+      "label": "Chapter 4: Seeing Eye to Eye: Face-to-Face Contacts",
+      "startPage": 103,
+      "endPage": 120,
+      "level": 2,
+      "sortOrder": 39
+    },
+    {
+      "id": "customer-service-trainin-ch04-step-1",
+      "label": "Step 1: Saying Hello: Greeting the Customer",
+      "startPage": 109,
+      "endPage": 110,
+      "level": 3,
+      "sortOrder": 40
+    },
+    {
+      "id": "customer-service-trainin-ch04-step-2",
+      "label": "Step 2: Between Hello and Goodbye: Helping the Customer",
+      "startPage": 111,
+      "endPage": 112,
+      "level": 3,
+      "sortOrder": 41
+    },
+    {
+      "id": "customer-service-trainin-ch04-step-3",
+      "label": "Step 3: Saying Goodbye: Ending the Interaction",
+      "startPage": 113,
+      "endPage": 116,
+      "level": 3,
+      "sortOrder": 42
+    },
+    {
+      "id": "customer-service-trainin-ch04-key-points",
+      "label": "Key Points",
+      "startPage": 117,
+      "endPage": 117,
+      "level": 3,
+      "sortOrder": 43
+    },
+    {
+      "id": "customer-service-trainin-ch04-practice-lesson",
+      "label": "Practice Lesson",
+      "startPage": 118,
+      "endPage": 118,
+      "level": 3,
+      "sortOrder": 44
+    },
+    {
+      "id": "customer-service-trainin-ch04-think-about",
+      "label": "Think About...",
+      "startPage": 119,
+      "endPage": 119,
+      "level": 3,
+      "sortOrder": 45
+    },
+    {
+      "id": "customer-service-trainin-ch04-quick-quotes",
+      "label": "Quick Quotes",
+      "startPage": 120,
+      "endPage": 120,
+      "level": 3,
+      "sortOrder": 46
+    },
+    {
+      "id": "customer-service-trainin-ch05",
+      "label": "Chapter 5: Saying It with a Smile: Telephone Contacts",
+      "startPage": 121,
+      "endPage": 142,
+      "level": 2,
+      "sortOrder": 47
+    },
+    {
+      "id": "customer-service-trainin-ch05-step-1",
+      "label": "Step 1: Putting Your Best Ear Forward",
+      "startPage": 126,
+      "endPage": 127,
+      "level": 3,
+      "sortOrder": 48
+    },
+    {
+      "id": "customer-service-trainin-ch05-step-2",
+      "label": "Step 2: Saying Hello: The Opener",
+      "startPage": 128,
+      "endPage": 129,
+      "level": 3,
+      "sortOrder": 49
+    },
+    {
+      "id": "customer-service-trainin-ch05-step-3",
+      "label": "Step 3: Between Hello and Goodbye: Helping the Customer",
+      "startPage": 130,
+      "endPage": 133,
+      "level": 3,
+      "sortOrder": 50
+    },
+    {
+      "id": "customer-service-trainin-ch05-step-4",
+      "label": "Step 4: Saying Goodbye: The Closer",
+      "startPage": 134,
+      "endPage": 136,
+      "level": 3,
+      "sortOrder": 51
+    },
+    {
+      "id": "customer-service-trainin-ch05-key-points",
+      "label": "Key Points",
+      "startPage": 137,
+      "endPage": 137,
+      "level": 3,
+      "sortOrder": 52
+    },
+    {
+      "id": "customer-service-trainin-ch05-practice-lesson",
+      "label": "Practice Lesson",
+      "startPage": 138,
+      "endPage": 139,
+      "level": 3,
+      "sortOrder": 53
+    },
+    {
+      "id": "customer-service-trainin-ch05-think-about",
+      "label": "Think About...",
+      "startPage": 140,
+      "endPage": 140,
+      "level": 3,
+      "sortOrder": 54
+    },
+    {
+      "id": "customer-service-trainin-ch05-quick-quotes",
+      "label": "Quick Quotes",
+      "startPage": 141,
+      "endPage": 142,
+      "level": 3,
+      "sortOrder": 55
+    },
+    {
+      "id": "customer-service-trainin-ch06",
+      "label": "Chapter 6: Looking Before You Leap: E-commerce Contacts",
+      "startPage": 143,
+      "endPage": 160,
+      "level": 2,
+      "sortOrder": 56
+    },
+    {
+      "id": "customer-service-trainin-ch06-step-1",
+      "label": "Step 1: What Does the E-customer Expect?",
+      "startPage": 147,
+      "endPage": 148,
+      "level": 3,
+      "sortOrder": 57
+    },
+    {
+      "id": "customer-service-trainin-ch06-step-2",
+      "label": "Step 2: Hanging the Open Sign: Being Accessible",
+      "startPage": 149,
+      "endPage": 150,
+      "level": 3,
+      "sortOrder": 58
+    },
+    {
+      "id": "customer-service-trainin-ch06-step-3",
+      "label": "Step 3: Writing What You Mean: E-mail Communication",
+      "startPage": 151,
+      "endPage": 153,
+      "level": 3,
+      "sortOrder": 59
+    },
+    {
+      "id": "customer-service-trainin-ch06-step-4",
+      "label": "Step 4: Speaking Around the World: Cross-Cultural Etiquette",
+      "startPage": 154,
+      "endPage": 154,
+      "level": 3,
+      "sortOrder": 60
+    },
+    {
+      "id": "customer-service-trainin-ch06-key-points",
+      "label": "Key Points",
+      "startPage": 155,
+      "endPage": 155,
+      "level": 3,
+      "sortOrder": 61
+    },
+    {
+      "id": "customer-service-trainin-ch06-practice-lesson",
+      "label": "Practice Lesson",
+      "startPage": 156,
+      "endPage": 157,
+      "level": 3,
+      "sortOrder": 62
+    },
+    {
+      "id": "customer-service-trainin-ch06-think-about",
+      "label": "Think About...",
+      "startPage": 158,
+      "endPage": 158,
+      "level": 3,
+      "sortOrder": 63
+    },
+    {
+      "id": "customer-service-trainin-ch06-quick-quotes",
+      "label": "Quick Quotes",
+      "startPage": 159,
+      "endPage": 160,
+      "level": 3,
+      "sortOrder": 64
+    },
+    {
+      "id": "customer-service-trainin-ch07",
+      "label": "Chapter 7: Calming the Storm: Difficult Customer Contacts",
+      "startPage": 161,
+      "endPage": 190,
+      "level": 2,
+      "sortOrder": 65
+    },
+    {
+      "id": "customer-service-trainin-ch07-step-1",
+      "label": "Step 1: What Is Going on: Determine the Reason",
+      "startPage": 167,
+      "endPage": 169,
+      "level": 3,
+      "sortOrder": 66
+    },
+    {
+      "id": "customer-service-trainin-ch07-step-2",
+      "label": "Step 2: What Caused It: Identify the Root Cause of the Problem",
+      "startPage": 170,
+      "endPage": 172,
+      "level": 3,
+      "sortOrder": 67
+    },
+    {
+      "id": "customer-service-trainin-ch07-step-3",
+      "label": "Step 3: What Can I Do: Rectify the Situation",
+      "startPage": 173,
+      "endPage": 175,
+      "level": 3,
+      "sortOrder": 68
+    },
+    {
+      "id": "customer-service-trainin-ch07-step-4",
+      "label": "Step 4: What Can I Say: Acknowledge the Problem",
+      "startPage": 176,
+      "endPage": 178,
+      "level": 3,
+      "sortOrder": 69
+    },
+    {
+      "id": "customer-service-trainin-ch07-step-5",
+      "label": "Step 5: What Needs to Be Done: Fix What Needs to Be Fixed",
+      "startPage": 179,
+      "endPage": 182,
+      "level": 3,
+      "sortOrder": 70
+    },
+    {
+      "id": "customer-service-trainin-ch07-key-points",
+      "label": "Key Points",
+      "startPage": 183,
+      "endPage": 183,
+      "level": 3,
+      "sortOrder": 71
+    },
+    {
+      "id": "customer-service-trainin-ch07-practice-lesson",
+      "label": "Practice Lesson",
+      "startPage": 184,
+      "endPage": 186,
+      "level": 3,
+      "sortOrder": 72
+    },
+    {
+      "id": "customer-service-trainin-ch07-think-about",
+      "label": "Think About...",
+      "startPage": 187,
+      "endPage": 187,
+      "level": 3,
+      "sortOrder": 73
+    },
+    {
+      "id": "customer-service-trainin-ch07-quick-quotes",
+      "label": "Quick Quotes",
+      "startPage": 188,
+      "endPage": 190,
+      "level": 3,
+      "sortOrder": 74
+    },
+    {
+      "id": "customer-service-trainin-h1-4-part-iii-putting-it-",
+      "label": "PART III: Putting It All Together",
+      "startPage": 191,
+      "endPage": 202,
+      "level": 1,
+      "sortOrder": 75
+    },
+    {
+      "id": "customer-service-trainin-ch08",
+      "label": "Chapter 8: Hitting the Ground Running: Ready, Set, Go",
+      "startPage": 191,
+      "endPage": 196,
+      "level": 2,
+      "sortOrder": 76
+    },
+    {
+      "id": "customer-service-trainin-ch09",
+      "label": "Chapter 9: Being the Best You Can Be: The Total Package",
+      "startPage": 197,
+      "endPage": 202,
+      "level": 2,
+      "sortOrder": 77
+    },
+    {
+      "id": "customer-service-trainin-ch09-quick-quotes",
+      "label": "Quick Quotes",
+      "startPage": 200,
+      "endPage": 202,
+      "level": 3,
+      "sortOrder": 78
+    },
+    {
+      "id": "customer-service-trainin-h1-5-back-matter",
+      "label": "Back Matter",
+      "startPage": 203,
+      "endPage": 203,
+      "level": 1,
+      "sortOrder": 79
+    },
+    {
+      "id": "customer-service-trainin-h1-5-back-matter-u1-index",
+      "label": "Index",
+      "startPage": 203,
+      "endPage": 203,
+      "level": 2,
+      "sortOrder": 80
+    }
+  ]
+}

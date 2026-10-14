@@ -716,13 +716,21 @@
   function assignTracks(dayEvents, boundsInput) {
     const bounds = resolveTimelineBounds(boundsInput || {});
     const tracks = [];
-    dayEvents.forEach((ev) => {
+    const sorted = (dayEvents || []).slice().sort((left, right) => {
+      const leftPos = calculatePosition(left.start, left.end, bounds);
+      const rightPos = calculatePosition(right.start, right.end, bounds);
+      if (leftPos.startMin !== rightPos.startMin) return leftPos.startMin - rightPos.startMin;
+      const leftDur = leftPos.endMin - leftPos.startMin;
+      const rightDur = rightPos.endMin - rightPos.startMin;
+      return rightDur - leftDur;
+    });
+    sorted.forEach((ev) => {
       const pos = calculatePosition(ev.start, ev.end, bounds);
       ev.pos = pos;
       let placed = false;
       for (let i = 0; i < tracks.length; i += 1) {
-        const lastEv = tracks[i][tracks[i].length - 1];
-        if (lastEv.pos.endMin <= pos.startMin) {
+        const overlapsTrack = tracks[i].some((existing) => eventsOverlapByPos(existing, ev));
+        if (!overlapsTrack) {
           tracks[i].push(ev);
           ev.trackIndex = i;
           placed = true;
@@ -730,8 +738,8 @@
         }
       }
       if (!placed) {
+        ev.trackIndex = tracks.length;
         tracks.push([ev]);
-        ev.trackIndex = tracks.length - 1;
       }
     });
     return tracks;
@@ -1888,7 +1896,8 @@
         trackIndex: ev.trackIndex,
         trackCount: clusterTrackCount
       });
-      sessionsHtml += `<div class="session-cal-positioned-session session-cal-positioned-vertical" data-timeline-start="${ev.pos.startMin}" data-timeline-end="${ev.pos.endMin}" style="top:${ev.pos.left}%;height:calc(${blockHeight}% - 4px);left:${trackLeft}%;width:calc(${trackWidth}% - 4px);">${blockHtml}</div>`;
+      const overlapLaneClass = clusterTrackCount > 1 ? ' is-overlap-lane' : '';
+      sessionsHtml += `<div class="session-cal-positioned-session session-cal-positioned-vertical${overlapLaneClass}" data-timeline-start="${ev.pos.startMin}" data-timeline-end="${ev.pos.endMin}" data-track-index="${ev.trackIndex}" data-track-count="${clusterTrackCount}" style="top:${ev.pos.left}%;height:calc(${blockHeight}% - 4px);left:${trackLeft}%;width:calc(${trackWidth}% - 4px);">${blockHtml}</div>`;
     });
     return `
       <div class="${dayClass}" data-cal-date="${escapeHtml(dateStr)}">
@@ -2070,7 +2079,8 @@
             trackIndex: ev.trackIndex,
             trackCount
           });
-          sessionsHtml += `<div class="session-cal-positioned-session session-cal-positioned-horizontal" data-timeline-start="${ev.pos.startMin}" data-timeline-end="${ev.pos.endMin}" data-track-index="${ev.trackIndex}" style="left:${ev.pos.left}%;width:${ev.pos.width}%;top:${topPos}px;height:${blockHeight}px;">${block}</div>`;
+          const overlapLaneClass = trackCount > 1 ? ' is-overlap-lane' : '';
+          sessionsHtml += `<div class="session-cal-positioned-session session-cal-positioned-horizontal${overlapLaneClass}" data-timeline-start="${ev.pos.startMin}" data-timeline-end="${ev.pos.endMin}" data-track-index="${ev.trackIndex}" data-track-count="${trackCount}" style="left:${ev.pos.left}%;width:${ev.pos.width}%;top:${topPos}px;height:${blockHeight}px;">${block}</div>`;
         });
         html += `
           <div class="${rowClass}" data-cal-date="${escapeHtml(day.date)}">

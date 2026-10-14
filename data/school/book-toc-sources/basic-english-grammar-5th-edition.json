@@ -1,0 +1,1379 @@
+{
+  "book_title": "Basic English Grammar - 5th edition",
+  "table_of_contents": [
+    {
+      "level": "H1",
+      "title": "Front Matter",
+      "start_page": "x",
+      "end_page": "xvi",
+      "children": [
+        {
+          "level": "H2",
+          "title": "Preface to the Fifth Edition",
+          "start_page": "x",
+          "end_page": "xiv"
+        },
+        {
+          "level": "H2",
+          "title": "Acknowledgments",
+          "start_page": "xv",
+          "end_page": "xvi"
+        }
+      ]
+    },
+    {
+      "level": "H1",
+      "title": "Main Chapters",
+      "start_page": 1,
+      "end_page": 490,
+      "children": [
+        {
+          "level": "H2",
+          "chapter_number": 1,
+          "title": "USING BE",
+          "start_page": 1,
+          "end_page": 27,
+          "sections": [
+            {
+              "level": "H3",
+              "section_number": "1-1",
+              "title": "Singular Pronouns + Be",
+              "start_page": 2,
+              "end_page": 3,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Introductions",
+                  "start_page": 3,
+                  "end_page": 3
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "1-2",
+              "title": "Plural Pronouns + Be",
+              "start_page": 4,
+              "end_page": 5
+            },
+            {
+              "level": "H3",
+              "section_number": "1-3",
+              "title": "Singular Nouns + Be",
+              "start_page": 6,
+              "end_page": 7
+            },
+            {
+              "level": "H3",
+              "section_number": "1-4",
+              "title": "Plural Nouns + Be",
+              "start_page": 8,
+              "end_page": 10
+            },
+            {
+              "level": "H3",
+              "section_number": "1-5",
+              "title": "Contractions with Be",
+              "start_page": 11,
+              "end_page": 12
+            },
+            {
+              "level": "H3",
+              "section_number": "1-6",
+              "title": "Negative with Be",
+              "start_page": 13,
+              "end_page": 15
+            },
+            {
+              "level": "H3",
+              "section_number": "1-7",
+              "title": "Be + Adjective",
+              "start_page": 16,
+              "end_page": 20,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: How are you?",
+                  "start_page": 19,
+                  "end_page": 20
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "1-8",
+              "title": "Be + a Place",
+              "start_page": 21,
+              "end_page": 23
+            },
+            {
+              "level": "H3",
+              "section_number": "1-9",
+              "title": "Summary: Basic Sentence Patterns with Be",
+              "start_page": 24,
+              "end_page": 27,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Saying Good-bye",
+                  "start_page": 25,
+                  "end_page": 27
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "chapter_number": 2,
+          "title": "USING BE AND HAVE",
+          "start_page": 28,
+          "end_page": 54,
+          "sections": [
+            {
+              "level": "H3",
+              "section_number": "2-1",
+              "title": "Using This and That",
+              "start_page": 29,
+              "end_page": 29
+            },
+            {
+              "level": "H3",
+              "section_number": "2-2",
+              "title": "Using These and Those",
+              "start_page": 30,
+              "end_page": 32
+            },
+            {
+              "level": "H3",
+              "section_number": "2-3",
+              "title": "Yes/No Questions with Be",
+              "start_page": 33,
+              "end_page": 34,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Classroom Questions",
+                  "start_page": 34,
+                  "end_page": 34
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "2-4",
+              "title": "Short Answers to Yes/No Questions",
+              "start_page": 35,
+              "end_page": 36,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Questions with Days of the Week",
+                  "start_page": 36,
+                  "end_page": 36
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "2-5",
+              "title": "Questions with Be: Using Where",
+              "start_page": 37,
+              "end_page": 39
+            },
+            {
+              "level": "H3",
+              "section_number": "2-6",
+              "title": "Using Have and Has",
+              "start_page": 40,
+              "end_page": 42,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Talking About Food Allergies",
+                  "start_page": 42,
+                  "end_page": 42
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "2-7",
+              "title": "Using My, Your, Her, His, Our, Their",
+              "start_page": 43,
+              "end_page": 48
+            },
+            {
+              "level": "H3",
+              "section_number": "2-8",
+              "title": "Asking Questions with What and Who + Be",
+              "start_page": 49,
+              "end_page": 54
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "chapter_number": 3,
+          "title": "USING THE SIMPLE PRESENT",
+          "start_page": 55,
+          "end_page": 95,
+          "sections": [
+            {
+              "level": "H3",
+              "section_number": "3-1",
+              "title": "Form and Basic Meaning of the Simple Present Tense",
+              "start_page": 56,
+              "end_page": 58
+            },
+            {
+              "level": "H3",
+              "section_number": "3-2",
+              "title": "Frequency Adverbs",
+              "start_page": 59,
+              "end_page": 61
+            },
+            {
+              "level": "H3",
+              "section_number": "3-3",
+              "title": "Position of Frequency Adverbs",
+              "start_page": 62,
+              "end_page": 63
+            },
+            {
+              "level": "H3",
+              "section_number": "3-4",
+              "title": "Spelling and Pronunciation of Final -es",
+              "start_page": 64,
+              "end_page": 65
+            },
+            {
+              "level": "H3",
+              "section_number": "3-5",
+              "title": "Adding Final -s/-es to Words That End in -y",
+              "start_page": 66,
+              "end_page": 67
+            },
+            {
+              "level": "H3",
+              "section_number": "3-6",
+              "title": "Irregular Singular Verbs: Has, Does, Goes",
+              "start_page": 68,
+              "end_page": 71,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Expressions with Do and Make",
+                  "start_page": 71,
+                  "end_page": 71
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "3-7",
+              "title": "Like To, Want To, Need To, Would Like",
+              "start_page": 72,
+              "end_page": 74
+            },
+            {
+              "level": "H3",
+              "section_number": "3-8",
+              "title": "Simple Present Tense: Negative",
+              "start_page": 75,
+              "end_page": 79
+            },
+            {
+              "level": "H3",
+              "section_number": "3-9",
+              "title": "Simple Present Tense: Yes/No Questions",
+              "start_page": 80,
+              "end_page": 84
+            },
+            {
+              "level": "H3",
+              "section_number": "3-10",
+              "title": "Simple Present Tense: Yes/No Questions and Information Questions with Where and What",
+              "start_page": 85,
+              "end_page": 88,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Common Questions at a Café",
+                  "start_page": 88,
+                  "end_page": 88
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "3-11",
+              "title": "Simple Present Tense: Asking Information Questions with When and What Time",
+              "start_page": 88,
+              "end_page": 95,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Saying the Time",
+                  "start_page": 89,
+                  "end_page": 95
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "chapter_number": 4,
+          "title": "USING THE PRESENT PROGRESSIVE AND THE IMPERATIVE",
+          "start_page": 96,
+          "end_page": 128,
+          "sections": [
+            {
+              "level": "H3",
+              "section_number": "4-1",
+              "title": "Be + -ing: the Present Progressive",
+              "start_page": 97,
+              "end_page": 101
+            },
+            {
+              "level": "H3",
+              "section_number": "4-2",
+              "title": "Spelling of -ing Verbs",
+              "start_page": 102,
+              "end_page": 102
+            },
+            {
+              "level": "H3",
+              "section_number": "4-3",
+              "title": "Present Progressive: Negative Forms",
+              "start_page": 103,
+              "end_page": 105
+            },
+            {
+              "level": "H3",
+              "section_number": "4-4",
+              "title": "Present Progressive: Question Forms",
+              "start_page": 106,
+              "end_page": 110,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Questions at Passport Control",
+                  "start_page": 110,
+                  "end_page": 110
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "4-5",
+              "title": "The Simple Present Tense vs. the Present Progressive Tense",
+              "start_page": 111,
+              "end_page": 116
+            },
+            {
+              "level": "H3",
+              "section_number": "4-6",
+              "title": "Non-Action Verbs Not Used in the Present Progressive",
+              "start_page": 117,
+              "end_page": 120,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: A Job Interview",
+                  "start_page": 120,
+                  "end_page": 120
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "4-7",
+              "title": "See, Look At, Watch, Hear, and Listen To",
+              "start_page": 121,
+              "end_page": 122
+            },
+            {
+              "level": "H3",
+              "section_number": "4-8",
+              "title": "Think About and Think That",
+              "start_page": 123,
+              "end_page": 124
+            },
+            {
+              "level": "H3",
+              "section_number": "4-9",
+              "title": "Imperative Sentences",
+              "start_page": 125,
+              "end_page": 128
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "chapter_number": 5,
+          "title": "NOUNS AND PRONOUNS",
+          "start_page": 129,
+          "end_page": 163,
+          "sections": [
+            {
+              "level": "H3",
+              "section_number": "5-1",
+              "title": "Nouns: Singular and Plural Forms",
+              "start_page": 130,
+              "end_page": 134,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Shopping: At a Shoe Store",
+                  "start_page": 133,
+                  "end_page": 134
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "5-2",
+              "title": "Nouns: Irregular Plural Forms",
+              "start_page": 135,
+              "end_page": 137
+            },
+            {
+              "level": "H3",
+              "section_number": "5-3",
+              "title": "Adjectives with Nouns",
+              "start_page": 138,
+              "end_page": 140
+            },
+            {
+              "level": "H3",
+              "section_number": "5-4",
+              "title": "Nouns: Subjects and Objects",
+              "start_page": 141,
+              "end_page": 142
+            },
+            {
+              "level": "H3",
+              "section_number": "5-5",
+              "title": "Subject Pronouns and Object Pronouns",
+              "start_page": 143,
+              "end_page": 145
+            },
+            {
+              "level": "H3",
+              "section_number": "5-6",
+              "title": "Prepositions + Object Pronouns",
+              "start_page": 146,
+              "end_page": 148
+            },
+            {
+              "level": "H3",
+              "section_number": "5-7",
+              "title": "Possessive Adjectives and Possessive Pronouns",
+              "start_page": 149,
+              "end_page": 152,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Useful Idioms",
+                  "start_page": 151,
+                  "end_page": 152
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "5-8",
+              "title": "Possessive Nouns",
+              "start_page": 153,
+              "end_page": 156
+            },
+            {
+              "level": "H3",
+              "section_number": "5-9",
+              "title": "Questions with Whose",
+              "start_page": 157,
+              "end_page": 158
+            },
+            {
+              "level": "H3",
+              "section_number": "5-10",
+              "title": "Possessive: Irregular Plural Nouns",
+              "start_page": 159,
+              "end_page": 163
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "chapter_number": 6,
+          "title": "COUNT AND NONCOUNT NOUNS",
+          "start_page": 164,
+          "end_page": 197,
+          "sections": [
+            {
+              "level": "H3",
+              "section_number": "6-1",
+              "title": "Nouns: Count and Noncount",
+              "start_page": 165,
+              "end_page": 168
+            },
+            {
+              "level": "H3",
+              "section_number": "6-2",
+              "title": "Using A vs. An",
+              "start_page": 169,
+              "end_page": 170
+            },
+            {
+              "level": "H3",
+              "section_number": "6-3",
+              "title": "Using A/An vs. Some",
+              "start_page": 171,
+              "end_page": 176
+            },
+            {
+              "level": "H3",
+              "section_number": "6-4",
+              "title": "Measurements with Noncount Nouns",
+              "start_page": 177,
+              "end_page": 180,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Ordering from a Menu",
+                  "start_page": 180,
+                  "end_page": 180
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "6-5",
+              "title": "Using Many, Much, A Few, A Little",
+              "start_page": 181,
+              "end_page": 185,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Talking About Email and Emails",
+                  "start_page": 185,
+                  "end_page": 185
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "6-6",
+              "title": "Using The",
+              "start_page": 186,
+              "end_page": 189
+            },
+            {
+              "level": "H3",
+              "section_number": "6-7",
+              "title": "Using Ø (No Article) to Make Generalizations",
+              "start_page": 190,
+              "end_page": 193
+            },
+            {
+              "level": "H3",
+              "section_number": "6-8",
+              "title": "Using Some and Any",
+              "start_page": 194,
+              "end_page": 197
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "chapter_number": 7,
+          "title": "MORE ABOUT THE PRESENT TENSE",
+          "start_page": 198,
+          "end_page": 229,
+          "sections": [
+            {
+              "level": "H3",
+              "section_number": "7-1",
+              "title": "Using It to Talk About Dates and Time",
+              "start_page": 199,
+              "end_page": 201,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Using Calendar Expressions for Days and Weeks",
+                  "start_page": 201,
+                  "end_page": 201
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "7-2",
+              "title": "Prepositions of Time",
+              "start_page": 202,
+              "end_page": 204
+            },
+            {
+              "level": "H3",
+              "section_number": "7-3",
+              "title": "Using It, What, and How to Talk About the Weather",
+              "start_page": 205,
+              "end_page": 208,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Talking About the Seasons",
+                  "start_page": 207,
+                  "end_page": 208
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "7-4",
+              "title": "There + Be",
+              "start_page": 209,
+              "end_page": 210
+            },
+            {
+              "level": "H3",
+              "section_number": "7-5",
+              "title": "There + Be: Yes/No Questions",
+              "start_page": 211,
+              "end_page": 212
+            },
+            {
+              "level": "H3",
+              "section_number": "7-6",
+              "title": "There + Be: Asking Questions with How Many",
+              "start_page": 213,
+              "end_page": 214
+            },
+            {
+              "level": "H3",
+              "section_number": "7-7",
+              "title": "Prepositions of Place",
+              "start_page": 215,
+              "end_page": 218
+            },
+            {
+              "level": "H3",
+              "section_number": "7-8",
+              "title": "More Prepositions of Place: A List",
+              "start_page": 219,
+              "end_page": 222
+            },
+            {
+              "level": "H3",
+              "section_number": "7-9",
+              "title": "Would Like",
+              "start_page": 223,
+              "end_page": 224
+            },
+            {
+              "level": "H3",
+              "section_number": "7-10",
+              "title": "Would Like vs. Like",
+              "start_page": 225,
+              "end_page": 229
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "chapter_number": 8,
+          "title": "EXPRESSING PAST TIME, PART 1",
+          "start_page": 230,
+          "end_page": 268,
+          "sections": [
+            {
+              "level": "H3",
+              "section_number": "8-1",
+              "title": "Simple Past Tense: Be",
+              "start_page": 231,
+              "end_page": 232
+            },
+            {
+              "level": "H3",
+              "section_number": "8-2",
+              "title": "Simple Past Tense of Be: Negative",
+              "start_page": 233,
+              "end_page": 233
+            },
+            {
+              "level": "H3",
+              "section_number": "8-3",
+              "title": "Simple Past Tense of Be: Questions",
+              "start_page": 234,
+              "end_page": 237
+            },
+            {
+              "level": "H3",
+              "section_number": "8-4",
+              "title": "Simple Past Tense: Regular Verbs",
+              "start_page": 238,
+              "end_page": 240
+            },
+            {
+              "level": "H3",
+              "section_number": "8-5",
+              "title": "Past Time Words: Yesterday, Last, and Ago",
+              "start_page": 241,
+              "end_page": 244
+            },
+            {
+              "level": "H3",
+              "section_number": "8-6",
+              "title": "Simple Past Tense: Irregular Verbs, Part I",
+              "start_page": 245,
+              "end_page": 248
+            },
+            {
+              "level": "H3",
+              "section_number": "8-7",
+              "title": "Simple Past Tense: Negative",
+              "start_page": 249,
+              "end_page": 250
+            },
+            {
+              "level": "H3",
+              "section_number": "8-8",
+              "title": "Simple Past Tense: Yes/No Questions",
+              "start_page": 251,
+              "end_page": 255
+            },
+            {
+              "level": "H3",
+              "section_number": "8-9",
+              "title": "Simple Past Tense: Irregular Verbs, Part II",
+              "start_page": 256,
+              "end_page": 268,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: At the Lost-and-Found",
+                  "start_page": 260,
+                  "end_page": 268
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "chapter_number": 9,
+          "title": "EXPRESSING PAST TIME, PART 2",
+          "start_page": 269,
+          "end_page": 305,
+          "sections": [
+            {
+              "level": "H3",
+              "section_number": "9-1",
+              "title": "Simple Past Tense: Using Where, Why, When, and What Time",
+              "start_page": 270,
+              "end_page": 274,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Using How Come",
+                  "start_page": 274,
+                  "end_page": 274
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "9-2",
+              "title": "Questions with What",
+              "start_page": 275,
+              "end_page": 278
+            },
+            {
+              "level": "H3",
+              "section_number": "9-3",
+              "title": "Questions with Who",
+              "start_page": 279,
+              "end_page": 283
+            },
+            {
+              "level": "H3",
+              "section_number": "9-4",
+              "title": "Before and After in Time Clauses",
+              "start_page": 284,
+              "end_page": 286
+            },
+            {
+              "level": "H3",
+              "section_number": "9-5",
+              "title": "When in Time Clauses",
+              "start_page": 287,
+              "end_page": 289
+            },
+            {
+              "level": "H3",
+              "section_number": "9-6",
+              "title": "Present Progressive vs. Past Progressive",
+              "start_page": 290,
+              "end_page": 292
+            },
+            {
+              "level": "H3",
+              "section_number": "9-7",
+              "title": "Using While with Past Progressive",
+              "start_page": 293,
+              "end_page": 293
+            },
+            {
+              "level": "H3",
+              "section_number": "9-8",
+              "title": "Simple Past Tense vs. Past Progressive",
+              "start_page": 294,
+              "end_page": 305
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "chapter_number": 10,
+          "title": "EXPRESSING FUTURE TIME, PART 1",
+          "start_page": 306,
+          "end_page": 341,
+          "sections": [
+            {
+              "level": "H3",
+              "section_number": "10-1",
+              "title": "Future Time: Using Be Going To",
+              "start_page": 307,
+              "end_page": 311
+            },
+            {
+              "level": "H3",
+              "section_number": "10-2",
+              "title": "Using the Present Progressive to Express Future Time",
+              "start_page": 312,
+              "end_page": 315
+            },
+            {
+              "level": "H3",
+              "section_number": "10-3",
+              "title": "Words Used for Past Time and Future Time",
+              "start_page": 316,
+              "end_page": 319
+            },
+            {
+              "level": "H3",
+              "section_number": "10-4",
+              "title": "Using A Couple Of or A Few with Ago (Past) and In (Future)",
+              "start_page": 320,
+              "end_page": 322
+            },
+            {
+              "level": "H3",
+              "section_number": "10-5",
+              "title": "Using Today, Tonight, and This + Morning, Afternoon, Evening, Week, Month, Year",
+              "start_page": 323,
+              "end_page": 325
+            },
+            {
+              "level": "H3",
+              "section_number": "10-6",
+              "title": "Future Time: Using Will",
+              "start_page": 326,
+              "end_page": 329,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Using Will to Offer Help",
+                  "start_page": 329,
+                  "end_page": 329
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "10-7",
+              "title": "Asking Questions with Will",
+              "start_page": 330,
+              "end_page": 331
+            },
+            {
+              "level": "H3",
+              "section_number": "10-8",
+              "title": "Verb Summary: Present, Past, and Future",
+              "start_page": 332,
+              "end_page": 333
+            },
+            {
+              "level": "H3",
+              "section_number": "10-9",
+              "title": "Verb Summary: Forms of Be",
+              "start_page": 334,
+              "end_page": 341,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: What are you doing? vs. What do you do?",
+                  "start_page": 337,
+                  "end_page": 341
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "chapter_number": 11,
+          "title": "EXPRESSING FUTURE TIME, PART 2",
+          "start_page": 342,
+          "end_page": 367,
+          "sections": [
+            {
+              "level": "H3",
+              "section_number": "11-1",
+              "title": "May/Might vs. Will",
+              "start_page": 343,
+              "end_page": 344
+            },
+            {
+              "level": "H3",
+              "section_number": "11-2",
+              "title": "Maybe (One Word) vs. May Be (Two Words)",
+              "start_page": 345,
+              "end_page": 350,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Discussing Plans with I'll probably",
+                  "start_page": 350,
+                  "end_page": 350
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "11-3",
+              "title": "Future Time Clauses with Before, After, and When",
+              "start_page": 351,
+              "end_page": 354
+            },
+            {
+              "level": "H3",
+              "section_number": "11-4",
+              "title": "Clauses with If",
+              "start_page": 355,
+              "end_page": 357
+            },
+            {
+              "level": "H3",
+              "section_number": "11-5",
+              "title": "Expressing the Future and Present Habits with Time Clauses and If-Clauses",
+              "start_page": 358,
+              "end_page": 367,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Making Phone Calls",
+                  "start_page": 364,
+                  "end_page": 367
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "chapter_number": 12,
+          "title": "MODALS, PART 1: EXPRESSING ABILITY AND PERMISSION",
+          "start_page": 368,
+          "end_page": 393,
+          "sections": [
+            {
+              "level": "H3",
+              "section_number": "12-1",
+              "title": "Using Can",
+              "start_page": 369,
+              "end_page": 370
+            },
+            {
+              "level": "H3",
+              "section_number": "12-2",
+              "title": "Pronunciation of Can and Can't",
+              "start_page": 371,
+              "end_page": 371
+            },
+            {
+              "level": "H3",
+              "section_number": "12-3",
+              "title": "Using Can: Questions",
+              "start_page": 372,
+              "end_page": 375,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Useful Expressions with Can and Can't",
+                  "start_page": 375,
+                  "end_page": 375
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "12-4",
+              "title": "Using Know How To",
+              "start_page": 376,
+              "end_page": 377
+            },
+            {
+              "level": "H3",
+              "section_number": "12-5",
+              "title": "Using Could: Past of Can",
+              "start_page": 378,
+              "end_page": 381,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Using Could for Suggestions",
+                  "start_page": 381,
+                  "end_page": 381
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "12-6",
+              "title": "Using Be Able To",
+              "start_page": 382,
+              "end_page": 385
+            },
+            {
+              "level": "H3",
+              "section_number": "12-7",
+              "title": "Using Very and Too + Adjective",
+              "start_page": 386,
+              "end_page": 389
+            },
+            {
+              "level": "H3",
+              "section_number": "12-8",
+              "title": "Asking for Permission: May I, Could I, and Can I",
+              "start_page": 390,
+              "end_page": 393
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "chapter_number": 13,
+          "title": "MODALS, PART 2: ADVICE, NECESSITY, REQUESTS, SUGGESTIONS",
+          "start_page": 394,
+          "end_page": 421,
+          "sections": [
+            {
+              "level": "H3",
+              "section_number": "13-1",
+              "title": "Using Should",
+              "start_page": 395,
+              "end_page": 398
+            },
+            {
+              "level": "H3",
+              "section_number": "13-2",
+              "title": "Using Have + Infinitive (Have To/Has To/Had To)",
+              "start_page": 399,
+              "end_page": 402
+            },
+            {
+              "level": "H3",
+              "section_number": "13-3",
+              "title": "Using Must, Have To/Has To, and Should",
+              "start_page": 403,
+              "end_page": 406
+            },
+            {
+              "level": "H3",
+              "section_number": "13-4",
+              "title": "Polite Requests with Modals",
+              "start_page": 407,
+              "end_page": 410,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: I didn't catch that: Asking for Clarification",
+                  "start_page": 410,
+                  "end_page": 410
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "13-5",
+              "title": "Modal Auxiliaries",
+              "start_page": 411,
+              "end_page": 412
+            },
+            {
+              "level": "H3",
+              "section_number": "13-6",
+              "title": "Summary Chart: Modal Auxiliaries and Similar Expressions",
+              "start_page": 413,
+              "end_page": 416,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Making Requests with Would you mind",
+                  "start_page": 415,
+                  "end_page": 416
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "13-7",
+              "title": "Using Let's",
+              "start_page": 417,
+              "end_page": 421
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "chapter_number": 14,
+          "title": "NOUNS AND MODIFIERS",
+          "start_page": 422,
+          "end_page": 454,
+          "sections": [
+            {
+              "level": "H3",
+              "section_number": "14-1",
+              "title": "Modifying Nouns with Adjectives and Nouns",
+              "start_page": 423,
+              "end_page": 427
+            },
+            {
+              "level": "H3",
+              "section_number": "14-2",
+              "title": "Word Order of Adjectives",
+              "start_page": 428,
+              "end_page": 431
+            },
+            {
+              "level": "H3",
+              "section_number": "14-3",
+              "title": "Linking Verbs + Adjectives",
+              "start_page": 432,
+              "end_page": 434
+            },
+            {
+              "level": "H3",
+              "section_number": "14-4",
+              "title": "Adjectives and Adverbs",
+              "start_page": 435,
+              "end_page": 439,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Increasing Your Vocabulary with Prefixes and Suffixes",
+                  "start_page": 438,
+                  "end_page": 439
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "14-5",
+              "title": "Expressions of Quantity: All Of, Most Of, Some Of, Almost All Of",
+              "start_page": 440,
+              "end_page": 441
+            },
+            {
+              "level": "H3",
+              "section_number": "14-6",
+              "title": "Expressions of Quantity: Subject-Verb Agreement",
+              "start_page": 442,
+              "end_page": 444
+            },
+            {
+              "level": "H3",
+              "section_number": "14-7",
+              "title": "Using Every, Everyone, Everybody, Everything",
+              "start_page": 445,
+              "end_page": 446
+            },
+            {
+              "level": "H3",
+              "section_number": "14-8",
+              "title": "Indefinite Pronouns: Something, Someone, Somebody, Anything, Anyone, Anybody",
+              "start_page": 447,
+              "end_page": 454,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Using You to Talk About People in General",
+                  "start_page": 450,
+                  "end_page": 454
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "chapter_number": 15,
+          "title": "MAKING COMPARISONS",
+          "start_page": 455,
+          "end_page": 490,
+          "sections": [
+            {
+              "level": "H3",
+              "section_number": "15-1",
+              "title": "The Comparative: Using -er and More",
+              "start_page": 456,
+              "end_page": 461
+            },
+            {
+              "level": "H3",
+              "section_number": "15-2",
+              "title": "The Superlative: Using -est and Most",
+              "start_page": 462,
+              "end_page": 467
+            },
+            {
+              "level": "H3",
+              "section_number": "15-3",
+              "title": "Using One Of + Superlative + Plural Noun",
+              "start_page": 468,
+              "end_page": 473
+            },
+            {
+              "level": "H3",
+              "section_number": "15-4",
+              "title": "Making Comparisons with Adverbs",
+              "start_page": 474,
+              "end_page": 475
+            },
+            {
+              "level": "H3",
+              "section_number": "15-5",
+              "title": "Comparisons: Using The Same (As), Similar (To), and Different (From)",
+              "start_page": 476,
+              "end_page": 478
+            },
+            {
+              "level": "H3",
+              "section_number": "15-6",
+              "title": "Comparisons: Using Like and Alike",
+              "start_page": 479,
+              "end_page": 482,
+              "subsections": [
+                {
+                  "level": "H4",
+                  "title": "Jump-start your English: Getting a Haircut",
+                  "start_page": 482,
+                  "end_page": 482
+                }
+              ]
+            },
+            {
+              "level": "H3",
+              "section_number": "15-7",
+              "title": "Using But",
+              "start_page": 483,
+              "end_page": 484
+            },
+            {
+              "level": "H3",
+              "section_number": "15-8",
+              "title": "Using Verbs After But",
+              "start_page": 485,
+              "end_page": 490
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "level": "H1",
+      "title": "Appendix & Back Matter",
+      "start_page": 491,
+      "end_page": 523,
+      "children": [
+        {
+          "level": "H2",
+          "title": "Appendix",
+          "start_page": 491,
+          "end_page": 498,
+          "sections": [
+            {
+              "level": "H3",
+              "title": "Appendix 1: English Handwriting",
+              "start_page": 491,
+              "end_page": 491
+            },
+            {
+              "level": "H3",
+              "title": "Appendix 2: Numbers",
+              "start_page": 492,
+              "end_page": 492
+            },
+            {
+              "level": "H3",
+              "title": "Appendix 3: Ways of Saying the Time",
+              "start_page": 493,
+              "end_page": 493
+            },
+            {
+              "level": "H3",
+              "title": "Appendix 4: Days/Months/Seasons",
+              "start_page": 494,
+              "end_page": 494
+            },
+            {
+              "level": "H3",
+              "title": "Appendix 5: Basic Capitalization Rules",
+              "start_page": 495,
+              "end_page": 495
+            },
+            {
+              "level": "H3",
+              "title": "Appendix 6: Pronunciation for Verb Endings -s and -ed",
+              "start_page": 496,
+              "end_page": 496
+            },
+            {
+              "level": "H3",
+              "title": "Appendix 7: Common Irregular Verbs: A Reference List",
+              "start_page": 497,
+              "end_page": 498
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "title": "Listening Script",
+          "start_page": 499,
+          "end_page": 508
+        },
+        {
+          "level": "H2",
+          "title": "Let's Talk: Answers",
+          "start_page": 509,
+          "end_page": 512
+        },
+        {
+          "level": "H2",
+          "title": "Index",
+          "start_page": 513,
+          "end_page": 522
+        },
+        {
+          "level": "H2",
+          "title": "Credits",
+          "start_page": 523,
+          "end_page": 523
+        }
+      ]
+    }
+  ]
+}

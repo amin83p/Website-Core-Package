@@ -26,6 +26,10 @@
 
   const pdfBookPageOne = item.pdfBookPageOne ? Number(item.pdfBookPageOne) : '';
 
+  const thirdPartyDigitalUrl = item.thirdPartyDigitalUrl ? String(item.thirdPartyDigitalUrl) : '';
+
+  const hasThirdPartyDigitalUrl = Boolean(thirdPartyDigitalUrl);
+
 %>
 
 
@@ -348,11 +352,11 @@
 
               <h6 class="fw-bold text-primary mb-1"><i class="bi bi-file-earmark-pdf me-2"></i>Digital copy (PDF)</h6>
 
-              <div class="small text-muted mb-3">Upload the book PDF and map printed page 1 to the correct PDF page for session navigation.</div>
+              <div class="small text-muted mb-3">Upload a hosted PDF, add a publisher or LMS link, and map printed page 1 to the correct PDF page when a file is attached.</div>
 
               <div class="row g-3 align-items-start">
 
-                <div class="col-md-7">
+                <div class="col-md-6">
 
                   <label class="form-label fw-bold" for="digitalPdfInput">Upload PDF</label>
 
@@ -393,6 +397,26 @@
                   <div id="digitalPdfUploadStatus" class="small text-muted mt-2"></div>
 
                 </div>
+
+                <div class="col-md-6">
+
+                  <label class="form-label fw-bold" for="thirdPartyDigitalUrl">Third-party link</label>
+
+                  <input type="url" id="thirdPartyDigitalUrl" name="thirdPartyDigitalUrl" class="form-control size-md" placeholder="https://…" value="<%= thirdPartyDigitalUrl %>">
+
+                  <div class="form-text small">Optional HTTPS link when the school does not host the PDF (publisher site, LMS, etc.).</div>
+
+                  <div class="mt-2<%= hasThirdPartyDigitalUrl ? '' : ' d-none' %>" id="thirdPartyDigitalUrlPreviewWrap">
+
+                    <a href="<%= hasThirdPartyDigitalUrl ? thirdPartyDigitalUrl : '#' %>" target="_blank" rel="noopener noreferrer" class="btn btn-outline-secondary btn-sm" id="thirdPartyDigitalUrlOpenLink"><i class="bi bi-box-arrow-up-right me-1"></i>Open link</a>
+
+                  </div>
+
+                </div>
+
+              </div>
+
+              <div class="row g-3 align-items-start mt-1">
 
                 <div class="col-md-5">
 
@@ -578,7 +602,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const pdfPageMappingHint = document.getElementById('pdfPageMappingHint');
 
+  const thirdPartyDigitalUrlInput = document.getElementById('thirdPartyDigitalUrl');
+
+  const thirdPartyDigitalUrlPreviewWrap = document.getElementById('thirdPartyDigitalUrlPreviewWrap');
+
+  const thirdPartyDigitalUrlOpenLink = document.getElementById('thirdPartyDigitalUrlOpenLink');
+
   const bookTabs = document.getElementById('bookTabs');
+
+
+
+  function syncThirdPartyDigitalUrlPreview() {
+
+    const value = String(thirdPartyDigitalUrlInput?.value || '').trim();
+
+    thirdPartyDigitalUrlPreviewWrap?.classList.toggle('d-none', !value);
+
+    if (thirdPartyDigitalUrlOpenLink) {
+
+      thirdPartyDigitalUrlOpenLink.href = value || '#';
+
+    }
+
+  }
+
+  thirdPartyDigitalUrlInput?.addEventListener('input', syncThirdPartyDigitalUrlPreview);
+
+  thirdPartyDigitalUrlInput?.addEventListener('change', syncThirdPartyDigitalUrlPreview);
 
 
 

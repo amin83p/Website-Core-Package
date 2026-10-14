@@ -98,6 +98,8 @@ test('renderVerticalWeekGrid gives solo sessions full width when other overlaps 
   assert.match(overlapA, /width:calc\(50% - 4px\)/);
   assert.match(overlapB, /width:calc\(50% - 4px\)/);
   assert.match(soloC, /width:calc\(100% - 4px\)/);
+  assert.match(overlapA, /data-track-count="2"/);
+  assert.match(overlapA, /is-overlap-lane/);
 });
 
 test('renderVerticalWeekGrid uses custom block builder callback', () => {

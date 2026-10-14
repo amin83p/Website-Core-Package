@@ -1,0 +1,1910 @@
+{
+  "bookTitle": "Elements of Success 1",
+  "suggestedTotalPages": 386,
+  "tableOfContents": [
+    {
+      "id": "elements-of-success-1-h1-1-introduction-to-part",
+      "label": "Chapter 1: Introduction to Parts of Speech",
+      "startPage": 2,
+      "endPage": 25,
+      "level": 1,
+      "sortOrder": 1
+    },
+    {
+      "id": "elements-of-success-1-h1-1-introduction-to-part-u1-warm-up",
+      "label": "Warm-Up",
+      "startPage": 2,
+      "endPage": 3,
+      "level": 2,
+      "sortOrder": 2
+    },
+    {
+      "id": "elements-of-success-1-h1-1-introduction-to-part-u2-nouns",
+      "label": "1.1 Nouns",
+      "startPage": 4,
+      "endPage": 7,
+      "level": 2,
+      "sortOrder": 3
+    },
+    {
+      "id": "elements-of-success-1-h1-1-introduction-to-part-u2-nouns-spelling-note-a-and-an",
+      "label": "Spelling Note: A and An",
+      "startPage": 6,
+      "endPage": 7,
+      "level": 3,
+      "sortOrder": 4
+    },
+    {
+      "id": "elements-of-success-1-h1-1-introduction-to-part-u3-subject-pronouns",
+      "label": "1.2 Subject Pronouns and the Verb Be",
+      "startPage": 8,
+      "endPage": 9,
+      "level": 2,
+      "sortOrder": 5
+    },
+    {
+      "id": "elements-of-success-1-h1-1-introduction-to-part-u4-adjectives",
+      "label": "1.3 Adjectives",
+      "startPage": 10,
+      "endPage": 12,
+      "level": 2,
+      "sortOrder": 6
+    },
+    {
+      "id": "elements-of-success-1-h1-1-introduction-to-part-u5-possessives",
+      "label": "1.4 Possessives",
+      "startPage": 13,
+      "endPage": 14,
+      "level": 2,
+      "sortOrder": 7
+    },
+    {
+      "id": "elements-of-success-1-h1-1-introduction-to-part-u6-subjects-verbs-a",
+      "label": "1.5 Subjects, Verbs, and Sentences",
+      "startPage": 15,
+      "endPage": 18,
+      "level": 2,
+      "sortOrder": 8
+    },
+    {
+      "id": "elements-of-success-1-h1-1-introduction-to-part-u6-subjects-verbs-a-usage-note-words-that-ar",
+      "label": "Usage Note: Words That Are Nouns or Verbs",
+      "startPage": 17,
+      "endPage": 18,
+      "level": 3,
+      "sortOrder": 9
+    },
+    {
+      "id": "elements-of-success-1-h1-1-introduction-to-part-u7-imperatives",
+      "label": "1.6 Imperatives",
+      "startPage": 19,
+      "endPage": 21,
+      "level": 2,
+      "sortOrder": 10
+    },
+    {
+      "id": "elements-of-success-1-h1-1-introduction-to-part-u8-wrap-up",
+      "label": "Wrap-Up",
+      "startPage": 22,
+      "endPage": 24,
+      "level": 2,
+      "sortOrder": 11
+    },
+    {
+      "id": "elements-of-success-1-h1-1-introduction-to-part-u8-wrap-up-grammar-in-reading",
+      "label": "Grammar in Reading",
+      "startPage": 22,
+      "endPage": 23,
+      "level": 3,
+      "sortOrder": 12
+    },
+    {
+      "id": "elements-of-success-1-h1-1-introduction-to-part-u8-wrap-up-grammar-in-speaking",
+      "label": "Grammar in Speaking",
+      "startPage": 24,
+      "endPage": 24,
+      "level": 3,
+      "sortOrder": 13
+    },
+    {
+      "id": "elements-of-success-1-h1-1-introduction-to-part-u9-summary-of-parts",
+      "label": "1.7 Summary of Parts of Speech",
+      "startPage": 25,
+      "endPage": 25,
+      "level": 2,
+      "sortOrder": 14
+    },
+    {
+      "id": "elements-of-success-1-h1-2-the-verb-have",
+      "label": "Chapter 2: The Verb Have",
+      "startPage": 26,
+      "endPage": 45,
+      "level": 1,
+      "sortOrder": 15
+    },
+    {
+      "id": "elements-of-success-1-h1-2-the-verb-have-u1-warm-up",
+      "label": "Warm-Up",
+      "startPage": 26,
+      "endPage": 27,
+      "level": 2,
+      "sortOrder": 16
+    },
+    {
+      "id": "elements-of-success-1-h1-2-the-verb-have-u2-positive-stateme",
+      "label": "2.1 Positive Statements with Have/Has",
+      "startPage": 28,
+      "endPage": 30,
+      "level": 2,
+      "sortOrder": 17
+    },
+    {
+      "id": "elements-of-success-1-h1-2-the-verb-have-u3-negative-stateme",
+      "label": "2.2 Negative Statements with Have",
+      "startPage": 31,
+      "endPage": 33,
+      "level": 2,
+      "sortOrder": 18
+    },
+    {
+      "id": "elements-of-success-1-h1-2-the-verb-have-u4-yes-no-questions",
+      "label": "2.3 Yes/No Questions with Have",
+      "startPage": 34,
+      "endPage": 37,
+      "level": 2,
+      "sortOrder": 19
+    },
+    {
+      "id": "elements-of-success-1-h1-2-the-verb-have-u4-yes-no-questions-usage-note-common-phrase",
+      "label": "Usage Note: Common Phrases with Have",
+      "startPage": 36,
+      "endPage": 36,
+      "level": 3,
+      "sortOrder": 20
+    },
+    {
+      "id": "elements-of-success-1-h1-2-the-verb-have-u4-yes-no-questions-pronunciation-note-reduc",
+      "label": "Pronunciation Note: Reduction of Do You",
+      "startPage": 37,
+      "endPage": 37,
+      "level": 3,
+      "sortOrder": 21
+    },
+    {
+      "id": "elements-of-success-1-h1-2-the-verb-have-u4-yes-no-questions-pronunciation-note-inton",
+      "label": "Pronunciation Note: Intonation in Yes/No Questions",
+      "startPage": 38,
+      "endPage": 38,
+      "level": 3,
+      "sortOrder": 22
+    },
+    {
+      "id": "elements-of-success-1-h1-2-the-verb-have-u5-questions-with-w",
+      "label": "2.4 Questions with When, What, and How Many",
+      "startPage": 38,
+      "endPage": 43,
+      "level": 2,
+      "sortOrder": 23
+    },
+    {
+      "id": "elements-of-success-1-h1-2-the-verb-have-u5-questions-with-w-usage-note-time-expressi",
+      "label": "Usage Note: Time Expressions with At, In, and On",
+      "startPage": 40,
+      "endPage": 42,
+      "level": 3,
+      "sortOrder": 24
+    },
+    {
+      "id": "elements-of-success-1-h1-2-the-verb-have-u5-questions-with-w-pronunciation-note-inton",
+      "label": "Pronunciation Note: Intonation in Wh-Questions",
+      "startPage": 43,
+      "endPage": 43,
+      "level": 3,
+      "sortOrder": 25
+    },
+    {
+      "id": "elements-of-success-1-h1-2-the-verb-have-u6-wrap-up",
+      "label": "Wrap-Up",
+      "startPage": 44,
+      "endPage": 44,
+      "level": 2,
+      "sortOrder": 26
+    },
+    {
+      "id": "elements-of-success-1-h1-2-the-verb-have-u6-wrap-up-grammar-in-reading",
+      "label": "Grammar in Reading",
+      "startPage": 44,
+      "endPage": 44,
+      "level": 3,
+      "sortOrder": 27
+    },
+    {
+      "id": "elements-of-success-1-h1-2-the-verb-have-u6-wrap-up-grammar-in-speaking",
+      "label": "Grammar in Speaking",
+      "startPage": 44,
+      "endPage": 44,
+      "level": 3,
+      "sortOrder": 28
+    },
+    {
+      "id": "elements-of-success-1-h1-2-the-verb-have-u7-summary-of-the-v",
+      "label": "2.5 Summary of the Verb Have",
+      "startPage": 45,
+      "endPage": 45,
+      "level": 2,
+      "sortOrder": 29
+    },
+    {
+      "id": "elements-of-success-1-h1-3-simple-present",
+      "label": "Chapter 3: Simple Present",
+      "startPage": 46,
+      "endPage": 73,
+      "level": 1,
+      "sortOrder": 30
+    },
+    {
+      "id": "elements-of-success-1-h1-3-simple-present-u1-warm-up",
+      "label": "Warm-Up",
+      "startPage": 46,
+      "endPage": 47,
+      "level": 2,
+      "sortOrder": 31
+    },
+    {
+      "id": "elements-of-success-1-h1-3-simple-present-u2-positive-stateme",
+      "label": "3.1 Positive Statements with the Simple Present",
+      "startPage": 48,
+      "endPage": 52,
+      "level": 2,
+      "sortOrder": 32
+    },
+    {
+      "id": "elements-of-success-1-h1-3-simple-present-u2-positive-stateme-spelling-note-s-and-es-e",
+      "label": "Spelling Note: -s and -es Endings on Simple Present Verbs",
+      "startPage": 49,
+      "endPage": 50,
+      "level": 3,
+      "sortOrder": 33
+    },
+    {
+      "id": "elements-of-success-1-h1-3-simple-present-u2-positive-stateme-pronunciation-note-s-and",
+      "label": "Pronunciation Note: -s and -es Endings on Simple Present Verbs",
+      "startPage": 51,
+      "endPage": 52,
+      "level": 3,
+      "sortOrder": 34
+    },
+    {
+      "id": "elements-of-success-1-h1-3-simple-present-u3-adverbs-of-frequ",
+      "label": "3.2 Adverbs of Frequency with the Simple Present",
+      "startPage": 53,
+      "endPage": 56,
+      "level": 2,
+      "sortOrder": 35
+    },
+    {
+      "id": "elements-of-success-1-h1-3-simple-present-u3-adverbs-of-frequ-usage-note-time-expressi",
+      "label": "Usage Note: Time Expressions with the Simple Present",
+      "startPage": 56,
+      "endPage": 56,
+      "level": 3,
+      "sortOrder": 36
+    },
+    {
+      "id": "elements-of-success-1-h1-3-simple-present-u4-negative-stateme",
+      "label": "3.3 Negative Statements with the Simple Present",
+      "startPage": 57,
+      "endPage": 59,
+      "level": 2,
+      "sortOrder": 37
+    },
+    {
+      "id": "elements-of-success-1-h1-3-simple-present-u5-yes-no-questions",
+      "label": "3.4 Yes/No Questions with the Simple Present",
+      "startPage": 60,
+      "endPage": 65,
+      "level": 2,
+      "sortOrder": 38
+    },
+    {
+      "id": "elements-of-success-1-h1-3-simple-present-u5-yes-no-questions-usage-note-frequency-exp",
+      "label": "Usage Note: Frequency Expressions with the Simple Present",
+      "startPage": 64,
+      "endPage": 65,
+      "level": 3,
+      "sortOrder": 39
+    },
+    {
+      "id": "elements-of-success-1-h1-3-simple-present-u6-wh-questions-wit",
+      "label": "3.5 Wh-Questions with the Simple Present",
+      "startPage": 66,
+      "endPage": 70,
+      "level": 2,
+      "sortOrder": 40
+    },
+    {
+      "id": "elements-of-success-1-h1-3-simple-present-u7-wrap-up",
+      "label": "Wrap-Up",
+      "startPage": 71,
+      "endPage": 72,
+      "level": 2,
+      "sortOrder": 41
+    },
+    {
+      "id": "elements-of-success-1-h1-3-simple-present-u7-wrap-up-grammar-in-reading",
+      "label": "Grammar in Reading",
+      "startPage": 71,
+      "endPage": 71,
+      "level": 3,
+      "sortOrder": 42
+    },
+    {
+      "id": "elements-of-success-1-h1-3-simple-present-u7-wrap-up-grammar-in-speaking",
+      "label": "Grammar in Speaking",
+      "startPage": 72,
+      "endPage": 72,
+      "level": 3,
+      "sortOrder": 43
+    },
+    {
+      "id": "elements-of-success-1-h1-3-simple-present-u8-summary-of-the-s",
+      "label": "3.6 Summary of the Simple Present",
+      "startPage": 73,
+      "endPage": 73,
+      "level": 2,
+      "sortOrder": 44
+    },
+    {
+      "id": "elements-of-success-1-h1-4-the-verb-be",
+      "label": "Chapter 4: The Verb Be",
+      "startPage": 74,
+      "endPage": 101,
+      "level": 1,
+      "sortOrder": 45
+    },
+    {
+      "id": "elements-of-success-1-h1-4-the-verb-be-u1-warm-up",
+      "label": "Warm-Up",
+      "startPage": 74,
+      "endPage": 75,
+      "level": 2,
+      "sortOrder": 46
+    },
+    {
+      "id": "elements-of-success-1-h1-4-the-verb-be-u2-positive-stateme",
+      "label": "4.1 Positive Statements with Be + Noun Phrase",
+      "startPage": 76,
+      "endPage": 78,
+      "level": 2,
+      "sortOrder": 47
+    },
+    {
+      "id": "elements-of-success-1-h1-4-the-verb-be-u2-positive-stateme-usage-note-making-introd",
+      "label": "Usage Note: Making Introductions",
+      "startPage": 77,
+      "endPage": 78,
+      "level": 3,
+      "sortOrder": 48
+    },
+    {
+      "id": "elements-of-success-1-h1-4-the-verb-be-u3-positive-and-neg",
+      "label": "4.2 Positive and Negative Statements with Be + Adjective",
+      "startPage": 79,
+      "endPage": 85,
+      "level": 2,
+      "sortOrder": 49
+    },
+    {
+      "id": "elements-of-success-1-h1-4-the-verb-be-u3-positive-and-neg-usage-note-very-and-real",
+      "label": "Usage Note: Very and Really",
+      "startPage": 82,
+      "endPage": 82,
+      "level": 3,
+      "sortOrder": 50
+    },
+    {
+      "id": "elements-of-success-1-h1-4-the-verb-be-u3-positive-and-neg-pronunciation-note-he-s-",
+      "label": "Pronunciation Note: He's vs. His",
+      "startPage": 83,
+      "endPage": 83,
+      "level": 3,
+      "sortOrder": 51
+    },
+    {
+      "id": "elements-of-success-1-h1-4-the-verb-be-u3-positive-and-neg-usage-note-adverbs-of-fr",
+      "label": "Usage Note: Adverbs of Frequency with Be",
+      "startPage": 84,
+      "endPage": 85,
+      "level": 3,
+      "sortOrder": 52
+    },
+    {
+      "id": "elements-of-success-1-h1-4-the-verb-be-u4-be-place",
+      "label": "4.3 Be + Place",
+      "startPage": 86,
+      "endPage": 88,
+      "level": 2,
+      "sortOrder": 53
+    },
+    {
+      "id": "elements-of-success-1-h1-4-the-verb-be-u5-yes-no-questions",
+      "label": "4.4 Yes/No Questions and Short Answers with Be",
+      "startPage": 89,
+      "endPage": 91,
+      "level": 2,
+      "sortOrder": 54
+    },
+    {
+      "id": "elements-of-success-1-h1-4-the-verb-be-u5-yes-no-questions-usage-note-it-for-weathe",
+      "label": "Usage Note: It for Weather and Time",
+      "startPage": 91,
+      "endPage": 91,
+      "level": 3,
+      "sortOrder": 55
+    },
+    {
+      "id": "elements-of-success-1-h1-4-the-verb-be-u6-wh-questions-wit",
+      "label": "4.5 Wh-Questions with Be",
+      "startPage": 92,
+      "endPage": 95,
+      "level": 2,
+      "sortOrder": 56
+    },
+    {
+      "id": "elements-of-success-1-h1-4-the-verb-be-u7-the-simple-prese",
+      "label": "4.6 The Simple Present of Be vs. Other Verbs",
+      "startPage": 96,
+      "endPage": 98,
+      "level": 2,
+      "sortOrder": 57
+    },
+    {
+      "id": "elements-of-success-1-h1-4-the-verb-be-u7-the-simple-prese-usage-note-answering-be-",
+      "label": "Usage Note: Answering Be Questions with Other Verbs",
+      "startPage": 98,
+      "endPage": 98,
+      "level": 3,
+      "sortOrder": 58
+    },
+    {
+      "id": "elements-of-success-1-h1-4-the-verb-be-u8-wrap-up",
+      "label": "Wrap-Up",
+      "startPage": 99,
+      "endPage": 100,
+      "level": 2,
+      "sortOrder": 59
+    },
+    {
+      "id": "elements-of-success-1-h1-4-the-verb-be-u8-wrap-up-grammar-in-reading",
+      "label": "Grammar in Reading",
+      "startPage": 99,
+      "endPage": 99,
+      "level": 3,
+      "sortOrder": 60
+    },
+    {
+      "id": "elements-of-success-1-h1-4-the-verb-be-u8-wrap-up-grammar-in-speaking",
+      "label": "Grammar in Speaking",
+      "startPage": 100,
+      "endPage": 100,
+      "level": 3,
+      "sortOrder": 61
+    },
+    {
+      "id": "elements-of-success-1-h1-4-the-verb-be-u9-summary-of-the-v",
+      "label": "4.7 Summary of the Verb Be",
+      "startPage": 101,
+      "endPage": 101,
+      "level": 2,
+      "sortOrder": 62
+    },
+    {
+      "id": "elements-of-success-1-h1-5-nouns-articles-and-q",
+      "label": "Chapter 5: Nouns, Articles, and Quantifiers",
+      "startPage": 102,
+      "endPage": 135,
+      "level": 1,
+      "sortOrder": 63
+    },
+    {
+      "id": "elements-of-success-1-h1-5-nouns-articles-and-q-u1-warm-up",
+      "label": "Warm-Up",
+      "startPage": 102,
+      "endPage": 103,
+      "level": 2,
+      "sortOrder": 64
+    },
+    {
+      "id": "elements-of-success-1-h1-5-nouns-articles-and-q-u2-introduction-to-",
+      "label": "5.1 Introduction to Nouns",
+      "startPage": 104,
+      "endPage": 105,
+      "level": 2,
+      "sortOrder": 65
+    },
+    {
+      "id": "elements-of-success-1-h1-5-nouns-articles-and-q-u3-singular-nouns-a",
+      "label": "5.2 Singular Nouns and Plural Nouns",
+      "startPage": 106,
+      "endPage": 111,
+      "level": 2,
+      "sortOrder": 66
+    },
+    {
+      "id": "elements-of-success-1-h1-5-nouns-articles-and-q-u3-singular-nouns-a-spelling-note-s-and-es-e",
+      "label": "Spelling Note: -s and -es Endings",
+      "startPage": 108,
+      "endPage": 109,
+      "level": 3,
+      "sortOrder": 67
+    },
+    {
+      "id": "elements-of-success-1-h1-5-nouns-articles-and-q-u3-singular-nouns-a-pronunciation-note-s-and",
+      "label": "Pronunciation Note: -s and -es Endings",
+      "startPage": 110,
+      "endPage": 111,
+      "level": 3,
+      "sortOrder": 68
+    },
+    {
+      "id": "elements-of-success-1-h1-5-nouns-articles-and-q-u4-count-nouns-and-",
+      "label": "5.3 Count Nouns and Noncount Nouns",
+      "startPage": 112,
+      "endPage": 114,
+      "level": 2,
+      "sortOrder": 69
+    },
+    {
+      "id": "elements-of-success-1-h1-5-nouns-articles-and-q-u5-a-and-an-with-si",
+      "label": "5.4 A and An with Singular Count Nouns",
+      "startPage": 115,
+      "endPage": 117,
+      "level": 2,
+      "sortOrder": 70
+    },
+    {
+      "id": "elements-of-success-1-h1-5-nouns-articles-and-q-u6-some-and-any",
+      "label": "5.5 Some and Any",
+      "startPage": 118,
+      "endPage": 119,
+      "level": 2,
+      "sortOrder": 71
+    },
+    {
+      "id": "elements-of-success-1-h1-5-nouns-articles-and-q-u7-no-article-with-",
+      "label": "5.6 No Article (Ø) with Plural Count Nouns and Noncount Nouns",
+      "startPage": 120,
+      "endPage": 121,
+      "level": 2,
+      "sortOrder": 72
+    },
+    {
+      "id": "elements-of-success-1-h1-5-nouns-articles-and-q-u8-the",
+      "label": "5.7 The",
+      "startPage": 122,
+      "endPage": 126,
+      "level": 2,
+      "sortOrder": 73
+    },
+    {
+      "id": "elements-of-success-1-h1-5-nouns-articles-and-q-u8-the-pronunciation-note-prono",
+      "label": "Pronunciation Note: Pronouncing A, An, and The",
+      "startPage": 125,
+      "endPage": 125,
+      "level": 3,
+      "sortOrder": 74
+    },
+    {
+      "id": "elements-of-success-1-h1-5-nouns-articles-and-q-u8-the-usage-note-common-phrase",
+      "label": "Usage Note: Common Phrases with The",
+      "startPage": 125,
+      "endPage": 126,
+      "level": 3,
+      "sortOrder": 75
+    },
+    {
+      "id": "elements-of-success-1-h1-5-nouns-articles-and-q-u9-quantifiers-for-",
+      "label": "5.8 Quantifiers for Plural Count Nouns and Noncount Nouns",
+      "startPage": 127,
+      "endPage": 131,
+      "level": 2,
+      "sortOrder": 76
+    },
+    {
+      "id": "elements-of-success-1-h1-5-nouns-articles-and-q-u9-quantifiers-for--usage-note-measure-words",
+      "label": "Usage Note: Measure Words",
+      "startPage": 131,
+      "endPage": 131,
+      "level": 3,
+      "sortOrder": 77
+    },
+    {
+      "id": "elements-of-success-1-h1-5-nouns-articles-and-q-u10-wrap-up",
+      "label": "Wrap-Up",
+      "startPage": 132,
+      "endPage": 134,
+      "level": 2,
+      "sortOrder": 78
+    },
+    {
+      "id": "elements-of-success-1-h1-5-nouns-articles-and-q-u10-wrap-up-grammar-in-reading",
+      "label": "Grammar in Reading",
+      "startPage": 132,
+      "endPage": 133,
+      "level": 3,
+      "sortOrder": 79
+    },
+    {
+      "id": "elements-of-success-1-h1-5-nouns-articles-and-q-u10-wrap-up-grammar-in-speaking",
+      "label": "Grammar in Speaking",
+      "startPage": 134,
+      "endPage": 134,
+      "level": 3,
+      "sortOrder": 80
+    },
+    {
+      "id": "elements-of-success-1-h1-5-nouns-articles-and-q-u11-summary-of-nouns",
+      "label": "5.9 Summary of Nouns, Articles, and Quantifiers",
+      "startPage": 135,
+      "endPage": 135,
+      "level": 2,
+      "sortOrder": 81
+    },
+    {
+      "id": "elements-of-success-1-h1-6-there-is-there-are-a",
+      "label": "Chapter 6: There Is/There Are and Pronouns",
+      "startPage": 136,
+      "endPage": 163,
+      "level": 1,
+      "sortOrder": 82
+    },
+    {
+      "id": "elements-of-success-1-h1-6-there-is-there-are-a-u1-warm-up",
+      "label": "Warm-Up",
+      "startPage": 136,
+      "endPage": 137,
+      "level": 2,
+      "sortOrder": 83
+    },
+    {
+      "id": "elements-of-success-1-h1-6-there-is-there-are-a-u2-positive-stateme",
+      "label": "6.1 Positive Statements with There Is and There Are",
+      "startPage": 138,
+      "endPage": 139,
+      "level": 2,
+      "sortOrder": 84
+    },
+    {
+      "id": "elements-of-success-1-h1-6-there-is-there-are-a-u3-using-there-is-a",
+      "label": "6.2 Using There Is and There Are with Different Kinds of Nouns",
+      "startPage": 140,
+      "endPage": 142,
+      "level": 2,
+      "sortOrder": 85
+    },
+    {
+      "id": "elements-of-success-1-h1-6-there-is-there-are-a-u3-using-there-is-a-pronunciation-note-there",
+      "label": "Pronunciation Note: There Are vs. They're",
+      "startPage": 141,
+      "endPage": 141,
+      "level": 3,
+      "sortOrder": 86
+    },
+    {
+      "id": "elements-of-success-1-h1-6-there-is-there-are-a-u3-using-there-is-a-usage-note-using-subject",
+      "label": "Usage Note: Using Subject Pronouns after There Is and There Are",
+      "startPage": 142,
+      "endPage": 142,
+      "level": 3,
+      "sortOrder": 87
+    },
+    {
+      "id": "elements-of-success-1-h1-6-there-is-there-are-a-u4-negative-stateme",
+      "label": "6.3 Negative Statements with There Is and There Are",
+      "startPage": 143,
+      "endPage": 145,
+      "level": 2,
+      "sortOrder": 88
+    },
+    {
+      "id": "elements-of-success-1-h1-6-there-is-there-are-a-u5-yes-no-questions",
+      "label": "6.4 Yes/No Questions with Is There and Are There",
+      "startPage": 146,
+      "endPage": 147,
+      "level": 2,
+      "sortOrder": 89
+    },
+    {
+      "id": "elements-of-success-1-h1-6-there-is-there-are-a-u6-questions-with-h",
+      "label": "6.5 Questions with How Many and How Much + Are There and Is There",
+      "startPage": 148,
+      "endPage": 149,
+      "level": 2,
+      "sortOrder": 90
+    },
+    {
+      "id": "elements-of-success-1-h1-6-there-is-there-are-a-u6-questions-with-h-pronunciation-note-stres",
+      "label": "Pronunciation Note: Stress in Questions with How Much and How Many",
+      "startPage": 149,
+      "endPage": 149,
+      "level": 3,
+      "sortOrder": 91
+    },
+    {
+      "id": "elements-of-success-1-h1-6-there-is-there-are-a-u7-this-that-these-",
+      "label": "6.6 This, That, These, and Those",
+      "startPage": 150,
+      "endPage": 152,
+      "level": 2,
+      "sortOrder": 92
+    },
+    {
+      "id": "elements-of-success-1-h1-6-there-is-there-are-a-u8-object-pronouns",
+      "label": "6.7 Object Pronouns",
+      "startPage": 153,
+      "endPage": 156,
+      "level": 2,
+      "sortOrder": 93
+    },
+    {
+      "id": "elements-of-success-1-h1-6-there-is-there-are-a-u8-object-pronouns-pronunciation-note-reduc",
+      "label": "Pronunciation Note: Reducing Him, Her, and Them",
+      "startPage": 154,
+      "endPage": 156,
+      "level": 3,
+      "sortOrder": 94
+    },
+    {
+      "id": "elements-of-success-1-h1-6-there-is-there-are-a-u9-possessive-prono",
+      "label": "6.8 Possessive Pronouns and Questions with Whose",
+      "startPage": 157,
+      "endPage": 160,
+      "level": 2,
+      "sortOrder": 95
+    },
+    {
+      "id": "elements-of-success-1-h1-6-there-is-there-are-a-u10-wrap-up",
+      "label": "Wrap-Up",
+      "startPage": 161,
+      "endPage": 162,
+      "level": 2,
+      "sortOrder": 96
+    },
+    {
+      "id": "elements-of-success-1-h1-6-there-is-there-are-a-u10-wrap-up-grammar-in-reading",
+      "label": "Grammar in Reading",
+      "startPage": 161,
+      "endPage": 161,
+      "level": 3,
+      "sortOrder": 97
+    },
+    {
+      "id": "elements-of-success-1-h1-6-there-is-there-are-a-u10-wrap-up-grammar-in-speaking",
+      "label": "Grammar in Speaking",
+      "startPage": 161,
+      "endPage": 162,
+      "level": 3,
+      "sortOrder": 98
+    },
+    {
+      "id": "elements-of-success-1-h1-6-there-is-there-are-a-u11-summary-of-there",
+      "label": "6.9 Summary of There Is/There Are and Pronouns",
+      "startPage": 163,
+      "endPage": 163,
+      "level": 2,
+      "sortOrder": 99
+    },
+    {
+      "id": "elements-of-success-1-h1-7-present-progressive",
+      "label": "Chapter 7: Present Progressive",
+      "startPage": 164,
+      "endPage": 193,
+      "level": 1,
+      "sortOrder": 100
+    },
+    {
+      "id": "elements-of-success-1-h1-7-present-progressive-u1-warm-up",
+      "label": "Warm-Up",
+      "startPage": 164,
+      "endPage": 165,
+      "level": 2,
+      "sortOrder": 101
+    },
+    {
+      "id": "elements-of-success-1-h1-7-present-progressive-u2-positive-stateme",
+      "label": "7.1 Positive Statements with the Present Progressive",
+      "startPage": 166,
+      "endPage": 171,
+      "level": 2,
+      "sortOrder": 102
+    },
+    {
+      "id": "elements-of-success-1-h1-7-present-progressive-u2-positive-stateme-spelling-note-adding-ing",
+      "label": "Spelling Note: Adding -ing to Verbs",
+      "startPage": 168,
+      "endPage": 169,
+      "level": 3,
+      "sortOrder": 103
+    },
+    {
+      "id": "elements-of-success-1-h1-7-present-progressive-u2-positive-stateme-usage-note-using-two-ing",
+      "label": "Usage Note: Using Two -ing Verbs with One Subject",
+      "startPage": 170,
+      "endPage": 171,
+      "level": 3,
+      "sortOrder": 104
+    },
+    {
+      "id": "elements-of-success-1-h1-7-present-progressive-u3-negative-stateme",
+      "label": "7.2 Negative Statements with the Present Progressive",
+      "startPage": 172,
+      "endPage": 174,
+      "level": 2,
+      "sortOrder": 105
+    },
+    {
+      "id": "elements-of-success-1-h1-7-present-progressive-u4-yes-no-questions",
+      "label": "7.3 Yes/No Questions with the Present Progressive",
+      "startPage": 175,
+      "endPage": 176,
+      "level": 2,
+      "sortOrder": 106
+    },
+    {
+      "id": "elements-of-success-1-h1-7-present-progressive-u5-wh-questions-wit",
+      "label": "7.4 Wh-Questions with the Present Progressive",
+      "startPage": 177,
+      "endPage": 181,
+      "level": 2,
+      "sortOrder": 107
+    },
+    {
+      "id": "elements-of-success-1-h1-7-present-progressive-u5-wh-questions-wit-pronunciation-note-contr",
+      "label": "Pronunciation Note: Contractions with Wh-Words",
+      "startPage": 178,
+      "endPage": 181,
+      "level": 3,
+      "sortOrder": 108
+    },
+    {
+      "id": "elements-of-success-1-h1-7-present-progressive-u6-simple-present-v",
+      "label": "7.5 Simple Present vs. Present Progressive",
+      "startPage": 182,
+      "endPage": 184,
+      "level": 2,
+      "sortOrder": 109
+    },
+    {
+      "id": "elements-of-success-1-h1-7-present-progressive-u7-action-verbs-and",
+      "label": "7.6 Action Verbs and Non-Action Verbs",
+      "startPage": 185,
+      "endPage": 190,
+      "level": 2,
+      "sortOrder": 110
+    },
+    {
+      "id": "elements-of-success-1-h1-7-present-progressive-u7-action-verbs-and-usage-note-think-have-an",
+      "label": "Usage Note: Think, Have, and Look",
+      "startPage": 188,
+      "endPage": 190,
+      "level": 3,
+      "sortOrder": 111
+    },
+    {
+      "id": "elements-of-success-1-h1-7-present-progressive-u8-wrap-up",
+      "label": "Wrap-Up",
+      "startPage": 191,
+      "endPage": 192,
+      "level": 2,
+      "sortOrder": 112
+    },
+    {
+      "id": "elements-of-success-1-h1-7-present-progressive-u8-wrap-up-grammar-in-reading",
+      "label": "Grammar in Reading",
+      "startPage": 191,
+      "endPage": 191,
+      "level": 3,
+      "sortOrder": 113
+    },
+    {
+      "id": "elements-of-success-1-h1-7-present-progressive-u8-wrap-up-grammar-in-speaking",
+      "label": "Grammar in Speaking",
+      "startPage": 192,
+      "endPage": 192,
+      "level": 3,
+      "sortOrder": 114
+    },
+    {
+      "id": "elements-of-success-1-h1-7-present-progressive-u9-summary-of-the-p",
+      "label": "7.7 Summary of the Present Progressive",
+      "startPage": 193,
+      "endPage": 193,
+      "level": 2,
+      "sortOrder": 115
+    },
+    {
+      "id": "elements-of-success-1-h1-8-simple-past",
+      "label": "Chapter 8: Simple Past",
+      "startPage": 194,
+      "endPage": 219,
+      "level": 1,
+      "sortOrder": 116
+    },
+    {
+      "id": "elements-of-success-1-h1-8-simple-past-u1-warm-up",
+      "label": "Warm-Up",
+      "startPage": 194,
+      "endPage": 195,
+      "level": 2,
+      "sortOrder": 117
+    },
+    {
+      "id": "elements-of-success-1-h1-8-simple-past-u2-positive-stateme",
+      "label": "8.1 Positive Statements with the Simple Past",
+      "startPage": 196,
+      "endPage": 201,
+      "level": 2,
+      "sortOrder": 118
+    },
+    {
+      "id": "elements-of-success-1-h1-8-simple-past-u2-positive-stateme-spelling-note-ed-verb-en",
+      "label": "Spelling Note: -ed Verb Endings",
+      "startPage": 197,
+      "endPage": 198,
+      "level": 3,
+      "sortOrder": 119
+    },
+    {
+      "id": "elements-of-success-1-h1-8-simple-past-u2-positive-stateme-pronunciation-note-ed-ve",
+      "label": "Pronunciation Note: -ed Verb Endings",
+      "startPage": 199,
+      "endPage": 201,
+      "level": 3,
+      "sortOrder": 120
+    },
+    {
+      "id": "elements-of-success-1-h1-8-simple-past-u3-simple-past-irre",
+      "label": "8.2 Simple Past Irregular Verbs",
+      "startPage": 202,
+      "endPage": 203,
+      "level": 2,
+      "sortOrder": 121
+    },
+    {
+      "id": "elements-of-success-1-h1-8-simple-past-u4-negative-stateme",
+      "label": "8.3 Negative Statements with the Simple Past",
+      "startPage": 204,
+      "endPage": 205,
+      "level": 2,
+      "sortOrder": 122
+    },
+    {
+      "id": "elements-of-success-1-h1-8-simple-past-u5-questions-with-t",
+      "label": "8.4 Questions with the Simple Past",
+      "startPage": 206,
+      "endPage": 208,
+      "level": 2,
+      "sortOrder": 123
+    },
+    {
+      "id": "elements-of-success-1-h1-8-simple-past-u6-simple-past-of-b",
+      "label": "8.5 Simple Past of Be: Positive and Negative Statements",
+      "startPage": 209,
+      "endPage": 212,
+      "level": 2,
+      "sortOrder": 124
+    },
+    {
+      "id": "elements-of-success-1-h1-8-simple-past-u6-simple-past-of-b-pronunciation-note-were-",
+      "label": "Pronunciation Note: Were vs. Weren't",
+      "startPage": 211,
+      "endPage": 212,
+      "level": 3,
+      "sortOrder": 125
+    },
+    {
+      "id": "elements-of-success-1-h1-8-simple-past-u7-simple-past-ques",
+      "label": "8.6 Simple Past Questions with Be",
+      "startPage": 213,
+      "endPage": 215,
+      "level": 2,
+      "sortOrder": 126
+    },
+    {
+      "id": "elements-of-success-1-h1-8-simple-past-u8-there-was-there-",
+      "label": "8.7 There Was/There Were",
+      "startPage": 216,
+      "endPage": 217,
+      "level": 2,
+      "sortOrder": 127
+    },
+    {
+      "id": "elements-of-success-1-h1-8-simple-past-u9-wrap-up",
+      "label": "Wrap-Up",
+      "startPage": 218,
+      "endPage": 219,
+      "level": 2,
+      "sortOrder": 128
+    },
+    {
+      "id": "elements-of-success-1-h1-8-simple-past-u9-wrap-up-grammar-in-reading",
+      "label": "Grammar in Reading",
+      "startPage": 218,
+      "endPage": 218,
+      "level": 3,
+      "sortOrder": 129
+    },
+    {
+      "id": "elements-of-success-1-h1-8-simple-past-u9-wrap-up-grammar-in-speaking",
+      "label": "Grammar in Speaking",
+      "startPage": 219,
+      "endPage": 219,
+      "level": 3,
+      "sortOrder": 130
+    },
+    {
+      "id": "elements-of-success-1-h1-8-simple-past-u10-summary-of-the-s",
+      "label": "8.8 Summary of the Simple Past",
+      "startPage": 219,
+      "endPage": 219,
+      "level": 2,
+      "sortOrder": 131
+    },
+    {
+      "id": "elements-of-success-1-h1-9-adjectives",
+      "label": "Chapter 9: Adjectives",
+      "startPage": 220,
+      "endPage": 249,
+      "level": 1,
+      "sortOrder": 132
+    },
+    {
+      "id": "elements-of-success-1-h1-9-adjectives-u1-warm-up",
+      "label": "Warm-Up",
+      "startPage": 220,
+      "endPage": 221,
+      "level": 2,
+      "sortOrder": 133
+    },
+    {
+      "id": "elements-of-success-1-h1-9-adjectives-u2-placement-of-adj",
+      "label": "9.1 Placement of Adjectives",
+      "startPage": 222,
+      "endPage": 225,
+      "level": 2,
+      "sortOrder": 134
+    },
+    {
+      "id": "elements-of-success-1-h1-9-adjectives-u3-adverbs-of-degre",
+      "label": "9.2 Adverbs of Degree",
+      "startPage": 226,
+      "endPage": 230,
+      "level": 2,
+      "sortOrder": 135
+    },
+    {
+      "id": "elements-of-success-1-h1-9-adjectives-u4-questions-with-h",
+      "label": "9.3 Questions with How + Adjective",
+      "startPage": 231,
+      "endPage": 232,
+      "level": 2,
+      "sortOrder": 136
+    },
+    {
+      "id": "elements-of-success-1-h1-9-adjectives-u5-adjectives-with-",
+      "label": "9.4 Adjectives with -er and More",
+      "startPage": 233,
+      "endPage": 235,
+      "level": 2,
+      "sortOrder": 137
+    },
+    {
+      "id": "elements-of-success-1-h1-9-adjectives-u5-adjectives-with--spelling-note-adjectives",
+      "label": "Spelling Note: Adjectives + -er",
+      "startPage": 234,
+      "endPage": 235,
+      "level": 3,
+      "sortOrder": 138
+    },
+    {
+      "id": "elements-of-success-1-h1-9-adjectives-u6-using-adjectives",
+      "label": "9.5 Using Adjectives to Compare",
+      "startPage": 236,
+      "endPage": 238,
+      "level": 2,
+      "sortOrder": 139
+    },
+    {
+      "id": "elements-of-success-1-h1-9-adjectives-u7-less-adjective",
+      "label": "9.6 Less + Adjective",
+      "startPage": 239,
+      "endPage": 241,
+      "level": 2,
+      "sortOrder": 140
+    },
+    {
+      "id": "elements-of-success-1-h1-9-adjectives-u8-adjectives-with-",
+      "label": "9.7 Adjectives with -est and Most",
+      "startPage": 242,
+      "endPage": 247,
+      "level": 2,
+      "sortOrder": 141
+    },
+    {
+      "id": "elements-of-success-1-h1-9-adjectives-u8-adjectives-with--spelling-note-adjectives",
+      "label": "Spelling Note: Adjectives + -est",
+      "startPage": 244,
+      "endPage": 245,
+      "level": 3,
+      "sortOrder": 142
+    },
+    {
+      "id": "elements-of-success-1-h1-9-adjectives-u8-adjectives-with--usage-note-prepositional",
+      "label": "Usage Note: Prepositional Phrases after -est/Most Forms",
+      "startPage": 246,
+      "endPage": 247,
+      "level": 3,
+      "sortOrder": 143
+    },
+    {
+      "id": "elements-of-success-1-h1-9-adjectives-u9-wrap-up",
+      "label": "Wrap-Up",
+      "startPage": 248,
+      "endPage": 249,
+      "level": 2,
+      "sortOrder": 144
+    },
+    {
+      "id": "elements-of-success-1-h1-9-adjectives-u9-wrap-up-grammar-in-reading",
+      "label": "Grammar in Reading",
+      "startPage": 248,
+      "endPage": 248,
+      "level": 3,
+      "sortOrder": 145
+    },
+    {
+      "id": "elements-of-success-1-h1-9-adjectives-u9-wrap-up-grammar-in-writing",
+      "label": "Grammar in Writing",
+      "startPage": 249,
+      "endPage": 249,
+      "level": 3,
+      "sortOrder": 146
+    },
+    {
+      "id": "elements-of-success-1-h1-9-adjectives-u10-summary-of-adjec",
+      "label": "9.8 Summary of Adjectives",
+      "startPage": 249,
+      "endPage": 249,
+      "level": 2,
+      "sortOrder": 147
+    },
+    {
+      "id": "elements-of-success-1-h1-10-future-forms",
+      "label": "Chapter 10: Future Forms",
+      "startPage": 250,
+      "endPage": 277,
+      "level": 1,
+      "sortOrder": 148
+    },
+    {
+      "id": "elements-of-success-1-h1-10-future-forms-u1-warm-up",
+      "label": "Warm-Up",
+      "startPage": 250,
+      "endPage": 251,
+      "level": 2,
+      "sortOrder": 149
+    },
+    {
+      "id": "elements-of-success-1-h1-10-future-forms-u2-positive-and-neg",
+      "label": "10.1 Positive and Negative Statements with Be Going To",
+      "startPage": 252,
+      "endPage": 255,
+      "level": 2,
+      "sortOrder": 150
+    },
+    {
+      "id": "elements-of-success-1-h1-10-future-forms-u2-positive-and-neg-pronunciation-note-gonna",
+      "label": "Pronunciation Note: Gonna",
+      "startPage": 253,
+      "endPage": 254,
+      "level": 3,
+      "sortOrder": 151
+    },
+    {
+      "id": "elements-of-success-1-h1-10-future-forms-u2-positive-and-neg-usage-note-there-is-ther",
+      "label": "Usage Note: There Is/There Are Going to Be",
+      "startPage": 255,
+      "endPage": 255,
+      "level": 3,
+      "sortOrder": 152
+    },
+    {
+      "id": "elements-of-success-1-h1-10-future-forms-u3-future-time-expr",
+      "label": "10.2 Future Time Expressions",
+      "startPage": 256,
+      "endPage": 258,
+      "level": 2,
+      "sortOrder": 153
+    },
+    {
+      "id": "elements-of-success-1-h1-10-future-forms-u3-future-time-expr-usage-note-i-think-and-p",
+      "label": "Usage Note: I Think and Probably",
+      "startPage": 258,
+      "endPage": 258,
+      "level": 3,
+      "sortOrder": 154
+    },
+    {
+      "id": "elements-of-success-1-h1-10-future-forms-u4-yes-no-questions",
+      "label": "10.3 Yes/No Questions and Short Answers with Be Going To",
+      "startPage": 259,
+      "endPage": 260,
+      "level": 2,
+      "sortOrder": 155
+    },
+    {
+      "id": "elements-of-success-1-h1-10-future-forms-u5-wh-questions-wit",
+      "label": "10.4 Wh-Questions with Be Going To",
+      "startPage": 261,
+      "endPage": 262,
+      "level": 2,
+      "sortOrder": 156
+    },
+    {
+      "id": "elements-of-success-1-h1-10-future-forms-u6-using-the-presen",
+      "label": "10.5 Using the Present Progressive to Talk about Future Plans",
+      "startPage": 263,
+      "endPage": 265,
+      "level": 2,
+      "sortOrder": 157
+    },
+    {
+      "id": "elements-of-success-1-h1-10-future-forms-u7-may-and-might-fo",
+      "label": "10.6 May and Might for Future Possibility",
+      "startPage": 266,
+      "endPage": 268,
+      "level": 2,
+      "sortOrder": 158
+    },
+    {
+      "id": "elements-of-success-1-h1-10-future-forms-u8-statements-with-",
+      "label": "10.7 Statements with Will",
+      "startPage": 269,
+      "endPage": 273,
+      "level": 2,
+      "sortOrder": 159
+    },
+    {
+      "id": "elements-of-success-1-h1-10-future-forms-u8-statements-with--pronunciation-note-ll",
+      "label": "Pronunciation Note: 'll",
+      "startPage": 271,
+      "endPage": 273,
+      "level": 3,
+      "sortOrder": 160
+    },
+    {
+      "id": "elements-of-success-1-h1-10-future-forms-u9-questions-with-w",
+      "label": "10.8 Questions with Will",
+      "startPage": 274,
+      "endPage": 275,
+      "level": 2,
+      "sortOrder": 161
+    },
+    {
+      "id": "elements-of-success-1-h1-10-future-forms-u10-wrap-up",
+      "label": "Wrap-Up",
+      "startPage": 276,
+      "endPage": 276,
+      "level": 2,
+      "sortOrder": 162
+    },
+    {
+      "id": "elements-of-success-1-h1-10-future-forms-u10-wrap-up-grammar-in-reading",
+      "label": "Grammar in Reading",
+      "startPage": 276,
+      "endPage": 276,
+      "level": 3,
+      "sortOrder": 163
+    },
+    {
+      "id": "elements-of-success-1-h1-10-future-forms-u10-wrap-up-grammar-in-writing",
+      "label": "Grammar in Writing",
+      "startPage": 276,
+      "endPage": 276,
+      "level": 3,
+      "sortOrder": 164
+    },
+    {
+      "id": "elements-of-success-1-h1-10-future-forms-u11-summary-of-futur",
+      "label": "10.9 Summary of Future Forms",
+      "startPage": 277,
+      "endPage": 277,
+      "level": 2,
+      "sortOrder": 165
+    },
+    {
+      "id": "elements-of-success-1-h1-11-modals-i",
+      "label": "Chapter 11: Modals I",
+      "startPage": 278,
+      "endPage": 305,
+      "level": 1,
+      "sortOrder": 166
+    },
+    {
+      "id": "elements-of-success-1-h1-11-modals-i-u1-warm-up",
+      "label": "Warm-Up",
+      "startPage": 278,
+      "endPage": 279,
+      "level": 2,
+      "sortOrder": 167
+    },
+    {
+      "id": "elements-of-success-1-h1-11-modals-i-u2-can-for-ability-",
+      "label": "11.1 Can for Ability and Possibility",
+      "startPage": 280,
+      "endPage": 282,
+      "level": 2,
+      "sortOrder": 168
+    },
+    {
+      "id": "elements-of-success-1-h1-11-modals-i-u2-can-for-ability--usage-note-very-well-pre",
+      "label": "Usage Note: Very Well, Pretty Well, and Not at All",
+      "startPage": 281,
+      "endPage": 281,
+      "level": 3,
+      "sortOrder": 169
+    },
+    {
+      "id": "elements-of-success-1-h1-11-modals-i-u2-can-for-ability--pronunciation-note-can-v",
+      "label": "Pronunciation Note: Can vs. Can't",
+      "startPage": 282,
+      "endPage": 282,
+      "level": 3,
+      "sortOrder": 170
+    },
+    {
+      "id": "elements-of-success-1-h1-11-modals-i-u3-questions-with-c",
+      "label": "11.2 Questions with Can",
+      "startPage": 283,
+      "endPage": 285,
+      "level": 2,
+      "sortOrder": 171
+    },
+    {
+      "id": "elements-of-success-1-h1-11-modals-i-u4-could-for-past-a",
+      "label": "11.3 Could for Past Ability",
+      "startPage": 286,
+      "endPage": 289,
+      "level": 2,
+      "sortOrder": 172
+    },
+    {
+      "id": "elements-of-success-1-h1-11-modals-i-u5-be-able-to",
+      "label": "11.4 Be Able To",
+      "startPage": 290,
+      "endPage": 292,
+      "level": 2,
+      "sortOrder": 173
+    },
+    {
+      "id": "elements-of-success-1-h1-11-modals-i-u6-permission-with-",
+      "label": "11.5 Permission with Can, Could, and May + I/We",
+      "startPage": 293,
+      "endPage": 294,
+      "level": 2,
+      "sortOrder": 174
+    },
+    {
+      "id": "elements-of-success-1-h1-11-modals-i-u7-requests-with-ca",
+      "label": "11.6 Requests with Can, Could, and Would + You",
+      "startPage": 295,
+      "endPage": 298,
+      "level": 2,
+      "sortOrder": 175
+    },
+    {
+      "id": "elements-of-success-1-h1-11-modals-i-u7-requests-with-ca-usage-note-borrow-have-l",
+      "label": "Usage Note: Borrow, Have, Lend, and Give",
+      "startPage": 298,
+      "endPage": 298,
+      "level": 3,
+      "sortOrder": 176
+    },
+    {
+      "id": "elements-of-success-1-h1-11-modals-i-u8-would-like-for-d",
+      "label": "11.7 Would Like for Desires, Offers, and Invitations",
+      "startPage": 299,
+      "endPage": 303,
+      "level": 2,
+      "sortOrder": 177
+    },
+    {
+      "id": "elements-of-success-1-h1-11-modals-i-u8-would-like-for-d-pronunciation-note-would",
+      "label": "Pronunciation Note: Would You...",
+      "startPage": 300,
+      "endPage": 301,
+      "level": 3,
+      "sortOrder": 178
+    },
+    {
+      "id": "elements-of-success-1-h1-11-modals-i-u8-would-like-for-d-usage-note-would-like-vs",
+      "label": "Usage Note: Would Like vs. Want",
+      "startPage": 302,
+      "endPage": 302,
+      "level": 3,
+      "sortOrder": 179
+    },
+    {
+      "id": "elements-of-success-1-h1-11-modals-i-u8-would-like-for-d-pronunciation-note-d-you",
+      "label": "Pronunciation Note: D'you Wanna",
+      "startPage": 302,
+      "endPage": 303,
+      "level": 3,
+      "sortOrder": 180
+    },
+    {
+      "id": "elements-of-success-1-h1-11-modals-i-u9-wrap-up",
+      "label": "Wrap-Up",
+      "startPage": 304,
+      "endPage": 304,
+      "level": 2,
+      "sortOrder": 181
+    },
+    {
+      "id": "elements-of-success-1-h1-11-modals-i-u9-wrap-up-grammar-in-reading",
+      "label": "Grammar in Reading",
+      "startPage": 304,
+      "endPage": 304,
+      "level": 3,
+      "sortOrder": 182
+    },
+    {
+      "id": "elements-of-success-1-h1-11-modals-i-u9-wrap-up-grammar-in-speaking",
+      "label": "Grammar in Speaking",
+      "startPage": 304,
+      "endPage": 304,
+      "level": 3,
+      "sortOrder": 183
+    },
+    {
+      "id": "elements-of-success-1-h1-11-modals-i-u10-summary-of-modal",
+      "label": "11.8 Summary of Modals I",
+      "startPage": 305,
+      "endPage": 305,
+      "level": 2,
+      "sortOrder": 184
+    },
+    {
+      "id": "elements-of-success-1-h1-12-modals-ii",
+      "label": "Chapter 12: Modals II",
+      "startPage": 306,
+      "endPage": 331,
+      "level": 1,
+      "sortOrder": 185
+    },
+    {
+      "id": "elements-of-success-1-h1-12-modals-ii-u1-warm-up",
+      "label": "Warm-Up",
+      "startPage": 306,
+      "endPage": 307,
+      "level": 2,
+      "sortOrder": 186
+    },
+    {
+      "id": "elements-of-success-1-h1-12-modals-ii-u2-advice-and-opini",
+      "label": "12.1 Advice and Opinions with Should and Shouldn't",
+      "startPage": 308,
+      "endPage": 310,
+      "level": 2,
+      "sortOrder": 187
+    },
+    {
+      "id": "elements-of-success-1-h1-12-modals-ii-u2-advice-and-opini-pronunciation-note-stres",
+      "label": "Pronunciation Note: Stress with Should and Shouldn't",
+      "startPage": 308,
+      "endPage": 309,
+      "level": 3,
+      "sortOrder": 188
+    },
+    {
+      "id": "elements-of-success-1-h1-12-modals-ii-u2-advice-and-opini-usage-note-i-don-t-think",
+      "label": "Usage Note: I (Don't) Think and Maybe in Statements with Should",
+      "startPage": 310,
+      "endPage": 310,
+      "level": 3,
+      "sortOrder": 189
+    },
+    {
+      "id": "elements-of-success-1-h1-12-modals-ii-u3-questions-with-s",
+      "label": "12.2 Questions with Should",
+      "startPage": 311,
+      "endPage": 313,
+      "level": 2,
+      "sortOrder": 190
+    },
+    {
+      "id": "elements-of-success-1-h1-12-modals-ii-u4-suggestions-with",
+      "label": "12.3 Suggestions with Why Don't You/We",
+      "startPage": 314,
+      "endPage": 317,
+      "level": 2,
+      "sortOrder": 191
+    },
+    {
+      "id": "elements-of-success-1-h1-12-modals-ii-u5-necessity-with-h",
+      "label": "12.4 Necessity with Have To and Need To",
+      "startPage": 318,
+      "endPage": 320,
+      "level": 2,
+      "sortOrder": 192
+    },
+    {
+      "id": "elements-of-success-1-h1-12-modals-ii-u5-necessity-with-h-pronunciation-note-have-",
+      "label": "Pronunciation Note: Have To and Need To",
+      "startPage": 319,
+      "endPage": 320,
+      "level": 3,
+      "sortOrder": 193
+    },
+    {
+      "id": "elements-of-success-1-h1-12-modals-ii-u6-questions-with-h",
+      "label": "12.5 Questions with Have To and Need To",
+      "startPage": 321,
+      "endPage": 322,
+      "level": 2,
+      "sortOrder": 194
+    },
+    {
+      "id": "elements-of-success-1-h1-12-modals-ii-u7-necessity-and-pr",
+      "label": "12.6 Necessity and Prohibition with Must",
+      "startPage": 323,
+      "endPage": 325,
+      "level": 2,
+      "sortOrder": 195
+    },
+    {
+      "id": "elements-of-success-1-h1-12-modals-ii-u7-necessity-and-pr-usage-note-must-not-vs-n",
+      "label": "Usage Note: Must Not vs. Not Have To",
+      "startPage": 324,
+      "endPage": 325,
+      "level": 3,
+      "sortOrder": 196
+    },
+    {
+      "id": "elements-of-success-1-h1-12-modals-ii-u8-comparing-modals",
+      "label": "12.7 Comparing Modals: Can vs. Should vs. Have To",
+      "startPage": 326,
+      "endPage": 328,
+      "level": 2,
+      "sortOrder": 197
+    },
+    {
+      "id": "elements-of-success-1-h1-12-modals-ii-u9-wrap-up",
+      "label": "Wrap-Up",
+      "startPage": 329,
+      "endPage": 330,
+      "level": 2,
+      "sortOrder": 198
+    },
+    {
+      "id": "elements-of-success-1-h1-12-modals-ii-u9-wrap-up-grammar-in-reading",
+      "label": "Grammar in Reading",
+      "startPage": 329,
+      "endPage": 329,
+      "level": 3,
+      "sortOrder": 199
+    },
+    {
+      "id": "elements-of-success-1-h1-12-modals-ii-u9-wrap-up-grammar-in-speaking",
+      "label": "Grammar in Speaking",
+      "startPage": 330,
+      "endPage": 330,
+      "level": 3,
+      "sortOrder": 200
+    },
+    {
+      "id": "elements-of-success-1-h1-12-modals-ii-u10-summary-of-modal",
+      "label": "12.8 Summary of Modals II",
+      "startPage": 331,
+      "endPage": 331,
+      "level": 2,
+      "sortOrder": 201
+    },
+    {
+      "id": "elements-of-success-1-h1-13-types-of-verbs",
+      "label": "Chapter 13: Types of Verbs",
+      "startPage": 332,
+      "endPage": 357,
+      "level": 1,
+      "sortOrder": 202
+    },
+    {
+      "id": "elements-of-success-1-h1-13-types-of-verbs-u1-warm-up",
+      "label": "Warm-Up",
+      "startPage": 332,
+      "endPage": 333,
+      "level": 2,
+      "sortOrder": 203
+    },
+    {
+      "id": "elements-of-success-1-h1-13-types-of-verbs-u2-overview-of-past",
+      "label": "13.1 Overview of Past, Present, and Future Verb Forms",
+      "startPage": 334,
+      "endPage": 339,
+      "level": 2,
+      "sortOrder": 204
+    },
+    {
+      "id": "elements-of-success-1-h1-13-types-of-verbs-u2-overview-of-past-usage-note-action-verbs-",
+      "label": "Usage Note: Action Verbs and Non-Action Verbs with Present Forms",
+      "startPage": 336,
+      "endPage": 339,
+      "level": 3,
+      "sortOrder": 205
+    },
+    {
+      "id": "elements-of-success-1-h1-13-types-of-verbs-u3-verb-object",
+      "label": "13.2 Verb + Object",
+      "startPage": 340,
+      "endPage": 342,
+      "level": 2,
+      "sortOrder": 206
+    },
+    {
+      "id": "elements-of-success-1-h1-13-types-of-verbs-u3-verb-object-usage-note-common-phrase",
+      "label": "Usage Note: Common Phrases with Make and Take",
+      "startPage": 341,
+      "endPage": 342,
+      "level": 3,
+      "sortOrder": 207
+    },
+    {
+      "id": "elements-of-success-1-h1-13-types-of-verbs-u4-verbs-with-no-ob",
+      "label": "13.3 Verbs with No Object",
+      "startPage": 343,
+      "endPage": 344,
+      "level": 2,
+      "sortOrder": 208
+    },
+    {
+      "id": "elements-of-success-1-h1-13-types-of-verbs-u4-verbs-with-no-ob-usage-note-verb-object-v",
+      "label": "Usage Note: Verb + Object vs. No Object",
+      "startPage": 344,
+      "endPage": 344,
+      "level": 3,
+      "sortOrder": 209
+    },
+    {
+      "id": "elements-of-success-1-h1-13-types-of-verbs-u5-be-and-other-lin",
+      "label": "13.4 Be and Other Linking Verbs",
+      "startPage": 345,
+      "endPage": 345,
+      "level": 2,
+      "sortOrder": 210
+    },
+    {
+      "id": "elements-of-success-1-h1-13-types-of-verbs-u6-comparing-differ",
+      "label": "13.5 Comparing Different Types of Verbs",
+      "startPage": 346,
+      "endPage": 347,
+      "level": 2,
+      "sortOrder": 211
+    },
+    {
+      "id": "elements-of-success-1-h1-13-types-of-verbs-u7-be-adjective-phr",
+      "label": "13.6 Be + Adjective Phrase + Preposition",
+      "startPage": 348,
+      "endPage": 350,
+      "level": 2,
+      "sortOrder": 212
+    },
+    {
+      "id": "elements-of-success-1-h1-13-types-of-verbs-u8-multi-word-verbs",
+      "label": "13.7 Multi-Word Verbs (Part 1)",
+      "startPage": 351,
+      "endPage": 352,
+      "level": 2,
+      "sortOrder": 213
+    },
+    {
+      "id": "elements-of-success-1-h1-13-types-of-verbs-u9-multi-word-verbs",
+      "label": "13.8 Multi-Word Verbs (Part 2)",
+      "startPage": 353,
+      "endPage": 354,
+      "level": 2,
+      "sortOrder": 214
+    },
+    {
+      "id": "elements-of-success-1-h1-13-types-of-verbs-u10-wrap-up",
+      "label": "Wrap-Up",
+      "startPage": 355,
+      "endPage": 357,
+      "level": 2,
+      "sortOrder": 215
+    },
+    {
+      "id": "elements-of-success-1-h1-13-types-of-verbs-u10-wrap-up-grammar-in-reading",
+      "label": "Grammar in Reading",
+      "startPage": 355,
+      "endPage": 356,
+      "level": 3,
+      "sortOrder": 216
+    },
+    {
+      "id": "elements-of-success-1-h1-13-types-of-verbs-u10-wrap-up-grammar-in-writing",
+      "label": "Grammar in Writing",
+      "startPage": 357,
+      "endPage": 357,
+      "level": 3,
+      "sortOrder": 217
+    },
+    {
+      "id": "elements-of-success-1-h1-13-types-of-verbs-u11-summary-of-types",
+      "label": "13.9 Summary of Types of Verbs",
+      "startPage": 357,
+      "endPage": 357,
+      "level": 2,
+      "sortOrder": 218
+    },
+    {
+      "id": "elements-of-success-1-h1-14-sentence-patterns",
+      "label": "Chapter 14: Sentence Patterns",
+      "startPage": 358,
+      "endPage": 383,
+      "level": 1,
+      "sortOrder": 219
+    },
+    {
+      "id": "elements-of-success-1-h1-14-sentence-patterns-u1-warm-up",
+      "label": "Warm-Up",
+      "startPage": 358,
+      "endPage": 359,
+      "level": 2,
+      "sortOrder": 220
+    },
+    {
+      "id": "elements-of-success-1-h1-14-sentence-patterns-u2-what-is-a-senten",
+      "label": "14.1 What Is a Sentence?",
+      "startPage": 360,
+      "endPage": 361,
+      "level": 2,
+      "sortOrder": 221
+    },
+    {
+      "id": "elements-of-success-1-h1-14-sentence-patterns-u3-subjects-and-ver",
+      "label": "14.2 Subjects and Verbs in Questions",
+      "startPage": 362,
+      "endPage": 364,
+      "level": 2,
+      "sortOrder": 222
+    },
+    {
+      "id": "elements-of-success-1-h1-14-sentence-patterns-u3-subjects-and-ver-pronunciation-note-state",
+      "label": "Pronunciation Note: Statements as Questions",
+      "startPage": 364,
+      "endPage": 364,
+      "level": 3,
+      "sortOrder": 223
+    },
+    {
+      "id": "elements-of-success-1-h1-14-sentence-patterns-u4-common-sentence-",
+      "label": "14.3 Common Sentence Patterns",
+      "startPage": 365,
+      "endPage": 369,
+      "level": 2,
+      "sortOrder": 224
+    },
+    {
+      "id": "elements-of-success-1-h1-14-sentence-patterns-u4-common-sentence--usage-note-placement-of-",
+      "label": "Usage Note: Placement of Adverbs of Frequency",
+      "startPage": 368,
+      "endPage": 369,
+      "level": 3,
+      "sortOrder": 225
+    },
+    {
+      "id": "elements-of-success-1-h1-14-sentence-patterns-u5-connecting-claus",
+      "label": "14.4 Connecting Clauses with And, But, and So",
+      "startPage": 370,
+      "endPage": 372,
+      "level": 2,
+      "sortOrder": 226
+    },
+    {
+      "id": "elements-of-success-1-h1-14-sentence-patterns-u6-clauses-with-bec",
+      "label": "14.5 Clauses with Because",
+      "startPage": 373,
+      "endPage": 374,
+      "level": 2,
+      "sortOrder": 227
+    },
+    {
+      "id": "elements-of-success-1-h1-14-sentence-patterns-u7-past-and-present",
+      "label": "14.6 Past and Present Time Clauses",
+      "startPage": 375,
+      "endPage": 377,
+      "level": 2,
+      "sortOrder": 228
+    },
+    {
+      "id": "elements-of-success-1-h1-14-sentence-patterns-u8-future-time-clau",
+      "label": "14.7 Future Time Clauses",
+      "startPage": 378,
+      "endPage": 380,
+      "level": 2,
+      "sortOrder": 229
+    },
+    {
+      "id": "elements-of-success-1-h1-14-sentence-patterns-u9-using-sentence-p",
+      "label": "14.8 Using Sentence Patterns in Writing",
+      "startPage": 381,
+      "endPage": 382,
+      "level": 2,
+      "sortOrder": 230
+    },
+    {
+      "id": "elements-of-success-1-h1-14-sentence-patterns-u10-wrap-up",
+      "label": "Wrap-Up",
+      "startPage": 382,
+      "endPage": 382,
+      "level": 2,
+      "sortOrder": 231
+    },
+    {
+      "id": "elements-of-success-1-h1-14-sentence-patterns-u10-wrap-up-grammar-in-reading",
+      "label": "Grammar in Reading",
+      "startPage": 382,
+      "endPage": 382,
+      "level": 3,
+      "sortOrder": 232
+    },
+    {
+      "id": "elements-of-success-1-h1-14-sentence-patterns-u10-wrap-up-grammar-in-writing",
+      "label": "Grammar in Writing",
+      "startPage": 382,
+      "endPage": 382,
+      "level": 3,
+      "sortOrder": 233
+    },
+    {
+      "id": "elements-of-success-1-h1-14-sentence-patterns-u11-summary-of-sente",
+      "label": "14.9 Summary of Sentence Patterns",
+      "startPage": 383,
+      "endPage": 383,
+      "level": 2,
+      "sortOrder": 234
+    },
+    {
+      "id": "elements-of-success-1-h1-15-back-matter",
+      "label": "Back Matter",
+      "startPage": 384,
+      "endPage": 385,
+      "level": 1,
+      "sortOrder": 235
+    },
+    {
+      "id": "elements-of-success-1-h1-15-back-matter-u1-resources",
+      "label": "Resources",
+      "startPage": 384,
+      "endPage": 384,
+      "level": 2,
+      "sortOrder": 236
+    },
+    {
+      "id": "elements-of-success-1-h1-15-back-matter-u2-index",
+      "label": "Index",
+      "startPage": 386,
+      "endPage": 386,
+      "level": 2,
+      "sortOrder": 237
+    },
+    {
+      "id": "elements-of-success-1-h1-15-back-matter-u3-track-list",
+      "label": "Track List",
+      "startPage": 385,
+      "endPage": 385,
+      "level": 2,
+      "sortOrder": 238
+    }
+  ]
+}

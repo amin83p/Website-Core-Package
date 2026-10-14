@@ -73,6 +73,8 @@ test('book form view includes TOC editor and AJAX save', () => {
   assert.match(source, /bookInitialTocData/);
   assert.match(source, /hid_coverPhoto/);
   assert.match(source, /hid_digitalPdf/);
+  assert.match(source, /name="thirdPartyDigitalUrl"/);
+  assert.match(source, /digitalPdfInput/);
   assert.match(source, /pdfBookPageOne/);
   assert.match(source, /api\/upload-cover/);
   assert.match(source, /api\/upload-pdf/);
@@ -301,6 +303,37 @@ test('bookModel requires pdf page one when digital PDF is present', () => {
       })
     });
   }, /PDF page for book page 1 is required/);
+});
+
+test('bookModel accepts HTTPS third-party digital URL and rejects HTTP', () => {
+  const sanitized = bookModel.sanitizeInput({
+    orgId: 'ORG_TEST',
+    title: 'Sample Book',
+    thirdPartyDigitalUrl: 'https://publisher.example/book/123'
+  });
+  assert.equal(sanitized.thirdPartyDigitalUrl, 'https://publisher.example/book/123');
+  assert.throws(() => {
+    bookModel.sanitizeInput({
+      orgId: 'ORG_TEST',
+      title: 'Sample Book',
+      thirdPartyDigitalUrl: 'http://publisher.example/book/123'
+    });
+  }, /HTTPS/);
+  const cleared = bookModel.sanitizeInput({
+    orgId: 'ORG_TEST',
+    title: 'Sample Book',
+    thirdPartyDigitalUrl: '   '
+  });
+  assert.equal(cleared.thirdPartyDigitalUrl, '');
+});
+
+test('book controller buildPayload includes thirdPartyDigitalUrl', () => {
+  const payload = bookController._test.buildPayload({
+    title: 'Linked Book',
+    thirdPartyDigitalUrl: 'https://lms.example/course/book',
+    tableOfContents: '[]'
+  }, '42', 'USER_TEST');
+  assert.equal(payload.thirdPartyDigitalUrl, 'https://lms.example/course/book');
 });
 
 test('bookModel stores digital PDF with page-one mapping', () => {

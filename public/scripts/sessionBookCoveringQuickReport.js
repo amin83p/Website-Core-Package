@@ -209,13 +209,21 @@
     }
     const authors = Array.isArray(currentBook.authors) ? currentBook.authors.join(', ') : '';
     const pdfUrl = String(currentBook.digitalPdf?.url || '').trim();
+    const thirdPartyUrl = String(currentBook.thirdPartyDigitalUrl || '').trim();
     let meta = '';
     if (authors) meta += `<div><strong>Authors:</strong> ${escapeHtml(authors)}</div>`;
     if (currentBook.isbn) meta += `<div><strong>ISBN:</strong> ${escapeHtml(currentBook.isbn)}</div>`;
     if (currentBook.publisher) meta += `<div><strong>Publisher:</strong> ${escapeHtml(currentBook.publisher)}</div>`;
     if (currentBook.totalPages) meta += `<div><strong>Pages:</strong> ${escapeHtml(currentBook.totalPages)}</div>`;
-    if (pdfUrl) {
-      meta += `<div class="mt-2"><a href="${escapeHtml(pdfUrl)}" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener noreferrer"><i class="bi bi-file-earmark-pdf me-1"></i>Open PDF</a></div>`;
+    if (pdfUrl || thirdPartyUrl) {
+      meta += '<div class="mt-2 d-flex flex-wrap gap-2">';
+      if (pdfUrl) {
+        meta += `<a href="${escapeHtml(pdfUrl)}" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener noreferrer"><i class="bi bi-file-earmark-pdf me-1"></i>Open PDF</a>`;
+      }
+      if (thirdPartyUrl) {
+        meta += `<a href="${escapeHtml(thirdPartyUrl)}" class="btn btn-outline-secondary btn-sm" target="_blank" rel="noopener noreferrer"><i class="bi bi-box-arrow-up-right me-1"></i>Open online book</a>`;
+      }
+      meta += '</div>';
     }
     if (metaHost) metaHost.innerHTML = meta || '<span class="text-muted">No extra details.</span>';
   }

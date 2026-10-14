@@ -1,0 +1,513 @@
+{
+  "book_title": "At the River and Other Stories",
+  "table_of_contents": [
+    {
+      "level": "H1",
+      "title": "Table of Contents",
+      "start_page": 1,
+      "end_page": 122,
+      "units": [
+        {
+          "level": "H2",
+          "unit_number": 1,
+          "title": "Pam",
+          "start_page": 1,
+          "end_page": 7,
+          "subheadings": [
+            {
+              "level": "H3",
+              "category": "Topic",
+              "title": "Family",
+              "start_page": 1,
+              "end_page": 7
+            },
+            {
+              "level": "H3",
+              "category": "Letter Group",
+              "title": "Letter group 1: Aa, Mm, Pp, Ss, Tt",
+              "start_page": 1,
+              "end_page": 7
+            },
+            {
+              "level": "H3",
+              "category": "Stories",
+              "start_page": 1,
+              "end_page": 7,
+              "items": [
+                {
+                  "level": "H4",
+                  "title": "Pam",
+                  "start_page": 1,
+                  "end_page": 7
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "unit_number": 2,
+          "title": "Aunt Jan",
+          "start_page": 8,
+          "end_page": 18,
+          "subheadings": [
+            {
+              "level": "H3",
+              "category": "Topics",
+              "title": "People; Family",
+              "start_page": 8,
+              "end_page": 18
+            },
+            {
+              "level": "H3",
+              "category": "Letter Group",
+              "title": "Letter group 2: Dd, Jj, Ll, Nn (Includes review of letter group 1)",
+              "start_page": 8,
+              "end_page": 18
+            },
+            {
+              "level": "H3",
+              "category": "Stories",
+              "start_page": 8,
+              "end_page": 18,
+              "items": [
+                {
+                  "level": "H4",
+                  "title": "Aunt Jan",
+                  "start_page": 8,
+                  "end_page": 18
+                },
+                {
+                  "level": "H4",
+                  "title": "Lost and Found",
+                  "start_page": 8,
+                  "end_page": 18
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "unit_number": 3,
+          "title": "Jim and Jan's Family",
+          "start_page": 19,
+          "end_page": 28,
+          "subheadings": [
+            {
+              "level": "H3",
+              "category": "Topics",
+              "title": "People; Family; Kitchen",
+              "start_page": 19,
+              "end_page": 28
+            },
+            {
+              "level": "H3",
+              "category": "Letter Group",
+              "title": "Letter groups 1-2 plus short vowel Ii",
+              "start_page": 19,
+              "end_page": 28
+            },
+            {
+              "level": "H3",
+              "category": "Stories",
+              "start_page": 19,
+              "end_page": 28,
+              "items": [
+                {
+                  "level": "H4",
+                  "title": "Ouch!",
+                  "start_page": 19,
+                  "end_page": 28
+                },
+                {
+                  "level": "H4",
+                  "title": "Jim and Jan's Family",
+                  "start_page": 19,
+                  "end_page": 28
+                },
+                {
+                  "level": "H4",
+                  "title": "In the Kitchen",
+                  "start_page": 19,
+                  "end_page": 28
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "unit_number": 4,
+          "title": "Jan's Big Bag",
+          "start_page": 29,
+          "end_page": 39,
+          "subheadings": [
+            {
+              "level": "H3",
+              "category": "Topics",
+              "title": "Review of topics from Units 1-3",
+              "start_page": 29,
+              "end_page": 39
+            },
+            {
+              "level": "H3",
+              "category": "Letter Group",
+              "title": "Letter group 3: Bb, Gg, Kk, Rr (Includes review of letter groups 1-2)",
+              "start_page": 29,
+              "end_page": 39
+            },
+            {
+              "level": "H3",
+              "category": "Stories",
+              "start_page": 29,
+              "end_page": 39,
+              "items": [
+                {
+                  "level": "H4",
+                  "title": "Dan and Nan Ran",
+                  "start_page": 29,
+                  "end_page": 39
+                },
+                {
+                  "level": "H4",
+                  "title": "Jan's Big Bag",
+                  "start_page": 29,
+                  "end_page": 39
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "unit_number": 5,
+          "title": "A Happy Family",
+          "start_page": 40,
+          "end_page": 53,
+          "subheadings": [
+            {
+              "level": "H3",
+              "category": "Topics",
+              "title": "Family; Emotions; Transportation",
+              "start_page": 40,
+              "end_page": 53
+            },
+            {
+              "level": "H3",
+              "category": "Letter Group",
+              "title": "Letter groups 1-3 plus short vowel Oo",
+              "start_page": 40,
+              "end_page": 53
+            },
+            {
+              "level": "H3",
+              "category": "Stories",
+              "start_page": 40,
+              "end_page": 53,
+              "items": [
+                {
+                  "level": "H4",
+                  "title": "Bob and Pam's Family",
+                  "start_page": 40,
+                  "end_page": 53
+                },
+                {
+                  "level": "H4",
+                  "title": "A Happy Family",
+                  "start_page": 40,
+                  "end_page": 53
+                },
+                {
+                  "level": "H4",
+                  "title": "Sid the Dog",
+                  "start_page": 40,
+                  "end_page": 53
+                },
+                {
+                  "level": "H4",
+                  "title": "Bad Dog!",
+                  "start_page": 40,
+                  "end_page": 53
+                },
+                {
+                  "level": "H4",
+                  "title": "On the Bus",
+                  "start_page": 40,
+                  "end_page": 53
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "unit_number": 6,
+          "title": "The Beach",
+          "start_page": 54,
+          "end_page": 70,
+          "subheadings": [
+            {
+              "level": "H3",
+              "category": "Topics",
+              "title": "Cooking; Cleaning; Clothes; Leisure",
+              "start_page": 54,
+              "end_page": 70
+            },
+            {
+              "level": "H3",
+              "category": "Letter Group",
+              "title": "Letter group 4: Cc, Hh, Vv, Ww, digraph sh (Includes review of letter groups 1-3)",
+              "start_page": 54,
+              "end_page": 70
+            },
+            {
+              "level": "H3",
+              "category": "Stories",
+              "start_page": 54,
+              "end_page": 70,
+              "items": [
+                {
+                  "level": "H4",
+                  "title": "Bob and Pam Cook and Clean a Lot",
+                  "start_page": 54,
+                  "end_page": 70
+                },
+                {
+                  "level": "H4",
+                  "title": "The Shop",
+                  "start_page": 54,
+                  "end_page": 70
+                },
+                {
+                  "level": "H4",
+                  "title": "The Beach",
+                  "start_page": 54,
+                  "end_page": 70
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "unit_number": 7,
+          "title": "At the River",
+          "start_page": 71,
+          "end_page": 89,
+          "subheadings": [
+            {
+              "level": "H3",
+              "category": "Topics",
+              "title": "Weather; Leisure; Fruits and Vegetables",
+              "start_page": 71,
+              "end_page": 89
+            },
+            {
+              "level": "H3",
+              "category": "Letter Group",
+              "title": "Letter group 5: Ff, Xx, Uu, digraphs ch and th (Includes review of letter groups 1-4)",
+              "start_page": 71,
+              "end_page": 89
+            },
+            {
+              "level": "H3",
+              "category": "Stories",
+              "start_page": 71,
+              "end_page": 89,
+              "items": [
+                {
+                  "level": "H4",
+                  "title": "In the Van",
+                  "start_page": 71,
+                  "end_page": 89
+                },
+                {
+                  "level": "H4",
+                  "title": "The River",
+                  "start_page": 71,
+                  "end_page": 89
+                },
+                {
+                  "level": "H4",
+                  "title": "Fun at the River",
+                  "start_page": 71,
+                  "end_page": 89
+                },
+                {
+                  "level": "H4",
+                  "title": "A Picnic",
+                  "start_page": 71,
+                  "end_page": 89
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "unit_number": 8,
+          "title": "Nan is Sick",
+          "start_page": 90,
+          "end_page": 112,
+          "subheadings": [
+            {
+              "level": "H3",
+              "category": "Topics",
+              "title": "The Body; Illness and Injury; Healthcare; Feelings",
+              "start_page": 90,
+              "end_page": 112
+            },
+            {
+              "level": "H3",
+              "category": "Letter Group",
+              "title": "Letter group 6: Qq, Yy, Zz, Ee, digraph ck (Includes review of letter groups 1-5)",
+              "start_page": 90,
+              "end_page": 112
+            },
+            {
+              "level": "H3",
+              "category": "Stories",
+              "start_page": 90,
+              "end_page": 112,
+              "items": [
+                {
+                  "level": "H4",
+                  "title": "Nan is Sick",
+                  "start_page": 90,
+                  "end_page": 112
+                },
+                {
+                  "level": "H4",
+                  "title": "At the Doctor's Office",
+                  "start_page": 90,
+                  "end_page": 112
+                },
+                {
+                  "level": "H4",
+                  "title": "Nan Gets Well",
+                  "start_page": 90,
+                  "end_page": 112
+                },
+                {
+                  "level": "H4",
+                  "title": "Dan is Hurt",
+                  "start_page": 90,
+                  "end_page": 112
+                },
+                {
+                  "level": "H4",
+                  "title": "Dan Gets Well",
+                  "start_page": 90,
+                  "end_page": 112
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "unit_number": 9,
+          "title": "Bob's Job",
+          "start_page": 113,
+          "end_page": 121,
+          "subheadings": [
+            {
+              "level": "H3",
+              "category": "Topics",
+              "title": "Jobs; Furniture; Times of Day; Calendar; Food",
+              "start_page": 113,
+              "end_page": 121
+            },
+            {
+              "level": "H3",
+              "category": "Stories",
+              "start_page": 113,
+              "end_page": 121,
+              "items": [
+                {
+                  "level": "H4",
+                  "title": "Bob's Job",
+                  "start_page": 113,
+                  "end_page": 121
+                },
+                {
+                  "level": "H4",
+                  "title": "Bob's Shop",
+                  "start_page": 113,
+                  "end_page": 121
+                },
+                {
+                  "level": "H4",
+                  "title": "Rick Comes to the Shop",
+                  "start_page": 113,
+                  "end_page": 121
+                },
+                {
+                  "level": "H4",
+                  "title": "Lunch Break",
+                  "start_page": 113,
+                  "end_page": 121
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "unit_number": 10,
+          "title": "Dan and Nan at School",
+          "start_page": 122,
+          "end_page": 130,
+          "subheadings": [
+            {
+              "level": "H3",
+              "category": "Topics",
+              "title": "Daily Routines; School; Times of Day",
+              "start_page": 122,
+              "end_page": 130
+            },
+            {
+              "level": "H3",
+              "category": "Stories",
+              "start_page": 122,
+              "end_page": 130,
+              "items": [
+                {
+                  "level": "H4",
+                  "title": "In the Morning",
+                  "start_page": 122,
+                  "end_page": 130
+                },
+                {
+                  "level": "H4",
+                  "title": "Dan and Nan at School",
+                  "start_page": 122,
+                  "end_page": 130
+                },
+                {
+                  "level": "H4",
+                  "title": "Dinner Time",
+                  "start_page": 122,
+                  "end_page": 130
+                },
+                {
+                  "level": "H4",
+                  "title": "In the Evening",
+                  "start_page": 122,
+                  "end_page": 130
+                },
+                {
+                  "level": "H4",
+                  "title": "At Night",
+                  "start_page": 122,
+                  "end_page": 130
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

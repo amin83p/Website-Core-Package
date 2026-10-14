@@ -623,6 +623,7 @@ async function getAssignedBookDetailForSession(classData, bookId, reqUser, acces
     totalPages: book.totalPages ?? null,
     coverPhotoUrl: resolveCoverPhotoUrl(book),
     digitalPdf,
+    thirdPartyDigitalUrl: clean(book.thirdPartyDigitalUrl),
     tableOfContents: Array.isArray(book.tableOfContents) ? book.tableOfContents : []
   };
 }

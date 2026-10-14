@@ -1,0 +1,844 @@
+{
+  "book_title": "English Vocabulary in Use Upper-Intermediate",
+  "table_of_contents": [
+    {
+      "level": "H1",
+      "title": "Front Matter & Introduction",
+      "start_page": 5,
+      "end_page": 7,
+      "sections": [
+        {
+          "level": "H2",
+          "title": "Thanks",
+          "start_page": 5,
+          "end_page": 5
+        },
+        {
+          "level": "H2",
+          "title": "Introduction",
+          "start_page": 6,
+          "end_page": 7
+        }
+      ]
+    },
+    {
+      "level": "H1",
+      "title": "Effective vocabulary learning",
+      "start_page": 8,
+      "end_page": 15,
+      "units": [
+        {
+          "level": "H2",
+          "unit_number": 1,
+          "title": "Learning vocabulary",
+          "start_page": 8,
+          "end_page": 9
+        },
+        {
+          "level": "H2",
+          "unit_number": 2,
+          "title": "Organising a vocabulary notebook",
+          "start_page": 10,
+          "end_page": 11
+        },
+        {
+          "level": "H2",
+          "unit_number": 3,
+          "title": "Using your dictionary",
+          "start_page": 12,
+          "end_page": 13
+        },
+        {
+          "level": "H2",
+          "unit_number": 4,
+          "title": "Guessing and explaining meaning",
+          "start_page": 14,
+          "end_page": 15
+        }
+      ]
+    },
+    {
+      "level": "H1",
+      "title": "Topics",
+      "start_page": 16,
+      "end_page": 89,
+      "units": [
+        {
+          "level": "H2",
+          "unit_number": 5,
+          "title": "Countries, nationalities and languages",
+          "start_page": 16,
+          "end_page": 17
+        },
+        {
+          "level": "H2",
+          "unit_number": 6,
+          "title": "The weather",
+          "start_page": 18,
+          "end_page": 19
+        },
+        {
+          "level": "H2",
+          "unit_number": 7,
+          "title": "Describing people: appearance",
+          "start_page": 20,
+          "end_page": 21
+        },
+        {
+          "level": "H2",
+          "unit_number": 8,
+          "title": "Describing people: personality",
+          "start_page": 22,
+          "end_page": 23
+        },
+        {
+          "level": "H2",
+          "unit_number": 9,
+          "title": "Idioms describing people",
+          "start_page": 24,
+          "end_page": 25
+        },
+        {
+          "level": "H2",
+          "unit_number": 10,
+          "title": "Relationships",
+          "start_page": 26,
+          "end_page": 27
+        },
+        {
+          "level": "H2",
+          "unit_number": 11,
+          "title": "At home",
+          "start_page": 28,
+          "end_page": 29
+        },
+        {
+          "level": "H2",
+          "unit_number": 12,
+          "title": "Everyday minor problems",
+          "start_page": 30,
+          "end_page": 31
+        },
+        {
+          "level": "H2",
+          "unit_number": 13,
+          "title": "Global problems",
+          "start_page": 32,
+          "end_page": 33
+        },
+        {
+          "level": "H2",
+          "unit_number": 14,
+          "title": "Education",
+          "start_page": 34,
+          "end_page": 35
+        },
+        {
+          "level": "H2",
+          "unit_number": 15,
+          "title": "Higher education",
+          "start_page": 36,
+          "end_page": 37
+        },
+        {
+          "level": "H2",
+          "unit_number": 16,
+          "title": "Work",
+          "start_page": 38,
+          "end_page": 39
+        },
+        {
+          "level": "H2",
+          "unit_number": 17,
+          "title": "Business",
+          "start_page": 40,
+          "end_page": 41
+        },
+        {
+          "level": "H2",
+          "unit_number": 18,
+          "title": "Sport",
+          "start_page": 42,
+          "end_page": 43
+        },
+        {
+          "level": "H2",
+          "unit_number": 19,
+          "title": "Art and literature",
+          "start_page": 44,
+          "end_page": 45
+        },
+        {
+          "level": "H2",
+          "unit_number": 20,
+          "title": "Theatre and cinema",
+          "start_page": 46,
+          "end_page": 47
+        },
+        {
+          "level": "H2",
+          "unit_number": 21,
+          "title": "Music",
+          "start_page": 48,
+          "end_page": 49
+        },
+        {
+          "level": "H2",
+          "unit_number": 22,
+          "title": "Food",
+          "start_page": 50,
+          "end_page": 51
+        },
+        {
+          "level": "H2",
+          "unit_number": 23,
+          "title": "Physical geography",
+          "start_page": 52,
+          "end_page": 53
+        },
+        {
+          "level": "H2",
+          "unit_number": 24,
+          "title": "Environmental problems",
+          "start_page": 54,
+          "end_page": 55
+        },
+        {
+          "level": "H2",
+          "unit_number": 25,
+          "title": "Towns",
+          "start_page": 56,
+          "end_page": 57
+        },
+        {
+          "level": "H2",
+          "unit_number": 26,
+          "title": "The natural world",
+          "start_page": 58,
+          "end_page": 59
+        },
+        {
+          "level": "H2",
+          "unit_number": 27,
+          "title": "Clothes",
+          "start_page": 60,
+          "end_page": 61
+        },
+        {
+          "level": "H2",
+          "unit_number": 28,
+          "title": "Health and medicine",
+          "start_page": 62,
+          "end_page": 63
+        },
+        {
+          "level": "H2",
+          "unit_number": 29,
+          "title": "Medicine and technology",
+          "start_page": 64,
+          "end_page": 65
+        },
+        {
+          "level": "H2",
+          "unit_number": 30,
+          "title": "Health and lifestyle",
+          "start_page": 66,
+          "end_page": 67
+        },
+        {
+          "level": "H2",
+          "unit_number": 31,
+          "title": "Travel",
+          "start_page": 68,
+          "end_page": 69
+        },
+        {
+          "level": "H2",
+          "unit_number": 32,
+          "title": "Holidays",
+          "start_page": 70,
+          "end_page": 71
+        },
+        {
+          "level": "H2",
+          "unit_number": 33,
+          "title": "Science and technology",
+          "start_page": 72,
+          "end_page": 73
+        },
+        {
+          "level": "H2",
+          "unit_number": 34,
+          "title": "Computers",
+          "start_page": 74,
+          "end_page": 75
+        },
+        {
+          "level": "H2",
+          "unit_number": 35,
+          "title": "Communications and the Internet",
+          "start_page": 76,
+          "end_page": 77
+        },
+        {
+          "level": "H2",
+          "unit_number": 36,
+          "title": "Social media",
+          "start_page": 78,
+          "end_page": 79
+        },
+        {
+          "level": "H2",
+          "unit_number": 37,
+          "title": "The press and the media",
+          "start_page": 80,
+          "end_page": 81
+        },
+        {
+          "level": "H2",
+          "unit_number": 38,
+          "title": "Politics and public institutions",
+          "start_page": 82,
+          "end_page": 83
+        },
+        {
+          "level": "H2",
+          "unit_number": 39,
+          "title": "Crime",
+          "start_page": 84,
+          "end_page": 85
+        },
+        {
+          "level": "H2",
+          "unit_number": 40,
+          "title": "Money",
+          "start_page": 86,
+          "end_page": 87
+        },
+        {
+          "level": "H2",
+          "unit_number": 41,
+          "title": "Describing objects",
+          "start_page": 88,
+          "end_page": 89
+        }
+      ]
+    },
+    {
+      "level": "H1",
+      "title": "Feelings and actions",
+      "start_page": 90,
+      "end_page": 107,
+      "units": [
+        {
+          "level": "H2",
+          "unit_number": 42,
+          "title": "Belief and opinion",
+          "start_page": 90,
+          "end_page": 91
+        },
+        {
+          "level": "H2",
+          "unit_number": 43,
+          "title": "Pleasant and unpleasant feelings",
+          "start_page": 92,
+          "end_page": 93
+        },
+        {
+          "level": "H2",
+          "unit_number": 44,
+          "title": "Like, dislike and desire",
+          "start_page": 94,
+          "end_page": 95
+        },
+        {
+          "level": "H2",
+          "unit_number": 45,
+          "title": "Speaking",
+          "start_page": 96,
+          "end_page": 97
+        },
+        {
+          "level": "H2",
+          "unit_number": 46,
+          "title": "The six senses",
+          "start_page": 98,
+          "end_page": 99
+        },
+        {
+          "level": "H2",
+          "unit_number": 47,
+          "title": "What your body does",
+          "start_page": 100,
+          "end_page": 101
+        },
+        {
+          "level": "H2",
+          "unit_number": 48,
+          "title": "Praising and criticising",
+          "start_page": 102,
+          "end_page": 103
+        },
+        {
+          "level": "H2",
+          "unit_number": 49,
+          "title": "Emotions and moods",
+          "start_page": 104,
+          "end_page": 105
+        },
+        {
+          "level": "H2",
+          "unit_number": 50,
+          "title": "Commenting on problematic situations",
+          "start_page": 106,
+          "end_page": 107
+        }
+      ]
+    },
+    {
+      "level": "H1",
+      "title": "Basic concepts",
+      "start_page": 108,
+      "end_page": 127,
+      "units": [
+        {
+          "level": "H2",
+          "unit_number": 51,
+          "title": "Number, quantity, degree and intensity",
+          "start_page": 108,
+          "end_page": 109
+        },
+        {
+          "level": "H2",
+          "unit_number": 52,
+          "title": "Numbers and shapes",
+          "start_page": 110,
+          "end_page": 111
+        },
+        {
+          "level": "H2",
+          "unit_number": 53,
+          "title": "Time",
+          "start_page": 112,
+          "end_page": 113
+        },
+        {
+          "level": "H2",
+          "unit_number": 54,
+          "title": "Distances and dimensions",
+          "start_page": 114,
+          "end_page": 115
+        },
+        {
+          "level": "H2",
+          "unit_number": 55,
+          "title": "Obligation, need, possibility and probability",
+          "start_page": 116,
+          "end_page": 117
+        },
+        {
+          "level": "H2",
+          "unit_number": 56,
+          "title": "Sound and light",
+          "start_page": 118,
+          "end_page": 119
+        },
+        {
+          "level": "H2",
+          "unit_number": 57,
+          "title": "Possession and giving",
+          "start_page": 120,
+          "end_page": 121
+        },
+        {
+          "level": "H2",
+          "unit_number": 58,
+          "title": "Movement and speed",
+          "start_page": 122,
+          "end_page": 123
+        },
+        {
+          "level": "H2",
+          "unit_number": 59,
+          "title": "Texture, brightness, weight and density",
+          "start_page": 124,
+          "end_page": 125
+        },
+        {
+          "level": "H2",
+          "unit_number": 60,
+          "title": "Success, failure and difficulty",
+          "start_page": 126,
+          "end_page": 127
+        }
+      ]
+    },
+    {
+      "level": "H1",
+      "title": "Connecting and linking words",
+      "start_page": 128,
+      "end_page": 145,
+      "units": [
+        {
+          "level": "H2",
+          "unit_number": 61,
+          "title": "Time: connecting words and expressions",
+          "start_page": 128,
+          "end_page": 129
+        },
+        {
+          "level": "H2",
+          "unit_number": 62,
+          "title": "Condition",
+          "start_page": 130,
+          "end_page": 131
+        },
+        {
+          "level": "H2",
+          "unit_number": 63,
+          "title": "Cause, reason, purpose and result",
+          "start_page": 132,
+          "end_page": 133
+        },
+        {
+          "level": "H2",
+          "unit_number": 64,
+          "title": "Concession and contrast",
+          "start_page": 134,
+          "end_page": 135
+        },
+        {
+          "level": "H2",
+          "unit_number": 65,
+          "title": "Addition",
+          "start_page": 136,
+          "end_page": 137
+        },
+        {
+          "level": "H2",
+          "unit_number": 66,
+          "title": "Referring words",
+          "start_page": 138,
+          "end_page": 139
+        },
+        {
+          "level": "H2",
+          "unit_number": 67,
+          "title": "Discourse markers in spoken English",
+          "start_page": 140,
+          "end_page": 141
+        },
+        {
+          "level": "H2",
+          "unit_number": 68,
+          "title": "Linking words in writing",
+          "start_page": 142,
+          "end_page": 143
+        },
+        {
+          "level": "H2",
+          "unit_number": 69,
+          "title": "Talking and communicating",
+          "start_page": 144,
+          "end_page": 145
+        }
+      ]
+    },
+    {
+      "level": "H1",
+      "title": "Word formation",
+      "start_page": 146,
+      "end_page": 165,
+      "units": [
+        {
+          "level": "H2",
+          "unit_number": 70,
+          "title": "Suffixes",
+          "start_page": 146,
+          "end_page": 147
+        },
+        {
+          "level": "H2",
+          "unit_number": 71,
+          "title": "Prefixes",
+          "start_page": 148,
+          "end_page": 149
+        },
+        {
+          "level": "H2",
+          "unit_number": 72,
+          "title": "Roots",
+          "start_page": 150,
+          "end_page": 151
+        },
+        {
+          "level": "H2",
+          "unit_number": 73,
+          "title": "Abstract nouns",
+          "start_page": 152,
+          "end_page": 153
+        },
+        {
+          "level": "H2",
+          "unit_number": 74,
+          "title": "Compound adjectives",
+          "start_page": 154,
+          "end_page": 155
+        },
+        {
+          "level": "H2",
+          "unit_number": 75,
+          "title": "Compound nouns 1: noun + noun",
+          "start_page": 156,
+          "end_page": 157
+        },
+        {
+          "level": "H2",
+          "unit_number": 76,
+          "title": "Compound nouns 2: verb + preposition",
+          "start_page": 158,
+          "end_page": 159
+        },
+        {
+          "level": "H2",
+          "unit_number": 77,
+          "title": "Binomials",
+          "start_page": 160,
+          "end_page": 161
+        },
+        {
+          "level": "H2",
+          "unit_number": 78,
+          "title": "Abbreviations and acronyms",
+          "start_page": 162,
+          "end_page": 163
+        },
+        {
+          "level": "H2",
+          "unit_number": 79,
+          "title": "Multi-word expressions",
+          "start_page": 164,
+          "end_page": 165
+        }
+      ]
+    },
+    {
+      "level": "H1",
+      "title": "Words and pronunciation",
+      "start_page": 166,
+      "end_page": 171,
+      "units": [
+        {
+          "level": "H2",
+          "unit_number": 80,
+          "title": "Words commonly mispronounced",
+          "start_page": 166,
+          "end_page": 167
+        },
+        {
+          "level": "H2",
+          "unit_number": 81,
+          "title": "Onomatopoeic words",
+          "start_page": 168,
+          "end_page": 169
+        },
+        {
+          "level": "H2",
+          "unit_number": 82,
+          "title": "Homophones and homographs",
+          "start_page": 170,
+          "end_page": 171
+        }
+      ]
+    },
+    {
+      "level": "H1",
+      "title": "Counting people and things",
+      "start_page": 172,
+      "end_page": 183,
+      "units": [
+        {
+          "level": "H2",
+          "unit_number": 83,
+          "title": "Uncountable nouns",
+          "start_page": 172,
+          "end_page": 173
+        },
+        {
+          "level": "H2",
+          "unit_number": 84,
+          "title": "Words that only occur in the plural",
+          "start_page": 174,
+          "end_page": 175
+        },
+        {
+          "level": "H2",
+          "unit_number": 85,
+          "title": "Countable and uncountable nouns with different meanings",
+          "start_page": 176,
+          "end_page": 177
+        },
+        {
+          "level": "H2",
+          "unit_number": 86,
+          "title": "Making uncountable nouns countable",
+          "start_page": 178,
+          "end_page": 179
+        },
+        {
+          "level": "H2",
+          "unit_number": 87,
+          "title": "Collective nouns",
+          "start_page": 180,
+          "end_page": 181
+        },
+        {
+          "level": "H2",
+          "unit_number": 88,
+          "title": "Containers and contents",
+          "start_page": 182,
+          "end_page": 183
+        }
+      ]
+    },
+    {
+      "level": "H1",
+      "title": "Phrasal verbs and verb-based expressions",
+      "start_page": 184,
+      "end_page": 195,
+      "units": [
+        {
+          "level": "H2",
+          "unit_number": 89,
+          "title": "Expressions with do and make",
+          "start_page": 184,
+          "end_page": 185
+        },
+        {
+          "level": "H2",
+          "unit_number": 90,
+          "title": "Expressions with bring and take",
+          "start_page": 186,
+          "end_page": 187
+        },
+        {
+          "level": "H2",
+          "unit_number": 91,
+          "title": "Expressions with get",
+          "start_page": 188,
+          "end_page": 189
+        },
+        {
+          "level": "H2",
+          "unit_number": 92,
+          "title": "Expressions with set and put",
+          "start_page": 190,
+          "end_page": 191
+        },
+        {
+          "level": "H2",
+          "unit_number": 93,
+          "title": "Expressions with come and go",
+          "start_page": 192,
+          "end_page": 193
+        },
+        {
+          "level": "H2",
+          "unit_number": 94,
+          "title": "Expressions with other common verbs",
+          "start_page": 194,
+          "end_page": 195
+        }
+      ]
+    },
+    {
+      "level": "H1",
+      "title": "Varieties and styles",
+      "start_page": 196,
+      "end_page": 209,
+      "units": [
+        {
+          "level": "H2",
+          "unit_number": 95,
+          "title": "Formal and informal words 1",
+          "start_page": 196,
+          "end_page": 197
+        },
+        {
+          "level": "H2",
+          "unit_number": 96,
+          "title": "Formal and informal words 2",
+          "start_page": 198,
+          "end_page": 199
+        },
+        {
+          "level": "H2",
+          "unit_number": 97,
+          "title": "Similes",
+          "start_page": 200,
+          "end_page": 201
+        },
+        {
+          "level": "H2",
+          "unit_number": 98,
+          "title": "Proverbs",
+          "start_page": 202,
+          "end_page": 203
+        },
+        {
+          "level": "H2",
+          "unit_number": 99,
+          "title": "The language of signs and notices",
+          "start_page": 204,
+          "end_page": 205
+        },
+        {
+          "level": "H2",
+          "unit_number": 100,
+          "title": "Headline English",
+          "start_page": 206,
+          "end_page": 207
+        },
+        {
+          "level": "H2",
+          "unit_number": 101,
+          "title": "US English",
+          "start_page": 208,
+          "end_page": 209
+        }
+      ]
+    },
+    {
+      "level": "H1",
+      "title": "Back Matter",
+      "start_page": 210,
+      "end_page": 280,
+      "sections": [
+        {
+          "level": "H2",
+          "title": "Answer key",
+          "start_page": 210,
+          "end_page": 257
+        },
+        {
+          "level": "H2",
+          "title": "Phonemic symbols",
+          "start_page": 258,
+          "end_page": 258
+        },
+        {
+          "level": "H2",
+          "title": "Index",
+          "start_page": 259,
+          "end_page": 279
+        },
+        {
+          "level": "H2",
+          "title": "Acknowledgements",
+          "start_page": 280,
+          "end_page": 280
+        }
+      ]
+    }
+  ]
+}

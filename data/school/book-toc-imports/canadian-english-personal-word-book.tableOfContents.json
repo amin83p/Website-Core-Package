@@ -1,0 +1,358 @@
+{
+  "bookTitle": "Canadian English Personal Word Book",
+  "suggestedTotalPages": 65,
+  "tableOfContents": [
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents",
+      "label": "Table of Contents",
+      "startPage": 1,
+      "endPage": 65,
+      "level": 1,
+      "sortOrder": 1
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u1-introduction",
+      "label": "Introduction",
+      "startPage": 1,
+      "endPage": 1,
+      "level": 2,
+      "sortOrder": 2
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u2-basic-expression",
+      "label": "Basic expressions",
+      "startPage": 1,
+      "endPage": 1,
+      "level": 2,
+      "sortOrder": 3
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u3-parts-of-the-bod",
+      "label": "Parts of the body",
+      "startPage": 2,
+      "endPage": 3,
+      "level": 2,
+      "sortOrder": 4
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u4-clothing",
+      "label": "Clothing",
+      "startPage": 4,
+      "endPage": 5,
+      "level": 2,
+      "sortOrder": 5
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u5-colours",
+      "label": "Colours",
+      "startPage": 6,
+      "endPage": 7,
+      "level": 2,
+      "sortOrder": 6
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u6-days-and-months",
+      "label": "Days and months",
+      "startPage": 8,
+      "endPage": 8,
+      "level": 2,
+      "sortOrder": 7
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u7-seasons-and-weat",
+      "label": "Seasons and weather",
+      "startPage": 9,
+      "endPage": 9,
+      "level": 2,
+      "sortOrder": 8
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u8-family",
+      "label": "Family",
+      "startPage": 10,
+      "endPage": 10,
+      "level": 2,
+      "sortOrder": 9
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u9-home",
+      "label": "Home",
+      "startPage": 11,
+      "endPage": 11,
+      "level": 2,
+      "sortOrder": 10
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u10-food",
+      "label": "Food",
+      "startPage": 12,
+      "endPage": 15,
+      "level": 2,
+      "sortOrder": 11
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u11-the-kitchen",
+      "label": "The Kitchen",
+      "startPage": 16,
+      "endPage": 16,
+      "level": 2,
+      "sortOrder": 12
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u12-time",
+      "label": "Time",
+      "startPage": 17,
+      "endPage": 17,
+      "level": 2,
+      "sortOrder": 13
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u13-numbers",
+      "label": "Numbers",
+      "startPage": 18,
+      "endPage": 19,
+      "level": 2,
+      "sortOrder": 14
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u14-measurement",
+      "label": "Measurement",
+      "startPage": 20,
+      "endPage": 20,
+      "level": 2,
+      "sortOrder": 15
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u15-shapes",
+      "label": "Shapes",
+      "startPage": 21,
+      "endPage": 21,
+      "level": 2,
+      "sortOrder": 16
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u16-money",
+      "label": "Money",
+      "startPage": 22,
+      "endPage": 23,
+      "level": 2,
+      "sortOrder": 17
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u17-shopping",
+      "label": "Shopping",
+      "startPage": 24,
+      "endPage": 24,
+      "level": 2,
+      "sortOrder": 18
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u18-restaurants",
+      "label": "Restaurants",
+      "startPage": 25,
+      "endPage": 25,
+      "level": 2,
+      "sortOrder": 19
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u19-entertainment",
+      "label": "Entertainment",
+      "startPage": 26,
+      "endPage": 26,
+      "level": 2,
+      "sortOrder": 20
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u20-the-street",
+      "label": "The street",
+      "startPage": 27,
+      "endPage": 27,
+      "level": 2,
+      "sortOrder": 21
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u21-friends",
+      "label": "Friends",
+      "startPage": 28,
+      "endPage": 28,
+      "level": 2,
+      "sortOrder": 22
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u22-school",
+      "label": "School",
+      "startPage": 29,
+      "endPage": 29,
+      "level": 2,
+      "sortOrder": 23
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u23-sports-fitness-a",
+      "label": "Sports, fitness, and leisure",
+      "startPage": 30,
+      "endPage": 31,
+      "level": 2,
+      "sortOrder": 24
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u24-health",
+      "label": "Health",
+      "startPage": 32,
+      "endPage": 33,
+      "level": 2,
+      "sortOrder": 25
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u25-job-hunting",
+      "label": "Job hunting",
+      "startPage": 34,
+      "endPage": 35,
+      "level": 2,
+      "sortOrder": 26
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u26-technology",
+      "label": "Technology",
+      "startPage": 36,
+      "endPage": 37,
+      "level": 2,
+      "sortOrder": 27
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u27-canadian-animals",
+      "label": "Canadian animals",
+      "startPage": 38,
+      "endPage": 39,
+      "level": 2,
+      "sortOrder": 28
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u28-feelings-or-beha",
+      "label": "Feelings or behaviour",
+      "startPage": 40,
+      "endPage": 41,
+      "level": 2,
+      "sortOrder": 29
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u29-the-five-senses",
+      "label": "The five senses",
+      "startPage": 42,
+      "endPage": 43,
+      "level": 2,
+      "sortOrder": 30
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u30-basic-parts-of-s",
+      "label": "Basic parts of speech",
+      "startPage": 44,
+      "endPage": 44,
+      "level": 2,
+      "sortOrder": 31
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u31-capital-ideas",
+      "label": "Capital ideas",
+      "startPage": 45,
+      "endPage": 45,
+      "level": 2,
+      "sortOrder": 32
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u32-pronouns",
+      "label": "Pronouns",
+      "startPage": 46,
+      "endPage": 47,
+      "level": 2,
+      "sortOrder": 33
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u33-verbs",
+      "label": "Verbs",
+      "startPage": 48,
+      "endPage": 50,
+      "level": 2,
+      "sortOrder": 34
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u34-prepositions",
+      "label": "Prepositions",
+      "startPage": 51,
+      "endPage": 51,
+      "level": 2,
+      "sortOrder": 35
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u35-contractions",
+      "label": "Contractions",
+      "startPage": 52,
+      "endPage": 53,
+      "level": 2,
+      "sortOrder": 36
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u36-conjunctions",
+      "label": "Conjunctions",
+      "startPage": 54,
+      "endPage": 54,
+      "level": 2,
+      "sortOrder": 37
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u37-spelling",
+      "label": "Spelling",
+      "startPage": 55,
+      "endPage": 55,
+      "level": 2,
+      "sortOrder": 38
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u38-basic-punctuatio",
+      "label": "Basic punctuation",
+      "startPage": 56,
+      "endPage": 57,
+      "level": 2,
+      "sortOrder": 39
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u39-homophones-sound",
+      "label": "Homophones (sound-alike words)",
+      "startPage": 58,
+      "endPage": 59,
+      "level": 2,
+      "sortOrder": 40
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u40-synonyms-similar",
+      "label": "Synonyms (similar meaning)",
+      "startPage": 60,
+      "endPage": 62,
+      "level": 2,
+      "sortOrder": 41
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u41-beginning-a-sent",
+      "label": "Beginning a sentence",
+      "startPage": 63,
+      "endPage": 63,
+      "level": 2,
+      "sortOrder": 42
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u42-extra-hints-plur",
+      "label": "Extra hints (plurals, possession, adjectives)",
+      "startPage": 64,
+      "endPage": 64,
+      "level": 2,
+      "sortOrder": 43
+    },
+    {
+      "id": "canadian-english-persona-h1-1-table-of-contents-u43-o-canada",
+      "label": "O Canada",
+      "startPage": 65,
+      "endPage": 65,
+      "level": 2,
+      "sortOrder": 44
+    }
+  ]
+}

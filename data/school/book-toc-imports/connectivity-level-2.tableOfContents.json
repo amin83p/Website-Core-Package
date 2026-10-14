@@ -1,0 +1,134 @@
+{
+  "bookTitle": "Connectivity Level 2",
+  "suggestedTotalPages": 153,
+  "tableOfContents": [
+    {
+      "id": "connectivity-level-2-h1-1-main-units",
+      "label": "Main Units",
+      "startPage": 1,
+      "endPage": 122,
+      "level": 1,
+      "sortOrder": 1
+    },
+    {
+      "id": "connectivity-level-2-u01",
+      "label": "Unit 1: Making New Friends",
+      "startPage": 1,
+      "endPage": 12,
+      "level": 2,
+      "sortOrder": 2
+    },
+    {
+      "id": "connectivity-level-2-u02",
+      "label": "Unit 2: Sharing Life Experiences",
+      "startPage": 13,
+      "endPage": 24,
+      "level": 2,
+      "sortOrder": 3
+    },
+    {
+      "id": "connectivity-level-2-u03",
+      "label": "Unit 3: Talking about Movies",
+      "startPage": 25,
+      "endPage": 36,
+      "level": 2,
+      "sortOrder": 4
+    },
+    {
+      "id": "connectivity-level-2-u04",
+      "label": "Unit 4: Away from Home",
+      "startPage": 37,
+      "endPage": 48,
+      "level": 2,
+      "sortOrder": 5
+    },
+    {
+      "id": "connectivity-level-2-u05",
+      "label": "Unit 5: Looking Good",
+      "startPage": 49,
+      "endPage": 60,
+      "level": 2,
+      "sortOrder": 6
+    },
+    {
+      "id": "connectivity-level-2-u06",
+      "label": "Unit 6: Eating Well",
+      "startPage": 61,
+      "endPage": 72,
+      "level": 2,
+      "sortOrder": 7
+    },
+    {
+      "id": "connectivity-level-2-u07",
+      "label": "Unit 7: Driving Around",
+      "startPage": 73,
+      "endPage": 84,
+      "level": 2,
+      "sortOrder": 8
+    },
+    {
+      "id": "connectivity-level-2-u08",
+      "label": "Unit 8: Doing the Right Thing",
+      "startPage": 85,
+      "endPage": 96,
+      "level": 2,
+      "sortOrder": 9
+    },
+    {
+      "id": "connectivity-level-2-u09",
+      "label": "Unit 9: Enjoying the Arts",
+      "startPage": 97,
+      "endPage": 108,
+      "level": 2,
+      "sortOrder": 10
+    },
+    {
+      "id": "connectivity-level-2-u10",
+      "label": "Unit 10: Technology",
+      "startPage": 109,
+      "endPage": 122,
+      "level": 2,
+      "sortOrder": 11
+    },
+    {
+      "id": "connectivity-level-2-h1-2-reference-supplement",
+      "label": "Reference & Supplementary Sections",
+      "startPage": 123,
+      "endPage": 153,
+      "level": 1,
+      "sortOrder": 12
+    },
+    {
+      "id": "connectivity-level-2-h1-2-reference-supplement-u1-reference-charts",
+      "label": "Reference Charts",
+      "startPage": 123,
+      "endPage": 125,
+      "level": 2,
+      "sortOrder": 13
+    },
+    {
+      "id": "connectivity-level-2-h1-2-reference-supplement-u2-grammar-expander",
+      "label": "Grammar Expander",
+      "startPage": 126,
+      "endPage": 142,
+      "level": 2,
+      "sortOrder": 14
+    },
+    {
+      "id": "connectivity-level-2-h1-2-reference-supplement-u3-writing-handbook",
+      "label": "Writing Handbook",
+      "startPage": 143,
+      "endPage": 152,
+      "level": 2,
+      "sortOrder": 15
+    },
+    {
+      "id": "connectivity-level-2-h1-2-reference-supplement-u4-soft-skills-boos",
+      "label": "Soft Skills Booster",
+      "startPage": 153,
+      "endPage": 153,
+      "level": 2,
+      "sortOrder": 16
+    }
+  ]
+}

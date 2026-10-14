@@ -1,0 +1,552 @@
+{
+  "book_title": "Customer Service Training 101",
+  "table_of_contents": [
+    {
+      "level": "H1",
+      "title": "Front Matter",
+      "start_page": "ix",
+      "end_page": 20,
+      "sections": [
+        {
+          "level": "H2",
+          "title": "Acknowledgments",
+          "start_page": "ix",
+          "end_page": "x"
+        },
+        {
+          "level": "H2",
+          "title": "Introduction",
+          "start_page": 1,
+          "end_page": 2
+        },
+        {
+          "level": "H2",
+          "title": "Tips for the Trainer",
+          "start_page": 3,
+          "end_page": 10
+        },
+        {
+          "level": "H2",
+          "title": "Tips for the Student",
+          "start_page": 11,
+          "end_page": 20
+        }
+      ]
+    },
+    {
+      "level": "H1",
+      "title": "PART I: Putting Your Best Face Forward",
+      "start_page": 21,
+      "end_page": 102,
+      "chapters": [
+        {
+          "level": "H2",
+          "chapter_number": 1,
+          "title": "Taking Baby Steps: The Basics",
+          "start_page": 21,
+          "end_page": 42,
+          "subheadings": [
+            {
+              "level": "H3",
+              "step_number": 1,
+              "title": "First Impressions Matter",
+              "start_page": 26,
+              "end_page": 27
+            },
+            {
+              "level": "H3",
+              "step_number": 2,
+              "title": "Courtesy Counts",
+              "start_page": 28,
+              "end_page": 29
+            },
+            {
+              "level": "H3",
+              "step_number": 3,
+              "title": "Attitude Is Everything",
+              "start_page": 30,
+              "end_page": 32
+            },
+            {
+              "level": "H3",
+              "step_number": 4,
+              "title": "Doing the Right Thing: Ethical Issues",
+              "start_page": 33,
+              "end_page": 36
+            },
+            {
+              "level": "H3",
+              "title": "Key Points",
+              "start_page": 37,
+              "end_page": 37
+            },
+            {
+              "level": "H3",
+              "title": "Practice Lesson",
+              "start_page": 38,
+              "end_page": 38
+            },
+            {
+              "level": "H3",
+              "title": "Think About...",
+              "start_page": 39,
+              "end_page": 40
+            },
+            {
+              "level": "H3",
+              "title": "Quick Quotes",
+              "start_page": 41,
+              "end_page": 42
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "chapter_number": 2,
+          "title": "Tossing the Ball Back and Forth: Effective Communication",
+          "start_page": 43,
+          "end_page": 70,
+          "subheadings": [
+            {
+              "level": "H3",
+              "step_number": 1,
+              "title": "Saying What You Mean and Meaning What You Say",
+              "start_page": 48,
+              "end_page": 49
+            },
+            {
+              "level": "H3",
+              "step_number": 2,
+              "title": "What You Don't Say: Nonverbal Communication",
+              "start_page": 50,
+              "end_page": 51
+            },
+            {
+              "level": "H3",
+              "step_number": 3,
+              "title": "Putting Words Together: Grammar Usage",
+              "start_page": 52,
+              "end_page": 53
+            },
+            {
+              "level": "H3",
+              "step_number": 4,
+              "title": "Asking the Correct Questions and Answering the Questions Correctly",
+              "start_page": 54,
+              "end_page": 57
+            },
+            {
+              "level": "H3",
+              "step_number": 5,
+              "title": "When the Customer Says No",
+              "start_page": 58,
+              "end_page": 59
+            },
+            {
+              "level": "H3",
+              "step_number": 6,
+              "title": "Listening Actively",
+              "start_page": 60,
+              "end_page": 62
+            },
+            {
+              "level": "H3",
+              "title": "Key Points",
+              "start_page": 63,
+              "end_page": 64
+            },
+            {
+              "level": "H3",
+              "title": "Practice Lesson",
+              "start_page": 65,
+              "end_page": 66
+            },
+            {
+              "level": "H3",
+              "title": "Think About...",
+              "start_page": 67,
+              "end_page": 68
+            },
+            {
+              "level": "H3",
+              "title": "Quick Quotes",
+              "start_page": 69,
+              "end_page": 70
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "chapter_number": 3,
+          "title": "Jumping in with Both Feet: Relationship Building",
+          "start_page": 71,
+          "end_page": 102,
+          "subheadings": [
+            {
+              "level": "H3",
+              "step_number": 1,
+              "title": "Establishing Rapport",
+              "start_page": 78,
+              "end_page": 80
+            },
+            {
+              "level": "H3",
+              "step_number": 2,
+              "title": "Interacting Positively with Customers",
+              "start_page": 81,
+              "end_page": 82
+            },
+            {
+              "level": "H3",
+              "step_number": 3,
+              "title": "Identifying Customers' Needs",
+              "start_page": 83,
+              "end_page": 84
+            },
+            {
+              "level": "H3",
+              "step_number": 4,
+              "title": "Making the Customer Feel Valued",
+              "start_page": 85,
+              "end_page": 86
+            },
+            {
+              "level": "H3",
+              "step_number": 5,
+              "title": "Maintaining Ongoing Relationships",
+              "start_page": 87,
+              "end_page": 88
+            },
+            {
+              "level": "H3",
+              "step_number": 6,
+              "title": "Different Strokes: Handling Different Types of Customers",
+              "start_page": 89,
+              "end_page": 93
+            },
+            {
+              "level": "H3",
+              "title": "Key Points",
+              "start_page": 94,
+              "end_page": 95
+            },
+            {
+              "level": "H3",
+              "title": "Practice Lesson",
+              "start_page": 96,
+              "end_page": 98
+            },
+            {
+              "level": "H3",
+              "title": "Think About...",
+              "start_page": 99,
+              "end_page": 99
+            },
+            {
+              "level": "H3",
+              "title": "Quick Quotes",
+              "start_page": 100,
+              "end_page": 102
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "level": "H1",
+      "title": "PART II: Putting Your Customers First",
+      "start_page": 103,
+      "end_page": 190,
+      "chapters": [
+        {
+          "level": "H2",
+          "chapter_number": 4,
+          "title": "Seeing Eye to Eye: Face-to-Face Contacts",
+          "start_page": 103,
+          "end_page": 120,
+          "subheadings": [
+            {
+              "level": "H3",
+              "step_number": 1,
+              "title": "Saying Hello: Greeting the Customer",
+              "start_page": 109,
+              "end_page": 110
+            },
+            {
+              "level": "H3",
+              "step_number": 2,
+              "title": "Between Hello and Goodbye: Helping the Customer",
+              "start_page": 111,
+              "end_page": 112
+            },
+            {
+              "level": "H3",
+              "step_number": 3,
+              "title": "Saying Goodbye: Ending the Interaction",
+              "start_page": 113,
+              "end_page": 116
+            },
+            {
+              "level": "H3",
+              "title": "Key Points",
+              "start_page": 117,
+              "end_page": 117
+            },
+            {
+              "level": "H3",
+              "title": "Practice Lesson",
+              "start_page": 118,
+              "end_page": 118
+            },
+            {
+              "level": "H3",
+              "title": "Think About...",
+              "start_page": 119,
+              "end_page": 119
+            },
+            {
+              "level": "H3",
+              "title": "Quick Quotes",
+              "start_page": 120,
+              "end_page": 120
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "chapter_number": 5,
+          "title": "Saying It with a Smile: Telephone Contacts",
+          "start_page": 121,
+          "end_page": 142,
+          "subheadings": [
+            {
+              "level": "H3",
+              "step_number": 1,
+              "title": "Putting Your Best Ear Forward",
+              "start_page": 126,
+              "end_page": 127
+            },
+            {
+              "level": "H3",
+              "step_number": 2,
+              "title": "Saying Hello: The Opener",
+              "start_page": 128,
+              "end_page": 129
+            },
+            {
+              "level": "H3",
+              "step_number": 3,
+              "title": "Between Hello and Goodbye: Helping the Customer",
+              "start_page": 130,
+              "end_page": 133
+            },
+            {
+              "level": "H3",
+              "step_number": 4,
+              "title": "Saying Goodbye: The Closer",
+              "start_page": 134,
+              "end_page": 136
+            },
+            {
+              "level": "H3",
+              "title": "Key Points",
+              "start_page": 137,
+              "end_page": 137
+            },
+            {
+              "level": "H3",
+              "title": "Practice Lesson",
+              "start_page": 138,
+              "end_page": 139
+            },
+            {
+              "level": "H3",
+              "title": "Think About...",
+              "start_page": 140,
+              "end_page": 140
+            },
+            {
+              "level": "H3",
+              "title": "Quick Quotes",
+              "start_page": 141,
+              "end_page": 142
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "chapter_number": 6,
+          "title": "Looking Before You Leap: E-commerce Contacts",
+          "start_page": 143,
+          "end_page": 160,
+          "subheadings": [
+            {
+              "level": "H3",
+              "step_number": 1,
+              "title": "What Does the E-customer Expect?",
+              "start_page": 147,
+              "end_page": 148
+            },
+            {
+              "level": "H3",
+              "step_number": 2,
+              "title": "Hanging the Open Sign: Being Accessible",
+              "start_page": 149,
+              "end_page": 150
+            },
+            {
+              "level": "H3",
+              "step_number": 3,
+              "title": "Writing What You Mean: E-mail Communication",
+              "start_page": 151,
+              "end_page": 153
+            },
+            {
+              "level": "H3",
+              "step_number": 4,
+              "title": "Speaking Around the World: Cross-Cultural Etiquette",
+              "start_page": 154,
+              "end_page": 154
+            },
+            {
+              "level": "H3",
+              "title": "Key Points",
+              "start_page": 155,
+              "end_page": 155
+            },
+            {
+              "level": "H3",
+              "title": "Practice Lesson",
+              "start_page": 156,
+              "end_page": 157
+            },
+            {
+              "level": "H3",
+              "title": "Think About...",
+              "start_page": 158,
+              "end_page": 158
+            },
+            {
+              "level": "H3",
+              "title": "Quick Quotes",
+              "start_page": 159,
+              "end_page": 160
+            }
+          ]
+        },
+        {
+          "level": "H2",
+          "chapter_number": 7,
+          "title": "Calming the Storm: Difficult Customer Contacts",
+          "start_page": 161,
+          "end_page": 190,
+          "subheadings": [
+            {
+              "level": "H3",
+              "step_number": 1,
+              "title": "What Is Going on: Determine the Reason",
+              "start_page": 167,
+              "end_page": 169
+            },
+            {
+              "level": "H3",
+              "step_number": 2,
+              "title": "What Caused It: Identify the Root Cause of the Problem",
+              "start_page": 170,
+              "end_page": 172
+            },
+            {
+              "level": "H3",
+              "step_number": 3,
+              "title": "What Can I Do: Rectify the Situation",
+              "start_page": 173,
+              "end_page": 175
+            },
+            {
+              "level": "H3",
+              "step_number": 4,
+              "title": "What Can I Say: Acknowledge the Problem",
+              "start_page": 176,
+              "end_page": 178
+            },
+            {
+              "level": "H3",
+              "step_number": 5,
+              "title": "What Needs to Be Done: Fix What Needs to Be Fixed",
+              "start_page": 179,
+              "end_page": 182
+            },
+            {
+              "level": "H3",
+              "title": "Key Points",
+              "start_page": 183,
+              "end_page": 183
+            },
+            {
+              "level": "H3",
+              "title": "Practice Lesson",
+              "start_page": 184,
+              "end_page": 186
+            },
+            {
+              "level": "H3",
+              "title": "Think About...",
+              "start_page": 187,
+              "end_page": 187
+            },
+            {
+              "level": "H3",
+              "title": "Quick Quotes",
+              "start_page": 188,
+              "end_page": 190
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "level": "H1",
+      "title": "PART III: Putting It All Together",
+      "start_page": 191,
+      "end_page": 202,
+      "chapters": [
+        {
+          "level": "H2",
+          "chapter_number": 8,
+          "title": "Hitting the Ground Running: Ready, Set, Go",
+          "start_page": 191,
+          "end_page": 196
+        },
+        {
+          "level": "H2",
+          "chapter_number": 9,
+          "title": "Being the Best You Can Be: The Total Package",
+          "start_page": 197,
+          "end_page": 202,
+          "subheadings": [
+            {
+              "level": "H3",
+              "title": "Quick Quotes",
+              "start_page": 200,
+              "end_page": 202
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "level": "H1",
+      "title": "Back Matter",
+      "start_page": 203,
+      "end_page": 203,
+      "sections": [
+        {
+          "level": "H2",
+          "title": "Index",
+          "start_page": 203,
+          "end_page": 203
+        }
+      ]
+    }
+  ]
+}

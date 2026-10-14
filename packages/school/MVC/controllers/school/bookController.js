@@ -55,6 +55,7 @@ function buildPayload(reqBody, activeOrgId, userId) {
     removeCoverPhoto: toBoolean(reqBody?.removeCoverPhoto, false),
     digitalPdf: reqBody?.digitalPdf,
     removeDigitalPdf: toBoolean(reqBody?.removeDigitalPdf, false),
+    thirdPartyDigitalUrl: String(reqBody?.thirdPartyDigitalUrl || '').trim(),
     pdfBookPageOne: reqBody?.pdfBookPageOne,
     audit: {
       createUser: String(userId || 'SYSTEM'),
@@ -238,6 +239,7 @@ function buildBookCopyTemplate(source = {}) {
     description: String(source.description || '').trim(),
     active: source.active !== false,
     sortOrder: Number(source.sortOrder || 0),
+    thirdPartyDigitalUrl: String(source.thirdPartyDigitalUrl || '').trim(),
     tableOfContents: cloneTableOfContentsForCopy(source.tableOfContents || [])
   };
 }

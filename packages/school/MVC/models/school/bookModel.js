@@ -104,6 +104,21 @@ function normalizePdfBookPageOne(value, { required = false } = {}) {
   return cleanPositiveInt(value, { fieldLabel: 'PDF page for book page 1' });
 }
 
+function normalizeThirdPartyDigitalUrl(value) {
+  const cleaned = cleanString(value, { max: 600, allowEmpty: true });
+  if (!cleaned) return '';
+  let parsed;
+  try {
+    parsed = new URL(cleaned);
+  } catch (_) {
+    throw new Error('Third-party digital link must be a valid HTTPS URL.');
+  }
+  if (parsed.protocol !== 'https:') {
+    throw new Error('Third-party digital link must use HTTPS.');
+  }
+  return parsed.href;
+}
+
 function mapBookPageToPdfPage(bookPage, pdfBookPageOne = 1) {
   const bookPageNumber = Number(bookPage);
   const offset = Number(pdfBookPageOne || 1);
@@ -216,6 +231,7 @@ function normalizeStoredBook(row = {}) {
     tableOfContents: normalizeTableOfContents(parseTableOfContentsInput(row.tableOfContents), totalPages),
     coverPhoto: enrichBookFileAsset(sanitizeCoverPhoto(parseCoverPhotoInput(row.coverPhoto))),
     digitalPdf: enrichBookFileAsset(sanitizeDigitalPdf(parseDigitalPdfInput(row.digitalPdf))),
+    thirdPartyDigitalUrl: normalizeThirdPartyDigitalUrl(row.thirdPartyDigitalUrl),
     pdfBookPageOne: row.pdfBookPageOne === null || row.pdfBookPageOne === undefined || row.pdfBookPageOne === ''
       ? null
       : normalizePdfBookPageOne(row.pdfBookPageOne),
@@ -357,6 +373,7 @@ function sanitizeInput(input, { isUpdate = false } = {}) {
     tableOfContents,
     coverPhoto: parsedCover,
     digitalPdf: parsedDigitalPdf,
+    thirdPartyDigitalUrl: normalizeThirdPartyDigitalUrl(input.thirdPartyDigitalUrl),
     pdfBookPageOne
   };
   if (!isUpdate && input.id) {
@@ -478,6 +495,7 @@ module.exports = {
   MAX_TOC_LEVEL,
   normalizeIsbn,
   normalizePdfBookPageOne,
+  normalizeThirdPartyDigitalUrl,
   mapBookPageToPdfPage,
   sanitizeBookFileAsset,
   resolveBookFileAssetPublicUrl,

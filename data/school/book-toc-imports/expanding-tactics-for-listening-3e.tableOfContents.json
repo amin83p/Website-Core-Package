@@ -1,0 +1,1654 @@
+{
+  "bookTitle": "Expanding Tactics for Listening",
+  "suggestedTotalPages": 110,
+  "tableOfContents": [
+    {
+      "id": "expanding-tactics-for-li-h1-1-units-1-24",
+      "label": "Units 1–24",
+      "startPage": 2,
+      "endPage": 97,
+      "level": 1,
+      "sortOrder": 1
+    },
+    {
+      "id": "expanding-tactics-for-li-u01",
+      "label": "Unit 1: Small Talk",
+      "startPage": 2,
+      "endPage": 5,
+      "level": 2,
+      "sortOrder": 2
+    },
+    {
+      "id": "expanding-tactics-for-li-u01-greetings",
+      "label": "Topic: Greetings",
+      "startPage": 2,
+      "endPage": 5,
+      "level": 3,
+      "sortOrder": 3
+    },
+    {
+      "id": "expanding-tactics-for-li-u01-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 2,
+      "endPage": 5,
+      "level": 3,
+      "sortOrder": 4
+    },
+    {
+      "id": "expanding-tactics-for-li-u01-listening-skills-i1-listening-for-greeti",
+      "label": "Listening for greetings and introductions",
+      "startPage": 2,
+      "endPage": 5,
+      "level": 4,
+      "sortOrder": 5
+    },
+    {
+      "id": "expanding-tactics-for-li-u01-listening-skills-i2-listening-for-topics",
+      "label": "Listening for topics",
+      "startPage": 2,
+      "endPage": 5,
+      "level": 4,
+      "sortOrder": 6
+    },
+    {
+      "id": "expanding-tactics-for-li-u01-listening-skills-i3-listening-for-attitu",
+      "label": "Listening for attitudes",
+      "startPage": 2,
+      "endPage": 5,
+      "level": 4,
+      "sortOrder": 7
+    },
+    {
+      "id": "expanding-tactics-for-li-u01-listening-skills-i4-listening-and-making",
+      "label": "Listening and making inferences",
+      "startPage": 2,
+      "endPage": 5,
+      "level": 4,
+      "sortOrder": 8
+    },
+    {
+      "id": "expanding-tactics-for-li-u01-listening-skills-i5-listening-and-making",
+      "label": "Listening and making predictions",
+      "startPage": 2,
+      "endPage": 5,
+      "level": 4,
+      "sortOrder": 9
+    },
+    {
+      "id": "expanding-tactics-for-li-u01-reduction-of-h-in-he-him",
+      "label": "Pronunciation & Dictation: Reduction of h in he, him, his, her",
+      "startPage": 2,
+      "endPage": 5,
+      "level": 3,
+      "sortOrder": 10
+    },
+    {
+      "id": "expanding-tactics-for-li-u01-seeing-someone-you-know",
+      "label": "Conversation: Seeing someone you know",
+      "startPage": 2,
+      "endPage": 5,
+      "level": 3,
+      "sortOrder": 11
+    },
+    {
+      "id": "expanding-tactics-for-li-u02",
+      "label": "Unit 2: Plans",
+      "startPage": 6,
+      "endPage": 9,
+      "level": 2,
+      "sortOrder": 12
+    },
+    {
+      "id": "expanding-tactics-for-li-u02-the-weekend",
+      "label": "Topic: The weekend",
+      "startPage": 6,
+      "endPage": 9,
+      "level": 3,
+      "sortOrder": 13
+    },
+    {
+      "id": "expanding-tactics-for-li-u02-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 6,
+      "endPage": 9,
+      "level": 3,
+      "sortOrder": 14
+    },
+    {
+      "id": "expanding-tactics-for-li-u02-listening-skills-i1-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 6,
+      "endPage": 9,
+      "level": 4,
+      "sortOrder": 15
+    },
+    {
+      "id": "expanding-tactics-for-li-u02-listening-skills-i2-listening-for-plans",
+      "label": "Listening for plans",
+      "startPage": 6,
+      "endPage": 9,
+      "level": 4,
+      "sortOrder": 16
+    },
+    {
+      "id": "expanding-tactics-for-li-u02-listening-skills-i3-listening-for-attitu",
+      "label": "Listening for attitudes",
+      "startPage": 6,
+      "endPage": 9,
+      "level": 4,
+      "sortOrder": 17
+    },
+    {
+      "id": "expanding-tactics-for-li-u02-intonation-of-tag-questi",
+      "label": "Pronunciation & Dictation: Intonation of tag questions",
+      "startPage": 6,
+      "endPage": 9,
+      "level": 3,
+      "sortOrder": 18
+    },
+    {
+      "id": "expanding-tactics-for-li-u02-making-weekend-plans",
+      "label": "Conversation: Making weekend plans",
+      "startPage": 6,
+      "endPage": 9,
+      "level": 3,
+      "sortOrder": 19
+    },
+    {
+      "id": "expanding-tactics-for-li-u03",
+      "label": "Unit 3: Successful Businesses",
+      "startPage": 10,
+      "endPage": 13,
+      "level": 2,
+      "sortOrder": 20
+    },
+    {
+      "id": "expanding-tactics-for-li-u03-qualities-of-a-good-busi",
+      "label": "Topic: Qualities of a good business",
+      "startPage": 10,
+      "endPage": 13,
+      "level": 3,
+      "sortOrder": 21
+    },
+    {
+      "id": "expanding-tactics-for-li-u03-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 10,
+      "endPage": 13,
+      "level": 3,
+      "sortOrder": 22
+    },
+    {
+      "id": "expanding-tactics-for-li-u03-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 10,
+      "endPage": 13,
+      "level": 4,
+      "sortOrder": 23
+    },
+    {
+      "id": "expanding-tactics-for-li-u03-listening-skills-i2-listening-for-jobs",
+      "label": "Listening for jobs",
+      "startPage": 10,
+      "endPage": 13,
+      "level": 4,
+      "sortOrder": 24
+    },
+    {
+      "id": "expanding-tactics-for-li-u03-listening-skills-i3-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 10,
+      "endPage": 13,
+      "level": 4,
+      "sortOrder": 25
+    },
+    {
+      "id": "expanding-tactics-for-li-u03-word-stress-in-complaint",
+      "label": "Pronunciation & Dictation: Word stress in complaints",
+      "startPage": 10,
+      "endPage": 13,
+      "level": 3,
+      "sortOrder": 26
+    },
+    {
+      "id": "expanding-tactics-for-li-u03-making-complaints",
+      "label": "Conversation: Making complaints",
+      "startPage": 10,
+      "endPage": 13,
+      "level": 3,
+      "sortOrder": 27
+    },
+    {
+      "id": "expanding-tactics-for-li-u04",
+      "label": "Unit 4: Apologies and Excuses",
+      "startPage": 14,
+      "endPage": 17,
+      "level": 2,
+      "sortOrder": 28
+    },
+    {
+      "id": "expanding-tactics-for-li-u04-explanations",
+      "label": "Topic: Explanations",
+      "startPage": 14,
+      "endPage": 17,
+      "level": 3,
+      "sortOrder": 29
+    },
+    {
+      "id": "expanding-tactics-for-li-u04-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 14,
+      "endPage": 17,
+      "level": 3,
+      "sortOrder": 30
+    },
+    {
+      "id": "expanding-tactics-for-li-u04-listening-skills-i1-listening-for-reason",
+      "label": "Listening for reasons",
+      "startPage": 14,
+      "endPage": 17,
+      "level": 4,
+      "sortOrder": 31
+    },
+    {
+      "id": "expanding-tactics-for-li-u04-listening-skills-i2-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 14,
+      "endPage": 17,
+      "level": 4,
+      "sortOrder": 32
+    },
+    {
+      "id": "expanding-tactics-for-li-u04-intonation-of-yes-no-and",
+      "label": "Pronunciation & Dictation: Intonation of yes/no and Wh- questions",
+      "startPage": 14,
+      "endPage": 17,
+      "level": 3,
+      "sortOrder": 33
+    },
+    {
+      "id": "expanding-tactics-for-li-u04-asking-for-reasons",
+      "label": "Conversation: Asking for reasons",
+      "startPage": 14,
+      "endPage": 17,
+      "level": 3,
+      "sortOrder": 34
+    },
+    {
+      "id": "expanding-tactics-for-li-u05",
+      "label": "Unit 5: Character Traits",
+      "startPage": 18,
+      "endPage": 21,
+      "level": 2,
+      "sortOrder": 35
+    },
+    {
+      "id": "expanding-tactics-for-li-u05-people",
+      "label": "Topic: People",
+      "startPage": 18,
+      "endPage": 21,
+      "level": 3,
+      "sortOrder": 36
+    },
+    {
+      "id": "expanding-tactics-for-li-u05-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 18,
+      "endPage": 21,
+      "level": 3,
+      "sortOrder": 37
+    },
+    {
+      "id": "expanding-tactics-for-li-u05-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 18,
+      "endPage": 21,
+      "level": 4,
+      "sortOrder": 38
+    },
+    {
+      "id": "expanding-tactics-for-li-u05-listening-skills-i2-listening-for-praise",
+      "label": "Listening for praise or criticism",
+      "startPage": 18,
+      "endPage": 21,
+      "level": 4,
+      "sortOrder": 39
+    },
+    {
+      "id": "expanding-tactics-for-li-u05-listening-skills-i3-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 18,
+      "endPage": 21,
+      "level": 4,
+      "sortOrder": 40
+    },
+    {
+      "id": "expanding-tactics-for-li-u05-linking-vowel-sounds",
+      "label": "Pronunciation & Dictation: Linking vowel sounds",
+      "startPage": 18,
+      "endPage": 21,
+      "level": 3,
+      "sortOrder": 41
+    },
+    {
+      "id": "expanding-tactics-for-li-u05-talking-about-people",
+      "label": "Conversation: Talking about people",
+      "startPage": 18,
+      "endPage": 21,
+      "level": 3,
+      "sortOrder": 42
+    },
+    {
+      "id": "expanding-tactics-for-li-u06",
+      "label": "Unit 6: Travel",
+      "startPage": 22,
+      "endPage": 25,
+      "level": 2,
+      "sortOrder": 43
+    },
+    {
+      "id": "expanding-tactics-for-li-u06-schedules",
+      "label": "Topic: Schedules",
+      "startPage": 22,
+      "endPage": 25,
+      "level": 3,
+      "sortOrder": 44
+    },
+    {
+      "id": "expanding-tactics-for-li-u06-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 22,
+      "endPage": 25,
+      "level": 3,
+      "sortOrder": 45
+    },
+    {
+      "id": "expanding-tactics-for-li-u06-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 22,
+      "endPage": 25,
+      "level": 4,
+      "sortOrder": 46
+    },
+    {
+      "id": "expanding-tactics-for-li-u06-listening-skills-i2-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 22,
+      "endPage": 25,
+      "level": 4,
+      "sortOrder": 47
+    },
+    {
+      "id": "expanding-tactics-for-li-u06-reduction-of-to",
+      "label": "Pronunciation & Dictation: Reduction of to",
+      "startPage": 22,
+      "endPage": 25,
+      "level": 3,
+      "sortOrder": 48
+    },
+    {
+      "id": "expanding-tactics-for-li-u06-travel-stories",
+      "label": "Conversation: Travel stories",
+      "startPage": 22,
+      "endPage": 25,
+      "level": 3,
+      "sortOrder": 49
+    },
+    {
+      "id": "expanding-tactics-for-li-u07",
+      "label": "Unit 7: Housing",
+      "startPage": 26,
+      "endPage": 29,
+      "level": 2,
+      "sortOrder": 50
+    },
+    {
+      "id": "expanding-tactics-for-li-u07-types-of-housing",
+      "label": "Topic: Types of housing",
+      "startPage": 26,
+      "endPage": 29,
+      "level": 3,
+      "sortOrder": 51
+    },
+    {
+      "id": "expanding-tactics-for-li-u07-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 26,
+      "endPage": 29,
+      "level": 3,
+      "sortOrder": 52
+    },
+    {
+      "id": "expanding-tactics-for-li-u07-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 26,
+      "endPage": 29,
+      "level": 4,
+      "sortOrder": 53
+    },
+    {
+      "id": "expanding-tactics-for-li-u07-listening-skills-i2-listening-for-negati",
+      "label": "Listening for negative information",
+      "startPage": 26,
+      "endPage": 29,
+      "level": 4,
+      "sortOrder": 54
+    },
+    {
+      "id": "expanding-tactics-for-li-u07-listening-skills-i3-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 26,
+      "endPage": 29,
+      "level": 4,
+      "sortOrder": 55
+    },
+    {
+      "id": "expanding-tactics-for-li-u07-reduction-of-is-and-are",
+      "label": "Pronunciation & Dictation: Reduction of is and are",
+      "startPage": 26,
+      "endPage": 29,
+      "level": 3,
+      "sortOrder": 56
+    },
+    {
+      "id": "expanding-tactics-for-li-u07-talking-about-your-home",
+      "label": "Conversation: Talking about your home",
+      "startPage": 26,
+      "endPage": 29,
+      "level": 3,
+      "sortOrder": 57
+    },
+    {
+      "id": "expanding-tactics-for-li-u08",
+      "label": "Unit 8: Can You Believe It?",
+      "startPage": 30,
+      "endPage": 33,
+      "level": 2,
+      "sortOrder": 58
+    },
+    {
+      "id": "expanding-tactics-for-li-u08-unusual-news-stories",
+      "label": "Topic: Unusual news stories",
+      "startPage": 30,
+      "endPage": 33,
+      "level": 3,
+      "sortOrder": 59
+    },
+    {
+      "id": "expanding-tactics-for-li-u08-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 30,
+      "endPage": 33,
+      "level": 3,
+      "sortOrder": 60
+    },
+    {
+      "id": "expanding-tactics-for-li-u08-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 30,
+      "endPage": 33,
+      "level": 4,
+      "sortOrder": 61
+    },
+    {
+      "id": "expanding-tactics-for-li-u08-listening-skills-i2-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 30,
+      "endPage": 33,
+      "level": 4,
+      "sortOrder": 62
+    },
+    {
+      "id": "expanding-tactics-for-li-u08-listening-skills-i3-listening-for-topics",
+      "label": "Listening for topics",
+      "startPage": 30,
+      "endPage": 33,
+      "level": 4,
+      "sortOrder": 63
+    },
+    {
+      "id": "expanding-tactics-for-li-u08-intonation-of-complex-se",
+      "label": "Pronunciation & Dictation: Intonation of complex sentences",
+      "startPage": 30,
+      "endPage": 33,
+      "level": 3,
+      "sortOrder": 64
+    },
+    {
+      "id": "expanding-tactics-for-li-u08-telling-stories",
+      "label": "Conversation: Telling stories",
+      "startPage": 30,
+      "endPage": 33,
+      "level": 3,
+      "sortOrder": 65
+    },
+    {
+      "id": "expanding-tactics-for-li-u09",
+      "label": "Unit 9: Friendship",
+      "startPage": 34,
+      "endPage": 37,
+      "level": 2,
+      "sortOrder": 66
+    },
+    {
+      "id": "expanding-tactics-for-li-u09-invitations",
+      "label": "Topic: Invitations",
+      "startPage": 34,
+      "endPage": 37,
+      "level": 3,
+      "sortOrder": 67
+    },
+    {
+      "id": "expanding-tactics-for-li-u09-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 34,
+      "endPage": 37,
+      "level": 3,
+      "sortOrder": 68
+    },
+    {
+      "id": "expanding-tactics-for-li-u09-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 34,
+      "endPage": 37,
+      "level": 4,
+      "sortOrder": 69
+    },
+    {
+      "id": "expanding-tactics-for-li-u09-listening-skills-i2-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 34,
+      "endPage": 37,
+      "level": 4,
+      "sortOrder": 70
+    },
+    {
+      "id": "expanding-tactics-for-li-u09-word-stress-for-emphasis",
+      "label": "Pronunciation & Dictation: Word stress for emphasis",
+      "startPage": 34,
+      "endPage": 37,
+      "level": 3,
+      "sortOrder": 71
+    },
+    {
+      "id": "expanding-tactics-for-li-u09-describing-people",
+      "label": "Conversation: Describing people",
+      "startPage": 34,
+      "endPage": 37,
+      "level": 3,
+      "sortOrder": 72
+    },
+    {
+      "id": "expanding-tactics-for-li-u10",
+      "label": "Unit 10: Television",
+      "startPage": 38,
+      "endPage": 41,
+      "level": 2,
+      "sortOrder": 73
+    },
+    {
+      "id": "expanding-tactics-for-li-u10-tv-programs",
+      "label": "Topic: TV programs",
+      "startPage": 38,
+      "endPage": 41,
+      "level": 3,
+      "sortOrder": 74
+    },
+    {
+      "id": "expanding-tactics-for-li-u10-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 38,
+      "endPage": 41,
+      "level": 3,
+      "sortOrder": 75
+    },
+    {
+      "id": "expanding-tactics-for-li-u10-listening-skills-i1-listening-for-topics",
+      "label": "Listening for topics",
+      "startPage": 38,
+      "endPage": 41,
+      "level": 4,
+      "sortOrder": 76
+    },
+    {
+      "id": "expanding-tactics-for-li-u10-listening-skills-i2-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 38,
+      "endPage": 41,
+      "level": 4,
+      "sortOrder": 77
+    },
+    {
+      "id": "expanding-tactics-for-li-u10-listening-skills-i3-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 38,
+      "endPage": 41,
+      "level": 4,
+      "sortOrder": 78
+    },
+    {
+      "id": "expanding-tactics-for-li-u10-listening-skills-i4-listening-for-agreem",
+      "label": "Listening for agreement and disagreement",
+      "startPage": 38,
+      "endPage": 41,
+      "level": 4,
+      "sortOrder": 79
+    },
+    {
+      "id": "expanding-tactics-for-li-u10-rising-and-falling-inton",
+      "label": "Pronunciation & Dictation: Rising and falling intonation for positive and negative statements",
+      "startPage": 38,
+      "endPage": 41,
+      "level": 3,
+      "sortOrder": 80
+    },
+    {
+      "id": "expanding-tactics-for-li-u10-giving-opinions",
+      "label": "Conversation: Giving opinions",
+      "startPage": 38,
+      "endPage": 41,
+      "level": 3,
+      "sortOrder": 81
+    },
+    {
+      "id": "expanding-tactics-for-li-u11",
+      "label": "Unit 11: Cities",
+      "startPage": 42,
+      "endPage": 45,
+      "level": 2,
+      "sortOrder": 82
+    },
+    {
+      "id": "expanding-tactics-for-li-u11-travel",
+      "label": "Topic: Travel",
+      "startPage": 42,
+      "endPage": 45,
+      "level": 3,
+      "sortOrder": 83
+    },
+    {
+      "id": "expanding-tactics-for-li-u11-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 42,
+      "endPage": 45,
+      "level": 3,
+      "sortOrder": 84
+    },
+    {
+      "id": "expanding-tactics-for-li-u11-listening-skills-i1-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 42,
+      "endPage": 45,
+      "level": 4,
+      "sortOrder": 85
+    },
+    {
+      "id": "expanding-tactics-for-li-u11-listening-skills-i2-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 42,
+      "endPage": 45,
+      "level": 4,
+      "sortOrder": 86
+    },
+    {
+      "id": "expanding-tactics-for-li-u11-reduction-of-have-to-got",
+      "label": "Pronunciation & Dictation: Reduction of have to, got to, and had to",
+      "startPage": 42,
+      "endPage": 45,
+      "level": 3,
+      "sortOrder": 87
+    },
+    {
+      "id": "expanding-tactics-for-li-u11-talking-about-a-vacation",
+      "label": "Conversation: Talking about a vacation",
+      "startPage": 42,
+      "endPage": 45,
+      "level": 3,
+      "sortOrder": 88
+    },
+    {
+      "id": "expanding-tactics-for-li-u12",
+      "label": "Unit 12: Urban Life",
+      "startPage": 46,
+      "endPage": 49,
+      "level": 2,
+      "sortOrder": 89
+    },
+    {
+      "id": "expanding-tactics-for-li-u12-city-improvements",
+      "label": "Topic: City improvements",
+      "startPage": 46,
+      "endPage": 49,
+      "level": 3,
+      "sortOrder": 90
+    },
+    {
+      "id": "expanding-tactics-for-li-u12-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 46,
+      "endPage": 49,
+      "level": 3,
+      "sortOrder": 91
+    },
+    {
+      "id": "expanding-tactics-for-li-u12-listening-skills-i1-listening-for-topics",
+      "label": "Listening for topics",
+      "startPage": 46,
+      "endPage": 49,
+      "level": 4,
+      "sortOrder": 92
+    },
+    {
+      "id": "expanding-tactics-for-li-u12-listening-skills-i2-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 46,
+      "endPage": 49,
+      "level": 4,
+      "sortOrder": 93
+    },
+    {
+      "id": "expanding-tactics-for-li-u12-listening-skills-i3-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 46,
+      "endPage": 49,
+      "level": 4,
+      "sortOrder": 94
+    },
+    {
+      "id": "expanding-tactics-for-li-u12-listening-skills-i4-listening-for-sugges",
+      "label": "Listening for suggestions",
+      "startPage": 46,
+      "endPage": 49,
+      "level": 4,
+      "sortOrder": 95
+    },
+    {
+      "id": "expanding-tactics-for-li-u12-reduction-of-used-to-and",
+      "label": "Pronunciation & Dictation: Reduction of used to and use to",
+      "startPage": 46,
+      "endPage": 49,
+      "level": 3,
+      "sortOrder": 96
+    },
+    {
+      "id": "expanding-tactics-for-li-u12-talking-about-cities",
+      "label": "Conversation: Talking about cities",
+      "startPage": 46,
+      "endPage": 49,
+      "level": 3,
+      "sortOrder": 97
+    },
+    {
+      "id": "expanding-tactics-for-li-u13",
+      "label": "Unit 13: Special Days",
+      "startPage": 50,
+      "endPage": 53,
+      "level": 2,
+      "sortOrder": 98
+    },
+    {
+      "id": "expanding-tactics-for-li-u13-celebrations",
+      "label": "Topic: Celebrations",
+      "startPage": 50,
+      "endPage": 53,
+      "level": 3,
+      "sortOrder": 99
+    },
+    {
+      "id": "expanding-tactics-for-li-u13-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 50,
+      "endPage": 53,
+      "level": 3,
+      "sortOrder": 100
+    },
+    {
+      "id": "expanding-tactics-for-li-u13-listening-skills-i1-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 50,
+      "endPage": 53,
+      "level": 4,
+      "sortOrder": 101
+    },
+    {
+      "id": "expanding-tactics-for-li-u13-listening-skills-i2-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 50,
+      "endPage": 53,
+      "level": 4,
+      "sortOrder": 102
+    },
+    {
+      "id": "expanding-tactics-for-li-u13-intonation-of-who-what-w",
+      "label": "Pronunciation & Dictation: Intonation of who, what, when, where, why, and how questions",
+      "startPage": 50,
+      "endPage": 53,
+      "level": 3,
+      "sortOrder": 103
+    },
+    {
+      "id": "expanding-tactics-for-li-u13-talking-about-a-holiday",
+      "label": "Conversation: Talking about a holiday",
+      "startPage": 50,
+      "endPage": 53,
+      "level": 3,
+      "sortOrder": 104
+    },
+    {
+      "id": "expanding-tactics-for-li-u14",
+      "label": "Unit 14: Fashion",
+      "startPage": 54,
+      "endPage": 57,
+      "level": 2,
+      "sortOrder": 105
+    },
+    {
+      "id": "expanding-tactics-for-li-u14-clothes",
+      "label": "Topic: Clothes",
+      "startPage": 54,
+      "endPage": 57,
+      "level": 3,
+      "sortOrder": 106
+    },
+    {
+      "id": "expanding-tactics-for-li-u14-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 54,
+      "endPage": 57,
+      "level": 3,
+      "sortOrder": 107
+    },
+    {
+      "id": "expanding-tactics-for-li-u14-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 54,
+      "endPage": 57,
+      "level": 4,
+      "sortOrder": 108
+    },
+    {
+      "id": "expanding-tactics-for-li-u14-listening-skills-i2-listening-for-negati",
+      "label": "Listening for negative information",
+      "startPage": 54,
+      "endPage": 57,
+      "level": 4,
+      "sortOrder": 109
+    },
+    {
+      "id": "expanding-tactics-for-li-u14-consonant-clusters",
+      "label": "Pronunciation & Dictation: Consonant clusters",
+      "startPage": 54,
+      "endPage": 57,
+      "level": 3,
+      "sortOrder": 110
+    },
+    {
+      "id": "expanding-tactics-for-li-u14-talking-about-clothes",
+      "label": "Conversation: Talking about clothes",
+      "startPage": 54,
+      "endPage": 57,
+      "level": 3,
+      "sortOrder": 111
+    },
+    {
+      "id": "expanding-tactics-for-li-u15",
+      "label": "Unit 15: Favorites",
+      "startPage": 58,
+      "endPage": 61,
+      "level": 2,
+      "sortOrder": 112
+    },
+    {
+      "id": "expanding-tactics-for-li-u15-favorites",
+      "label": "Topic: Favorites",
+      "startPage": 58,
+      "endPage": 61,
+      "level": 3,
+      "sortOrder": 113
+    },
+    {
+      "id": "expanding-tactics-for-li-u15-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 58,
+      "endPage": 61,
+      "level": 3,
+      "sortOrder": 114
+    },
+    {
+      "id": "expanding-tactics-for-li-u15-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 58,
+      "endPage": 61,
+      "level": 4,
+      "sortOrder": 115
+    },
+    {
+      "id": "expanding-tactics-for-li-u15-listening-skills-i2-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 58,
+      "endPage": 61,
+      "level": 4,
+      "sortOrder": 116
+    },
+    {
+      "id": "expanding-tactics-for-li-u15-reduction-of-like-for-wa",
+      "label": "Pronunciation & Dictation: Reduction of like for, want to, and going to",
+      "startPage": 58,
+      "endPage": 61,
+      "level": 3,
+      "sortOrder": 117
+    },
+    {
+      "id": "expanding-tactics-for-li-u15-talking-about-favorites",
+      "label": "Conversation: Talking about favorites",
+      "startPage": 58,
+      "endPage": 61,
+      "level": 3,
+      "sortOrder": 118
+    },
+    {
+      "id": "expanding-tactics-for-li-u16",
+      "label": "Unit 16: Phone Messages",
+      "startPage": 62,
+      "endPage": 65,
+      "level": 2,
+      "sortOrder": 119
+    },
+    {
+      "id": "expanding-tactics-for-li-u16-messages",
+      "label": "Topic: Messages",
+      "startPage": 62,
+      "endPage": 65,
+      "level": 3,
+      "sortOrder": 120
+    },
+    {
+      "id": "expanding-tactics-for-li-u16-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 62,
+      "endPage": 65,
+      "level": 3,
+      "sortOrder": 121
+    },
+    {
+      "id": "expanding-tactics-for-li-u16-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 62,
+      "endPage": 65,
+      "level": 4,
+      "sortOrder": 122
+    },
+    {
+      "id": "expanding-tactics-for-li-u16-listening-skills-i2-listening-for-topics",
+      "label": "Listening for topics",
+      "startPage": 62,
+      "endPage": 65,
+      "level": 4,
+      "sortOrder": 123
+    },
+    {
+      "id": "expanding-tactics-for-li-u16-listening-skills-i3-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 62,
+      "endPage": 65,
+      "level": 4,
+      "sortOrder": 124
+    },
+    {
+      "id": "expanding-tactics-for-li-u16-word-stress-for-emphasis",
+      "label": "Pronunciation & Dictation: Word stress for emphasis",
+      "startPage": 62,
+      "endPage": 65,
+      "level": 3,
+      "sortOrder": 125
+    },
+    {
+      "id": "expanding-tactics-for-li-u16-taking-phone-messages",
+      "label": "Conversation: Taking phone messages",
+      "startPage": 62,
+      "endPage": 65,
+      "level": 3,
+      "sortOrder": 126
+    },
+    {
+      "id": "expanding-tactics-for-li-u17",
+      "label": "Unit 17: Past Events",
+      "startPage": 66,
+      "endPage": 69,
+      "level": 2,
+      "sortOrder": 127
+    },
+    {
+      "id": "expanding-tactics-for-li-u17-childhood-memories",
+      "label": "Topic: Childhood memories",
+      "startPage": 66,
+      "endPage": 69,
+      "level": 3,
+      "sortOrder": 128
+    },
+    {
+      "id": "expanding-tactics-for-li-u17-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 66,
+      "endPage": 69,
+      "level": 3,
+      "sortOrder": 129
+    },
+    {
+      "id": "expanding-tactics-for-li-u17-listening-skills-i1-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 66,
+      "endPage": 69,
+      "level": 4,
+      "sortOrder": 130
+    },
+    {
+      "id": "expanding-tactics-for-li-u17-listening-skills-i2-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 66,
+      "endPage": 69,
+      "level": 4,
+      "sortOrder": 131
+    },
+    {
+      "id": "expanding-tactics-for-li-u17-reduction-of-did",
+      "label": "Pronunciation & Dictation: Reduction of did",
+      "startPage": 66,
+      "endPage": 69,
+      "level": 3,
+      "sortOrder": 132
+    },
+    {
+      "id": "expanding-tactics-for-li-u17-talking-about-the-past",
+      "label": "Conversation: Talking about the past",
+      "startPage": 66,
+      "endPage": 69,
+      "level": 3,
+      "sortOrder": 133
+    },
+    {
+      "id": "expanding-tactics-for-li-u18",
+      "label": "Unit 18: Vacations",
+      "startPage": 70,
+      "endPage": 73,
+      "level": 2,
+      "sortOrder": 134
+    },
+    {
+      "id": "expanding-tactics-for-li-u18-vacation-jobs",
+      "label": "Topic: Vacation jobs",
+      "startPage": 70,
+      "endPage": 73,
+      "level": 3,
+      "sortOrder": 135
+    },
+    {
+      "id": "expanding-tactics-for-li-u18-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 70,
+      "endPage": 73,
+      "level": 3,
+      "sortOrder": 136
+    },
+    {
+      "id": "expanding-tactics-for-li-u18-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 70,
+      "endPage": 73,
+      "level": 4,
+      "sortOrder": 137
+    },
+    {
+      "id": "expanding-tactics-for-li-u18-listening-skills-i2-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 70,
+      "endPage": 73,
+      "level": 4,
+      "sortOrder": 138
+    },
+    {
+      "id": "expanding-tactics-for-li-u18-linking-sounds-verb-tens",
+      "label": "Pronunciation & Dictation: Linking sounds: verb/tense ending + vowel",
+      "startPage": 70,
+      "endPage": 73,
+      "level": 3,
+      "sortOrder": 139
+    },
+    {
+      "id": "expanding-tactics-for-li-u18-talking-about-summer",
+      "label": "Conversation: Talking about summer",
+      "startPage": 70,
+      "endPage": 73,
+      "level": 3,
+      "sortOrder": 140
+    },
+    {
+      "id": "expanding-tactics-for-li-u19",
+      "label": "Unit 19: The News",
+      "startPage": 74,
+      "endPage": 77,
+      "level": 2,
+      "sortOrder": 141
+    },
+    {
+      "id": "expanding-tactics-for-li-u19-news-stories",
+      "label": "Topic: News stories",
+      "startPage": 74,
+      "endPage": 77,
+      "level": 3,
+      "sortOrder": 142
+    },
+    {
+      "id": "expanding-tactics-for-li-u19-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 74,
+      "endPage": 77,
+      "level": 3,
+      "sortOrder": 143
+    },
+    {
+      "id": "expanding-tactics-for-li-u19-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 74,
+      "endPage": 77,
+      "level": 4,
+      "sortOrder": 144
+    },
+    {
+      "id": "expanding-tactics-for-li-u19-listening-skills-i2-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 74,
+      "endPage": 77,
+      "level": 4,
+      "sortOrder": 145
+    },
+    {
+      "id": "expanding-tactics-for-li-u19-listening-skills-i3-listening-for-topics",
+      "label": "Listening for topics",
+      "startPage": 74,
+      "endPage": 77,
+      "level": 4,
+      "sortOrder": 146
+    },
+    {
+      "id": "expanding-tactics-for-li-u19-intonation-of-who-what-w",
+      "label": "Pronunciation & Dictation: Intonation of who, what, when, where, why, and how in tag questions",
+      "startPage": 74,
+      "endPage": 77,
+      "level": 3,
+      "sortOrder": 147
+    },
+    {
+      "id": "expanding-tactics-for-li-u19-describing-an-accident",
+      "label": "Conversation: Describing an accident",
+      "startPage": 74,
+      "endPage": 77,
+      "level": 3,
+      "sortOrder": 148
+    },
+    {
+      "id": "expanding-tactics-for-li-u20",
+      "label": "Unit 20: Opinions",
+      "startPage": 78,
+      "endPage": 81,
+      "level": 2,
+      "sortOrder": 149
+    },
+    {
+      "id": "expanding-tactics-for-li-u20-opinions",
+      "label": "Topic: Opinions",
+      "startPage": 78,
+      "endPage": 81,
+      "level": 3,
+      "sortOrder": 150
+    },
+    {
+      "id": "expanding-tactics-for-li-u20-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 78,
+      "endPage": 81,
+      "level": 3,
+      "sortOrder": 151
+    },
+    {
+      "id": "expanding-tactics-for-li-u20-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 78,
+      "endPage": 81,
+      "level": 4,
+      "sortOrder": 152
+    },
+    {
+      "id": "expanding-tactics-for-li-u20-listening-skills-i2-listening-for-agreem",
+      "label": "Listening for agreement and disagreement",
+      "startPage": 78,
+      "endPage": 81,
+      "level": 4,
+      "sortOrder": 153
+    },
+    {
+      "id": "expanding-tactics-for-li-u20-sentence-stress-in-respo",
+      "label": "Pronunciation & Dictation: Sentence stress in responses",
+      "startPage": 78,
+      "endPage": 81,
+      "level": 3,
+      "sortOrder": 154
+    },
+    {
+      "id": "expanding-tactics-for-li-u20-agreeing-and-disagreeing",
+      "label": "Conversation: Agreeing and disagreeing",
+      "startPage": 78,
+      "endPage": 81,
+      "level": 3,
+      "sortOrder": 155
+    },
+    {
+      "id": "expanding-tactics-for-li-u21",
+      "label": "Unit 21: Famous People",
+      "startPage": 82,
+      "endPage": 85,
+      "level": 2,
+      "sortOrder": 156
+    },
+    {
+      "id": "expanding-tactics-for-li-u21-people",
+      "label": "Topic: People",
+      "startPage": 82,
+      "endPage": 85,
+      "level": 3,
+      "sortOrder": 157
+    },
+    {
+      "id": "expanding-tactics-for-li-u21-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 82,
+      "endPage": 85,
+      "level": 3,
+      "sortOrder": 158
+    },
+    {
+      "id": "expanding-tactics-for-li-u21-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 82,
+      "endPage": 85,
+      "level": 4,
+      "sortOrder": 159
+    },
+    {
+      "id": "expanding-tactics-for-li-u21-listening-skills-i2-listening-for-opinio",
+      "label": "Listening for opinions",
+      "startPage": 82,
+      "endPage": 85,
+      "level": 4,
+      "sortOrder": 160
+    },
+    {
+      "id": "expanding-tactics-for-li-u21-intonation-of-surprise",
+      "label": "Pronunciation & Dictation: Intonation of surprise",
+      "startPage": 82,
+      "endPage": 85,
+      "level": 3,
+      "sortOrder": 161
+    },
+    {
+      "id": "expanding-tactics-for-li-u21-talking-about-celebritie",
+      "label": "Conversation: Talking about celebrities",
+      "startPage": 82,
+      "endPage": 85,
+      "level": 3,
+      "sortOrder": 162
+    },
+    {
+      "id": "expanding-tactics-for-li-u22",
+      "label": "Unit 22: Food and Nutrition",
+      "startPage": 86,
+      "endPage": 89,
+      "level": 2,
+      "sortOrder": 163
+    },
+    {
+      "id": "expanding-tactics-for-li-u22-food",
+      "label": "Topic: Food",
+      "startPage": 86,
+      "endPage": 89,
+      "level": 3,
+      "sortOrder": 164
+    },
+    {
+      "id": "expanding-tactics-for-li-u22-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 86,
+      "endPage": 89,
+      "level": 3,
+      "sortOrder": 165
+    },
+    {
+      "id": "expanding-tactics-for-li-u22-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 86,
+      "endPage": 89,
+      "level": 4,
+      "sortOrder": 166
+    },
+    {
+      "id": "expanding-tactics-for-li-u22-listening-skills-i2-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 86,
+      "endPage": 89,
+      "level": 4,
+      "sortOrder": 167
+    },
+    {
+      "id": "expanding-tactics-for-li-u22-intonation-of-imperative",
+      "label": "Pronunciation & Dictation: Intonation of imperatives",
+      "startPage": 86,
+      "endPage": 89,
+      "level": 3,
+      "sortOrder": 168
+    },
+    {
+      "id": "expanding-tactics-for-li-u22-talking-about-food",
+      "label": "Conversation: Talking about food",
+      "startPage": 86,
+      "endPage": 89,
+      "level": 3,
+      "sortOrder": 169
+    },
+    {
+      "id": "expanding-tactics-for-li-u23",
+      "label": "Unit 23: Predicaments",
+      "startPage": 90,
+      "endPage": 93,
+      "level": 2,
+      "sortOrder": 170
+    },
+    {
+      "id": "expanding-tactics-for-li-u23-accidents",
+      "label": "Topic: Accidents",
+      "startPage": 90,
+      "endPage": 93,
+      "level": 3,
+      "sortOrder": 171
+    },
+    {
+      "id": "expanding-tactics-for-li-u23-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 90,
+      "endPage": 93,
+      "level": 3,
+      "sortOrder": 172
+    },
+    {
+      "id": "expanding-tactics-for-li-u23-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 90,
+      "endPage": 93,
+      "level": 4,
+      "sortOrder": 173
+    },
+    {
+      "id": "expanding-tactics-for-li-u23-listening-skills-i2-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 90,
+      "endPage": 93,
+      "level": 4,
+      "sortOrder": 174
+    },
+    {
+      "id": "expanding-tactics-for-li-u23-listening-skills-i3-listening-for-reason",
+      "label": "Listening for reasons",
+      "startPage": 90,
+      "endPage": 93,
+      "level": 4,
+      "sortOrder": 175
+    },
+    {
+      "id": "expanding-tactics-for-li-u23-reduction-of-can-and-cou",
+      "label": "Pronunciation & Dictation: Reduction of can and could",
+      "startPage": 90,
+      "endPage": 93,
+      "level": 3,
+      "sortOrder": 176
+    },
+    {
+      "id": "expanding-tactics-for-li-u23-helping-someone",
+      "label": "Conversation: Helping someone",
+      "startPage": 90,
+      "endPage": 93,
+      "level": 3,
+      "sortOrder": 177
+    },
+    {
+      "id": "expanding-tactics-for-li-u24",
+      "label": "Unit 24: Global Issues",
+      "startPage": 94,
+      "endPage": 97,
+      "level": 2,
+      "sortOrder": 178
+    },
+    {
+      "id": "expanding-tactics-for-li-u24-current-events",
+      "label": "Topic: Current events",
+      "startPage": 94,
+      "endPage": 97,
+      "level": 3,
+      "sortOrder": 179
+    },
+    {
+      "id": "expanding-tactics-for-li-u24-listening-skills",
+      "label": "Listening Skills",
+      "startPage": 94,
+      "endPage": 97,
+      "level": 3,
+      "sortOrder": 180
+    },
+    {
+      "id": "expanding-tactics-for-li-u24-listening-skills-i1-listening-for-gist",
+      "label": "Listening for gist",
+      "startPage": 94,
+      "endPage": 97,
+      "level": 4,
+      "sortOrder": 181
+    },
+    {
+      "id": "expanding-tactics-for-li-u24-listening-skills-i2-listening-for-detail",
+      "label": "Listening for details",
+      "startPage": 94,
+      "endPage": 97,
+      "level": 4,
+      "sortOrder": 182
+    },
+    {
+      "id": "expanding-tactics-for-li-u24-listening-skills-i3-listening-and-making",
+      "label": "Listening and making inferences",
+      "startPage": 94,
+      "endPage": 97,
+      "level": 4,
+      "sortOrder": 183
+    },
+    {
+      "id": "expanding-tactics-for-li-u24-linking-sounds-consonant",
+      "label": "Pronunciation & Dictation: Linking sounds: consonant + vowel",
+      "startPage": 94,
+      "endPage": 97,
+      "level": 3,
+      "sortOrder": 184
+    },
+    {
+      "id": "expanding-tactics-for-li-u24-discussing-global-issues",
+      "label": "Conversation: Discussing global issues",
+      "startPage": 94,
+      "endPage": 97,
+      "level": 3,
+      "sortOrder": 185
+    },
+    {
+      "id": "expanding-tactics-for-li-h1-2-tactics-for-testing",
+      "label": "Tactics for Testing",
+      "startPage": 98,
+      "endPage": 108,
+      "level": 1,
+      "sortOrder": 186
+    },
+    {
+      "id": "expanding-tactics-for-li-h1-2-tactics-for-testing-u1-units-1-4",
+      "label": "Units 1 – 4",
+      "startPage": 98,
+      "endPage": 99,
+      "level": 2,
+      "sortOrder": 187
+    },
+    {
+      "id": "expanding-tactics-for-li-h1-2-tactics-for-testing-u1-units-1-4-picture-based-questions",
+      "label": "Testing Focus: Picture-based questions",
+      "startPage": 98,
+      "endPage": 99,
+      "level": 3,
+      "sortOrder": 188
+    },
+    {
+      "id": "expanding-tactics-for-li-h1-2-tactics-for-testing-u1-units-1-4-predicting",
+      "label": "Test-taking Skill: Predicting",
+      "startPage": 98,
+      "endPage": 99,
+      "level": 3,
+      "sortOrder": 189
+    },
+    {
+      "id": "expanding-tactics-for-li-h1-2-tactics-for-testing-u2-units-5-8",
+      "label": "Units 5 – 8",
+      "startPage": 100,
+      "endPage": 101,
+      "level": 2,
+      "sortOrder": 190
+    },
+    {
+      "id": "expanding-tactics-for-li-h1-2-tactics-for-testing-u2-units-5-8-making-inferences",
+      "label": "Testing Focus: Making inferences",
+      "startPage": 100,
+      "endPage": 101,
+      "level": 3,
+      "sortOrder": 191
+    },
+    {
+      "id": "expanding-tactics-for-li-h1-2-tactics-for-testing-u2-units-5-8-making-inferences",
+      "label": "Test-taking Skill: Making inferences",
+      "startPage": 100,
+      "endPage": 101,
+      "level": 3,
+      "sortOrder": 192
+    },
+    {
+      "id": "expanding-tactics-for-li-h1-2-tactics-for-testing-u3-units-9-12",
+      "label": "Units 9 – 12",
+      "startPage": 102,
+      "endPage": 103,
+      "level": 2,
+      "sortOrder": 193
+    },
+    {
+      "id": "expanding-tactics-for-li-h1-2-tactics-for-testing-u3-units-9-12-question-focused-listeni",
+      "label": "Testing Focus: Question-focused listening",
+      "startPage": 102,
+      "endPage": 103,
+      "level": 3,
+      "sortOrder": 194
+    },
+    {
+      "id": "expanding-tactics-for-li-h1-2-tactics-for-testing-u3-units-9-12-previewing-questions",
+      "label": "Test-taking Skill: Previewing questions",
+      "startPage": 102,
+      "endPage": 103,
+      "level": 3,
+      "sortOrder": 195
+    },
+    {
+      "id": "expanding-tactics-for-li-h1-2-tactics-for-testing-u4-units-13-16",
+      "label": "Units 13 – 16",
+      "startPage": 104,
+      "endPage": 105,
+      "level": 2,
+      "sortOrder": 196
+    },
+    {
+      "id": "expanding-tactics-for-li-h1-2-tactics-for-testing-u4-units-13-16-conversation-based-quest",
+      "label": "Testing Focus: Conversation-based questions",
+      "startPage": 104,
+      "endPage": 105,
+      "level": 3,
+      "sortOrder": 197
+    },
+    {
+      "id": "expanding-tactics-for-li-h1-2-tactics-for-testing-u4-units-13-16-taking-notes",
+      "label": "Test-taking Skill: Taking notes",
+      "startPage": 104,
+      "endPage": 105,
+      "level": 3,
+      "sortOrder": 198
+    },
+    {
+      "id": "expanding-tactics-for-li-h1-2-tactics-for-testing-u5-units-17-20",
+      "label": "Units 17 – 20",
+      "startPage": 106,
+      "endPage": 107,
+      "level": 2,
+      "sortOrder": 199
+    },
+    {
+      "id": "expanding-tactics-for-li-h1-2-tactics-for-testing-u5-units-17-20-negatives-in-questions-a",
+      "label": "Testing Focus: Negatives in questions and answer choices",
+      "startPage": 106,
+      "endPage": 107,
+      "level": 3,
+      "sortOrder": 200
+    },
+    {
+      "id": "expanding-tactics-for-li-h1-2-tactics-for-testing-u5-units-17-20-reading-questions-carefu",
+      "label": "Test-taking Skill: Reading questions carefully",
+      "startPage": 106,
+      "endPage": 107,
+      "level": 3,
+      "sortOrder": 201
+    },
+    {
+      "id": "expanding-tactics-for-li-h1-2-tactics-for-testing-u6-units-21-24",
+      "label": "Units 21 – 24",
+      "startPage": 108,
+      "endPage": 109,
+      "level": 2,
+      "sortOrder": 202
+    },
+    {
+      "id": "expanding-tactics-for-li-h1-2-tactics-for-testing-u6-units-21-24-listening-for-organizati",
+      "label": "Testing Focus: Listening for organization",
+      "startPage": 108,
+      "endPage": 109,
+      "level": 3,
+      "sortOrder": 203
+    },
+    {
+      "id": "expanding-tactics-for-li-h1-2-tactics-for-testing-u6-units-21-24-listening-for-transition",
+      "label": "Test-taking Skill: Listening for transitions",
+      "startPage": 108,
+      "endPage": 109,
+      "level": 3,
+      "sortOrder": 204
+    },
+    {
+      "id": "expanding-tactics-for-li-h1-3-back-matter",
+      "label": "Back Matter",
+      "startPage": 110,
+      "endPage": 110,
+      "level": 1,
+      "sortOrder": 205
+    },
+    {
+      "id": "expanding-tactics-for-li-h1-3-back-matter-u1-vocabulary-index",
+      "label": "Vocabulary Index",
+      "startPage": 110,
+      "endPage": 110,
+      "level": 2,
+      "sortOrder": 206
+    }
+  ]
+}

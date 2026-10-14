@@ -7186,6 +7186,74 @@ if (canLoadAllSchedules) {
         refreshScheduleActiveView();
     });
 
+    function groupDayEventsByTimeSlot(dayEvents) {
+        const groups = [];
+        let index = 0;
+        while (index < dayEvents.length) {
+            const current = dayEvents[index];
+            const slotKey = `${String(current?.start || '').trim()}|${String(current?.end || '').trim()}`;
+            const group = [current];
+            let next = index + 1;
+            while (next < dayEvents.length) {
+                const candidate = dayEvents[next];
+                const candidateKey = `${String(candidate?.start || '').trim()}|${String(candidate?.end || '').trim()}`;
+                if (candidateKey !== slotKey) break;
+                group.push(candidate);
+                next += 1;
+            }
+            groups.push(group);
+            index = next;
+        }
+        return groups;
+    }
+
+    function renderSingleDayListEventRow(ev, { hideTime = false } = {}) {
+        const scd = window.ScheduleCompletionDisplay;
+        const leaveEvent = isLeaveEvent(ev);
+        const eventTitle = getEventTitle(ev);
+        const scan = scd ? scd.resolveScheduleCompletionScan(ev, sessionStatusMetaMap) : null;
+        const rowClasses = scd
+            ? scd.buildScheduleRowClasses(scan, `event-row ${ev?.hasOverlap ? 'overlap' : ''}`)
+            : `event-row ${ev?.hasOverlap ? 'overlap' : ''} ${leaveEvent ? 'leave-event' : ''}`;
+        const selectedClass = buildScheduleSessionSelectedClass(ev);
+        const unselectableClass = buildScheduleSessionUnselectableClass(ev);
+        const mutedClass = buildScheduleClassFilterMutedClass(ev);
+        const selectionControl = buildScheduleSelectionControlHtml(ev);
+        const scanIcon = scd ? scd.buildScheduleScanIcon(scan) : '';
+        const statusBadge = scd
+            ? scd.buildScheduleStatusBadge(scan, formatStatusLabel(ev?.status), getStatusTagStyle(ev?.status))
+            : `<span class="session-status-tag" style="${getStatusTagStyle(ev?.status)}">${escapeHtml(formatStatusLabel(ev?.status))}</span>`;
+        const makeupBadge = scd ? scd.buildMakeupRequiredBadge(ev) : '';
+        const detailsUrl = String(ev?.detailsUrl || '').trim();
+        const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
+        const coTeacherBadges = buildScheduleCoTeacherBadgesHtml(ev, { inline: true });
+        const openButton = detailsUrl
+            ? `<a class="btn btn-sm btn-outline-primary event-open" href="${escapeHtml(detailsUrl)}" target="_blank" rel="noopener">Open</a>`
+            : `<span class="text-muted small">No details</span>`;
+        const timeCell = hideTime
+            ? ''
+            : `<div class="event-time">${escapeHtml(formatScheduleClockRange(ev?.start, ev?.end))}</div>`;
+        return `
+            <div class="${rowClasses}${selectedClass}${unselectableClass}${mutedClass}" ${buildScheduleSessionContextDataAttrs(ev)}${scan?.rowStyle ? ` style="${scan.rowStyle}"` : ''}>
+                <div class="schedule-scan-cell">${selectionControl}${scanIcon}</div>
+                ${timeCell}
+                <div>
+                    <div class="event-main-title">${buildReportPriorityMarker(ev)}${escapeHtml(eventTitle)}</div>
+                    <div class="event-meta-line">
+                        <span class="badge ${leaveEvent ? 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' : (String(ev?.role || '').toLowerCase() === 'student' ? 'bg-primary-subtle text-primary border' : 'bg-info-subtle text-info-emphasis border')}">${escapeHtml(leaveEvent ? 'Approved Leave' : (ev?.role || '-'))}</span>
+                        ${statusBadge}
+                        ${makeupBadge}
+                        ${coTeacherBadges}
+                        ${caseBadge}
+                        <span class="text-muted">${Number(ev?.duration || 0).toFixed(2)} h</span>
+                    </div>
+                    <div class="event-meta-line">${leaveEvent ? '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Leave request approved and reserved on schedule</span>' : buildLifecycleInline(ev)}</div>
+                </div>
+                <div class="event-actions">${openButton}</div>
+            </div>
+        `;
+    }
+
     function renderSingleDayListView(eventsByDate, container) {
         const scd = window.ScheduleCompletionDisplay;
         container.innerHTML = '';
@@ -7218,47 +7286,18 @@ if (canLoadAllSchedules) {
                     </div>
             `;
 
-            dayEvents.forEach((ev) => {
-                const leaveEvent = isLeaveEvent(ev);
-                const eventTitle = getEventTitle(ev);
-                const scan = scd ? scd.resolveScheduleCompletionScan(ev, sessionStatusMetaMap) : null;
-                const rowClasses = scd
-                    ? scd.buildScheduleRowClasses(scan, `event-row ${ev?.hasOverlap ? 'overlap' : ''}`)
-                    : `event-row ${ev?.hasOverlap ? 'overlap' : ''} ${leaveEvent ? 'leave-event' : ''}`;
-                const selectedClass = buildScheduleSessionSelectedClass(ev);
-                const unselectableClass = buildScheduleSessionUnselectableClass(ev);
-                const mutedClass = buildScheduleClassFilterMutedClass(ev);
-                const selectionControl = buildScheduleSelectionControlHtml(ev);
-                const scanIcon = scd ? scd.buildScheduleScanIcon(scan) : '';
-                const statusBadge = scd
-                    ? scd.buildScheduleStatusBadge(scan, formatStatusLabel(ev?.status), getStatusTagStyle(ev?.status))
-                    : `<span class="session-status-tag" style="${getStatusTagStyle(ev?.status)}">${escapeHtml(formatStatusLabel(ev?.status))}</span>`;
-                const makeupBadge = scd ? scd.buildMakeupRequiredBadge(ev) : '';
-                const detailsUrl = String(ev?.detailsUrl || '').trim();
-                const caseBadge = buildSessionCaseBadgeHtml(ev?.caseSummary);
-                const coTeacherBadges = buildScheduleCoTeacherBadgesHtml(ev, { inline: true });
-                const openButton = detailsUrl
-                    ? `<a class="btn btn-sm btn-outline-primary event-open" href="${escapeHtml(detailsUrl)}" target="_blank" rel="noopener">Open</a>`
-                    : `<span class="text-muted small">No details</span>`;
-                html += `
-                    <div class="${rowClasses}${selectedClass}${unselectableClass}${mutedClass}" ${buildScheduleSessionContextDataAttrs(ev)}${scan?.rowStyle ? ` style="${scan.rowStyle}"` : ''}>
-                        <div class="schedule-scan-cell">${selectionControl}${scanIcon}</div>
-                        <div class="event-time">${escapeHtml(formatScheduleClockRange(ev?.start, ev?.end))}</div>
-                        <div>
-                            <div class="event-main-title">${buildReportPriorityMarker(ev)}${escapeHtml(eventTitle)}</div>
-                            <div class="event-meta-line">
-                                <span class="badge ${leaveEvent ? 'bg-warning-subtle text-warning-emphasis border border-warning-subtle' : (String(ev?.role || '').toLowerCase() === 'student' ? 'bg-primary-subtle text-primary border' : 'bg-info-subtle text-info-emphasis border')}">${escapeHtml(leaveEvent ? 'Approved Leave' : (ev?.role || '-'))}</span>
-                                ${statusBadge}
-                                ${makeupBadge}
-                                ${coTeacherBadges}
-                                ${caseBadge}
-                                <span class="text-muted">${Number(ev?.duration || 0).toFixed(2)} h</span>
-                            </div>
-                            <div class="event-meta-line">${leaveEvent ? '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Leave request approved and reserved on schedule</span>' : buildLifecycleInline(ev)}</div>
-                        </div>
-                        <div class="event-actions">${openButton}</div>
-                    </div>
-                `;
+            groupDayEventsByTimeSlot(dayEvents).forEach((group) => {
+                if (group.length > 1) {
+                    const slotLabel = formatScheduleClockRange(group[0]?.start, group[0]?.end);
+                    const groupSize = Math.min(4, group.length);
+                    html += `<div class="event-row-group event-row-group--${groupSize}"><div class="event-row-group-time">${escapeHtml(slotLabel)}</div>`;
+                    group.forEach((ev) => {
+                        html += renderSingleDayListEventRow(ev, { hideTime: true });
+                    });
+                    html += '</div>';
+                    return;
+                }
+                html += renderSingleDayListEventRow(group[0]);
             });
 
             html += '</div>';
@@ -7322,15 +7361,16 @@ if (canLoadAllSchedules) {
         };
     }
 
-    function buildScheduleVerticalBlockInner(ev) {
+    function buildScheduleVerticalBlockInner(ev, layout = {}) {
         const scd = window.ScheduleCompletionDisplay;
                 const eventTitle = getEventTitle(ev);
                 const cssClass = scheduleEventRoleClass(ev);
                 const scan = scd ? scd.resolveScheduleCompletionScan(ev, sessionStatusMetaMap) : null;
                 const embeddedReportsClass = buildScheduleEmbeddedReportsClass(ev);
+                const overlapLaneClass = Number(layout?.trackCount || 1) > 1 ? ' is-schedule-overlap-lane' : '';
                 const blockClasses = scd
-            ? scd.buildScheduleBlockClasses(scan, `vertical-event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}${ev.isDraft ? ' is-schedule-draft' : ''}${embeddedReportsClass}`)
-            : `vertical-event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}${ev.isDraft ? ' is-schedule-draft' : ''}${embeddedReportsClass}`;
+            ? scd.buildScheduleBlockClasses(scan, `vertical-event-block ${cssClass}${overlapLaneClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}${ev.isDraft ? ' is-schedule-draft' : ''}${embeddedReportsClass}`)
+            : `vertical-event-block ${cssClass}${overlapLaneClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}${ev.isDraft ? ' is-schedule-draft' : ''}${embeddedReportsClass}`;
                 const statusChip = scheduleStatusChip(ev, sessionStatusMetaMap, scan);
                 const selectedClass = buildScheduleSessionSelectedClass(ev);
                 const unselectableClass = buildScheduleSessionUnselectableClass(ev);
@@ -7377,15 +7417,16 @@ if (canLoadAllSchedules) {
                 `;
     }
 
-    function buildScheduleHorizontalBlockInner(ev) {
+    function buildScheduleHorizontalBlockInner(ev, layout = {}) {
         const scd = window.ScheduleCompletionDisplay;
                 const eventTitle = getEventTitle(ev);
                 const cssClass = scheduleEventRoleClass(ev);
                 const scan = scd ? scd.resolveScheduleCompletionScan(ev, sessionStatusMetaMap) : null;
                 const embeddedReportsClass = buildScheduleEmbeddedReportsClass(ev);
+                const overlapLaneClass = Number(layout?.trackCount || 1) > 1 ? ' is-schedule-overlap-lane' : '';
                 const blockClasses = scd
-            ? scd.buildScheduleBlockClasses(scan, `event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}${ev.isDraft ? ' is-schedule-draft' : ''}${embeddedReportsClass}`)
-            : `event-block ${cssClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}${ev.isDraft ? ' is-schedule-draft' : ''}${embeddedReportsClass}`;
+            ? scd.buildScheduleBlockClasses(scan, `event-block ${cssClass}${overlapLaneClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}${ev.isDraft ? ' is-schedule-draft' : ''}${embeddedReportsClass}`)
+            : `event-block ${cssClass}${overlapLaneClass} ${ev.hasOverlap ? 'border-danger border-2' : ''}${ev.isDraft ? ' is-schedule-draft' : ''}${embeddedReportsClass}`;
                 const statusChip = scheduleStatusChip(ev, sessionStatusMetaMap, scan);
                 const selectedClass = buildScheduleSessionSelectedClass(ev);
                 const unselectableClass = buildScheduleSessionUnselectableClass(ev);
@@ -7429,8 +7470,8 @@ if (canLoadAllSchedules) {
 
     function buildSchedulePositionedBlockHtml(ev, layout = {}) {
         const mode = String(layout?.mode || '').trim();
-        if (mode === 'timeline') return buildScheduleHorizontalBlockInner(ev);
-        return buildScheduleVerticalBlockInner(ev);
+        if (mode === 'timeline') return buildScheduleHorizontalBlockInner(ev, layout);
+        return buildScheduleVerticalBlockInner(ev, layout);
     }
 
     function renderTimelineView(eventsByDate, container) {

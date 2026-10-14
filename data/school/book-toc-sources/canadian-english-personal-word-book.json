@@ -1,0 +1,271 @@
+{
+  "book_title": "Canadian English Personal Word Book",
+  "table_of_contents": [
+    {
+      "level": "H1",
+      "title": "Table of Contents",
+      "start_page": "Inside front cover",
+      "end_page": "Inside back cover",
+      "sections": [
+        {
+          "level": "H2",
+          "title": "Introduction",
+          "start_page": "Inside front cover",
+          "end_page": "Inside front cover"
+        },
+        {
+          "level": "H2",
+          "title": "Basic expressions",
+          "start_page": 1,
+          "end_page": 1
+        },
+        {
+          "level": "H2",
+          "title": "Parts of the body",
+          "start_page": 2,
+          "end_page": 3
+        },
+        {
+          "level": "H2",
+          "title": "Clothing",
+          "start_page": 4,
+          "end_page": 5
+        },
+        {
+          "level": "H2",
+          "title": "Colours",
+          "start_page": 6,
+          "end_page": 7
+        },
+        {
+          "level": "H2",
+          "title": "Days and months",
+          "start_page": 8,
+          "end_page": 8
+        },
+        {
+          "level": "H2",
+          "title": "Seasons and weather",
+          "start_page": 9,
+          "end_page": 9
+        },
+        {
+          "level": "H2",
+          "title": "Family",
+          "start_page": 10,
+          "end_page": 10
+        },
+        {
+          "level": "H2",
+          "title": "Home",
+          "start_page": 11,
+          "end_page": 11
+        },
+        {
+          "level": "H2",
+          "title": "Food",
+          "start_page": 12,
+          "end_page": 15
+        },
+        {
+          "level": "H2",
+          "title": "The Kitchen",
+          "start_page": 16,
+          "end_page": 16
+        },
+        {
+          "level": "H2",
+          "title": "Time",
+          "start_page": 17,
+          "end_page": 17
+        },
+        {
+          "level": "H2",
+          "title": "Numbers",
+          "start_page": 18,
+          "end_page": 19
+        },
+        {
+          "level": "H2",
+          "title": "Measurement",
+          "start_page": 20,
+          "end_page": 20
+        },
+        {
+          "level": "H2",
+          "title": "Shapes",
+          "start_page": 21,
+          "end_page": 21
+        },
+        {
+          "level": "H2",
+          "title": "Money",
+          "start_page": 22,
+          "end_page": 23
+        },
+        {
+          "level": "H2",
+          "title": "Shopping",
+          "start_page": 24,
+          "end_page": 24
+        },
+        {
+          "level": "H2",
+          "title": "Restaurants",
+          "start_page": 25,
+          "end_page": 25
+        },
+        {
+          "level": "H2",
+          "title": "Entertainment",
+          "start_page": 26,
+          "end_page": 26
+        },
+        {
+          "level": "H2",
+          "title": "The street",
+          "start_page": 27,
+          "end_page": 27
+        },
+        {
+          "level": "H2",
+          "title": "Friends",
+          "start_page": 28,
+          "end_page": 28
+        },
+        {
+          "level": "H2",
+          "title": "School",
+          "start_page": 29,
+          "end_page": 29
+        },
+        {
+          "level": "H2",
+          "title": "Sports, fitness, and leisure",
+          "start_page": 30,
+          "end_page": 31
+        },
+        {
+          "level": "H2",
+          "title": "Health",
+          "start_page": 32,
+          "end_page": 33
+        },
+        {
+          "level": "H2",
+          "title": "Job hunting",
+          "start_page": 34,
+          "end_page": 35
+        },
+        {
+          "level": "H2",
+          "title": "Technology",
+          "start_page": 36,
+          "end_page": 37
+        },
+        {
+          "level": "H2",
+          "title": "Canadian animals",
+          "start_page": 38,
+          "end_page": 39
+        },
+        {
+          "level": "H2",
+          "title": "Feelings or behaviour",
+          "start_page": 40,
+          "end_page": 41
+        },
+        {
+          "level": "H2",
+          "title": "The five senses",
+          "start_page": 42,
+          "end_page": 43
+        },
+        {
+          "level": "H2",
+          "title": "Basic parts of speech",
+          "start_page": 44,
+          "end_page": 44
+        },
+        {
+          "level": "H2",
+          "title": "Capital ideas",
+          "start_page": 45,
+          "end_page": 45
+        },
+        {
+          "level": "H2",
+          "title": "Pronouns",
+          "start_page": 46,
+          "end_page": 47
+        },
+        {
+          "level": "H2",
+          "title": "Verbs",
+          "start_page": 48,
+          "end_page": 50
+        },
+        {
+          "level": "H2",
+          "title": "Prepositions",
+          "start_page": 51,
+          "end_page": 51
+        },
+        {
+          "level": "H2",
+          "title": "Contractions",
+          "start_page": 52,
+          "end_page": 53
+        },
+        {
+          "level": "H2",
+          "title": "Conjunctions",
+          "start_page": 54,
+          "end_page": 54
+        },
+        {
+          "level": "H2",
+          "title": "Spelling",
+          "start_page": 55,
+          "end_page": 55
+        },
+        {
+          "level": "H2",
+          "title": "Basic punctuation",
+          "start_page": 56,
+          "end_page": 57
+        },
+        {
+          "level": "H2",
+          "title": "Homophones (sound-alike words)",
+          "start_page": 58,
+          "end_page": 59
+        },
+        {
+          "level": "H2",
+          "title": "Synonyms (similar meaning)",
+          "start_page": 60,
+          "end_page": 62
+        },
+        {
+          "level": "H2",
+          "title": "Beginning a sentence",
+          "start_page": 63,
+          "end_page": 63
+        },
+        {
+          "level": "H2",
+          "title": "Extra hints (plurals, possession, adjectives)",
+          "start_page": 64,
+          "end_page": 64
+        },
+        {
+          "level": "H2",
+          "title": "O Canada",
+          "start_page": "Inside back cover",
+          "end_page": "Inside back cover"
+        }
+      ]
+    }
+  ]
+}
