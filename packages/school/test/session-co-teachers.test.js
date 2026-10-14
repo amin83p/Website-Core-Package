@@ -152,6 +152,20 @@ test('timesheet and schedule paths include co-teacher delivery matching', () => 
   assert.match(timesheetEditor, /isCoTeacherSession/);
 });
 
+test('getSessionDeliveryPersonIds lists the main teacher and every co-teacher for schedule indexing', () => {
+  const sessionDeliveryTeamService = require('../MVC/services/school/sessionDeliveryTeamService');
+  const ids = sessionDeliveryTeamService.getSessionDeliveryPersonIds({
+    delivery: {
+      deliveredBy: 'MAIN',
+      coTeachers: [
+        { personId: 'CO1', name: 'Helper' },
+        { personId: 'CO2', name: 'Previous Teacher', roleLabel: 'Previous Teacher' }
+      ]
+    }
+  });
+  assert.deepEqual(ids, ['MAIN', 'CO1', 'CO2']);
+});
+
 test('normalizeSessionCoTeachers defaults paid to true for legacy rows', () => {
   const rows = sessionDeliveryTeamService.normalizeSessionCoTeachers([
     { personId: 'C1', name: 'Legacy' }

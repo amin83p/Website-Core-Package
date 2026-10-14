@@ -15,6 +15,17 @@
       return String(value || '').trim();
     }
 
+    function isMergedScheduleEvent(event) {
+      return event?.merged?.isMergedSession === true;
+    }
+
+    function canUndoMergeScheduleEvent(event) {
+      if (!event) return false;
+      const classId = clean(event?.classId);
+      const sessionId = clean(event?.sessionId || event?.id);
+      return Boolean(classId && sessionId && isMergedScheduleEvent(event));
+    }
+
     function escapeHtml(value) {
       return typeof deps.escapeHtml === 'function'
         ? deps.escapeHtml(value)
@@ -254,6 +265,67 @@
       if (state.step === 'review') showStep('teacher');
     });
     deps.bindMergeSessionsRail?.(openWizard);
+
+    async function undoMergeForEvent(event) {
+      const classId = clean(event?.classId);
+      const sessionId = clean(event?.sessionId || event?.id);
+      const sessionDate = clean(event?.date);
+      if (!classId || !sessionId) {
+        throw new Error('Session reference is missing.');
+      }
+      const confirmed = typeof deps.uiConfirm === 'function'
+        ? await deps.uiConfirm({
+          title: 'Undo merge?',
+          html: true,
+          message: '<p>This will restore this session to <strong>Scheduled</strong>, reinstate the original main teacher, remove the unpaid previous-teacher co-teacher row, and clear the partner link on both sessions.</p><p class="mb-0 text-muted small">Timesheet entries are not automatically adjusted.</p>',
+          confirmButton: 'Undo merge',
+          cancelButton: 'Cancel'
+        })
+        : global.confirm('Undo merge for this session?');
+      if (!confirmed) return;
+
+      const url = '/school/classes/'
+        + encodeURIComponent(classId)
+        + '/sessions/'
+        + encodeURIComponent(sessionId)
+        + '/merge/unmerge'
+        + (sessionDate ? `?sessionDate=${encodeURIComponent(sessionDate)}` : '');
+      const res = await fetch(url, {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: JSON.stringify({})
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.status !== 'success') {
+        throw new Error(data.message || `Request failed (${res.status}).`);
+      }
+      deps.hideScheduleSessionContextMenu?.();
+      if (typeof deps.applyScheduleSessionChangesInView === 'function') {
+        await deps.applyScheduleSessionChangesInView({ reloadAll: true });
+      } else {
+        deps.refreshScheduleViewWithHolidays?.();
+      }
+      await deps.uiAlert?.(data.message || 'Session merge undone.', 'Undo Merge', { icon: 'success' });
+    }
+
+    document.getElementById('btn_scheduleSessionContextUndoMerge')?.addEventListener('click', (clickEvent) => {
+      clickEvent.preventDefault();
+      clickEvent.stopPropagation();
+      const event = typeof deps.getScheduleSessionContextEvent === 'function'
+        ? deps.getScheduleSessionContextEvent()
+        : null;
+      deps.hideScheduleSessionContextMenu?.();
+      void undoMergeForEvent(event).catch(async (error) => {
+        await deps.uiAlert?.(error.message || 'Unable to undo merge.', 'Undo Merge', { icon: 'warning' });
+      });
+    });
+
+    global.canUndoMergeScheduleEvent = canUndoMergeScheduleEvent;
   }
 
   global.installMasterScheduleMergeSessions = installMasterScheduleMergeSessions;

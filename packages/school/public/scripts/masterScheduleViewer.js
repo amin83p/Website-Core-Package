@@ -2277,7 +2277,40 @@
         }));
     }
 
-    async function applyScheduleSessionChangesInView({ removed = [], upsertRefs = [], showProgress = false } = {}) {
+    function resolveScheduleWorkspacePersonIds(affectedPersonIds = []) {
+        const workspaceIds = new Set(
+            scheduleState.persons
+                .map((person) => String(person?.id || '').trim())
+                .filter(Boolean)
+        );
+        const affected = (Array.isArray(affectedPersonIds) ? affectedPersonIds : [])
+            .map((id) => String(id || '').trim())
+            .filter((id) => workspaceIds.has(id));
+        return [...new Set([
+            ...listLoadedSchedulePersonIds(),
+            ...affected
+        ])];
+    }
+
+    async function reloadScheduleWorkspacePersons(personIds = [], { silent = true } = {}) {
+        const targets = [...new Set(
+            (Array.isArray(personIds) ? personIds : [])
+                .map((id) => String(id || '').trim())
+                .filter(Boolean)
+        )];
+        await Promise.all(targets.map(async (personId) => {
+            const person = scheduleState.persons.find((row) => row.id === personId)
+                || { id: personId, name: personId };
+            await loadSchedulePerson(person, { silent });
+        }));
+    }
+
+    async function applyScheduleSessionChangesInView({
+        removed = [],
+        upsertRefs = [],
+        affectedPersonIds = [],
+        showProgress = false
+    } = {}) {
         let loadingToken = null;
         if (showProgress === true && typeof window.showLoading === 'function') {
             loadingToken = window.showLoading('Updating schedule view...');
@@ -2289,7 +2322,11 @@
             const upsertRows = (Array.isArray(upsertRefs) ? upsertRefs : [])
                 .map(normalizeScheduleSessionRefRow)
                 .filter((row) => row.classId && row.sessionId);
-            const personIds = listLoadedSchedulePersonIds();
+            const workspaceAffectedIds = (Array.isArray(affectedPersonIds) ? affectedPersonIds : [])
+                .map((id) => String(id || '').trim())
+                .filter(Boolean)
+                .filter((id) => scheduleState.persons.some((person) => person.id === id));
+            const personIds = resolveScheduleWorkspacePersonIds(affectedPersonIds);
             const touched = removeClassSessionsAcrossLoadedPersons(removedRows);
             let mergedEventCount = 0;
             if (removedRows.length > 0 && personIds.length > 0) {
@@ -2314,6 +2351,10 @@
                     await reloadLoadedSchedulePersons({ silent: true });
                     personIds.forEach((personId) => touched.add(personId));
                 }
+            }
+            if (workspaceAffectedIds.length) {
+                await reloadScheduleWorkspacePersons(workspaceAffectedIds, { silent: true });
+                workspaceAffectedIds.forEach((personId) => touched.add(personId));
             }
             if (removedRows.length || upsertRows.length || touched.size) {
                 refreshScheduleActiveView();
@@ -2966,15 +3007,21 @@
             document.getElementById('scheduleSessionContextStatusList')?.classList.add('d-none');
             document.getElementById('btn_scheduleSessionContextSelect')?.classList.add('d-none');
             document.getElementById('btn_scheduleSessionContextUndoTakeOver')?.classList.add('d-none');
+            document.getElementById('btn_scheduleSessionContextUndoMerge')?.classList.add('d-none');
         } else {
             renderScheduleSessionContextMenuHeader(event);
             renderScheduleSessionContextStatusList(event);
             bulkSection?.classList.add('d-none');
             bulkDivider?.classList.add('d-none');
             document.getElementById('btn_scheduleSessionContextSelect')?.classList.toggle('d-none', !isClass);
+            const canUndoMerge = isClass
+                && typeof global.canUndoMergeScheduleEvent === 'function'
+                && global.canUndoMergeScheduleEvent(event);
             const canUndoTakeOver = isClass
+                && !canUndoMerge
                 && typeof global.canUndoTakeOverScheduleEvent === 'function'
                 && global.canUndoTakeOverScheduleEvent(event);
+            document.getElementById('btn_scheduleSessionContextUndoMerge')?.classList.toggle('d-none', !canUndoMerge);
             document.getElementById('btn_scheduleSessionContextUndoTakeOver')?.classList.toggle('d-none', !canUndoTakeOver);
             const quickEdit = isClass && isScheduledClassSessionScheduleEditable(event);
             const canMoveDate = isClass && canScheduleSessionChangeDate(event);
@@ -8078,14 +8125,18 @@ if (canLoadAllSchedules) {
     if (canSelectAnyPerson && typeof global.installMasterScheduleMergeSessions === 'function') {
         global.installMasterScheduleMergeSessions({
             uiAlert,
+            uiConfirm,
             escapeHtml,
             showBootstrapModal: showScheduleBootstrapModal,
             hideBootstrapModal: hideScheduleBootstrapModal,
+            hideScheduleSessionContextMenu,
+            getScheduleSessionContextEvent: () => scheduleSessionContextEvent,
             bindMergeSessionsRail,
             countActiveScheduleSelectedSessions,
             countActiveDraftSelectedSessions,
             getSelectedSavedClassSessionEvents,
-            refreshScheduleViewWithHolidays
+            refreshScheduleViewWithHolidays,
+            applyScheduleSessionChangesInView
         });
     }
     if (canSelectAnyPerson && typeof global.installMasterScheduleTakeOverSessions === 'function') {
@@ -8117,7 +8168,8 @@ if (canLoadAllSchedules) {
             countActiveDraftSelectedSessions,
             getSelectedSavedClassSessionEvents,
             refreshScheduleViewWithHolidays,
-            applyClassSessionCoTeacherChangesInView
+            applyClassSessionCoTeacherChangesInView,
+            applyScheduleSessionChangesInView
         });
     }
     if (canSelectAnyPerson && typeof global.installMasterSchedulePersonNote === 'function') {

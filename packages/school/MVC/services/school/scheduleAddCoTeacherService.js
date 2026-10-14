@@ -43,6 +43,35 @@ function buildAddCoTeacherPreviewHash(payload) {
   return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 }
 
+function buildUpsertedSessionRefs(classId, sessions = [], selectedIds = new Set()) {
+  const normalizedClassId = toPublicId(classId);
+  const refs = [];
+  (Array.isArray(sessions) ? sessions : []).forEach((session) => {
+    const sessionId = toPublicId(session?.sessionId || session?.id);
+    if (!sessionId || !selectedIds.has(sessionId)) return;
+    refs.push({
+      classId: normalizedClassId,
+      sessionId,
+      date: cleanText(session?.date).slice(0, 10)
+    });
+  });
+  return refs;
+}
+
+function collectAffectedPersonIdsFromSessions(sessions = [], selectedIds = new Set()) {
+  const personIds = new Set();
+  const filterSelected = selectedIds instanceof Set && selectedIds.size > 0;
+  (Array.isArray(sessions) ? sessions : []).forEach((session) => {
+    const sessionId = toPublicId(session?.sessionId || session?.id);
+    if (filterSelected && sessionId && !selectedIds.has(sessionId)) return;
+    dependencies.sessionDeliveryTeamService.getSessionDeliveryPersonIds(session).forEach((rawId) => {
+      const personId = toPublicId(rawId);
+      if (personId) personIds.add(personId);
+    });
+  });
+  return [...personIds];
+}
+
 function isApprovedTimesheetLocked(session = {}) {
   const locked = session?.locked === true || String(session?.locked) === 'true';
   return locked && cleanText(session?.lockReason) === 'timesheet_approved';
@@ -579,7 +608,9 @@ async function applyAddCoTeacher({
     paidHours: preview.paidHours,
     action: preview.action,
     change: preview.change,
-    sessions: updatedSessions
+    sessions: updatedSessions,
+    upsertedSessions: buildUpsertedSessionRefs(preview.classId, nextSessions, selectedIds),
+    affectedPersonIds: collectAffectedPersonIdsFromSessions(nextSessions, selectedIds)
   };
 }
 
@@ -607,6 +638,8 @@ module.exports = {
   listExistingCoTeachers,
   buildAddCoTeacherPreview,
   applyAddCoTeacher,
+  collectAffectedPersonIdsFromSessions,
+  buildUpsertedSessionRefs,
   __setDependenciesForTest,
   __resetDependenciesForTest
 };

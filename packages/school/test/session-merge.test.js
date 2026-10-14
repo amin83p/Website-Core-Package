@@ -338,6 +338,18 @@ test('session manager keeps metadata controls behind canEditSessionMetadataFlag'
   assert.match(sessionManager, /canManageCoTeachersFlag/);
 });
 
+test('master schedule context menu offers undo merge for merged sessions', () => {
+  const view = readPackage('MVC/views/school/schedule/personSchedule.ejs');
+  const mergeScript = readPackage('public/scripts/masterScheduleMergeSessions.js');
+  const viewer = readPackage('public/scripts/masterScheduleViewer.js');
+  assert.match(view, /btn_scheduleSessionContextUndoMerge/);
+  assert.match(view, /Undo Merge/);
+  assert.match(mergeScript, /canUndoMergeScheduleEvent/);
+  assert.match(mergeScript, /merge\/unmerge/);
+  assert.match(viewer, /canUndoMergeScheduleEvent/);
+  assert.match(viewer, /btn_scheduleSessionContextUndoMerge/);
+});
+
 test('session manager includes undo merge UI and handler', () => {
   const sessionManager = readPackage('MVC/views/school/class/sessionManager.ejs');
   assert.match(sessionManager, /btnUndoSessionMerge/);

@@ -1321,6 +1321,23 @@ async function getClassByIdForSessionManage(classId, req, { sessionId = '', sess
     return { classData, activeOrgId };
 }
 
+const SESSION_MANAGE_ORG_ACCESS_CONTEXT = { scopeId: 'SCP_ORG' };
+
+async function loadSessionManageScope(classId, req, { sessionId = '', sessionDate = '' } = {}) {
+    const routeAccessContext = buildRouteAccessContext(req);
+    const { classData, activeOrgId } = await getClassByIdForSessionManage(classId, req, {
+        sessionId,
+        sessionDate
+    });
+    const scopedClassRow = await schoolDataService.getDataById('classes', classId, req.user, routeAccessContext);
+    const persistAccessContext = scopedClassRow ? routeAccessContext : SESSION_MANAGE_ORG_ACCESS_CONTEXT;
+    let sessions = await schoolDataService.getClassSessions(classId, req.user, persistAccessContext);
+    if (!sessions.length && Array.isArray(classData?.sessions) && classData.sessions.length) {
+        sessions = classData.sessions;
+    }
+    return { classData, activeOrgId, sessions, persistAccessContext };
+}
+
 function normalizeDateOnlyValue(value) {
     const token = String(value || '').trim();
     if (!token) return '';
@@ -4273,7 +4290,7 @@ async function manageSession(req, res) {
 
         // 1. Fetch Core Data
         const requestedSessionDateEarly = sessionNavigationService.normalizeSessionDate(req.query?.sessionDate || req.query?.date);
-        const { classData } = await getClassByIdForSessionManage(classId, req, {
+        const { classData, sessions } = await loadSessionManageScope(classId, req, {
             sessionId,
             sessionDate: requestedSessionDateEarly
         });
@@ -4281,8 +4298,7 @@ async function manageSession(req, res) {
             classData?.orgId || getActiveOrgIdOrThrow(req.user),
             req.user
         );
-        
-        const sessions = await schoolDataService.getClassSessions(classId, req.user);
+
         const requestedSessionDate = sessionNavigationService.normalizeSessionDate(req.query?.sessionDate || req.query?.date);
         const { session } = findSessionInList(sessions, sessionId, requestedSessionDate);
         if (!session) throw new Error('Session not found');
@@ -6031,9 +6047,12 @@ async function saveSession(req, res) {
         const { status, notes, room, roster, contentItems, contentOrder, skillsCovered } = req.body; 
         const forceRemoveMakeups = parseBoolean(req.body?.forceRemoveMakeups, false);
         const forceMetadataConflicts = parseBoolean(req.body?.force, false);
-        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
-        const sessions = await schoolDataService.getClassSessions(classId, req.user);
-        const { index: sessionIndex } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
+        const sessionDate = resolveSessionDateFromRequest(req);
+        const { classData, sessions, persistAccessContext } = await loadSessionManageScope(classId, req, {
+            sessionId,
+            sessionDate
+        });
+        const { index: sessionIndex } = findSessionInList(sessions, sessionId, sessionDate);
         if (sessionIndex === -1) throw new Error('Session not found');
         assertSessionScopeForRequest(req, classData, sessions[sessionIndex]);
         const originalSession = sessions[sessionIndex];
@@ -6716,7 +6735,7 @@ async function saveSession(req, res) {
             };
         }
 
-        await schoolDataService.saveClassSessions(classId, sessions, req.user);
+        await schoolDataService.saveClassSessions(classId, sessions, req.user, persistAccessContext);
 
         if (pendingAttendanceChangeLog) {
             const rosterChanges = attendanceChangeLogService.diffRosterAttendanceChanges(
@@ -6812,8 +6831,10 @@ async function normalizeSessionGradebooksForSave(classData, session, rawList, re
 }
 
 async function assertSessionGradebookEditable(req, { classId, sessionId }) {
-    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
-    const sessions = await schoolDataService.getClassSessions(classId, req.user);
+    const { classData, sessions, persistAccessContext } = await loadSessionManageScope(classId, req, {
+        sessionId,
+        sessionDate: resolveSessionDateFromRequest(req)
+    });
     const { index: sessionIndex } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
     if (sessionIndex === -1) throw new Error('Session not found');
     assertSessionScopeForRequest(req, classData, sessions[sessionIndex]);
@@ -6854,7 +6875,13 @@ async function assertSessionGradebookEditable(req, { classId, sessionId }) {
         statusMap
     });
 
-    return { classData, sessions, sessionIndex, session: sessions[sessionIndex] };
+    return {
+        classData,
+        sessions,
+        sessionIndex,
+        session: sessions[sessionIndex],
+        persistAccessContext
+    };
 }
 
 async function getGradebookMakeupSources(req, res) {
@@ -6933,7 +6960,7 @@ async function postGradebookMakeupFrom(req, res) {
 async function saveSessionGradebooks(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
-        const { classData, sessions, sessionIndex } = await assertSessionGradebookEditable(req, { classId, sessionId });
+        const { classData, sessions, sessionIndex, persistAccessContext } = await assertSessionGradebookEditable(req, { classId, sessionId });
 
         let rawList = req.body?.gradebooks;
         if (typeof rawList === 'string') {
@@ -6948,7 +6975,7 @@ async function saveSessionGradebooks(req, res) {
         );
 
         sessions[sessionIndex].gradebooks = normalized;
-        await schoolDataService.saveClassSessions(classId, sessions, req.user);
+        await schoolDataService.saveClassSessions(classId, sessions, req.user, persistAccessContext);
 
         const indexService = require('../../services/school/schoolIndexService');
         await indexService.rebuildIndexesForClass(classId);
@@ -7030,9 +7057,12 @@ async function postOfficialFinalGradesWorkflow(req, res) {
 async function saveSessionConduct(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
-        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
-        const sessions = await schoolDataService.getClassSessions(classId, req.user);
-        const { index: sessionIndex } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
+        const sessionDate = resolveSessionDateFromRequest(req);
+        const { classData, sessions, persistAccessContext } = await loadSessionManageScope(classId, req, {
+            sessionId,
+            sessionDate
+        });
+        const { index: sessionIndex } = findSessionInList(sessions, sessionId, sessionDate);
         if (sessionIndex === -1) {
             return res.status(404).json({ status: 'error', message: 'Session not found.' });
         }
@@ -7100,7 +7130,7 @@ async function saveSessionConduct(req, res) {
             userId: req.user?.id
         });
         sessions[sessionIndex] = session;
-        await schoolDataService.saveClassSessions(classId, sessions, req.user);
+        await schoolDataService.saveClassSessions(classId, sessions, req.user, persistAccessContext);
 
         const ready = sessionConductService.isSessionConductReady(session);
         return res.json({

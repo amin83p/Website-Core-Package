@@ -4,6 +4,7 @@ function getSchoolDataService() {
 }
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
+const teacherIdentityService = require('./teacherIdentityService');
 
 function normalizeDateOnly(value) {
     const token = String(value || '').trim();
@@ -103,6 +104,8 @@ async function rebuildIndexesForClass(classId) {
 
         // --- B. REBUILD TEACHERS ---
         const sessions = await getSchoolDataService().getClassSessions(classId);
+        const allTeachers = await getSchoolDataService().fetchAllData('teachers', {}, null);
+        const teacherPersonMap = teacherIdentityService.buildTeacherPersonMap(allTeachers);
 
         sessions.forEach(session => {
             const excludeFromTeacherIndex = sessionStatusPolicyService.shouldExcludeFromTeacherIndexByMap(statusMap, {
@@ -111,8 +114,15 @@ async function rebuildIndexesForClass(classId) {
             });
             if (excludeFromTeacherIndex) return;
             const deliveryPersonIds = sessionDeliveryTeamService.getSessionDeliveryPersonIds(session);
-            deliveryPersonIds.forEach((tid) => {
-                if (!tid) return;
+            const indexKeys = new Set();
+            deliveryPersonIds.forEach((rawId) => {
+                if (!rawId) return;
+                const personId = teacherIdentityService.resolveTeacherPersonId(rawId, teacherPersonMap) || rawId;
+                teacherIdentityService.collectTeacherRecordIdsForPerson(personId, teacherPersonMap).forEach((key) => {
+                    if (key) indexKeys.add(key);
+                });
+            });
+            indexKeys.forEach((tid) => {
                 const date = session.date;
 
                 if (!teacherIndex[tid]) teacherIndex[tid] = {};

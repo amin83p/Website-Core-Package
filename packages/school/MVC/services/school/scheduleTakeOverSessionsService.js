@@ -255,6 +255,20 @@ function buildUpsertedSessionRefs(classId, sessions = [], selectedIds = new Set(
   return refs;
 }
 
+function collectAffectedPersonIdsFromSessions(sessions = [], selectedIds = new Set()) {
+  const personIds = new Set();
+  const filterSelected = selectedIds instanceof Set && selectedIds.size > 0;
+  (Array.isArray(sessions) ? sessions : []).forEach((session) => {
+    const sessionId = toPublicId(session?.sessionId || session?.id);
+    if (filterSelected && sessionId && !selectedIds.has(sessionId)) return;
+    dependencies.sessionDeliveryTeamService.getSessionDeliveryPersonIds(session).forEach((rawId) => {
+      const personId = toPublicId(rawId);
+      if (personId) personIds.add(personId);
+    });
+  });
+  return [...personIds];
+}
+
 function applyTakeOverToSession(session = {}, { teacherId = '', teacherName = '' } = {}) {
   const nextTeacherId = toPublicId(teacherId);
   const previousTeacherId = toPublicId(session?.delivery?.deliveredBy);
@@ -512,7 +526,8 @@ async function applyTakeOverSessions({
     takenOverCount: selectedIds.size,
     teacherId: preview.teacherId,
     teacherName: preview.teacherName,
-    upsertedSessions: buildUpsertedSessionRefs(preview.classId, nextSessions, selectedIds)
+    upsertedSessions: buildUpsertedSessionRefs(preview.classId, nextSessions, selectedIds),
+    affectedPersonIds: collectAffectedPersonIdsFromSessions(nextSessions, selectedIds)
   };
 }
 
@@ -628,7 +643,8 @@ async function applyUndoTakeOver({
   return {
     classId: preview.classId,
     undoneCount: selectedIds.size,
-    upsertedSessions: buildUpsertedSessionRefs(preview.classId, nextSessions, selectedIds)
+    upsertedSessions: buildUpsertedSessionRefs(preview.classId, nextSessions, selectedIds),
+    affectedPersonIds: collectAffectedPersonIdsFromSessions(nextSessions, selectedIds)
   };
 }
 
@@ -658,6 +674,7 @@ module.exports = {
   canUndoTakeOverSession,
   sessionHasExpectedEnrollment,
   buildTakeOverPreview,
+  collectAffectedPersonIdsFromSessions,
   applyTakeOverSessions,
   buildUndoTakeOverPreview,
   applyUndoTakeOver,

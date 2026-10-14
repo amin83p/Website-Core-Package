@@ -200,9 +200,34 @@ test('a completed session can gain a co-teacher, and a teacher conflict or stale
     assert.equal(added.paidHours, 2);
     assert.equal(added.canEdit, false);
     assert.ok(saved[0].delivery.coTeachers.some((row) => row.personId === 'TCH_CO'));
+    assert.deepEqual(result.upsertedSessions, [{
+      classId: 'CLS_A',
+      sessionId: 'SES_1',
+      date: '2026-06-02'
+    }]);
+    assert.ok(result.affectedPersonIds.includes('TCH_OLD'));
+    assert.ok(result.affectedPersonIds.includes('TCH_NEW'));
+    assert.ok(result.affectedPersonIds.includes('TCH_CO'));
   } finally {
     scheduleAddCoTeacherService.__resetDependenciesForTest();
   }
+});
+
+test('collectAffectedPersonIdsFromSessions unions main and co-teacher delivery ids', () => {
+  const session = scheduleAddCoTeacherService.applyCoTeacherToSession(sessionRow(), {
+    teacherId: 'TCH_NEW',
+    teacherName: 'Noah',
+    paid: true,
+    paidHours: 2,
+    action: 'upsert'
+  });
+  const affected = scheduleAddCoTeacherService.collectAffectedPersonIdsFromSessions(
+    [session],
+    new Set([session.sessionId])
+  );
+  assert.ok(affected.includes('TCH_OLD'));
+  assert.ok(affected.includes('TCH_NEW'));
+  assert.ok(affected.includes('TCH_CO'));
 });
 
 test('overlapping selected sessions block a new co-teacher, and an existing co-teacher can be edited or removed', async () => {
@@ -318,8 +343,10 @@ test('add co-teacher sits under take over on the schedule rail', () => {
   assert.match(viewer, /add-co-teacher/);
   assert.match(viewer, /installMasterScheduleAddCoTeacher/);
   assert.match(viewer, /applyClassSessionCoTeacherChangesInView/);
-  assert.match(script, /applyClassSessionCoTeacherChangesInView/);
-  assert.match(script, /applyResult\?\.data\?\.sessions/);
+  assert.match(viewer, /applyScheduleSessionChangesInView/);
+  assert.match(script, /applyScheduleSessionChangesInView/);
+  assert.match(script, /applyResult\?\.data\?\.upsertedSessions/);
+  assert.match(script, /applyResult\?\.data\?\.affectedPersonIds/);
   assert.doesNotMatch(script, /refreshScheduleViewWithHolidays\?\(\);\s*\n\s*await deps\.uiAlert\?\.\(successMessage/);
   assert.match(script, /scheduleAddCoTeacherHoursWrap/);
   assert.match(script, /row\.sessions/);

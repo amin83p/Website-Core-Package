@@ -332,7 +332,19 @@
             previewHash: preview.previewHash
           });
           deps.hideBootstrapModal?.(document.getElementById('scheduleAddCoTeacherModal'));
-          if (typeof deps.applyClassSessionCoTeacherChangesInView === 'function') {
+          const upsertRefs = Array.isArray(applyResult?.data?.upsertedSessions)
+            ? applyResult.data.upsertedSessions
+            : [];
+          const affectedPersonIds = Array.isArray(applyResult?.data?.affectedPersonIds)
+            ? applyResult.data.affectedPersonIds
+            : [];
+          if (upsertRefs.length && typeof deps.applyScheduleSessionChangesInView === 'function') {
+            await deps.applyScheduleSessionChangesInView({
+              upsertRefs,
+              affectedPersonIds,
+              showProgress: true
+            });
+          } else if (typeof deps.applyClassSessionCoTeacherChangesInView === 'function') {
             await deps.applyClassSessionCoTeacherChangesInView({
               sessions: applyResult?.data?.sessions || [],
               action: state.action,

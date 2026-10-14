@@ -27,6 +27,7 @@
       if (upsertRefs.length && typeof deps.applyScheduleSessionChangesInView === 'function') {
         refreshPromise = deps.applyScheduleSessionChangesInView({
           upsertRefs,
+          affectedPersonIds: Array.isArray(applyData?.affectedPersonIds) ? applyData.affectedPersonIds : [],
           showProgress: true
         }).catch(async () => {
           if (typeof deps.reloadLoadedSchedulePersons === 'function') {
@@ -43,8 +44,12 @@
       await refreshPromise;
     }
 
+    function isMergedScheduleEvent(event) {
+      return event?.merged?.isMergedSession === true;
+    }
+
     function canUndoTakeOverScheduleEvent(event) {
-      if (!event) return false;
+      if (!event || isMergedScheduleEvent(event)) return false;
       const classId = clean(event?.classId);
       const sessionId = clean(event?.sessionId || event?.id);
       if (!classId || !sessionId) return false;

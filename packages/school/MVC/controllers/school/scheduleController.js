@@ -761,6 +761,37 @@ function collectClassIdsFromTeacherIndex(teacherIndex, personId, teacherPersonMa
     return classIds;
 }
 
+function collectClassIdsFromTeacherIndexForRange(
+    teacherIndex,
+    personId,
+    teacherPersonMap = new Map(),
+    startDate = '',
+    endDate = ''
+) {
+    const classIds = new Set();
+    const rangeStart = normalizeDateOnly(startDate);
+    const rangeEnd = normalizeDateOnly(endDate);
+    const keys = teacherIdentityService.collectTeacherRecordIdsForPerson(personId, teacherPersonMap);
+    const indexRoot = teacherIndex && typeof teacherIndex === 'object' && !Array.isArray(teacherIndex)
+        ? teacherIndex
+        : {};
+    keys.forEach((key) => {
+        const byDate = indexRoot[key];
+        if (!byDate || typeof byDate !== 'object') return;
+        Object.entries(byDate).forEach(([dateKey, entries]) => {
+            const sessionDate = normalizeDateOnly(dateKey);
+            if (!sessionDate) return;
+            if (rangeStart && sessionDate < rangeStart) return;
+            if (rangeEnd && sessionDate > rangeEnd) return;
+            (Array.isArray(entries) ? entries : []).forEach((entry) => {
+                const classId = normalizeId(entry?.classId);
+                if (classId) classIds.add(classId);
+            });
+        });
+    });
+    return classIds;
+}
+
 function hasInstructorMatchWithTeacherLink(classRow, personId, teacherPersonMap = new Map()) {
     const normalizedPersonId = normalizeId(personId);
     const instructors = Array.isArray(classRow?.instructors) ? classRow.instructors : [];
@@ -770,9 +801,48 @@ function hasInstructorMatchWithTeacherLink(classRow, personId, teacherPersonMap 
     });
 }
 
-function hasSessionDeliveryMatch(classRow, personId, teacherPersonMap = new Map()) {
+function hasSessionDeliveryMatch(classRow, personId, teacherPersonMap = new Map(), startDate = '', endDate = '') {
+    const rangeStart = normalizeDateOnly(startDate);
+    const rangeEnd = normalizeDateOnly(endDate);
     const sessions = Array.isArray(classRow?.sessions) ? classRow.sessions : [];
-    return sessions.some((session) => sessionDeliveryTeamService.isPersonOnSessionDelivery(session, personId, teacherPersonMap));
+    return sessions.some((session) => {
+        const sessionDate = normalizeDateOnly(session?.date);
+        if (rangeStart || rangeEnd) {
+            if (!sessionDate) return false;
+            if (rangeStart && sessionDate < rangeStart) return false;
+            if (rangeEnd && sessionDate > rangeEnd) return false;
+        }
+        return sessionDeliveryTeamService.isPersonOnSessionDelivery(session, personId, teacherPersonMap);
+    });
+}
+
+function shouldUseOrgScopeDeliveryClassDiscovery(accessContext = {}, reqUser = {}) {
+    const scopeId = String(
+        accessContext?.scopeId
+        || reqUser?.accessScope
+        || ''
+    ).trim();
+    return Boolean(scopeId && scopeId !== 'SCP_ORG');
+}
+
+function collectClassIdsWithSessionDeliveryInRange(
+    classRows = [],
+    personId,
+    teacherPersonMap = new Map(),
+    startDate = '',
+    endDate = '',
+    { activeOrgId = '' } = {}
+) {
+    const classIds = new Set();
+    (Array.isArray(classRows) ? classRows : []).forEach((classRow) => {
+        if (activeOrgId && !idsEqual(classRow?.orgId, activeOrgId)) return;
+        const classId = normalizeId(classRow?.id);
+        if (!classId) return;
+        if (hasSessionDeliveryMatch(classRow, personId, teacherPersonMap, startDate, endDate)) {
+            classIds.add(classId);
+        }
+    });
+    return classIds;
 }
 
 async function getClassSessionsForScheduleScan(classId, reqUser, accessContext, { allowOrgScopeFallback = false } = {}) {
@@ -1621,6 +1691,7 @@ async function buildEventsForPersonAndRange({
     };
 
     const candidateClassIds = new Set();
+    const sessionDeliveryOnlyClassIds = new Set();
     studentClassIds.forEach((id) => candidateClassIds.add(id));
 
     for (const classRow of allClasses || []) {
@@ -1629,16 +1700,56 @@ async function buildEventsForPersonAndRange({
         if (
             hasInstructorMatchWithTeacherLink(classRow, normalizedPersonId, teacherPersonMap)
             || studentClassIds.has(classId)
-            || hasSessionDeliveryMatch(classRow, normalizedPersonId, teacherPersonMap)
         ) {
             candidateClassIds.add(classId);
+            continue;
+        }
+        if (hasSessionDeliveryMatch(classRow, normalizedPersonId, teacherPersonMap, startDate, endDate)) {
+            candidateClassIds.add(classId);
+            sessionDeliveryOnlyClassIds.add(classId);
         }
     }
 
-    const teacherIndexClassIds = collectClassIdsFromTeacherIndex(teacherIndex, normalizedPersonId, teacherPersonMap);
+    let orgDeliveryClassIds = new Set();
+    if (shouldUseOrgScopeDeliveryClassDiscovery(accessContext, reqUser)) {
+        const orgScopedClasses = await schoolDataService.fetchAllData(
+            'classes',
+            {},
+            reqUser,
+            SCHEDULE_ORG_SCAN_ACCESS_CONTEXT
+        );
+        orgDeliveryClassIds = collectClassIdsWithSessionDeliveryInRange(
+            orgScopedClasses,
+            normalizedPersonId,
+            teacherPersonMap,
+            startDate,
+            endDate,
+            { activeOrgId }
+        );
+        orgDeliveryClassIds.forEach((classId) => {
+            candidateClassIds.add(classId);
+            if (
+                !hasInstructorMatchWithTeacherLink(classMap.get(classId), normalizedPersonId, teacherPersonMap)
+                && !studentClassIds.has(classId)
+            ) {
+                sessionDeliveryOnlyClassIds.add(classId);
+            }
+        });
+    }
+
+    const teacherIndexClassIds = collectClassIdsFromTeacherIndexForRange(
+        teacherIndex,
+        normalizedPersonId,
+        teacherPersonMap,
+        startDate,
+        endDate
+    );
     teacherIndexClassIds.forEach((classId) => candidateClassIds.add(classId));
 
-    const orgScopeFallbackClassIds = new Set(teacherIndexClassIds);
+    const orgScopeFallbackClassIds = new Set([
+        ...teacherIndexClassIds,
+        ...sessionDeliveryOnlyClassIds
+    ]);
     const mergeLinkedClassIds = await expandScheduleCandidateClassIdsForMergeLinks({
         candidateClassIds,
         reqUser,
@@ -2061,6 +2172,7 @@ async function getMyScheduleData(req, res) {
         }));
         const selectedSummary = summarizeEvents(selectedEvents, statusMeta);
 
+
         res.json({
             status: 'success',
             person: {
@@ -2277,10 +2389,12 @@ async function getPersonSchedule(req, res) {
             })
             : (Array.isArray(viewerScheduleAccess.availableRoles) ? viewerScheduleAccess.availableRoles : []);
 
+        const roleFilteredEvents = filterScheduleEventsForRole(personResult?.events, effectiveRole);
         const filteredEvents = filterEventsWithCasesIfRequested(
-            filterScheduleEventsForRole(personResult?.events, effectiveRole),
+            roleFilteredEvents,
             req.query
         );
+
         const fingerprint = buildScheduleEventsFingerprint(filteredEvents);
         const events = filteredEvents.map((event) => {
             const isLeaveEvent = isApprovedLeaveScheduleEvent(event);
@@ -3575,6 +3689,11 @@ module.exports = {
     isAllowedMergedSessionOverlap,
     buildActiveClassesForSchedulePerson,
     collectClassIdsWithSessionsInEvents,
-    isActiveClassForSchedulePicker
+    isActiveClassForSchedulePicker,
+    collectClassIdsFromTeacherIndexForRange,
+    collectClassIdsFromTeacherIndex,
+    collectClassIdsWithSessionDeliveryInRange,
+    shouldUseOrgScopeDeliveryClassDiscovery,
+    hasSessionDeliveryMatch
 };
 

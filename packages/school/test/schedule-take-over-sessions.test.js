@@ -146,6 +146,18 @@ test('take over makes the new teacher the main teacher and the previous teacher 
   assert.equal(updated.delivery.coTeachers.some((row) => row.personId === 'TCH_NEW'), false);
 });
 
+test('collectAffectedPersonIdsFromSessions includes the new main teacher and previous co-teachers', () => {
+  const updated = scheduleTakeOverSessionsService.applyTakeOverToSession(sessionRow({ status: 'scheduled' }), {
+    teacherId: 'TCH_NEW',
+    teacherName: 'Noah'
+  });
+  const selectedIds = new Set([updated.sessionId]);
+  const affected = scheduleTakeOverSessionsService.collectAffectedPersonIdsFromSessions([updated], selectedIds);
+  assert.ok(affected.includes('TCH_NEW'));
+  assert.ok(affected.includes('TCH_OLD'));
+  assert.ok(affected.includes('TCH_CO'));
+});
+
 test('a conflicting teacher schedule blocks take over and a clear schedule is saved without a merge link', async () => {
   const stored = [sessionRow()];
   let saved = null;
@@ -243,7 +255,10 @@ test('take over is wired beside merge on the schedule rail', () => {
   assert.match(viewer, /applyScheduleSessionChangesInView[\s\S]*installMasterScheduleTakeOverSessions/);
   assert.match(script, /applyScheduleSessionChangesInView/);
   assert.match(script, /take-over-sessions\/undo-apply/);
+  assert.match(script, /affectedPersonIds/);
   assert.match(script, /canUndoTakeOverScheduleEvent/);
+  assert.match(script, /isMergedScheduleEvent/);
+  assert.match(script, /if \(!event \|\| isMergedScheduleEvent\(event\)\) return false/);
   assert.match(script, /classifySelectedUndoEligibility/);
   assert.match(script, /undoTakeOverForSessions/);
   assert.match(script, /allUndoable/);
