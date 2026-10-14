@@ -1,5 +1,7 @@
 // MVC/controllers/school/scheduleController.js
 const crypto = require('crypto');
+
+const SCHEDULE_ORG_SCAN_ACCESS_CONTEXT = { scopeId: 'SCP_ORG' };
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const { resolveOrgTodayFromRequest, resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
@@ -773,30 +775,51 @@ function hasSessionDeliveryMatch(classRow, personId, teacherPersonMap = new Map(
     return sessions.some((session) => sessionDeliveryTeamService.isPersonOnSessionDelivery(session, personId, teacherPersonMap));
 }
 
+async function getClassSessionsForScheduleScan(classId, reqUser, accessContext, { allowOrgScopeFallback = false } = {}) {
+    const scopedSessions = await schoolDataService.getClassSessions(classId, reqUser, accessContext);
+    if (scopedSessions.length || !allowOrgScopeFallback) return scopedSessions;
+    return schoolDataService.getClassSessions(classId, reqUser, SCHEDULE_ORG_SCAN_ACCESS_CONTEXT);
+}
+
+async function getClassRowForScheduleScan(classId, reqUser, accessContext, { allowOrgScopeFallback = false } = {}) {
+    const scopedRow = await schoolDataService.getDataById('classes', classId, reqUser, accessContext);
+    if (scopedRow || !allowOrgScopeFallback) return scopedRow;
+    return schoolDataService.getDataById('classes', classId, reqUser, SCHEDULE_ORG_SCAN_ACCESS_CONTEXT);
+}
+
 async function expandScheduleCandidateClassIdsForMergeLinks({
     candidateClassIds,
     reqUser,
-    accessContext = {}
+    accessContext = {},
+    orgScopeFallbackClassIds = null
 } = {}) {
-    if (!candidateClassIds || candidateClassIds.size === 0) return;
+    const addedByMerge = new Set();
+    if (!candidateClassIds || candidateClassIds.size === 0) return addedByMerge;
     const pending = [...candidateClassIds];
     const visited = new Set();
     while (pending.length) {
         const classId = normalizeId(pending.pop());
         if (!classId || visited.has(classId)) continue;
         visited.add(classId);
+        const allowOrgScopeFallback = Boolean(
+            orgScopeFallbackClassIds && orgScopeFallbackClassIds.has(classId)
+        );
         // eslint-disable-next-line no-await-in-loop
-        const sessions = await schoolDataService.getClassSessions(classId, reqUser, accessContext);
+        const sessions = await getClassSessionsForScheduleScan(classId, reqUser, accessContext, {
+            allowOrgScopeFallback
+        });
         for (const session of sessions || []) {
             const partnerClassId = normalizeId(session?.merged?.partnerClassId);
             const linkedClassId = normalizeId(session?.mergedPartner?.linkedClassId);
             [partnerClassId, linkedClassId].forEach((linkedId) => {
                 if (!linkedId) return;
+                if (!candidateClassIds.has(linkedId)) addedByMerge.add(linkedId);
                 candidateClassIds.add(linkedId);
                 if (!visited.has(linkedId)) pending.push(linkedId);
             });
         }
     }
+    return addedByMerge;
 }
 
 function buildPersonDisplayName(person, fallbackId = '') {
@@ -1612,25 +1635,34 @@ async function buildEventsForPersonAndRange({
         }
     }
 
-    collectClassIdsFromTeacherIndex(teacherIndex, normalizedPersonId, teacherPersonMap)
-        .forEach((classId) => candidateClassIds.add(classId));
+    const teacherIndexClassIds = collectClassIdsFromTeacherIndex(teacherIndex, normalizedPersonId, teacherPersonMap);
+    teacherIndexClassIds.forEach((classId) => candidateClassIds.add(classId));
 
-    await expandScheduleCandidateClassIdsForMergeLinks({
+    const orgScopeFallbackClassIds = new Set(teacherIndexClassIds);
+    const mergeLinkedClassIds = await expandScheduleCandidateClassIdsForMergeLinks({
         candidateClassIds,
         reqUser,
-        accessContext
+        accessContext,
+        orgScopeFallbackClassIds
     });
+    mergeLinkedClassIds.forEach((classId) => orgScopeFallbackClassIds.add(classId));
 
+    const droppedClassIds = [];
     for (const classId of candidateClassIds) {
         if (classMap.has(classId)) continue;
+        const allowOrgScopeFallback = orgScopeFallbackClassIds.has(classId);
         // eslint-disable-next-line no-await-in-loop
-        const classRow = await schoolDataService.getDataById('classes', classId, reqUser, accessContext);
-        if (classRow) classMap.set(classId, classRow);
+        const classRow = await getClassRowForScheduleScan(classId, reqUser, accessContext, {
+            allowOrgScopeFallback
+        });
+        if (classRow) {
+            classMap.set(classId, classRow);
+        } else {
+            droppedClassIds.push(classId);
+        }
     }
 
-    [...candidateClassIds].forEach((classId) => {
-        if (!classMap.has(classId)) candidateClassIds.delete(classId);
-    });
+    droppedClassIds.forEach((classId) => candidateClassIds.delete(classId));
 
     const schedulePersonNameById = await buildSchedulePersonNameById({
         reqUser,
@@ -1663,7 +1695,9 @@ async function buildEventsForPersonAndRange({
     for (const classId of classIdsToScan) {
         const classDef = classMap.get(classId) || null;
         const classHasInstructor = hasInstructorMatchWithTeacherLink(classDef, normalizedPersonId, teacherPersonMap);
-        const sessions = await schoolDataService.getClassSessions(classId, reqUser, accessContext);
+        const sessions = await getClassSessionsForScheduleScan(classId, reqUser, accessContext, {
+            allowOrgScopeFallback: orgScopeFallbackClassIds.has(classId)
+        });
         classSessionsById.set(classId, Array.isArray(sessions) ? sessions : []);
         let rollingApplicability = null;
         if (classSessionCapacityService.getClassRegistrationModeKey(classDef) === 'rolling') {
