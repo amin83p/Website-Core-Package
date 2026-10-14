@@ -65,6 +65,7 @@ router.get('/auth/microsoft/callback', microsoftLoginLimiter, ctrl.microsoftCall
 router.get('/password-reset', ctrl.showPasswordReset);
 router.post('/login', loginLimiter, validateRequest(authValidators.loginSchema), ctrl.login);
 router.post('/force-login', loginLimiter, validateRequest(authValidators.forceLoginSchema), ctrl.forceLogin);
+router.post('/impersonate', loginLimiter, requireAuth, validateRequest(authValidators.impersonateUserSchema), ctrl.postImpersonateUser);
 router.get('/logout', requireAuth ,ctrl.logout);
 router.get('/membership-status', requireAuth, ctrl.showMembershipStatus);
 router.get('/updates', requireAuth, ctrl.showUpdates);

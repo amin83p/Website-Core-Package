@@ -109,11 +109,20 @@ async function cleanupExpiredSessions(userId) {
 /**
  * Creates a new session using the token signature as the ID.
  */
-async function createSession(user, orgId, deviceInfo, tokenSignature) {
+function isImpersonationSessionRecord(session = {}) {
+    return Boolean(toPublicId(session?.impersonatedByUserId));
+}
+
+function countSessionsTowardUserLimit(sessions = []) {
+    return (Array.isArray(sessions) ? sessions : []).filter((row) => !isImpersonationSessionRecord(row)).length;
+}
+
+async function createSession(user, orgId, deviceInfo, tokenSignature, options = {}) {
     const limits = await resolvePolicyLimits(user, orgId);
 
     const now = new Date();
     const expiryTime = new Date(now.getTime() + (limits.maxDurationMins * 60 * 1000));
+    const impersonatedByUserId = toPublicId(options?.impersonatedByUserId || '');
 
     const newSession = {
         id: tokenSignature,
@@ -133,6 +142,9 @@ async function createSession(user, orgId, deviceInfo, tokenSignature) {
             action: 'login'
         }]
     };
+    if (impersonatedByUserId) {
+        newSession.impersonatedByUserId = impersonatedByUserId;
+    }
 
     const created = await dataService.addData('sessions', newSession, SYSTEM_CONTEXT);
     sessionRecordCacheService.set(tokenSignature, newSession);
@@ -201,13 +213,14 @@ async function checkLoginEligibility(user, targetOrgId) {
     await cleanupExpiredSessions(user.id);
     const limits = await resolvePolicyLimits(user, targetOrgId);
     const activeSessions = await dataService.fetchData('sessions', { q: user.id, type: 'exact_match', searchFields: 'userId' }, SYSTEM_CONTEXT);
+    const countedSessions = countSessionsTowardUserLimit(activeSessions);
 
-    if (limits.maxSessions === 0 || activeSessions.length >= limits.maxSessions) {
+    if (limits.maxSessions === 0 || countedSessions >= limits.maxSessions) {
         return {
             allowed: false,
             reason: 'COUNT_LIMIT',
             maxSessions: limits.maxSessions,
-            currentCount: activeSessions.length,
+            currentCount: countedSessions,
             activeSessions
         };
     }
@@ -242,12 +255,13 @@ async function validateOrgSwitch(user, currentSessionId, targetOrgId) {
     }
 
     const userSessions = await dataService.fetchData('sessions', { q: user.id, type: 'exact_match', searchFields: 'userId' }, SYSTEM_CONTEXT);
-    if (userSessions.length > limits.maxSessions) {
+    const countedSessions = countSessionsTowardUserLimit(userSessions);
+    if (countedSessions > limits.maxSessions) {
         return {
             allowed: false,
             reason: 'COUNT_LIMIT',
-            message: `<b>You have reached organization limit</b><br>You are allowed to use <b>${limits.maxSessions}</b> sessions.<br>You currently have ${userSessions.length}.`,
-            sessionsToDelete: userSessions.length - limits.maxSessions
+            message: `<b>You have reached organization limit</b><br>You are allowed to use <b>${limits.maxSessions}</b> sessions.<br>You currently have ${countedSessions}.`,
+            sessionsToDelete: countedSessions - limits.maxSessions
         };
     }
 
@@ -403,6 +417,8 @@ async function refreshSessionPolicyLimitsForUsers(userIds = []) {
 module.exports = {
     resolvePolicyLimits,
     cleanupExpiredSessions,
+    isImpersonationSessionRecord,
+    countSessionsTowardUserLimit,
     createSession,
     touchSession,
     checkLoginEligibility,

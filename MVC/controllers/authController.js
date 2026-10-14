@@ -21,6 +21,8 @@ const userRepository = require('../repositories/userRepository');
 const microsoftAuthService = require('../services/microsoftAuthService');
 const microsoftPendingLoginService = require('../services/microsoftPendingLoginService');
 const adminCheckersService = require('../services/adminChekersService');
+const authImpersonationService = require('../services/authImpersonationService');
+const adminAuthorityService = require('../services/adminAuthorityService');
 const { normalizePhoneE164, validateSmsPhoneE164, maskPhone } = require('../utils/phoneUtils');
 
 const DEFAULT_DASHBOARD_URL = '/dashboard';
@@ -537,7 +539,7 @@ async function recordSuccessfulLogin(user, { provider = 'password', providerAcco
   }
 }
 
-async function completeLoginForUser(req, res, user, { provider = 'password', providerAccount = null } = {}) {
+async function completeLoginForUser(req, res, user, { provider = 'password', providerAccount = null, impersonatedByUserId = '' } = {}) {
   const orgId = user.primaryOrgId || 'SYSTEM';
   const limits = await sessionService.resolvePolicyLimits(user, orgId);
   const maxDurationMins = limits.maxDurationMins || 1440;
@@ -558,7 +560,9 @@ async function completeLoginForUser(req, res, user, { provider = 'password', pro
   const token = authService.generateToken(user, maxDurationMins);
   const tokenSignature = token.split('.')[2];
 
-  await sessionService.createSession(user, orgId, buildDeviceInfo(req, provider), tokenSignature);
+  await sessionService.createSession(user, orgId, buildDeviceInfo(req, provider), tokenSignature, {
+    impersonatedByUserId: toPublicId(impersonatedByUserId)
+  });
   await recordSuccessfulLogin(user, { provider, providerAccount });
 
   res.cookie('auth_token', token, {
@@ -817,8 +821,36 @@ async function forceLogin(req, res) {
 /* ============================================================
    LOGOUT
 ============================================================ */
+async function postImpersonateUser(req, res) {
+  try {
+    if (!adminAuthorityService.isSuperAdmin(req.user)) {
+      return res.status(403).json({ status: 'error', message: 'Only super administrators can impersonate users.' });
+    }
+    const targetUserId = toPublicId(req.body?.targetUserId);
+    if (!targetUserId) {
+      return res.status(400).json({ status: 'error', message: 'targetUserId is required.' });
+    }
+    const result = await authImpersonationService.beginImpersonation(req, res, targetUserId);
+    return res.json({
+      status: 'success',
+      message: 'Signed in as selected user.',
+      redirectUrl: result.redirectUrl || DEFAULT_DASHBOARD_URL,
+      targetUserId: result.targetUserId
+    });
+  } catch (error) {
+    const statusCode = Number(error?.statusCode) || 400;
+    return res.status(statusCode).json({
+      status: 'error',
+      message: error.message || 'Unable to impersonate user.'
+    });
+  }
+}
+
 async function logout(req, res) {
     try {
+        if (await authImpersonationService.endImpersonationIfActive(req, res)) {
+            return;
+        }
         const token = req.cookies.auth_token;
         if (token) {
             const parts = token.split('.');
@@ -1536,6 +1568,7 @@ module.exports = {
   switchProfileMode,
   resolvePendingMicrosoftUser,
   forceLogin,
+  postImpersonateUser,
   requestPasswordReset,
   startPasswordResetEmail,
   startPasswordResetSms,

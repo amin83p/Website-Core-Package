@@ -2084,7 +2084,9 @@
                                 <% }); %>
                             <% } %>
                         </div>
+                        <% if (canManageCoTeachersFlag) { %>
                         <div class="form-text mt-1 mb-0">Unpaid co-teachers appear on schedules but earn 0 timesheet hours. Paid co-teachers can use a lower paid-hours amount than the session duration.</div>
+                        <% } %>
                     </div>
                     <div class="session-info-tile session-info-tile--location">
                         <label class="session-info-tile-label mb-0" for="sessionRoom">Location</label>

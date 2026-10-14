@@ -1,0 +1,30 @@
+<%
+  const viewingAsName = (typeof user !== 'undefined' && user)
+    ? String(user.name || user.username || user.email || user.id || 'User').trim()
+    : 'User';
+  const actorLabel = (typeof impersonationActorLabel !== 'undefined' && impersonationActorLabel)
+    ? String(impersonationActorLabel).trim()
+    : 'Administrator';
+%>
+
+<div class="container mt-3">
+  <div class="alert impersonation-banner shadow-sm mb-0" role="status">
+    <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-2">
+      <div>
+        <div class="fw-bold">
+          <i class="bi bi-person-badge me-2" aria-hidden="true"></i>
+          Viewing as <%= viewingAsName %>
+        </div>
+        <div class="small mb-0">
+          You are impersonating this account. Use <strong>Return to admin account</strong> in the account menu to restore your super-admin session.
+          <% if (actorLabel) { %>
+            <span class="d-block d-lg-inline text-muted">Admin: <%= actorLabel %></span>
+          <% } %>
+        </div>
+      </div>
+      <a href="<%= (typeof impersonationLogoutHref !== 'undefined' && impersonationLogoutHref) ? impersonationLogoutHref : '/logout' %>" class="btn btn-sm btn-outline-dark fw-semibold">
+        Return to admin account
+      </a>
+    </div>
+  </div>
+</div>

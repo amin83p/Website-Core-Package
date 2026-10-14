@@ -46,6 +46,26 @@ function sanitizeCurrentPath(value, maxLength = 500) {
   return pathname.slice(0, Math.max(1, Number(maxLength) || 500));
 }
 
+function sanitizeAppReturnUrl(value, maxLength = 500) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (raw.startsWith('//') || /^https?:\/\//i.test(raw)) return '';
+  if (!raw.startsWith('/')) return '';
+
+  try {
+    const parsed = new URL(raw, 'http://local.invalid');
+    let pathname = String(parsed.pathname || '').trim();
+    if (!pathname.startsWith('/')) return '';
+    pathname = pathname.replace(/[\u0000-\u001f\u007f]/g, '');
+    pathname = pathname.replace(/\/{2,}/g, '/');
+    const search = String(parsed.search || '').replace(/[\u0000-\u001f\u007f]/g, '');
+    const combined = `${pathname}${search}`;
+    return combined.slice(0, Math.max(1, Number(maxLength) || 500));
+  } catch (_) {
+    return sanitizeCurrentPath(raw, maxLength);
+  }
+}
+
 function getExtension(pathname = '') {
   const clean = String(pathname || '').split('/').pop() || '';
   const dotIndex = clean.lastIndexOf('.');
@@ -74,5 +94,6 @@ function isHtmlNavigationRequest(req) {
 
 module.exports = {
   isHtmlNavigationRequest,
-  sanitizeCurrentPath
+  sanitizeCurrentPath,
+  sanitizeAppReturnUrl
 };

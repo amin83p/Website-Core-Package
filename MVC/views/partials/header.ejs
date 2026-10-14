@@ -355,12 +355,22 @@
                             </li>
                             <% } %>
 
+                            <% if (typeof canImpersonateUsers !== 'undefined' && canImpersonateUsers) { %>
+                            <li class="header-user-menu-divider" role="separator" aria-hidden="true"></li>
+                            <li class="header-user-menu-nav" role="none">
+                                <button type="button" class="header-user-menu-item w-100 border-0 bg-transparent text-start" id="btn_headerLoginAsUser" role="menuitem">
+                                    <span class="header-user-menu-item-icon" aria-hidden="true"><i class="bi bi-person-bounding-box"></i></span>
+                                    <span class="header-user-menu-item-label">Login as user…</span>
+                                </button>
+                            </li>
+                            <% } %>
+
                             <li class="header-user-menu-divider" role="separator" aria-hidden="true"></li>
 
                             <li class="header-user-menu-footer" role="none">
-                                <a class="header-user-menu-item header-user-menu-item--danger" href="/logout" role="menuitem">
+                                <a class="header-user-menu-item header-user-menu-item--danger" href="<%= (typeof isImpersonating !== 'undefined' && isImpersonating && typeof impersonationLogoutHref !== 'undefined' && impersonationLogoutHref) ? impersonationLogoutHref : '/logout' %>" role="menuitem">
                                     <span class="header-user-menu-item-icon" aria-hidden="true"><i class="bi bi-box-arrow-right"></i></span>
-                                    <span class="header-user-menu-item-label">Sign Out</span>
+                                    <span class="header-user-menu-item-label"><%= (typeof isImpersonating !== 'undefined' && isImpersonating) ? 'Return to admin account' : 'Sign Out' %></span>
                                 </a>
                             </li>
                         </ul>
@@ -1092,5 +1102,78 @@
             .catch((error) => console.error('[ScheduledTaskManager]', error));
         });
       })();
+    </script>
+    <% } %>
+
+    <% if (typeof canImpersonateUsers !== 'undefined' && canImpersonateUsers) { %>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const trigger = document.getElementById('btn_headerLoginAsUser');
+        if (!trigger) return;
+        trigger.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          if (!window.GenericPicker || !window.GenericPickerPresets || !window.GenericPickerContexts) {
+            if (typeof window.showMessageModal === 'function') {
+              void window.showMessageModal({
+                title: 'Login as user',
+                icon: 'bi-exclamation-triangle text-warning',
+                message: 'User picker is unavailable on this page.'
+              });
+            }
+            return;
+          }
+          window.GenericPicker.open(window.GenericPickerPresets.user({
+            title: 'Login as user',
+            icon: 'bi-person-bounding-box',
+            placeholder: 'Search users...',
+            context: window.GenericPickerContexts.allUsers(),
+            onSelect: (item) => {
+              const targetUserId = String(item?.id || item?.value || '').trim();
+              if (!targetUserId) return;
+              const label = String(item?.name || item?.username || item?.label || targetUserId).trim();
+              const proceed = typeof window.showMessageModal === 'function'
+                ? window.showMessageModal({
+                  title: 'Login as user?',
+                  icon: 'bi-person-bounding-box text-primary',
+                  message: `Sign in as ${label}? You can return to your super-admin account from Sign Out.`,
+                  buttons: [
+                    { text: 'Cancel', class: 'btn-secondary' },
+                    { text: 'Continue', class: 'btn-primary' }
+                  ]
+                })
+                : Promise.resolve(window.confirm(`Sign in as ${label}?`));
+              void Promise.resolve(proceed).then(async (confirmed) => {
+                if (confirmed !== 'Continue') return;
+                try {
+                  const response = await fetch('/impersonate', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      Accept: 'application/json',
+                      'X-AJAX-Request': 'true'
+                    },
+                    body: JSON.stringify({ targetUserId })
+                  });
+                  const payload = await response.json().catch(() => ({}));
+                  if (!response.ok || payload.status !== 'success') {
+                    throw new Error(payload.message || `Request failed (${response.status}).`);
+                  }
+                  window.location.reload();
+                } catch (error) {
+                  if (typeof window.showMessageModal === 'function') {
+                    await window.showMessageModal({
+                      title: 'Login as user failed',
+                      icon: 'bi-exclamation-triangle text-danger',
+                      message: error?.message || 'Unable to impersonate user.'
+                    });
+                  }
+                }
+              });
+            }
+          }));
+        });
+      });
     </script>
     <% } %>

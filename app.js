@@ -60,6 +60,7 @@ const appBrandingService = require('./MVC/services/appBrandingService');
 const appPublicUrlService = require('./MVC/services/appPublicUrlService');
 const smsProviderService = require('./MVC/services/sms/smsProviderService');
 const adminAuthorityService = require('./MVC/services/adminAuthorityService');
+const authImpersonationService = require('./MVC/services/authImpersonationService');
 const { registerCoreEntityQueryExecutors } = require('./MVC/models/queryExecutorBootstrap');
 const dataBackendRuntimeService = require('./MVC/services/dataBackendRuntimeService');
 const dataBackendRecoveryMiddleware = require('./MVC/middleware/dataBackendRecoveryMiddleware');
@@ -504,7 +505,7 @@ app.use(requestPerfTracer.wrapMiddleware('org-timezone-locals', orgTimezoneLocal
 app.use(requestPerfTracer.wrapMiddleware('data-backend-status', dataBackendRecoveryMiddleware.exposeBackendStatus));
 app.use(requestPerfTracer.wrapMiddleware('chat-access-locals', chatAccessLocals));
 app.use(requestPerfTracer.wrapMiddleware('scheduled-task-manager-locals', scheduledTaskManagerLocals));
-app.use(requestPerfTracer.wrapMiddleware('app-locals', (req, res, next) => {
+app.use(requestPerfTracer.wrapMiddleware('app-locals', async (req, res, next) => {
   res.locals.appBrand = appBrandingService.getBrand();
   res.locals.publicSiteUrl = appPublicUrlService.resolvePublicSiteUrl({ req });
   res.locals.appContact = appBrandingService.getContact();
@@ -546,6 +547,14 @@ app.use(requestPerfTracer.wrapMiddleware('app-locals', (req, res, next) => {
     if (canUsePageDiagnostics) {
       res.locals.pageDiagnosticsRuntime = resolvePageDiagnosticsRuntime(req);
     }
+  }
+  try {
+    await authImpersonationService.resolveImpersonationLocals(req, res);
+  } catch (_) {
+    res.locals.isImpersonating = false;
+    res.locals.canImpersonateUsers = false;
+    res.locals.impersonationActorLabel = '';
+    res.locals.impersonationLogoutHref = '/logout';
   }
   next();
 }));

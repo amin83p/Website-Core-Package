@@ -29,6 +29,12 @@ const switchModeSchema = z.object({
   })
 });
 
+const impersonateUserSchema = z.object({
+  body: z.object({
+    targetUserId: z.union([z.string(), z.number()]).transform((val) => String(val).trim()).pipe(z.string().min(1, 'targetUserId is required.'))
+  })
+});
+
 const requestPasswordResetSchema = z.object({
   body: z.object({
     email: z.string().email('Valid email is required.').optional().or(z.literal('')),
@@ -74,6 +80,7 @@ module.exports = {
   forceLoginSchema,
   switchOrgSchema,
   switchModeSchema,
+  impersonateUserSchema,
   requestPasswordResetSchema,
   startPasswordResetEmailSchema,
   startPasswordResetSmsSchema,

@@ -84,6 +84,10 @@
     <%- include('../partials/backendRecoveryBanner') %>
   <% } %>
 
+  <% if (typeof isImpersonating !== 'undefined' && isImpersonating) { %>
+    <%- include('../partials/impersonationBanner') %>
+  <% } %>
+
   <main class="<%= layoutMainClass %>">
     <%- body %>
   </main>
@@ -102,6 +106,9 @@
   <% } %>
   <% if (typeof includeModal_StudentImport !== 'undefined' && includeModal_StudentImport!== null && includeModal_StudentImport) { %>
     <%- include('../../packages/school/MVC/views/school/student/modal_StudentImport') %>
+    <%- include('../partials/modal_GenericPicker') %>
+  <% } %>
+  <% if (typeof canImpersonateUsers !== 'undefined' && canImpersonateUsers) { %>
     <%- include('../partials/modal_GenericPicker') %>
   <% } %>
   <%- include('../partials/modal_FileExport') %>
