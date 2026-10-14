@@ -30,6 +30,40 @@ async function evaluateRouteAccess(req, sectionId, operationId) {
   }
 }
 
+function requireClassSessionManagePageAccess() {
+  return async (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({
+        status: 'error',
+        message: 'Authentication required before access check.'
+      });
+    }
+
+    if (adminAuthorityService.isSuperAdmin(req.user) || req.adminContext?.isSuperAdmin) {
+      req.accessLimits = {};
+      return next();
+    }
+
+    const [readAll, read] = await Promise.all([
+      evaluateRouteAccess(req, SECTIONS.SCHOOL_SESSIONS, OPERATIONS.READ_ALL),
+      evaluateRouteAccess(req, SECTIONS.SCHOOL_SESSIONS, OPERATIONS.READ)
+    ]);
+
+    if (readAll?.allowed || read?.allowed) {
+      const granted = readAll?.allowed ? readAll : read;
+      req.accessLimits = granted.limits || {};
+      req.accessScope = granted.scopeId;
+      return next();
+    }
+
+    return denyAccess(
+      req,
+      res,
+      readAll?.reason || read?.reason || 'Insufficient permissions.'
+    );
+  };
+}
+
 function requireSessionFileUploadRouteAccess() {
   return async (req, res, next) => {
     if (!req.user) {
@@ -64,5 +98,6 @@ function requireSessionFileUploadRouteAccess() {
 }
 
 module.exports = {
+  requireClassSessionManagePageAccess,
   requireSessionFileUploadRouteAccess
 };

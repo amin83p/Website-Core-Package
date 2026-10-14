@@ -19,7 +19,10 @@ const {
   requireStudentCaseOperation
 } = require('./sessionStudentCaseRouteGuards');
 const { requireBookCoveringOperationAny } = require('./bookCoveringReportRouteGuards');
-const { requireSessionFileUploadRouteAccess } = require('./sessionFileUploadRouteGuards');
+const {
+  requireClassSessionManagePageAccess,
+  requireSessionFileUploadRouteAccess
+} = require('./sessionFileUploadRouteGuards');
 
 router.use(requireAuth);
 
@@ -599,7 +602,7 @@ router.post('/conduct-rating-scale/settings',
 
 // --- Session Execution Routes ---
 router.get('/:id/sessions/:sessionId',
-  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.READ_ALL),
+  requireClassSessionManagePageAccess(),
   // Session manager posts to session UPDATE; mint the matching token on page load.
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
   classCtrl.manageSession);
@@ -607,7 +610,7 @@ router.get('/:id/sessions/:sessionId/cases',
   requireStudentCaseOperation(OPERATIONS.READ_ALL),
   classCtrl.listSessionStudentCases);
 router.get('/:id/sessions/:sessionId/report-instances',
-  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.READ_ALL),
+  requireClassSessionManagePageAccess(),
   classCtrl.listSessionReportInstances);
 router.post('/:id/sessions/:sessionId/report-assignments',
   requireAccess(SECTIONS.SCHOOL_REPORTS_ASSIGNMENT, OPERATIONS.CREATE),

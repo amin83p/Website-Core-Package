@@ -1275,6 +1275,52 @@ async function getClassByIdWithOrgCheck(classId, reqUser, accessContext = {}) {
     return { classData, activeOrgId };
 }
 
+async function getClassByIdForSessionManage(classId, req, { sessionId = '', sessionDate = '' } = {}) {
+    const accessContext = buildRouteAccessContext(req);
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    let classData = await schoolDataService.getDataById('classes', classId, req.user, accessContext);
+    if (classData) {
+        assertClassOrgAccess(classData, activeOrgId, req.user);
+        return { classData, activeOrgId };
+    }
+
+    const normalizedSessionId = String(sessionId || '').trim();
+    if (!normalizedSessionId) {
+        throw schoolRecordAccessService.createAccessDeniedError(schoolRecordAccessService.CLASS_ACCESS_DENIED);
+    }
+
+    const orgAccessContext = { scopeId: 'SCP_ORG' };
+    classData = await schoolDataService.getDataById('classes', classId, req.user, orgAccessContext);
+    if (!classData) {
+        throw schoolRecordAccessService.createAccessDeniedError(schoolRecordAccessService.CLASS_ACCESS_DENIED);
+    }
+    assertClassOrgAccess(classData, activeOrgId, req.user);
+    const sessions = Array.isArray(classData.sessions) ? classData.sessions : [];
+    const { session } = findSessionInList(sessions, normalizedSessionId, sessionDate);
+    if (!session) {
+        throw schoolRecordAccessService.createAccessDeniedError(schoolRecordAccessService.CLASS_ACCESS_DENIED);
+    }
+
+    const sessionAccess = schoolRecordAccessService.resolveAccessFromRequest(req);
+    try {
+        schoolRecordAccessService.assertSessionAccessible({
+            classRow: classData,
+            session,
+            access: sessionAccess,
+            context: 'manageSession'
+        });
+    } catch (_) {
+        schoolRecordAccessService.assertSessionAccessible({
+            classRow: classData,
+            session,
+            access: sessionAccess,
+            context: 'viewSession'
+        });
+    }
+
+    return { classData, activeOrgId };
+}
+
 function normalizeDateOnlyValue(value) {
     const token = String(value || '').trim();
     if (!token) return '';
@@ -4224,9 +4270,13 @@ function logManageSessionStep(req, label, startMs) {
 async function manageSession(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
-        
+
         // 1. Fetch Core Data
-        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+        const requestedSessionDateEarly = sessionNavigationService.normalizeSessionDate(req.query?.sessionDate || req.query?.date);
+        const { classData } = await getClassByIdForSessionManage(classId, req, {
+            sessionId,
+            sessionDate: requestedSessionDateEarly
+        });
         const { sessionStatusMeta, selectableSessionStatusMeta, allowAdminStatuses } = await getSessionStatusMetaBundleForUser(
             classData?.orgId || getActiveOrgIdOrThrow(req.user),
             req.user

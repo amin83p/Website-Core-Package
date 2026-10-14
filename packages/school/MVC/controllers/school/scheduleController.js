@@ -773,6 +773,32 @@ function hasSessionDeliveryMatch(classRow, personId, teacherPersonMap = new Map(
     return sessions.some((session) => sessionDeliveryTeamService.isPersonOnSessionDelivery(session, personId, teacherPersonMap));
 }
 
+async function expandScheduleCandidateClassIdsForMergeLinks({
+    candidateClassIds,
+    reqUser,
+    accessContext = {}
+} = {}) {
+    if (!candidateClassIds || candidateClassIds.size === 0) return;
+    const pending = [...candidateClassIds];
+    const visited = new Set();
+    while (pending.length) {
+        const classId = normalizeId(pending.pop());
+        if (!classId || visited.has(classId)) continue;
+        visited.add(classId);
+        // eslint-disable-next-line no-await-in-loop
+        const sessions = await schoolDataService.getClassSessions(classId, reqUser, accessContext);
+        for (const session of sessions || []) {
+            const partnerClassId = normalizeId(session?.merged?.partnerClassId);
+            const linkedClassId = normalizeId(session?.mergedPartner?.linkedClassId);
+            [partnerClassId, linkedClassId].forEach((linkedId) => {
+                if (!linkedId) return;
+                candidateClassIds.add(linkedId);
+                if (!visited.has(linkedId)) pending.push(linkedId);
+            });
+        }
+    }
+}
+
 function buildPersonDisplayName(person, fallbackId = '') {
     return schoolPersonAccessService.formatPersonName(person, fallbackId || person?.id || '');
 }
@@ -1588,6 +1614,12 @@ async function buildEventsForPersonAndRange({
 
     collectClassIdsFromTeacherIndex(teacherIndex, normalizedPersonId, teacherPersonMap)
         .forEach((classId) => candidateClassIds.add(classId));
+
+    await expandScheduleCandidateClassIdsForMergeLinks({
+        candidateClassIds,
+        reqUser,
+        accessContext
+    });
 
     for (const classId of candidateClassIds) {
         if (classMap.has(classId)) continue;
