@@ -190,6 +190,7 @@ test('auth routes and controller wire impersonation and logout restore', () => {
   assert.match(routeSource, /ctrl\.postImpersonateUser/);
   assert.match(controllerSource, /authImpersonationService\.beginImpersonation/);
   assert.match(controllerSource, /authImpersonationService\.endImpersonationIfActive\(req, res\)/);
+  assert.doesNotMatch(controllerSource, /finally\s*\{[\s\S]*clearCookie\('auth_token'\)/);
   assert.match(controllerSource, /impersonatedByUserId/);
   assert.match(appSource, /authImpersonationService\.resolveImpersonationLocals/);
   assert.equal(authImpersonationService.IMPERSONATOR_COOKIE, 'auth_impersonator_token');

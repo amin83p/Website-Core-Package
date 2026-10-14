@@ -856,7 +856,6 @@ async function logout(req, res) {
             const parts = token.split('.');
             if (parts.length === 3) {
                 const sessionId = parts[2];
-                // ✅ Try to delete, but ignore error if it's already gone
                 try {
                     await sessionService.terminateSession(sessionId);
                 } catch (err) {
@@ -866,11 +865,10 @@ async function logout(req, res) {
         }
     } catch (error) {
         console.error('Logout Unexpected Error:', error);
-    } finally {
-        // ✅ ALWAYS clear cookie, even if server-side delete failed
-        res.clearCookie('auth_token');
-        res.redirect('/login');
     }
+    res.clearCookie('auth_token');
+    res.clearCookie(authImpersonationService.IMPERSONATOR_COOKIE);
+    return res.redirect('/login');
 }
 
 function showUpdates(req, res) {
