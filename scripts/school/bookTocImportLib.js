@@ -208,6 +208,9 @@ function convertGeminiBookTocSource(source = {}) {
       || !category
     );
 
+    const subLevel = levelFromHeading(sub.level || 'H3');
+    const itemLevelDefault = subLevel >= 6 ? 6 : subLevel + 1;
+
     if (expandNested) {
       sortOrder += 1;
       pushRow(rows, {
@@ -215,7 +218,7 @@ function convertGeminiBookTocSource(source = {}) {
         label: formatH3Label(sub),
         startPage,
         endPage,
-        level: 3,
+        level: subLevel,
         sortOrder
       });
       nested.forEach((item, itemIndex) => {
@@ -225,7 +228,7 @@ function convertGeminiBookTocSource(source = {}) {
           label: String(item?.title || '').trim(),
           startPage: item.start_page ?? startPage,
           endPage: item.end_page ?? endPage,
-          level: 4,
+          level: levelFromHeading(item.level || `H${itemLevelDefault}`),
           sortOrder
         });
       });
@@ -238,12 +241,36 @@ function convertGeminiBookTocSource(source = {}) {
       label: formatH3Label(sub),
       startPage,
       endPage,
-      level: 3,
+      level: subLevel,
       sortOrder
     });
   };
 
+  function hasDirectUnitSubheadings(h1) {
+    return !listH1ChildUnits(h1).length && Array.isArray(h1.subheadings) && h1.subheadings.length > 0;
+  }
+
   (source.table_of_contents || []).forEach((h1, h1Index) => {
+    const h1ChildMode = resolveH1ChildMode(h1);
+    const h1Units = listH1ChildUnits(h1);
+
+    if (hasDirectUnitSubheadings(h1)) {
+      const unitSlug = h1.unit_number
+        ? `${bookSlug}-u${String(h1.unit_number).padStart(2, '0')}`
+        : `${bookSlug}-h1-${h1Index + 1}-${slugPart(h1.title, 20)}`;
+      sortOrder += 1;
+      pushRow(rows, {
+        id: unitSlug,
+        label: formatH2Label(h1),
+        startPage: h1.start_page,
+        endPage: h1.end_page,
+        level: levelFromHeading(h1.level || 'H1'),
+        sortOrder
+      });
+      listH3UnderUnit(h1, 'nested').forEach((sub, subIndex) => walkH3(h1, sub, unitSlug, subIndex));
+      return;
+    }
+
     const h1Slug = `${bookSlug}-h1-${h1Index + 1}-${slugPart(h1.title, 20)}`;
     sortOrder += 1;
     pushRow(rows, {
@@ -255,8 +282,6 @@ function convertGeminiBookTocSource(source = {}) {
       sortOrder
     });
 
-    const h1ChildMode = resolveH1ChildMode(h1);
-    const h1Units = listH1ChildUnits(h1);
     h1Units.forEach((unit, unitIndex) => {
       const unitSlug = unit.unit_number
         ? `${bookSlug}-u${String(unit.unit_number).padStart(2, '0')}`

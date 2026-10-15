@@ -10,7 +10,29 @@ test('applyTitlePattern fills EAL example tokens with static delivery segment', 
     format: 'group',
     teacherName: 'Jane Doe'
   });
-  assert.equal(title, 'EAL-PM-I/G-Jane Doe');
+  assert.equal(title, 'EAL-PM-I/G-JANE');
+});
+
+test('formatFromStudentCount maps 1 to 1 and 2+ to G', () => {
+  assert.equal(naming.formatFromStudentCount(1), '1');
+  assert.equal(naming.formatFromStudentCount(8), 'G');
+  assert.throws(() => naming.formatFromStudentCount(0), /integer from 1 to 30/i);
+  assert.throws(() => naming.formatFromStudentCount(31), /integer from 1 to 30/i);
+});
+
+test('applyTitlePattern derives format from studentCount', () => {
+  const one = naming.applyTitlePattern('EAL-{{period}}-I/{{format}}-{{teacherName}}', {
+    period: 'AM',
+    studentCount: 1,
+    teacherName: 'Jane Doe'
+  });
+  assert.equal(one, 'EAL-AM-I/1-JANE');
+  const group = naming.applyTitlePattern('EAL-{{period}}-I/{{format}}-{{teacherName}}', {
+    period: 'PM',
+    studentCount: 12,
+    teacherName: { firstName: 'sam' }
+  });
+  assert.equal(group, 'EAL-PM-I/G-SAM');
 });
 
 test('applyTitlePattern rejects {{delivery}} placeholder in pattern', () => {
@@ -37,6 +59,13 @@ test('applyTitlePattern rejects empty resolved title', () => {
     () => naming.applyTitlePattern('{{teacherName}}', { teacherName: '' }),
     /empty/i
   );
+});
+
+test('buildSnapshotFromClassFormBody normalizes isClosedForNewEnrollment boolean', () => {
+  const openSnapshot = snapshot.buildSnapshotFromClassFormBody({ isClosedForNewEnrollment: 'false' });
+  const closedSnapshot = snapshot.buildSnapshotFromClassFormBody({ isClosedForNewEnrollment: 'true' });
+  assert.equal(openSnapshot.isClosedForNewEnrollment, false);
+  assert.equal(closedSnapshot.isClosedForNewEnrollment, true);
 });
 
 test('stripForbiddenSnapshotFields removes instructors and sessions', () => {

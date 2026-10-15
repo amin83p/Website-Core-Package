@@ -45,6 +45,13 @@
       apiEndpoint: '/school/classes',
       placeholder: 'Search classes...'
     },
+    classDefinitionTemplate: {
+      title: 'Select Class Template',
+      icon: 'bi-file-earmark-ruled',
+      apiEndpoint: '/school/class-templates',
+      placeholder: 'Search class templates...',
+      searchFields: 'id,code,name,titlePattern,status'
+    },
     clbBenchmark: {
       title: 'Select Benchmark',
       icon: 'bi-123',

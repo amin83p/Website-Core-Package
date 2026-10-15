@@ -1,0 +1,58 @@
+<div class="modal fade" id="classCreateFromTemplateModal" tabindex="-1" aria-labelledby="classCreateFromTemplateModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold" id="classCreateFromTemplateModalLabel">
+          <i class="bi bi-file-earmark-plus me-2 text-primary"></i>Create Class from Template
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <form id="classCreateFromTemplateForm" novalidate>
+        <div class="modal-body">
+          <div id="classCreateFromTemplateLoading" class="text-center text-muted py-4 d-none">
+            <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+            Loading templates and teachers…
+          </div>
+          <div id="classCreateFromTemplateFields" class="d-none">
+            <input type="hidden" name="actionStateId" id="cft_actionStateId" value="">
+            <div class="mb-3">
+              <label class="form-label" for="cft_templateId">Template *</label>
+              <select class="form-select" id="cft_templateId" name="templateId" required></select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="cft_teacherPersonId">Teacher *</label>
+              <select class="form-select" id="cft_teacherPersonId" name="teacherPersonId" required></select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="cft_period">Delivery time *</label>
+              <select class="form-select" id="cft_period" name="period" required>
+                <option value="AM">AM</option>
+                <option value="PM" selected>PM</option>
+              </select>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="cft_studentCount">Number of students *</label>
+              <select class="form-select" id="cft_studentCount" name="studentCount" required></select>
+              <div class="form-text">Sets class max capacity and title format (1 student → <code>1</code>, 2+ → <code>G</code>).</div>
+            </div>
+            <div class="mb-3">
+              <label class="form-label" for="cft_title">Class name *</label>
+              <input type="text" class="form-control font-monospace" id="cft_title" name="title" required maxlength="160" autocomplete="off">
+              <div class="form-text">Generated from the template; you can edit before creating.</div>
+            </div>
+            <div class="mb-0 d-none" id="cft_startDateWrap">
+              <label class="form-label" for="cft_startDate">Start date *</label>
+              <input type="date" class="form-control" id="cft_startDate" name="startDate">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer flex-wrap gap-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary btn-sm" id="cft_submitBtn">
+            <i class="bi bi-plus-circle me-1"></i>Create Class
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>

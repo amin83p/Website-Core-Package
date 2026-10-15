@@ -1,6 +1,16 @@
 <%
+  function parseFormBooleanField(value, defaultValue = false) {
+    if (value === true) return true;
+    if (value === false) return false;
+    if (value === undefined || value === null || value === '') return defaultValue;
+    const token = String(value).trim().toLowerCase();
+    if (['true', '1', 'yes', 'on'].includes(token)) return true;
+    if (['false', '0', 'no', 'off'].includes(token)) return false;
+    return defaultValue;
+  }
   const c = classData || {};
   const isEdit = !!c.id;
+  const initIsClosedForNewEnrollment = parseFormBooleanField(c.isClosedForNewEnrollment, false);
   const initBillingMode = String(c.billingMode || 'chargeable').trim().toLowerCase() === 'no_charge' ? 'no_charge' : 'chargeable';
   const initCredits = Number(c.credits || 0);
   const initCurriculum = JSON.stringify(c.curriculum || { subjects: [], totalHours: 0 });
@@ -63,7 +73,12 @@
           <% if(isEdit && !isTemplate) { %> <span class="badge bg-primary border font-monospace">ID: <%= c.id %></span> <% } %>
           <% if (isTemplateEdit) { %><span class="badge bg-primary border font-monospace">ID: <%= templateRecord.id %></span><% } %>
           <% if (!isTemplate) { %><button type="button" class="btn btn-outline-primary btn-sm" id="btnCopyFromClass"><i class="bi bi-copy me-1"></i>Copy From Class</button><% } %>
-          <% if (isTemplate) { %><button type="button" class="btn btn-outline-secondary btn-sm" id="btnImportClassIntoTemplate"><i class="bi bi-copy me-1"></i>Import from Class</button><% } %>
+          <% if (isTemplate) { %>
+          <div class="d-flex flex-wrap gap-2 justify-content-end">
+            <button type="button" class="btn btn-outline-primary btn-sm" id="btnCopyFromTemplate"><i class="bi bi-copy me-1"></i>Copy from Template</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnImportClassIntoTemplate"><i class="bi bi-copy me-1"></i>Import from Class</button>
+          </div>
+          <% } %>
       </div>
   </div>
 
@@ -124,7 +139,7 @@
               </select>
             </div>
           </div>
-          <p class="small text-muted mb-0 mt-2">Title pattern placeholders: <code>{{period}}</code>, <code>{{format}}</code> (1/G), <code>{{teacherName}}</code>, <code>{{startDate}}</code>. Use separate templates for In-Person vs Online and put the delivery segment as literal text in the pattern (e.g. <code>I</code>, <code>OL</code>). Example: <code>EAL-{{period}}-I/{{format}}-{{teacherName}}</code></p>
+          <p class="small text-muted mb-0 mt-2">Title pattern placeholders: <code>{{period}}</code>, <code>{{format}}</code> (1 when max capacity is 1, G when 2+ — set at create-from-template), <code>{{teacherName}}</code> (teacher first name, uppercase), <code>{{startDate}}</code>. Use separate templates for In-Person vs Online and put the delivery segment as literal text in the pattern (e.g. <code>I</code>, <code>OL</code>). Example: <code>EAL-{{period}}-I/{{format}}-{{teacherName}}</code></p>
         </div>
       </div>
       <% } %>
@@ -240,7 +255,7 @@
                        </div>
                        <div class="col-md-4 mb-3 d-flex align-items-center">
                           <div class="form-check form-switch mt-4">
-                             <input class="form-check-input" type="checkbox" role="switch" id="inp_isClosedForNewEnrollment" <%= c.isClosedForNewEnrollment ? 'checked' : '' %>>
+                             <input class="form-check-input" type="checkbox" role="switch" id="inp_isClosedForNewEnrollment" <%= initIsClosedForNewEnrollment ? 'checked' : '' %>>
                              <label class="form-check-label" for="inp_isClosedForNewEnrollment">Closed For New Enrollment</label>
                              <div class="form-text small">When enabled, new open enrollment periods are blocked for this rolling class.</div>
                           </div>
@@ -1039,13 +1054,20 @@ function orgTodayFallback() {
 
 document.addEventListener('DOMContentLoaded', () => {
     // UI helpers (prefer message modal if available)
-    async function uiAlert(message, title = 'Notice') {
+    async function uiAlert(message, title = 'Notice', options = {}) {
+        const icon = String(options.icon || 'info').trim();
+        const okClassByIcon = {
+            error: 'btn-danger',
+            warning: 'btn-warning',
+            success: 'btn-success',
+            info: 'btn-primary'
+        };
         if (typeof showMessageModal === 'function') {
             await showMessageModal({
                 title,
-                icon: 'info',
+                icon,
                 message,
-                buttons: [{ text: 'OK', class: 'btn-primary' }]
+                buttons: [{ text: options.okText || 'OK', class: options.okClass || okClassByIcon[icon] || 'btn-primary' }]
             });
             return;
         }
@@ -1111,7 +1133,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const dInst = instructorsState;
     const dEnrl = enrollmentState;
-    const classId = '<%= c.id || "" %>';
+    const classId = <%- JSON.stringify(String(c.id || '')) %>;
     const classFormTemplateMode = <%= isTemplate ? 'true' : 'false' %>;
 
     function setTargetHoursLabel(value) {
@@ -1440,6 +1462,16 @@ document.addEventListener('DOMContentLoaded', () => {
         if (cycleEndDateInput) cycleEndDateInput.value = '';
         if (isClosedEnrollmentInput) isClosedEnrollmentInput.checked = false;
         if (cycleStartDateInput) cycleStartDateInput.value = resolveJanFirstOfOrgYear();
+    }
+
+    function parseFormBoolean(value, defaultValue = false) {
+        if (value === true) return true;
+        if (value === false) return false;
+        if (value === undefined || value === null || value === '') return defaultValue;
+        const token = String(value).trim().toLowerCase();
+        if (['true', '1', 'yes', 'on'].includes(token)) return true;
+        if (['false', '0', 'no', 'off'].includes(token)) return false;
+        return defaultValue;
     }
 
     function applyRegistrationModeFromTemplate(sourceRegistrationMode) {
@@ -2840,6 +2872,28 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
     };
 
+    const classDefinitionTemplateRecordId = <%- JSON.stringify(isTemplateEdit ? String(templateRecord.id || '') : '') %>;
+
+    const classDefinitionTemplateRenderer = (item) => {
+        const code = String(item?.code || '').trim();
+        const name = String(item?.name || '').trim();
+        const pattern = String(item?.titlePattern || '').trim();
+        const status = String(item?.status || '').trim();
+        return `
+          <div class="d-flex justify-content-between align-items-center w-100">
+              <div class="d-flex flex-column">
+                  <div class="fw-bold text-dark">${escapeHtml(code || item?.id || 'Template')}</div>
+                  <div class="text-muted small">${escapeHtml(name || 'Unnamed template')}</div>
+                  <div class="text-muted x-small font-monospace">${escapeHtml(pattern || 'No title pattern')}</div>
+              </div>
+              <div class="d-flex align-items-center gap-2">
+                  <span class="badge bg-light text-secondary border text-uppercase">${escapeHtml(status || 'draft')}</span>
+                  <span class="badge bg-light text-secondary border font-monospace">${escapeHtml(item?.id || '')}</span>
+              </div>
+          </div>
+        `;
+    };
+
     const classTemplateRenderer = (item) => {
         const title = String(item?.title || item?.id || 'Class').trim();
         const delivery = String(item?.deliveryDepartmentName || '').trim();
@@ -2894,6 +2948,28 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function applyDefinitionTemplateCopy(payload, options = {}) {
+        const source = payload && typeof payload === 'object' ? payload : {};
+        const replaceIdentity = options.replaceIdentity !== false;
+        if (classFormTemplateMode && replaceIdentity) {
+            const codeInput = document.querySelector('input[name="code"]');
+            const nameInput = document.querySelector('input[name="name"]');
+            const templateStatusSelect = document.querySelector('select[name="templateStatus"]');
+            if (codeInput) codeInput.value = String(source.code || '').trim();
+            if (nameInput) nameInput.value = String(source.name || '').trim();
+            if (templateStatusSelect) {
+                const nextStatus = String(source.templateStatus || 'draft').trim().toLowerCase();
+                const hasOption = Array.from(templateStatusSelect.options || []).some(
+                    (opt) => String(opt.value || '').trim().toLowerCase() === nextStatus
+                );
+                if (hasOption) templateStatusSelect.value = nextStatus;
+            }
+        }
+        const titleInput = document.querySelector('input[name="title"]');
+        if (titleInput) titleInput.value = String(source.title || '').trim();
+        applyClassTemplate(source);
+    }
+
     function applyClassTemplate(template) {
         const source = template && typeof template === 'object' ? template : {};
 
@@ -2917,6 +2993,14 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('inp_capacity').value = Number.isFinite(maxCapacity) && maxCapacity > 0 ? Math.round(maxCapacity) : 30;
 
         applyRegistrationModeFromTemplate(source?.registrationMode);
+        if (cycleStartDateInput) cycleStartDateInput.value = String(source?.cycleStartDate || '').trim();
+        if (cycleEndDateInput) cycleEndDateInput.value = String(source?.cycleEndDate || '').trim();
+        if (cycleNoInput && source?.cycleNo != null && String(source.cycleNo).trim() !== '') {
+            cycleNoInput.value = String(source.cycleNo);
+        }
+        if (isClosedEnrollmentInput) {
+            isClosedEnrollmentInput.checked = parseFormBoolean(source?.isClosedForNewEnrollment, false);
+        }
         refreshLifecycleModeUi();
 
         const copiedSkillIds = new Set(
@@ -3078,6 +3162,51 @@ document.addEventListener('DOMContentLoaded', () => {
         title: 'Import from Class',
         successMessage: 'Configuration was imported from class {id}. Adjust the title pattern and template fields, then save.'
     });
+
+    (function bindCopyFromDefinitionTemplatePicker() {
+        const btn = document.getElementById('btnCopyFromTemplate');
+        if (!btn || !classFormTemplateMode) return;
+        btn.addEventListener('click', () => {
+            if (!window.GenericPicker || !window.GenericPickerPresets?.classDefinitionTemplate) {
+                void uiAlert('Template picker is unavailable on this page.', 'Copy from Template', { icon: 'warning' });
+                return;
+            }
+            GenericPicker.open(GenericPickerPresets.classDefinitionTemplate({
+                title: 'Copy from Template',
+                icon: 'bi-file-earmark-ruled',
+                placeholder: 'Search class templates to copy...',
+                renderer: classDefinitionTemplateRenderer,
+                onSelect: async (item) => {
+                    const sourceTemplateId = String(item?.id || '').trim();
+                    if (!sourceTemplateId) return;
+                    if (classDefinitionTemplateRecordId && sourceTemplateId === String(classDefinitionTemplateRecordId)) {
+                        await uiAlert('Select a different template to copy from.', 'Copy from Template', { icon: 'warning' });
+                        return;
+                    }
+                    try {
+                        const response = await fetch(`/school/class-templates/api/template/${encodeURIComponent(sourceTemplateId)}`, {
+                            headers: { 'X-AJAX-Request': 'true' }
+                        });
+                        const result = await response.json();
+                        if (!response.ok || result?.status === 'error') {
+                            throw new Error(result?.message || 'Failed to load class template.');
+                        }
+                        applyDefinitionTemplateCopy(result.template || {}, {
+                            replaceIdentity: !classDefinitionTemplateRecordId
+                        });
+                        const label = String(result?.template?.sourceCode || result?.template?.sourceName || sourceTemplateId).trim();
+                        await uiAlert(
+                            `Template fields were copied from ${label}. Review code, name, and title pattern before saving.`,
+                            'Template Applied',
+                            { icon: 'success' }
+                        );
+                    } catch (error) {
+                        await uiAlert(error.message || 'Failed to copy template data.', 'Copy Failed', { icon: 'error' });
+                    }
+                }
+            }));
+        });
+    })();
 
     (function bindProgramScopedSubjectPicker() {
         const subjectPickerBtn = document.getElementById('openSubjectPickerBtn');

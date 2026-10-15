@@ -18,7 +18,10 @@ const sessionStatusPolicyService = require('../../services/school/sessionStatusP
 const schoolAdminAccessService = require('../../services/school/schoolAdminAccessService');
 const skillCatalogService = require('../../services/school/skillCatalogService');
 const { respondSchoolDeleteError } = require('../../utils/schoolDeleteErrorResponse');
-const { buildSnapshotFromClassFormBody } = require('../../services/school/classTemplateSnapshotService');
+const {
+  buildSnapshotFromClassFormBody,
+  parseSnapshotBoolean
+} = require('../../services/school/classTemplateSnapshotService');
 
 function assertTemplateOrgAccess(template, activeOrgId, reqUser) {
   assertOrgAccess(template, activeOrgId, reqUser, { orgField: 'orgId' });
@@ -107,6 +110,7 @@ async function listClassTemplates(req, res) {
       searchableFields,
       newUrl: 'school/class-templates',
       newLabel: canCreate ? 'New Template' : null,
+      canCreateTemplates: canCreate,
       includeModal: true,
       includeModal_Table: true,
       print: true,
@@ -126,7 +130,56 @@ function mapTemplateToFormData(template) {
   return {
     ...snapshot,
     title: String(template?.titlePattern || '').trim(),
-    status: String(snapshot?.status || 'active').trim()
+    status: String(snapshot?.status || 'active').trim(),
+    isClosedForNewEnrollment: parseSnapshotBoolean(snapshot?.isClosedForNewEnrollment, false)
+  };
+}
+
+function collectOrgTemplateCodes(rows, orgId) {
+  const set = new Set();
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    if (String(row?.orgId || '') !== String(orgId || '')) return;
+    const code = String(row?.code || '').trim().toUpperCase();
+    if (code) set.add(code);
+  });
+  return set;
+}
+
+function suggestTemplateCopyCode(sourceCode, usedCodes) {
+  const base = String(sourceCode || 'TEMPLATE').trim().toUpperCase() || 'TEMPLATE';
+  for (let i = 0; i < 100; i += 1) {
+    const candidate = i === 0 ? `${base}-COPY` : `${base}-COPY${i + 1}`;
+    if (!usedCodes.has(candidate)) return candidate;
+  }
+  return `${base}-COPY${Date.now().toString(36).slice(-4).toUpperCase()}`;
+}
+
+function suggestTemplateCopyName(sourceName) {
+  const base = String(sourceName || 'Template').trim() || 'Template';
+  return /\(\s*copy\s*\)/i.test(base) ? base : `${base} (Copy)`;
+}
+
+function buildDefinitionTemplateCopyPayload(source, { usedCodes = new Set() } = {}) {
+  const formFields = mapTemplateToFormData(source);
+  return {
+    ...formFields,
+    sourceId: String(source?.id || '').trim(),
+    sourceCode: String(source?.code || '').trim(),
+    sourceName: String(source?.name || '').trim(),
+    code: suggestTemplateCopyCode(source?.code, usedCodes),
+    name: suggestTemplateCopyName(source?.name),
+    templateStatus: 'draft',
+    title: String(source?.titlePattern || formFields.title || '').trim()
+  };
+}
+
+function buildNewTemplateDraftFromSource(source, usedCodes) {
+  return {
+    code: suggestTemplateCopyCode(source?.code, usedCodes),
+    name: suggestTemplateCopyName(source?.name),
+    status: 'draft',
+    titlePattern: String(source?.titlePattern || '').trim(),
+    snapshot: source?.snapshot && typeof source.snapshot === 'object' ? source.snapshot : {}
   };
 }
 
@@ -135,17 +188,29 @@ async function renderTemplateForm(req, res, { isEdit }) {
     await assertCreateOrgContextOrThrow(req.user);
     const ctx = await loadClassFormSharedContext(req);
     let templateData = null;
+    let classData = null;
+    const copyFromId = !isEdit ? String(req.query?.copyFrom || '').trim() : '';
     if (isEdit) {
       const activeOrgId = getActiveOrgIdOrThrow(req.user);
       templateData = await schoolDataService.getDataById('classTemplates', req.params.id, req.user);
       if (!templateData) throw new Error('Class template not found.');
       assertTemplateOrgAccess(templateData, activeOrgId, req.user);
+      classData = mapTemplateToFormData(templateData);
+    } else if (copyFromId) {
+      const activeOrgId = getActiveOrgIdOrThrow(req.user);
+      const source = await schoolDataService.getDataById('classTemplates', copyFromId, req.user);
+      if (!source) throw new Error('Class template not found.');
+      assertTemplateOrgAccess(source, activeOrgId, req.user);
+      const orgRows = await schoolDataService.fetchAllData('classTemplates', {}, req.user);
+      const usedCodes = collectOrgTemplateCodes(orgRows, activeOrgId);
+      templateData = buildNewTemplateDraftFromSource(source, usedCodes);
+      classData = mapTemplateToFormData(source);
     }
 
     res.render('school/class/classTemplateForm', {
-      title: isEdit ? 'Edit Class Template' : 'New Class Template',
+      title: isEdit ? 'Edit Class Template' : (copyFromId ? 'New Class Template (Copy)' : 'New Class Template'),
       templateData,
-      classData: templateData ? mapTemplateToFormData(templateData) : null,
+      classData,
       templateMode: true,
       includeModal: true,
       user: req.user,
@@ -226,6 +291,25 @@ async function editTemplate(req, res) {
   return saveTemplate(req, res, { isEdit: true });
 }
 
+async function getDefinitionTemplateCopyPayload(req, res) {
+  try {
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    const sourceId = String(req.params.id || '').trim();
+    if (!sourceId) throw new Error('Template id is required.');
+    const source = await schoolDataService.getDataById('classTemplates', sourceId, req.user);
+    if (!source) throw new Error('Class template not found.');
+    assertTemplateOrgAccess(source, activeOrgId, req.user);
+    const orgRows = await schoolDataService.fetchAllData('classTemplates', {}, req.user);
+    const usedCodes = collectOrgTemplateCodes(orgRows, activeOrgId);
+    return res.json({
+      status: 'success',
+      template: buildDefinitionTemplateCopyPayload(source, { usedCodes })
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
 async function deleteTemplate(req, res) {
   try {
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
@@ -247,5 +331,7 @@ module.exports = {
   addTemplate,
   editTemplate,
   deleteTemplate,
-  mapTemplateToFormData
+  getDefinitionTemplateCopyPayload,
+  mapTemplateToFormData,
+  buildDefinitionTemplateCopyPayload
 };

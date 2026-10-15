@@ -3177,6 +3177,7 @@ async function listClasses(req, res) {
       includeModal: true,
       includeModal_Table: true,
       includeModal_FileImport: true,
+      includeClassCreateFromTemplateModal: canCreateClasses,
       print: true,
       pagination,
       filters: req.query,
@@ -7221,27 +7222,103 @@ async function setSessionLock(req, res) {
     }
 }
 
+async function listActiveClassDefinitionTemplates(reqUser, activeOrgId) {
+  const allTemplates = await schoolDataService.fetchAllData('classTemplates', {}, reqUser);
+  return (Array.isArray(allTemplates) ? allTemplates : [])
+    .filter((row) => String(row?.status || '').trim().toLowerCase() === 'active')
+    .filter((row) => String(row?.orgId || '') === String(activeOrgId))
+    .sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || '')));
+}
+
+function mapClassDefinitionTemplateOption(template) {
+  const snapshot = template?.snapshot && typeof template.snapshot === 'object' ? template.snapshot : {};
+  const registrationMode = String(snapshot.registrationMode || 'term_based').trim().toLowerCase();
+  return {
+    id: String(template?.id || '').trim(),
+    code: String(template?.code || '').trim(),
+    name: String(template?.name || '').trim(),
+    titlePattern: String(template?.titlePattern || '').trim(),
+    registrationMode
+  };
+}
+
+async function listTeachersForCreateFromTemplate(reqUser, activeOrgId) {
+  const accessContext = schoolDataService.buildRouteAccessContext({ user: reqUser });
+  const teachers = await schoolDataService.fetchAllData('teachers', {}, reqUser, accessContext);
+  const persons = await schoolPersonAccessService.listActiveOrgPersons({
+    reqUser,
+    query: { limit: 5000 }
+  });
+  const personMap = new Map((Array.isArray(persons) ? persons : []).map((person) => [
+    String(person?.id || person?.personId || '').trim(),
+    person
+  ]));
+  const seen = new Set();
+  const items = [];
+  (Array.isArray(teachers) ? teachers : []).forEach((teacher) => {
+    const orgId = String(teacher?.orgId || '').trim();
+    if (orgId && orgId !== String(activeOrgId)) return;
+    const status = String(teacher?.status || 'active').trim().toLowerCase();
+    if (status && !['active', ''].includes(status)) return;
+    const personId = String(teacher?.personId || '').trim();
+    if (!personId || seen.has(personId)) return;
+    seen.add(personId);
+    const person = personMap.get(personId) || { id: personId };
+    const picker = schoolPersonAccessService.toPickerRow(person);
+    const firstName = picker.firstName || String(teacher?.firstName || '').trim();
+    const lastName = picker.lastName || String(teacher?.lastName || '').trim();
+    const displayName = picker.displayName || personId;
+    items.push({
+      personId,
+      firstName,
+      lastName,
+      label: displayName
+    });
+  });
+  items.sort((a, b) => String(a.label || '').localeCompare(String(b.label || '')));
+  return items;
+}
+
+async function resolveTeacherForTemplateTitle(req, teacherPersonId) {
+  const personId = String(teacherPersonId || '').trim();
+  if (!personId) throw new Error('Select a teacher for this class.');
+  const person = await schoolPersonAccessService.getPersonById({ reqUser: req.user, personId });
+  const displayName = schoolPersonAccessService.formatPersonName(person || {}, personId) || personId;
+  const titleToken = classTemplateNamingService.normalizeTeacherTitleToken(person || { firstName: displayName });
+  if (!titleToken) throw new Error('Teacher name is required for the class title.');
+  return { personId, displayName, titleToken };
+}
+
+function buildTitlePatternInputs(reqBody, teacherTitleToken) {
+  return {
+    teacherName: teacherTitleToken,
+    period: reqBody?.period,
+    studentCount: reqBody?.studentCount,
+    format: reqBody?.format,
+    startDate: reqBody?.startDate
+  };
+}
+
 async function showCreateClassFromTemplate(req, res) {
+  return res.redirect('/school/classes');
+}
+
+async function bootstrapCreateClassFromTemplate(req, res) {
   try {
     await assertCreateOrgContextOrThrow(req.user);
     const activeOrgId = getActiveOrgIdOrThrow(req.user);
-    const allTemplates = await schoolDataService.fetchAllData('classTemplates', {}, req.user);
-    const templates = (Array.isArray(allTemplates) ? allTemplates : [])
-      .filter((row) => String(row?.status || '').trim().toLowerCase() === 'active')
-      .filter((row) => String(row?.orgId || '') === String(activeOrgId))
-      .sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || '')));
-
-    res.render('school/class/classCreateFromTemplate', {
-      title: 'Create Class from Template',
-      templates,
-      includeModal: true,
-      user: req.user,
+    const templates = (await listActiveClassDefinitionTemplates(req.user, activeOrgId))
+      .map(mapClassDefinitionTemplateOption);
+    const teachers = await listTeachersForCreateFromTemplate(req.user, activeOrgId);
+    return res.json({
+      status: 'success',
       orgToday: resolveOrgTodayFromRequest(req),
-      actionStateId: req.actionStateId,
-      defaultReturnTo: '/school/classes'
+      actionStateId: req.actionStateId || '',
+      templates,
+      teachers
     });
   } catch (error) {
-    res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+    return res.status(400).json({ status: 'error', message: error.message });
   }
 }
 
@@ -7252,12 +7329,15 @@ async function previewClassTemplateTitle(req, res) {
       ? await schoolDataService.getDataById('classTemplates', templateId, req.user)
       : null;
     const pattern = String(template?.titlePattern || req.body?.titlePattern || '').trim();
-    const title = classTemplateNamingService.previewTitle(pattern, {
-      teacherName: req.body?.teacherName,
-      period: req.body?.period,
-      format: req.body?.format,
-      startDate: req.body?.startDate
-    });
+    const teacherPersonId = String(req.body?.teacherPersonId || '').trim();
+    let teacherTitleToken = '';
+    if (teacherPersonId) {
+      const teacher = await resolveTeacherForTemplateTitle(req, teacherPersonId);
+      teacherTitleToken = teacher.titleToken;
+    } else if (req.body?.teacherName) {
+      teacherTitleToken = classTemplateNamingService.normalizeTeacherTitleToken(req.body.teacherName);
+    }
+    const title = classTemplateNamingService.previewTitle(pattern, buildTitlePatternInputs(req.body, teacherTitleToken));
     return res.json({ status: 'success', title });
   } catch (error) {
     return res.status(400).json({ status: 'error', message: error.message });
@@ -7279,20 +7359,41 @@ async function createClassFromTemplate(req, res) {
       throw new Error('Selected template is not active.');
     }
 
-    const teacherPersonId = String(req.body?.teacherPersonId || req.body?.instructorId || '').trim();
-    const teacherName = String(req.body?.teacherName || req.body?.instructorName || '').trim();
-    if (!teacherPersonId) throw new Error('Select a teacher for this class.');
+    const studentCount = classTemplateNamingService.normalizeStudentCount(
+      req.body?.studentCount ?? req.body?.maxCapacity
+    );
+    const teacher = await resolveTeacherForTemplateTitle(req, req.body?.teacherPersonId || req.body?.instructorId);
+    const teacherPersonId = teacher.personId;
+    const teacherName = teacher.displayName;
 
+    const registrationMode = String(template?.snapshot?.registrationMode || 'term_based').trim().toLowerCase();
     const startDate = String(req.body?.startDate || '').trim();
-    const title = classTemplateNamingService.applyTitlePattern(template.titlePattern, {
-      teacherName,
-      period: req.body?.period,
-      format: req.body?.format,
-      startDate
-    });
+    if (registrationMode === 'rolling' && !startDate) {
+      throw new Error('Start date is required for rolling templates.');
+    }
 
-    const snapshotWithDates = applyStartDateToSnapshot(template.snapshot || {}, startDate);
-    const mergedBody = snapshotToClassFormBody(snapshotWithDates, { title, cycleStartDate: startDate });
+    const titleOverride = String(req.body?.title || '').trim();
+    const computedTitle = classTemplateNamingService.applyTitlePattern(
+      template.titlePattern,
+      buildTitlePatternInputs(req.body, teacher.titleToken)
+    );
+    const title = titleOverride || computedTitle;
+
+    const snapshotBase = { ...(template.snapshot && typeof template.snapshot === 'object' ? template.snapshot : {}) };
+    snapshotBase.enrollment = {
+      ...(snapshotBase.enrollment && typeof snapshotBase.enrollment === 'object' ? snapshotBase.enrollment : {}),
+      maxCapacity: studentCount,
+      students: []
+    };
+    const snapshotWithDates = applyStartDateToSnapshot(snapshotBase, registrationMode === 'rolling' ? startDate : '');
+    const mergedBody = snapshotToClassFormBody(snapshotWithDates, {
+      title,
+      cycleStartDate: registrationMode === 'rolling' ? startDate : (snapshotWithDates.cycleStartDate || '')
+    });
+    mergedBody.enrollment = JSON.stringify({
+      maxCapacity: studentCount,
+      students: []
+    });
     mergedBody.instructors = JSON.stringify([{
       personId: teacherPersonId,
       name: teacherName || teacherPersonId,
@@ -7312,7 +7413,7 @@ async function createClassFromTemplate(req, res) {
 }
 
 module.exports = {
-  listClasses, showAddForm, showAddWizardForm, addClass, showCreateClassFromTemplate, createClassFromTemplate, previewClassTemplateTitle, showEditForm, showEditWizardForm, editClass, deleteClass,
+  listClasses, showAddForm, showAddWizardForm, addClass, showCreateClassFromTemplate, bootstrapCreateClassFromTemplate, createClassFromTemplate, previewClassTemplateTitle, showEditForm, showEditWizardForm, editClass, deleteClass,
   showResolveCycleLinksPage, showDeletePreparationPage, getDeletePreparationApi,
   showClassStorageIntegrityPage, getClassStorageIntegrityScanApi, postClassStorageIntegrityApplyApi,
   getCycleLinkBlockersApi, unlinkCycleLinkApi, unlinkAllCycleLinksApi,

@@ -10,6 +10,16 @@ function parseJsonField(raw, fallback) {
   }
 }
 
+function parseSnapshotBoolean(value, defaultValue = false) {
+  if (value === true) return true;
+  if (value === false) return false;
+  if (value === undefined || value === null || value === '') return defaultValue;
+  const token = String(value).trim().toLowerCase();
+  if (['true', '1', 'yes', 'on'].includes(token)) return true;
+  if (['false', '0', 'no', 'off'].includes(token)) return false;
+  return defaultValue;
+}
+
 function stripForbiddenSnapshotFields(snapshot = {}) {
   const next = { ...(snapshot && typeof snapshot === 'object' ? snapshot : {}) };
   delete next.id;
@@ -51,7 +61,7 @@ function buildSnapshotFromClassFormBody(body = {}) {
     cycleStartDate: String(body.cycleStartDate || '').trim(),
     cycleEndDate: String(body.cycleEndDate || '').trim(),
     cycleNo: body.cycleNo,
-    isClosedForNewEnrollment: body.isClosedForNewEnrollment,
+    isClosedForNewEnrollment: parseSnapshotBoolean(body.isClosedForNewEnrollment, false),
     enforceEnrollmentSessionCount: false
   });
 }
@@ -80,7 +90,7 @@ function snapshotToClassFormBody(snapshot = {}, overrides = {}) {
     cycleStartDate: overrides.cycleStartDate != null ? overrides.cycleStartDate : (base.cycleStartDate || ''),
     cycleEndDate: base.cycleEndDate || '',
     cycleNo: base.cycleNo,
-    isClosedForNewEnrollment: base.isClosedForNewEnrollment
+    isClosedForNewEnrollment: parseSnapshotBoolean(base.isClosedForNewEnrollment, false)
   };
 }
 
@@ -104,6 +114,7 @@ function applyStartDateToSnapshot(snapshot, startDate) {
 
 module.exports = {
   stripForbiddenSnapshotFields,
+  parseSnapshotBoolean,
   buildSnapshotFromClassFormBody,
   snapshotToClassFormBody,
   applyStartDateToSnapshot

@@ -39,31 +39,19 @@
     }
     empty?.classList.add('d-none');
     if (mode === 'units') {
-      tree.innerHTML = (
-        '<div class="session-bc-unit-grid">' +
-        rows.map((entry) => {
-          const id = String(entry?.id || '').trim();
-          const level = Number(entry?.level || 1);
-          const label = escapeHtml(entry?.label || id);
-          const start = entry?.startPage;
-          const end = entry?.endPage;
-          const pageLabel = start
-            ? (end && end !== start ? `pp. ${start}–${end}` : `p. ${start}`)
-            : '';
-          const checked = selectedIds.has(id) ? ' checked' : '';
-          const levelHint = level > 1 ? '<span class="session-bc-unit-level">Level ' + level + '</span>' : '';
-          return (
-            '<label class="session-bc-unit-card">' +
-            '<input type="checkbox" class="form-check-input js-toc-pick mt-1" value="' + escapeHtml(id) + '"' + checked + '>' +
-            '<div class="session-bc-unit-card-body">' +
-            levelHint +
-            '<div class="session-bc-unit-title">' + label + '</div>' +
-            (pageLabel ? '<div class="session-bc-unit-pages">' + escapeHtml(pageLabel) + '</div>' : '') +
-            '</div></label>'
-          );
-        }).join('') +
-        '</div>'
-      );
+      const utils = global.BookCoveringTocUtils;
+      if (!utils) {
+        tree.innerHTML = '<div class="text-muted small">TOC picker utilities are not loaded.</div>';
+        return;
+      }
+      const h1Selected = utils.normalizeTocEntryIdsToH1(rows, [...selectedIds]);
+      selectedIds = new Set(h1Selected);
+      tree.innerHTML = utils.buildSelectableTocTableHtml(rows, h1Selected, { escapeHtml });
+      utils.bindSelectableTocTable(tree, rows, {
+        onChange: (h1Ids) => {
+          selectedIds = new Set(h1Ids);
+        }
+      });
     } else {
       tree.innerHTML = rows.map((entry) => {
         const id = String(entry?.id || '').trim();
@@ -114,7 +102,11 @@
     if (title) {
       title.innerHTML = '<i class="bi bi-list-nested me-2"></i>' + (mode === 'pages' ? 'Pick pages from TOC' : 'Pick units from TOC');
     }
-    selectedIds = new Set((Array.isArray(options.selectedIds) ? options.selectedIds : []).map((id) => String(id).trim()).filter(Boolean));
+    const rawSelected = (Array.isArray(options.selectedIds) ? options.selectedIds : []).map((id) => String(id).trim()).filter(Boolean);
+    selectedIds = new Set(rawSelected);
+    if (mode === 'units' && global.BookCoveringTocUtils && toc.length) {
+      selectedIds = new Set(global.BookCoveringTocUtils.normalizeTocEntryIdsToH1(toc, rawSelected));
+    }
     currentCallback = typeof options.onConfirm === 'function' ? options.onConfirm : null;
     renderTree(toc, mode);
     modal.show();

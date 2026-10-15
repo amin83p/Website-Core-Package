@@ -140,43 +140,15 @@
 
   function renderUnitPicker() {
     const host = document.getElementById('sessionBookCoveringUnitPicker');
-    if (!host || !currentBook) return;
+    const utils = global.BookCoveringTocUtils;
+    if (!host || !utils || !currentBook) return;
     const toc = Array.isArray(currentBook.tableOfContents) ? currentBook.tableOfContents : [];
-    if (!toc.length) {
-      host.innerHTML = '<div class="text-muted small">This book has no table of contents.</div>';
-      return;
-    }
-    const selected = new Set(selectedUnitIds.map((id) => String(id)));
-    const cards = toc.map((row) => {
-      const id = String(row.id || '').trim();
-      const level = Number(row.level || 1);
-      const label = escapeHtml(row.label || id);
-      const start = row.startPage;
-      const end = row.endPage;
-      const pages = start ? (end && end !== start ? `pp. ${start}–${end}` : `p. ${start}`) : '';
-      const checked = selected.has(id) ? ' checked' : '';
-      const levelHint = level > 1 ? `<span class="session-bc-unit-level">Level ${level}</span>` : '';
-      return (
-        '<label class="session-bc-unit-card">' +
-        `<input type="checkbox" class="form-check-input js-bc-unit-pick" value="${escapeHtml(id)}"${checked}>` +
-        '<div class="session-bc-unit-card-body">' +
-        levelHint +
-        `<div class="session-bc-unit-title">${label}</div>` +
-        (pages ? `<div class="session-bc-unit-pages">${escapeHtml(pages)}</div>` : '') +
-        '</div></label>'
-      );
-    }).join('');
-    host.innerHTML = `<div class="session-bc-unit-grid">${cards}</div>`;
-    host.querySelectorAll('.js-bc-unit-pick').forEach((input) => {
-      input.addEventListener('change', () => {
-        const val = String(input.value || '').trim();
-        if (!val) return;
-        if (input.checked) {
-          if (!selectedUnitIds.includes(val)) selectedUnitIds.push(val);
-        } else {
-          selectedUnitIds = selectedUnitIds.filter((id) => id !== val);
-        }
-      });
+    selectedUnitIds = utils.normalizeTocEntryIdsToH1(toc, selectedUnitIds);
+    host.innerHTML = utils.buildSelectableTocTableHtml(toc, selectedUnitIds, { escapeHtml });
+    utils.bindSelectableTocTable(host, toc, {
+      onChange: (h1Ids) => {
+        selectedUnitIds = h1Ids.slice();
+      }
     });
   }
 
@@ -249,6 +221,11 @@
       return;
     }
     currentBook = result.book;
+    const toc = Array.isArray(currentBook.tableOfContents) ? currentBook.tableOfContents : [];
+    const utils = global.BookCoveringTocUtils;
+    if (utils && toc.length) {
+      selectedUnitIds = utils.normalizeTocEntryIdsToH1(toc, selectedUnitIds);
+    }
     renderBookDetail();
     wizardModal?.show();
   }
@@ -256,7 +233,7 @@
   async function saveEntry() {
     if (!currentBook) return;
     if (!selectedUnitIds.length) {
-      await showMessage('Select units', 'Choose at least one unit from the table of contents.', 'warning');
+      await showMessage('Select chapters', 'Choose at least one chapter (H1) from the table of contents.', 'warning');
       showStep('Units');
       return;
     }
@@ -312,7 +289,7 @@
     document.getElementById('btnSessionBookCoveringBackToDetail')?.addEventListener('click', () => showStep('Detail'));
     document.getElementById('btnSessionBookCoveringToPages')?.addEventListener('click', () => {
       if (!selectedUnitIds.length) {
-        showMessage('Select units', 'Choose at least one unit before continuing.', 'warning');
+        showMessage('Select chapters', 'Choose at least one chapter (H1) before continuing.', 'warning');
         return;
       }
       renderPagePicker();

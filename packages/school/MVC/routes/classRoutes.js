@@ -157,6 +157,11 @@ router.get('/new-from-template',
   trackActionState(SECTIONS.SCHOOL_CLASSES, OPERATIONS.CREATE),
   classCtrl.showCreateClassFromTemplate);
 
+router.get('/api/create-from-template/bootstrap',
+  requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_CLASSES, OPERATIONS.CREATE, { requireToken: false, keepActive: true }),
+  classCtrl.bootstrapCreateClassFromTemplate);
+
 router.post('/api/create-from-template',
   requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.CREATE),
   trackActionState(SECTIONS.SCHOOL_CLASSES, OPERATIONS.CREATE, { requireToken: true }),

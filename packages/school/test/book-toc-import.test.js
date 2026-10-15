@@ -13,6 +13,7 @@ const connectivitySourcePath = path.join(__dirname, '../../../data/school/book-t
 const customerServiceSourcePath = path.join(__dirname, '../../../data/school/book-toc-sources/customer-service-training-101.json');
 const elementsSuccessSourcePath = path.join(__dirname, '../../../data/school/book-toc-sources/elements-of-success-1.json');
 const eviuSourcePath = path.join(__dirname, '../../../data/school/book-toc-sources/english-vocabulary-in-use-upper-intermediate.json');
+const expandingTacticsSourcePath = path.join(__dirname, '../../../data/school/book-toc-sources/expanding-tactics-for-listening-3e.json');
 
 test('convertGeminiBookTocSource flattens Basic Tactics sample with units and skills', () => {
   const source = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
@@ -119,6 +120,25 @@ test('convertGeminiBookTocSource flattens Elements of Success chapter sections a
   assert.ok(index);
   assert.equal(index.startPage, 386);
   assert.equal(converted.suggestedTotalPages, 386);
+});
+
+test('convertGeminiBookTocSource promotes Expanding Tactics units to H1 without Units 1–24 wrapper', () => {
+  const source = JSON.parse(fs.readFileSync(expandingTacticsSourcePath, 'utf8'));
+  const converted = convertGeminiBookTocSource(source);
+  assert.equal(converted.bookTitle, 'Expanding Tactics for Listening');
+  assert.doesNotMatch(JSON.stringify(converted.tableOfContents), /Units 1–24/);
+  const unit1 = converted.tableOfContents.find((row) => row.label === 'Unit 1: Small Talk');
+  assert.ok(unit1);
+  assert.equal(unit1.level, 1);
+  const topic = converted.tableOfContents.find((row) => row.id.includes('u01') && row.label === 'Topic: Greetings');
+  assert.ok(topic);
+  assert.equal(topic.level, 2);
+  const skillItem = converted.tableOfContents.find((row) => row.label === 'Listening for greetings and introductions');
+  assert.ok(skillItem);
+  assert.equal(skillItem.level, 3);
+  const testing = converted.tableOfContents.find((row) => row.label === 'Tactics for Testing');
+  assert.ok(testing);
+  assert.equal(testing.level, 1);
 });
 
 test('convertGeminiBookTocSource flattens English Vocabulary in Use units and back matter', () => {

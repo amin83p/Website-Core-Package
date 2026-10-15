@@ -315,6 +315,13 @@ test('manage session view wires quick book covering wizard', () => {
   assert.match(view, /sessionBookCoveringQuickReportModals/);
   assert.match(view, /sessionBookCoveringQuickReport\.js/);
   assert.match(view, /book-covering-reports\/entries/);
+  const modals = fs.readFileSync(
+    path.join(ROOT, 'packages/school/MVC/views/school/class/partials/sessionBookCoveringQuickReportModals.ejs'),
+    'utf8'
+  );
+  assert.match(modals, /book-coverage-toc-chapter-head/);
+  assert.match(modals, /Each card is a top-level chapter/);
+  assert.match(modals, /book-coverage-toc-chapter/);
 });
 
 test('session book covering quick report client loads assigned books on demand', () => {
@@ -322,6 +329,22 @@ test('session book covering quick report client loads assigned books on demand',
   assert.match(client, /assigned-books/);
   assert.match(client, /\$\{apiBase\(\)\}\/entries/);
   assert.match(client, /page_numbers/);
+  assert.match(client, /buildSelectableTocTableHtml/);
+  assert.match(client, /bindSelectableTocTable/);
+  assert.match(client, /normalizeTocEntryIdsToH1/);
+  assert.doesNotMatch(client, /session-bc-unit-grid/);
+});
+
+test('library book TOC picker units mode uses shared selectable TOC table', () => {
+  const picker = fs.readFileSync(path.join(ROOT, 'public/scripts/bookTocPicker.js'), 'utf8');
+  assert.match(picker, /buildSelectableTocTableHtml/);
+  assert.match(picker, /bindSelectableTocTable/);
+  assert.doesNotMatch(picker, /session-bc-unit-grid/);
+  const modal = fs.readFileSync(
+    path.join(ROOT, 'packages/school/MVC/views/school/library/partials/bookTocPickerModal.ejs'),
+    'utf8'
+  );
+  assert.match(modal, /book-coverage-toc-list-wrap/);
 });
 
 test('book covering report form template avoids nested EJS output tags', () => {

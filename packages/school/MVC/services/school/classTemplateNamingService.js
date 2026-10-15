@@ -29,6 +29,47 @@ function normalizeFormat(value) {
   throw new Error('Format must be 1-on-1 or Group.');
 }
 
+const STUDENT_COUNT_MIN = 1;
+const STUDENT_COUNT_MAX = 30;
+
+function normalizeStudentCount(value) {
+  const count = Number(value);
+  if (!Number.isFinite(count) || count < STUDENT_COUNT_MIN || count > STUDENT_COUNT_MAX || Math.round(count) !== count) {
+    throw new Error(`Number of students must be an integer from ${STUDENT_COUNT_MIN} to ${STUDENT_COUNT_MAX}.`);
+  }
+  return count;
+}
+
+function formatFromStudentCount(value) {
+  const count = normalizeStudentCount(value);
+  return count === 1 ? FORMAT_TOKENS.one_on_one : FORMAT_TOKENS.group;
+}
+
+function resolveFormatToken(inputs = {}) {
+  if (inputs.studentCount !== undefined && inputs.studentCount !== null && inputs.studentCount !== '') {
+    return formatFromStudentCount(inputs.studentCount);
+  }
+  if (inputs.format) return normalizeFormat(inputs.format);
+  return '';
+}
+
+function normalizeTeacherTitleToken(personOrName) {
+  if (personOrName && typeof personOrName === 'object') {
+    const first = cleanString(
+      personOrName.firstName || personOrName?.name?.first || personOrName?.name?.firstName || '',
+      120
+    );
+    if (first) return first.toUpperCase();
+    const display = cleanString(personOrName.displayName || personOrName.name || '', 120);
+    if (display) return normalizeTeacherTitleToken(display);
+    return '';
+  }
+  const raw = cleanString(personOrName, 120);
+  if (!raw) return '';
+  const firstWord = raw.split(/\s+/).filter(Boolean)[0] || '';
+  return firstWord.toUpperCase();
+}
+
 function normalizeStartDate(value) {
   const s = String(value || '').trim();
   if (!s) return '';
@@ -46,10 +87,13 @@ function assertTitlePatternAllowsNoDeliveryPlaceholder(pattern) {
 }
 
 function buildTokenMap(inputs = {}) {
+  const teacherName = inputs.teacherNameToken != null && String(inputs.teacherNameToken).trim()
+    ? normalizeTeacherTitleToken(inputs.teacherNameToken)
+    : normalizeTeacherTitleToken(inputs.teacherName);
   return {
-    teacherName: cleanString(inputs.teacherName, 120),
+    teacherName,
     period: inputs.period ? normalizePeriod(inputs.period) : '',
-    format: inputs.format ? normalizeFormat(inputs.format) : '',
+    format: resolveFormatToken(inputs),
     startDate: inputs.startDate ? normalizeStartDate(inputs.startDate) : ''
   };
 }
@@ -89,10 +133,15 @@ function previewTitle(pattern, inputs = {}) {
 module.exports = {
   TITLE_MAX_LENGTH,
   FORMAT_TOKENS,
+  STUDENT_COUNT_MIN,
+  STUDENT_COUNT_MAX,
   applyTitlePattern,
   previewTitle,
   buildTokenMap,
   assertTitlePatternAllowsNoDeliveryPlaceholder,
   normalizePeriod,
-  normalizeFormat
+  normalizeFormat,
+  normalizeStudentCount,
+  formatFromStudentCount,
+  normalizeTeacherTitleToken
 };

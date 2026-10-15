@@ -44,22 +44,22 @@ function buildUnit(index, unit) {
   const start = UNIT_START_PAGES[index];
   const end = unitEndPage(index);
   return {
-    level: 'H2',
+    level: 'H1',
     unit_number: index + 1,
     title: unit.title,
     start_page: start,
     end_page: end,
     subheadings: [
-      { level: 'H3', category: 'Topic', title: unit.topic, start_page: start, end_page: end },
+      { level: 'H2', category: 'Topic', title: unit.topic, start_page: start, end_page: end },
       {
-        level: 'H3',
+        level: 'H2',
         category: 'Listening Skills',
         start_page: start,
         end_page: end,
-        items: unit.skills.map((title) => ({ level: 'H4', title, start_page: start, end_page: end }))
+        items: unit.skills.map((title) => ({ level: 'H3', title, start_page: start, end_page: end }))
       },
-      { level: 'H3', category: 'Pronunciation & Dictation', title: unit.pronunciation, start_page: start, end_page: end },
-      { level: 'H3', category: 'Conversation', title: unit.conversation, start_page: start, end_page: end }
+      { level: 'H2', category: 'Pronunciation & Dictation', title: unit.pronunciation, start_page: start, end_page: end },
+      { level: 'H2', category: 'Conversation', title: unit.conversation, start_page: start, end_page: end }
     ]
   };
 }
@@ -76,13 +76,7 @@ const testingBlocks = [
 const source = {
   book_title: 'Expanding Tactics for Listening',
   table_of_contents: [
-    {
-      level: 'H1',
-      title: 'Units 1–24',
-      start_page: 2,
-      end_page: 97,
-      children: UNITS.map((unit, index) => buildUnit(index, unit))
-    },
+    ...UNITS.map((unit, index) => buildUnit(index, unit)),
     {
       level: 'H1',
       title: 'Tactics for Testing',

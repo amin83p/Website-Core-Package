@@ -61,6 +61,11 @@
                 <i class="bi bi-three-dots-vertical"></i>
               </button>
               <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                <% if (typeof canCreateTemplates !== 'undefined' && canCreateTemplates) { %>
+                <a href="/school/class-templates/new?copyFrom=<%= encodeURIComponent(item.id) %>" class="btn btn-outline-secondary btn-sm">
+                  <i class="bi bi-copy me-2"></i>Copy
+                </a>
+                <% } %>
                 <a href="/school/class-templates/edit/<%= item.id %>" class="btn btn-outline-primary btn-sm">
                   <i class="bi bi-pencil-square me-2"></i>Edit
                 </a>

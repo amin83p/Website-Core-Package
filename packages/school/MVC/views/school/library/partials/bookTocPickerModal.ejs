@@ -41,49 +41,175 @@
     border-top: 1px solid var(--bs-border-color-translucent);
     padding: 0.75rem 1.25rem;
   }
-  .session-bc-unit-grid {
+  .book-toc-picker-tree {
+    max-height: min(60vh, 480px);
+    overflow-y: auto;
+  }
+  .book-coverage-toc-list-wrap {
+    border: 1px solid #e2e8f0;
+    border-radius: 0.65rem;
+    background: #f8fafc;
+    overflow: hidden;
+  }
+  .book-coverage-toc-list-header {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
-    gap: 0.65rem;
-  }
-  .session-bc-unit-card {
-    display: flex;
-    gap: 0.5rem;
-    align-items: flex-start;
-    margin: 0;
-    padding: 0.65rem 0.75rem;
-    border: 1px solid var(--bs-border-color-translucent);
-    border-radius: 0.5rem;
-    cursor: pointer;
-    transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
-  }
-  .session-bc-unit-card:has(.js-toc-pick:checked) {
-    border-color: rgba(var(--bs-primary-rgb), 0.55);
-    background: rgba(var(--bs-primary-rgb), 0.06);
-    box-shadow: 0 0 0 1px rgba(var(--bs-primary-rgb), 0.15);
-  }
-  .session-bc-unit-card-body {
-    flex: 1;
-    min-width: 0;
-  }
-  .session-bc-unit-title {
-    font-weight: 600;
-    font-size: 0.875rem;
-    line-height: 1.35;
-  }
-  .session-bc-unit-pages {
-    font-size: 0.75rem;
-    color: var(--bs-secondary-color);
-    margin-top: 0.15rem;
-  }
-  .session-bc-unit-level {
-    display: inline-block;
-    font-size: 0.65rem;
-    font-weight: 600;
+    grid-template-columns: minmax(0, 1fr) 6.5rem;
+    gap: 0.75rem;
+    align-items: center;
+    padding: 0.5rem 0.85rem 0.5rem 3.35rem;
+    font-size: 0.6875rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
-    letter-spacing: 0.03em;
-    color: var(--bs-secondary-color);
-    margin-bottom: 0.15rem;
+    color: #64748b;
+    background: #f1f5f9;
+    border-bottom: 1px solid #e2e8f0;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+  .book-coverage-toc-list-header-pages {
+    text-align: right;
+  }
+  .book-coverage-toc-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+  .book-coverage-toc-chapter {
+    border: 1px solid #e2e8f0;
+    border-radius: 0.55rem;
+    background: #fff;
+    overflow: hidden;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .book-coverage-toc-chapter--selected {
+    border-color: rgba(var(--bs-primary-rgb), 0.45);
+    box-shadow: 0 0 0 1px rgba(var(--bs-primary-rgb), 0.12);
+  }
+  .book-coverage-toc-chapter-head {
+    display: grid;
+    grid-template-columns: auto auto minmax(0, 1fr) 6.5rem;
+    gap: 0.5rem;
+    align-items: center;
+    padding: 0.65rem 0.75rem;
+    cursor: pointer;
+    background: #fff;
+  }
+  .book-coverage-toc-chapter-head:hover {
+    background: #f8fafc;
+  }
+  .book-coverage-toc-chapter--selected .book-coverage-toc-chapter-head {
+    background: rgba(var(--bs-primary-rgb), 0.06);
+  }
+  .book-coverage-toc-chapter-check {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+  }
+  .book-coverage-toc-chapter-check .form-check-input {
+    margin: 0;
+    cursor: pointer;
+  }
+  .book-coverage-toc-h1-chevron-spacer {
+    width: 1.5rem;
+    flex-shrink: 0;
+  }
+  .book-coverage-toc-h1-chevron {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    padding: 0;
+    border: 0;
+    border-radius: 0.35rem;
+    background: transparent;
+    color: #64748b;
+    line-height: 1;
+  }
+  .book-coverage-toc-h1-chevron:hover {
+    color: var(--bs-primary);
+    background: rgba(var(--bs-primary-rgb), 0.08);
+  }
+  .book-coverage-toc-h1-chevron .bi {
+    transition: transform 0.15s ease;
+    font-size: 0.9rem;
+  }
+  .book-coverage-toc-chapter--expanded .book-coverage-toc-h1-chevron .bi {
+    transform: rotate(90deg);
+  }
+  .book-coverage-toc-chapter-title {
+    font-size: 0.9375rem;
+    font-weight: 700;
+    line-height: 1.35;
+    color: #0f172a;
+    word-break: break-word;
+  }
+  .book-coverage-toc-chapter-pages {
+    font-size: 0.75rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: #475569;
+    text-align: right;
+    white-space: nowrap;
+    padding: 0.2rem 0.45rem;
+    border-radius: 999px;
+    background: #f1f5f9;
+  }
+  .book-coverage-toc-chapter--selected .book-coverage-toc-chapter-pages {
+    background: rgba(var(--bs-primary-rgb), 0.12);
+    color: var(--bs-primary);
+  }
+  .book-coverage-toc-chapter-body {
+    border-top: 1px solid #e2e8f0;
+    background: #fafbfc;
+    padding: 0.35rem 0.5rem 0.5rem 0.65rem;
+    margin-left: 0.65rem;
+    border-left: 2px solid rgba(var(--bs-primary-rgb), 0.2);
+  }
+  .book-coverage-toc-chapter:not(.book-coverage-toc-chapter--expanded) .book-coverage-toc-chapter-body {
+    display: none;
+  }
+  .book-coverage-toc-entry {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 6rem;
+    gap: 0.65rem;
+    align-items: start;
+    padding: 0.4rem 0.45rem;
+    margin-left: calc(var(--toc-sub-depth, 0) * 0.85rem);
+    border-radius: 0.4rem;
+    cursor: pointer;
+  }
+  .book-coverage-toc-entry:hover {
+    background: rgba(var(--bs-primary-rgb), 0.05);
+  }
+  .book-coverage-toc-row--selected.book-coverage-toc-entry {
+    background: rgba(var(--bs-primary-rgb), 0.08);
+  }
+  .book-coverage-toc-entry-title {
+    font-size: 0.8125rem;
+    line-height: 1.4;
+    color: #334155;
+    word-break: break-word;
+  }
+  .book-coverage-toc-entry[data-level="2"] .book-coverage-toc-entry-title {
+    font-weight: 600;
+    color: #1e293b;
+  }
+  .book-coverage-toc-entry[data-level="3"] .book-coverage-toc-entry-title,
+  .book-coverage-toc-entry[data-level="4"] .book-coverage-toc-entry-title {
+    font-weight: 500;
+  }
+  .book-coverage-toc-entry-pages {
+    font-size: 0.75rem;
+    font-variant-numeric: tabular-nums;
+    color: #64748b;
+    text-align: right;
+    white-space: nowrap;
+    padding-top: 0.05rem;
   }
   .session-bc-page-picker .session-bc-page-toggle.active {
     background: var(--bs-primary);

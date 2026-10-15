@@ -23,6 +23,11 @@ router.get('/new',
   trackActionState(SECTION_ID, OPERATIONS.CREATE),
   ctrl.showAddForm);
 
+router.get('/api/template/:id',
+  requireAccess(SECTION_ID, OPERATIONS.READ_ALL),
+  trackActionState(SECTION_ID, OPERATIONS.READ_ALL),
+  ctrl.getDefinitionTemplateCopyPayload);
+
 router.post('/new',
   requireAccess(SECTION_ID, OPERATIONS.CREATE),
   trackActionState(SECTION_ID, OPERATIONS.CREATE, { requireToken: true }),
