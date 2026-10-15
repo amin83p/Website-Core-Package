@@ -73,6 +73,7 @@ router.use('/teaching-outlines', require('./teachingOutlineRoutes'));
 router.use('/timesheetPeriods', require('./timesheetPeriodRoutes'));
 router.use('/timesheets', require('./timesheetRoutes'));
 router.use('/rolling-enrollment', require('./rollingEnrollmentRoutes'));
+router.use('/class-templates', require('./classTemplateRoutes'));
 router.use('/classes', require('./classRoutes'));
 router.use('/calendar', require('./calendarRoutes'));
 router.use('/schedules', require('./scheduleRoutes'));

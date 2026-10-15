@@ -1,3 +1,4 @@
+<% if (!locals.__genericPickerPartialIncluded) { locals.__genericPickerPartialIncluded = true; %>
 <div class="modal fade" id="genericPickerModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
     <div class="modal-content border-0 shadow-lg" style="border-radius: var(--modal-radius, 16px); overflow: hidden;">
@@ -85,7 +86,9 @@
 /**
  * Generic Picker Utility
  */
-window.GenericPicker = (function() {
+if (window.GenericPicker && typeof window.GenericPicker.open === 'function') {
+    // Singleton: avoid duplicate input listeners when partial is included more than once.
+} else window.GenericPicker = (function() {
     const modalEl = document.getElementById('genericPickerModal');
     let bsModal = null; 
 
@@ -108,8 +111,43 @@ window.GenericPicker = (function() {
     let currentConfig = {};
     let currentRecentResourceKey = '';
     let debounceTimer;
-    const SHOW_ALL_KEYWORDS = new Set(['aaa', '---']);
     const DEFAULT_SEARCH_DEBOUNCE_MS = 400;
+
+    function parsePickerSearchKeywords(value) {
+        return String(value || '')
+            .split(/[,\|;]/)
+            .map((part) => String(part || '').trim().toLowerCase())
+            .filter(Boolean);
+    }
+
+    function getShowAllKeywordSet() {
+        const appUiSettings = window.__APP_UI_SETTINGS__ && typeof window.__APP_UI_SETTINGS__ === 'object'
+            ? window.__APP_UI_SETTINGS__
+            : {};
+        const configured = parsePickerSearchKeywords(appUiSettings.searchDefaultKeyword || 'aaa');
+        const fallback = ['aaa', '---'];
+        return new Set([...fallback, ...configured]);
+    }
+
+    function getPrimaryShowAllKeyword() {
+        const appUiSettings = window.__APP_UI_SETTINGS__ && typeof window.__APP_UI_SETTINGS__ === 'object'
+            ? window.__APP_UI_SETTINGS__
+            : {};
+        const configured = String(appUiSettings.searchDefaultKeyword || '').trim();
+        if (configured) {
+            const first = parsePickerSearchKeywords(configured)[0];
+            if (first) return first;
+        }
+        return 'aaa';
+    }
+
+    function getShowAllHintHtml() {
+        const primary = getPrimaryShowAllKeyword();
+        if (primary === '---') {
+            return ' (type <kbd>---</kbd> to show all)';
+        }
+        return ` (type <kbd>${primary}</kbd> or <kbd>---</kbd> to show all)`;
+    }
     const RECENT_PICKS_LIMIT = 5;
     const pickerState = {
       term: '',
@@ -480,7 +518,7 @@ window.GenericPicker = (function() {
     function normalizePickerTerm(rawTerm) {
         const trimmed = String(rawTerm || '').trim();
         if (!trimmed) return { term: '', forceShowAll: false };
-        if (SHOW_ALL_KEYWORDS.has(trimmed.toLowerCase())) {
+        if (getShowAllKeywordSet().has(trimmed.toLowerCase())) {
             return { term: '', forceShowAll: true };
         }
         return { term: trimmed, forceShowAll: false };
@@ -650,9 +688,13 @@ window.GenericPicker = (function() {
       };
     }
 
-    function buildRequestUrl(queryTerm, page) {
+    function buildRequestUrl(queryTerm, page, options = {}) {
         const params = new URLSearchParams();
-        params.set('q', queryTerm);
+        const forceShowAll = options?.forceShowAll === true;
+        const qParam = forceShowAll && !String(queryTerm || '').trim()
+            ? getPrimaryShowAllKeyword()
+            : queryTerm;
+        params.set('q', qParam);
         params.set('page', String(page));
         const limit = getConfiguredLimit();
         if (limit) params.set('limit', String(limit));
@@ -704,7 +746,7 @@ window.GenericPicker = (function() {
         const isMulti = currentConfig.multiselect === true;
 
         if (queryTerm.length < 2 && !forceShowAll) {
-            const showAllHint = ' (type <kbd>---</kbd> to show all)';
+            const showAllHint = getShowAllHintHtml();
             if (isMulti) {
                 resetResultStatePreserveSelection();
                 renderList([], { append: false });
@@ -772,7 +814,7 @@ window.GenericPicker = (function() {
         }
         
         try {
-            const url = buildRequestUrl(queryTerm, requestedPage);
+            const url = buildRequestUrl(queryTerm, requestedPage, { forceShowAll });
             const res = await fetch(url, {
                 credentials: 'include',
                 headers: {
@@ -1092,3 +1134,4 @@ window.GenericPicker = (function() {
     };
 })();
 </script>
+<% } %>

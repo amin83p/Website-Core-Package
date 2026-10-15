@@ -274,8 +274,10 @@ function resolveAppUiSettings() {
   const genericPickerSearchDebounceMs = Number.isFinite(rawPickerDelay)
     ? Math.max(0, Math.min(2000, rawPickerDelay))
     : 400;
+  const searchDefaultKeyword = String(appSettings.searchDefaultKeyword || 'aaa').trim() || 'aaa';
   return {
-    genericPickerSearchDebounceMs
+    genericPickerSearchDebounceMs,
+    searchDefaultKeyword
   };
 }
 

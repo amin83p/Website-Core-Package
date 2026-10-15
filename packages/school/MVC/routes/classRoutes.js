@@ -152,6 +152,20 @@ router.get('/api/template/:id',
   requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.READ_ALL),
   classCtrl.getClassTemplate);
 
+router.get('/new-from-template',
+  requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_CLASSES, OPERATIONS.CREATE),
+  classCtrl.showCreateClassFromTemplate);
+
+router.post('/api/create-from-template',
+  requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_CLASSES, OPERATIONS.CREATE, { requireToken: true }),
+  classCtrl.createClassFromTemplate);
+
+router.post('/api/preview-template-title',
+  requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.CREATE),
+  classCtrl.previewClassTemplateTitle);
+
 router.get('/new-wizard',
   requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.CREATE),
   trackActionState(SECTIONS.SCHOOL_CLASSES, OPERATIONS.CREATE),

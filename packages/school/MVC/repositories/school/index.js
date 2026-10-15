@@ -5,6 +5,7 @@ const transactionDefinitionModel = require('../../models/school/transactionDefin
 const globalTransactionLedgerModel = require('../../models/school/globalTransactionLedgerModel');
 const subjectModel = require('../../models/school/subjectModel');
 const classModel = require('../../models/school/classModel');
+const classTemplateModel = require('../../models/school/classTemplateModel');
 const holidayModel = require('../../models/school/holidayModel');
 const departmentModel = require('../../models/school/departmentModel');
 const activityCategoryModel = require('../../models/school/activityCategoryModel');
@@ -1191,6 +1192,17 @@ const schoolRepositories = {
     assignmentScopeKind: 'instructor',
     transformList: (rows) => normalizeRows(rows).map((row) => normalizeClassDataContract(row)),
     transformItem: (row) => normalizeClassDataContract(row)
+  }),
+  classTemplates: createSchoolRepository({
+    entityName: 'classTemplates',
+    collectionName: 'schoolClassTemplates',
+    getAll: classTemplateModel.getAllClassTemplates,
+    getById: classTemplateModel.getClassTemplateById,
+    create: classTemplateModel.addClassTemplate,
+    update: classTemplateModel.updateClassTemplate,
+    remove: classTemplateModel.deleteClassTemplate,
+    defaultSearchFields: ['id', 'orgId', 'code', 'name', 'titlePattern', 'status'],
+    assignmentScopeKind: 'catalog'
   }),
   holidays: createSchoolRepository({
     entityName: 'holidays',

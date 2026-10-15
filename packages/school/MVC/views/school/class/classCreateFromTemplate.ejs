@@ -1,0 +1,190 @@
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <h1 class="page-heading size-md m-0"><%= title %></h1>
+    <a href="/school/classes" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Back to Classes</a>
+  </div>
+
+  <% if (!templates || !templates.length) { %>
+    <div class="alert alert-warning">
+      No active class templates are available. Ask an administrator to create and activate templates under
+      <a href="/school/class-templates">Class Definition Templates</a>.
+    </div>
+  <% } else { %>
+  <div class="form-container wide" style="max-width: 720px;">
+    <form id="createFromTemplateForm" action="/school/classes/api/create-from-template" method="POST" class="card border-0 shadow-sm">
+      <div class="card-body">
+        <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+
+        <div class="mb-3">
+          <label class="form-label">Template *</label>
+          <select name="templateId" id="inp_templateId" class="form-select" required>
+            <option value="">Select a template...</option>
+            <% templates.forEach(t => { %>
+              <option value="<%= t.id %>" data-pattern="<%= (t.titlePattern || '').replace(/"/g, '&quot;') %>">
+                <%= t.code %> — <%= t.name %>
+              </option>
+            <% }) %>
+          </select>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Teacher *</label>
+          <div class="input-group">
+            <input type="hidden" name="teacherPersonId" id="inp_teacherPersonId" required>
+            <input type="text" name="teacherName" id="inp_teacherName" class="form-control bg-white" placeholder="Select teacher..." readonly required>
+            <button type="button" class="btn btn-outline-primary" id="btn_pickTeacher"><i class="bi bi-person"></i></button>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Start date *</label>
+          <input type="date" name="startDate" id="inp_startDate" class="form-control" value="<%= orgToday || '' %>" required>
+        </div>
+
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label">Period *</label>
+            <select name="period" id="inp_period" class="form-select" required>
+              <option value="AM">AM</option>
+              <option value="PM" selected>PM</option>
+            </select>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Format *</label>
+            <select name="format" id="inp_format" class="form-select" required>
+              <option value="group" selected>Group</option>
+              <option value="one_on_one">1-on-1</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label">Class title preview</label>
+          <input type="text" id="inp_titlePreview" class="form-control font-monospace bg-light" readonly placeholder="Select template and fill fields...">
+          <div class="form-text">Built from the template title pattern and your choices above. In-Person vs Online is defined by the template you select (literal text in its pattern).</div>
+        </div>
+
+        <div class="d-flex gap-2 pt-2 border-top">
+          <button type="submit" class="btn btn-filled btn-primary btn-md">Create Class</button>
+          <a href="/school/classes" class="btn btn-outline-secondary btn-md">Cancel</a>
+        </div>
+      </div>
+    </form>
+  </div>
+  <% } %>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const form = document.getElementById('createFromTemplateForm');
+  if (!form) return;
+
+  const previewEl = document.getElementById('inp_titlePreview');
+  let previewTimer = null;
+
+  function collectPreviewPayload() {
+    return {
+      templateId: String(document.getElementById('inp_templateId')?.value || '').trim(),
+      teacherName: String(document.getElementById('inp_teacherName')?.value || '').trim(),
+      period: String(document.getElementById('inp_period')?.value || '').trim(),
+      format: String(document.getElementById('inp_format')?.value || '').trim(),
+      startDate: String(document.getElementById('inp_startDate')?.value || '').trim()
+    };
+  }
+
+  async function refreshTitlePreview() {
+    const payload = collectPreviewPayload();
+    if (!payload.templateId) {
+      if (previewEl) previewEl.value = '';
+      return;
+    }
+    try {
+      const body = new URLSearchParams(payload);
+      const response = await fetch('/school/classes/api/preview-template-title', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' },
+        body: body.toString()
+      });
+      const result = await response.json();
+      if (previewEl) {
+        previewEl.value = result?.status === 'success' ? String(result.title || '') : '';
+      }
+    } catch (_) {
+      if (previewEl) previewEl.value = '';
+    }
+  }
+
+  function schedulePreview() {
+    clearTimeout(previewTimer);
+    previewTimer = setTimeout(refreshTitlePreview, 200);
+  }
+
+  ['inp_templateId', 'inp_teacherName', 'inp_period', 'inp_format', 'inp_startDate'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('change', schedulePreview);
+    document.getElementById(id)?.addEventListener('input', schedulePreview);
+  });
+
+  document.getElementById('btn_pickTeacher')?.addEventListener('click', () => {
+    if (typeof GenericPicker === 'undefined') return;
+    GenericPicker.open(GenericPickerPresets.teacher({
+      title: 'Select Teacher',
+      placeholder: 'Search teachers...',
+      context: GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' }),
+      onSelect: (item) => {
+        const teacherId = item.personId || item.id || '';
+        const teacherName = `${item.firstName || ''} ${item.lastName || ''}`.trim()
+          || item.displayName
+          || item.name
+          || teacherId;
+        document.getElementById('inp_teacherPersonId').value = teacherId;
+        document.getElementById('inp_teacherName').value = teacherName;
+        schedulePreview();
+      }
+    }));
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!form.checkValidity()) {
+      form.reportValidity();
+      return;
+    }
+    const submitBtn = form.querySelector('button[type="submit"]');
+    const original = submitBtn.innerHTML;
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Creating...';
+    try {
+      const body = new URLSearchParams(new FormData(form));
+      const response = await fetch(form.action, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' },
+        body: body.toString()
+      });
+      let result;
+      try {
+        result = await response.json();
+      } catch (_) {
+        if (response.redirected || response.ok) {
+          window.location.href = '<%= defaultReturnTo || "/school/classes" %>';
+          return;
+        }
+        throw new Error('Unable to create class.');
+      }
+      if (result?.status !== 'success') {
+        throw new Error(result?.message || 'Unable to create class.');
+      }
+      window.location.href = '<%= defaultReturnTo || "/school/classes" %>';
+    } catch (error) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = original;
+      if (typeof uiAlert === 'function') {
+        await uiAlert(error.message || 'Create failed.', 'Error');
+      } else {
+        alert(error.message || 'Create failed.');
+      }
+    }
+  });
+
+  schedulePreview();
+});
+</script>

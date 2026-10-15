@@ -21,6 +21,7 @@ const {
 const schoolFileService = require('../../services/school/schoolFileService');
 const { respondSchoolDeleteError } = require('../../utils/schoolDeleteErrorResponse');
 const subjectModel = require('../../models/school/subjectModel');
+const programSubjectScopeService = require('../../services/school/programSubjectScopeService');
 
 // Helpers
 function parseData(input) {
@@ -70,6 +71,32 @@ async function listSubjects(req, res) {
     const query = await buildDataServiceQuery(req.query);
     const searchDefaultKeyword = settingService.getValue('app', 'searchDefaultKeyword') || 'aaa';
     if(query.q === searchDefaultKeyword) query.q='';
+    const programIdsFilter = programSubjectScopeService.parseProgramIdsFromQuery(req.query);
+    // programIds is a picker/API scope param only; do not pass it as a subject field filter
+    // (empty-q "show all" queries use filter-mode and would otherwise match no rows).
+    delete query.programIds;
+    delete query.programId;
+    if (programIdsFilter.length) {
+      const allowedSubjectIds = await programSubjectScopeService.resolveAllowedSubjectIdsForProgramIds(
+        programIdsFilter,
+        req.user
+      );
+      const allowedList = [...allowedSubjectIds];
+      if (!allowedList.length) {
+        const emptyPagination = {
+          currentPage: 1,
+          totalPages: 1,
+          totalItems: 0,
+          limit: Number(query.limit) || 50
+        };
+        if (isAjax(req)) {
+          return res.json({ status: 'success', results: [], pagination: emptyPagination });
+        }
+        query.id__in = '__PROGRAM_SCOPE_EMPTY__';
+      } else {
+        query.id__in = allowedList.join(',');
+      }
+    }
     const canCreateSubjects = await canCreateOrgScopedItem(req.user, { scopeLabel: 'subjects' });
     // Note: You must add 'subjects' case to dataService.js
     const paged = await dataService.fetchDataPaged('subjects', query, req.user);

@@ -76,6 +76,13 @@ const classCycleLinkResolutionService = require('../../services/school/classCycl
 const classDeletePreparationService = require('../../services/school/classDeletePreparationService');
 const classDeleteCascadeService = require('../../services/school/classDeleteCascadeService');
 const classStorageIntegrityService = require('../../services/school/classStorageIntegrityService');
+const programSubjectScopeService = require('../../services/school/programSubjectScopeService');
+const classTemplateNamingService = require('../../services/school/classTemplateNamingService');
+const {
+  applyStartDateToSnapshot,
+  snapshotToClassFormBody
+} = require('../../services/school/classTemplateSnapshotService');
+const { sanitizeAppReturnUrl } = requireCoreModule('MVC/utils/pagePathUtils');
 const classFolderPaths = require('../../services/school/classFolderPaths');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const { isRollingClassWorkflowEnabledForClass } = require('../../services/school/phase2FeatureFlagService');
@@ -3015,6 +3022,16 @@ function validateChargeablePostingTemplatesOrThrow(rowsInput) {
     }
 }
 
+async function assertClassCurriculumSubjectsInProgramScopeForClass(classItem, reqUser) {
+    const programIds = programSubjectScopeService.collectProgramIdsFromAllowedProgramTerms(classItem?.allowedProgramTerms);
+    const programs = programIds.length
+        ? await programSubjectScopeService.resolveProgramsForProgramIds(programIds, reqUser)
+        : [];
+    programSubjectScopeService.assertClassCurriculumSubjectsInProgramScope(classItem, programs, {
+        requireProgramsWhenSubjects: true
+    });
+}
+
 async function resolveAllowedProgramTermsOrThrow(rows, activeOrgId, reqUser, options = {}) {
     const requestedRows = Array.isArray(rows) ? rows : [];
     if (!requestedRows.length) return [];
@@ -3507,6 +3524,7 @@ async function addClass(req, res) {
     item.allowedProgramTerms = await resolveAllowedProgramTermsOrThrow(item.allowedProgramTerms, activeOrgId, req.user, {
         registrationMode: item.registrationMode
     });
+    await assertClassCurriculumSubjectsInProgramScopeForClass(item, req.user);
     assertRollingClassHasAllowedProgramOrThrow(item);
     assertRollingClassConfigAllowed(req, item, activeOrgId);
     await assertClassSessionsWithinDateWindowOrThrow(item, sessions, req.user);
@@ -3596,6 +3614,7 @@ async function editClass(req, res) {
     updates.allowedProgramTerms = await resolveAllowedProgramTermsOrThrow(updates.allowedProgramTerms, existing?.orgId || activeOrgId, req.user, {
         registrationMode: updates.registrationMode
     });
+    await assertClassCurriculumSubjectsInProgramScopeForClass(updates, req.user);
     assertRollingClassHasAllowedProgramOrThrow(updates);
     assertRollingClassConfigAllowed(req, updates, existing?.orgId || activeOrgId);
     await assertClassSessionsWithinDateWindowOrThrow(updates, sessions, req.user);
@@ -7202,8 +7221,98 @@ async function setSessionLock(req, res) {
     }
 }
 
+async function showCreateClassFromTemplate(req, res) {
+  try {
+    await assertCreateOrgContextOrThrow(req.user);
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    const allTemplates = await schoolDataService.fetchAllData('classTemplates', {}, req.user);
+    const templates = (Array.isArray(allTemplates) ? allTemplates : [])
+      .filter((row) => String(row?.status || '').trim().toLowerCase() === 'active')
+      .filter((row) => String(row?.orgId || '') === String(activeOrgId))
+      .sort((a, b) => String(a?.name || '').localeCompare(String(b?.name || '')));
+
+    res.render('school/class/classCreateFromTemplate', {
+      title: 'Create Class from Template',
+      templates,
+      includeModal: true,
+      user: req.user,
+      orgToday: resolveOrgTodayFromRequest(req),
+      actionStateId: req.actionStateId,
+      defaultReturnTo: '/school/classes'
+    });
+  } catch (error) {
+    res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+}
+
+async function previewClassTemplateTitle(req, res) {
+  try {
+    const templateId = String(req.body?.templateId || req.query?.templateId || '').trim();
+    const template = templateId
+      ? await schoolDataService.getDataById('classTemplates', templateId, req.user)
+      : null;
+    const pattern = String(template?.titlePattern || req.body?.titlePattern || '').trim();
+    const title = classTemplateNamingService.previewTitle(pattern, {
+      teacherName: req.body?.teacherName,
+      period: req.body?.period,
+      format: req.body?.format,
+      startDate: req.body?.startDate
+    });
+    return res.json({ status: 'success', title });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function createClassFromTemplate(req, res) {
+  const priorBody = req.body;
+  try {
+    await assertCreateOrgContextOrThrow(req.user);
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    const templateId = String(req.body?.templateId || '').trim();
+    if (!templateId) throw new Error('Select a class template.');
+
+    const template = await schoolDataService.getDataById('classTemplates', templateId, req.user);
+    if (!template) throw new Error('Class template not found.');
+    assertOrgAccess(template, activeOrgId, req.user, { orgField: 'orgId' });
+    if (String(template?.status || '').trim().toLowerCase() !== 'active') {
+      throw new Error('Selected template is not active.');
+    }
+
+    const teacherPersonId = String(req.body?.teacherPersonId || req.body?.instructorId || '').trim();
+    const teacherName = String(req.body?.teacherName || req.body?.instructorName || '').trim();
+    if (!teacherPersonId) throw new Error('Select a teacher for this class.');
+
+    const startDate = String(req.body?.startDate || '').trim();
+    const title = classTemplateNamingService.applyTitlePattern(template.titlePattern, {
+      teacherName,
+      period: req.body?.period,
+      format: req.body?.format,
+      startDate
+    });
+
+    const snapshotWithDates = applyStartDateToSnapshot(template.snapshot || {}, startDate);
+    const mergedBody = snapshotToClassFormBody(snapshotWithDates, { title, cycleStartDate: startDate });
+    mergedBody.instructors = JSON.stringify([{
+      personId: teacherPersonId,
+      name: teacherName || teacherPersonId,
+      role: 'Primary',
+      status: 'active'
+    }]);
+    mergedBody.sessions = '[]';
+    mergedBody.actionStateId = priorBody?.actionStateId || req.actionStateId || '';
+
+    req.body = mergedBody;
+    await addClass(req, res);
+  } catch (error) {
+    req.body = priorBody;
+    if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
+    return res.status(400).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+}
+
 module.exports = {
-  listClasses, showAddForm, showAddWizardForm, addClass, showEditForm, showEditWizardForm, editClass, deleteClass,
+  listClasses, showAddForm, showAddWizardForm, addClass, showCreateClassFromTemplate, createClassFromTemplate, previewClassTemplateTitle, showEditForm, showEditWizardForm, editClass, deleteClass,
   showResolveCycleLinksPage, showDeletePreparationPage, getDeletePreparationApi,
   showClassStorageIntegrityPage, getClassStorageIntegrityScanApi, postClassStorageIntegrityApplyApi,
   getCycleLinkBlockersApi, unlinkCycleLinkApi, unlinkAllCycleLinksApi,

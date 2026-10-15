@@ -39,6 +39,9 @@
   });
   const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
   const lc = (typeof lifecycleContext !== 'undefined' && lifecycleContext) ? lifecycleContext : {};
+  const isTemplate = typeof templateMode !== 'undefined' && templateMode === true;
+  const templateRecord = (typeof templateData !== 'undefined' && templateData) ? templateData : null;
+  const isTemplateEdit = isTemplate && !!(templateRecord && templateRecord.id);
 %>
 
 <style>
@@ -55,14 +58,16 @@
 
 <div class="sections-page">
   <div class="d-flex align-items-center justify-content-between mb-4">
-      <h1 class="page-heading size-md m-0"><%= isEdit ? 'Edit Class' : 'New Class' %></h1>
+      <h1 class="page-heading size-md m-0"><%= isTemplate ? (isTemplateEdit ? 'Edit Class Template' : 'New Class Template') : (isEdit ? 'Edit Class' : 'New Class') %></h1>
       <div class="d-flex flex-column align-items-end gap-1">
-          <% if(isEdit) { %> <span class="badge bg-primary border font-monospace">ID: <%= c.id %></span> <% } %>
-          <button type="button" class="btn btn-outline-primary btn-sm" id="btnCopyFromClass"><i class="bi bi-copy me-1"></i>Copy From Class</button>
+          <% if(isEdit && !isTemplate) { %> <span class="badge bg-primary border font-monospace">ID: <%= c.id %></span> <% } %>
+          <% if (isTemplateEdit) { %><span class="badge bg-primary border font-monospace">ID: <%= templateRecord.id %></span><% } %>
+          <% if (!isTemplate) { %><button type="button" class="btn btn-outline-primary btn-sm" id="btnCopyFromClass"><i class="bi bi-copy me-1"></i>Copy From Class</button><% } %>
+          <% if (isTemplate) { %><button type="button" class="btn btn-outline-secondary btn-sm" id="btnImportClassIntoTemplate"><i class="bi bi-copy me-1"></i>Import from Class</button><% } %>
       </div>
   </div>
 
-  <% if (isEdit) { %>
+  <% if (isEdit && !isTemplate) { %>
     <div class="card border-0 shadow-sm mb-3">
       <div class="card-body py-2">
         <div class="d-flex flex-wrap align-items-center gap-2">
@@ -96,8 +101,34 @@
   <% } %>
 
   <div class="form-container wide" style="max-width: 1400px;">
-    <form id="classForm" action="<%= isEdit ? '/school/classes/edit/'+c.id : '/school/classes/new' %>" method="POST">
+    <form id="classForm" action="<%= isTemplate ? (isTemplateEdit ? '/school/class-templates/edit/'+templateRecord.id : '/school/class-templates/new') : (isEdit ? '/school/classes/edit/'+c.id : '/school/classes/new') %>" method="POST">
       
+      <% if (isTemplate) { %>
+      <div class="card border-0 shadow-sm mb-3">
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-md-3">
+              <label class="form-label">Template Code *</label>
+              <input type="text" name="code" class="form-control" required maxlength="40" value="<%= templateRecord ? (templateRecord.code || '') : '' %>" placeholder="EAL-STD">
+            </div>
+            <div class="col-md-5">
+              <label class="form-label">Template Name *</label>
+              <input type="text" name="name" class="form-control" required maxlength="160" value="<%= templateRecord ? (templateRecord.name || '') : '' %>" placeholder="EAL Standard Group PM">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Template Status</label>
+              <select name="templateStatus" class="form-select">
+                <option value="draft" <%= templateRecord && String(templateRecord.status||'').toLowerCase()==='draft' ? 'selected' : '' %>>Draft</option>
+                <option value="active" <%= !templateRecord || String(templateRecord.status||'').toLowerCase()==='active' ? 'selected' : '' %>>Active</option>
+                <option value="archived" <%= templateRecord && String(templateRecord.status||'').toLowerCase()==='archived' ? 'selected' : '' %>>Archived</option>
+              </select>
+            </div>
+          </div>
+          <p class="small text-muted mb-0 mt-2">Title pattern placeholders: <code>{{period}}</code>, <code>{{format}}</code> (1/G), <code>{{teacherName}}</code>, <code>{{startDate}}</code>. Use separate templates for In-Person vs Online and put the delivery segment as literal text in the pattern (e.g. <code>I</code>, <code>OL</code>). Example: <code>EAL-{{period}}-I/{{format}}-{{teacherName}}</code></p>
+        </div>
+      </div>
+      <% } %>
+
       <input type="hidden" name="curriculum" id="hid_curriculum" value="">
       <input type="hidden" name="billingMode" id="hid_billingMode" value="<%= initBillingMode %>">
       <input type="hidden" name="pricing" id="hid_pricing" value="">
@@ -124,8 +155,8 @@
       <ul class="nav nav-tabs mb-4" id="classTabs" role="tablist">
         <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#tab-general" type="button">General Info</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-eligibility" type="button">Program / terms</button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-curriculum" type="button">Curriculum & Team</button></li>
-        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-sessions" type="button">Session Builder</button></li>
+        <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-curriculum" type="button"><%= isTemplate ? 'Curriculum' : 'Curriculum & Team' %></button></li>
+        <% if (!isTemplate) { %><li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-sessions" type="button">Session Builder</button></li><% } %>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-eval" type="button">Evaluation Rules</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-attendance-statuses" type="button">Attendance Statuses</button></li>
         <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#tab-pricing" type="button">Pricing</button></li>
@@ -136,8 +167,8 @@
         <div class="tab-pane fade show active" id="tab-general">
            <div class="row">
               <div class="col-md-6 mb-3">
-                 <label class="form-label">Class Title *</label>
-                 <input type="text" name="title" class="form-control size-md" value="<%= c.title || '' %>" required placeholder="e.g., Fall 2026 - CS Bootcamp">
+                 <label class="form-label"><%= isTemplate ? 'Class Title Pattern *' : 'Class Title *' %></label>
+                 <input type="text" name="title" class="form-control size-md" value="<%= c.title || '' %>" required placeholder="<%= isTemplate ? 'EAL-{{period}}-I/{{format}}-{{teacherName}}' : 'e.g., Fall 2026 - CS Bootcamp' %>">
               </div>
               <div class="col-md-6 mb-3">
                  <label class="form-label">Organization</label>
@@ -350,10 +381,11 @@
         </div>
 
         <div class="tab-pane fade" id="tab-curriculum">
-           <div class="d-flex justify-content-between align-items-center mb-3">
+           <div class="d-flex justify-content-between align-items-center mb-2">
                <h6 class="fw-bold text-primary m-0">Curriculum Subjects</h6>
                <button type="button" class="btn btn-sm btn-outline-primary" id="openSubjectPickerBtn"><i class="bi bi-plus"></i> Add Subject</button>
            </div>
+           <p class="small text-muted mb-3">Only subjects assigned to this class&rsquo;s program(s) on the Program Terms tab are listed.</p>
            <div class="table-responsive border rounded bg-white mb-4">
                <table class="table table-hover table-sm mb-0 align-middle">
                    <thead class="table-light">
@@ -421,6 +453,7 @@
                  <div class="form-text small" id="classCreditsHint">Defaults to the selected subjects' total credits. You can edit it.</div>
               </div>
            </div>
+           <% if (!isTemplate) { %>
            <hr>
            <h6 class="fw-bold text-primary mb-3">Class instructors</h6>
            <p class="text-muted small mb-3">Teachers listed here can see this class in class pickers. Session-only or co-teachers must be added below. The primary instructor is the default in the session builder.</p>
@@ -448,8 +481,13 @@
               <div id="additionalInstructorsList" class="border rounded p-2 bg-light small" style="min-height: 2.5rem;"></div>
               <div class="form-text">Add co-teachers or others who need class-picker access. The primary instructor above cannot be removed here.</div>
            </div>
+           <% } else { %>
+           <input type="hidden" id="inp_instructorId" value="">
+           <input type="hidden" id="inp_instructorName" value="">
+           <% } %>
         </div>
 
+        <% if (!isTemplate) { %>
         <div class="tab-pane fade" id="tab-sessions">
            <div class="card bg-light border-0 mb-4">
              <div class="card-body">
@@ -544,6 +582,7 @@
                <div id="noSessionsMsg" class="text-center py-4 text-muted small d-none">No sessions generated yet.</div>
            </div>
         </div>
+        <% } %>
 
         <div class="tab-pane fade" id="tab-eval">
            <h6 class="fw-bold text-primary mb-3">Gradebook Rules</h6>
@@ -807,7 +846,7 @@
       </div>
 
       <div class="button-row mt-4 pt-3 border-top">
-        <button type="submit" class="btn btn-filled btn-primary btn-md">Save Class & Ledger</button>
+        <button type="submit" class="btn btn-filled btn-primary btn-md"><%= isTemplate ? 'Save Template' : 'Save Class & Ledger' %></button>
         <a href="/school/classes" class="btn btn-filled btn-secondary btn-md" id="btnCancelAction" data-return-url="/school/classes">Cancel</a>
       </div>
     </form>
@@ -1073,6 +1112,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const dInst = instructorsState;
     const dEnrl = enrollmentState;
     const classId = '<%= c.id || "" %>';
+    const classFormTemplateMode = <%= isTemplate ? 'true' : 'false' %>;
+
+    function setTargetHoursLabel(value) {
+        const label = document.getElementById('lbl_targetHours');
+        if (label) label.innerText = value;
+    }
 
     function buildNextClientSessionId() {
         if (window.SchoolSessionIdHelper && typeof window.SchoolSessionIdHelper.buildNextSessionId === 'function') {
@@ -1290,10 +1335,10 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('inp_capacity').value = dEnrl.maxCapacity || 30;
     const initialHours = Number(initCurriculumData?.totalHours || 0);
     document.getElementById('inp_totalHours').value = initialHours;
-    document.getElementById('lbl_targetHours').innerText = initialHours;
+    setTargetHoursLabel(initialHours);
 
     document.getElementById('inp_totalHours').addEventListener('input', (e) => {
-        document.getElementById('lbl_targetHours').innerText = e.target.value || 0;
+        setTargetHoursLabel(e.target.value || 0);
     });
     syncClassCreditsField({ force: !classCreditsTouched });
     if (creditsInput) {
@@ -1303,13 +1348,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    if (dInst && dInst.length > 0) {
+    if (dInst && dInst.length > 0 && !classFormTemplateMode) {
         const primary = dInst.find(i => i.status === 'active') || dInst[0];
-        document.getElementById('inp_instructorId').value = primary.personId;
-        document.getElementById('inp_instructorName').value = primary.name || primary.personId; 
-        document.getElementById('inp_instructorRole').value = primary.role || 'Primary';
-        document.getElementById('bg_teacherId').value = primary.personId;
-        document.getElementById('bg_teacherName').value = primary.name || primary.personId;
+        const instructorIdEl = document.getElementById('inp_instructorId');
+        const instructorNameEl = document.getElementById('inp_instructorName');
+        const instructorRoleEl = document.getElementById('inp_instructorRole');
+        if (instructorIdEl) instructorIdEl.value = primary.personId;
+        if (instructorNameEl) instructorNameEl.value = primary.name || primary.personId;
+        if (instructorRoleEl) instructorRoleEl.value = primary.role || 'Primary';
+        const bgTeacherIdEl = document.getElementById('bg_teacherId');
+        const bgTeacherNameEl = document.getElementById('bg_teacherName');
+        if (bgTeacherIdEl) bgTeacherIdEl.value = primary.personId;
+        if (bgTeacherNameEl) bgTeacherNameEl.value = primary.name || primary.personId;
     }
     renderAdditionalInstructors();
     document.getElementById('additionalInstructorsList')?.addEventListener('click', (event) => {
@@ -1404,11 +1454,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function clearClassInstructorFields() {
-        document.getElementById('inp_instructorId').value = '';
-        document.getElementById('inp_instructorName').value = '';
-        document.getElementById('inp_instructorRole').value = 'Primary';
-        document.getElementById('bg_teacherId').value = '';
-        document.getElementById('bg_teacherName').value = '';
+        const instructorIdEl = document.getElementById('inp_instructorId');
+        const instructorNameEl = document.getElementById('inp_instructorName');
+        const instructorRoleEl = document.getElementById('inp_instructorRole');
+        if (instructorIdEl) instructorIdEl.value = '';
+        if (instructorNameEl) instructorNameEl.value = '';
+        if (instructorRoleEl) instructorRoleEl.value = 'Primary';
+        const bgTeacherIdEl = document.getElementById('bg_teacherId');
+        const bgTeacherNameEl = document.getElementById('bg_teacherName');
+        if (bgTeacherIdEl) bgTeacherIdEl.value = '';
+        if (bgTeacherNameEl) bgTeacherNameEl.value = '';
     }
 
     function refreshLifecycleModeUi() {
@@ -1445,6 +1500,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function validateLifecycleInputs() {
+        if (classFormTemplateMode) return '';
         const rolling = isRollingMode();
         const cycleNo = Number.parseInt(String(cycleNoInput?.value || '').trim(), 10);
         if (!Number.isFinite(cycleNo) || cycleNo <= 0) {
@@ -2841,7 +2897,9 @@ document.addEventListener('DOMContentLoaded', () => {
     function applyClassTemplate(template) {
         const source = template && typeof template === 'object' ? template : {};
 
-        document.querySelector('input[name="title"]').value = String(source?.title || '').trim();
+        if (!classFormTemplateMode) {
+            document.querySelector('input[name="title"]').value = String(source?.title || '').trim();
+        }
 
         const status = String(source?.status || '').trim().toLowerCase();
         const statusSelect = document.querySelector('select[name="status"]');
@@ -2884,7 +2942,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const totalHours = Number(source?.curriculum?.totalHours || 0);
         document.getElementById('inp_totalHours').value = Number.isFinite(totalHours) ? totalHours : 0;
-        document.getElementById('lbl_targetHours').innerText = document.getElementById('inp_totalHours').value || 0;
+        setTargetHoursLabel(document.getElementById('inp_totalHours').value || 0);
 
         const copiedCredits = Number(source?.credits || 0);
         if (Number.isFinite(copiedCredits) && copiedCredits > 0) {
@@ -2949,7 +3007,9 @@ document.addEventListener('DOMContentLoaded', () => {
         renderSubjects();
         renderSubjectWeights();
         syncPricingHidden();
-        renderSessions();
+        if (!classFormTemplateMode) {
+            renderSessions();
+        }
 
         _prevRollingModeForEval = null;
         _savedExamWeightsBackup = null;
@@ -2973,11 +3033,12 @@ document.addEventListener('DOMContentLoaded', () => {
         }));
     }
 
-    const btnCopyFromClass = document.getElementById('btnCopyFromClass');
-    if (btnCopyFromClass) {
-        btnCopyFromClass.addEventListener('click', () => {
+    function bindImportClassSnapshotPicker({ buttonId, title, successMessage }) {
+        const btn = document.getElementById(buttonId);
+        if (!btn) return;
+        btn.addEventListener('click', () => {
             GenericPicker.open(GenericPickerPresets.class({
-                title: 'Copy From Class',
+                title,
                 icon: 'bi-copy',
                 placeholder: 'Search classes to copy...',
                 context: GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' }),
@@ -2986,7 +3047,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const sourceClassId = String(item?.id || '').trim();
                     if (!sourceClassId) return;
                     if (classId && String(classId) === sourceClassId) {
-                        await uiAlert('Select a different class to copy from.', 'Copy From Class');
+                        await uiAlert('Select a different class to copy from.', title);
                         return;
                     }
                     try {
@@ -2998,7 +3059,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             throw new Error(result?.message || 'Failed to load class template.');
                         }
                         applyClassTemplate(result.template || {});
-                        await uiAlert(`Class data was copied from ${sourceClassId}. Sessions were not copied, so you can generate a new session plan.`, 'Template Applied');
+                        await uiAlert(successMessage.replace('{id}', sourceClassId), 'Template Applied');
                     } catch (error) {
                         await uiAlert(error.message || 'Failed to copy class data.', 'Copy Failed');
                     }
@@ -3007,27 +3068,73 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    setupPicker('openSubjectPickerBtn', '/school/subjects', 'Select Subject', 'bi-book', (items) => {
-        const rows = Array.isArray(items) ? items : [items];
-        rows.forEach((item) => {
-            if (!item?.id) return;
-            if (curriculumState.find(s => s.subjectId === item.id)) return;
-            const currentTotal = getCurriculumWeightTotal();
-            const remainingWeight = roundWeight(Math.max(0, 100 - currentTotal));
-            curriculumState.push({
-                subjectId: item.id,
-                code: item.code || item.id,
-                name: item.title || '',
-                allocatedHours: item.configuration?.defaultHours || 0,
-                weight: remainingWeight
-            });
-        });
-        normalizeCurriculumState({ rebalanceIfMissing: false });
-        renderSubjects();
-    }, {
-        multiselect: true,
-        placeholder: 'Search subjects, select multiple, then Add Selected...'
+    bindImportClassSnapshotPicker({
+        buttonId: 'btnCopyFromClass',
+        title: 'Copy From Class',
+        successMessage: 'Class data was copied from {id}. Sessions were not copied, so you can generate a new session plan.'
     });
+    bindImportClassSnapshotPicker({
+        buttonId: 'btnImportClassIntoTemplate',
+        title: 'Import from Class',
+        successMessage: 'Configuration was imported from class {id}. Adjust the title pattern and template fields, then save.'
+    });
+
+    (function bindProgramScopedSubjectPicker() {
+        const subjectPickerBtn = document.getElementById('openSubjectPickerBtn');
+        if (!subjectPickerBtn) return;
+
+        const onSubjectsPicked = (items) => {
+            const rows = Array.isArray(items) ? items : [items];
+            rows.forEach((item) => {
+                if (!item?.id) return;
+                if (curriculumState.find(s => s.subjectId === item.id)) return;
+                const pushWeight = classId
+                    ? roundWeight(Math.max(0, 100 - getCurriculumWeightTotal()))
+                    : 0;
+                curriculumState.push({
+                    subjectId: item.id,
+                    code: item.code || item.id,
+                    name: item.title || '',
+                    allocatedHours: item.configuration?.defaultHours || 0,
+                    weight: pushWeight
+                });
+            });
+            if (!classId) {
+                curriculumState = buildEvenWeights(curriculumState);
+            } else {
+                normalizeCurriculumState({ rebalanceIfMissing: false });
+            }
+            renderSubjects();
+        };
+
+        subjectPickerBtn.addEventListener('click', () => {
+            normalizeAllowedProgramTermsState();
+            const programIds = [...new Set(
+                (Array.isArray(allowedProgramTermsState) ? allowedProgramTermsState : [])
+                    .map((row) => String(row?.programId || '').trim())
+                    .filter(Boolean)
+            )];
+            if (!programIds.length) {
+                void uiAlert(
+                    'Add at least one program on the Program Terms tab before selecting curriculum subjects.',
+                    'Program required'
+                );
+                return;
+            }
+            if (!window.GenericPicker || !window.GenericPickerPresets) {
+                void uiAlert('Subject picker is unavailable on this page.', 'Select Subject');
+                return;
+            }
+            window.GenericPicker.open(window.GenericPickerPresets.subject({
+                title: 'Select Subject',
+                icon: 'bi-book',
+                apiEndpoint: '/school/subjects?programIds=' + encodeURIComponent(programIds.join(',')),
+                placeholder: 'Search subjects, select multiple, then Add Selected...',
+                multiselect: true,
+                onSelect: onSubjectsPicked
+            }));
+        });
+    })();
 
     setupPicker('openUserPickerBtn', '/school/teachers', 'Select Default Instructor', 'bi-person', (item) => {
         const teacher = resolveTeacherPickerSelection(item);
@@ -3498,6 +3605,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function renderSessions() {
+        if (classFormTemplateMode || !tbody) return;
         tbody.innerHTML = '';
         let total = 0;
 
@@ -3508,8 +3616,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         if (sessionsState.length === 0) {
-            document.getElementById('noSessionsMsg').classList.remove('d-none');
-            lblScheduled.innerText = '0';
+            document.getElementById('noSessionsMsg')?.classList.remove('d-none');
+            if (lblScheduled) lblScheduled.innerText = '0';
             return;
         }
         document.getElementById('noSessionsMsg').classList.add('d-none');
@@ -3634,78 +3742,80 @@ document.addEventListener('DOMContentLoaded', () => {
             tbody.appendChild(tr);
         });
 
-        lblScheduled.innerText = total.toFixed(2);
+        if (lblScheduled) lblScheduled.innerText = total.toFixed(2);
     }
 
-    tbody.addEventListener('change', (e) => {
-        const index = e.target.getAttribute('data-index');
-        if (e.target.classList.contains('session-select-cb')) {
-            if (sessionsState[index]) sessionsState[index]._bulkSelected = e.target.checked;
-            if (typeof computeBulkCoTeacherPreview === 'function') computeBulkCoTeacherPreview();
-            return;
-        }
-        if (e.target.classList.contains('session-lock-cb')) {
-            if (isTimesheetApprovedLock(sessionsState[index])) {
-                e.target.checked = true;
+    if (tbody) {
+        tbody.addEventListener('change', (e) => {
+            const index = e.target.getAttribute('data-index');
+            if (e.target.classList.contains('session-select-cb')) {
+                if (sessionsState[index]) sessionsState[index]._bulkSelected = e.target.checked;
+                if (typeof computeBulkCoTeacherPreview === 'function') computeBulkCoTeacherPreview();
                 return;
             }
-            sessionsState[index].locked = e.target.checked;
-            if (!e.target.checked) {
-                delete sessionsState[index].lockReason;
-                delete sessionsState[index].lockedTimesheetId;
-            } else if (!sessionsState[index].lockReason) {
-                sessionsState[index].lockReason = 'admin_locked';
-            }
-            renderSessions(); return;
-        }
-
-        if (e.target.classList.contains('session-input')) {
-            const field = e.target.getAttribute('data-field');
-            const val = e.target.value;
-
-            if (field === 'startTime' || field === 'endTime') {
-                sessionsState[index][field] = val;
-                sessionsState[index].durationHours = getDuration(sessionsState[index].startTime, sessionsState[index].endTime);
-            } else if (field === 'status') {
-                const normalizedStatus = normalizeStatusCode(val) || normalizeStatusCode(defaultSessionStatusCode) || 'scheduled';
-                sessionsState[index][field] = normalizedStatus;
-                if (shouldForceZeroHours(normalizedStatus)) {
-                    sessionsState[index].durationHours = 0;
+            if (e.target.classList.contains('session-lock-cb')) {
+                if (isTimesheetApprovedLock(sessionsState[index])) {
+                    e.target.checked = true;
+                    return;
                 }
-            } else {
-                sessionsState[index][field] = field === 'durationHours' ? (parseFloat(val) || 0) : val;
-            }
-            sessionsState[index].conflictMsg = null; 
-            renderSessions(); 
-        }
-    });
-
-    tbody.addEventListener('click', (e) => {
-        const removeBtn = e.target.closest('.btn-remove-session');
-        if (removeBtn && !removeBtn.disabled) {
-            sessionsState.splice(removeBtn.getAttribute('data-index'), 1);
-            renderSessions();
-        }
-
-        const pickBtn = e.target.closest('.btn-pick-teacher');
-        if (pickBtn && !pickBtn.disabled) {
-            const index = pickBtn.getAttribute('data-index');
-            GenericPicker.open(GenericPickerPresets.teacher({
-                title: 'Select Teacher',
-                icon: 'bi-person',
-                placeholder: 'Search Teachers...',
-                renderer: teacherPickerRenderer,
-                onSelect: (item) => {
-                    const teacher = resolveTeacherPickerSelection(item);
-                    if(!sessionsState[index].delivery) sessionsState[index].delivery = {};
-                    sessionsState[index].delivery.deliveredBy = teacher.personId;
-                    sessionsState[index].delivery.deliveredByName = teacher.displayName;
-                    sessionsState[index].conflictMsg = null; 
-                    renderSessions();
+                sessionsState[index].locked = e.target.checked;
+                if (!e.target.checked) {
+                    delete sessionsState[index].lockReason;
+                    delete sessionsState[index].lockedTimesheetId;
+                } else if (!sessionsState[index].lockReason) {
+                    sessionsState[index].lockReason = 'admin_locked';
                 }
-            }));
-        }
-    });
+                renderSessions(); return;
+            }
+
+            if (e.target.classList.contains('session-input')) {
+                const field = e.target.getAttribute('data-field');
+                const val = e.target.value;
+
+                if (field === 'startTime' || field === 'endTime') {
+                    sessionsState[index][field] = val;
+                    sessionsState[index].durationHours = getDuration(sessionsState[index].startTime, sessionsState[index].endTime);
+                } else if (field === 'status') {
+                    const normalizedStatus = normalizeStatusCode(val) || normalizeStatusCode(defaultSessionStatusCode) || 'scheduled';
+                    sessionsState[index][field] = normalizedStatus;
+                    if (shouldForceZeroHours(normalizedStatus)) {
+                        sessionsState[index].durationHours = 0;
+                    }
+                } else {
+                    sessionsState[index][field] = field === 'durationHours' ? (parseFloat(val) || 0) : val;
+                }
+                sessionsState[index].conflictMsg = null;
+                renderSessions();
+            }
+        });
+
+        tbody.addEventListener('click', (e) => {
+            const removeBtn = e.target.closest('.btn-remove-session');
+            if (removeBtn && !removeBtn.disabled) {
+                sessionsState.splice(removeBtn.getAttribute('data-index'), 1);
+                renderSessions();
+            }
+
+            const pickBtn = e.target.closest('.btn-pick-teacher');
+            if (pickBtn && !pickBtn.disabled) {
+                const index = pickBtn.getAttribute('data-index');
+                GenericPicker.open(GenericPickerPresets.teacher({
+                    title: 'Select Teacher',
+                    icon: 'bi-person',
+                    placeholder: 'Search Teachers...',
+                    renderer: teacherPickerRenderer,
+                    onSelect: (item) => {
+                        const teacher = resolveTeacherPickerSelection(item);
+                        if(!sessionsState[index].delivery) sessionsState[index].delivery = {};
+                        sessionsState[index].delivery.deliveredBy = teacher.personId;
+                        sessionsState[index].delivery.deliveredByName = teacher.displayName;
+                        sessionsState[index].conflictMsg = null;
+                        renderSessions();
+                    }
+                }));
+            }
+        });
+    }
 
     const btnDeleteAllSessions = document.getElementById('btn_deleteAllSessions');
     if (btnDeleteAllSessions) {
@@ -4011,7 +4121,7 @@ form.addEventListener('submit', async (e) => {
                 submitBtn.innerHTML = originalText;
                 return;
             }
-            if (isRollingMode() && !!isClosedEnrollmentInput?.checked && classId) {
+            if (!classFormTemplateMode && isRollingMode() && !!isClosedEnrollmentInput?.checked && classId) {
                 try {
                     const openRows = await findOpenPeriodsForClosedClassCheck();
                     if (openRows.length) {
@@ -4049,7 +4159,9 @@ form.addEventListener('submit', async (e) => {
             }
 
             // Pre-flight Conflict Check
-            const check = await executeConflictCheck();
+            const check = classFormTemplateMode
+                ? { checkFailed: false, hasConflicts: false, hasWarnings: false }
+                : await executeConflictCheck();
             if (check.checkFailed) {
                 const failMsg = check.message || 'Unable to validate schedule conflicts. Please try again.';
                 if (typeof showMessageModal === 'function') {
@@ -4146,7 +4258,7 @@ form.addEventListener('submit', async (e) => {
             params.append('postingTemplates', hidPostingTemplates.value || '[]');
             params.append('billingMode', hidBillingMode?.value || 'chargeable');
             
-            params.append('instructors', JSON.stringify(getInstructorRowsForSubmit()));
+            params.append('instructors', classFormTemplateMode ? '[]' : JSON.stringify(getInstructorRowsForSubmit()));
             
             const dEnrlSubmit = { ...enrollmentState };
             dEnrlSubmit.maxCapacity = parseInt(document.getElementById('inp_capacity').value) || 30;
@@ -4167,9 +4279,14 @@ form.addEventListener('submit', async (e) => {
             params.append('enabledAttendanceStatuses', hidEnabledAttendanceStatuses?.value || JSON.stringify(ALL_ATTENDANCE_STATUSES_ORDERED));
             
             // Append sessions payload directly from JS memory
-            const submitSessionsPayload = buildSessionsPayloadForValidation();
+            const submitSessionsPayload = classFormTemplateMode ? [] : buildSessionsPayloadForValidation();
             params.append('sessions', JSON.stringify(submitSessionsPayload));
             params.append('actionStateId', document.getElementById('hid_actionStateId')?.value || '');
+            if (classFormTemplateMode) {
+                params.append('code', String(document.querySelector('input[name="code"]')?.value || '').trim());
+                params.append('name', String(document.querySelector('input[name="name"]')?.value || '').trim());
+                params.append('templateStatus', String(document.querySelector('select[name="templateStatus"]')?.value || 'draft').trim());
+            }
 
             const response = await fetch(form.action, {
                 method: 'POST', 
@@ -4205,7 +4322,7 @@ form.addEventListener('submit', async (e) => {
             if (typeof showMessageModal === 'function') {
                 await showMessageModal({ title: 'Success', icon: 'success', message: result.message, buttons: [{ text: 'OK', class: 'btn-success' }] });
             }
-            window.location.href = '/school/classes';
+            window.location.href = classFormTemplateMode ? '/school/class-templates' : '/school/classes';
 
         } catch (error) {
             console.error('Submission Error:', error);
@@ -4223,9 +4340,10 @@ form.addEventListener('submit', async (e) => {
     // Modals & Batch Logic
     const modalEl = document.getElementById('singleSessionModal');
     let sessionModal;
-    if (typeof bootstrap !== 'undefined') { sessionModal = new bootstrap.Modal(modalEl); }
-    
-    document.getElementById('btn_saveSingleSession').addEventListener('click', async () => {
+    if (modalEl && typeof bootstrap !== 'undefined') { sessionModal = new bootstrap.Modal(modalEl); }
+
+    const btnSaveSingleSession = document.getElementById('btn_saveSingleSession');
+    if (btnSaveSingleSession) btnSaveSingleSession.addEventListener('click', async () => {
         const date = document.getElementById('mod_date').value;
         const sTime = document.getElementById('mod_startTime').value;
         const eTime = document.getElementById('mod_endTime').value;
@@ -4261,7 +4379,8 @@ form.addEventListener('submit', async (e) => {
         if (sessionModal) sessionModal.hide();
     });
 
-    document.getElementById('btn_generateBatch').addEventListener('click', async () => {
+    const btnGenerateBatch = document.getElementById('btn_generateBatch');
+    if (btnGenerateBatch) btnGenerateBatch.addEventListener('click', async () => {
         const start = document.getElementById('bg_start').value;
         const end = document.getElementById('bg_end').value;
         const sTime = document.getElementById('bg_start_time').value;
@@ -5286,7 +5405,9 @@ if (bulkClearCoTeachersBtn) {
     }
 
     // Initial Render
-    renderSessions();
+    if (!classFormTemplateMode) {
+        renderSessions();
+    }
 });
 </script>
 <style>
