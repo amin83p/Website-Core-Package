@@ -43,7 +43,7 @@ test('renderTemplate leaves unknown placeholders literal', () => {
   assert.equal(out, 'Hi Ada {{UNKNOWN_TOKEN}}');
 });
 
-test('session_without_book_report default mentions book covering not session completion', async () => {
+test('session_without_book_report default mentions book coverage not session completion', async () => {
   const preview = await composeService.buildEmailPreview({
     rule: { ruleType: 'session_without_book_report', label: 'Book reports' },
     recipientPersonId: 'T1',
@@ -51,10 +51,10 @@ test('session_without_book_report default mentions book covering not session com
     orgName: 'Demo School',
     baseUrl: 'https://school.example'
   });
-  assert.match(preview.plainText, /book covering/i);
+  assert.match(preview.plainText, /book coverage/i);
   assert.match(preview.plainText, /Add Book Report/i);
   assert.doesNotMatch(preview.plainText, /require review and completion/i);
-  assert.match(preview.htmlBody, /Book covering reminder/);
+  assert.match(preview.htmlBody, /Book coverage reminder/);
 });
 
 test('session_not_final default uses uncompleted session completion copy', async () => {
@@ -117,7 +117,7 @@ test('buildBatchPreview delegates to compose service for book report rules', asy
     orgName: 'Demo School',
     baseUrl: 'https://school.example'
   });
-  assert.match(preview.plainText, /submitted book covering report/i);
+  assert.match(preview.plainText, /submitted book coverage report/i);
 });
 
 test('rule form includes email template fields', () => {

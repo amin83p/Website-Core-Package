@@ -357,7 +357,7 @@ test('book covering report form uses multi-step wizard with covers and overall n
   assert.match(view, /overallReportNotes/);
   assert.match(view, /coverPhotoUrl/);
   assert.match(view, /max-width: 1400px/);
-  assert.match(view, /Book Covering Report/);
+  assert.match(view, /Book Coverage Report/);
   assert.match(view, /covering-wizard-section/);
   assert.match(view, /Class & session/);
   assert.match(view, /Reporting period/);

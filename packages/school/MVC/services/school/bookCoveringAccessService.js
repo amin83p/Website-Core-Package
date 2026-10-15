@@ -14,7 +14,7 @@ const accessService = requireCoreModule('MVC/services/security/index');
 
 const BOOK_COVERING_SECTION = SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING;
 
-function createDeniedError(message = 'You do not have access to this book covering report.', statusCode = 403) {
+function createDeniedError(message = 'You do not have access to this book coverage report.', statusCode = 403) {
   const error = new Error(message);
   error.statusCode = statusCode;
   return error;
@@ -124,25 +124,25 @@ function resolveScopedTeacherIdForCreate(req, accessContext = null) {
 function assertCanReadReport(req, report, accessContext = null, capabilities = null) {
   const resolvedCapabilities = capabilities || null;
   if (resolvedCapabilities && !hasViewCapability(resolvedCapabilities)) {
-    throw createDeniedError('You do not have permission to view book covering reports.');
+    throw createDeniedError('You do not have permission to view book coverage reports.');
   }
   const access = resolveAccessFromRequest(req, accessContext);
   if (canAccessReport(report, access)) return access;
-  throw createDeniedError('You do not have permission to view this book covering report.');
+  throw createDeniedError('You do not have permission to view this book coverage report.');
 }
 
 function assertCanMutateReport(req, report, accessContext = null, capabilities = null) {
   if (capabilities && !capabilities?.canUpdate) {
-    throw createDeniedError('You do not have permission to modify book covering reports.');
+    throw createDeniedError('You do not have permission to modify book coverage reports.');
   }
   const access = resolveAccessFromRequest(req, accessContext);
   if (canAccessReport(report, access)) return access;
-  throw createDeniedError('You do not have permission to modify this book covering report.');
+  throw createDeniedError('You do not have permission to modify this book coverage report.');
 }
 
 function assertCanDeleteReport(req, report, accessContext = null, capabilities = null) {
   if (capabilities && !capabilities?.canDelete) {
-    throw createDeniedError('You do not have permission to delete book covering reports.');
+    throw createDeniedError('You do not have permission to delete book coverage reports.');
   }
   return assertCanMutateReport(req, report, accessContext, null);
 }
@@ -152,10 +152,10 @@ function assertCanCreateForTeacher(req, teacherId, accessContext = null) {
   if (isOrgWideAccess(access)) return access;
   const scopedTeacherId = resolveScopedTeacherIdForCreate(req, accessContext);
   if (!scopedTeacherId) {
-    throw createDeniedError('You do not have permission to create book covering reports for this teacher.');
+    throw createDeniedError('You do not have permission to create book coverage reports for this teacher.');
   }
   if (!idsEqual(teacherId, scopedTeacherId)) {
-    throw createDeniedError('You can only create book covering reports for yourself.');
+    throw createDeniedError('You can only create book coverage reports for yourself.');
   }
   return access;
 }

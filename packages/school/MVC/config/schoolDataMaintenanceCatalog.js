@@ -89,7 +89,7 @@ const SCHOOL_DATA_MAINTENANCE_CATALOG = Object.freeze([
   { entityType: 'libraryLoans', label: 'Library Loans', group: 'library', collectionName: 'schoolLibraryLoans', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: false },
   { entityType: 'libraryLocations', label: 'Library Locations', group: 'library', collectionName: 'schoolLibraryLocations', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
   { entityType: 'bookAssignments', label: 'Book Assignments', group: 'library', collectionName: 'schoolBookAssignments', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
-  { entityType: 'bookCoveringReports', label: 'Book Covering Reports', group: 'library', collectionName: 'schoolBookCoveringReports', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
+  { entityType: 'bookCoveringReports', label: 'Book Coverage Reports', group: 'library', collectionName: 'schoolBookCoveringReports', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
   { entityType: 'classes', label: 'Classes', group: 'academics', collectionName: 'schoolClasses', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: false, cascadeClassSessionAssets: true },
   { entityType: 'classSessions', label: 'Class Sessions', group: 'academics', collectionName: 'schoolClassSessions', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'classSessions' },
   { entityType: 'holidays', label: 'Holidays', group: 'academics', collectionName: 'schoolHolidays', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: false },

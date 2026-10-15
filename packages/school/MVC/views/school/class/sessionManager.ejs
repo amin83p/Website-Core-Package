@@ -2365,8 +2365,8 @@
                 </button>
                 <% if (canViewBookCoveringReport && isInstructionalInactive !== true) { %>
                 <button type="button" class="session-manager-nav-item" data-session-panel="book-covering" role="tab" aria-selected="false">
-                    <i class="bi bi-journal-richtext fs-5"></i><span class="session-manager-nav-label">Book covering</span>
-                    <span id="sessionBookCoveringNavBadge" class="badge rounded-pill session-nav-badge <%= sessionBookCoveringSummary?.status === 'submitted' ? 'bg-success' : 'bg-danger' %><%= hasSessionBookCoveringReport ? '' : ' d-none' %>" aria-hidden="<%= hasSessionBookCoveringReport ? 'false' : 'true' %>" title="<%= sessionBookCoveringSummary?.status === 'submitted' ? 'Book covering report submitted' : (hasSessionBookCoveringReport ? 'Book covering report draft' : 'Book covering report') %>"><%= hasSessionBookCoveringReport ? 'BR' : '' %></span>
+                    <i class="bi bi-journal-richtext fs-5"></i><span class="session-manager-nav-label">Book coverage</span>
+                    <span id="sessionBookCoveringNavBadge" class="badge rounded-pill session-nav-badge <%= sessionBookCoveringSummary?.status === 'submitted' ? 'bg-success' : 'bg-danger' %><%= hasSessionBookCoveringReport ? '' : ' d-none' %>" aria-hidden="<%= hasSessionBookCoveringReport ? 'false' : 'true' %>" title="<%= sessionBookCoveringSummary?.status === 'submitted' ? 'Book coverage report submitted' : (hasSessionBookCoveringReport ? 'Book coverage report draft' : 'Book coverage report') %>"><%= hasSessionBookCoveringReport ? 'BR' : '' %></span>
                 </button>
                 <% } %>
                 <% if (typeof studentCaseCapabilities !== 'undefined' && studentCaseCapabilities && studentCaseCapabilities.canRead) { %>
@@ -3024,7 +3024,7 @@
                 <div class="card border-0 shadow-sm mb-3" id="sessionBookCoveringCard">
                     <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
                         <div>
-                            <h5 class="m-0 fw-bold text-primary"><i class="bi bi-journal-richtext me-2"></i>Book covering</h5>
+                            <h5 class="m-0 fw-bold text-primary"><i class="bi bi-journal-richtext me-2"></i>Book coverage</h5>
                             <div class="small text-muted mt-1">Report daily book coverage for assigned class books.</div>
                         </div>
                         <div class="d-flex flex-wrap align-items-center gap-2">
@@ -3063,7 +3063,7 @@
                             <div class="small text-muted mt-2"><%= sessionBookCoveringSummary.notesPreview %></div>
                             <% } %>
                             <% } else { %>
-                            <div class="text-muted small" id="sessionBookCoveringSummaryEmpty">No book covering report for this session yet. Use Add Book Report to record coverage.</div>
+                            <div class="text-muted small" id="sessionBookCoveringSummaryEmpty">No book coverage report for this session yet. Use Add Book Report to record coverage.</div>
                             <% } %>
                         </div>
                         <div class="table-responsive">
@@ -7248,12 +7248,12 @@ document.addEventListener('DOMContentLoaded', () => {
         badge.classList.add(submitted ? 'bg-success' : 'bg-danger');
         badge.textContent = 'BR';
         badge.setAttribute('aria-hidden', 'false');
-        badge.title = submitted ? 'Book covering report submitted' : 'Book covering report draft';
+        badge.title = submitted ? 'Book coverage report submitted' : 'Book coverage report draft';
     }
 
     function renderSessionBookCoveringMetaHtml(summary) {
         if (!summary || !summary.id) {
-            return '<div class="text-muted small" id="sessionBookCoveringSummaryEmpty">No book covering report for this session yet. Use Add Book Report to record coverage.</div>';
+            return '<div class="text-muted small" id="sessionBookCoveringSummaryEmpty">No book coverage report for this session yet. Use Add Book Report to record coverage.</div>';
         }
         const submitted = String(summary.status || '').trim().toLowerCase() === 'submitted';
         const statusLabel = summary.statusLabel || (submitted ? 'Submitted' : 'Draft');
@@ -7392,12 +7392,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function deleteSessionBookCoveringReport(reportId) {
         const id = String(reportId || '').trim();
-        if (!id) throw new Error('Book covering report id is required.');
+        if (!id) throw new Error('Book coverage report id is required.');
         const confirmed = await sessionConfirmBox({
-            title: 'Delete Book Covering Report',
+            title: 'Delete Book Coverage Report',
             icon: 'warning',
             html: true,
-            message: '<p class="mb-0">Permanently delete this book covering report? This action cannot be undone.</p>',
+            message: '<p class="mb-0">Permanently delete this book coverage report? This action cannot be undone.</p>',
             confirmText: 'Delete',
             confirmClass: 'btn-danger'
         });
@@ -7414,9 +7414,9 @@ document.addEventListener('DOMContentLoaded', () => {
             body: JSON.stringify({ actionStateId })
         });
         const result = await res.json().catch(() => ({ status: 'error', message: 'Unable to read server response.' }));
-        if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Could not delete book covering report.');
+        if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Could not delete book coverage report.');
         applySessionBookCoveringSummary(null);
-        await showStudentCaseMessage('Report Deleted', result.message || 'Book covering report deleted.', 'success');
+        await showStudentCaseMessage('Report Deleted', result.message || 'Book coverage report deleted.', 'success');
     }
 
     async function refreshSessionBookCoveringSummary() {
@@ -7458,7 +7458,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 body
             });
             const result = await res.json().catch(() => ({ status: 'error', message: 'Unable to read server response.' }));
-            if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Could not create book covering report.');
+            if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Could not create book coverage report.');
             if (result.summary) {
                 applySessionBookCoveringSummary(result.summary);
             }
@@ -7467,9 +7467,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 openBookCoveringReportInNewTab(editUrl);
                 return;
             }
-            await showStudentCaseMessage('Report Created', result.message || 'Book covering report draft created.', 'success');
+            await showStudentCaseMessage('Report Created', result.message || 'Book coverage report draft created.', 'success');
         } catch (error) {
-            await showStudentCaseMessage('Report Failed', error.message || 'Could not create book covering report.', 'error');
+            await showStudentCaseMessage('Report Failed', error.message || 'Could not create book coverage report.', 'error');
         } finally {
             if (button) {
                 button.disabled = false;

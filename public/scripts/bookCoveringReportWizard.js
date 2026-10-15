@@ -25,7 +25,7 @@
     if (typeof window.showMessageModal === 'function') {
       return window.showMessageModal(payload);
     }
-    console.warn('showMessageModal unavailable for book covering wizard.', payload);
+    console.warn('showMessageModal unavailable for book coverage wizard.', payload);
     return Promise.resolve(false);
   }
 

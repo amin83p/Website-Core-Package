@@ -156,14 +156,14 @@ This table answers whether Manage Session reuses another section's access or inh
 | **Report instance list** | Partial — list route uses `SCHOOL_SESSIONS` | `GET .../report-instances` → `READ_ALL` | Yes | N/A | Rows filtered server-side |
 | **Assign report to session** | **Yes** — `SCHOOL_REPORTS_ASSIGNMENT` | `POST .../report-assignments` → `CREATE` | Yes (controller asserts session scope) | N/A | `canAssignSessionReports` |
 | **Fill / open report instance** | **Yes** — destination report routes | Manage Session links to report hub / instance routes (`SCHOOL_REPORTS_INSTANCES` and participant rules) | Session context preserved in URLs | Conduct may block fill | Row visibility + conduct gates |
-| **Book covering report** | **Yes** — `SCHOOL_LIBRARY_BOOK_COVERING` | READ/CREATE/DELETE on session book-covering routes | Yes | N/A | `canViewBookCoveringReport`, `canCreateBookCoveringReport`, `canDeleteBookCoveringReport` |
+| **Book coverage report** | **Yes** — `SCHOOL_LIBRARY_BOOK_COVERING` | READ/CREATE/DELETE on session book-covering routes | Yes | N/A | `canViewBookCoveringReport`, `canCreateBookCoveringReport`, `canDeleteBookCoveringReport` |
 | **Class conduct (before reports)** | No — `SCHOOL_SESSIONS` | `POST .../conduct` → `UPDATE` | Yes | `completedSessionConductEdit`; override: class admin | `canManageClassConduct`, `conductEditLocked` |
 | **Gradebook / activities panel** | **No** — not `SCHOOL_GRADEBOOK` | `SCHOOL_SESSIONS` `UPDATE` (`POST .../save` or `.../gradebooks/save`) | Yes | `completedSessionGradebookEdit`; override: class admin | `gradebookSectionReadOnly`, `sessionGradebookSectionReadOnly` |
 | **Grades Matrix link** | **Yes** — `SCHOOL_GRADEBOOK` | Destination `/school/grades-matrix/*` | N/A (separate page) | N/A | Link shown without gate; destination enforces access |
 | **Activity work sessions** | **No** on Manage Session | `SCHOOL_ACTIVITIES` applies to Activity Work Session Manager, not this panel | N/A | N/A | N/A |
 | **Curriculum / skills covered** | No — `SCHOOL_SESSIONS` | `SCHOOL_SESSIONS` `UPDATE` | Yes | `completedSessionCurriculumEdit`; override: class admin | `curriculumEditLocked` |
 
-**Core pattern:** instructional data on the page is **`SCHOOL_SESSIONS` + session editor scope**. Dedicated sections are added only where the product exposes a separately cataloged capability (cases, report assignment, book covering, external matrix tools).
+**Core pattern:** instructional data on the page is **`SCHOOL_SESSIONS` + session editor scope**. Dedicated sections are added only where the product exposes a separately cataloged capability (cases, report assignment, book coverage, external matrix tools).
 
 ## Attendance
 
@@ -264,7 +264,7 @@ Reports on Manage Session involve **multiple sections** and **row-level visibili
 
 Manage Session links into report instance routes (Report Hub / `reportRoutes.js`). Those destinations enforce **`SCHOOL_REPORTS_INSTANCES`** and participant access rules. The list endpoint on Manage Session does not substitute for fill authorization.
 
-### Book covering
+### Book coverage
 
 | Action | Section | Operation |
 | --- | --- | --- |
@@ -367,7 +367,7 @@ Mutating routes use `trackActionState` with section-appropriate tokens. Session 
 | `studentCaseCapabilities` | `sessionStudentCaseAccessService` | Tab visibility, create/update/delete/resolve |
 | `canAssignSessionReports` | `SCHOOL_REPORTS_ASSIGNMENT` CREATE evaluation | Assign Report button |
 | `canOpenAttendanceMatrix` | `userCanOpenAttendanceMatrix` | Attendance Matrix link |
-| `canViewBookCoveringReport` | Book covering read/create evaluation | Book covering nav and panel |
+| `canViewBookCoveringReport` | Book coverage read/create evaluation | Book coverage nav and panel |
 | `canManageClassConduct` | Class admin or session editor | Conduct editing |
 
 JavaScript mirrors several flags (`sessionGradebookSectionReadOnly`, `canCreateStudentCases`, and so on) for dynamic behavior. Always validate on the server for mutations.

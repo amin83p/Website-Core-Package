@@ -101,7 +101,7 @@ function buildDefaultTemplates(ruleType = '') {
       bodyText: [
         'Hi {{TEACHER_NAME}},',
         '',
-        'The following session(s) are missing a submitted book covering report. Open each session, go to the Book covering tab, and use Add Book Report to record coverage for the class book.',
+        'The following session(s) are missing a submitted book coverage report. Open each session, go to the Book coverage tab, and use Add Book Report to record coverage for the class book.',
         '',
         '{{SESSION_LIST}}',
         '',
@@ -110,11 +110,11 @@ function buildDefaultTemplates(ruleType = '') {
       ].join('\n'),
       bodyHtml: [
         '<p style="margin:0 0 14px;">Hi {{TEACHER_NAME}},</p>',
-        `<p style="margin:0 0 16px;color:${NEWS_MUTED};">The following session(s) are missing a submitted book covering report. Open each session, go to the <strong>Book covering</strong> tab, and use <strong>Add Book Report</strong> to record coverage for the class book.</p>`,
+        `<p style="margin:0 0 16px;color:${NEWS_MUTED};">The following session(s) are missing a submitted book coverage report. Open each session, go to the <strong>Book coverage</strong> tab, and use <strong>Add Book Report</strong> to record coverage for the class book.</p>`,
         '{{SESSION_LIST_HTML}}',
         `<p style="margin:20px 0 0;color:${NEWS_MUTED};">Thank you,<br><strong style="color:${NEWS_INK};">{{ORG_NAME}}</strong></p>`
       ].join(''),
-      emailTitle: 'Book covering reminder',
+      emailTitle: 'Book coverage reminder',
       eyebrow: 'School notification',
       smsText: sms,
       useUncompletedBuilder: false

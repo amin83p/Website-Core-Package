@@ -5024,12 +5024,12 @@ async function deleteBookCoveringForSession(req, res) {
         assertSessionScopeForRequest(req, classData, session);
 
         const report = await schoolDataService.getDataById('bookCoveringReports', reportId, req.user, accessContext);
-        if (!report) throw new Error('Book covering report not found.');
+        if (!report) throw new Error('Book coverage report not found.');
         if (!idsEqual(report.classId, classId)) {
-            throw new Error('Book covering report does not belong to this class.');
+            throw new Error('Book coverage report does not belong to this class.');
         }
         if (String(report.sessionId || '').trim() && !idsEqual(report.sessionId, sessionId)) {
-            throw new Error('Book covering report is not linked to this session.');
+            throw new Error('Book coverage report is not linked to this session.');
         }
         bookCoveringAccessService.assertCanMutateReport(req, report, accessContext);
 
@@ -5037,7 +5037,7 @@ async function deleteBookCoveringForSession(req, res) {
 
         return res.json({
             status: 'success',
-            message: 'Book covering report deleted.',
+            message: 'Book coverage report deleted.',
             summary: null,
             actionStateId: req.actionStateId
         });
@@ -5071,7 +5071,7 @@ async function createBookCoveringForSession(req, res) {
 
         return res.json({
             status: 'success',
-            message: result.message || 'Book covering report draft created.',
+            message: result.message || 'Book coverage report draft created.',
             reportId: result.report?.id || '',
             editUrl: result.editUrl || '',
             summary,

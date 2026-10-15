@@ -93,18 +93,19 @@
           </td>
           <td><span class="badge <%= item.active ? 'bg-success' : 'bg-danger' %>"><%= item.active ? 'Active' : 'Inactive' %></span></td>
           <td class="table-actions text-end pe-4">
-            <% if (typeof canCreateBooks === 'undefined' || canCreateBooks !== false) { %>
             <div class="row-actions-wrap">
               <button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="<%= item.id %>" title="Book actions">
                 <i class="bi bi-three-dots-vertical"></i>
               </button>
               <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
+                <button type="button" class="btn btn-outline-secondary btn-sm js-book-preview" data-book-id="<%= item.id %>" data-book-title='<%- JSON.stringify(item.title || "") %>'><i class="bi bi-list-nested me-2"></i>View contents &amp; resources</button>
+                <% if (typeof canCreateBooks === 'undefined' || canCreateBooks !== false) { %>
                 <a href="/school/library/books/edit/<%= item.id %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a>
                 <a href="/school/library/books/new?copyFrom=<%= encodeURIComponent(item.id) %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-copy me-2"></i>Copy to new book</a>
                 <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= item.id %>"><i class="bi bi-trash me-2"></i>Delete</button>
+                <% } %>
               </div>
             </div>
-            <% } %>
           </td>
         </tr>
       <% }) %>
@@ -117,5 +118,8 @@
   filters,
   baseUrlPath: newUrl
 }) %>
+
+<%- include('school/book/partials/bookPreviewModal') %>
+<script src="/scripts/schoolBookPreviewModal.js"></script>
 
 <%- include('partials/tablePages-end') %>

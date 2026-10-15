@@ -21,7 +21,7 @@ const SESSION_DATE_RANGE_TYPES = Object.freeze([
 ]);
 
 const NOTIFICATION_RULE_TYPE_LABELS = Object.freeze({
-  session_without_book_report: 'Sessions without Book Reports',
+  session_without_book_report: 'Sessions without Book Coverage Reports',
   session_without_notes: 'Sessions without Notes',
   session_with_cases: 'Sessions with Cases',
   session_with_activities: 'Sessions with Activities'

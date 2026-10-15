@@ -192,7 +192,7 @@ function inspectExternalSessionActivity({
   const bookCoveringReport = prefetched.bookCoveringReport;
 
   if (bookCoveringReport) {
-    blockers.push(buildActivityBlocker(ACTIVITY_BLOCKER_CODES.BOOK_COVERING_REPORT, 'Book covering report'));
+    blockers.push(buildActivityBlocker(ACTIVITY_BLOCKER_CODES.BOOK_COVERING_REPORT, 'Book coverage report'));
   }
 
   const matchedAssignments = assignments.filter((row) => (

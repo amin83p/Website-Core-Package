@@ -355,7 +355,7 @@ def build_presentation(manifest: dict) -> Presentation:
             "Class Conduct — if your school requires it",
             "Session & notes — what happened today",
             "Curriculum — Covered content (what you taught)",
-            "Reports, Book covering, Student Cases — if you see them",
+            "Reports, Book coverage, Student Cases — if you see them",
         ],
         width=5.6,
         size=17,

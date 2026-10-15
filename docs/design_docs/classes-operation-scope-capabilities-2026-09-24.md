@@ -93,7 +93,7 @@ Each row answers: *Given `SCHOOL_CLASSES` access at this scope, what class-manag
 | Rolling enrollment (`/school/classes/:id/rolling-enrollment`, enrollment APIs) | `SCHOOL_ROLLING_ENROLLMENT` | Often paired with `SCHOOL_CLASSES` UPDATE on session-append APIs. |
 | Cycle rollover, delete preparation, cycle links | `SCHOOL_CLASS_CYCLES` | — |
 | Final grades (`/school/classes/:id/final-grades`) | OR: `SCHOOL_GRADEBOOK`, `SCHOOL_DEPARTMENTS`, `SCHOOL_CLASSES` | READ_ALL / UPDATE per workflow. |
-| Session student cases, reports, book covering (embedded) | `SCHOOL_SESSION_STUDENT_CASES`, report sections, `SCHOOL_LIBRARY_BOOK_COVERING` | — |
+| Session student cases, reports, book coverage (embedded) | `SCHOOL_SESSION_STUDENT_CASES`, report sections, `SCHOOL_LIBRARY_BOOK_COVERING` | — |
 
 ---
 

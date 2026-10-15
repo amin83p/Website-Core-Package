@@ -1,0 +1,106 @@
+<div class="modal fade" id="schoolBookPreviewModal" tabindex="-1" aria-labelledby="schoolBookPreviewModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header border-bottom">
+        <div>
+          <h5 class="modal-title fw-bold mb-0" id="schoolBookPreviewModalTitle"><i class="bi bi-list-nested me-2 text-primary"></i>Book contents</h5>
+          <div class="small text-muted mt-1 d-none" id="schoolBookPreviewModalSubtitle"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="schoolBookPreviewLoading" class="text-center text-muted py-5 d-none">
+          <div class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div>
+          Loading book details…
+        </div>
+        <div id="schoolBookPreviewError" class="alert alert-danger border d-none" role="alert"></div>
+        <div id="schoolBookPreviewContent" class="d-none">
+          <div id="schoolBookPreviewResources" class="d-flex flex-wrap gap-2 mb-3 d-none"></div>
+          <div class="table-responsive border rounded" style="max-height:  min(60vh, 480px);">
+            <table class="table table-sm table-hover align-middle mb-0 book-preview-toc-table" id="schoolBookPreviewTocTable">
+              <thead class="table-light sticky-top">
+                <tr>
+                  <th class="ps-3">Table of contents</th>
+                  <th class="text-end pe-3" style="width: 7.5rem;">Pages</th>
+                </tr>
+              </thead>
+              <tbody id="schoolBookPreviewTocBody"></tbody>
+            </table>
+          </div>
+          <div id="schoolBookPreviewTocEmpty" class="text-center text-muted small py-4 d-none">No table of contents entries for this book.</div>
+        </div>
+      </div>
+      <div class="modal-footer border-top">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .book-preview-toc-table tbody tr {
+    border-left: 3px solid transparent;
+  }
+  .book-preview-toc-table .book-preview-toc-heading-cell {
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+  }
+  .book-preview-toc-table .book-preview-toc-pages {
+    font-variant-numeric: tabular-nums;
+    color: #64748b;
+    font-size: 0.8125rem;
+    white-space: nowrap;
+  }
+  .book-preview-toc-row--level-1 {
+    border-left-color: var(--bs-primary, #0d6efd) !important;
+  }
+  .book-preview-toc-row--level-1 .book-preview-toc-heading {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+    letter-spacing: -0.01em;
+  }
+  .book-preview-toc-row--level-1 .book-preview-toc-heading-cell {
+    padding-top: 0.65rem;
+  }
+  .book-preview-toc-row--level-2 {
+    border-left-color: rgba(13, 110, 253, 0.45) !important;
+  }
+  .book-preview-toc-row--level-2 .book-preview-toc-heading {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: #1e293b;
+    padding-left: 0.75rem;
+  }
+  .book-preview-toc-row--level-3 .book-preview-toc-heading {
+    font-size: 0.875rem;
+    font-weight: 600;
+    color: #334155;
+    padding-left: 1.5rem;
+  }
+  .book-preview-toc-row--level-4 .book-preview-toc-heading {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #475569;
+    padding-left: 2.25rem;
+  }
+  .book-preview-toc-row--level-5 .book-preview-toc-heading {
+    font-size: 0.8125rem;
+    font-weight: 500;
+    color: #64748b;
+    padding-left: 3rem;
+  }
+  .book-preview-toc-row--level-6 .book-preview-toc-heading {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #64748b;
+    padding-left: 3.75rem;
+  }
+  .book-preview-toc-row--level-2 + .book-preview-toc-row--level-1,
+  .book-preview-toc-row--level-3 + .book-preview-toc-row--level-1,
+  .book-preview-toc-row--level-4 + .book-preview-toc-row--level-1,
+  .book-preview-toc-row--level-5 + .book-preview-toc-row--level-1,
+  .book-preview-toc-row--level-6 + .book-preview-toc-row--level-1 {
+    border-top: 1px solid #e2e8f0;
+  }
+</style>

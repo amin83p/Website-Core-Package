@@ -42,6 +42,8 @@ test('book routes register list and CRUD handlers', () => {
   assert.match(source, /ctrl\.listBooks/);
   assert.match(source, /ctrl\.saveBook/);
   assert.match(source, /ctrl\.deleteBook/);
+  assert.match(source, /\/api\/preview\/:id/);
+  assert.match(source, /ctrl\.getBookPreview/);
 });
 
 test('book controller exports list and form handlers', () => {
@@ -52,6 +54,7 @@ test('book controller exports list and form handlers', () => {
   assert.equal(typeof bookController.uploadCoverPhoto, 'function');
   assert.equal(typeof bookController.uploadDigitalPdf, 'function');
   assert.equal(typeof bookController.getBookTemplate, 'function');
+  assert.equal(typeof bookController.getBookPreview, 'function');
   assert.equal(typeof bookController.deleteBook, 'function');
 });
 
@@ -61,6 +64,15 @@ test('book list view includes table conventions', () => {
   assert.match(source, /tableName/);
   assert.match(source, /school\/library\/books/);
   assert.match(source, /No books found/);
+});
+
+test('book list view wires preview modal and menu action', () => {
+  const source = fs.readFileSync(BOOK_LIST_VIEW, 'utf8');
+  assert.match(source, /js-book-preview/);
+  assert.match(source, /View contents/);
+  assert.match(source, /bookPreviewModal/);
+  assert.match(source, /schoolBookPreviewModal\.js/);
+  assert.match(source, /canCreateBooks/);
 });
 
 test('book form view includes TOC editor and AJAX save', () => {
@@ -358,4 +370,30 @@ test('bookModel resolves public URL from stored path when url is missing', () =>
   });
   assert.ok(enriched);
   assert.match(enriched.url, /\/uploads\//);
+});
+
+test('buildBookPreviewResponse enriches PDF and sorts TOC without persisting', () => {
+  const preview = bookController._test.buildBookPreviewResponse({
+    id: 'BK-1',
+    title: 'Preview Book',
+    totalPages: 100,
+    thirdPartyDigitalUrl: 'https://publisher.example/book',
+    digitalPdf: {
+      fileName: 'book.pdf',
+      originalName: 'Textbook.pdf',
+      path: 'uploads/ORG_1/school/books/BK-1/pdf/book.pdf'
+    },
+    tableOfContents: [
+      { level: 2, label: 'Unit B', startPage: 10, endPage: 20, sortOrder: 2 },
+      { level: 1, label: 'Unit A', startPage: 1, endPage: 9, sortOrder: 1 }
+    ]
+  });
+  assert.equal(preview.id, 'BK-1');
+  assert.equal(preview.title, 'Preview Book');
+  assert.equal(preview.thirdPartyDigitalUrl, 'https://publisher.example/book');
+  assert.ok(preview.digitalPdf?.url);
+  assert.equal(preview.digitalPdf.fileName, 'Textbook.pdf');
+  assert.equal(preview.tableOfContents.length, 2);
+  assert.equal(preview.tableOfContents[0].label, 'Unit A');
+  assert.equal(preview.tableOfContents[1].label, 'Unit B');
 });

@@ -376,6 +376,54 @@ exports.getBookTemplate = async (req, res) => {
   }
 };
 
+function buildBookPreviewResponse(row = {}) {
+  const enrichedPdf = bookModel.enrichBookFileAsset(row.digitalPdf);
+  const pdfUrl = String(enrichedPdf?.url || enrichedPdf?.path || '').trim();
+  const toc = Array.isArray(row.tableOfContents) ? row.tableOfContents : [];
+  const tableOfContents = [...toc]
+    .sort((a, b) => Number(a?.sortOrder || 0) - Number(b?.sortOrder || 0))
+    .map((entry) => ({
+      level: Number(entry?.level) || 1,
+      label: String(entry?.label || '').trim(),
+      startPage: entry?.startPage,
+      endPage: entry?.endPage,
+      sortOrder: Number(entry?.sortOrder || 0)
+    }));
+  return {
+    id: String(row.id || '').trim(),
+    title: String(row.title || '').trim(),
+    subtitle: String(row.subtitle || '').trim(),
+    totalPages: row.totalPages === null || row.totalPages === undefined || row.totalPages === ''
+      ? null
+      : Number(row.totalPages),
+    tableOfContents,
+    thirdPartyDigitalUrl: String(row.thirdPartyDigitalUrl || '').trim(),
+    digitalPdf: pdfUrl
+      ? {
+        url: pdfUrl,
+        fileName: String(enrichedPdf?.originalName || enrichedPdf?.fileName || 'book.pdf').trim() || 'book.pdf'
+      }
+      : null
+  };
+}
+
+exports.getBookPreview = async (req, res) => {
+  try {
+    const orgId = getActiveOrgIdOrThrow(req.user);
+    const bookId = String(req.params.id || '').trim();
+    if (!bookId) throw new Error('Book id is required.');
+    const row = await schoolDataService.getDataById('books', bookId, req.user);
+    if (!row) throw new Error('Book not found.');
+    assertOrgAccess(row, orgId);
+    return res.json({
+      status: 'success',
+      book: buildBookPreviewResponse(row)
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+};
+
 exports.saveBook = async (req, res) => {
   let guardKey = '';
   try {
@@ -519,5 +567,6 @@ exports.deleteBook = async (req, res) => {
 exports._test = {
   buildPayload,
   buildBookFileFromUpload,
-  bookAssetNeedsRelocation
+  bookAssetNeedsRelocation,
+  buildBookPreviewResponse
 };

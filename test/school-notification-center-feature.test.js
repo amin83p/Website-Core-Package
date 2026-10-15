@@ -161,5 +161,5 @@ test('School notification centre routes, services, repositories, and views are w
   assert.match(registry, /session_with_cases/);
   assert.match(registry, /session_with_activities/);
   assert.match(registry, /timesheet_not_submitted/);
-  assert.match(ruleModel, /Sessions without Book Reports/);
+  assert.match(ruleModel, /Sessions without Book Coverage Reports/);
 });

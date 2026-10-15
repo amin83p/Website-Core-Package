@@ -1,0 +1,462 @@
+PREFACE|Preface|12
+CH|1|PRESENT TIME|1
+1-1|Simple present and present progressive|1
+1-2|Forms of the simple present|1
+1-3|Forms of the simple present|2
+1-4|The simple present|2
+1-5|The simple present|3
+1-6|Forms of the present progressive|3
+1-7|The present progressive|4
+1-8|The simple present and the present progressive|4
+1-9|Present verbs: questions|5
+1-10|Present verbs: questions|5
+1-11|The simple present and the present progressive|5
+1-12|Singular/plural|6
+1-13|Final -s / -es|6
+1-14|Spelling of final -s / -es|7
+1-15|Simple present: final -s / -es|7
+1-16|Frequency adverbs|8
+1-17|Frequency adverbs|8
+1-18|Reading comprehension|9
+1-19|Verbs not usually in the progressive|9
+1-20|Simple present and present progressive|10
+1-21|Simple present and present progressive|10
+1-22|Present verbs: questions and short answers|11
+1-23|Check your knowledge|11
+1-24|Present time|12
+1-25|Crossword puzzle|13
+CH|2|PAST TIME|14
+2-1|Expressing past time: regular verbs|14
+2-2|Simple present and simple past|14
+2-3|Expressing past time|15
+2-4|Expressing past time: yes / no questions|15
+2-5|Expressing past time: yes / no questions|16
+2-6|Expressing past time: yes / no questions|16
+2-7|Simple past: yes / no questions|17
+2-8|Spelling of irregular verbs|18
+2-9|Word search puzzle|18
+2-10|Common irregular verbs|18
+2-11|Common irregular verbs|19
+2-12|Expressing the past|19
+2-13|Spelling of -ing and -ed forms|20
+2-14|Spelling of -ing forms|21
+2-15|Spelling of -ing forms|21
+2-16|Spelling of -ing and -ed forms|22
+2-17|Spelling of -ing and -ed forms|22
+2-18|Present and past negatives|23
+2-19|Review: simple present, present progressive, and simple past forms|24
+2-20|Past progressive|24
+2-21|Past progressive|25
+2-22|Simple past and past progressive|25
+2-23|Simple past and past progressive|26
+2-24|Simple past and past progressive|26
+2-25|Expressing past time: using time clauses|27
+2-26|Expressing past habit: used to|27
+2-27|Past verbs|28
+2-28|Check your knowledge|29
+2-29|Past time|29
+2-30|Past time|30
+CH|3|FUTURE TIME|31
+3-1|Expressing future time: be going to and will|31
+3-2|Forms with be going to|31
+3-3|Will and be going to|32
+3-4|Will|32
+3-5|Questions with will and be going to|32
+3-6|Forms with will|33
+3-7|Present, past, and future|33
+3-8|Forms with will and contractions|34
+3-9|Forms with will and be going to|35
+3-10|Be going to vs. will|35
+3-11|Be going to vs. will|36
+3-12|Be going to vs. will|37
+3-13|Be going to vs. will|37
+3-14|Will probably|38
+3-15|Certainty about the future|39
+3-16|Certainty about the future|39
+3-17|Past and future time clauses|40
+3-18|Future time clauses|40
+3-19|If-clauses|41
+3-20|Future time clauses and if-clauses|41
+3-21|Future time clauses|42
+3-22|Future time clauses and if-clauses|42
+3-23|Review: past and future|43
+3-24|Using be going to and the present progressive to express future time|44
+3-25|Using the present progressive to express future time|44
+3-26|Using the present progressive to express future time|45
+3-27|Using the present progressive to express future time|45
+3-28|Using the simple present to express future time|46
+3-29|Using be about to|47
+3-30|Parallel verbs|47
+3-31|Check your knowledge|47
+3-32|Verb tense review|48
+3-33|Crossword puzzle|50
+CH|4|PRESENT PERFECT AND PAST PERFECT|51
+4-1|Past participles|51
+4-2|Review: irregular verbs|51
+4-3|Present perfect: unspecified time with ever and never|52
+4-4|Present perfect: unspecified time with ever and never|53
+4-5|Present perfect: unspecified time with already and yet|54
+4-6|Present perfect: unspecified time with already and yet|54
+4-7|Present perfect: unspecified time with already, yet, just, and recently|55
+4-8|Present perfect with since and for|55
+4-9|Present perfect with since and for|56
+4-10|Present perfect with since and for|56
+4-11|Present perfect: review|57
+4-12|Present perfect: review|57
+4-13|Simple past vs. present perfect|58
+4-14|Present perfect and simple past with time words|58
+4-15|Simple past vs. present perfect|58
+4-16|Simple past vs. present perfect|59
+4-17|Present perfect progressive|59
+4-18|Present perfect progressive vs. present perfect|60
+4-19|Present progressive, present perfect progressive, and the present perfect|60
+4-20|Present perfect progressive vs. present perfect|61
+4-21|Verb tense review|61
+4-22|Past perfect|62
+4-23|Past perfect|63
+4-24|Past perfect|63
+4-25|Time expressions|64
+4-26|Verb tense review|64
+4-27|Check your knowledge|64
+4-28|Word search puzzle|65
+CH|5|ASKING QUESTIONS|66
+5-1|Yes / no questions|66
+5-2|Yes / no questions and short answers|67
+5-3|Yes / no questions and short answers|67
+5-4|Yes / no questions|68
+5-5|Short answers for yes / no questions|69
+5-6|Forming information questions|69
+5-7|Yes / no and information questions|70
+5-8|Where, When, What time, Why, How come, What ... for|70
+5-9|Why, How come, and What ... for|71
+5-10|Where, Why, When, and What time|71
+5-11|Yes / no and information questions|72
+5-12|Yes / no and information questions|73
+5-13|Who, Who(m), and What|74
+5-14|Who, Who(m), and What|75
+5-15|Who, Who(m), and What|76
+5-16|Who, Who(m), and What|76
+5-17|Asking for the meaning of a word|76
+5-18|What + a form of do|77
+5-19|Using which and what|77
+5-20|Using What kind of|78
+5-21|Using How|79
+5-22|Using How often / How many times|79
+5-23|Asking about distance|80
+5-24|Using How far, It + take, and How long|80
+5-25|Using How often, How far, and How long|81
+5-26|More questions with How|82
+5-27|Using How about and What about|82
+5-28|Review of questions|83
+5-29|Review of questions|84
+5-30|Tag questions|85
+5-31|Tag questions|85
+5-32|Forming questions|86
+5-33|Check your knowledge|87
+5-34|Crossword puzzle|88
+CH|6|NOUNS AND PRONOUNS|89
+6-1|Forms of nouns|89
+6-2|Forms of nouns|89
+6-3|Forms of nouns|89
+6-4|Forms of nouns|90
+6-5|Subjects, verbs, and objects|90
+6-6|Subjects, verbs, and objects|91
+6-7|Subjects, verbs, and objects|91
+6-8|Objects of prepositions|92
+6-9|Objects of prepositions|92
+6-10|Prepositions|92
+6-11|Objects of prepositions|93
+6-12|Prepositions of time|94
+6-13|Prepositions of time|94
+6-14|Word order: place and time|94
+6-15|Word order: place and time|95
+6-16|Subject-verb agreement|95
+6-17|Subject-verb agreement|96
+6-18|Adjectives|96
+6-19|Adjectives|96
+6-20|Using nouns as adjectives|97
+6-21|Using nouns as adjectives|97
+6-22|Review: adjectives|98
+6-23|Review: nouns|98
+6-24|Personal pronouns: subjects and objects|99
+6-25|Personal pronouns: subjects and objects|99
+6-26|Personal pronouns: subjects and objects|100
+6-27|Personal pronouns|101
+6-28|Possessive nouns|101
+6-29|Possessive nouns|102
+6-30|Possessive nouns|102
+6-31|Using whose|102
+6-32|Using whose|103
+6-33|Possessive pronouns vs. possessive adjectives|103
+6-34|Possessive pronouns vs. possessive adjectives|104
+6-35|Reflexive pronouns|104
+6-36|Reflexive pronouns|105
+6-37|Review: pronouns and possessive adjectives|105
+6-38|Review: pronouns and possessive adjectives|106
+6-39|Singular forms of other: another vs. the other|107
+6-40|Singular forms of other: another vs. the other|107
+6-41|Plural forms of other: other(s) vs. the other(s)|108
+6-42|Summary: forms of other|108
+6-43|Nouns and pronouns|109
+6-44|Check your knowledge|109
+6-45|Word search puzzle|110
+CH|7|MODAL AUXILIARIES|111
+7-1|Introduction to modal auxiliaries|111
+7-2|Expressing ability: can, could, be able to|111
+7-3|Expressing ability|112
+7-4|Expressing possibility and permission|112
+7-5|Expressing possibility|113
+7-6|Expressing ability and possibility|113
+7-7|Meanings of could|114
+7-8|Polite requests: May I, Could I, Can I|114
+7-9|Polite requests|115
+7-10|Polite requests|115
+7-11|Expressing advice|116
+7-12|Expressing advice|116
+7-13|Expressing advice|117
+7-14|Expressing necessity|117
+7-15|Necessity: must, have to, have got to|118
+7-16|Necessity: must, have to, have got to|118
+7-17|Expressing necessity|119
+7-18|Expressing lack of necessity and prohibition|119
+7-19|Expressing necessity, lack of necessity, and prohibition|120
+7-20|Logical conclusions|121
+7-21|Logical conclusion or necessity|121
+7-22|Tag questions with modal auxiliaries|121
+7-23|Giving instructions: imperative sentences|122
+7-24|Let's and Why don't|122
+7-25|Stating preferences|123
+7-26|Stating preferences|124
+7-27|Modal auxiliaries|124
+7-28|Check your knowledge|125
+7-29|Crossword puzzle|126
+CH|8|CONNECTING IDEAS|127
+8-1|Connecting ideas with and|127
+8-2|Punctuating sentences|127
+8-3|Punctuating items connected with and|128
+8-4|Punctuating sentences|128
+8-5|Connecting ideas with and|128
+8-6|Using but and or|129
+8-7|Using and, but, or, and so|129
+8-8|Connecting ideas with so|130
+8-9|Using and, but, or, and so|130
+8-10|Using and, but, or, and so|131
+8-11|Using and, but, or, and so|131
+8-12|Using auxiliary verbs after but|131
+8-13|Using and + too, so, either, neither|132
+8-14|Using and + too, so, either, neither|132
+8-15|Using and + too, so, either, neither|132
+8-16|Auxiliary verbs after but and and|133
+8-17|Connecting ideas with because|133
+8-18|Connecting ideas with because|134
+8-19|Using so or because|134
+8-20|Connecting ideas with even though / although|135
+8-21|Using because and even though|135
+8-22|Using because and even though|136
+8-23|Using because and although|136
+8-24|Using even though / although and because|137
+8-25|Check your knowledge|138
+8-26|Word search puzzle|139
+CH|9|COMPARISONS|140
+9-1|Comparative forms|140
+9-2|Comparative forms|140
+9-3|Comparative forms|141
+9-4|Superlative forms|141
+9-5|Comparatives and superlatives|141
+9-6|Comparative and superlative forms|142
+9-7|Completing comparisons with pronouns|142
+9-8|Completing superlatives|143
+9-9|Comparative adjectives and adverbs|144
+9-10|Farther and Further|145
+9-11|Repeating a comparative|145
+9-12|Double comparatives|146
+9-13|Double comparatives|146
+9-14|Modifying comparatives with adjectives and adverbs|146
+9-15|Negative comparisons|147
+9-16|Using ever and never in comparisons|148
+9-17|As . . . as|148
+9-18|As . . . as|149
+9-19|As . . . as|149
+9-20|As . . . as|151
+9-21|Not as . . . as and less . . . than|152
+9-22|Using more with nouns|152
+9-23|Using more with adjectives, adverbs, and nouns|153
+9-24|Review of comparatives and superlatives|154
+9-25|Review of comparatives and superlatives|154
+9-26|Like, alike|155
+9-27|The same, similar, different|155
+9-28|Like, alike, similar, different|156
+9-29|The same, similar, different, like, alike|156
+9-30|Check your knowledge|157
+9-31|Crossword puzzle|158
+CH|10|THE PASSIVE|159
+10-1|Active vs. passive|159
+10-2|Active vs. passive|159
+10-3|Review of past participles|160
+10-4|Forming the passive|160
+10-5|Forming the passive|160
+10-6|Tense forms of the passive|161
+10-7|Passive vs. active meaning|162
+10-8|Passive to active|163
+10-9|Progressive forms of the passive|163
+10-10|Progressive forms of the passive|164
+10-11|Passive questions|165
+10-12|Transitive vs. intransitive|165
+10-13|Active and passive|166
+10-14|Review: identifying passives with transitive and intransitive verbs|166
+10-15|The by-phrase|166
+10-16|Active to passive|167
+10-17|Review: active vs. passive|168
+10-18|Meaning of passive verbs|168
+10-19|Review: active vs. passive|169
+10-20|Passive modals|169
+10-21|Passive modals|170
+10-22|Summary: active vs. passive|171
+10-23|Using past participles as adjectives|171
+10-24|Using past participles as adjectives|172
+10-25|-ed vs. -ing|172
+10-26|-ed vs. -ing|173
+10-27|-ed vs. -ing|173
+10-28|-ed vs. -ing|174
+10-29|Get + adjective and past participle|174
+10-30|Get + adjective and past participle|175
+10-31|Be used / accustomed to|175
+10-32|Used to vs. be used to|176
+10-33|Used to vs. be used to|176
+10-34|Be supposed to|176
+10-35|Check your knowledge|177
+10-36|Active and passive verbs|177
+CH|11|COUNT/NONCOUNT NOUNS AND ARTICLES|178
+11-1|A vs. an: singular count nouns|178
+11-2|Count and noncount nouns|178
+11-3|Noncount nouns|179
+11-4|More noncount nouns|179
+11-5|Count and noncount nouns|179
+11-6|Count and noncount nouns|180
+11-7|Count and noncount nouns|180
+11-8|Count and noncount nouns|181
+11-9|Count and noncount nouns|181
+11-10|Many vs. much|181
+11-11|How many and how much|182
+11-12|Review: count and noncount nouns|182
+11-13|A few vs. a little|183
+11-14|Count and noncount nouns: summary|183
+11-15|Count and noncount nouns|184
+11-16|Nouns that can be count or noncount|185
+11-17|Units of measure with noncount nouns|185
+11-18|Units of measure with noncount nouns|185
+11-19|Much vs. many|186
+11-20|Specific vs. non-specific nouns|186
+11-21|A / an vs. some|187
+11-22|A / an vs. the: singular count nouns|187
+11-23|Using the for second mention|188
+11-24|Using the for second mention|189
+11-25|Summary: A / an vs. the vs. Ø|190
+11-26|Using the or Ø with names|190
+11-27|Using the or Ø with names|191
+11-28|Capitalization|192
+11-29|Check your knowledge|192
+11-30|Crossword puzzle|193
+CH|12|ADJECTIVE CLAUSES|194
+12-1|Adjective clauses: introduction|194
+12-2|Using who and that in adjective clauses to describe people|194
+12-3|Using who and that in adjective clauses to describe people|195
+12-4|Using who and that in adjective clauses to describe people|195
+12-5|Using who and that in adjective clauses to describe people|196
+12-6|Using object pronouns in adjective clauses to describe people|196
+12-7|Using who and that in adjective clauses|197
+12-8|Using object pronouns in adjective clauses to describe people|197
+12-9|Using object pronouns in adjective clauses to describe people|198
+12-10|Who vs. that|198
+12-11|Using pronouns in adjective clauses to describe things|199
+12-12|Using pronouns in adjective clauses to describe things|199
+12-13|Adjective clauses|199
+12-14|Pronouns in adjective clauses|200
+12-15|Singular and plural verbs in adjective clauses|201
+12-16|Prepositions in adjective clauses|201
+12-17|Prepositions in adjective clauses|202
+12-18|Prepositions in adjective clauses|202
+12-19|Adjective clauses with whose|203
+12-20|Adjective clauses with whose|203
+12-21|Meaning of adjective clauses|204
+12-22|Adjective clauses|204
+12-23|Reading|205
+12-24|Check your knowledge|206
+12-25|Word search puzzle|206
+CH|13|GERUNDS AND INFINITIVES|207
+13-1|Verb + gerund|207
+13-2|Go + gerund|207
+13-3|Identifying gerunds and infinitives|208
+13-4|Verb + gerund or infinitive|208
+13-5|Verb + gerund or infinitive|209
+13-6|Verb + gerund or infinitive|210
+13-7|Gerunds and infinitives|211
+13-8|Preposition + gerund|211
+13-9|Preposition + gerund|212
+13-10|Review|213
+13-11|Review|214
+13-12|Review|214
+13-13|By + gerund|215
+13-14|By + gerund|215
+13-15|By vs. with|216
+13-16|Gerund as subject; It + infinitive|216
+13-17|Purpose: to vs. for|216
+13-18|Purpose: to vs. for|217
+13-19|Purpose: to vs. for|217
+13-20|(In order) to|217
+13-21|Too vs. enough|218
+13-22|Too vs. enough|218
+13-23|Gerund vs. infinitive|219
+13-24|Check your knowledge|219
+13-25|Gerunds and infinitives|220
+13-26|Crossword puzzle|221
+CH|14|NOUN CLAUSES|222
+14-1|Noun clauses: introduction|222
+14-2|Questions vs. noun clauses|222
+14-3|Noun clauses that begin with a question word|223
+14-4|Noun clauses that begin with a question word|223
+14-5|Information questions and noun clauses|224
+14-6|Noun clauses|225
+14-7|Noun clauses|225
+14-8|Noun clauses|226
+14-9|Noun clauses that begin with if or whether|226
+14-10|Noun clauses|227
+14-11|Noun clauses with questions|227
+14-12|That-clauses|228
+14-13|That-clauses|228
+14-14|That-clauses|229
+14-15|Substituting so for a that-clause|229
+14-16|Quoted speech|230
+14-17|Quoted speech words|230
+14-18|Reported speech: changing pronouns and possessive words|230
+14-19|Verb forms in reported speech|231
+14-20|Verb forms in reported speech|232
+14-21|Reporting questions|232
+14-22|Quoting questions|233
+14-23|Reported speech|233
+14-24|Reporting questions|234
+14-25|Reported speech to direct speech|234
+14-26|Say vs. tell vs. ask|235
+14-27|Reported speech|235
+14-28|Reported speech|236
+14-29|Reported speech|237
+14-30|Check your knowledge|238
+14-31|Word search puzzle|239
+SPECIAL|Special Workbook Section|240
+A1-1|Group A, Phrasal Verbs (separable)|240
+A1-2|Group B, Phrasal Verbs (nonseparable)|242
+A1-3|Group C, Phrasal Verbs (separable)|243
+A1-4|Group D, Phrasal Verbs (separable)|245
+A1-5|Group E, Phrasal Verbs (separable)|248
+A1-6|Group F, Phrasal Verbs (intransitive)|249
+A1-7|Group G, Phrasal Verbs (three-word)|251
+A1-8|Group H, Phrasal Verbs (three-word)|252
+A2-1|Preposition Combinations, Group A|254
+A2-2|Preposition Combinations, Group B|255
+A2-3|Preposition Combinations, Group C|257
+A2-4|Preposition Combinations, Group D|258
+A2-5|Preposition Combinations, Group E|260
+A2-6|Preposition Combinations, Group F|261
+A2-7|Preposition Combinations, Group G|263
+INDEX|Index|265
+ANSWER|Answer Key|271

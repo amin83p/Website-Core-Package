@@ -255,7 +255,7 @@ function normalizeStoredReport(row = {}) {
 
 function sanitizeInput(input, { isUpdate = false } = {}) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) {
-    throw new Error('Invalid book covering report payload.');
+    throw new Error('Invalid book coverage report payload.');
   }
   const orgId = cleanId(input.orgId, { max: 64, allowEmpty: false });
   const classId = cleanId(input.classId, { max: 80, allowEmpty: false });
@@ -381,7 +381,7 @@ async function updateBookCoveringReport(id, payload) {
   return queueWrite(async () => {
     const rows = await getAllBookCoveringReports();
     const index = rows.findIndex((row) => String(row.id) === String(id));
-    if (index < 0) throw new Error('Book covering report not found.');
+    if (index < 0) throw new Error('Book coverage report not found.');
     const current = rows[index];
     const sanitized = sanitizeInput({
       ...current,
@@ -404,7 +404,7 @@ async function deleteBookCoveringReport(id) {
   return queueWrite(async () => {
     const rows = await getAllBookCoveringReports();
     const index = rows.findIndex((row) => String(row.id) === String(id));
-    if (index < 0) throw new Error('Book covering report not found.');
+    if (index < 0) throw new Error('Book coverage report not found.');
     const removed = rows[index];
     rows.splice(index, 1);
     await fs.writeFile(dataPath, JSON.stringify(rows, null, 2));

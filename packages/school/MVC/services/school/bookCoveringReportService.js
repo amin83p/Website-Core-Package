@@ -86,7 +86,7 @@ async function findDuplicateReport({
 async function assertNoDuplicateReport(options) {
   const duplicate = await findDuplicateReport(options);
   if (duplicate) {
-    throw new Error('A covering report already exists for this class, teacher, and period.');
+    throw new Error('A book coverage report already exists for this class, teacher, and period.');
   }
 }
 
@@ -397,7 +397,7 @@ async function createReport(payload, reqUser, accessContext = {}) {
 
 async function updateReport(id, payload, reqUser, accessContext = {}) {
   const existing = await schoolDataService.getDataById('bookCoveringReports', id, reqUser, accessContext);
-  if (!existing) throw new Error('Book covering report not found.');
+  if (!existing) throw new Error('Book coverage report not found.');
   await assertReportEditable(existing, reqUser);
 
   const orgId = existing.orgId;
@@ -448,7 +448,7 @@ async function updateReport(id, payload, reqUser, accessContext = {}) {
 
 async function submitReport(id, reqUser, accessContext = {}) {
   const existing = await schoolDataService.getDataById('bookCoveringReports', id, reqUser, accessContext);
-  if (!existing) throw new Error('Book covering report not found.');
+  if (!existing) throw new Error('Book coverage report not found.');
   if (String(existing.status) === REPORT_STATUSES.SUBMITTED) return existing;
   await assertReportEditable(existing, reqUser);
   return updateReport(id, { status: REPORT_STATUSES.SUBMITTED }, reqUser, accessContext);
@@ -468,7 +468,7 @@ async function createDraftForSession({
   if (!sessionDate) throw new Error('Session date is required.');
 
   const teacherId = resolveTeacherId(session, classData);
-  if (!teacherId) throw new Error('The session needs an assigned teacher before creating a book covering report.');
+  if (!teacherId) throw new Error('The session needs an assigned teacher before creating a book coverage report.');
 
   const orgId = clean(classData.orgId || reqUser?.activeOrgId);
   const classId = clean(classData.id);
@@ -507,8 +507,8 @@ async function createDraftForSession({
       editUrl: `/school/library/book-covering/edit/${existing.id}`,
       alreadyExists: true,
       message: status === REPORT_STATUSES.SUBMITTED
-        ? 'Opening your submitted book covering report.'
-        : 'Opening your book covering report draft.'
+        ? 'Opening your submitted book coverage report.'
+        : 'Opening your book coverage report draft.'
     };
   }
 
@@ -532,7 +532,7 @@ async function createDraftForSession({
   return {
     report,
     editUrl: `/school/library/book-covering/edit/${report.id}`,
-    message: 'Book covering report draft created for this session.'
+    message: 'Book coverage report draft created for this session.'
   };
 }
 
@@ -557,9 +557,9 @@ async function enrichReports(rows, reqUser, accessContext = {}) {
 
 async function deleteReport(id, reqUser, accessContext = {}) {
   const reportId = clean(id);
-  if (!reportId) throw new Error('Book covering report id is required.');
+  if (!reportId) throw new Error('Book coverage report id is required.');
   const existing = await schoolDataService.getDataById('bookCoveringReports', reportId, reqUser, accessContext);
-  if (!existing) throw new Error('Book covering report not found.');
+  if (!existing) throw new Error('Book coverage report not found.');
   await schoolDataService.deleteData('bookCoveringReports', reportId, reqUser, buildWriteOptions(accessContext));
   return existing;
 }
@@ -675,7 +675,7 @@ async function removeSessionReportEntry({
   const token = clean(bookId);
   if (!token) throw new Error('Book id is required.');
   const report = await findReportForSession({ classData, session, reqUser, accessContext });
-  if (!report) throw new Error('Book covering report not found for this session.');
+  if (!report) throw new Error('Book coverage report not found for this session.');
   await assertReportEditable(report, reqUser);
 
   const entries = (Array.isArray(report.entries) ? report.entries : [])

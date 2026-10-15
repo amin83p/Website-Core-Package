@@ -35,7 +35,7 @@
     </thead>
     <tbody>
       <% if (!data || data.length === 0) { %>
-        <tr><td colspan="6" class="text-center py-5 text-muted">No book covering reports found.</td></tr>
+        <tr><td colspan="6" class="text-center py-5 text-muted">No book coverage reports found.</td></tr>
       <% } %>
       <% (data || []).forEach((item) => { %>
         <tr>
@@ -49,7 +49,7 @@
           <td><span class="badge <%= item.status === 'submitted' ? 'bg-success' : 'bg-warning text-dark' %>"><%= item.status %></span></td>
           <td class="table-actions text-end pe-4">
             <div class="row-actions-wrap">
-              <button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="<%= item.id %>" title="Book covering report actions">
+              <button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="<%= item.id %>" title="Book coverage report actions">
                 <i class="bi bi-three-dots-vertical"></i>
               </button>
               <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
@@ -71,9 +71,9 @@
   async function confirmBookCoveringDelete() {
     if (typeof window.showMessageModal === 'function') {
       const result = await window.showMessageModal({
-        title: 'Delete Book Covering Report',
+        title: 'Delete Book Coverage Report',
         icon: 'warning',
-        message: 'Delete this book covering report permanently? This cannot be undone.',
+        message: 'Delete this book coverage report permanently? This cannot be undone.',
         buttons: [
           { text: 'Cancel', class: 'btn-secondary' },
           { text: 'Delete', class: 'btn-danger' }
@@ -81,7 +81,7 @@
       });
       return result === 'Delete';
     }
-    return window.confirm('Delete this book covering report permanently? This cannot be undone.');
+    return window.confirm('Delete this book coverage report permanently? This cannot be undone.');
   }
 
   document.addEventListener('click', async (event) => {

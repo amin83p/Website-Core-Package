@@ -81,6 +81,11 @@ router.get('/api/template/:id',
   trackActionState(SECTIONS.SCHOOL_BOOKS, OPERATIONS.READ_ALL),
   ctrl.getBookTemplate);
 
+router.get('/api/preview/:id',
+  requireAccess(SECTIONS.SCHOOL_BOOKS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_BOOKS, OPERATIONS.READ_ALL),
+  ctrl.getBookPreview);
+
 router.get('/',  requireAccess(SECTIONS.SCHOOL_BOOKS, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_BOOKS, OPERATIONS.READ_ALL),
   ctrl.listBooks);
