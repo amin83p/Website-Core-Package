@@ -622,8 +622,8 @@
   .school-master-hub .hub-weekly-reports-teacher-cell {
     vertical-align: top;
     border-right: 1px solid rgba(15, 23, 42, 0.1);
-    width: var(--hub-wr-teacher-col-width, 17.5rem);
-    min-width: var(--hub-wr-teacher-col-width, 17.5rem);
+    width: var(--hub-wr-teacher-col-width, 15rem);
+    min-width: var(--hub-wr-teacher-col-width, 15rem);
     max-width: none;
     padding: 0.75rem 0.85rem !important;
     box-sizing: border-box;
@@ -952,11 +952,57 @@
 
   .school-master-hub .hub-weekly-reports-data-table {
     --hub-wr-table-border: #e2e8f0;
-    --hub-wr-class-col-width: 9.25rem;
-    --hub-wr-teacher-col-width: 17.5rem;
+    --hub-wr-class-col-width: 11rem;
+    --hub-wr-teacher-col-width: 15rem;
+    --hub-wr-metric-col-width: 2.65rem;
+    --hub-wr-metric-col-width-attendance: 3.15rem;
     width: max-content;
     min-width: 100%;
     margin-bottom: 0;
+  }
+
+  .school-master-hub .hub-weekly-reports-data-table :is(
+    th.hub-wr-col-sessions,
+    th.hub-wr-col-book,
+    th.hub-wr-col-gradebooks,
+    th.hub-wr-col-notes,
+    th.hub-wr-col-reports,
+    th.hub-wr-col-cases,
+    th.hub-wr-col-hours,
+    td.hub-wr-col-sessions,
+    td.hub-wr-col-book,
+    td.hub-wr-col-gradebooks,
+    td.hub-wr-col-notes,
+    td.hub-wr-col-reports,
+    td.hub-wr-col-cases,
+    td.hub-wr-col-hours
+  ) {
+    width: var(--hub-wr-metric-col-width);
+    min-width: var(--hub-wr-metric-col-width);
+    max-width: var(--hub-wr-metric-col-width);
+    padding-left: 0.3rem;
+    padding-right: 0.3rem;
+    box-sizing: border-box;
+  }
+
+  .school-master-hub .hub-weekly-reports-data-table :is(
+    th.hub-wr-col-attendance,
+    td.hub-wr-col-attendance
+  ) {
+    width: var(--hub-wr-metric-col-width-attendance);
+    min-width: var(--hub-wr-metric-col-width-attendance);
+    max-width: var(--hub-wr-metric-col-width-attendance);
+    padding-left: 0.3rem;
+    padding-right: 0.3rem;
+    box-sizing: border-box;
+  }
+
+  .school-master-hub .hub-weekly-reports-data-table .hub-weekly-reports-metric-cell {
+    min-width: var(--hub-wr-metric-col-width);
+  }
+
+  .school-master-hub .hub-weekly-reports-data-table .hub-weekly-reports-metric-cell.hub-wr-col-attendance {
+    min-width: var(--hub-wr-metric-col-width-attendance);
   }
 
   .school-master-hub .hub-weekly-reports-data-table col.hub-wr-col-teacher-col {
@@ -3134,7 +3180,7 @@
   let activeWeeklyReportsClassTipTrigger = null;
   let hubWeeklyReportsClassTipWindowEventsBound = false;
   const HUB_WR_CLASS_COL_WIDTH_STORAGE_KEY = 'hubWeeklyReports.classColumnWidthPx';
-  const HUB_WR_CLASS_COL_DEFAULT_PX = 148;
+  const HUB_WR_CLASS_COL_DEFAULT_PX = 176;
   const HUB_WR_CLASS_COL_MIN_PX = 72;
   const HUB_WR_CLASS_COL_MAX_PX = 360;
   const HUB_WEEKLY_REPORTS_DEPARTMENT_COLORS = [
@@ -7280,8 +7326,6 @@
     if (endEl) endEl.addEventListener('change', snapHubWeeklyReportsDateInputs);
 
     bindWeeklyReportsFilterCollapse();
-    const workspaceCard = els.workspace && els.workspace.querySelector('.hub-workspace-card');
-    if (workspaceCard) bindWeeklyReportsSharePrintControls(workspaceCard);
   }
 
   function renderWeeklyReportsWorkspace(payload) {
@@ -7302,7 +7346,6 @@
       '<div class="text-uppercase text-muted small fw-bold">Report Hub Section</div>',
       '<h2 class="h5 mb-0"><i class="' + escapeHtml(section.icon || 'bi bi-calendar-week') + ' me-2"></i>' + escapeHtml(section.label || 'Weekly Reports') + '</h2>',
       '</div>',
-      renderWeeklyReportsSharePrintButtons({ requireLoaded: false }),
       '</div>',
       '<div class="p-3 border-bottom bg-white hub-no-print">',
       '<div class="card border shadow-sm mb-0">',
