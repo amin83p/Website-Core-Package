@@ -96,6 +96,57 @@
                 btn.classList.toggle('active', chip === normalized);
             });
         }
+
+        function readScheduleStageLimitMode() {
+            const modalEl = getScheduleStageModalEl();
+            const through = modalEl?.querySelector('#sessionEnrollmentStageLimitModeThroughDate');
+            if (through?.checked) return 'throughDate';
+            return 'count';
+        }
+
+        function readScheduleStageThroughDate() {
+            const modalEl = getScheduleStageModalEl();
+            const raw = String(modalEl?.querySelector('#sessionEnrollmentStageThroughDate')?.value || '').trim();
+            return deps.scheduleCalendarCore?.normalizeDateOnly
+                ? deps.scheduleCalendarCore.normalizeDateOnly(raw)
+                : raw;
+        }
+
+        function estimateDefaultScheduleStageThroughDate(anchorDate, count = 4) {
+            const anchor = deps.scheduleCalendarCore?.normalizeDateOnly
+                ? deps.scheduleCalendarCore.normalizeDateOnly(anchorDate)
+                : String(anchorDate || '').trim();
+            if (!anchor || !deps.scheduleCalendarCore?.addDaysIso) return '';
+            const weeksSpan = Math.max(2, Math.ceil(Number(count) || 4) / 2) + 1;
+            return deps.scheduleCalendarCore.addDaysIso(anchor, weeksSpan * 7 + 14);
+        }
+
+        function syncScheduleStageLimitModeUi(limitMode) {
+            const modalEl = getScheduleStageModalEl();
+            if (!modalEl) return;
+            const mode = limitMode === 'throughDate' ? 'throughDate' : 'count';
+            const countRadio = modalEl.querySelector('#sessionEnrollmentStageLimitModeCount');
+            const throughRadio = modalEl.querySelector('#sessionEnrollmentStageLimitModeThroughDate');
+            if (countRadio) countRadio.checked = mode === 'count';
+            if (throughRadio) throughRadio.checked = mode === 'throughDate';
+            modalEl.classList.toggle('is-stage-limit-through-date', mode === 'throughDate');
+            if (mode === 'throughDate') {
+                const throughInput = modalEl.querySelector('#sessionEnrollmentStageThroughDate');
+                const anchor = deps.scheduleCalendarCore?.normalizeDateOnly
+                    ? deps.scheduleCalendarCore.normalizeDateOnly(scheduleStageContext?.date || '')
+                    : String(scheduleStageContext?.date || '').trim();
+                if (throughInput && anchor && !String(throughInput.value || '').trim()) {
+                    throughInput.value = estimateDefaultScheduleStageThroughDate(anchor, readScheduleStageSessionCount());
+                }
+                if (throughInput && anchor) {
+                    throughInput.min = anchor;
+                }
+            }
+        }
+
+        function setScheduleStageLimitMode(limitMode) {
+            syncScheduleStageLimitModeUi(limitMode);
+        }
     
         function formatScheduleClassPickerMode(mode) {
             const raw = String(mode || '').trim().toLowerCase();
@@ -250,11 +301,15 @@
             });
             const count = readScheduleStageSessionCount();
             const skipHolidays = Boolean(modalEl?.querySelector('#sessionEnrollmentStageSkipHolidays')?.checked);
+            const limitMode = readScheduleStageLimitMode();
+            const throughDate = readScheduleStageThroughDate();
             return {
                 durationHours,
                 weekdays: deps.scheduleCalendarCore?.normalizeWeekdays ? deps.scheduleCalendarCore.normalizeWeekdays(weekdays) : weekdays,
                 count,
-                skipHolidays
+                skipHolidays,
+                limitMode,
+                throughDate
             };
         }
     
@@ -705,6 +760,19 @@
                 if (typeof deps.uiAlert === 'function') deps.uiAlert('Select at least one weekday.', 'Stage Sessions', { icon: 'info' });
                 return;
             }
+            const anchorDate = deps.scheduleCalendarCore?.normalizeDateOnly
+                ? deps.scheduleCalendarCore.normalizeDateOnly(scheduleStageContext.date)
+                : String(scheduleStageContext.date || '').trim();
+            if (form.limitMode === 'throughDate') {
+                if (!form.throughDate) {
+                    if (typeof deps.uiAlert === 'function') deps.uiAlert('Choose a through date.', 'Stage Sessions', { icon: 'info' });
+                    return;
+                }
+                if (form.throughDate < anchorDate) {
+                    if (typeof deps.uiAlert === 'function') deps.uiAlert('Through date must be on or after the slot date.', 'Stage Sessions', { icon: 'info' });
+                    return;
+                }
+            }
             const editAttemptId = String(scheduleStageEditAttemptId || '').trim();
             if (editAttemptId) {
                 const person = deps.activeSchedulePerson();
@@ -717,10 +785,13 @@
             }
             try {
                 const count = readScheduleStageSessionCount();
-                const projectedEnd = deps.scheduleCalendarCore.addDaysIso(
-                    scheduleStageContext.date,
-                    Math.max(2, Math.ceil(count / 2) + 1) * 7 + 14
-                );
+                const limitMode = form.limitMode === 'throughDate' ? 'throughDate' : 'count';
+                const projectedEnd = limitMode === 'throughDate'
+                    ? form.throughDate
+                    : deps.scheduleCalendarCore.addDaysIso(
+                        scheduleStageContext.date,
+                        Math.max(2, Math.ceil(count / 2) + 1) * 7 + 14
+                    );
                 let blockedDates = [];
                 if (form.skipHolidays && window.SessionEnrollmentCalendarModal?.collectHolidayDatesForRange) {
                     blockedDates = await window.SessionEnrollmentCalendarModal.collectHolidayDatesForRange(
@@ -729,12 +800,12 @@
                     );
                 }
                 const person = deps.activeSchedulePerson();
-                const result = deps.scheduleCalendarCore.generateRotatingWeekdaySessions({
+                const genOptions = {
                     anchorDate: scheduleStageContext.date,
                     startTime: scheduleStageContext.startTime24,
                     durationHours: form.durationHours,
                     weekdays: form.weekdays,
-                    count,
+                    limitMode,
                     enrollmentStart: scheduleStageContext.date,
                     enrollmentEnd: projectedEnd,
                     blockedDates,
@@ -743,10 +814,15 @@
                         teacherId: person?.id || '',
                         teacherName: person?.name || ''
                     }
-                });
+                };
+                if (limitMode === 'count') genOptions.count = count;
+                const result = deps.scheduleCalendarCore.generateRotatingWeekdaySessions(genOptions);
                 if (!result.sessions.length) {
                     if (typeof deps.uiAlert === 'function') {
-                        deps.uiAlert('No sessions could be generated. Adjust weekdays, count, or holiday settings.', 'Stage Sessions', { icon: 'warning' });
+                        const hint = limitMode === 'throughDate'
+                            ? 'No sessions could be generated. Adjust weekdays, through date, or holiday settings.'
+                            : 'No sessions could be generated. Adjust weekdays, count, or holiday settings.';
+                        deps.uiAlert(hint, 'Stage Sessions', { icon: 'warning' });
                     }
                     return;
                 }
@@ -762,7 +838,9 @@
                 const stageParams = {
                     durationHours: form.durationHours,
                     weekdays: form.weekdays,
-                    count,
+                    limitMode,
+                    count: limitMode === 'count' ? count : undefined,
+                    throughDate: limitMode === 'throughDate' ? form.throughDate : undefined,
                     skipHolidays: form.skipHolidays,
                     anchorDate: scheduleStageContext.date,
                     startTime: scheduleStageContext.startTime24
@@ -849,6 +927,9 @@
                 btn.classList.toggle('active', SCHEDULE_STAGE_DEFAULT_WEEKDAYS.includes(dow));
             });
             syncScheduleStageCountDisplay(4);
+            setScheduleStageLimitMode('count');
+            const throughInput = modalEl?.querySelector('#sessionEnrollmentStageThroughDate');
+            if (throughInput) throughInput.value = '';
             const skipEl = modalEl?.querySelector('#sessionEnrollmentStageSkipHolidays');
             if (skipEl) skipEl.checked = true;
             const holidayHint = modalEl?.querySelector('#sessionEnrollmentStageHolidayHint');
@@ -928,6 +1009,17 @@
                     const chip = Number(btn.getAttribute('data-stage-count'));
                     btn.classList.toggle('active', chip === Math.round(parsed));
                 });
+            });
+
+            modalEl.querySelector('#sessionEnrollmentStageLimitModeCount')?.addEventListener('change', () => {
+                if (modalEl.querySelector('#sessionEnrollmentStageLimitModeCount')?.checked) {
+                    setScheduleStageLimitMode('count');
+                }
+            });
+            modalEl.querySelector('#sessionEnrollmentStageLimitModeThroughDate')?.addEventListener('change', () => {
+                if (modalEl.querySelector('#sessionEnrollmentStageLimitModeThroughDate')?.checked) {
+                    setScheduleStageLimitMode('throughDate');
+                }
             });
         }
     
@@ -1377,7 +1469,14 @@
                 const dow = Number(btn.getAttribute('data-stage-weekday'));
                 btn.classList.toggle('active', (params.weekdays || []).includes(dow));
             });
-            syncScheduleStageCountDisplay(Number(params.count || 4));
+            const editLimitMode = String(params.limitMode || 'count').trim() === 'throughDate' ? 'throughDate' : 'count';
+            setScheduleStageLimitMode(editLimitMode);
+            if (editLimitMode === 'throughDate') {
+                const throughInput = modalEl?.querySelector('#sessionEnrollmentStageThroughDate');
+                if (throughInput) throughInput.value = String(params.throughDate || '').trim();
+            } else {
+                syncScheduleStageCountDisplay(Number(params.count || 4));
+            }
             const skipEl = modalEl?.querySelector('#sessionEnrollmentStageSkipHolidays');
             if (skipEl) skipEl.checked = params.skipHolidays === true;
         }

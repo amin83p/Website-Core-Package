@@ -1476,6 +1476,22 @@ body.is-schedule-draft-moving [data-event-type="schedule_draft"][data-session-id
   border-right: 0;
 }
 
+.session-stage-through-date-input {
+  max-width: 11rem;
+}
+
+.session-stage-limit-mode .form-check-label {
+  color: var(--bs-secondary-color, #6c757d);
+}
+
+#sessionEnrollmentStageModal.is-stage-limit-through-date #sessionEnrollmentStageCountSection {
+  display: none;
+}
+
+#sessionEnrollmentStageModal.is-stage-limit-through-date #sessionEnrollmentStageThroughDateSection {
+  display: block !important;
+}
+
 /* Master Schedule Viewer — week grid host */
 .schedule-calendar-card-body {
   min-height: min(92vh, 1280px);

@@ -2073,7 +2073,15 @@
     });
     stageDurationHours = Number(params.durationHours || 1);
     stageWeekdays = new Set(Array.isArray(params.weekdays) ? params.weekdays : []);
-    syncStageCountDisplay(Number(params.count || 4));
+    const editLimitMode = String(params.limitMode || 'count').trim() === 'throughDate' ? 'throughDate' : 'count';
+    setStageLimitMode(editLimitMode);
+    if (editLimitMode === 'throughDate') {
+      const throughInput = stageModalEl?.querySelector('#sessionEnrollmentStageThroughDate')
+        || qs('sessionEnrollmentStageThroughDate');
+      if (throughInput) throughInput.value = String(params.throughDate || '').trim();
+    } else {
+      syncStageCountDisplay(Number(params.count || 4));
+    }
     stageModalEl = resolveStageOverlayEl();
     stageModalEl?.querySelectorAll('[data-stage-duration]').forEach((btn) => {
       const hours = Number(btn.getAttribute('data-stage-duration'));
@@ -2438,6 +2446,74 @@
     return Boolean(el?.checked);
   }
 
+  function readStageLimitMode() {
+    const el = stageModalEl?.querySelector('#sessionEnrollmentStageLimitModeThroughDate')
+      || qs('sessionEnrollmentStageLimitModeThroughDate');
+    if (el?.checked) return 'throughDate';
+    return 'count';
+  }
+
+  function readStageThroughDate() {
+    const el = stageModalEl?.querySelector('#sessionEnrollmentStageThroughDate')
+      || qs('sessionEnrollmentStageThroughDate');
+    return core.normalizeDateOnly(String(el?.value || '').trim());
+  }
+
+  function estimateDefaultStageThroughDate() {
+    const anchorDate = core.normalizeDateOnly(stageContext?.date || state?.startDate || '');
+    if (!anchorDate) return '';
+    const count = readStageSessionCount();
+    const weeksSpan = Math.max(2, Math.ceil(count / 2) + 1);
+    let projected = core.addDaysIso(anchorDate, weeksSpan * 7 + 14);
+    const enrollmentEnd = core.normalizeDateOnly(state?.endDate || '');
+    if (enrollmentEnd && projected > enrollmentEnd) projected = enrollmentEnd;
+    return projected;
+  }
+
+  function syncStageLimitModeUi(limitMode) {
+    stageModalEl = resolveStageOverlayEl();
+    if (!stageModalEl) return;
+    const mode = limitMode === 'throughDate' ? 'throughDate' : 'count';
+    const countRadio = stageModalEl.querySelector('#sessionEnrollmentStageLimitModeCount');
+    const throughRadio = stageModalEl.querySelector('#sessionEnrollmentStageLimitModeThroughDate');
+    if (countRadio) countRadio.checked = mode === 'count';
+    if (throughRadio) throughRadio.checked = mode === 'throughDate';
+    stageModalEl.classList.toggle('is-stage-limit-through-date', mode === 'throughDate');
+    if (mode === 'throughDate') {
+      const throughInput = stageModalEl.querySelector('#sessionEnrollmentStageThroughDate');
+      const anchorDate = core.normalizeDateOnly(stageContext?.date || state?.startDate || '');
+      if (throughInput && anchorDate) {
+        throughInput.min = anchorDate;
+        const enrollmentEnd = core.normalizeDateOnly(state?.endDate || '');
+        if (enrollmentEnd) throughInput.max = enrollmentEnd;
+        if (!String(throughInput.value || '').trim()) {
+          throughInput.value = estimateDefaultStageThroughDate();
+        }
+      }
+    }
+  }
+
+  function setStageLimitMode(limitMode) {
+    syncStageLimitModeUi(limitMode);
+  }
+
+  function capStageThroughDateToEnrollment(throughDate) {
+    const normalized = core.normalizeDateOnly(throughDate || '');
+    if (!normalized) return '';
+    const enrollmentEnd = core.normalizeDateOnly(state?.endDate || '');
+    if (enrollmentEnd && normalized > enrollmentEnd) return enrollmentEnd;
+    return normalized;
+  }
+
+  function resolveStageHolidayRangeEnd() {
+    if (readStageLimitMode() === 'throughDate') {
+      const through = readStageThroughDate();
+      if (through) return capStageThroughDateToEnrollment(through);
+      return estimateStageGenerationEndDate();
+    }
+    return isPartialMode() ? estimateStageGenerationEndDate() : core.normalizeDateOnly(state?.endDate || '');
+  }
+
   function estimateStageGenerationEndDate() {
     const count = readStageSessionCount();
     const anchorDate = core.normalizeDateOnly(stageContext?.date || state?.startDate || '');
@@ -2475,19 +2551,25 @@
     const weekdays = readStageWeekdays();
     const durationHours = readStageDurationHours();
     const count = readStageSessionCount();
+    const limitMode = readStageLimitMode();
     const enrollmentStart = isPartialMode()
       ? core.normalizeDateOnly(stageContext?.date || state?.startDate || '')
       : state.startDate;
-    const enrollmentEnd = isPartialMode()
-      ? estimateStageGenerationEndDate()
-      : state.endDate;
+    let enrollmentEnd;
+    if (limitMode === 'throughDate') {
+      enrollmentEnd = capStageThroughDateToEnrollment(readStageThroughDate());
+    } else {
+      enrollmentEnd = isPartialMode()
+        ? estimateStageGenerationEndDate()
+        : state.endDate;
+    }
     const blockedDates = await buildStageBlockedDatesForRange(enrollmentStart, enrollmentEnd);
-    return {
+    const options = {
       anchorDate: stageContext.date,
       startTime: stageContext.startTime24,
       durationHours,
       weekdays,
-      count,
+      limitMode,
       enrollmentStart,
       enrollmentEnd,
       existingSessions: getPartialBlockingScheduleEvents(),
@@ -2495,6 +2577,8 @@
       scheduleDefaults: state.scheduleDefaults || {},
       blockedDates
     };
+    if (limitMode === 'count') options.count = count;
+    return options;
   }
 
   async function commitQuickStagedSessionsFromForm() {
@@ -2508,6 +2592,24 @@
       showStageFormError('Select at least one weekday.');
       return;
     }
+    const limitMode = readStageLimitMode();
+    const anchorDate = core.normalizeDateOnly(stageContext?.date || state?.startDate || '');
+    if (limitMode === 'throughDate') {
+      const throughDate = readStageThroughDate();
+      if (!throughDate) {
+        showStageFormError('Choose a through date.');
+        return;
+      }
+      if (anchorDate && throughDate < anchorDate) {
+        showStageFormError('Through date must be on or after the slot date.');
+        return;
+      }
+      const enrollmentEnd = core.normalizeDateOnly(state?.endDate || '');
+      if (enrollmentEnd && throughDate > enrollmentEnd) {
+        showStageFormError(`Through date cannot be after enrollment end (${enrollmentEnd}).`);
+        return;
+      }
+    }
     const createBtn = qs('btn_sessionEnrollmentStageCreate');
     if (createBtn) {
       createBtn.disabled = true;
@@ -2516,7 +2618,10 @@
     try {
       const result = core.generateRotatingWeekdaySessions(await buildStageGenerationOptions());
       if (!result.sessions.length) {
-        showStageFormError('No sessions fit in the enrollment window. Adjust weekdays, count, or enrollment dates.');
+        const hint = limitMode === 'throughDate'
+          ? 'No sessions fit in the enrollment window. Adjust weekdays, through date, or enrollment dates.'
+          : 'No sessions fit in the enrollment window. Adjust weekdays, count, or enrollment dates.';
+        showStageFormError(hint);
         return;
       }
       const clickedDate = stageContext.date;
@@ -2529,7 +2634,9 @@
         const stageParams = {
           durationHours: readStageDurationHours(),
           weekdays: readStageWeekdays(),
-          count: readStageSessionCount(),
+          limitMode,
+          count: limitMode === 'count' ? readStageSessionCount() : undefined,
+          throughDate: limitMode === 'throughDate' ? capStageThroughDateToEnrollment(readStageThroughDate()) : undefined,
           skipHolidays: Boolean(qs('sessionEnrollmentStageSkipHolidays')?.checked),
           anchorDate: stageContext.date,
           startTime: stageContext.startTime24
@@ -2647,17 +2754,22 @@
     const token = ++stageCapacityPreviewToken;
     const preview = core.generateRotatingWeekdaySessions(await buildStageGenerationOptions());
     if (token !== stageCapacityPreviewToken) return;
-    const requested = readStageSessionCount();
-    if (preview.capacity < requested) {
-      warningEl.textContent = `Only ${preview.capacity} of ${requested} can fit in the enrollment window.`;
-      warningEl.classList.remove('d-none');
-    } else {
+    if (readStageLimitMode() === 'throughDate') {
       warningEl.classList.add('d-none');
       warningEl.textContent = '';
+    } else {
+      const requested = readStageSessionCount();
+      if (preview.capacity < requested) {
+        warningEl.textContent = `Only ${preview.capacity} of ${requested} can fit in the enrollment window.`;
+        warningEl.classList.remove('d-none');
+      } else {
+        warningEl.classList.add('d-none');
+        warningEl.textContent = '';
+      }
     }
     syncStageHolidayHint(
       isPartialMode() ? stageContext?.date : state.startDate,
-      isPartialMode() ? estimateStageGenerationEndDate() : state.endDate
+      resolveStageHolidayRangeEnd()
     ).catch(() => {});
   }
 
@@ -2689,6 +2801,10 @@
       });
     }
     syncStageCountDisplay(4);
+    setStageLimitMode('count');
+    const throughInput = stageModalEl?.querySelector('#sessionEnrollmentStageThroughDate')
+      || qs('sessionEnrollmentStageThroughDate');
+    if (throughInput) throughInput.value = '';
     const skipEl = stageModalEl?.querySelector('#sessionEnrollmentStageSkipHolidays');
     if (skipEl) skipEl.checked = true;
     const holidayHint = qs('sessionEnrollmentStageHolidayHint');
@@ -2774,6 +2890,22 @@
         const chip = Number(btn.getAttribute('data-stage-count'));
         btn.classList.toggle('active', chip === Math.round(parsed));
       });
+    });
+
+    stageModalEl?.querySelector('#sessionEnrollmentStageLimitModeCount')?.addEventListener('change', () => {
+      if (stageModalEl?.querySelector('#sessionEnrollmentStageLimitModeCount')?.checked) {
+        setStageLimitMode('count');
+        updateStageCapacityWarning().catch(() => {});
+      }
+    });
+    stageModalEl?.querySelector('#sessionEnrollmentStageLimitModeThroughDate')?.addEventListener('change', () => {
+      if (stageModalEl?.querySelector('#sessionEnrollmentStageLimitModeThroughDate')?.checked) {
+        setStageLimitMode('throughDate');
+        updateStageCapacityWarning().catch(() => {});
+      }
+    });
+    stageModalEl?.querySelector('#sessionEnrollmentStageThroughDate')?.addEventListener('change', () => {
+      updateStageCapacityWarning().catch(() => {});
     });
 
   }

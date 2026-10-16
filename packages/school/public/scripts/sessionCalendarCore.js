@@ -178,6 +178,16 @@
     return `${y}-${m}-${d}`;
   }
 
+  function daysBetweenInclusive(startDate, endDate) {
+    const start = normalizeDateOnly(startDate);
+    const end = normalizeDateOnly(endDate);
+    if (!start || !end || end < start) return 0;
+    const a = new Date(`${start}T12:00:00`);
+    const b = new Date(`${end}T12:00:00`);
+    if (Number.isNaN(a.getTime()) || Number.isNaN(b.getTime())) return 0;
+    return Math.floor((b.getTime() - a.getTime()) / 86400000) + 1;
+  }
+
   function endOfMonth(dateStr) {
     const base = new Date(`${dateStr}T00:00:00`);
     if (Number.isNaN(base.getTime())) return dateStr;
@@ -2503,6 +2513,7 @@
     const startTime = String(options.startTime || '').trim();
     const durationHours = Number(options.durationHours || 0);
     const weekdays = normalizeWeekdays(options.weekdays);
+    const limitMode = String(options.limitMode || 'count').trim() === 'throughDate' ? 'throughDate' : 'count';
     const count = Math.max(1, Math.min(72, Number(options.count || 1)));
     const enrollmentStart = normalizeDateOnly(options.enrollmentStart || '');
     const enrollmentEnd = normalizeDateOnly(options.enrollmentEnd || '');
@@ -2513,9 +2524,13 @@
       ? options.scheduleDefaults
       : {};
     const idPrefix = String(options.idPrefix || `STAGED_quick_${Date.now()}`).trim();
+    const emptyResult = (requested) => ({ sessions: [], requested, created: 0, capacity: 0 });
 
     if (!anchorDate || !startTime || !durationHours || !weekdays.length) {
-      return { sessions: [], requested: count, created: 0, capacity: 0 };
+      return emptyResult(limitMode === 'throughDate' ? null : count);
+    }
+    if (limitMode === 'throughDate' && !enrollmentEnd) {
+      return emptyResult(null);
     }
 
     const endTime = addDurationToTime(startTime, durationHours);
@@ -2530,12 +2545,12 @@
     if (enrollmentStart && enrollmentStart > rangeStart) rangeStart = enrollmentStart;
 
     let rangeEnd = enrollmentEnd;
-    if (!rangeEnd) {
+    if (!rangeEnd && limitMode !== 'throughDate') {
       const weeksSpan = Math.max(2, Math.ceil(count / 2) + 1);
       rangeEnd = addDaysIso(anchorDate, weeksSpan * 7 + 14);
     }
-    if (rangeEnd < rangeStart) {
-      return { sessions: [], requested: count, created: 0, capacity: 0 };
+    if (!rangeEnd || rangeEnd < rangeStart) {
+      return emptyResult(limitMode === 'throughDate' ? null : count);
     }
 
     const anchorDow = new Date(`${anchorDate}T12:00:00`).getDay();
@@ -2627,7 +2642,24 @@
       return sessions;
     }
 
-    const allSessions = generateUpTo(72);
+    const COUNT_MODE_CAP = 72;
+    const THROUGH_DATE_MAX = 500;
+    let maxPlace = COUNT_MODE_CAP;
+    if (limitMode === 'throughDate') {
+      const spanDays = daysBetweenInclusive(rangeStart, rangeEnd);
+      maxPlace = Math.min(THROUGH_DATE_MAX, Math.max(1, spanDays * weekdays.length));
+    }
+
+    const allSessions = generateUpTo(maxPlace);
+
+    if (limitMode === 'throughDate') {
+      return {
+        sessions: allSessions,
+        requested: null,
+        created: allSessions.length,
+        capacity: allSessions.length
+      };
+    }
 
     return {
       sessions: allSessions.slice(0, count),

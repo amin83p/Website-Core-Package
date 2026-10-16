@@ -884,6 +884,33 @@
     margin-top: 0.15rem;
   }
 
+  .school-master-hub .hub-wr-col-attendance .hub-weekly-reports-metric-hint {
+    font-size: 0.68rem;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+  }
+
+  .school-master-hub .hub-wr-attendance-stat-stack {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.05rem;
+    line-height: 1.15;
+  }
+
+  .school-master-hub .hub-wr-attendance-stat-stack .hub-wr-attendance-stat-count {
+    font-size: 0.72rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .school-master-hub .hub-wr-attendance-stat-stack .hub-wr-attendance-stat-minutes {
+    font-size: 0.62rem;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: #64748b;
+  }
+
   .school-master-hub .hub-table-date-cell {
     min-width: 7.5rem;
     line-height: 1.25;
@@ -5945,6 +5972,32 @@
     ].join('');
   }
 
+  function readWeeklyReportsAttendanceBucketValues(bucket) {
+    return {
+      count: Number(bucket && bucket.count || 0),
+      minutes: Math.max(0, Math.round(Number(bucket && bucket.minutes || 0)))
+    };
+  }
+
+  function formatWeeklyReportsAttendanceMinutesLabel(minutes) {
+    const m = Math.max(0, Math.round(Number(minutes) || 0));
+    return m + ' min';
+  }
+
+  function renderWeeklyReportsTeacherAttendanceStatLine(label, bucket, valueTone) {
+    const values = readWeeklyReportsAttendanceBucketValues(bucket);
+    const toneClass = weeklyReportsMetricToneClass(valueTone);
+    return [
+      '<div class="stat-detail-line">',
+      '<span class="stat-detail-key">' + escapeHtml(label) + '</span>',
+      '<span class="stat-detail-val hub-wr-attendance-stat-stack hub-wr-metric' + toneClass + '">',
+      '<span class="hub-wr-attendance-stat-count">' + escapeHtml(String(values.count)) + '</span>',
+      '<span class="hub-wr-attendance-stat-minutes">' + escapeHtml(formatWeeklyReportsAttendanceMinutesLabel(values.minutes)) + '</span>',
+      '</span>',
+      '</div>'
+    ].join('');
+  }
+
   function renderWeeklyReportsTeacherStatDetailLine(label, value, valueTone) {
     const toneClass = weeklyReportsMetricToneClass(valueTone);
     return [
@@ -5957,16 +6010,13 @@
 
   function renderWeeklyReportsTeacherAttendanceBlock(totals) {
     const att = totals && totals.attendance ? totals.attendance : {};
-    const absence = Number(att.absence && att.absence.count || 0);
-    const late = Number(att.late && att.late.count || 0);
-    const early = Number(att.early && att.early.count || 0);
     return [
       '<div class="hub-weekly-reports-teacher-stat hub-weekly-reports-teacher-stat--stacked hub-weekly-reports-teacher-stat--attendance">',
       '<span class="stat-label">Attendance</span>',
       '<div class="stat-detail">',
-      renderWeeklyReportsTeacherStatDetailLine('Absences', absence, 'danger'),
-      renderWeeklyReportsTeacherStatDetailLine('Late', late, 'warning'),
-      renderWeeklyReportsTeacherStatDetailLine('Early leave', early, 'early'),
+      renderWeeklyReportsTeacherAttendanceStatLine('Absences', att.absence, 'danger'),
+      renderWeeklyReportsTeacherAttendanceStatLine('Late', att.late, 'warning'),
+      renderWeeklyReportsTeacherAttendanceStatLine('Early leave', att.early, 'early'),
       '</div>',
       '</div>'
     ].join('');
@@ -6110,6 +6160,18 @@
     return renderWeeklyReportsMetricStack(primary, '', { rawPrimary: count > 0, tone: tone });
   }
 
+  function renderWeeklyReportsAttendanceDrillRatio(classId, metricKey, bucket, tone) {
+    const values = readWeeklyReportsAttendanceBucketValues(bucket);
+    const countHtml = values.count > 0
+      ? '<button type="button" class="btn btn-link btn-sm p-0 hub-weekly-reports-drill" data-hub-wr-drill="1" data-class-id="' + escapeHtml(classId || '') + '" data-metric-key="' + escapeHtml(metricKey || '') + '">' + escapeHtml(String(values.count)) + '</button>'
+      : escapeHtml('0');
+    return renderWeeklyReportsMetricStack(
+      countHtml,
+      formatWeeklyReportsAttendanceMinutesLabel(values.minutes),
+      { rawPrimary: values.count > 0, tone: tone }
+    );
+  }
+
   function renderWeeklyReportsOperationalMetricCells(row) {
     const classId = String(row.classId || '').trim();
     const m = readWeeklyReportsOperationalMetrics(row);
@@ -6129,9 +6191,9 @@
       '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-reports">' + renderWeeklyReportsDrillCount(classId, 'reportInstancesIncomplete', m.reports.incomplete, 'danger') + '</td>',
       '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-cases hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'studentCases', m.studentCases.total) + '</td>',
       '<td class="text-center hub-weekly-reports-metric-cell hub-wr-col-hours hub-wr-col-band">' + renderWeeklyReportsMetricStack(formatWeeklyReportsScheduledHours(scheduledHours), '') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-attendance hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'attendanceAbsence', m.attendance.absence.count, 'danger') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-attendance">' + renderWeeklyReportsDrillCount(classId, 'attendanceLate', m.attendance.late.count, 'warning') + '</td>',
-      '<td class="text-center pe-3 hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-attendance">' + renderWeeklyReportsDrillCount(classId, 'attendanceEarly', m.attendance.early.count, 'early') + '</td>'
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-attendance hub-wr-col-band">' + renderWeeklyReportsAttendanceDrillRatio(classId, 'attendanceAbsence', m.attendance.absence, 'danger') + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-attendance">' + renderWeeklyReportsAttendanceDrillRatio(classId, 'attendanceLate', m.attendance.late, 'warning') + '</td>',
+      '<td class="text-center pe-3 hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-attendance">' + renderWeeklyReportsAttendanceDrillRatio(classId, 'attendanceEarly', m.attendance.early, 'early') + '</td>'
     ].join('');
   }
 

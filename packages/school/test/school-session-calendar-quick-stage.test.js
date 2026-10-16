@@ -227,3 +227,41 @@ test('resolveGridClickContext returns null without valid grid target', () => {
   assert.equal(core.resolveGridClickContext(null, 0, 0, null), null);
   assert.equal(core.resolveGridClickContext({}, 0, 0, {}), null);
 });
+
+test('generateRotatingWeekdaySessions throughDate mode fills window through inclusive end', () => {
+  const core = loadSessionCalendarCore();
+  const result = core.generateRotatingWeekdaySessions({
+    anchorDate: '2026-01-05',
+    startTime: '09:00',
+    durationHours: 1,
+    weekdays: [1],
+    limitMode: 'throughDate',
+    enrollmentStart: '2026-01-01',
+    enrollmentEnd: '2026-01-20',
+    existingSessions: [],
+    alreadyStaged: []
+  });
+
+  assert.equal(result.requested, null);
+  assert.equal(result.created, 3);
+  assert.ok(result.sessions.every((row) => row.date <= '2026-01-20'));
+  assert.ok(result.sessions.some((row) => row.date === '2026-01-19'));
+});
+
+test('generateRotatingWeekdaySessions throughDate mode can exceed 72 sessions', () => {
+  const core = loadSessionCalendarCore();
+  const result = core.generateRotatingWeekdaySessions({
+    anchorDate: '2026-01-05',
+    startTime: '09:00',
+    durationHours: 1,
+    weekdays: [1, 2, 3, 4, 5],
+    limitMode: 'throughDate',
+    enrollmentStart: '2026-01-05',
+    enrollmentEnd: '2026-06-30',
+    existingSessions: [],
+    alreadyStaged: []
+  });
+
+  assert.ok(result.created > 72);
+  assert.ok(result.sessions.every((row) => row.date <= '2026-06-30'));
+});

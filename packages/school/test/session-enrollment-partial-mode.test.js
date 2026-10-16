@@ -42,6 +42,14 @@ test('stage modal includes skip holidays toggle', () => {
   assert.match(stageModal, /Skip Holidays\/Off Days/);
 });
 
+test('stage modal supports count and through-date limit modes', () => {
+  const stageModal = read('MVC/views/school/partials/sessionEnrollmentStageModal.ejs');
+  assert.match(stageModal, /sessionEnrollmentStageLimitModeCount/);
+  assert.match(stageModal, /sessionEnrollmentStageLimitModeThroughDate/);
+  assert.match(stageModal, /sessionEnrollmentStageThroughDate/);
+  assert.match(stageModal, /sessionEnrollmentStageCountSection/);
+});
+
 test('calendar modal supports partial mode and shared helpers', () => {
   const modalSource = read('public/scripts/sessionEnrollmentCalendarModal.js');
   assert.match(modalSource, /function isPartialMode\(\)/);

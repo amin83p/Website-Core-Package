@@ -29,7 +29,18 @@
         </div>
       </div>
       <div class="session-stage-section mb-2">
-        <div class="session-stage-label small text-muted mb-1">Number of sessions</div>
+        <div class="session-stage-label small text-muted mb-1">How many sessions</div>
+        <div class="session-stage-limit-mode d-flex flex-wrap gap-2 mb-2" role="radiogroup" aria-label="Session limit mode">
+          <div class="form-check form-check-inline mb-0">
+            <input class="form-check-input" type="radio" name="sessionEnrollmentStageLimitMode" id="sessionEnrollmentStageLimitModeCount" value="count" checked>
+            <label class="form-check-label small" for="sessionEnrollmentStageLimitModeCount">Number of sessions</label>
+          </div>
+          <div class="form-check form-check-inline mb-0">
+            <input class="form-check-input" type="radio" name="sessionEnrollmentStageLimitMode" id="sessionEnrollmentStageLimitModeThroughDate" value="throughDate">
+            <label class="form-check-label small" for="sessionEnrollmentStageLimitModeThroughDate">Through date</label>
+          </div>
+        </div>
+        <div id="sessionEnrollmentStageCountSection">
         <div class="session-stage-count-row d-flex flex-wrap align-items-center gap-2">
           <div class="btn-group session-stage-stepper" role="group" aria-label="Session count stepper">
             <button type="button" class="btn btn-outline-secondary" id="btn_sessionEnrollmentStageCountDown" aria-label="Decrease session count"><i class="bi bi-dash-lg"></i></button>
@@ -50,6 +61,12 @@
             <button type="button" class="btn btn-outline-secondary session-stage-chip session-stage-count-chip" data-stage-count="60">60</button>
             <button type="button" class="btn btn-outline-secondary session-stage-chip session-stage-count-chip" data-stage-count="72">72</button>
           </div>
+        </div>
+        </div>
+        <div id="sessionEnrollmentStageThroughDateSection" class="session-stage-through-date-section d-none">
+          <label class="form-label small text-muted mb-1" for="sessionEnrollmentStageThroughDate">Through date (inclusive)</label>
+          <input type="date" class="form-control form-control-sm session-stage-through-date-input" id="sessionEnrollmentStageThroughDate" aria-describedby="sessionEnrollmentStageThroughDateHelp">
+          <div class="form-text small" id="sessionEnrollmentStageThroughDateHelp">Creates sessions on selected weekdays from the slot date through this date.</div>
         </div>
       </div>
       <div class="session-stage-section mb-2">
