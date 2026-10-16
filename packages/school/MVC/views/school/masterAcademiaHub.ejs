@@ -148,14 +148,12 @@
     background: #ffffff;
   }
 
-  .school-master-hub.hub-sidebar-collapsed .hub-shell {
-    grid-template-columns: 88px minmax(0, 1fr);
-  }
-
   .school-master-hub .hub-sidebar {
     position: sticky;
     top: 0;
     align-self: start;
+    display: flex;
+    flex-direction: column;
     min-height: calc(100vh - 92px);
     border-right: 1px solid rgba(15, 23, 42, 0.09);
     border-radius: 0;
@@ -164,23 +162,6 @@
       linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
     box-shadow: 12px 0 35px rgba(15, 23, 42, 0.07);
     overflow: hidden;
-  }
-
-  .school-master-hub .hub-sidebar-inner {
-    display: flex;
-    flex-direction: column;
-    min-height: calc(100vh - 92px);
-  }
-
-  .school-master-hub .hub-sidebar-header {
-    padding: 1.2rem 1.2rem 0.85rem;
-    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-  }
-
-  .school-master-hub .hub-collapse-toggle {
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 999px;
   }
 
   .school-master-hub .hub-tab {
@@ -251,31 +232,6 @@
     }
   }
 
-  .school-master-hub.hub-sidebar-collapsed .hub-sidebar-header-text,
-  .school-master-hub.hub-sidebar-collapsed .hub-tab-label,
-  .school-master-hub.hub-sidebar-collapsed .hub-tab-open-section,
-  .school-master-hub.hub-sidebar-collapsed .hub-sidebar-content {
-    display: none !important;
-  }
-
-  .school-master-hub.hub-sidebar-collapsed .hub-sidebar-header {
-    padding: 1rem 0.65rem;
-    display: flex;
-    justify-content: center;
-  }
-
-  .school-master-hub.hub-sidebar-collapsed .hub-tab {
-    justify-content: center !important;
-    padding: 1rem 0.65rem;
-  }
-
-  .school-master-hub.hub-sidebar-collapsed .hub-tabs {
-    display: block;
-  }
-
-  .school-master-hub.hub-sidebar-collapsed .hub-tab-main {
-    justify-content: center;
-  }
 .school-master-hub .hub-main {
     min-width: 0;
     margin-top: 0;
@@ -1367,13 +1323,6 @@
     padding: 1rem 1.25rem 1.25rem;
   }
 
-  .school-master-hub .hub-sidebar-content {
-    flex: 1;
-    min-height: 0;
-    padding: 1rem;
-    overflow: auto;
-  }
-
   .school-master-hub .hub-table-wrap {
     overflow: auto;
     border: 1px solid rgba(15, 23, 42, 0.08);
@@ -1468,14 +1417,10 @@
       position: static;
       min-height: auto;
     }
-
-    .school-master-hub .hub-sidebar-inner {
-      min-height: auto;
-    }
   }
 </style>
 
-<div class="container-fluid school-master-hub hub-sidebar-collapsed py-0"
+<div class="container-fluid school-master-hub py-0"
      data-master-hub
      data-modules='<%- JSON.stringify(safeModules) %>'
      data-default-type="<%= initialType %>"
@@ -1556,19 +1501,6 @@
   <% } else { %>
     <div class="hub-shell">
       <aside class="hub-sidebar">
-        <div class="hub-sidebar-inner">
-          <div class="hub-sidebar-header d-flex align-items-center justify-content-between gap-2">
-            <div class="hub-sidebar-header-text">
-              <div class="text-uppercase text-muted small fw-bold">People Lists</div>
-              <div class="fw-semibold">Choose a directory</div>
-            </div>
-            <button type="button"
-                    class="btn btn-outline-secondary btn-sm hub-collapse-toggle"
-                    id="schoolMasterHubCollapseSidebar"
-                    title="Collapse sidebar">
-              <i class="bi bi-layout-sidebar-inset"></i>
-            </button>
-          </div>
           <div class="hub-tabs" id="schoolMasterHubTabs">
             <% safeModules.forEach((item) => { %>
               <div class="hub-tab-shell">
@@ -1595,24 +1527,20 @@
               </div>
             <% }); %>
           </div>
-
-          <div class="hub-sidebar-content">
-            <div class="mb-3">
-              <label for="schoolMasterHubSearch" class="form-label fw-semibold">Search selected list</label>
-              <div class="input-group">
-                <input type="search"
-                       id="schoolMasterHubSearch"
-                       class="form-control"
-                       placeholder="Search name, email, phone, ID, status, or department">
-                <button type="button" class="btn btn-primary" id="schoolMasterHubSearchButton">
-                  <i class="bi bi-search me-1"></i> Search
-                </button>
-              </div>
+          <div class="p-3 pb-0">
+            <label for="schoolMasterHubSearch" class="form-label fw-semibold">Search selected list</label>
+            <div class="input-group">
+              <input type="search"
+                     id="schoolMasterHubSearch"
+                     class="form-control"
+                     placeholder="Search name, email, phone, ID, status, or department">
+              <button type="button" class="btn btn-primary" id="schoolMasterHubSearchButton">
+                <i class="bi bi-search me-1"></i> Search
+              </button>
             </div>
-            <div id="schoolMasterHubStatus" class="alert alert-info d-none" role="status"></div>
-            <div id="schoolMasterHubList"></div>
           </div>
-        </div>
+          <div id="schoolMasterHubStatus" class="alert alert-info d-none mx-3" role="status"></div>
+          <div id="schoolMasterHubList" class="flex-grow-1 overflow-auto px-3 pb-3"></div>
       </aside>
 
       <main class="hub-main">
@@ -1756,7 +1684,6 @@
     searchButton: document.getElementById('schoolMasterHubSearchButton'),
     refreshCurrent: document.getElementById('schoolMasterHubRefreshCurrent'),
     openDirectory: document.getElementById('schoolMasterHubOpenDirectory'),
-    collapseSidebar: document.getElementById('schoolMasterHubCollapseSidebar'),
     taskCount: document.getElementById('schoolMasterHubTaskCount'),
     taskSettings: document.getElementById('schoolMasterHubTaskSettings'),
     workspace: document.getElementById('schoolMasterHubWorkspace'),
@@ -9167,22 +9094,6 @@
     });
   });
 
-  function syncSidebarToggle() {
-    if (!els.collapseSidebar) return;
-    const collapsed = root.classList.contains('hub-sidebar-collapsed');
-    els.collapseSidebar.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
-    els.collapseSidebar.innerHTML = collapsed
-      ? '<i class="bi bi-layout-sidebar-inset-reverse"></i>'
-      : '<i class="bi bi-layout-sidebar-inset"></i>';
-  }
-
-  if (els.collapseSidebar) {
-    els.collapseSidebar.addEventListener('click', function () {
-      root.classList.toggle('hub-sidebar-collapsed');
-      syncSidebarToggle();
-    });
-  }
-
   root.querySelectorAll('[data-hub-tab]').forEach(function (tab) {
     tab.addEventListener('click', function (event) {
       if (event.target && event.target.closest('[data-hub-refresh]')) return;
@@ -9245,7 +9156,6 @@
 
   if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
   restartTaskTimer();
-  syncSidebarToggle();
   syncActiveTab();
   renderSearchPrompt();
 }());

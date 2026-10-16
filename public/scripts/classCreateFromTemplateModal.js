@@ -92,7 +92,7 @@
       const opt = document.createElement('option');
       opt.value = String(row.id || '');
       opt.dataset.registrationMode = String(row.registrationMode || 'term_based');
-      opt.textContent = row.code && row.name ? `${row.code} — ${row.name}` : String(row.name || row.code || opt.value);
+      opt.textContent = String(row.name || row.code || opt.value);
       selectEl.appendChild(opt);
     });
   }

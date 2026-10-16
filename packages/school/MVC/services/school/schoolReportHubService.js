@@ -133,17 +133,6 @@ function enrichRows(moduleConfig, rows, personById, departments) {
       directoryUrl: `${moduleConfig.directoryUrl}/edit/${encodeURIComponent(normalizeText(row?.id))}`,
       actions: [
         {
-          label: 'Current Month Schedule',
-          icon: 'bi bi-calendar-month',
-          tone: 'info',
-          command: 'person-current-month-schedule',
-          recordId: normalizeText(row?.id),
-          personId: normalizeText(row?.personId),
-          personName: buildPersonName(person),
-          role: normalizeText(moduleConfig.singular).toLowerCase(),
-          roleLabel: normalizeText(moduleConfig.singular)
-        },
-        {
           label: 'Edit',
           icon: 'bi bi-pencil-square',
           tone: 'secondary',
@@ -1155,6 +1144,30 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       error.statusCode = 403;
       throw error;
     }
+    const filterOptionsOnly = ['1', 'true', 'yes'].includes(lower(queryInput?.departmentsOnly || ''))
+      || ['1', 'true', 'yes'].includes(lower(queryInput?.filterOptionsOnly || ''));
+    if (filterOptionsOnly) {
+      const [departmentOptions, programOptions, teacherOptions] = await Promise.all([
+        weeklyReportsHubService.resolveWeeklyReportsDepartmentOptions(req.user),
+        weeklyReportsHubService.resolveWeeklyReportsProgramOptions(req.user),
+        weeklyReportsHubService.resolveWeeklyReportsTeacherOptions(req.user)
+      ]);
+      return {
+        section: {
+          key: 'weekly-reports',
+          label: 'Weekly Reports',
+          icon: 'bi bi-calendar-week',
+          sourceUrl: '/school/report-hub'
+        },
+        view: 'classes',
+        rows: [],
+        total: 0,
+        departmentOptions,
+        programOptions,
+        teacherOptions,
+        refreshedAt: new Date().toISOString()
+      };
+    }
     const classIds = weeklyReportsHubService.parseFilterIdList(
       queryInput?.classIds || queryInput?.classId || ''
     );
@@ -1164,14 +1177,20 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
     const startDate = normalizeText(queryInput?.startDate || queryInput?.dueDateStart || '');
     const endDate = normalizeText(queryInput?.endDate || queryInput?.dueDateEnd || '');
     const departmentId = normalizeText(queryInput?.departmentId || '');
+    const programId = normalizeText(queryInput?.programId || '');
+    const teacherPersonId = normalizeText(
+      queryInput?.teacherPersonId || queryInput?.teacherId || ''
+    );
     const view = lower(queryInput?.view || 'classes');
-    const [board, departmentOptions] = await Promise.all([
+    const [board, departmentOptions, programOptions, teacherOptions] = await Promise.all([
       view === 'students'
         ? weeklyReportsHubService.buildWeeklyReportsStudentBoard({
           reqUser: req.user,
           classIds,
           studentIds,
           departmentId,
+          programId,
+          teacherPersonId,
           startDate,
           endDate
         })
@@ -1179,10 +1198,14 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
           reqUser: req.user,
           classIds,
           departmentId,
+          programId,
+          teacherPersonId,
           startDate,
           endDate
         }),
-      weeklyReportsHubService.resolveWeeklyReportsDepartmentOptions(req.user)
+      weeklyReportsHubService.resolveWeeklyReportsDepartmentOptions(req.user),
+      weeklyReportsHubService.resolveWeeklyReportsProgramOptions(req.user),
+      weeklyReportsHubService.resolveWeeklyReportsTeacherOptions(req.user)
     ]);
     return {
       section: {
@@ -1196,6 +1219,8 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       total: board.total,
       filters: board.filters,
       departmentOptions,
+      programOptions,
+      teacherOptions,
       refreshedAt: board.refreshedAt
     };
   }

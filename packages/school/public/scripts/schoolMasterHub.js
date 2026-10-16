@@ -26,8 +26,7 @@
     search: document.getElementById('schoolMasterHubSearch'),
     limit: document.getElementById('schoolMasterHubLimit'),
     refreshCurrent: document.getElementById('schoolMasterHubRefreshCurrent'),
-    openDirectory: document.getElementById('schoolMasterHubOpenDirectory'),
-    collapseSidebar: document.getElementById('schoolMasterHubCollapseSidebar')
+    openDirectory: document.getElementById('schoolMasterHubOpenDirectory')
   };
 
   function escapeHtml(value) {
@@ -208,17 +207,6 @@
 
   if (els.refreshCurrent) {
     els.refreshCurrent.addEventListener('click', () => loadCurrent({ resetPage: false }));
-  }
-
-  if (els.collapseSidebar) {
-    els.collapseSidebar.addEventListener('click', () => {
-      root.classList.toggle('hub-sidebar-collapsed');
-      const collapsed = root.classList.contains('hub-sidebar-collapsed');
-      els.collapseSidebar.title = collapsed ? 'Expand sidebar' : 'Collapse sidebar';
-      els.collapseSidebar.innerHTML = collapsed
-        ? '<i class="bi bi-layout-sidebar-inset-reverse"></i>'
-        : '<i class="bi bi-layout-sidebar-inset"></i>';
-    });
   }
 
   root.querySelectorAll('[data-hub-tab]').forEach((tab) => {

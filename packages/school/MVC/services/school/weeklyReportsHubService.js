@@ -1,4 +1,5 @@
 const schoolDataService = require('./schoolDataService');
+const activityService = require('./activityService');
 const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
@@ -114,16 +115,65 @@ function classMatchesDepartment(row = {}, departmentId = '') {
   return idsEqual(toPublicId(row?.deliveryDepartmentId), normalizedDepartmentId);
 }
 
-function buildClassBoardRow(classRow = {}, summary = {}, gradebookCount = 0) {
+function collectClassProgramIds(row = {}) {
+  const ids = new Set();
+  (Array.isArray(row?.allowedProgramTerms) ? row.allowedProgramTerms : []).forEach((termRow) => {
+    const programId = toPublicId(termRow?.programId);
+    if (programId) ids.add(programId);
+  });
+  return ids;
+}
+
+function classMatchesProgram(row = {}, programId = '') {
+  const normalizedProgramId = toPublicId(programId);
+  if (!normalizedProgramId) return true;
+  return collectClassProgramIds(row).has(normalizedProgramId);
+}
+
+function classMatchesTeacher(row = {}, teacherPersonId = '') {
+  const normalizedTeacherPersonId = toPublicId(teacherPersonId);
+  if (!normalizedTeacherPersonId) return true;
+  const instructors = Array.isArray(row?.instructors) ? row.instructors : [];
+  return instructors.some((instructorRow) => idsEqual(
+    toPublicId(instructorRow?.personId || instructorRow?.id || instructorRow?.teacherId),
+    normalizedTeacherPersonId
+  ));
+}
+
+function resolvePrimaryInstructor(classRow = {}) {
+  const primary = Array.isArray(classRow?.instructors) ? classRow.instructors[0] : null;
+  if (!primary) {
+    return { teacherPersonId: '', teacherName: 'Unassigned' };
+  }
+  const teacherPersonId = toPublicId(primary.personId || primary.id || primary.teacherId || '') || '';
+  const teacherName = String(primary.name || primary.displayName || classRow?.teacherName || teacherPersonId || 'Unassigned').trim() || 'Unassigned';
+  return { teacherPersonId, teacherName };
+}
+
+function sumSessionScheduledHours(sessions = []) {
+  return roundOneDecimal((Array.isArray(sessions) ? sessions : []).reduce((sum, sessionRow) => {
+    const stored = Number(sessionRow?.durationHours);
+    const hours = Number.isFinite(stored) && stored > 0
+      ? stored
+      : activityService.calculateDurationHours(sessionRow?.startTime, sessionRow?.endTime);
+    return sum + (Number.isFinite(Number(hours)) ? Number(hours) : 0);
+  }, 0));
+}
+
+function buildClassBoardRow(classRow = {}, summary = {}, gradebookCount = 0, scheduledHours = 0) {
   const classId = toPublicId(classRow?.id);
   const departmentId = toPublicId(classRow?.deliveryDepartmentId) || '';
   const departmentName = String(classRow?.deliveryDepartmentName || departmentId || '').trim();
+  const instructor = resolvePrimaryInstructor(classRow);
   return {
     classId,
     className: String(classRow?.title || classRow?.name || classId || '').trim() || classId,
     departmentId,
     departmentName,
+    teacherPersonId: instructor.teacherPersonId,
+    teacherName: instructor.teacherName,
     sessionCount: Number(summary.sessionCount || 0),
+    scheduledHours: Number(scheduledHours || 0),
     avgStudentsPerSession: Number(summary.avgStudentsPerSession || 0),
     absenceCount: Number(summary.absenceCount || 0),
     lateCount: Number(summary.lateCount || 0),
@@ -447,11 +497,19 @@ function buildStudentDetailRowFromClass({
   });
 }
 
-function filterClassesForWeeklyReports(rows = [], { activeOrgId = '', classIds = [], departmentId = '' } = {}) {
+function filterClassesForWeeklyReports(rows = [], {
+  activeOrgId = '',
+  classIds = [],
+  departmentId = '',
+  programId = '',
+  teacherPersonId = ''
+} = {}) {
   let scoped = (Array.isArray(rows) ? rows : [])
     .filter((row) => classBelongsToActiveOrg(row, activeOrgId))
     .filter(isActiveAttendanceClass)
-    .filter((row) => classMatchesDepartment(row, departmentId));
+    .filter((row) => classMatchesDepartment(row, departmentId))
+    .filter((row) => classMatchesProgram(row, programId))
+    .filter((row) => classMatchesTeacher(row, teacherPersonId));
 
   if (classIds.length) {
     const classIdSet = new Set(classIds.map((id) => toPublicId(id)).filter(Boolean));
@@ -474,27 +532,74 @@ async function resolveWeeklyReportsDepartmentOptions(reqUser = {}) {
     .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
 }
 
-async function resolveWeeklyReportsClasses({ reqUser, classIds = [], departmentId = '', activeOrgId = '' } = {}) {
+async function resolveWeeklyReportsClasses({
+  reqUser,
+  classIds = [],
+  departmentId = '',
+  programId = '',
+  teacherPersonId = '',
+  activeOrgId = ''
+} = {}) {
   const classes = await schoolDataService.fetchAllData('classes', {}, reqUser);
   const normalizedClassIds = parseFilterIdList(classIds);
   const normalizedDepartmentId = toPublicId(departmentId) || '';
+  const normalizedProgramId = toPublicId(programId) || '';
+  const normalizedTeacherPersonId = toPublicId(teacherPersonId) || '';
   return filterClassesForWeeklyReports(classes, {
     activeOrgId,
     classIds: normalizedClassIds,
-    departmentId: normalizedDepartmentId
+    departmentId: normalizedDepartmentId,
+    programId: normalizedProgramId,
+    teacherPersonId: normalizedTeacherPersonId
   });
+}
+
+async function resolveWeeklyReportsProgramOptions(reqUser = {}) {
+  const activeOrgId = String(reqUser?.activeOrgId || '').trim();
+  const programs = await schoolDataService.fetchAllData('programs', {}, reqUser);
+  return (Array.isArray(programs) ? programs : [])
+    .filter((row) => !String(row?.orgId || '').trim() || idsEqual(row?.orgId, activeOrgId))
+    .map((row) => {
+      const id = toPublicId(row?.id);
+      const code = String(row?.code || '').trim();
+      const name = String(row?.name || row?.id || 'Program').trim();
+      const label = [code, name].filter(Boolean).join(' - ') || name || id;
+      return { id, name: label };
+    })
+    .filter((row) => row.id)
+    .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+}
+
+async function resolveWeeklyReportsTeacherOptions(reqUser = {}) {
+  const activeOrgId = String(reqUser?.activeOrgId || '').trim();
+  const teachers = await schoolDataService.fetchAllData('teachers', {}, reqUser);
+  const byPersonId = new Map();
+  (Array.isArray(teachers) ? teachers : []).forEach((row) => {
+    if (activeOrgId && row?.orgId && !idsEqual(row.orgId, activeOrgId)) return;
+    const personId = toPublicId(row?.personId || row?.id);
+    if (!personId || byPersonId.has(personId)) return;
+    const name = String(
+      row?.displayName || row?.name || row?.preferredName || personId || 'Teacher'
+    ).trim() || personId;
+    byPersonId.set(personId, { id: personId, name });
+  });
+  return Array.from(byPersonId.values()).sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
 }
 
 async function buildWeeklyReportsClassBoard({
   reqUser,
   classIds = [],
   departmentId = '',
+  programId = '',
+  teacherPersonId = '',
   startDate = '',
   endDate = ''
 } = {}) {
   const activeOrgId = String(reqUser?.activeOrgId || '').trim();
   const normalizedClassIds = parseFilterIdList(classIds);
   const normalizedDepartmentId = toPublicId(departmentId) || '';
+  const normalizedProgramId = toPublicId(programId) || '';
+  const normalizedTeacherPersonId = toPublicId(teacherPersonId) || '';
   const normalizedStartDate = String(startDate || '').trim();
   const normalizedEndDate = String(endDate || '').trim();
 
@@ -502,6 +607,8 @@ async function buildWeeklyReportsClassBoard({
     reqUser,
     classIds: normalizedClassIds,
     departmentId: normalizedDepartmentId,
+    programId: normalizedProgramId,
+    teacherPersonId: normalizedTeacherPersonId,
     activeOrgId
   });
 
@@ -534,8 +641,9 @@ async function buildWeeklyReportsClassBoard({
         endDate: normalizedEndDate
       });
       const gradebookCount = countGradebooksInSessions(filteredSessions);
+      const scheduledHours = sumSessionScheduledHours(filteredSessions);
 
-      rows.push(buildClassBoardRow(classRow, summary, gradebookCount));
+      rows.push(buildClassBoardRow(classRow, summary, gradebookCount, scheduledHours));
     } catch (error) {
       console.warn(`[weeklyReportsHubService] Skipping class ${classId}: ${error.message}`);
     }
@@ -550,6 +658,8 @@ async function buildWeeklyReportsClassBoard({
     filters: {
       classIds: normalizedClassIds,
       departmentId: normalizedDepartmentId,
+      programId: normalizedProgramId,
+      teacherPersonId: normalizedTeacherPersonId,
       startDate: normalizedStartDate,
       endDate: normalizedEndDate
     },
@@ -562,6 +672,8 @@ async function buildWeeklyReportsStudentBoard({
   classIds = [],
   studentIds = [],
   departmentId = '',
+  programId = '',
+  teacherPersonId = '',
   startDate = '',
   endDate = ''
 } = {}) {
@@ -569,6 +681,8 @@ async function buildWeeklyReportsStudentBoard({
   const normalizedClassIds = parseFilterIdList(classIds);
   const normalizedStudentIds = parseFilterIdList(studentIds);
   const normalizedDepartmentId = toPublicId(departmentId) || '';
+  const normalizedProgramId = toPublicId(programId) || '';
+  const normalizedTeacherPersonId = toPublicId(teacherPersonId) || '';
   const normalizedStartDate = String(startDate || '').trim();
   const normalizedEndDate = String(endDate || '').trim();
 
@@ -576,6 +690,8 @@ async function buildWeeklyReportsStudentBoard({
     reqUser,
     classIds: normalizedClassIds,
     departmentId: normalizedDepartmentId,
+    programId: normalizedProgramId,
+    teacherPersonId: normalizedTeacherPersonId,
     activeOrgId
   });
 
@@ -661,6 +777,8 @@ async function buildWeeklyReportsStudentBoard({
       classIds: normalizedClassIds,
       studentIds: normalizedStudentIds,
       departmentId: normalizedDepartmentId,
+      programId: normalizedProgramId,
+      teacherPersonId: normalizedTeacherPersonId,
       startDate: normalizedStartDate,
       endDate: normalizedEndDate
     },
@@ -671,10 +789,15 @@ async function buildWeeklyReportsStudentBoard({
 module.exports = {
   parseFilterIdList,
   classMatchesDepartment,
+  classMatchesProgram,
+  classMatchesTeacher,
+  collectClassProgramIds,
   filterClassesForWeeklyReports,
   filterSessionsForWeeklyReport,
   countGradebooksInSessions,
   summarizeClassAttendanceMatrix,
+  resolvePrimaryInstructor,
+  sumSessionScheduledHours,
   buildClassBoardRow,
   countExpectedSessionsFromMatrixRow,
   aggregateMatrixIntoStudentMap,
@@ -690,6 +813,8 @@ module.exports = {
   buildStudentDetailRowFromClass,
   mapStudentBoardRows,
   resolveWeeklyReportsDepartmentOptions,
+  resolveWeeklyReportsProgramOptions,
+  resolveWeeklyReportsTeacherOptions,
   resolveWeeklyReportsClasses,
   buildWeeklyReportsClassBoard,
   buildWeeklyReportsStudentBoard
