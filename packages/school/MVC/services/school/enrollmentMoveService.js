@@ -10,6 +10,8 @@ const registrationStatusLifecycleService = require('./registrationStatusLifecycl
 const rollingEnrollmentEngineService = require('./rollingEnrollmentEngineService');
 const rollingEnrollmentFunderService = require('./rollingEnrollmentFunderService');
 const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
+const enrollmentMoveOneOnOneService = require('./enrollmentMoveOneOnOneService');
+const scheduleMoveSessionsService = require('./scheduleMoveSessionsService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -21,7 +23,8 @@ let dependencies = {
   enrollmentPeriodService: classEnrollmentPeriodService,
   schoolDataService,
   registrationStatusLifecycleService,
-  rollingEnrollmentEngineService
+  rollingEnrollmentEngineService,
+  scheduleMoveSessionsService
 };
 
 function normalizeDateOnly(value) {
@@ -206,10 +209,67 @@ async function previewSourceClose(normalized, sourcePeriod, orgId, options = {})
   };
 }
 
-async function previewTargetEnrollment(normalized, sourcePeriod, targetClass, reqUser, options = {}) {
+function buildEngineRawRequestFromMove(normalized, sessionTransferPlan = null) {
+  const target = normalized.target;
+  const unmarkSessionIds = Array.isArray(sessionTransferPlan?.targetUnmarkSessionIds)
+    ? sessionTransferPlan.targetUnmarkSessionIds
+    : [];
+  return {
+    classId: target.classId,
+    studentId: target.studentId,
+    startDate: target.startDate,
+    endDate: target.endDate,
+    targetSessionCount: target.targetSessionCount,
+    targetHours: target.targetHours,
+    funderId: target.funder.funderId,
+    funderType: target.funder.funderType,
+    status: target.status,
+    reasonStart: target.reasonStart,
+    notes: target.notes,
+    programId: target.programId,
+    termId: target.termId,
+    programRegistrationId: target.programRegistrationId,
+    sessionCapacityType: target.sessionCapacityType,
+    claimNumber: target.claimNumber,
+    claimNumberId: target.claimNumberId,
+    sessionCountPolicy: target.sessionCountPolicy,
+    enrollmentSource: 'enrollment_move',
+    ...(unmarkSessionIds.length ? { unmarkSessionIds } : {})
+  };
+}
+
+async function previewTargetEnrollment(normalized, sourcePeriod, sourceClass, targetClass, reqUser, options = {}) {
   const warnings = [];
   const blockers = [];
+  const notices = [];
   const target = normalized.target;
+  let sessionTransferPlan = normalized.sessionTransferPlan || null;
+
+  if (
+    sourceClass
+    && targetClass
+    && enrollmentMoveOneOnOneService.requiresIntegratedSessionMove({
+      sourcePeriod,
+      sourceClass,
+      targetClass,
+      normalized
+    })
+  ) {
+    const sessionPlan = await enrollmentMoveOneOnOneService.planOneOnOneEnrollmentMove({
+      sourcePeriod,
+      sourceClass,
+      targetClass,
+      normalized,
+      reqUser,
+      options
+    });
+    blockers.push(...(sessionPlan.blockers || []));
+    warnings.push(...(sessionPlan.warnings || []));
+    notices.push(...(sessionPlan.notices || []));
+    sessionTransferPlan = sessionPlan.sessionTransferPlan || null;
+    normalized.sessionTransferPlan = sessionTransferPlan;
+  }
+
   const rawRequest = {
     classId: target.classId,
     studentId: target.studentId,
@@ -229,7 +289,10 @@ async function previewTargetEnrollment(normalized, sourcePeriod, targetClass, re
     claimNumber: target.claimNumber,
     claimNumberId: target.claimNumberId,
     sessionCountPolicy: target.sessionCountPolicy,
-    enrollmentSource: 'enrollment_move'
+    enrollmentSource: 'enrollment_move',
+    ...(Array.isArray(sessionTransferPlan?.targetUnmarkSessionIds) && sessionTransferPlan.targetUnmarkSessionIds.length
+      ? { unmarkSessionIds: sessionTransferPlan.targetUnmarkSessionIds }
+      : {})
   };
 
   let engineRequest;
@@ -237,7 +300,14 @@ async function previewTargetEnrollment(normalized, sourcePeriod, targetClass, re
     engineRequest = dependencies.rollingEnrollmentEngineService.normalizeEnrollmentEngineRequest(rawRequest, targetClass);
   } catch (error) {
     blockers.push({ code: 'TARGET_PAYLOAD_INVALID', message: error.message || 'Target enrollment fields are invalid.' });
-    return { blockers, warnings, engineRequest: null, draftRequired: false };
+    return {
+      blockers,
+      warnings,
+      notices,
+      engineRequest: null,
+      draftRequired: false,
+      sessionTransferPlan
+    };
   }
 
   try {
@@ -325,15 +395,22 @@ async function previewTargetEnrollment(normalized, sourcePeriod, targetClass, re
     warnings.push({ code: 'DRAFT_REQUIRED', message: 'Target class is chargeable. A draft enrollment will be created for finance review after the move is applied.' });
   }
 
+  let summary = `Enroll in ${String(targetClass?.title || target.classId || '').trim()} starting ${engineRequest.startDate}.`;
+  if (sessionTransferPlan?.sourceSessionIds?.length) {
+    summary = `Move ${sessionTransferPlan.sourceSessionIds.length} session(s) to ${String(targetClass?.title || target.classId || '').trim()} and enroll starting ${engineRequest.startDate}.`;
+  }
+
   return {
     blockers,
     warnings,
+    notices,
     engineRequest,
     alignment,
     draftRequired,
     scheduleConflicts,
+    sessionTransferPlan,
     classTitle: String(targetClass?.title || target.classId || '').trim(),
-    summary: `Enroll in ${String(targetClass?.title || target.classId || '').trim()} starting ${engineRequest.startDate}.`
+    summary
   };
 }
 
@@ -362,12 +439,22 @@ async function previewMoveEnrollment({
   }
 
   if (!blockers.length && targetClass) {
-    targetEnrollmentPreview = await previewTargetEnrollment(normalized, sourcePeriod, targetClass, reqUser, {
-      ...options,
-      sourceClass
-    });
+    targetEnrollmentPreview = await previewTargetEnrollment(
+      normalized,
+      sourcePeriod,
+      sourceClass,
+      targetClass,
+      reqUser,
+      {
+        ...options,
+        sourceClass
+      }
+    );
     blockers.push(...(targetEnrollmentPreview.blockers || []));
     warnings.push(...(targetEnrollmentPreview.warnings || []));
+    if (targetEnrollmentPreview.sessionTransferPlan) {
+      normalized.sessionTransferPlan = targetEnrollmentPreview.sessionTransferPlan;
+    }
   }
 
   const previewHash = buildPreviewHash(normalized);
@@ -391,8 +478,10 @@ async function previewMoveEnrollment({
       status: normalized.target.status,
       draftRequired: targetEnrollmentPreview.draftRequired,
       alignment: targetEnrollmentPreview.alignment || null,
-      scheduleConflicts: targetEnrollmentPreview.scheduleConflicts || null
+      scheduleConflicts: targetEnrollmentPreview.scheduleConflicts || null,
+      sessionTransferPlan: targetEnrollmentPreview.sessionTransferPlan || null
     } : null,
+    sessionTransferPlan: normalized.sessionTransferPlan || null,
     summaryLines
   };
 }
@@ -438,44 +527,120 @@ async function applyMoveEnrollment({
 
   const sourcePeriod = await getSourcePeriodOrThrow(sourcePeriodId, options);
   const normalized = preview.normalizedPayload;
+  const sourceClass = await dependencies.repositories.classes.getById(sourcePeriod.classId, options);
   const targetClass = await dependencies.repositories.classes.getById(normalized.target.classId, options);
   if (!targetClass) throw new Error('Target class not found.');
 
-  const closedSource = await applySourceClose(normalized, sourcePeriod, orgId, reqUser, options);
+  const integratedMove = Boolean(
+    sourceClass
+    && enrollmentMoveOneOnOneService.requiresIntegratedSessionMove({
+      sourcePeriod,
+      sourceClass,
+      targetClass,
+      normalized
+    })
+  );
+  const sessionTransferPlan = normalized.sessionTransferPlan || null;
+  const accessContext = options.accessContext || null;
+
+  if (!integratedMove) {
+    const legacy = await applyMoveEnrollmentGroupLegacy({
+      normalized,
+      sourcePeriod,
+      targetClass,
+      orgId,
+      reqUser,
+      engineHooks,
+      options
+    });
+    const targetPeriod = legacy.firstResult.period || null;
+    const requiresDraftReview = Boolean(
+      preview.targetEnrollmentPreview?.draftRequired
+      && targetPeriod
+      && ['draft', 'to_be_confirmed', 'waiting_list'].includes(String(targetPeriod.status || '').trim().toLowerCase())
+    );
+    return {
+      closedSource: legacy.closedSource,
+      targetPeriod,
+      engineResult: legacy.engineResult,
+      sessionTransferResult: null,
+      requiresDraftReview,
+      preview
+    };
+  }
+
+  let sessionTransferResult = null;
+  let closedSource = null;
+
+  if (integratedMove) {
+    if (!sessionTransferPlan?.plans?.length) {
+      throw new Error('Session transfer plan is missing. Preview the move again before applying.');
+    }
+    const [sourceSessions, targetSessions] = await Promise.all([
+      dependencies.schoolDataService.getClassSessions(sourceClass.id, reqUser),
+      dependencies.schoolDataService.getClassSessions(targetClass.id, reqUser)
+    ]);
+    sessionTransferResult = await dependencies.scheduleMoveSessionsService.applySessionTransferPlans({
+      sourceClass,
+      targetClass,
+      sourceSessions,
+      targetSessions,
+      sessionPlans: sessionTransferPlan.plans,
+      reqUser,
+      accessContext
+    });
+    normalized.sessionTransferPlan = {
+      ...sessionTransferPlan,
+      targetUnmarkSessionIds: sessionTransferResult.targetUnmarkSessionIds
+    };
+  }
 
   const engineResult = await dependencies.rollingEnrollmentEngineService.execute({
     classData: targetClass,
     reqUser,
-    rawRequest: {
-      classId: normalized.target.classId,
-      studentId: normalized.target.studentId,
-      startDate: normalized.target.startDate,
-      endDate: normalized.target.endDate,
-      targetSessionCount: normalized.target.targetSessionCount,
-      targetHours: normalized.target.targetHours,
-      funderId: normalized.target.funder.funderId,
-      funderType: normalized.target.funder.funderType,
-      status: normalized.target.status,
-      reasonStart: normalized.target.reasonStart,
-      notes: normalized.target.notes,
-      programId: normalized.target.programId,
-      termId: normalized.target.termId,
-      programRegistrationId: normalized.target.programRegistrationId,
-      sessionCapacityType: normalized.target.sessionCapacityType,
-      claimNumber: normalized.target.claimNumber,
-      claimNumberId: normalized.target.claimNumberId,
-      sessionCountPolicy: normalized.target.sessionCountPolicy,
-      enrollmentSource: 'enrollment_move'
-    },
+    rawRequest: buildEngineRawRequestFromMove(normalized, normalized.sessionTransferPlan),
     hooks: engineHooks
+  }).catch(async (error) => {
+    if (sessionTransferResult?.rollbackTargetSessions) {
+      await dependencies.scheduleMoveSessionsService.rollbackTargetSessionTransfer({
+        targetClassId: targetClass.id,
+        rollbackTargetSessions: sessionTransferResult.rollbackTargetSessions,
+        reqUser,
+        accessContext
+      });
+    }
+    throw error;
   });
 
   const firstResult = (Array.isArray(engineResult.results) ? engineResult.results : [])[0];
   if (!firstResult?.ok) {
-    const message = firstResult?.error || 'Target enrollment failed after closing the source period.';
-    const error = new Error(`${message} Source enrollment was already closed; review the student record and create the target enrollment manually if needed.`);
-    error.partial = { closedSource, engineResult };
+    if (sessionTransferResult?.rollbackTargetSessions) {
+      await dependencies.scheduleMoveSessionsService.rollbackTargetSessionTransfer({
+        targetClassId: targetClass.id,
+        rollbackTargetSessions: sessionTransferResult.rollbackTargetSessions,
+        reqUser,
+        accessContext
+      });
+    }
+    const message = firstResult?.error || 'Target enrollment failed.';
+    const error = new Error(integratedMove
+      ? message
+      : `${message} Source enrollment was already closed; review the student record and create the target enrollment manually if needed.`);
+    error.partial = { closedSource, engineResult, sessionTransferResult };
     throw error;
+  }
+
+  closedSource = await applySourceClose(normalized, sourcePeriod, orgId, reqUser, options);
+
+  if (integratedMove && sessionTransferPlan?.sourceSessionIds?.length) {
+    const sourceSessions = await dependencies.schoolDataService.getClassSessions(sourceClass.id, reqUser);
+    await dependencies.scheduleMoveSessionsService.removeSourceSessionsAfterTransfer({
+      sourceClassId: sourceClass.id,
+      sourceSessions,
+      sourceSessionIdsToRemove: sessionTransferPlan.sourceSessionIds,
+      reqUser,
+      accessContext
+    });
   }
 
   const targetPeriod = firstResult.period || null;
@@ -489,13 +654,45 @@ async function applyMoveEnrollment({
     closedSource,
     targetPeriod,
     engineResult,
+    sessionTransferResult,
     requiresDraftReview,
     preview
   };
 }
 
+async function applyMoveEnrollmentGroupLegacy({
+  normalized,
+  sourcePeriod,
+  targetClass,
+  orgId,
+  reqUser,
+  engineHooks,
+  options
+} = {}) {
+  const closedSource = await applySourceClose(normalized, sourcePeriod, orgId, reqUser, options);
+  const engineResult = await dependencies.rollingEnrollmentEngineService.execute({
+    classData: targetClass,
+    reqUser,
+    rawRequest: buildEngineRawRequestFromMove(normalized),
+    hooks: engineHooks
+  });
+  const firstResult = (Array.isArray(engineResult.results) ? engineResult.results : [])[0];
+  if (!firstResult?.ok) {
+    const message = firstResult?.error || 'Target enrollment failed after closing the source period.';
+    const error = new Error(`${message} Source enrollment was already closed; review the student record and create the target enrollment manually if needed.`);
+    error.partial = { closedSource, engineResult };
+    throw error;
+  }
+  return { closedSource, engineResult, firstResult };
+}
+
 function __setDependenciesForTest(nextDeps = {}) {
   dependencies = { ...dependencies, ...nextDeps };
+  if (nextDeps.schoolDataService) {
+    enrollmentMoveOneOnOneService.__setDependenciesForTest({
+      schoolDataService: nextDeps.schoolDataService
+    });
+  }
 }
 
 function __resetDependenciesForTest() {
@@ -504,8 +701,10 @@ function __resetDependenciesForTest() {
     enrollmentPeriodService: classEnrollmentPeriodService,
     schoolDataService,
     registrationStatusLifecycleService,
-    rollingEnrollmentEngineService
+    rollingEnrollmentEngineService,
+    scheduleMoveSessionsService
   };
+  enrollmentMoveOneOnOneService.__resetDependenciesForTest();
 }
 
 module.exports = {

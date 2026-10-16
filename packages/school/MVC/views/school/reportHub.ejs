@@ -622,9 +622,11 @@
   .school-master-hub .hub-weekly-reports-teacher-cell {
     vertical-align: top;
     border-right: 1px solid rgba(15, 23, 42, 0.1);
-    min-width: 11.5rem;
-    max-width: 15rem;
+    width: var(--hub-wr-teacher-col-width, 17.5rem);
+    min-width: var(--hub-wr-teacher-col-width, 17.5rem);
+    max-width: none;
     padding: 0.75rem 0.85rem !important;
+    box-sizing: border-box;
   }
 
   .school-master-hub .hub-weekly-reports-teacher-head {
@@ -821,14 +823,46 @@
     font-size: 0.68rem;
     color: #64748b;
     margin-top: -0.1rem;
+    line-height: 1.4;
   }
 
-  .school-master-hub .hub-weekly-reports-teacher-stat--attendance .stat-value {
+  .school-master-hub .hub-weekly-reports-teacher-stat--stacked {
+    grid-template-columns: 1fr;
+    align-items: stretch;
+  }
+
+  .school-master-hub .hub-weekly-reports-teacher-stat--stacked .stat-label {
+    margin-bottom: 0.1rem;
+  }
+
+  .school-master-hub .hub-weekly-reports-teacher-stat--stacked .stat-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 0.22rem;
+    grid-column: 1 / -1;
+  }
+
+  .school-master-hub .hub-weekly-reports-teacher-stat--stacked .stat-detail-line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.5rem;
     font-size: 0.7rem;
-    font-weight: 600;
     line-height: 1.35;
-    white-space: normal;
+  }
+
+  .school-master-hub .hub-weekly-reports-teacher-stat--stacked .stat-detail-line .stat-detail-key {
+    font-weight: 600;
+    color: #64748b;
+    flex-shrink: 0;
+  }
+
+  .school-master-hub .hub-weekly-reports-teacher-stat--stacked .stat-detail-line .stat-detail-val {
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #0f172a;
     text-align: right;
+    min-width: 0;
   }
 
   .school-master-hub .hub-weekly-reports-metric-cell {
@@ -891,7 +925,28 @@
 
   .school-master-hub .hub-weekly-reports-data-table {
     --hub-wr-table-border: #e2e8f0;
+    --hub-wr-class-col-width: 9.25rem;
+    --hub-wr-teacher-col-width: 17.5rem;
+    width: max-content;
+    min-width: 100%;
     margin-bottom: 0;
+  }
+
+  .school-master-hub .hub-weekly-reports-data-table col.hub-wr-col-teacher-col {
+    width: var(--hub-wr-teacher-col-width);
+  }
+
+  .school-master-hub .hub-weekly-reports-data-table col.hub-wr-col-class-col {
+    width: var(--hub-wr-class-col-width);
+  }
+
+  body.hub-wr-class-col-resizing {
+    cursor: col-resize;
+    user-select: none;
+  }
+
+  body.hub-wr-class-col-resizing .hub-wr-col-resize-handle {
+    background: rgba(37, 99, 235, 0.28);
   }
 
   .school-master-hub .hub-weekly-reports-data-table thead th {
@@ -920,6 +975,9 @@
   .school-master-hub .hub-weekly-reports-data-table .hub-wr-col-teacher,
   .school-master-hub .hub-weekly-reports-data-table .hub-wr-col-teacher.hub-weekly-reports-teacher-cell {
     background-color: #e8edf4;
+    width: var(--hub-wr-teacher-col-width);
+    min-width: var(--hub-wr-teacher-col-width);
+    box-sizing: border-box;
   }
 
   .school-master-hub .hub-weekly-reports-data-table thead .hub-wr-col-teacher {
@@ -928,10 +986,45 @@
 
   .school-master-hub .hub-weekly-reports-data-table .hub-wr-col-class {
     background-color: #ffffff;
+    width: var(--hub-wr-class-col-width);
+    min-width: var(--hub-wr-class-col-width);
+    max-width: var(--hub-wr-class-col-width);
+    overflow: visible;
+    box-sizing: border-box;
+    white-space: normal;
+    vertical-align: top;
+  }
+
+  .school-master-hub .hub-weekly-reports-class-open .hub-weekly-reports-class-name {
+    white-space: normal;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    line-height: 1.35;
+    font-weight: 600;
   }
 
   .school-master-hub .hub-weekly-reports-data-table thead .hub-wr-col-class {
     background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  }
+
+  .school-master-hub .hub-weekly-reports-data-table thead .hub-wr-col-class.hub-wr-col-class-resizable {
+    position: relative;
+    padding-right: 0.65rem;
+  }
+
+  .school-master-hub .hub-wr-col-resize-handle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 7px;
+    height: 100%;
+    cursor: col-resize;
+    touch-action: none;
+    z-index: 3;
+  }
+
+  .school-master-hub .hub-wr-col-resize-handle:hover {
+    background: rgba(37, 99, 235, 0.18);
   }
 
   .school-master-hub .hub-weekly-reports-data-table .hub-wr-col-sessions {
@@ -998,6 +1091,7 @@
 
   .school-master-hub .hub-weekly-reports-data-table .hub-wr-col-attendance {
     background-color: #ffefe0;
+    box-sizing: border-box;
   }
 
   .school-master-hub .hub-weekly-reports-data-table thead .hub-wr-col-attendance {
@@ -1013,10 +1107,90 @@
     border-left: 2px solid rgba(15, 23, 42, 0.08);
   }
 
+  .school-master-hub .hub-weekly-reports-class-list-wrap {
+    max-height: min(72vh, calc(100vh - 280px));
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .school-master-hub .hub-weekly-reports-class-list-wrap .hub-weekly-reports-data-table {
+    --hub-wr-thead-row1-height: 2.45rem;
+  }
+
+  .school-master-hub .hub-weekly-reports-class-list-wrap .hub-weekly-reports-data-table thead th {
+    position: sticky;
+    z-index: 2;
+  }
+
+  .school-master-hub .hub-weekly-reports-class-list-wrap .hub-weekly-reports-data-table thead tr:first-child th {
+    top: 0;
+  }
+
+  .school-master-hub .hub-weekly-reports-class-list-wrap .hub-weekly-reports-data-table thead tr:nth-child(2) th {
+    top: var(--hub-wr-thead-row1-height);
+  }
+
+  .school-master-hub .hub-weekly-reports-class-list-wrap .hub-weekly-reports-data-table .hub-wr-col-teacher {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    box-shadow: 1px 0 0 rgba(15, 23, 42, 0.1);
+  }
+
+  .school-master-hub .hub-weekly-reports-class-list-wrap .hub-weekly-reports-data-table thead .hub-wr-col-teacher {
+    z-index: 5;
+    box-shadow:
+      1px 0 0 rgba(15, 23, 42, 0.12),
+      0 1px 0 rgba(15, 23, 42, 0.08);
+  }
+
+  .school-master-hub .hub-weekly-reports-class-list-wrap .hub-weekly-reports-data-table tbody tr:hover .hub-wr-col-teacher {
+    filter: none;
+    background-color: #dfe5ee;
+  }
+
   .school-master-hub .hub-weekly-reports-metric-primary {
     font-size: 1.05rem;
     font-weight: 700;
     color: #0f172a;
+  }
+
+  .school-master-hub .hub-wr-metric--success,
+  .school-master-hub .hub-weekly-reports-metric-primary.hub-wr-metric--success {
+    color: #15803d;
+  }
+
+  .school-master-hub .hub-wr-metric--danger,
+  .school-master-hub .hub-weekly-reports-metric-primary.hub-wr-metric--danger {
+    color: #dc2626;
+  }
+
+  .school-master-hub .hub-wr-metric--warning,
+  .school-master-hub .hub-weekly-reports-metric-primary.hub-wr-metric--warning {
+    color: #c2410c;
+  }
+
+  .school-master-hub .hub-wr-metric--early,
+  .school-master-hub .hub-weekly-reports-metric-primary.hub-wr-metric--early {
+    color: #b45309;
+  }
+
+  .school-master-hub .hub-wr-metric--info,
+  .school-master-hub .hub-weekly-reports-metric-primary.hub-wr-metric--info {
+    color: #0369a1;
+  }
+
+  .school-master-hub .hub-weekly-reports-metric-primary.hub-wr-metric--success .hub-weekly-reports-drill,
+  .school-master-hub .hub-weekly-reports-metric-primary.hub-wr-metric--danger .hub-weekly-reports-drill,
+  .school-master-hub .hub-weekly-reports-metric-primary.hub-wr-metric--warning .hub-weekly-reports-drill,
+  .school-master-hub .hub-weekly-reports-metric-primary.hub-wr-metric--early .hub-weekly-reports-drill,
+  .school-master-hub .hub-weekly-reports-metric-primary.hub-wr-metric--info .hub-weekly-reports-drill {
+    color: inherit;
+    text-decoration-color: currentColor;
+  }
+
+  .school-master-hub .hub-weekly-reports-teacher-stat .stat-sub .hub-wr-metric {
+    font-weight: 700;
   }
 
   .school-master-hub .hub-weekly-reports-student-detail-wrap {
@@ -1065,34 +1239,96 @@
     background: rgba(37, 99, 235, 0.04);
   }
 
+  .school-master-hub .hub-schedule-tip,
+  #hubWeeklyReportsClassTip.hub-schedule-tip {
+    position: fixed;
+    z-index: 2200;
+    pointer-events: none;
+    max-width: min(340px, calc(100vw - 1.5rem));
+    padding: 0.7rem 1rem;
+    border-radius: 0.7rem;
+    border: 2px solid transparent;
+    background: #0f172a;
+    color: #fff;
+    font-size: 1.08rem;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    line-height: 1.3;
+    white-space: normal;
+    text-align: left;
+    direction: ltr;
+    box-shadow:
+      0 14px 34px rgba(15, 23, 42, 0.38),
+      0 0 0 1px rgba(255, 255, 255, 0.18),
+      0 0 28px rgba(13, 110, 253, 0.28);
+    opacity: 0;
+    transform: translate(-50%, calc(-100% - 14px)) scale(0.96);
+    transition: opacity 0.12s ease, transform 0.12s ease;
+  }
+
+  .school-master-hub .hub-schedule-tip.is-visible,
+  #hubWeeklyReportsClassTip.hub-schedule-tip.is-visible {
+    opacity: 1;
+    transform: translate(-50%, calc(-100% - 10px)) scale(1);
+  }
+
+  .school-master-hub .hub-schedule-tip.is-below,
+  #hubWeeklyReportsClassTip.hub-schedule-tip.is-below {
+    transform: translate(-50%, 10px) scale(1);
+  }
+
+  .school-master-hub .hub-schedule-tip::after,
+  #hubWeeklyReportsClassTip.hub-schedule-tip::after {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 100%;
+    transform: translateX(-50%);
+    border: 7px solid transparent;
+    border-top-color: var(--sch-tip-arrow, #0f172a);
+  }
+
+  .school-master-hub .hub-schedule-tip.is-below::after,
+  #hubWeeklyReportsClassTip.hub-schedule-tip.is-below::after {
+    top: auto;
+    bottom: 100%;
+    border-top-color: transparent;
+    border-bottom-color: var(--sch-tip-arrow, #0f172a);
+  }
+
+  .school-master-hub .hub-schedule-tip .sch-tip-line,
+  #hubWeeklyReportsClassTip.hub-schedule-tip .sch-tip-line {
+    display: block;
+  }
+
+  .school-master-hub .hub-schedule-tip .sch-tip-line + .sch-tip-line,
+  #hubWeeklyReportsClassTip.hub-schedule-tip .sch-tip-line + .sch-tip-line {
+    margin-top: 0.28rem;
+  }
+
+  .school-master-hub .hub-schedule-tip .sch-tip-date,
+  #hubWeeklyReportsClassTip.hub-schedule-tip .sch-tip-date {
+    direction: ltr;
+    unicode-bidi: isolate;
+  }
+
+  .school-master-hub .hub-schedule-tip .sch-tip-sub,
+  #hubWeeklyReportsClassTip.hub-schedule-tip .sch-tip-sub {
+    display: block;
+    margin-top: 0.28rem;
+    font-size: 0.95rem;
+    font-weight: 650;
+    opacity: 0.92;
+  }
+
   .school-master-hub .hub-weekly-reports-class-tile-name.hub-weekly-reports-class-open {
     cursor: pointer;
   }
 
-  .school-master-hub .hub-weekly-reports-attendance-stack {
-    text-align: left;
-    font-size: 0.78rem;
-    line-height: 1.45;
-    min-width: 9.5rem;
-    padding: 0.15rem 0;
-  }
-
-  .school-master-hub .hub-weekly-reports-attendance-stack .hub-weekly-reports-attendance-line {
-    display: flex;
-    justify-content: space-between;
-    gap: 0.35rem;
-    white-space: nowrap;
-  }
-
-  .school-master-hub .hub-weekly-reports-attendance-stack .label {
-    color: #64748b;
-    font-weight: 500;
-  }
-
-  .school-master-hub .hub-weekly-reports-attendance-stack .value {
-    font-variant-numeric: tabular-nums;
-    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    font-size: 0.75rem;
+  .school-master-hub .hub-weekly-reports-teacher-stat--attendance .stat-detail-val.hub-wr-metric--danger,
+  .school-master-hub .hub-weekly-reports-teacher-stat--attendance .stat-detail-val.hub-wr-metric--warning,
+  .school-master-hub .hub-weekly-reports-teacher-stat--attendance .stat-detail-val.hub-wr-metric--early {
+    font-weight: 700;
   }
 
   .school-master-hub .hub-weekly-reports-drilldown-modal .modal-body {
@@ -1630,6 +1866,16 @@
     body.hub-print-weekly-reports .school-master-hub .hub-table-wrap {
       overflow: visible !important;
       border: none !important;
+    }
+
+    body.hub-print-weekly-reports .school-master-hub .hub-weekly-reports-class-list-wrap {
+      max-height: none !important;
+    }
+
+    body.hub-print-weekly-reports .school-master-hub .hub-weekly-reports-class-list-wrap .hub-weekly-reports-data-table thead th,
+    body.hub-print-weekly-reports .school-master-hub .hub-weekly-reports-class-list-wrap .hub-weekly-reports-data-table .hub-wr-col-teacher {
+      position: static !important;
+      box-shadow: none !important;
     }
 
     body.hub-print-weekly-reports .school-master-hub table {
@@ -2857,6 +3103,13 @@
   let hubWeeklyReportsDepartmentOptions = [];
   let hubWeeklyReportsProgramOptions = [];
   let hubWeeklyReportsTeacherOptions = [];
+  let hubWeeklyReportsClassTipEl = null;
+  let activeWeeklyReportsClassTipTrigger = null;
+  let hubWeeklyReportsClassTipWindowEventsBound = false;
+  const HUB_WR_CLASS_COL_WIDTH_STORAGE_KEY = 'hubWeeklyReports.classColumnWidthPx';
+  const HUB_WR_CLASS_COL_DEFAULT_PX = 148;
+  const HUB_WR_CLASS_COL_MIN_PX = 72;
+  const HUB_WR_CLASS_COL_MAX_PX = 360;
   const HUB_WEEKLY_REPORTS_DEPARTMENT_COLORS = [
     '#2563eb', '#059669', '#d97706', '#dc2626', '#7c3aed', '#db2777',
     '#0891b2', '#65a30d', '#ea580c', '#4f46e5', '#0d9488', '#64748b'
@@ -5679,7 +5932,7 @@
     const expandLabel = classCount === 1 ? '1 class collapsed' : String(classCount) + ' classes collapsed';
     return [
       '<tr class="hub-weekly-reports-teacher-group-row hub-weekly-reports-teacher-group-collapsed" data-hub-wr-teacher-group="' + escapeHtml(groupKey) + '">',
-      '<td colspan="18" class="hub-weekly-reports-teacher-collapsed-bar hub-wr-col-teacher" data-hub-wr-teacher-expand="' + escapeHtml(groupKey) + '" role="button" tabindex="0" aria-label="' + escapeHtml(expandLabel) + '">',
+      '<td colspan="19" class="hub-weekly-reports-teacher-collapsed-bar hub-wr-col-teacher" data-hub-wr-teacher-expand="' + escapeHtml(groupKey) + '" role="button" tabindex="0" aria-label="' + escapeHtml(expandLabel) + '">',
       '<div class="hub-weekly-reports-teacher-head hub-weekly-reports-teacher-head--compact hub-weekly-reports-teacher-head--with-ring">',
       renderWeeklyReportsEngagementRing(groupKey, { compact: true }),
       '<button type="button" class="btn btn-sm btn-link p-0 hub-weekly-reports-teacher-toggle" data-hub-wr-teacher-toggle="1" data-hub-wr-teacher-key="' + escapeHtml(groupKey) + '" aria-expanded="false" aria-label="Expand teacher classes">',
@@ -5689,6 +5942,33 @@
       '</div>',
       '</td>',
       '</tr>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsTeacherStatDetailLine(label, value, valueTone) {
+    const toneClass = weeklyReportsMetricToneClass(valueTone);
+    return [
+      '<div class="stat-detail-line">',
+      '<span class="stat-detail-key">' + escapeHtml(label) + '</span>',
+      '<span class="stat-detail-val hub-wr-metric' + toneClass + '">' + escapeHtml(String(value)) + '</span>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsTeacherAttendanceBlock(totals) {
+    const att = totals && totals.attendance ? totals.attendance : {};
+    const absence = Number(att.absence && att.absence.count || 0);
+    const late = Number(att.late && att.late.count || 0);
+    const early = Number(att.early && att.early.count || 0);
+    return [
+      '<div class="hub-weekly-reports-teacher-stat hub-weekly-reports-teacher-stat--stacked hub-weekly-reports-teacher-stat--attendance">',
+      '<span class="stat-label">Attendance</span>',
+      '<div class="stat-detail">',
+      renderWeeklyReportsTeacherStatDetailLine('Absences', absence, 'danger'),
+      renderWeeklyReportsTeacherStatDetailLine('Late', late, 'warning'),
+      renderWeeklyReportsTeacherStatDetailLine('Early leave', early, 'early'),
+      '</div>',
+      '</div>'
     ].join('');
   }
 
@@ -5711,12 +5991,8 @@
       '<div class="hub-weekly-reports-teacher-stat">',
       '<span class="stat-label">Sessions</span>',
       '<span class="stat-value">' + escapeHtml(String(teacherTotals.sessions.total)) + '</span>',
-      '<span class="stat-sub">' + escapeHtml(String(teacherTotals.sessions.uncompleted)) + ' open · ' + escapeHtml(String(teacherTotals.sessions.finalized)) + ' final</span>',
       '</div>',
-      '<div class="hub-weekly-reports-teacher-stat hub-weekly-reports-teacher-stat--attendance">',
-      '<span class="stat-label">Attendance</span>',
-      '<span class="stat-value">' + escapeHtml(String(teacherTotals.attendance.absence.count)) + ' abs · ' + escapeHtml(String(teacherTotals.attendance.late.count)) + ' late · ' + escapeHtml(String(teacherTotals.attendance.early.count)) + ' early</span>',
-      '</div>',
+      renderWeeklyReportsTeacherAttendanceBlock(teacherTotals),
       '<div class="hub-weekly-reports-teacher-stat">',
       '<span class="stat-label">Hours</span>',
       '<span class="stat-value">' + escapeHtml(formatWeeklyReportsScheduledHours(teacherHours)) + '</span>',
@@ -5736,22 +6012,20 @@
     return String(Math.round(n * 10) / 10);
   }
 
-  function weeklyReportsHoursPerSessionLabel(sessionCount, scheduledHours) {
-    const sessions = Number(sessionCount || 0);
-    const hours = Number(scheduledHours || 0);
-    if (!sessions || !Number.isFinite(hours)) return '';
-    const per = Math.round((hours / sessions) * 10) / 10;
-    return per > 0 ? String(per) + ' h / session' : '';
+  function weeklyReportsMetricToneClass(tone) {
+    const key = String(tone || '').trim();
+    return key ? ' hub-wr-metric--' + key : '';
   }
 
   function renderWeeklyReportsMetricStack(primary, hint, options) {
     const opts = options || {};
+    const toneClass = weeklyReportsMetricToneClass(opts.tone);
     const hintHtml = hint
       ? '<div class="hub-weekly-reports-metric-hint">' + escapeHtml(hint) + '</div>'
       : '';
     const primaryHtml = opts.rawPrimary ? String(primary || '') : escapeHtml(primary);
     return [
-      '<div class="hub-weekly-reports-metric-primary">' + primaryHtml + '</div>',
+      '<div class="hub-weekly-reports-metric-primary' + toneClass + '">' + primaryHtml + '</div>',
       hintHtml
     ].join('');
   }
@@ -5828,66 +6102,36 @@
     return totals;
   }
 
-  function renderWeeklyReportsAttendanceRatio(classId, metricKey, bucket) {
-    const count = Number(bucket && bucket.count || 0);
-    const minutes = Number(bucket && bucket.minutes || 0);
-    const countHtml = count > 0
-      ? '<button type="button" class="btn btn-link btn-sm p-0 hub-weekly-reports-drill" data-hub-wr-drill="1" data-class-id="' + escapeHtml(classId || '') + '" data-metric-key="' + escapeHtml(metricKey || '') + '">' + escapeHtml(String(count)) + '</button>'
-      : escapeHtml('0');
-    return countHtml + '<span class="text-muted">/</span>' + escapeHtml(String(minutes)) + '<span class="text-muted small">m</span>';
-  }
-
-  function renderWeeklyReportsAttendanceStack(row) {
-    const classId = String(row.classId || '').trim();
-    const att = readWeeklyReportsOperationalMetrics(row).attendance;
-    const lines = [
-      { label: 'Absence', key: 'attendanceAbsence', bucket: att.absence },
-      { label: 'Late', key: 'attendanceLate', bucket: att.late },
-      { label: 'Early', key: 'attendanceEarly', bucket: att.early }
-    ];
-    return [
-      '<div class="hub-weekly-reports-attendance-stack">',
-      lines.map(function (line) {
-        return [
-          '<div class="hub-weekly-reports-attendance-line">',
-          '<span class="label">' + escapeHtml(line.label) + ':</span>',
-          '<span class="value">' + renderWeeklyReportsAttendanceRatio(classId, line.key, line.bucket) + '</span>',
-          '</div>'
-        ].join('');
-      }).join(''),
-      '</div>'
-    ].join('');
-  }
-
-  function renderWeeklyReportsDrillCount(classId, metricKey, value, hint) {
+  function renderWeeklyReportsDrillCount(classId, metricKey, value, tone) {
     const count = Number(value || 0);
     const primary = count > 0
       ? '<button type="button" class="btn btn-link btn-sm p-0 hub-weekly-reports-drill" data-hub-wr-drill="1" data-class-id="' + escapeHtml(classId || '') + '" data-metric-key="' + escapeHtml(metricKey || '') + '">' + escapeHtml(String(count)) + '</button>'
-      : escapeHtml('0');
-    return renderWeeklyReportsMetricStack(primary, hint, { rawPrimary: count > 0 });
+      : escapeHtml(String(count));
+    return renderWeeklyReportsMetricStack(primary, '', { rawPrimary: count > 0, tone: tone });
   }
 
   function renderWeeklyReportsOperationalMetricCells(row) {
     const classId = String(row.classId || '').trim();
     const m = readWeeklyReportsOperationalMetrics(row);
     const scheduledHours = Number(row.scheduledHours || 0);
-    const hoursHint = weeklyReportsHoursPerSessionLabel(m.sessions.total, scheduledHours);
     return [
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-sessions hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'sessionsTotal', m.sessions.total, 'total') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-sessions">' + renderWeeklyReportsDrillCount(classId, 'sessionsFinalized', m.sessions.finalized, 'final') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-sessions">' + renderWeeklyReportsDrillCount(classId, 'sessionsUncompleted', m.sessions.uncompleted, 'open') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-book hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'bookCoverageWith', m.bookCoverage.with, 'with report') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-book">' + renderWeeklyReportsDrillCount(classId, 'bookCoverageWithout', m.bookCoverage.without, 'missing') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-gradebooks hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'gradebooksWith', m.gradebooks.with, 'with') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-gradebooks">' + renderWeeklyReportsDrillCount(classId, 'gradebooksWithout', m.gradebooks.without, 'without') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-notes hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'notesWith', m.notes.with, 'with notes') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-notes">' + renderWeeklyReportsDrillCount(classId, 'notesWithout', m.notes.without, 'no notes') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-reports hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'reportInstancesAssigned', m.reports.assigned, 'assigned') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-reports">' + renderWeeklyReportsDrillCount(classId, 'reportInstancesCompleted', m.reports.completed, 'done') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-reports">' + renderWeeklyReportsDrillCount(classId, 'reportInstancesIncomplete', m.reports.incomplete, 'open') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-cases hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'studentCases', m.studentCases.total, 'cases') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-wr-col-hours hub-wr-col-band">' + renderWeeklyReportsMetricStack(formatWeeklyReportsScheduledHours(scheduledHours), hoursHint) + '</td>',
-      '<td class="text-center pe-3 hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-attendance hub-wr-col-band">' + renderWeeklyReportsAttendanceStack(row) + '</td>'
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-sessions hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'sessionsTotal', m.sessions.total) + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-sessions">' + renderWeeklyReportsDrillCount(classId, 'sessionsFinalized', m.sessions.finalized, 'success') + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-sessions">' + renderWeeklyReportsDrillCount(classId, 'sessionsUncompleted', m.sessions.uncompleted, 'danger') + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-book hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'bookCoverageWith', m.bookCoverage.with, 'success') + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-book">' + renderWeeklyReportsDrillCount(classId, 'bookCoverageWithout', m.bookCoverage.without, 'warning') + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-gradebooks hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'gradebooksWith', m.gradebooks.with, 'success') + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-gradebooks">' + renderWeeklyReportsDrillCount(classId, 'gradebooksWithout', m.gradebooks.without, 'warning') + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-notes hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'notesWith', m.notes.with) + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-notes">' + renderWeeklyReportsDrillCount(classId, 'notesWithout', m.notes.without) + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-reports hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'reportInstancesAssigned', m.reports.assigned, 'info') + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-reports">' + renderWeeklyReportsDrillCount(classId, 'reportInstancesCompleted', m.reports.completed, 'success') + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-reports">' + renderWeeklyReportsDrillCount(classId, 'reportInstancesIncomplete', m.reports.incomplete, 'danger') + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-cases hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'studentCases', m.studentCases.total) + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-wr-col-hours hub-wr-col-band">' + renderWeeklyReportsMetricStack(formatWeeklyReportsScheduledHours(scheduledHours), '') + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-attendance hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'attendanceAbsence', m.attendance.absence.count, 'danger') + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-attendance">' + renderWeeklyReportsDrillCount(classId, 'attendanceLate', m.attendance.late.count, 'warning') + '</td>',
+      '<td class="text-center pe-3 hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-attendance">' + renderWeeklyReportsDrillCount(classId, 'attendanceEarly', m.attendance.early.count, 'early') + '</td>'
     ].join('');
   }
 
@@ -6097,6 +6341,216 @@
     ].join('');
   }
 
+  function buildWeeklyReportsClassColumnTooltip(row) {
+    const parts = [];
+    const addDetail = function (label, value) {
+      const cleaned = String(value || '').trim();
+      if (cleaned) parts.push(label + ': ' + cleaned);
+    };
+    addDetail('Class', row.className || row.classId);
+    addDetail('Organization', row.orgName || row.orgId);
+    addDetail('Class ID', row.classId);
+    addDetail('Department', row.departmentName || row.departmentId);
+    return parts.join('\n');
+  }
+
+  function renderWeeklyReportsClassColumnCell(row) {
+    const classId = String(row.classId || '').trim();
+    const className = String(row.className || row.classId || 'Class').trim();
+    const tooltip = buildWeeklyReportsClassColumnTooltip(row);
+    const tooltipAttrs = tooltip
+      ? ' data-tip="' + escapeHtml(tooltip) + '" data-hub-schedule-tip="' + escapeHtml(tooltip) + '" aria-label="' + escapeHtml(tooltip.replace(/\n/g, ', ')) + '"'
+      : '';
+    return [
+      '<td class="hub-weekly-reports-class-open hub-wr-col-class" role="button" tabindex="0" data-hub-wr-class-tip="1"',
+      ' data-hub-weekly-reports-class-id="' + escapeHtml(classId) + '"',
+      ' data-hub-weekly-reports-class-name="' + escapeHtml(className) + '"',
+      tooltipAttrs,
+      '>',
+      '<div class="hub-weekly-reports-class-name">' + escapeHtml(className) + '</div>',
+      '</td>'
+    ].join('');
+  }
+
+  function ensureWeeklyReportsClassTipElement() {
+    if (hubWeeklyReportsClassTipEl && document.body.contains(hubWeeklyReportsClassTipEl)) {
+      return hubWeeklyReportsClassTipEl;
+    }
+    hubWeeklyReportsClassTipEl = document.getElementById('hubWeeklyReportsClassTip');
+    if (!hubWeeklyReportsClassTipEl) {
+      hubWeeklyReportsClassTipEl = document.createElement('div');
+      hubWeeklyReportsClassTipEl.id = 'hubWeeklyReportsClassTip';
+      hubWeeklyReportsClassTipEl.className = 'hub-schedule-tip';
+      hubWeeklyReportsClassTipEl.setAttribute('role', 'tooltip');
+      hubWeeklyReportsClassTipEl.hidden = true;
+      document.body.appendChild(hubWeeklyReportsClassTipEl);
+    }
+    return hubWeeklyReportsClassTipEl;
+  }
+
+  function hideWeeklyReportsClassTip() {
+    if (activeWeeklyReportsClassTipTrigger) {
+      activeWeeklyReportsClassTipTrigger.removeAttribute('aria-describedby');
+    }
+    activeWeeklyReportsClassTipTrigger = null;
+    if (!hubWeeklyReportsClassTipEl) return;
+    hubWeeklyReportsClassTipEl.classList.remove('is-visible', 'is-below');
+    hubWeeklyReportsClassTipEl.hidden = true;
+  }
+
+  function showWeeklyReportsClassTip(trigger) {
+    const label = String(
+      trigger?.getAttribute('data-tip') || trigger?.getAttribute('data-hub-schedule-tip') || ''
+    ).trim();
+    if (!label) {
+      hideWeeklyReportsClassTip();
+      return;
+    }
+    const tip = ensureWeeklyReportsClassTipElement();
+    if (activeWeeklyReportsClassTipTrigger && activeWeeklyReportsClassTipTrigger !== trigger) {
+      activeWeeklyReportsClassTipTrigger.removeAttribute('aria-describedby');
+    }
+    activeWeeklyReportsClassTipTrigger = trigger;
+    trigger.setAttribute('aria-describedby', tip.id);
+    const tipBg = trigger.getAttribute('data-tip-bg') || '#0f172a';
+    const tipFg = trigger.getAttribute('data-tip-fg') || '#ffffff';
+    const tipBorder = trigger.getAttribute('data-tip-border') || tipBg;
+    const parts = (label.includes('\n') ? label.split('\n') : label.split(' | ')).map(function (part) {
+      return String(part || '').trim();
+    }).filter(Boolean);
+    tip.innerHTML = parts.map(function (part, index) {
+      const isDate = /^Date:/i.test(part);
+      return '<span class="sch-tip-line' + (index > 0 ? ' sch-tip-sub' : '') + (isDate ? ' sch-tip-date' : '') + '">' + escapeHtml(part) + '</span>';
+    }).join('');
+    tip.style.background = tipBg;
+    tip.style.color = tipFg;
+    tip.style.borderColor = tipBorder;
+    tip.style.setProperty('--sch-tip-arrow', tipBg);
+    tip.hidden = false;
+    tip.removeAttribute('hidden');
+    tip.classList.remove('is-below');
+    const rect = trigger.getBoundingClientRect();
+    let left = rect.left + (rect.width / 2);
+    const tipWidth = tip.offsetWidth || 160;
+    const tipHeight = tip.offsetHeight || 80;
+    const pad = 10;
+    left = Math.max(pad + tipWidth / 2, Math.min(left, window.innerWidth - pad - tipWidth / 2));
+    tip.style.left = left + 'px';
+    if ((rect.top - tipHeight - 14) < pad) {
+      tip.classList.add('is-below');
+      tip.style.top = Math.min(window.innerHeight - pad - tipHeight, rect.bottom) + 'px';
+    } else {
+      tip.style.top = rect.top + 'px';
+    }
+    tip.classList.add('is-visible');
+  }
+
+  function readWeeklyReportsClassColumnWidthPx() {
+    try {
+      const stored = Number(localStorage.getItem(HUB_WR_CLASS_COL_WIDTH_STORAGE_KEY));
+      if (Number.isFinite(stored) && stored >= HUB_WR_CLASS_COL_MIN_PX && stored <= HUB_WR_CLASS_COL_MAX_PX) {
+        return Math.round(stored);
+      }
+    } catch (error) {
+      /* ignore storage errors */
+    }
+    return HUB_WR_CLASS_COL_DEFAULT_PX;
+  }
+
+  function clampWeeklyReportsClassColumnWidthPx(widthPx) {
+    const value = Number(widthPx);
+    if (!Number.isFinite(value)) return HUB_WR_CLASS_COL_DEFAULT_PX;
+    return Math.max(HUB_WR_CLASS_COL_MIN_PX, Math.min(HUB_WR_CLASS_COL_MAX_PX, Math.round(value)));
+  }
+
+  function applyWeeklyReportsClassColumnWidth(table, widthPx) {
+    if (!table) return;
+    const width = clampWeeklyReportsClassColumnWidthPx(widthPx);
+    table.style.setProperty('--hub-wr-class-col-width', width + 'px');
+    return width;
+  }
+
+  function persistWeeklyReportsClassColumnWidth(widthPx) {
+    const width = clampWeeklyReportsClassColumnWidthPx(widthPx);
+    try {
+      localStorage.setItem(HUB_WR_CLASS_COL_WIDTH_STORAGE_KEY, String(width));
+    } catch (error) {
+      /* ignore storage errors */
+    }
+    return width;
+  }
+
+  function initWeeklyReportsClassColumnWidth(table) {
+    if (!table) return;
+    applyWeeklyReportsClassColumnWidth(table, readWeeklyReportsClassColumnWidthPx());
+  }
+
+  function bindWeeklyReportsClassColumnResize(container) {
+    if (!container || container.dataset.hubWrClassColResizeBound === '1') return;
+    container.dataset.hubWrClassColResizeBound = '1';
+    container.addEventListener('mousedown', function (event) {
+      const handle = event.target && event.target.closest('[data-hub-wr-resize-class-col]');
+      if (!handle || !container.contains(handle)) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const table = handle.closest('.hub-weekly-reports-data-table');
+      const headerCell = handle.closest('th.hub-wr-col-class');
+      if (!table || !headerCell) return;
+      const startX = event.clientX;
+      const startWidth = headerCell.offsetWidth || readWeeklyReportsClassColumnWidthPx();
+      document.body.classList.add('hub-wr-class-col-resizing');
+      handle.classList.add('is-dragging');
+      const onMove = function (moveEvent) {
+        applyWeeklyReportsClassColumnWidth(table, startWidth + (moveEvent.clientX - startX));
+      };
+      const onUp = function () {
+        handle.classList.remove('is-dragging');
+        document.body.classList.remove('hub-wr-class-col-resizing');
+        document.removeEventListener('mousemove', onMove);
+        document.removeEventListener('mouseup', onUp);
+        const computed = getComputedStyle(table).getPropertyValue('--hub-wr-class-col-width').trim();
+        const parsed = parseFloat(computed);
+        if (Number.isFinite(parsed)) persistWeeklyReportsClassColumnWidth(parsed);
+      };
+      document.addEventListener('mousemove', onMove);
+      document.addEventListener('mouseup', onUp);
+    });
+    container.querySelectorAll('.hub-weekly-reports-data-table').forEach(initWeeklyReportsClassColumnWidth);
+  }
+
+  function bindWeeklyReportsClassColumnTooltips(container) {
+    if (!container || container.dataset.hubWrClassTooltipsBound === '1') return;
+    container.dataset.hubWrClassTooltipsBound = '1';
+    container.addEventListener('pointerover', function (event) {
+      const trigger = event.target && event.target.closest('[data-hub-wr-class-tip]');
+      if (!trigger || !container.contains(trigger)) return;
+      showWeeklyReportsClassTip(trigger);
+    });
+    container.addEventListener('pointerout', function (event) {
+      const trigger = event.target && event.target.closest('[data-hub-wr-class-tip]');
+      if (!trigger) return;
+      const next = event.relatedTarget;
+      if (next && trigger.contains(next)) return;
+      hideWeeklyReportsClassTip();
+    });
+    container.addEventListener('focusin', function (event) {
+      const trigger = event.target && event.target.closest('[data-hub-wr-class-tip]');
+      if (trigger) showWeeklyReportsClassTip(trigger);
+    });
+    container.addEventListener('focusout', function (event) {
+      const trigger = event.target && event.target.closest('[data-hub-wr-class-tip]');
+      if (!trigger) return;
+      const next = event.relatedTarget;
+      if (next && trigger.contains(next)) return;
+      hideWeeklyReportsClassTip();
+    });
+    if (!hubWeeklyReportsClassTipWindowEventsBound) {
+      hubWeeklyReportsClassTipWindowEventsBound = true;
+      window.addEventListener('scroll', hideWeeklyReportsClassTip, true);
+      window.addEventListener('resize', hideWeeklyReportsClassTip);
+    }
+  }
+
   function renderWeeklyReportsClassList(rows) {
     const groups = groupWeeklyReportsClassesByTeacher(rows);
     if (!groups.length) {
@@ -6113,11 +6567,7 @@
       const teacherCell = renderWeeklyReportsTeacherCell(group, classes, groupKey, classes.length);
       return classes.map(function (row, index) {
         const classCells = [
-          '<td class="hub-weekly-reports-class-open hub-wr-col-class" role="button" tabindex="0" data-hub-weekly-reports-class-id="' + escapeHtml(row.classId || '') + '" data-hub-weekly-reports-class-name="' + escapeHtml(row.className || row.classId || '') + '">',
-          '<div class="fw-semibold">' + escapeHtml(row.className || row.classId || 'Class') + '</div>',
-          '<div class="small text-muted font-monospace">' + escapeHtml(row.classId || '-') + '</div>',
-          row.departmentName ? '<div class="small text-muted">' + escapeHtml(row.departmentName) + '</div>' : '',
-          '</td>',
+          renderWeeklyReportsClassColumnCell(row),
           renderWeeklyReportsOperationalMetricCells(row)
         ].join('');
         return [
@@ -6129,12 +6579,19 @@
       }).join('');
     }).join('');
     return [
-      '<div class="hub-table-wrap">',
-      '<table class="table table-hover align-middle hub-workspace-table hub-weekly-reports-data-table mb-0">',
+      '<div class="hub-table-wrap hub-weekly-reports-class-list-wrap">',
+      '<table class="table table-hover align-middle hub-workspace-table hub-weekly-reports-data-table mb-0" style="--hub-wr-class-col-width: ' + String(readWeeklyReportsClassColumnWidthPx()) + 'px;">',
+      '<colgroup>',
+      '<col class="hub-wr-col-teacher-col">',
+      '<col class="hub-wr-col-class-col">',
+      '</colgroup>',
       '<thead>',
       '<tr>',
       '<th class="ps-3 hub-wr-col-teacher" rowspan="2">Teacher</th>',
-      '<th rowspan="2" class="hub-weekly-reports-list-sort hub-wr-col-class" data-hub-weekly-reports-class-sort="className">Class' + weeklyReportsClassSortIndicator('className') + '</th>',
+      '<th rowspan="2" class="hub-weekly-reports-list-sort hub-wr-col-class hub-wr-col-class-resizable" data-hub-weekly-reports-class-sort="className">',
+      'Class' + weeklyReportsClassSortIndicator('className'),
+      '<span class="hub-wr-col-resize-handle" data-hub-wr-resize-class-col="1" role="separator" aria-orientation="vertical" aria-label="Resize class column" title="Drag to resize column"></span>',
+      '</th>',
       '<th colspan="3" class="text-center hub-weekly-reports-col-group hub-wr-col-sessions hub-wr-col-band">Sessions</th>',
       '<th colspan="2" class="text-center hub-weekly-reports-col-group hub-wr-col-book hub-wr-col-band">Book coverage</th>',
       '<th colspan="2" class="text-center hub-weekly-reports-col-group hub-wr-col-gradebooks hub-wr-col-band">Gradebooks</th>',
@@ -6142,7 +6599,7 @@
       '<th colspan="3" class="text-center hub-weekly-reports-col-group hub-wr-col-reports hub-wr-col-band">Student reports</th>',
       '<th rowspan="2" class="text-center hub-weekly-reports-col-group hub-wr-col-cases hub-wr-col-band">Cases</th>',
       '<th rowspan="2" class="text-center hub-wr-col-hours hub-wr-col-band">Hours</th>',
-      '<th rowspan="2" class="text-center pe-3 hub-weekly-reports-col-group hub-wr-col-attendance hub-wr-col-band">Attendance</th>',
+      '<th colspan="3" class="text-center hub-weekly-reports-col-group hub-wr-col-attendance hub-wr-col-band">Attendance</th>',
       '</tr>',
       '<tr>',
       '<th class="text-center small hub-wr-col-sessions hub-wr-col-band">Total</th><th class="text-center small hub-wr-col-sessions">Final</th><th class="text-center small hub-wr-col-sessions">Open</th>',
@@ -6150,6 +6607,7 @@
       '<th class="text-center small hub-wr-col-gradebooks hub-wr-col-band">With</th><th class="text-center small hub-wr-col-gradebooks">Without</th>',
       '<th class="text-center small hub-wr-col-notes hub-wr-col-band">With</th><th class="text-center small hub-wr-col-notes">Without</th>',
       '<th class="text-center small hub-wr-col-reports hub-wr-col-band">Assigned</th><th class="text-center small hub-wr-col-reports">Done</th><th class="text-center small hub-wr-col-reports">Open</th>',
+      '<th class="text-center small hub-wr-col-attendance hub-wr-col-band">Absence</th><th class="text-center small hub-wr-col-attendance">Late</th><th class="text-center small hub-wr-col-attendance pe-3">Early</th>',
       '</tr>',
       '</thead>',
       '<tbody>', body, '</tbody>',
@@ -6260,13 +6718,13 @@
         '<tr class="hub-weekly-reports-student-row" data-hub-weekly-reports-student-id="' + escapeHtml(row.studentId || '') + '" data-hub-weekly-reports-student-name="' + escapeHtml(row.name || row.studentId || '') + '">',
         '<td class="ps-3"><div class="fw-semibold">' + hubStudentNameHtml(row.name || row.studentId, row.studentId) + '</div>',
         '<div class="small text-muted font-monospace">' + escapeHtml(row.studentId || '-') + '</div></td>',
-        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsMetricStack(String(Number(row.presentCount || 0)), 'present') + '</td>',
-        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsMetricStack(String(Number(row.lateCount || 0)), 'late') + '</td>',
-        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsMetricStack(String(Number(row.absenceCount || 0)), 'absences') + '</td>',
-        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsMetricStack(caseLabel, 'cases') + '</td>',
-        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsMetricStack(String(Number(row.sessionCount || 0)), 'sessions') + '</td>',
-        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsMetricStack(formatWeeklyReportsSkillSummary(row.skillAverages), 'skills') + '</td>',
-        '<td class="text-center pe-3 hub-weekly-reports-metric-cell">' + renderWeeklyReportsMetricStack(String(Math.round(Number(row.attendanceHealth || 0))), 'health %') + '</td>',
+        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsMetricStack(String(Number(row.presentCount || 0)), '') + '</td>',
+        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsMetricStack(String(Number(row.lateCount || 0)), '') + '</td>',
+        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsMetricStack(String(Number(row.absenceCount || 0)), '') + '</td>',
+        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsMetricStack(caseLabel, '') + '</td>',
+        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsMetricStack(String(Number(row.sessionCount || 0)), '') + '</td>',
+        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsMetricStack(formatWeeklyReportsSkillSummary(row.skillAverages), '') + '</td>',
+        '<td class="text-center pe-3 hub-weekly-reports-metric-cell">' + renderWeeklyReportsMetricStack(String(Math.round(Number(row.attendanceHealth || 0))), '') + '</td>',
         '</tr>'
       ].join('');
     }).join('');
@@ -6375,6 +6833,7 @@
   function renderWeeklyReportsResultsPanel() {
     const panel = document.getElementById('hubWeeklyReportsResults');
     if (!panel) return;
+    hideWeeklyReportsClassTip();
     panel.innerHTML = renderWeeklyReportsResultsContent();
     bindWeeklyReportsResultsControls();
     bindWeeklyReportsSharePrintControls(panel);
@@ -6408,7 +6867,8 @@
       });
     });
     panel.querySelectorAll('[data-hub-weekly-reports-class-sort]').forEach(function (header) {
-      header.addEventListener('click', function () {
+      header.addEventListener('click', function (event) {
+        if (event.target && event.target.closest('[data-hub-wr-resize-class-col]')) return;
         const key = header.getAttribute('data-hub-weekly-reports-class-sort') || 'className';
         const current = hubWeeklyReportsState.classListSort || { key: 'className', dir: 'asc' };
         if (current.key === key) {
@@ -6510,6 +6970,8 @@
         syncWeeklyReportsShareUrl();
       });
     });
+    bindWeeklyReportsClassColumnTooltips(panel);
+    bindWeeklyReportsClassColumnResize(panel);
   }
 
   function applyWeeklyReportsPayloadToState(payload, opts) {

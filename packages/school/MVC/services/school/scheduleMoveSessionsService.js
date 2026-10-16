@@ -302,6 +302,130 @@ function evaluateSessionConflicts({
   return { blockers, notices, plans };
 }
 
+/**
+ * Like evaluateSessionConflicts but keeps each source session's start/end on the same date.
+ */
+function evaluateSessionTransferPlans({
+  selectedSessions = [],
+  targetSessions = [],
+  targetCapacity = 0,
+  sourcePeriods = [],
+  targetPeriods = [],
+  cycleStartDate = '',
+  cycleEndDate = ''
+} = {}) {
+  const blockers = [];
+  const sessionBlockers = [];
+  const notices = [];
+  const plans = [];
+
+  const selected = (Array.isArray(selectedSessions) ? selectedSessions : [])
+    .map((session) => ({
+      session,
+      sessionId: sessionIdentity(session),
+      date: sessionDate(session),
+      duration: durationMinutes(session)
+    }))
+    .filter((row) => row.sessionId && row.date)
+    .sort((a, b) => a.date.localeCompare(b.date) || a.sessionId.localeCompare(b.sessionId));
+
+  selected.forEach((row) => {
+    const sessionRef = {
+      date: row.date,
+      sessionId: row.sessionId,
+      startTime: sessionStart(row.session),
+      endTime: sessionEnd(row.session)
+    };
+    if (!row.duration) {
+      sessionBlockers.push({ code: 'INVALID_DURATION', ...sessionRef });
+      return;
+    }
+    const proposedStart = timeToMinutes(sessionStart(row.session));
+    if (!Number.isFinite(proposedStart)) {
+      sessionBlockers.push({ code: 'INVALID_DURATION', ...sessionRef });
+      return;
+    }
+    const proposedEnd = proposedStart + row.duration;
+    if (proposedEnd > (24 * 60)) {
+      sessionBlockers.push({ code: 'END_TIME_OVERFLOW', ...sessionRef });
+      return;
+    }
+    const cycleStart = normalizeDateOnly(cycleStartDate);
+    const cycleEnd = normalizeDateOnly(cycleEndDate);
+    if ((cycleStart && row.date < cycleStart) || (cycleEnd && row.date > cycleEnd)) {
+      sessionBlockers.push({ code: 'OUT_OF_CYCLE', ...sessionRef });
+      return;
+    }
+
+    const sameDay = (Array.isArray(targetSessions) ? targetSessions : []).filter((session) => sessionDate(session) === row.date);
+    const overlaps = sameDay.filter((session) => {
+      const start = timeToMinutes(sessionStart(session));
+      const end = timeToMinutes(sessionEnd(session));
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return false;
+      return proposedStart < end && start < proposedEnd;
+    });
+    const exact = overlaps.find((session) => {
+      const start = timeToMinutes(sessionStart(session));
+      return start === proposedStart && durationMinutes(session) === row.duration;
+    });
+    const mismatched = overlaps.filter((session) => session !== exact);
+    if (mismatched.length) {
+      sessionBlockers.push({ code: 'TIME_MISMATCH', ...sessionRef });
+      return;
+    }
+    if (exact) {
+      const targetStudents = studentsCoveringDate(targetPeriods, row.date);
+      const movingStudents = studentsCoveringDate(sourcePeriods, row.date);
+      const combined = new Set([...targetStudents, ...movingStudents]);
+      if (targetCapacity === 1 && targetStudents.size > 0) {
+        sessionBlockers.push({
+          code: 'OCCUPIED_ONE_ON_ONE',
+          ...sessionRef,
+          sessionId: sessionIdentity(exact) || row.sessionId
+        });
+        return;
+      }
+      if (targetCapacity > 1 && combined.size > targetCapacity) {
+        sessionBlockers.push({
+          code: 'CAPACITY_EXCEEDED',
+          ...sessionRef,
+          sessionId: sessionIdentity(exact) || row.sessionId
+        });
+        return;
+      }
+      plans.push({
+        action: 'reuse',
+        date: row.date,
+        sourceSessionId: row.sessionId,
+        targetSessionId: sessionIdentity(exact),
+        startTime: minutesToTime(proposedStart),
+        endTime: minutesToTime(proposedEnd)
+      });
+      return;
+    }
+    plans.push({
+      action: 'create',
+      date: row.date,
+      sourceSessionId: row.sessionId,
+      targetSessionId: '',
+      startTime: minutesToTime(proposedStart),
+      endTime: minutesToTime(proposedEnd)
+    });
+  });
+
+  const reuseCount = plans.filter((row) => row.action === 'reuse').length;
+  const createCount = plans.filter((row) => row.action === 'create').length;
+  const groupedBlockers = groupSessionBlockers(sessionBlockers, targetCapacity);
+  blockers.push(...groupedBlockers);
+  if (!blockers.length && reuseCount > 0 && createCount > 0) {
+    notices.push({
+      code: 'PARTIAL_CREATE',
+      message: `This will create ${createCount} missing session(s) on the target class and will not change the ${reuseCount} session(s) that already match.`
+    });
+  }
+  return { blockers, notices, plans };
+}
+
 function consumedBeforeDate(period, sessions, closeDate) {
   const prior = (Array.isArray(sessions) ? sessions : []).filter((session) => {
     const date = sessionDate(session);
@@ -656,6 +780,129 @@ async function applyEnrollmentRow({
   });
 }
 
+function resolveTargetUnmarkSessionIdsFromPlans(sessionPlans = [], targetSessionsAfter = []) {
+  const ids = [];
+  (Array.isArray(sessionPlans) ? sessionPlans : []).forEach((plan) => {
+    const explicit = toPublicId(plan?.targetSessionId || '');
+    if (explicit) {
+      ids.push(explicit);
+      return;
+    }
+    const sourceId = toPublicId(plan?.sourceSessionId || '');
+    if (!sourceId) return;
+    const match = (Array.isArray(targetSessionsAfter) ? targetSessionsAfter : []).find((session) => {
+      if (sessionDate(session) !== normalizeDateOnly(plan?.date)) return false;
+      return timeToMinutes(sessionStart(session)) === timeToMinutes(plan?.startTime)
+        && durationMinutes(session) === (timeToMinutes(plan?.endTime) - timeToMinutes(plan?.startTime));
+    });
+    if (match) ids.push(sessionIdentity(match));
+  });
+  return Array.from(new Set(ids.map((id) => toPublicId(id)).filter(Boolean)));
+}
+
+async function applySessionTransferPlans({
+  sourceClass,
+  targetClass,
+  sourceSessions = [],
+  targetSessions = [],
+  sessionPlans = [],
+  reqUser,
+  accessContext
+} = {}) {
+  if (!targetClass?.id) throw new Error('Target class is required.');
+  const plans = Array.isArray(sessionPlans) ? sessionPlans : [];
+  if (!plans.length) {
+    return {
+      targetSessionsAfter: Array.isArray(targetSessions) ? targetSessions : [],
+      createdSessionIds: [],
+      targetUnmarkSessionIds: [],
+      rollbackTargetSessions: Array.isArray(targetSessions) ? targetSessions : []
+    };
+  }
+  const teacher = resolveTargetTeacher(targetClass);
+  const sourceById = new Map(
+    (Array.isArray(sourceSessions) ? sourceSessions : []).map((session) => [sessionIdentity(session), session])
+  );
+  const targetSessionsBefore = JSON.parse(JSON.stringify(Array.isArray(targetSessions) ? targetSessions : []));
+  let targetSessionsWorking = targetSessionsBefore.slice();
+  const created = [];
+  plans.forEach((plan) => {
+    const sourceSession = sourceById.get(toPublicId(plan.sourceSessionId || ''));
+    if (!sourceSession) return;
+    if (plan.action === 'create') {
+      const session = buildCreatedSession({
+        classId: targetClass.id,
+        sourceSession,
+        plan,
+        existingSessions: targetSessionsWorking,
+        teacher
+      });
+      targetSessionsWorking.push(session);
+      created.push(session.sessionId);
+      return;
+    }
+    const targetId = toPublicId(plan.targetSessionId || '');
+    targetSessionsWorking = targetSessionsWorking.map((session) => {
+      if (!idsEqual(sessionIdentity(session), targetId)) return session;
+      return { ...session, roster: mergeRoster(session.roster, sourceSession.roster) };
+    });
+  });
+  await dependencies.schoolDataService.saveClassSessions(
+    targetClass.id,
+    targetSessionsWorking,
+    reqUser,
+    accessContext
+  );
+  const targetUnmarkSessionIds = resolveTargetUnmarkSessionIdsFromPlans(plans, targetSessionsWorking);
+  return {
+    targetSessionsAfter: targetSessionsWorking,
+    createdSessionIds: created,
+    targetUnmarkSessionIds,
+    rollbackTargetSessions: targetSessionsBefore
+  };
+}
+
+async function rollbackTargetSessionTransfer({
+  targetClassId,
+  rollbackTargetSessions,
+  reqUser,
+  accessContext
+} = {}) {
+  const targetId = toPublicId(targetClassId);
+  if (!targetId || !Array.isArray(rollbackTargetSessions)) return;
+  await dependencies.schoolDataService.saveClassSessions(
+    targetId,
+    rollbackTargetSessions,
+    reqUser,
+    accessContext
+  );
+}
+
+async function removeSourceSessionsAfterTransfer({
+  sourceClassId,
+  sourceSessions = [],
+  sourceSessionIdsToRemove = [],
+  reqUser,
+  accessContext
+} = {}) {
+  const removeIds = new Set(
+    (Array.isArray(sourceSessionIdsToRemove) ? sourceSessionIdsToRemove : [])
+      .map((id) => toPublicId(id))
+      .filter(Boolean)
+  );
+  if (!removeIds.size) return { removedSessionIds: [] };
+  const remaining = (Array.isArray(sourceSessions) ? sourceSessions : []).filter((session) => (
+    !removeIds.has(sessionIdentity(session))
+  ));
+  await dependencies.schoolDataService.saveClassSessions(
+    sourceClassId,
+    remaining,
+    reqUser,
+    accessContext
+  );
+  return { removedSessionIds: [...removeIds] };
+}
+
 async function applyMoveSessions({
   classId,
   targetClassId,
@@ -797,6 +1044,14 @@ module.exports = {
   addDaysIso,
   evaluateCapacityGate,
   evaluateSessionConflicts,
+  evaluateSessionTransferPlans,
+  resolveTargetUnmarkSessionIdsFromPlans,
+  applySessionTransferPlans,
+  rollbackTargetSessionTransfer,
+  removeSourceSessionsAfterTransfer,
+  resolveTargetTeacher,
+  sessionIdentity,
+  sessionDate,
   classifyMoveEnrollments,
   buildMovePreviewHash,
   parseSelectedSessionIds,

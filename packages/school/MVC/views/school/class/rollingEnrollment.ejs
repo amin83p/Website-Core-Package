@@ -11502,12 +11502,37 @@
     });
   }
 
+  function formatMoveSessionTransferPlanHtml(sessionTransferPlan) {
+    if (!sessionTransferPlan || !Array.isArray(sessionTransferPlan.plans) || !sessionTransferPlan.plans.length) return '';
+    const rows = sessionTransferPlan.plans.slice(0, 8).map((plan) => {
+      const action = String(plan?.action || '').trim() === 'reuse' ? 'Use existing' : 'Create';
+      return `${htmlEscape(String(plan?.date || ''))} ${htmlEscape(String(plan?.startTime || ''))}–${htmlEscape(String(plan?.endTime || ''))} (${action})`;
+    });
+    const extra = sessionTransferPlan.plans.length > 8
+      ? `<div class="small text-muted">+ ${sessionTransferPlan.plans.length - 8} more session(s)</div>`
+      : '';
+    return [
+      '<div class="small mt-2"><span class="fw-semibold">Sessions:</span>',
+      rows.map((line) => `<div>${line}</div>`).join(''),
+      extra,
+      '</div>'
+    ].join('');
+  }
+
   function renderMovePreviewPanel(preview) {
     const panel = qs('move_previewPanel');
     if (!panel) return;
     const lines = Array.isArray(preview?.summaryLines) ? preview.summaryLines : [];
     const blockers = Array.isArray(preview?.blockers) ? preview.blockers : [];
     const warnings = Array.isArray(preview?.warnings) ? preview.warnings : [];
+    const sessionTransferPlan = preview?.sessionTransferPlan
+      || preview?.targetEnrollmentPreview?.sessionTransferPlan
+      || null;
+    const masterScheduleUrl = String(sessionTransferPlan?.masterScheduleUrl || '').trim();
+    const scheduleLinkHtml = masterScheduleUrl
+      ? `<div class="mt-2"><a class="btn btn-outline-secondary btn-sm" href="${htmlEscape(masterScheduleUrl)}" target="_blank" rel="noopener">Open master schedule</a></div>`
+      : '';
+    const sessionPlanHtml = formatMoveSessionTransferPlanHtml(sessionTransferPlan);
     const scheduleConflicts = Array.isArray(preview?.scheduleConflicts?.conflicts)
       ? preview.scheduleConflicts.conflicts
       : (Array.isArray(preview?.targetEnrollmentPreview?.scheduleConflicts?.conflicts)
@@ -11519,6 +11544,7 @@
       panel.innerHTML = [
         '<div class="fw-semibold mb-1">Ready to apply</div>',
         ...lines.map((line) => `<div>${htmlEscape(line)}</div>`),
+        sessionPlanHtml,
         warnings.length ? `<div class="small mt-2">${warnings.map((row) => formatRichServerMessageHtml(row.message || '')).join('<br>')}</div>` : ''
       ].join('');
       return;
@@ -11527,7 +11553,9 @@
     panel.innerHTML = [
       '<div class="fw-semibold mb-1">Preview blocked</div>',
       ...blockers.map((row) => `<div>${formatRichServerMessageHtml(row.message || 'Unable to preview move.')}</div>`),
-      conflictLines.length ? `<div class="small mt-2">${conflictLines.map((line) => htmlEscape(line)).join('<br>')}</div>` : ''
+      sessionPlanHtml,
+      conflictLines.length ? `<div class="small mt-2">${conflictLines.map((line) => htmlEscape(line)).join('<br>')}</div>` : '',
+      scheduleLinkHtml
     ].join('');
   }
 

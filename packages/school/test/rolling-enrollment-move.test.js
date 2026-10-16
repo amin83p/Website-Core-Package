@@ -48,7 +48,8 @@ const sourceClass = {
   title: 'Source Class',
   registrationMode: 'rolling',
   billingMode: 'no_charge',
-  isClosedForNewEnrollment: false
+  isClosedForNewEnrollment: false,
+  maxStudents: 1
 };
 
 const targetClass = {
@@ -59,7 +60,8 @@ const targetClass = {
   billingMode: 'no_charge',
   isClosedForNewEnrollment: false,
   cycleStartDate: '2026-01-01',
-  cycleEndDate: '2026-12-31'
+  cycleEndDate: '2026-12-31',
+  maxStudents: 1
 };
 
 function buildPayload(overrides = {}) {
@@ -148,6 +150,25 @@ function buildMocks() {
         }
         return null;
       },
+      async getClassSessions(classId) {
+        if (classId === 'CLS_SOURCE') {
+          return [{
+            sessionId: 'SRC_SESS_1',
+            date: '2026-03-15',
+            startTime: '09:00',
+            endTime: '10:00',
+            roster: [{ personId: 'PERSON_001', attendance: { status: 'present' } }]
+          }];
+        }
+        if (classId === 'CLS_TARGET') return [];
+        return [];
+      },
+      async getClassEnrollmentPeriodsByClassId() {
+        return [];
+      },
+      async saveClassSessions(classId, sessions) {
+        return { classId, sessions };
+      },
       async createClassEnrollmentPeriod(payload) {
         const period = { id: `PER_NEW_${createdPeriods.length + 1}`, ...payload };
         createdPeriods.push(period);
@@ -210,7 +231,9 @@ function buildMocks() {
       async assertEnrollmentAlignmentForCreate() {
         return true;
       },
+      lastExecuteRawRequest: null,
       async execute({ classData, rawRequest }) {
+        this.lastExecuteRawRequest = rawRequest;
         return {
           results: [{
             ok: true,
@@ -225,6 +248,19 @@ function buildMocks() {
           }],
           summary: { succeeded: 1, failed: 0, total: 1 }
         };
+      }
+    },
+    scheduleMoveSessionsService: {
+      async applySessionTransferPlans() {
+        return {
+          targetUnmarkSessionIds: ['TGT_SESS_1'],
+          createdSessionIds: ['TGT_SESS_1'],
+          rollbackTargetSessions: []
+        };
+      },
+      async rollbackTargetSessionTransfer() {},
+      async removeSourceSessionsAfterTransfer() {
+        return { removedSessionIds: ['SRC_SESS_1'] };
       }
     },
     createdPeriods,
@@ -292,7 +328,7 @@ test('previewMoveEnrollment allows same-class target for close-and-re-enroll', a
       reqUser: { id: 'USR_1' },
       orgId: 'ORG_001'
     });
-    assert.equal(preview.blockers.some((row) => row.code === 'SAME_CLASS'), false);
+    assert.equal(preview.blockers.some((row) => row.code === 'SAME_CLASS'), true);
   } finally {
     enrollmentMoveService.__resetDependenciesForTest();
   }
@@ -416,6 +452,39 @@ test('applyMoveEnrollment closes source and creates target period', async () => 
     assert.equal(result.targetPeriod.classId, 'CLS_TARGET');
     assert.equal(mocks.periodStore.get(sourcePeriod.id).status, 'completed');
     assert.equal(result.targetPeriod.id, 'PER_TARGET_1');
+    assert.ok(Array.isArray(mocks.rollingEnrollmentEngineService.lastExecuteRawRequest?.unmarkSessionIds));
+    assert.ok(mocks.rollingEnrollmentEngineService.lastExecuteRawRequest.unmarkSessionIds.length > 0);
+    assert.ok(preview.sessionTransferPlan?.plans?.length > 0);
+  } finally {
+    enrollmentMoveService.__resetDependenciesForTest();
+  }
+});
+
+test('applyMoveEnrollment does not close source when integrated engine step fails', async () => {
+  const mocks = buildMocks();
+  mocks.rollingEnrollmentEngineService.execute = async ({ rawRequest }) => ({
+    results: [{ ok: false, error: 'At least one session must be selected to unmark for 1-on-1 enrollment.', studentId: rawRequest.studentId }],
+    summary: { succeeded: 0, failed: 1, total: 1 }
+  });
+  enrollmentMoveService.__setDependenciesForTest(mocks);
+  try {
+    const preview = await enrollmentMoveService.previewMoveEnrollment({
+      sourcePeriodId: sourcePeriod.id,
+      payload: buildPayload(),
+      reqUser: { id: 'USR_1', activeOrgId: 'ORG_001' },
+      orgId: 'ORG_001'
+    });
+    await assert.rejects(
+      () => enrollmentMoveService.applyMoveEnrollment({
+        sourcePeriodId: sourcePeriod.id,
+        payload: buildPayload(),
+        previewHash: preview.previewHash,
+        reqUser: { id: 'USR_1', activeOrgId: 'ORG_001' },
+        orgId: 'ORG_001'
+      }),
+      /1-on-1 enrollment/i
+    );
+    assert.equal(mocks.periodStore.get(sourcePeriod.id).status, 'active');
   } finally {
     enrollmentMoveService.__resetDependenciesForTest();
   }
@@ -438,6 +507,8 @@ test('rolling enrollment view wires move menu and modal', () => {
   assert.match(viewSource, /targetStatus: 'completed'/);
   assert.match(viewSource, /function formatMoveScheduleConflictLines/);
   assert.match(viewSource, /scheduleConflicts/);
+  assert.match(viewSource, /Open master schedule/);
+  assert.match(viewSource, /formatMoveSessionTransferPlanHtml/);
   assert.doesNotMatch(viewSource, /function loadMoveTargetClasses/);
   assert.doesNotMatch(viewSource, /<select id="move_targetClassId"/);
   assert.doesNotMatch(viewSource, /<select id="move_close_status"/);

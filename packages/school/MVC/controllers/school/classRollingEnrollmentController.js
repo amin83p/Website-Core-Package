@@ -5631,6 +5631,7 @@ async function listEnrollmentMoveTargetClasses(req, res) {
 function buildMoveEnrollmentServiceOptions(req, { targetClassData, sourcePeriod } = {}) {
   const sourceClassId = toPublicId(sourcePeriod?.classId || '');
   return {
+    accessContext: buildRouteAccessContext(req),
     orgToday: resolveOrgTodayFromRequest(req),
     assertPrerequisites: targetClassData
       ? async (student, programId, termId, startDate) => {

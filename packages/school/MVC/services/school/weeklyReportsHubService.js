@@ -9,7 +9,26 @@ const weeklyReportsClassMetricsService = require('./weeklyReportsClassMetricsSer
 const { buildAttendanceMatrixPayload } = require('../../controllers/school/attendanceController');
 const { buildGradesMatrixPayload } = require('../../controllers/school/gradesMatrixController');
 const { requireCoreModule } = require('./schoolCoreContracts');
+const dataService = requireCoreModule('MVC/services/dataService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+
+function buildWeeklyReportsOrgNameMap(organizations = []) {
+  const orgNameMap = new Map();
+  (Array.isArray(organizations) ? organizations : []).forEach((org) => {
+    const id = toPublicId(org?.id);
+    if (!id) return;
+    const label = String(org?.identity?.displayName || org?.name || '').trim();
+    orgNameMap.set(id, label || `Unknown Org (#${id})`);
+  });
+  return orgNameMap;
+}
+
+function resolveWeeklyReportsOrgName(orgId = '', orgNameMap = new Map()) {
+  const normalizedOrgId = toPublicId(orgId) || '';
+  if (!normalizedOrgId) return '';
+  if (orgNameMap.has(normalizedOrgId)) return orgNameMap.get(normalizedOrgId);
+  return `Unknown Org (#${normalizedOrgId})`;
+}
 
 function parseFilterIdList(value) {
   if (Array.isArray(value)) {
@@ -203,8 +222,10 @@ function sumSessionScheduledHours(sessions = []) {
   }, 0));
 }
 
-function buildClassBoardRow(classRow = {}, summary = {}, gradebookCount = 0, scheduledHours = 0, operationalMetrics = null) {
+function buildClassBoardRow(classRow = {}, summary = {}, gradebookCount = 0, scheduledHours = 0, operationalMetrics = null, orgNameMap = new Map()) {
   const classId = toPublicId(classRow?.id);
+  const orgId = toPublicId(classRow?.orgId) || '';
+  const orgName = resolveWeeklyReportsOrgName(orgId, orgNameMap);
   const departmentId = toPublicId(classRow?.deliveryDepartmentId) || '';
   const departmentName = String(classRow?.deliveryDepartmentName || departmentId || '').trim();
   const instructor = resolvePrimaryInstructor(classRow);
@@ -214,6 +235,8 @@ function buildClassBoardRow(classRow = {}, summary = {}, gradebookCount = 0, sch
   return {
     classId,
     className: String(classRow?.title || classRow?.name || classId || '').trim() || classId,
+    orgId,
+    orgName,
     departmentId,
     departmentName,
     teacherPersonId: instructor.teacherPersonId,
@@ -677,7 +700,11 @@ async function buildWeeklyReportsClassBoard({
   });
 
   const rows = [];
-  const orgCaches = await weeklyReportsClassMetricsService.loadWeeklyReportsOrgCaches(reqUser, activeOrgId);
+  const [orgCaches, organizations] = await Promise.all([
+    weeklyReportsClassMetricsService.loadWeeklyReportsOrgCaches(reqUser, activeOrgId),
+    dataService.fetchData('organizations', {}, reqUser).catch(() => [])
+  ]);
+  const orgNameMap = buildWeeklyReportsOrgNameMap(organizations);
 
   for (const classRow of classes) {
     const classId = toPublicId(classRow?.id);
@@ -728,7 +755,8 @@ async function buildWeeklyReportsClassBoard({
         alignedSummary,
         gradebookCount,
         scheduledHours,
-        weeklyMetrics.metrics
+        weeklyMetrics.metrics,
+        orgNameMap
       ));
     } catch (error) {
       console.warn(`[weeklyReportsHubService] Skipping class ${classId}: ${error.message}`);
