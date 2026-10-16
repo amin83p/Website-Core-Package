@@ -175,6 +175,64 @@ test('classMatchesDepartment and filterClassesForWeeklyReports filter by deliver
   assert.deepEqual(filtered.map((row) => row.id), ['CLS-1']);
 });
 
+test('filterClassesForWeeklyReports filters by program in allowedProgramTerms', () => {
+  const classes = [
+    {
+      id: 'CLS-1',
+      title: 'A',
+      status: 'active',
+      allowedProgramTerms: [{ programId: 'PROG-1' }]
+    },
+    {
+      id: 'CLS-2',
+      title: 'B',
+      status: 'active',
+      allowedProgramTerms: [{ programId: 'PROG-2' }]
+    }
+  ];
+  const filtered = weeklyReportsHubService.filterClassesForWeeklyReports(classes, {
+    programId: 'PROG-1'
+  });
+  assert.deepEqual(filtered.map((row) => row.id), ['CLS-1']);
+});
+
+test('classMatchesTeacher ignores inactive instructors and resolves teacher record ids', () => {
+  const teacherLookup = weeklyReportsHubService.buildTeacherRecordLookup([
+    { id: 'TCH-1', personId: 'PERSON-T1' }
+  ]);
+  const classRow = {
+    instructors: [
+      { personId: 'PERSON-T1', status: 'active' },
+      { teacherId: 'TCH-1', status: 'active' },
+      { personId: 'PERSON-T2', status: 'inactive' }
+    ]
+  };
+  assert.equal(weeklyReportsHubService.classMatchesTeacher(classRow, 'PERSON-T1', teacherLookup), true);
+  assert.equal(weeklyReportsHubService.classMatchesTeacher(classRow, 'PERSON-T2', teacherLookup), false);
+  assert.equal(weeklyReportsHubService.classMatchesTeacher(classRow, 'PERSON-T1', null), true);
+});
+
+test('filterClassesForWeeklyReports filters by teacher person id', () => {
+  const classes = [
+    {
+      id: 'CLS-1',
+      title: 'Morning',
+      status: 'active',
+      instructors: [{ personId: 'PERSON-T1', status: 'active' }]
+    },
+    {
+      id: 'CLS-2',
+      title: 'Afternoon',
+      status: 'active',
+      instructors: [{ personId: 'PERSON-T2', status: 'active' }]
+    }
+  ];
+  const filtered = weeklyReportsHubService.filterClassesForWeeklyReports(classes, {
+    teacherPersonId: 'PERSON-T1'
+  });
+  assert.deepEqual(filtered.map((row) => row.id), ['CLS-1']);
+});
+
 test('filterSessionsForWeeklyReport applies date range and excludes cancelled sessions', () => {
   const statusMap = {
   };

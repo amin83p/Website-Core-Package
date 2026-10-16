@@ -1,9 +1,11 @@
 const schoolDataService = require('./schoolDataService');
+const schoolPersonAccessService = require('./schoolPersonAccessService');
 const activityService = require('./activityService');
 const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const gradebookSkillCatalogService = require('./gradebookSkillCatalogService');
+const weeklyReportsClassMetricsService = require('./weeklyReportsClassMetricsService');
 const { buildAttendanceMatrixPayload } = require('../../controllers/school/attendanceController');
 const { buildGradesMatrixPayload } = require('../../controllers/school/gradesMatrixController');
 const { requireCoreModule } = require('./schoolCoreContracts');
@@ -100,12 +102,17 @@ function summarizeClassAttendanceMatrix(matrix = [], sessions = []) {
     ? roundOneDecimal(studentsPerSession.reduce((sum, count) => sum + count, 0) / sessionCount)
     : 0;
 
+  const attendanceTotals = weeklyReportsClassMetricsService.summarizeAttendanceFromMatrix(matrix).totals;
+
   return {
     sessionCount,
     avgStudentsPerSession,
     absenceCount,
     lateCount,
-    earlyLeaveCount
+    earlyLeaveCount,
+    absenceMinutes: Number(attendanceTotals.absence.minutes || 0),
+    lateMinutes: Number(attendanceTotals.late.minutes || 0),
+    earlyLeaveMinutes: Number(attendanceTotals.early.minutes || 0)
   };
 }
 
@@ -130,13 +137,49 @@ function classMatchesProgram(row = {}, programId = '') {
   return collectClassProgramIds(row).has(normalizedProgramId);
 }
 
-function classMatchesTeacher(row = {}, teacherPersonId = '') {
+function isActiveClassInstructor(instructorRow = {}) {
+  const status = String(instructorRow?.status || 'active').trim().toLowerCase();
+  return status !== 'inactive';
+}
+
+function buildTeacherRecordLookup(teachers = []) {
+  const teacherIdToPersonId = new Map();
+  (Array.isArray(teachers) ? teachers : []).forEach((row) => {
+    const teacherId = toPublicId(row?.id);
+    const personId = toPublicId(row?.personId);
+    if (teacherId && personId) {
+      teacherIdToPersonId.set(teacherId, personId);
+    }
+  });
+  return teacherIdToPersonId;
+}
+
+function instructorMatchesTeacherPerson(
+  instructorRow = {},
+  normalizedTeacherPersonId = '',
+  teacherIdToPersonId = null
+) {
+  if (!normalizedTeacherPersonId || !isActiveClassInstructor(instructorRow)) return false;
+  const instructorPersonId = toPublicId(instructorRow?.personId);
+  if (instructorPersonId && idsEqual(instructorPersonId, normalizedTeacherPersonId)) {
+    return true;
+  }
+  const lookup = teacherIdToPersonId instanceof Map ? teacherIdToPersonId : null;
+  if (!lookup || !lookup.size) return false;
+  const linkedTeacherId = toPublicId(instructorRow?.teacherId || instructorRow?.id);
+  if (!linkedTeacherId) return false;
+  const mappedPersonId = lookup.get(linkedTeacherId);
+  return mappedPersonId && idsEqual(mappedPersonId, normalizedTeacherPersonId);
+}
+
+function classMatchesTeacher(row = {}, teacherPersonId = '', teacherIdToPersonId = null) {
   const normalizedTeacherPersonId = toPublicId(teacherPersonId);
   if (!normalizedTeacherPersonId) return true;
   const instructors = Array.isArray(row?.instructors) ? row.instructors : [];
-  return instructors.some((instructorRow) => idsEqual(
-    toPublicId(instructorRow?.personId || instructorRow?.id || instructorRow?.teacherId),
-    normalizedTeacherPersonId
+  return instructors.some((instructorRow) => instructorMatchesTeacherPerson(
+    instructorRow,
+    normalizedTeacherPersonId,
+    teacherIdToPersonId
   ));
 }
 
@@ -160,11 +203,14 @@ function sumSessionScheduledHours(sessions = []) {
   }, 0));
 }
 
-function buildClassBoardRow(classRow = {}, summary = {}, gradebookCount = 0, scheduledHours = 0) {
+function buildClassBoardRow(classRow = {}, summary = {}, gradebookCount = 0, scheduledHours = 0, operationalMetrics = null) {
   const classId = toPublicId(classRow?.id);
   const departmentId = toPublicId(classRow?.deliveryDepartmentId) || '';
   const departmentName = String(classRow?.deliveryDepartmentName || departmentId || '').trim();
   const instructor = resolvePrimaryInstructor(classRow);
+  const metrics = operationalMetrics && typeof operationalMetrics === 'object'
+    ? operationalMetrics
+    : weeklyReportsClassMetricsService.buildEmptyOperationalMetrics();
   return {
     classId,
     className: String(classRow?.title || classRow?.name || classId || '').trim() || classId,
@@ -178,7 +224,8 @@ function buildClassBoardRow(classRow = {}, summary = {}, gradebookCount = 0, sch
     absenceCount: Number(summary.absenceCount || 0),
     lateCount: Number(summary.lateCount || 0),
     earlyLeaveCount: Number(summary.earlyLeaveCount || 0),
-    gradebookCount: Number(gradebookCount || 0)
+    gradebookCount: Number(gradebookCount || 0),
+    operationalMetrics: metrics
   };
 }
 
@@ -502,14 +549,15 @@ function filterClassesForWeeklyReports(rows = [], {
   classIds = [],
   departmentId = '',
   programId = '',
-  teacherPersonId = ''
+  teacherPersonId = '',
+  teacherIdToPersonId = null
 } = {}) {
   let scoped = (Array.isArray(rows) ? rows : [])
     .filter((row) => classBelongsToActiveOrg(row, activeOrgId))
     .filter(isActiveAttendanceClass)
     .filter((row) => classMatchesDepartment(row, departmentId))
     .filter((row) => classMatchesProgram(row, programId))
-    .filter((row) => classMatchesTeacher(row, teacherPersonId));
+    .filter((row) => classMatchesTeacher(row, teacherPersonId, teacherIdToPersonId));
 
   if (classIds.length) {
     const classIdSet = new Set(classIds.map((id) => toPublicId(id)).filter(Boolean));
@@ -545,12 +593,18 @@ async function resolveWeeklyReportsClasses({
   const normalizedDepartmentId = toPublicId(departmentId) || '';
   const normalizedProgramId = toPublicId(programId) || '';
   const normalizedTeacherPersonId = toPublicId(teacherPersonId) || '';
+  let teacherIdToPersonId = null;
+  if (normalizedTeacherPersonId) {
+    const teachers = await schoolDataService.fetchAllData('teachers', {}, reqUser);
+    teacherIdToPersonId = buildTeacherRecordLookup(teachers);
+  }
   return filterClassesForWeeklyReports(classes, {
     activeOrgId,
     classIds: normalizedClassIds,
     departmentId: normalizedDepartmentId,
     programId: normalizedProgramId,
-    teacherPersonId: normalizedTeacherPersonId
+    teacherPersonId: normalizedTeacherPersonId,
+    teacherIdToPersonId
   });
 }
 
@@ -573,15 +627,25 @@ async function resolveWeeklyReportsProgramOptions(reqUser = {}) {
 async function resolveWeeklyReportsTeacherOptions(reqUser = {}) {
   const activeOrgId = String(reqUser?.activeOrgId || '').trim();
   const teachers = await schoolDataService.fetchAllData('teachers', {}, reqUser);
+  const visibleTeachers = (Array.isArray(teachers) ? teachers : []).filter((row) => {
+    if (activeOrgId && row?.orgId && !idsEqual(row.orgId, activeOrgId)) return false;
+    return !!toPublicId(row?.personId);
+  });
+  const personIds = visibleTeachers
+    .map((row) => toPublicId(row.personId))
+    .filter(Boolean);
+  const personById = await schoolPersonAccessService.buildPersonByIdMap({
+    reqUser,
+    personIds
+  });
   const byPersonId = new Map();
-  (Array.isArray(teachers) ? teachers : []).forEach((row) => {
-    if (activeOrgId && row?.orgId && !idsEqual(row.orgId, activeOrgId)) return;
-    const personId = toPublicId(row?.personId || row?.id);
+  visibleTeachers.forEach((row) => {
+    const personId = toPublicId(row.personId);
     if (!personId || byPersonId.has(personId)) return;
-    const name = String(
-      row?.displayName || row?.name || row?.preferredName || personId || 'Teacher'
-    ).trim() || personId;
-    byPersonId.set(personId, { id: personId, name });
+    const person = personById.get(personId);
+    const fallback = String(row?.displayName || row?.name || row?.preferredName || '').trim();
+    const name = schoolPersonAccessService.formatPersonName(person || {}, fallback || personId);
+    byPersonId.set(personId, { id: personId, name: name || personId });
   });
   return Array.from(byPersonId.values()).sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
 }
@@ -613,22 +677,13 @@ async function buildWeeklyReportsClassBoard({
   });
 
   const rows = [];
+  const orgCaches = await weeklyReportsClassMetricsService.loadWeeklyReportsOrgCaches(reqUser, activeOrgId);
 
   for (const classRow of classes) {
     const classId = toPublicId(classRow?.id);
     if (!classId) continue;
 
     try {
-      const payload = await buildAttendanceMatrixPayload({
-        user: reqUser,
-        query: {
-          classId,
-          startDate: normalizedStartDate,
-          endDate: normalizedEndDate
-        }
-      });
-      const summary = summarizeClassAttendanceMatrix(payload?.matrix || [], payload?.sessions || []);
-
       const allSessions = await schoolDataService.getClassSessions(classId, reqUser);
       const statusMap = await sessionStatusPolicyService.getStatusMap(
         classRow?.orgId || activeOrgId,
@@ -640,10 +695,41 @@ async function buildWeeklyReportsClassBoard({
         startDate: normalizedStartDate,
         endDate: normalizedEndDate
       });
+
+      const payload = await buildAttendanceMatrixPayload({
+        user: reqUser,
+        query: {
+          classId,
+          startDate: normalizedStartDate,
+          endDate: normalizedEndDate
+        }
+      }, { applyWindow: false });
+      const matrixSessions = Array.isArray(payload?.sessions) ? payload.sessions : [];
+      const summary = summarizeClassAttendanceMatrix(payload?.matrix || [], matrixSessions);
+      const alignedSessionCount = filteredSessions.length;
+      const alignedSummary = {
+        ...summary,
+        sessionCount: alignedSessionCount
+      };
       const gradebookCount = countGradebooksInSessions(filteredSessions);
       const scheduledHours = sumSessionScheduledHours(filteredSessions);
+      const weeklyMetrics = weeklyReportsClassMetricsService.buildClassWeeklyMetrics({
+        classRow,
+        filteredSessions,
+        matrixPayload: payload,
+        statusMap,
+        orgCaches,
+        startDate: normalizedStartDate,
+        endDate: normalizedEndDate
+      });
 
-      rows.push(buildClassBoardRow(classRow, summary, gradebookCount, scheduledHours));
+      rows.push(buildClassBoardRow(
+        classRow,
+        alignedSummary,
+        gradebookCount,
+        scheduledHours,
+        weeklyMetrics.metrics
+      ));
     } catch (error) {
       console.warn(`[weeklyReportsHubService] Skipping class ${classId}: ${error.message}`);
     }
@@ -663,6 +749,87 @@ async function buildWeeklyReportsClassBoard({
       startDate: normalizedStartDate,
       endDate: normalizedEndDate
     },
+    refreshedAt: new Date().toISOString()
+  };
+}
+
+async function buildWeeklyReportsClassDrilldown({
+  reqUser,
+  classId = '',
+  metricKey = '',
+  departmentId = '',
+  programId = '',
+  teacherPersonId = '',
+  startDate = '',
+  endDate = ''
+} = {}) {
+  const activeOrgId = String(reqUser?.activeOrgId || '').trim();
+  const normalizedClassId = toPublicId(classId);
+  const normalizedMetricKey = String(metricKey || '').trim();
+  if (!normalizedClassId) throw new Error('Class ID is required.');
+  if (!normalizedMetricKey) throw new Error('Metric key is required.');
+
+  const classes = await resolveWeeklyReportsClasses({
+    reqUser,
+    classIds: [normalizedClassId],
+    departmentId: toPublicId(departmentId) || '',
+    programId: toPublicId(programId) || '',
+    teacherPersonId: toPublicId(teacherPersonId) || '',
+    activeOrgId
+  });
+  const classRow = classes.find((row) => idsEqual(row?.id, normalizedClassId)) || classes[0];
+  if (!classRow) throw new Error('Class not found or not accessible.');
+
+  const normalizedStartDate = String(startDate || '').trim();
+  const normalizedEndDate = String(endDate || '').trim();
+  const allSessions = await schoolDataService.getClassSessions(normalizedClassId, reqUser);
+  const statusMap = await sessionStatusPolicyService.getStatusMap(
+    classRow?.orgId || activeOrgId,
+    { includeInactive: true }
+  );
+  const filteredSessions = filterSessionsForWeeklyReport({
+    sessions: allSessions,
+    statusMap,
+    startDate: normalizedStartDate,
+    endDate: normalizedEndDate
+  });
+  const payload = await buildAttendanceMatrixPayload({
+    user: reqUser,
+    query: {
+      classId: normalizedClassId,
+      startDate: normalizedStartDate,
+      endDate: normalizedEndDate
+    }
+  }, { applyWindow: false });
+  const orgCaches = await weeklyReportsClassMetricsService.loadWeeklyReportsOrgCaches(reqUser, activeOrgId);
+
+  return weeklyReportsClassMetricsService.buildWeeklyReportsDrilldown({
+    metricKey: normalizedMetricKey,
+    classRow,
+    filteredSessions,
+    matrixPayload: payload,
+    statusMap,
+    orgCaches,
+    startDate: normalizedStartDate,
+    endDate: normalizedEndDate
+  });
+}
+
+async function buildWeeklyReportsEngagement({
+  reqUser,
+  classIds = [],
+  startDate = '',
+  endDate = ''
+} = {}) {
+  const weeklyReportsEngagementService = require('./weeklyReportsEngagementService');
+  const result = await weeklyReportsEngagementService.buildEngagementForClasses({
+    reqUser,
+    classIds,
+    startDate,
+    endDate
+  });
+  return {
+    ...result,
     refreshedAt: new Date().toISOString()
   };
 }
@@ -710,7 +877,7 @@ async function buildWeeklyReportsStudentBoard({
             startDate: normalizedStartDate,
             endDate: normalizedEndDate
           }
-        }),
+        }, { applyWindow: false }),
         buildGradesMatrixPayload(
           { user: reqUser },
           {
@@ -791,6 +958,9 @@ module.exports = {
   classMatchesDepartment,
   classMatchesProgram,
   classMatchesTeacher,
+  buildTeacherRecordLookup,
+  instructorMatchesTeacherPerson,
+  isActiveClassInstructor,
   collectClassProgramIds,
   filterClassesForWeeklyReports,
   filterSessionsForWeeklyReport,
@@ -817,5 +987,7 @@ module.exports = {
   resolveWeeklyReportsTeacherOptions,
   resolveWeeklyReportsClasses,
   buildWeeklyReportsClassBoard,
+  buildWeeklyReportsClassDrilldown,
+  buildWeeklyReportsEngagement,
   buildWeeklyReportsStudentBoard
 };

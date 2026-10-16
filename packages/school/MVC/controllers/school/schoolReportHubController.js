@@ -10,6 +10,8 @@ exports.showReportHubPage = async (req, res) => {
 
     res.render('school/reportHub', {
       title: 'Report Hub',
+      bodyClass: 'school-report-hub-page',
+      mainClass: 'school-report-hub-main p-0 my-0',
       modules,
       defaultType: defaultModule ? defaultModule.type : '',
       canManageAllTasks: taskService.isAdminViewer(req.user),
@@ -65,6 +67,32 @@ exports.getWorkspaceSection = async (req, res) => {
     res.status(statusCode).json({
       status: 'error',
       message: error.message || 'Unable to load this Report Hub section.'
+    });
+  }
+};
+
+exports.getWeeklyReportsDrilldown = async (req, res) => {
+  try {
+    const result = await reportHubService.getWeeklyReportsDrilldown(req.query, req);
+    res.json({ status: 'success', ...result });
+  } catch (error) {
+    const statusCode = error.statusCode || 500;
+    res.status(statusCode).json({
+      status: 'error',
+      message: error.message || 'Unable to load weekly reports drill-down.'
+    });
+  }
+};
+
+exports.getWeeklyReportsEngagement = async (req, res) => {
+  try {
+    const result = await reportHubService.getWeeklyReportsEngagement(req.query, req);
+    res.json({ status: 'success', ...result });
+  } catch (error) {
+    const statusCode = error.statusCode || 500;
+    res.status(statusCode).json({
+      status: 'error',
+      message: error.message || 'Unable to load weekly reports engagement.'
     });
   }
 };

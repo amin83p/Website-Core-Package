@@ -1572,11 +1572,81 @@ async function updateWorkspaceSession(input = {}, req = {}) {
   return { classId, sessionId, session };
 }
 
+async function getWeeklyReportsEngagement(queryInput = {}, req = {}) {
+  const access = await evaluateModuleAccess(req, {
+    label: 'Weekly Reports',
+    sectionId: SECTIONS.SCHOOL_CLASSES
+  });
+  if (!access.allowed) {
+    const error = new Error('You do not have access to Weekly Reports.');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const classIds = queryInput?.classIds || queryInput?.classId || '';
+  const startDate = normalizeText(queryInput?.startDate || '');
+  const endDate = normalizeText(queryInput?.endDate || '');
+
+  const engagement = await weeklyReportsHubService.buildWeeklyReportsEngagement({
+    reqUser: req.user,
+    classIds,
+    startDate,
+    endDate
+  });
+
+  return {
+    ...engagement,
+    refreshedAt: engagement.refreshedAt || new Date().toISOString()
+  };
+}
+
+async function getWeeklyReportsDrilldown(queryInput = {}, req = {}) {
+  const access = await evaluateModuleAccess(req, {
+    label: 'Weekly Reports',
+    sectionId: SECTIONS.SCHOOL_CLASSES
+  });
+  if (!access.allowed) {
+    const error = new Error('You do not have access to Weekly Reports.');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  const classId = normalizeText(queryInput?.classId || '');
+  const metricKey = normalizeText(queryInput?.metricKey || '');
+  const startDate = normalizeText(queryInput?.startDate || '');
+  const endDate = normalizeText(queryInput?.endDate || '');
+  const departmentId = normalizeText(queryInput?.departmentId || '');
+  const programId = normalizeText(queryInput?.programId || '');
+  const teacherPersonId = normalizeText(
+    queryInput?.teacherPersonId || queryInput?.teacherId || ''
+  );
+
+  const drilldown = await weeklyReportsHubService.buildWeeklyReportsClassDrilldown({
+    reqUser: req.user,
+    classId,
+    metricKey,
+    departmentId,
+    programId,
+    teacherPersonId,
+    startDate,
+    endDate
+  });
+
+  return {
+    classId,
+    metricKey,
+    ...drilldown,
+    refreshedAt: new Date().toISOString()
+  };
+}
+
 module.exports = {
   resolveAccessibleModules,
   getPeoplePanelRows,
   getTaskSummary,
   getWorkspaceSection,
+  getWeeklyReportsEngagement,
+  getWeeklyReportsDrilldown,
   lockWorkspaceSessions,
   updateWorkspaceSession
 };

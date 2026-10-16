@@ -54,6 +54,16 @@ router.get('/api/workspace/:sectionKey',
   trackActionState(SECTIONS.SCHOOL_REPORT_HUB, OPERATIONS.READ_ALL),
   ctrl.getWorkspaceSection);
 
+router.get('/api/workspace/weekly-reports/drilldown',
+  requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_REPORT_HUB, OPERATIONS.READ_ALL),
+  ctrl.getWeeklyReportsDrilldown);
+
+router.get('/api/workspace/weekly-reports/engagement',
+  requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_REPORT_HUB, OPERATIONS.READ_ALL),
+  ctrl.getWeeklyReportsEngagement);
+
 router.post('/api/workspace/sessions/lock',
   requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
