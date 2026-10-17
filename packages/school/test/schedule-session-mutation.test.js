@@ -38,9 +38,21 @@ test('scheduleSessionMutationService rejects makeup and merge statuses with MANA
 test('schedule routes expose saved session mutation endpoints', () => {
   const routeSource = read('MVC/routes/scheduleRoutes.js');
   assert.match(routeSource, /\/api\/update-class-session-schedule/);
+  assert.match(routeSource, /\/api\/bulk-update-class-session-schedule/);
   assert.match(routeSource, /\/api\/update-class-session-status/);
   assert.match(routeSource, /\/api\/update-work-session-schedule/);
   assert.match(routeSource, /postUpdateClassSessionSchedule/);
+  assert.match(routeSource, /postBulkUpdateClassSessionSchedule/);
   assert.match(routeSource, /postUpdateClassSessionStatus/);
   assert.match(routeSource, /postUpdateWorkSessionSchedule/);
+});
+
+test('master schedule bulk edit uses bulk update API instead of per-session posts', () => {
+  const viewerSource = read('public/scripts/masterScheduleViewer.js');
+  assert.match(viewerSource, /bulkUpdateClassSessionSchedule/);
+  assert.match(viewerSource, /postBulkSavedSessionScheduleUpdates/);
+  assert.match(viewerSource, /scheduleSavedBulkEditInFlight/);
+  const bulkApplyIdx = viewerSource.indexOf('async function applyScheduleSavedBulkEditOverlay');
+  const bulkFnSlice = viewerSource.slice(bulkApplyIdx, bulkApplyIdx + 4500);
+  assert.doesNotMatch(bulkFnSlice, /applySavedSessionScheduleUpdate\(/);
 });

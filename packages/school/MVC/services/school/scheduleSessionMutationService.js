@@ -264,6 +264,110 @@ async function updateClassSessionSchedule(input = {}, req = {}) {
   return { classId, sessionId, session: workingSession };
 }
 
+async function bulkUpdateClassSessionSchedule(input = {}, req = {}) {
+  await assertScheduleMutationAccess(req);
+  const classId = toPublicId(input.classId);
+  const updates = Array.isArray(input.updates) ? input.updates : [];
+  const forceConflicts = input.forceConflicts === true
+    || String(input.forceConflicts || '').trim().toLowerCase() === 'true';
+  if (!classId) throw new Error('classId is required.');
+  if (!updates.length) throw new Error('At least one session update is required.');
+  if (updates.length > 120) throw new Error('Too many sessions in one bulk update.');
+
+  const accessContext = schoolDataService.buildRouteAccessContext(req);
+  const classData = await schoolDataService.getDataById('classes', classId, req.user, accessContext);
+  if (!classData) throw new Error('Class not found.');
+  const sessions = await schoolDataService.getClassSessions(classId, req.user);
+  const updatedSessionIds = [];
+
+  for (const row of updates) {
+    const sessionId = toPublicId(row?.sessionId);
+    const sessionDate = sessionNavigationService.normalizeSessionDate(row?.sessionDate || row?.date || '');
+    if (!sessionId) throw new Error('Each update requires sessionId.');
+    const { index, session } = findSessionInList(sessions, sessionId, sessionDate);
+    if (index < 0 || !session) throw new Error('Session not found.');
+    assertSessionScope(req, classData, session);
+
+    const nextDate = normalizeDateOnly(row.date !== undefined ? row.date : session.date);
+    const nextStart = normalizeClockTime(row.startTime !== undefined ? row.startTime : session.startTime);
+    let nextEnd = normalizeClockTime(row.endTime !== undefined ? row.endTime : session.endTime);
+    if (!nextEnd && row.durationHours !== undefined) {
+      const durationHours = Number(row.durationHours);
+      if (Number.isFinite(durationHours) && durationHours > 0 && nextStart) {
+        const startParts = nextStart.split(':').map(Number);
+        const totalMinutes = (startParts[0] * 60) + startParts[1] + Math.round(durationHours * 60);
+        const endH = Math.floor(totalMinutes / 60) % 24;
+        const endM = totalMinutes % 60;
+        nextEnd = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+      }
+    }
+
+    await sessionManagementService.assertSessionScheduleUpdateAllowed({
+      classId,
+      sessionId,
+      session,
+      classData,
+      allSessions: sessions,
+      reqUser: req.user,
+      source: 'master_schedule',
+      proposedChanges: {
+        date: nextDate,
+        startTime: nextStart,
+        endTime: nextEnd
+      }
+    });
+
+    const workingSession = { ...session };
+    applyScheduleFields(workingSession, { date: nextDate, startTime: nextStart, endTime: nextEnd });
+    await assertSessionWithinWindows(classData, workingSession, req.user);
+    workingSession.audit = {
+      ...(workingSession.audit || {}),
+      lastUpdateUser: toPublicId(req.user?.id || req.user?.username || ''),
+      lastUpdateDateTime: new Date().toISOString()
+    };
+    sessions[index] = workingSession;
+    updatedSessionIds.push(sessionId);
+  }
+
+  const { detectSessionConflicts } = require('./sessionConflictDetectionService');
+  const conflicts = await detectSessionConflicts({
+    classId,
+    sessions,
+    activeOrgId: classData?.orgId || req.user?.activeOrgId || '',
+    reqUser: req.user,
+    fallbackTeacherId: '',
+    includeExternalScheduleConflicts: true,
+    externalFocusSessionIds: updatedSessionIds
+  });
+  if (Array.isArray(conflicts) && conflicts.length && forceConflicts !== true) {
+    const warningMessage = 'Schedule conflicts were detected for one or more updated sessions.';
+    const error = new Error(warningMessage);
+    error.statusCode = 409;
+    error.code = 'SESSION_METADATA_CONFLICTS';
+    error.data = {
+      requiresConfirmation: true,
+      conflicts: conflicts.slice(0, 12).map((conflictRow) => ({
+        date: conflictRow?.date || '',
+        teacherName: conflictRow?.teacherName || '',
+        conflictClass: conflictRow?.conflictClass || 'schedule conflict',
+        existTime: conflictRow?.existTime || ''
+      }))
+    };
+    throw error;
+  }
+
+  await persistClassSessions(classId, sessions, req.user);
+  const updatedSessions = updatedSessionIds.map((sessionId) => {
+    const { session } = findSessionInList(sessions, sessionId);
+    return session;
+  }).filter(Boolean);
+  return {
+    classId,
+    updatedCount: updatedSessions.length,
+    sessions: updatedSessions
+  };
+}
+
 async function updateClassSessionStatus(input = {}, req = {}) {
   await assertScheduleMutationAccess(req);
   const classId = toPublicId(input.classId);
@@ -411,6 +515,7 @@ async function updateWorkSessionFromSchedule(input = {}, req = {}) {
 
 module.exports = {
   updateClassSessionSchedule,
+  bulkUpdateClassSessionSchedule,
   updateClassSessionStatus,
   updateWorkSessionFromSchedule,
   isScheduledEditableSession,

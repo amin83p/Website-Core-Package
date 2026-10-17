@@ -48,6 +48,7 @@ function buildMasterScheduleViewerClientConfig({
       validatePendingEnrollmentsCommit: '/school/schedules/api/enroll-students/validate-pending-commit',
       executePendingEnrollmentsCommit: '/school/schedules/api/enroll-students/execute-pending-commit',
       updateClassSessionSchedule: '/school/schedules/api/update-class-session-schedule',
+      bulkUpdateClassSessionSchedule: '/school/schedules/api/bulk-update-class-session-schedule',
       sessionManagementPolicy: '/school/schedules/api/session-management-policy',
       updateClassSessionStatus: '/school/schedules/api/update-class-session-status',
       updateWorkSessionSchedule: '/school/schedules/api/update-work-session-schedule',

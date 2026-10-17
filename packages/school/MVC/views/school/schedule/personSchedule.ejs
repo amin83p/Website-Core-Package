@@ -20,6 +20,7 @@
   const defaultRole = scheduleAccess.selectedRole || (scheduleRoles.length >= 1 ? scheduleRoles[0].key : '');
   const lockedPersonId = scheduleAccess.lockedPersonId || (typeof prefillId !== 'undefined' ? prefillId : '') || '';
   const lockedPersonName = scheduleAccess.lockedPersonName || (typeof prefillName !== 'undefined' ? prefillName : '') || '';
+  const showCreateClassFromTemplateModal = typeof includeClassCreateFromTemplateModal !== 'undefined' && includeClassCreateFromTemplateModal === true;
 %>
 <% if (canSelectAnyPerson || canDragCreateSessions) { %>
 <link rel="stylesheet" href="/styles/schedule-viewer-admin.css">
@@ -195,6 +196,9 @@
               <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-admin-action="merge-sessions" title="Merge Sessions" aria-label="Merge Sessions"><i class="bi bi-intersect" aria-hidden="true"></i></button>
               <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-admin-action="take-over-sessions" title="Take Over / Undo Take Over" aria-label="Take Over / Undo Take Over"><i class="bi bi-person-check" aria-hidden="true"></i></button>
               <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-admin-action="add-co-teacher" title="Add Co-Teacher" aria-label="Add Co-Teacher"><i class="bi bi-people" aria-hidden="true"></i></button>
+              <% if (showCreateClassFromTemplateModal) { %>
+              <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-admin-action="create-class-from-template" title="Create class from template" aria-label="Create class from template"><i class="bi bi-file-earmark-plus" aria-hidden="true"></i></button>
+              <% } %>
               <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-admin-action="claim-numbers" title="Manage Claim Numbers" aria-label="Manage Claim Numbers"><i class="bi bi-card-checklist" aria-hidden="true"></i></button>
               <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-admin-action="person-schedule-note" title="Schedule note" aria-label="Schedule note" aria-pressed="false"><i class="bi bi-journal-text" aria-hidden="true"></i></button>
             </div>
@@ -536,6 +540,9 @@
 <%- include('school/schedule/partials/scheduleMergeSessionsModal') %>
 <%- include('school/schedule/partials/scheduleTakeOverSessionsModal') %>
 <%- include('school/schedule/partials/scheduleAddCoTeacherModal') %>
+<% if (showCreateClassFromTemplateModal) { %>
+<%- include('school/class/partials/classCreateFromTemplateModal') %>
+<% } %>
 <% } %>
 <%- include('partials/tablePages-end') %>
 
@@ -562,6 +569,10 @@
 <script src="/scripts/masterScheduleMergeSessions.js"></script>
 <script src="/scripts/masterScheduleTakeOverSessions.js"></script>
 <script src="/scripts/masterScheduleAddCoTeacher.js"></script>
+<% if (showCreateClassFromTemplateModal) { %>
+<script src="/scripts/classCreateFromTemplateModal.js"></script>
+<script src="/scripts/masterScheduleCreateClassFromTemplate.js"></script>
+<% } %>
 <script src="/scripts/masterSchedulePersonNote.js"></script>
 <% } %>
 <script src="/scripts/masterScheduleViewer.js"></script>

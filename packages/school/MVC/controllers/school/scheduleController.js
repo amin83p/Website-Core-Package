@@ -3,6 +3,7 @@ const crypto = require('crypto');
 
 const SCHEDULE_ORG_SCAN_ACCESS_CONTEXT = { scopeId: 'SCP_ORG' };
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
+const { canCreateOrgScopedItem } = requireCoreModule('MVC/utils/orgContextUtils');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const { resolveOrgTodayFromRequest, resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 const schoolDataService = require('../../services/school/schoolDataService'); 
@@ -2227,6 +2228,7 @@ async function showSchedulePage(req, res) {
             viewerScheduleAccess,
             initialScheduleViewerPrefs
         });
+        const canCreateClasses = await canCreateOrgScopedItem(req.user, { scopeLabel: 'classes' });
 
         res.render('school/schedule/personSchedule', {
             title: 'Master Schedule Viewer',
@@ -2240,7 +2242,8 @@ async function showSchedulePage(req, res) {
             scheduleCapabilities,
             attendanceMarkAppearanceResolved,
             initialScheduleViewerPrefs,
-            masterScheduleViewerClientConfig
+            masterScheduleViewerClientConfig,
+            includeClassCreateFromTemplateModal: canCreateClasses
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', error, message: error.message, user: req.user });
@@ -3511,6 +3514,38 @@ async function getSessionManagementPolicy(req, res) {
     }
 }
 
+async function postBulkUpdateClassSessionSchedule(req, res) {
+    try {
+        const result = await scheduleSessionMutationService.bulkUpdateClassSessionSchedule(req.body || {}, req);
+        const updatedCount = Number(result?.updatedCount || 0);
+        const message = updatedCount === 1
+            ? '1 session schedule updated.'
+            : `${updatedCount} session schedules updated.`;
+        return res.json({
+            status: 'success',
+            message,
+            data: result,
+            actionStateId: req.actionStateId || ''
+        });
+    } catch (error) {
+        if (error?.name === 'SessionOperationBlockedError') {
+            return res.status(Number(error?.statusCode) || 409).json({
+                status: 'error',
+                code: error.code,
+                message: error.message,
+                blockers: error.blockers || []
+            });
+        }
+        const statusCode = Number(error?.statusCode) || 400;
+        return res.status(statusCode).json({
+            status: statusCode === 409 ? 'warning' : 'error',
+            code: error?.code || '',
+            message: error.message || 'Unable to update selected session schedules.',
+            data: error?.data || undefined
+        });
+    }
+}
+
 async function postUpdateClassSessionSchedule(req, res) {
     try {
         const result = await scheduleSessionMutationService.updateClassSessionSchedule(req.body || {}, req);
@@ -3660,6 +3695,7 @@ module.exports = {
     postBulkDeleteSessionsPreview,
     postBulkDeleteSessions,
     getSessionManagementPolicy,
+    postBulkUpdateClassSessionSchedule,
     postUpdateClassSessionSchedule,
     postUpdateClassSessionStatus,
     postUpdateWorkSessionSchedule,

@@ -113,6 +113,67 @@
                 : raw;
         }
 
+        function readScheduleStageStartDate() {
+            const modalEl = getScheduleStageModalEl();
+            const raw = String(modalEl?.querySelector('#sessionEnrollmentStageStartDate')?.value || '').trim();
+            const fromInput = deps.scheduleCalendarCore?.normalizeDateOnly
+                ? deps.scheduleCalendarCore.normalizeDateOnly(raw)
+                : raw;
+            if (fromInput) return fromInput;
+            const fallback = String(scheduleStageContext?.date || '').trim();
+            return deps.scheduleCalendarCore?.normalizeDateOnly
+                ? deps.scheduleCalendarCore.normalizeDateOnly(fallback)
+                : fallback;
+        }
+
+        function syncScheduleStageStartDateInput(value) {
+            const modalEl = getScheduleStageModalEl();
+            const startInput = modalEl?.querySelector('#sessionEnrollmentStageStartDate');
+            if (!startInput) return;
+            const normalized = deps.scheduleCalendarCore?.normalizeDateOnly
+                ? deps.scheduleCalendarCore.normalizeDateOnly(value || scheduleStageContext?.date || '')
+                : String(value || scheduleStageContext?.date || '').trim();
+            if (normalized) startInput.value = normalized;
+            if (scheduleStageContext && normalized) scheduleStageContext.date = normalized;
+            syncScheduleThroughDateStartMin();
+        }
+
+        function syncScheduleStageContextHeader() {
+            if (!scheduleStageContext) return;
+            const modalEl = getScheduleStageModalEl();
+            const contextEl = modalEl?.querySelector('#sessionEnrollmentStageContext');
+            if (!contextEl || !deps.scheduleCalendarCore) return;
+            const dateLabel = deps.scheduleCalendarCore.formatDayHeaderLong(readScheduleStageStartDate());
+            const timeLabel = String(scheduleStageContext.startTimeLabel || scheduleStageContext.startTime24 || '').trim();
+            const classLabel = String(scheduleStageClassContext?.classLabel || '').trim();
+            contextEl.textContent = classLabel
+                ? `${classLabel} · ${dateLabel} · Start ${timeLabel}`
+                : `${dateLabel} · Start ${timeLabel}`;
+        }
+
+        function syncScheduleThroughDateStartMin() {
+            const modalEl = getScheduleStageModalEl();
+            const throughInput = modalEl?.querySelector('#sessionEnrollmentStageThroughDate');
+            if (!throughInput) return;
+            const anchorDate = readScheduleStageStartDate();
+            if (!anchorDate) return;
+            throughInput.min = anchorDate;
+            const through = deps.scheduleCalendarCore?.normalizeDateOnly
+                ? deps.scheduleCalendarCore.normalizeDateOnly(String(throughInput.value || '').trim())
+                : String(throughInput.value || '').trim();
+            if (through && through < anchorDate) throughInput.value = '';
+        }
+
+        function handleScheduleStageStartDateInputChange() {
+            const startDate = readScheduleStageStartDate();
+            if (scheduleStageContext && startDate) scheduleStageContext.date = startDate;
+            syncScheduleStageContextHeader();
+            syncScheduleThroughDateStartMin();
+            if (readScheduleStageLimitMode() === 'throughDate') {
+                updateScheduleStageSessionPreview().catch(() => {});
+            }
+        }
+
         function estimateDefaultScheduleStageThroughDate(anchorDate, count = 4) {
             const anchor = deps.scheduleCalendarCore?.normalizeDateOnly
                 ? deps.scheduleCalendarCore.normalizeDateOnly(anchorDate)
@@ -137,9 +198,7 @@
             if (throughSection) throughSection.classList.toggle('d-none', mode !== 'throughDate');
             if (mode === 'throughDate') {
                 const throughInput = modalEl.querySelector('#sessionEnrollmentStageThroughDate');
-                const anchor = deps.scheduleCalendarCore?.normalizeDateOnly
-                    ? deps.scheduleCalendarCore.normalizeDateOnly(scheduleStageContext?.date || '')
-                    : String(scheduleStageContext?.date || '').trim();
+                const anchor = readScheduleStageStartDate();
                 if (throughInput && anchor && !String(throughInput.value || '').trim()) {
                     throughInput.value = estimateDefaultScheduleStageThroughDate(anchor, readScheduleStageSessionCount());
                 }
@@ -180,15 +239,21 @@
         function bindScheduleThroughDatePreviewDelegation() {
             if (scheduleThroughDatePreviewDelegated) return;
             scheduleThroughDatePreviewDelegated = true;
-            const onThroughDateInput = (event) => {
+            const onStageDateInput = (event) => {
                 const target = event.target;
-                if (!target || target.id !== 'sessionEnrollmentStageThroughDate') return;
+                if (!target) return;
+                const fieldId = String(target.id || '').trim();
+                if (fieldId !== 'sessionEnrollmentStageThroughDate' && fieldId !== 'sessionEnrollmentStageStartDate') return;
                 const modal = target.closest('#sessionEnrollmentStageModal');
                 if (!modal || modal.classList.contains('d-none')) return;
+                if (fieldId === 'sessionEnrollmentStageStartDate') {
+                    handleScheduleStageStartDateInputChange();
+                    return;
+                }
                 updateScheduleStageSessionPreview().catch(() => {});
             };
-            document.addEventListener('change', onThroughDateInput);
-            document.addEventListener('input', onThroughDateInput);
+            document.addEventListener('change', onStageDateInput);
+            document.addEventListener('input', onStageDateInput);
         }
 
         async function updateScheduleStageSessionPreview() {
@@ -214,21 +279,22 @@
             const count = readScheduleStageSessionCount();
             const projectedEnd = form.throughDate;
             let blockedDates = [];
+            const startDate = form.startDate || readScheduleStageStartDate();
             if (form.skipHolidays && window.SessionEnrollmentCalendarModal?.collectHolidayDatesForRange) {
                 blockedDates = await window.SessionEnrollmentCalendarModal.collectHolidayDatesForRange(
-                    scheduleStageContext.date,
+                    startDate,
                     projectedEnd
                 );
             }
             if (token !== scheduleStagePreviewToken) return;
             const person = deps.activeSchedulePerson();
             const genOptions = {
-                anchorDate: scheduleStageContext.date,
+                anchorDate: startDate,
                 startTime: scheduleStageContext.startTime24,
                 durationHours: form.durationHours,
                 weekdays: form.weekdays,
                 limitMode: 'throughDate',
-                enrollmentStart: scheduleStageContext.date,
+                enrollmentStart: startDate,
                 enrollmentEnd: projectedEnd,
                 blockedDates,
                 existingSessions: collectScheduleConflictSessionsForPerson(person?.id || ''),
@@ -402,13 +468,15 @@
             const skipHolidays = Boolean(modalEl?.querySelector('#sessionEnrollmentStageSkipHolidays')?.checked);
             const limitMode = readScheduleStageLimitMode();
             const throughDate = readScheduleStageThroughDate();
+            const startDate = readScheduleStageStartDate();
             return {
                 durationHours,
                 weekdays: deps.scheduleCalendarCore?.normalizeWeekdays ? deps.scheduleCalendarCore.normalizeWeekdays(weekdays) : weekdays,
                 count,
                 skipHolidays,
                 limitMode,
-                throughDate
+                throughDate,
+                startDate
             };
         }
     
@@ -859,9 +927,12 @@
                 if (typeof deps.uiAlert === 'function') deps.uiAlert('Select at least one weekday.', 'Stage Sessions', { icon: 'info' });
                 return;
             }
-            const anchorDate = deps.scheduleCalendarCore?.normalizeDateOnly
-                ? deps.scheduleCalendarCore.normalizeDateOnly(scheduleStageContext.date)
-                : String(scheduleStageContext.date || '').trim();
+            const anchorDate = form.startDate || readScheduleStageStartDate();
+            if (!anchorDate) {
+                if (typeof deps.uiAlert === 'function') deps.uiAlert('Choose a start date.', 'Stage Sessions', { icon: 'info' });
+                return;
+            }
+            if (scheduleStageContext) scheduleStageContext.date = anchorDate;
             if (form.limitMode === 'throughDate') {
                 if (!form.throughDate) {
                     if (typeof deps.uiAlert === 'function') deps.uiAlert('Choose a through date.', 'Stage Sessions', { icon: 'info' });
@@ -888,24 +959,24 @@
                 const projectedEnd = limitMode === 'throughDate'
                     ? form.throughDate
                     : deps.scheduleCalendarCore.addDaysIso(
-                        scheduleStageContext.date,
+                        anchorDate,
                         Math.max(2, Math.ceil(count / 2) + 1) * 7 + 14
                     );
                 let blockedDates = [];
                 if (form.skipHolidays && window.SessionEnrollmentCalendarModal?.collectHolidayDatesForRange) {
                     blockedDates = await window.SessionEnrollmentCalendarModal.collectHolidayDatesForRange(
-                        scheduleStageContext.date,
+                        anchorDate,
                         projectedEnd
                     );
                 }
                 const person = deps.activeSchedulePerson();
                 const genOptions = {
-                    anchorDate: scheduleStageContext.date,
+                    anchorDate,
                     startTime: scheduleStageContext.startTime24,
                     durationHours: form.durationHours,
                     weekdays: form.weekdays,
                     limitMode,
-                    enrollmentStart: scheduleStageContext.date,
+                    enrollmentStart: anchorDate,
                     enrollmentEnd: projectedEnd,
                     blockedDates,
                     existingSessions: collectScheduleConflictSessionsForPerson(person?.id || ''),
@@ -929,7 +1000,7 @@
                     ? deps.getStagedViewPaddingRangeOptions()
                     : {};
                 const paddedRange = deps.scheduleCalendarCore.computeStagedSessionsViewRange(result.sessions, {
-                    anchorDate: scheduleStageContext.date,
+                    anchorDate,
                     ...stagedPaddingOptions
                 });
                 const startDate = paddedRange.startDate;
@@ -941,7 +1012,7 @@
                     count: limitMode === 'count' ? count : undefined,
                     throughDate: limitMode === 'throughDate' ? form.throughDate : undefined,
                     skipHolidays: form.skipHolidays,
-                    anchorDate: scheduleStageContext.date,
+                    anchorDate,
                     startTime: scheduleStageContext.startTime24
                 };
                 scheduleStageClassContext.lastStageParams = stageParams;
@@ -1007,15 +1078,8 @@
             scheduleStageContext = context;
             initScheduleStageModal();
             const modalEl = getScheduleStageModalEl();
-            const contextEl = modalEl?.querySelector('#sessionEnrollmentStageContext');
-            if (contextEl && deps.scheduleCalendarCore) {
-                const dateLabel = deps.scheduleCalendarCore.formatDayHeaderLong(context.date);
-                const timeLabel = String(context.startTimeLabel || context.startTime24 || '').trim();
-                const classLabel = String(scheduleStageClassContext?.classLabel || '').trim();
-                contextEl.textContent = classLabel
-                    ? `${classLabel} · ${dateLabel} · Start ${timeLabel}`
-                    : `${dateLabel} · Start ${timeLabel}`;
-            }
+            syncScheduleStageStartDateInput(context.date);
+            syncScheduleStageContextHeader();
             const durationHours = nearestScheduleStageDurationChip(context.durationHours);
             modalEl?.querySelectorAll('[data-stage-duration]').forEach((btn) => {
                 const hours = Number(btn.getAttribute('data-stage-duration'));
@@ -1126,6 +1190,12 @@
             });
             modalEl.querySelector('#sessionEnrollmentStageThroughDate')?.addEventListener('input', () => {
                 updateScheduleStageSessionPreview().catch(() => {});
+            });
+            modalEl.querySelector('#sessionEnrollmentStageStartDate')?.addEventListener('change', () => {
+                handleScheduleStageStartDateInputChange();
+            });
+            modalEl.querySelector('#sessionEnrollmentStageStartDate')?.addEventListener('input', () => {
+                handleScheduleStageStartDateInputChange();
             });
             modalEl.querySelector('#sessionEnrollmentStageSkipHolidays')?.addEventListener('change', () => {
                 updateScheduleStageSessionPreview().catch(() => {});

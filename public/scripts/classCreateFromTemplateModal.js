@@ -318,6 +318,15 @@
       populateTemplateSelect(document.getElementById('cft_templateId'), data.templates, 'Select a template...');
       populateTeacherSelect(document.getElementById('cft_teacherPersonId'), data.teachers, 'Select a teacher...');
 
+      const requestedTeacherId = String(openOptions.teacherPersonId || '').trim();
+      const teacherSelect = document.getElementById('cft_teacherPersonId');
+      if (requestedTeacherId && teacherSelect) {
+        const hasOption = Array.from(teacherSelect.options).some(
+          (opt) => String(opt.value || '').trim() === requestedTeacherId
+        );
+        if (hasOption) teacherSelect.value = requestedTeacherId;
+      }
+
       setLoadingState(false);
       fieldsEl?.classList.remove('d-none');
       if (submitBtn) submitBtn.disabled = false;

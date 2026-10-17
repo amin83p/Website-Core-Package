@@ -10,6 +10,11 @@
     </div>
     <div class="card-body py-2">
       <div class="session-stage-section mb-3">
+        <label class="form-label small text-muted mb-1" for="sessionEnrollmentStageStartDate">Start date</label>
+        <input type="date" class="form-control form-control-sm session-stage-through-date-input" id="sessionEnrollmentStageStartDate" aria-describedby="sessionEnrollmentStageStartDateHelp">
+        <div class="form-text small" id="sessionEnrollmentStageStartDateHelp">First session is on or after this date on the selected weekdays. Start time comes from the slot you clicked.</div>
+      </div>
+      <div class="session-stage-section mb-3">
         <div class="session-stage-label small text-muted mb-1">Duration</div>
         <div class="session-stage-btn-group d-flex flex-wrap gap-2" id="sessionEnrollmentStageDurationGroup" role="group" aria-label="Session duration">
           <button type="button" class="btn btn-outline-secondary session-stage-chip" data-stage-duration="0.5">30 Mins</button>

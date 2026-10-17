@@ -48,7 +48,17 @@ test('stage modal supports count and through-date limit modes', () => {
   assert.match(stageModal, /sessionEnrollmentStageLimitModeThroughDate/);
   assert.match(stageModal, /sessionEnrollmentStageThroughDate/);
   assert.match(stageModal, /sessionEnrollmentStageThroughDatePreview/);
+  assert.match(stageModal, /sessionEnrollmentStageStartDate/);
   assert.match(stageModal, /sessionEnrollmentStageCountSection/);
+});
+
+test('stage modal start date is wired in enrollment and schedule staging scripts', () => {
+  const modalSource = read('public/scripts/sessionEnrollmentCalendarModal.js');
+  const staging = read('public/scripts/masterScheduleViewerStaging.js');
+  assert.match(modalSource, /readStageStartDate/);
+  assert.match(modalSource, /sessionEnrollmentStageStartDate/);
+  assert.match(staging, /readScheduleStageStartDate/);
+  assert.match(staging, /sessionEnrollmentStageStartDate/);
 });
 
 test('calendar modal supports partial mode and shared helpers', () => {

@@ -40,6 +40,7 @@
     const SCHEDULE_UPDATE_WORK_SESSION_SCHEDULE_API = String(cfg.api?.updateWorkSessionSchedule || '/school/schedules/api/update-work-session-schedule');
     const SCHEDULE_BULK_DELETE_SESSIONS_PREVIEW_API = String(cfg.api?.bulkDeleteSessionsPreview || '/school/schedules/api/bulk-delete-sessions/preview');
     const SCHEDULE_BULK_DELETE_SESSIONS_API = String(cfg.api?.bulkDeleteSessions || '/school/schedules/api/bulk-delete-sessions');
+    const SCHEDULE_BULK_UPDATE_CLASS_SESSION_SCHEDULE_API = String(cfg.api?.bulkUpdateClassSessionSchedule || '/school/schedules/api/bulk-update-class-session-schedule');
     const SCHEDULE_REFRESH_SESSIONS_API = String(cfg.api?.refreshScheduleSessions || '/school/schedules/api/schedule-viewer/refresh-sessions');
     const SCHEDULE_DRAGGABLE_BLOCK_SELECTOR = String(cfg.constants?.draggableBlockSelector || '[data-event-type="schedule_draft"], .is-schedule-draft[data-session-id], [data-event-type="class_session"][data-schedule-editable="1"]');
     const scheduleCalendarCore = window.SessionCalendarCore;
@@ -3293,11 +3294,6 @@
                 });
             }
         });
-        document.getElementById('btn_scheduleSavedBulkEditApply')?.addEventListener('click', (clickEvent) => {
-            clickEvent.preventDefault();
-            void applyScheduleSavedBulkEditOverlay();
-        });
-
         document.getElementById('btn_scheduleSessionContextEdit')?.addEventListener('click', (clickEvent) => {
             clickEvent.preventDefault();
             const event = scheduleSessionContextEvent;
@@ -4496,6 +4492,11 @@
         addCoTeacherRailHandler = typeof handler === 'function' ? handler : null;
     }
 
+    let createClassFromTemplateRailHandler = null;
+    function bindCreateClassFromTemplateRail(handler) {
+        createClassFromTemplateRailHandler = typeof handler === 'function' ? handler : null;
+    }
+
     let claimNumbersRailHandler = null;
     function bindClaimNumbersRail(handler) {
         claimNumbersRailHandler = typeof handler === 'function' ? handler : null;
@@ -4660,7 +4661,59 @@
         overlay.setAttribute('aria-hidden', 'false');
     }
 
+    let scheduleSavedBulkEditInFlight = false;
+
+    async function postBulkSavedSessionScheduleUpdates(selectedEvents, validation, { forceConflicts = false } = {}) {
+        const classId = String(selectedEvents[0]?.classId || activeScheduleSelectedClassId() || '').trim();
+        if (!classId) throw new Error('No active class for bulk update.');
+        const updates = selectedEvents.map((event) => ({
+            sessionId: event.sessionId,
+            sessionDate: String(event.date || '').trim(),
+            date: String(event.date || '').trim(),
+            startTime: validation.startTime,
+            endTime: validation.endTime,
+            durationHours: validation.durationHours
+        }));
+        const res = await fetch(SCHEDULE_BULK_UPDATE_CLASS_SESSION_SCHEDULE_API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+                classId,
+                updates,
+                forceConflicts: forceConflicts === true
+            })
+        });
+        const result = await res.json().catch(() => ({}));
+        return { res, result };
+    }
+
+    function patchBulkSavedSessionScheduleResults(selectedEvents, serverSessions = []) {
+        const byId = new Map(
+            (Array.isArray(serverSessions) ? serverSessions : []).map((row) => [
+                String(row?.sessionId || row?.id || '').trim(),
+                row
+            ])
+        );
+        selectedEvents.forEach((event) => {
+            const sessionId = String(event?.sessionId || '').trim();
+            const sessionDate = String(event?.date || '').trim();
+            const session = byId.get(sessionId);
+            if (!session) return;
+            patchSavedClassSessionEventInState(
+                { ...event, date: sessionDate },
+                {
+                    date: session.date || sessionDate,
+                    start: session.startTime || event.start,
+                    end: session.endTime || event.end,
+                    duration: session.durationHours || event.duration
+                }
+            );
+        });
+    }
+
     async function applyScheduleSavedBulkEditOverlay() {
+        if (scheduleSavedBulkEditInFlight) return;
         const selectedEvents = getSelectedSavedClassSessionEvents();
         if (selectedEvents.length < 2) return;
         const values = readScheduleSavedBulkEditFormValues();
@@ -4677,46 +4730,61 @@
             errorEl.classList.add('d-none');
             errorEl.textContent = '';
         }
+        scheduleSavedBulkEditInFlight = true;
         let loadingToken = typeof window.showLoading === 'function'
             ? window.showLoading('Updating selected sessions...')
             : null;
-        let updatedCount = 0;
+        // #region agent log
+        fetch('http://127.0.0.1:7806/ingest/c7fa1798-3774-4efe-9724-2848436aa81e',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ae2ae1'},body:JSON.stringify({sessionId:'ae2ae1',hypothesisId:'A',location:'masterScheduleViewer.js:applyScheduleSavedBulkEditOverlay',message:'bulk edit start',data:{sessionCount:selectedEvents.length,api:'bulk'},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         try {
-            for (const event of selectedEvents) {
-                const sessionDate = String(event.date || '').trim();
-                const ok = await applySavedSessionScheduleUpdate({
-                    event,
-                    lookupSessionDate: sessionDate,
-                    date: sessionDate,
-                    startTime: validation.startTime,
-                    endTime: validation.endTime,
-                    durationHours: validation.durationHours,
-                    deferPostUpdate: true,
-                    skipLoading: true,
-                    errorElementId: 'scheduleSavedBulkEditError'
-                });
-                if (!ok) {
-                    if (updatedCount > 0) {
-                        refreshScheduleViewWithHolidays();
-                        const person = activeSchedulePerson();
-                        if (person?.id) await acknowledgeLocalScheduleMutation(person);
-                    }
-                    return;
-                }
-                updatedCount += 1;
+            let { res, result } = await postBulkSavedSessionScheduleUpdates(selectedEvents, validation, { forceConflicts: false });
+            // #region agent log
+            fetch('http://127.0.0.1:7806/ingest/c7fa1798-3774-4efe-9724-2848436aa81e',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ae2ae1'},body:JSON.stringify({sessionId:'ae2ae1',hypothesisId:'B',location:'masterScheduleViewer.js:applyScheduleSavedBulkEditOverlay',message:'bulk edit response',data:{status:res.status,resultStatus:String(result?.status||''),code:String(result?.code||'')},timestamp:Date.now()})}).catch(()=>{});
+            // #endregion
+            if (res.status === 409 && result.code === 'SESSION_METADATA_CONFLICTS') {
+                const conflicts = Array.isArray(result.data?.conflicts) ? result.data.conflicts : [];
+                const lines = conflicts.slice(0, 5).map((row) => {
+                    const parts = [row?.date, row?.existTime, row?.teacherName, row?.conflictClass].filter(Boolean);
+                    return parts.join(' · ');
+                }).join('\n');
+                const confirmed = typeof uiConfirm === 'function'
+                    ? await uiConfirm(`${result.message || 'Schedule conflicts were detected.'}${lines ? `\n\n${lines}` : ''}\n\nSave anyway?`, 'Schedule conflict', {
+                        icon: 'warning',
+                        cancelText: 'Cancel',
+                        confirmText: 'Save anyway',
+                        confirmClass: 'btn-warning btn-md'
+                    })
+                    : false;
+                if (!confirmed) return;
+                ({ res, result } = await postBulkSavedSessionScheduleUpdates(selectedEvents, validation, { forceConflicts: true }));
             }
+            if (!res.ok || result.status !== 'success') {
+                const message = result.message
+                    || (res.status === 429 ? 'Too many requests. Please wait a moment and try again.' : 'Unable to update selected sessions.');
+                if (errorEl) {
+                    errorEl.textContent = message;
+                    errorEl.classList.remove('d-none');
+                } else if (typeof uiAlert === 'function') {
+                    await uiAlert(message, 'Sessions update', { icon: 'error' });
+                }
+                return;
+            }
+            const updatedCount = Number(result?.data?.updatedCount || selectedEvents.length);
+            patchBulkSavedSessionScheduleResults(selectedEvents, result?.data?.sessions);
             hideScheduleSavedBulkEditOverlay();
             refreshScheduleViewWithHolidays();
             const person = activeSchedulePerson();
             if (person?.id) await acknowledgeLocalScheduleMutation(person);
             if (typeof uiAlert === 'function') {
                 await uiAlert(
-                    `Updated ${updatedCount} session${updatedCount === 1 ? '' : 's'}.`,
+                    result.message || `Updated ${updatedCount} session${updatedCount === 1 ? '' : 's'}.`,
                     'Sessions updated',
                     { icon: 'success' }
                 );
             }
         } finally {
+            scheduleSavedBulkEditInFlight = false;
             if (loadingToken && typeof window.hideLoading === 'function') window.hideLoading(loadingToken);
         }
     }
@@ -5706,6 +5774,9 @@
             }
             if (action === 'add-co-teacher' && typeof addCoTeacherRailHandler === 'function') {
                 void addCoTeacherRailHandler();
+            }
+            if (action === 'create-class-from-template' && typeof createClassFromTemplateRailHandler === 'function') {
+                void createClassFromTemplateRailHandler();
             }
             if (action === 'claim-numbers' && typeof claimNumbersRailHandler === 'function') {
                 void claimNumbersRailHandler();
@@ -8170,6 +8241,14 @@ if (canLoadAllSchedules) {
             refreshScheduleViewWithHolidays,
             applyClassSessionCoTeacherChangesInView,
             applyScheduleSessionChangesInView
+        });
+    }
+    if (canSelectAnyPerson && typeof global.installMasterScheduleCreateClassFromTemplate === 'function') {
+        global.installMasterScheduleCreateClassFromTemplate({
+            uiAlert,
+            bindCreateClassFromTemplateRail,
+            selectedScheduleRole,
+            activeSchedulePerson
         });
     }
     if (canSelectAnyPerson && typeof global.installMasterSchedulePersonNote === 'function') {
