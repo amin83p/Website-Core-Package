@@ -1,5 +1,6 @@
 // MVC/controllers/school/scheduleController.js
 const crypto = require('crypto');
+const { performance } = require('perf_hooks');
 
 const SCHEDULE_ORG_SCAN_ACCESS_CONTEXT = { scopeId: 'SCP_ORG' };
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
@@ -49,6 +50,68 @@ const PERIOD_LABELS = Object.freeze({
     year: 'Yearly'
 });
 
+const SCHEDULE_CLASS_FETCH_CONCURRENCY = 12;
+const SCHEDULE_PERSON_BUILD_TIMING = process.env.SCHEDULE_PERSON_BUILD_TIMING === '1';
+
+function createPersonScheduleBuildTimer(label = '') {
+    const marks = [];
+    const startedAt = performance.now();
+    return {
+        mark(segmentName) {
+            marks.push({ name: String(segmentName || '').trim(), ms: Math.round((performance.now() - startedAt) * 100) / 100 });
+        },
+        finish(extra = {}) {
+            if (!SCHEDULE_PERSON_BUILD_TIMING) return;
+            const payload = {
+                label: String(label || '').trim(),
+                ...extra,
+                segments: marks,
+                totalMs: Math.round((performance.now() - startedAt) * 100) / 100
+            };
+            console.info('[schedule-person-build]', payload);
+        }
+    };
+}
+
+async function runWithConcurrency(items, limit, worker) {
+    const list = Array.isArray(items) ? items : [];
+    if (!list.length) return [];
+    const concurrency = Math.max(1, Math.min(Number(limit) || 1, list.length));
+    const results = new Array(list.length);
+    let nextIndex = 0;
+    async function runWorker() {
+        while (nextIndex < list.length) {
+            const currentIndex = nextIndex;
+            nextIndex += 1;
+            results[currentIndex] = await worker(list[currentIndex], currentIndex);
+        }
+    }
+    await Promise.all(Array.from({ length: concurrency }, () => runWorker()));
+    return results;
+}
+
+function readEmbeddedClassSessions(classRow) {
+    return Array.isArray(classRow?.sessions) ? classRow.sessions : null;
+}
+
+async function resolveScheduleCapabilitiesForRequest(req, accessOptions = {}) {
+    if (req._scheduleViewerCapabilities) return req._scheduleViewerCapabilities;
+    const capabilities = await scheduleAccessService.buildScheduleCapabilities(req.user, {
+        accessScope: accessOptions.accessScope ?? req?.accessScope ?? '',
+        ipAddress: accessOptions.ipAddress ?? req?.ip ?? ''
+    });
+    req._scheduleViewerCapabilities = capabilities;
+    return capabilities;
+}
+
+async function getScheduleClientStatusMetaForRequest(req, activeOrgId, options = {}) {
+    const cacheKey = `_scheduleClientStatusMeta_${String(activeOrgId || '').trim()}`;
+    if (req[cacheKey]) return req[cacheKey];
+    const statusMeta = await sessionStatusPolicyService.getClientStatusMeta(activeOrgId || '', options);
+    req[cacheKey] = statusMeta;
+    return statusMeta;
+}
+
 function buildScheduleEventsFingerprint(events = []) {
     const parts = (Array.isArray(events) ? events : [])
         .map((event) => [
@@ -70,10 +133,12 @@ async function resolvePersonScheduleRequest(req) {
         accessScope: req?.accessScope || '',
         ipAddress: req?.ip || ''
     };
-    const { capabilities, effectivePersonId: lockedOrRequestedPersonId } = await scheduleAccessService.assertCanViewPersonSchedule(
+    const capabilities = await resolveScheduleCapabilitiesForRequest(req, accessOptions);
+    const { effectivePersonId: lockedOrRequestedPersonId } = await scheduleAccessService.assertCanViewPersonSchedule(
         req.user,
         personId,
-        accessOptions
+        accessOptions,
+        capabilities
     );
     const viewerScheduleAccess = scheduleAccessService.toViewerScheduleAccess(capabilities);
     let effectivePersonId = normalizeId(personId) || lockedOrRequestedPersonId;
@@ -846,10 +911,45 @@ function collectClassIdsWithSessionDeliveryInRange(
     return classIds;
 }
 
-async function getClassSessionsForScheduleScan(classId, reqUser, accessContext, { allowOrgScopeFallback = false } = {}) {
+async function getClassSessionsForScheduleScan(classId, reqUser, accessContext, { allowOrgScopeFallback = false, classRow = null } = {}) {
+    const embedded = classRow ? readEmbeddedClassSessions(classRow) : null;
+    if (embedded) return embedded;
     const scopedSessions = await schoolDataService.getClassSessions(classId, reqUser, accessContext);
     if (scopedSessions.length || !allowOrgScopeFallback) return scopedSessions;
     return schoolDataService.getClassSessions(classId, reqUser, SCHEDULE_ORG_SCAN_ACCESS_CONTEXT);
+}
+
+async function resolveClassSessionsForScheduleScan(classId, classDef, reqUser, accessContext, { allowOrgScopeFallback = false } = {}) {
+    const embedded = classDef ? readEmbeddedClassSessions(classDef) : null;
+    if (embedded) return embedded;
+    return getClassSessionsForScheduleScan(classId, reqUser, accessContext, { allowOrgScopeFallback, classRow: classDef });
+}
+
+async function hydrateClassMapForScheduleCandidates({
+    candidateClassIds,
+    classMap,
+    reqUser,
+    accessContext,
+    orgScopeFallbackClassIds = new Set()
+}) {
+    const missingIds = [...candidateClassIds].filter((classId) => !classMap.has(classId));
+    if (!missingIds.length) return [];
+    const rows = await runWithConcurrency(missingIds, SCHEDULE_CLASS_FETCH_CONCURRENCY, async (classId) => {
+        const allowOrgScopeFallback = orgScopeFallbackClassIds.has(classId);
+        const classRow = await getClassRowForScheduleScan(classId, reqUser, accessContext, { allowOrgScopeFallback });
+        return { classId, classRow: classRow || null };
+    });
+    const droppedClassIds = [];
+    rows.forEach((entry) => {
+        const classId = normalizeId(entry?.classId);
+        if (!classId) return;
+        if (entry?.classRow) {
+            classMap.set(classId, entry.classRow);
+        } else {
+            droppedClassIds.push(classId);
+        }
+    });
+    return droppedClassIds;
 }
 
 async function getClassRowForScheduleScan(classId, reqUser, accessContext, { allowOrgScopeFallback = false } = {}) {
@@ -860,6 +960,7 @@ async function getClassRowForScheduleScan(classId, reqUser, accessContext, { all
 
 async function expandScheduleCandidateClassIdsForMergeLinks({
     candidateClassIds,
+    classMap = new Map(),
     reqUser,
     accessContext = {},
     orgScopeFallbackClassIds = null
@@ -875,8 +976,9 @@ async function expandScheduleCandidateClassIdsForMergeLinks({
         const allowOrgScopeFallback = Boolean(
             orgScopeFallbackClassIds && orgScopeFallbackClassIds.has(classId)
         );
+        const classDef = classMap.get(classId) || null;
         // eslint-disable-next-line no-await-in-loop
-        const sessions = await getClassSessionsForScheduleScan(classId, reqUser, accessContext, {
+        const sessions = await resolveClassSessionsForScheduleScan(classId, classDef, reqUser, accessContext, {
             allowOrgScopeFallback
         });
         for (const session of sessions || []) {
@@ -1556,31 +1658,41 @@ async function buildEventsForPersonAndRange({
     skipEnrichment = false,
     orgTimeZone = ''
 }) {
+    const buildTimer = createPersonScheduleBuildTimer(`${normalizeId(personId)}:${startDate}:${endDate}`);
     const listScope = scheduleAccessService.resolveListScope(reqUser, accessContext);
     const assignmentListScope = await buildReportAssignmentListScope(reqUser, accessContext, listScope);
     const templateListScope = buildReportTemplateListScope(activeOrgId, listScope);
-    const [studentIndex, teacherIndex, allClasses, allAssignments, allTemplates, allTeachers, allStudents, allEnrollmentPeriods] = await Promise.all([
+    const normalizedPersonIdInput = normalizeId(personId);
+    const personTeachers = await schoolDataService.fetchAllData(
+        'teachers',
+        { personId__eq: normalizedPersonIdInput },
+        reqUser,
+        accessContext
+    ).catch(() => []);
+    let teacherPersonMap = buildTeacherPersonMap(personTeachers);
+    const normalizedPersonId = resolveLinkedPersonId(personId, teacherPersonMap);
+    const [studentIndex, teacherIndex, allAssignments, allTemplates, personStudents, allEnrollmentPeriods] = await Promise.all([
         schoolDataService.getStudentIndex(),
         schoolDataService.getTeacherIndex(),
-        schoolDataService.fetchAllData('classes', {}, reqUser, accessContext),
         schoolRepositories.reportAssignments.list({ query: {}, scope: assignmentListScope }),
         schoolRepositories.reportTemplates.list({ query: {}, scope: templateListScope }),
-        schoolDataService.fetchAllData('teachers', {}, reqUser, accessContext),
-        schoolDataService.fetchAllData('students', {}, reqUser, accessContext),
+        schoolDataService.fetchAllData(
+            'students',
+            { personId__eq: normalizedPersonId },
+            reqUser,
+            accessContext
+        ).catch(() => []),
         activeOrgId
             ? schoolDataService.getClassEnrollmentPeriodsByOrg(activeOrgId, reqUser, accessContext).catch(() => [])
             : schoolDataService.fetchAllData('classEnrollmentPeriods', {}, reqUser, accessContext).catch(() => [])
     ]);
-    const teacherPersonMap = buildTeacherPersonMap(allTeachers);
-    const normalizedPersonId = resolveLinkedPersonId(personId, teacherPersonMap);
+    buildTimer.mark('indexesAndScopedIdentity');
+    const allTeachers = Array.isArray(personTeachers) ? personTeachers : [];
+    const allStudents = Array.isArray(personStudents) ? personStudents : [];
     const effectiveStatusMap = statusMap instanceof Map
         ? statusMap
         : await sessionStatusPolicyService.getStatusMap(activeOrgId || '', { includeInactive: true });
-    const classMap = new Map(
-        (allClasses || [])
-            .map((row) => [normalizeId(row?.id), row])
-            .filter(([id]) => Boolean(id))
-    );
+    const classMap = new Map();
     const classSessionsById = new Map();
     const templateTitleMap = await enrichReportTemplateTitleMap(
         new Map(
@@ -1694,22 +1806,8 @@ async function buildEventsForPersonAndRange({
     const candidateClassIds = new Set();
     const sessionDeliveryOnlyClassIds = new Set();
     studentClassIds.forEach((id) => candidateClassIds.add(id));
-
-    for (const classRow of allClasses || []) {
-        const classId = normalizeId(classRow?.id);
-        if (!classId) continue;
-        if (
-            hasInstructorMatchWithTeacherLink(classRow, normalizedPersonId, teacherPersonMap)
-            || studentClassIds.has(classId)
-        ) {
-            candidateClassIds.add(classId);
-            continue;
-        }
-        if (hasSessionDeliveryMatch(classRow, normalizedPersonId, teacherPersonMap, startDate, endDate)) {
-            candidateClassIds.add(classId);
-            sessionDeliveryOnlyClassIds.add(classId);
-        }
-    }
+    collectClassIdsFromTeacherIndex(teacherIndex, normalizedPersonId, teacherPersonMap)
+        .forEach((classId) => candidateClassIds.add(classId));
 
     let orgDeliveryClassIds = new Set();
     if (shouldUseOrgScopeDeliveryClassDiscovery(accessContext, reqUser)) {
@@ -1719,6 +1817,10 @@ async function buildEventsForPersonAndRange({
             reqUser,
             SCHEDULE_ORG_SCAN_ACCESS_CONTEXT
         );
+        (Array.isArray(orgScopedClasses) ? orgScopedClasses : []).forEach((classRow) => {
+            const classId = normalizeId(classRow?.id);
+            if (classId) classMap.set(classId, classRow);
+        });
         orgDeliveryClassIds = collectClassIdsWithSessionDeliveryInRange(
             orgScopedClasses,
             normalizedPersonId,
@@ -1751,37 +1853,88 @@ async function buildEventsForPersonAndRange({
         ...teacherIndexClassIds,
         ...sessionDeliveryOnlyClassIds
     ]);
+    let droppedClassIds = await hydrateClassMapForScheduleCandidates({
+        candidateClassIds,
+        classMap,
+        reqUser,
+        accessContext,
+        orgScopeFallbackClassIds
+    });
+    droppedClassIds.forEach((classId) => candidateClassIds.delete(classId));
+
+    const discoveredFromHydrated = new Set();
+    classMap.forEach((classRow) => {
+        const classId = normalizeId(classRow?.id);
+        if (!classId || candidateClassIds.has(classId)) return;
+        if (
+            hasInstructorMatchWithTeacherLink(classRow, normalizedPersonId, teacherPersonMap)
+            || studentClassIds.has(classId)
+            || hasSessionDeliveryMatch(classRow, normalizedPersonId, teacherPersonMap, startDate, endDate)
+        ) {
+            discoveredFromHydrated.add(classId);
+            candidateClassIds.add(classId);
+            if (
+                hasSessionDeliveryMatch(classRow, normalizedPersonId, teacherPersonMap, startDate, endDate)
+                && !hasInstructorMatchWithTeacherLink(classRow, normalizedPersonId, teacherPersonMap)
+                && !studentClassIds.has(classId)
+            ) {
+                sessionDeliveryOnlyClassIds.add(classId);
+                orgScopeFallbackClassIds.add(classId);
+            }
+        }
+    });
+    if (discoveredFromHydrated.size) {
+        const moreDropped = await hydrateClassMapForScheduleCandidates({
+            candidateClassIds,
+            classMap,
+            reqUser,
+            accessContext,
+            orgScopeFallbackClassIds
+        });
+        moreDropped.forEach((classId) => candidateClassIds.delete(classId));
+    }
+
+    if (!candidateClassIds.size) {
+        const fallbackClasses = await schoolDataService.fetchAllData('classes', {}, reqUser, accessContext);
+        (Array.isArray(fallbackClasses) ? fallbackClasses : []).forEach((classRow) => {
+            const classId = normalizeId(classRow?.id);
+            if (!classId) return;
+            if (
+                hasInstructorMatchWithTeacherLink(classRow, normalizedPersonId, teacherPersonMap)
+                || studentClassIds.has(classId)
+                || hasSessionDeliveryMatch(classRow, normalizedPersonId, teacherPersonMap, startDate, endDate)
+            ) {
+                candidateClassIds.add(classId);
+                classMap.set(classId, classRow);
+            }
+        });
+    }
+    buildTimer.mark('candidateDiscovery');
+
     const mergeLinkedClassIds = await expandScheduleCandidateClassIdsForMergeLinks({
         candidateClassIds,
+        classMap,
         reqUser,
         accessContext,
         orgScopeFallbackClassIds
     });
     mergeLinkedClassIds.forEach((classId) => orgScopeFallbackClassIds.add(classId));
-
-    const droppedClassIds = [];
-    for (const classId of candidateClassIds) {
-        if (classMap.has(classId)) continue;
-        const allowOrgScopeFallback = orgScopeFallbackClassIds.has(classId);
-        // eslint-disable-next-line no-await-in-loop
-        const classRow = await getClassRowForScheduleScan(classId, reqUser, accessContext, {
-            allowOrgScopeFallback
-        });
-        if (classRow) {
-            classMap.set(classId, classRow);
-        } else {
-            droppedClassIds.push(classId);
-        }
-    }
-
+    droppedClassIds = await hydrateClassMapForScheduleCandidates({
+        candidateClassIds,
+        classMap,
+        reqUser,
+        accessContext,
+        orgScopeFallbackClassIds
+    });
     droppedClassIds.forEach((classId) => candidateClassIds.delete(classId));
+    buildTimer.mark('classHydration');
 
     const schedulePersonNameById = await buildSchedulePersonNameById({
         reqUser,
         students: allStudents,
         persons: [person].filter(Boolean),
         enrollmentPeriods: allEnrollmentPeriods,
-        classes: allClasses
+        classes: [...classMap.values()]
     });
     const resolveSoloStudentForSession = buildSoloStudentResolver({
         students: allStudents,
@@ -1804,17 +1957,18 @@ async function buildEventsForPersonAndRange({
 
     const events = [];
 
-    for (const classId of classIdsToScan) {
+    const classScanResults = await runWithConcurrency(classIdsToScan, SCHEDULE_CLASS_FETCH_CONCURRENCY, async (classId) => {
         const classDef = classMap.get(classId) || null;
         const classHasInstructor = hasInstructorMatchWithTeacherLink(classDef, normalizedPersonId, teacherPersonMap);
-        const sessions = await getClassSessionsForScheduleScan(classId, reqUser, accessContext, {
+        const sessions = await resolveClassSessionsForScheduleScan(classId, classDef, reqUser, accessContext, {
             allowOrgScopeFallback: orgScopeFallbackClassIds.has(classId)
         });
-        classSessionsById.set(classId, Array.isArray(sessions) ? sessions : []);
+        const normalizedSessions = Array.isArray(sessions) ? sessions : [];
+        const classEvents = [];
         let rollingApplicability = null;
         if (classSessionCapacityService.getClassRegistrationModeKey(classDef) === 'rolling') {
             const applicabilityByClass = await classSessionCapacityService.buildRollingApplicabilityByClassId([classDef], {
-                sessionsByClassId: new Map([[String(classDef?.id || classId).trim(), Array.isArray(sessions) ? sessions : []]]),
+                sessionsByClassId: new Map([[String(classDef?.id || classId).trim(), normalizedSessions]]),
                 students: allStudents,
                 activeOrgId,
                 reqUser
@@ -1824,8 +1978,8 @@ async function buildEventsForPersonAndRange({
         const managementFlagsBySessionId = await sessionManagementService.buildSessionManagementFlagsForClassSessions({
             classId,
             classData: classDef,
-            sessions: Array.isArray(sessions) ? sessions : [],
-            allSessions: Array.isArray(sessions) ? sessions : [],
+            sessions: normalizedSessions,
+            allSessions: normalizedSessions,
             reqUser,
             source: 'master_schedule',
             accessContext,
@@ -1833,7 +1987,7 @@ async function buildEventsForPersonAndRange({
             orgTimeZone: orgTimeZone || reqUser?.activeOrgTimeZone || ''
         });
 
-        for (const session of sessions || []) {
+        for (const session of normalizedSessions) {
             const sessionDate = normalizeId(session?.date);
             if (!sessionDate || sessionDate < startDate || sessionDate > endDate) continue;
 
@@ -1906,7 +2060,7 @@ async function buildEventsForPersonAndRange({
                 )
                 : '';
 
-            events.push({
+            classEvents.push({
                 id: eventId,
                 sessionId,
                 sourceSessionId: '',
@@ -1963,7 +2117,14 @@ async function buildEventsForPersonAndRange({
                 viewerCoTeacherPaid: coTeacherEntry ? coTeacherEntry.paid !== false : null
             });
         }
-    }
+        return { classId, sessions: normalizedSessions, events: classEvents };
+    });
+    classScanResults.forEach((result) => {
+        if (!result?.classId) return;
+        classSessionsById.set(result.classId, Array.isArray(result.sessions) ? result.sessions : []);
+        (Array.isArray(result.events) ? result.events : []).forEach((event) => events.push(event));
+    });
+    buildTimer.mark('classSessionScan');
 
     await appendReportEventsForPerson({
         events,
@@ -2004,15 +2165,28 @@ async function buildEventsForPersonAndRange({
     events.push(...activityEvents);
 
     if (!skipEnrichment) {
+        buildTimer.mark('preCaseEnrichment');
         events.splice(0, events.length, ...await attachCaseSummariesToSessionEvents(events, reqUser));
+        buildTimer.mark('caseEnrichment');
     }
     sortEventsChronologically(events);
     if (!skipEnrichment) {
         markOverlappingEvents(events);
+        buildTimer.mark('overlapMarking');
     }
 
     const classIdsWithSessionsInRange = collectClassIdsWithSessionsInEvents(events);
     const activeClasses = buildActiveClassesForSchedulePerson(classMap, classIdsWithSessionsInRange);
+
+    buildTimer.finish({
+        personId: normalizedPersonId,
+        startDate,
+        endDate,
+        candidateClassCount: candidateClassIds.size,
+        classIdsToScan: classIdsToScan.length,
+        eventCount: events.length,
+        skipEnrichment
+    });
 
     return { events, personName, personOrgRoles, allStudents, allTeachers, person, activeClasses };
 }
@@ -2361,6 +2535,7 @@ async function saveScheduleViewerPreferences(req, res) {
 
 async function getPersonSchedule(req, res) {
     try {
+        const requestStartedAt = performance.now();
         const {
             effectivePersonId,
             effectiveRole,
@@ -2370,7 +2545,8 @@ async function getPersonSchedule(req, res) {
             activeOrgId
         } = await resolvePersonScheduleRequest(req);
 
-        const statusMeta = await sessionStatusPolicyService.getClientStatusMeta(activeOrgId || '', { includeInactive: true });
+        const minimalEnrichment = String(req.query?.enrichment || '').trim().toLowerCase() === 'minimal';
+        const statusMeta = await getScheduleClientStatusMetaForRequest(req, activeOrgId || '', { includeInactive: true });
         const statusMap = sessionStatusPolicyService.getStatusMetaMap(statusMeta);
         const personResult = await buildEventsForPersonAndRange({
             personId: effectivePersonId,
@@ -2380,6 +2556,7 @@ async function getPersonSchedule(req, res) {
             activeOrgId,
             statusMap,
             accessContext: schoolDataService.buildRouteAccessContext(req),
+            skipEnrichment: minimalEnrichment,
             orgTimeZone: req.orgTimeZone || req.user?.activeOrgTimeZone || ''
         });
 
@@ -2419,6 +2596,17 @@ async function getPersonSchedule(req, res) {
 
         const activeClasses = Array.isArray(personResult?.activeClasses) ? personResult.activeClasses : [];
 
+        if (SCHEDULE_PERSON_BUILD_TIMING) {
+            console.info('[schedule-person-schedule-api]', {
+                personId: effectivePersonId,
+                startDate,
+                endDate,
+                eventCount: events.length,
+                minimalEnrichment,
+                durationMs: Math.round((performance.now() - requestStartedAt) * 100) / 100
+            });
+        }
+
         res.json({
             status: 'success',
             events,
@@ -2427,7 +2615,8 @@ async function getPersonSchedule(req, res) {
             availableRoles,
             selectedRole: effectiveRole,
             fingerprint,
-            activeClasses
+            activeClasses,
+            enrichment: minimalEnrichment ? 'minimal' : 'full'
         });
     } catch (error) {
         res.status(400).json({ status: 'error', message: error.message });
@@ -3733,6 +3922,10 @@ module.exports = {
     collectClassIdsFromTeacherIndex,
     collectClassIdsWithSessionDeliveryInRange,
     shouldUseOrgScopeDeliveryClassDiscovery,
-    hasSessionDeliveryMatch
+    hasSessionDeliveryMatch,
+    runWithConcurrency,
+    readEmbeddedClassSessions,
+    resolveClassSessionsForScheduleScan,
+    createPersonScheduleBuildTimer
 };
 

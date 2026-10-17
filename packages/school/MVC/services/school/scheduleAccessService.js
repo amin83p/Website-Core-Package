@@ -321,8 +321,8 @@ async function buildScheduleViewerAccess(reqUser = {}, options = {}) {
   return toViewerScheduleAccess(capabilities);
 }
 
-async function assertCanViewPersonSchedule(reqUser, targetPersonId, options = {}) {
-  const capabilities = await buildScheduleCapabilities(reqUser, options);
+async function assertCanViewPersonSchedule(reqUser, targetPersonId, options = {}, precomputedCapabilities = null) {
+  const capabilities = precomputedCapabilities || await buildScheduleCapabilities(reqUser, options);
   const normalizedTarget = normalizeId(targetPersonId);
   if (capabilities.canSelectAnyPerson) {
     return { capabilities, effectivePersonId: normalizedTarget };

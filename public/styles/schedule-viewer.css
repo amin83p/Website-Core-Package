@@ -310,6 +310,36 @@
 .schedule-status-chip.status-pending { background: #fff3cd; color: #664d03; border-color: #ffda6a; }
 .schedule-status-chip.status-leave { background: #fff3bf; color: #7a4d00; border-color: #f59f00; }
 .schedule-status-chip.status-overlap { background: #f8d7da; color: #842029; border-color: #f1aeb5; }
+.schedule-co-teacher-badges {
+    position: absolute;
+    top: 4px;
+    right: 4.5rem;
+    z-index: 22;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.1rem 0.28rem;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.88);
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.1);
+    font-size: 0.78rem;
+    line-height: 1;
+}
+.schedule-co-teacher-badges--inline {
+    position: static;
+    z-index: auto;
+    display: inline-flex;
+    vertical-align: middle;
+    margin-left: 0.15rem;
+    padding: 0.05rem 0.2rem;
+    box-shadow: none;
+}
+.schedule-co-teacher-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
 .status-tag-scheduled { background: #e7f1ff; color: #084298; border-color: #b6d4fe; }
 .status-tag-completed { background: #d1e7dd; color: #0f5132; border-color: #a3cfbb; }
 .status-tag-cancelled { background: #f8d7da; color: #842029; border-color: #f1aeb5; }
@@ -1131,6 +1161,29 @@ button.schedule-active-class-chip.active {
     display: inline-flex;
     align-items: center;
     flex-shrink: 0;
+    gap: 0.45rem;
+}
+.schedule-load-duration-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 999px;
+    padding: 0.5rem 0.75rem 0.34rem 0.65rem;
+    border: 1px solid #dee2e6;
+    background: #f8f9fa;
+    color: #495057;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    white-space: nowrap;
+    line-height: 1.2;
+}
+.schedule-load-duration-chip.is-active {
+    border-color: #b6d4fe;
+    background: #e7f1ff;
+    color: #084298;
+}
+.schedule-load-duration-chip .bi {
+    font-size: 0.85rem;
 }
 .schedule-loaded-at-chip-shell {
     position: relative;
@@ -1295,6 +1348,11 @@ html.schedule-master-self-viewer #visualDisplayArea .cal-session-chip[data-event
     cursor: pointer;
 }
 
+.schedule-admin-week-rail-inner [data-schedule-admin-action="person-schedule-note"].has-schedule-person-note {
+    background-color: var(--bs-warning, #ffc107);
+    border-color: var(--bs-warning-border-subtle, #ffda6a);
+    color: var(--bs-warning-text-emphasis, #664d03);
+}
 .schedule-calendar-card-body.is-month-view .schedule-admin-week-rail,
 #scheduleContainer.d-none .schedule-admin-week-rail {
     display: none !important;
@@ -1623,6 +1681,69 @@ body.modal-open #scheduleContainer .schedule-admin-week-rail-inner {
 }
 .single-day-list .event-row.overlap {
     background: #fff5f5;
+}
+.single-day-list .event-row-group {
+    display: grid;
+    gap: 0;
+    border-bottom: 1px dashed #e9ecef;
+    background: linear-gradient(180deg, #f8fafc 0%, #ffffff 42%);
+}
+.single-day-list .event-row-group-time {
+    grid-column: 1 / -1;
+    padding: 0.45rem 0.9rem 0.15rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #495057;
+    border-bottom: 1px solid #e9ecef;
+}
+.single-day-list .event-row-group--2 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.single-day-list .event-row-group--3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.single-day-list .event-row-group--4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.single-day-list .event-row-group .event-row {
+    border-bottom: none;
+    border-right: 1px solid #e9ecef;
+    min-width: 0;
+    grid-template-columns: auto 1fr auto;
+    grid-template-rows: auto auto;
+    gap: 0.45rem 0.55rem;
+    padding: 0.55rem 0.5rem;
+}
+.single-day-list .event-row-group .event-row .event-time {
+    grid-column: 1 / -1;
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: #495057;
+}
+.single-day-list .event-row-group .event-row .schedule-scan-cell {
+    grid-row: 2;
+}
+.single-day-list .event-row-group .event-row > div:nth-child(3) {
+    grid-row: 2;
+    min-width: 0;
+}
+.single-day-list .event-row-group .event-row .event-actions {
+    grid-row: 2;
+    align-self: start;
+}
+.single-day-list .event-row-group .event-row:last-child {
+    border-right: none;
+}
+.single-day-list .event-row-group .event-main-title {
+    font-size: 0.88rem;
+    line-height: 1.2;
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+    overflow: hidden;
+}
+.single-day-list .event-row-group .event-meta-line {
+    font-size: 0.72rem;
 }
 .single-day-list .event-row.leave-event {
     background: linear-gradient(90deg, #fff9db 0%, #ffffff 72%);

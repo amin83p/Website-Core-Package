@@ -68,6 +68,8 @@ test('personSchedule wires last-loaded refresh chip and stale detection', () => 
   assert.match(source, /lastLoadedAtByPersonId/);
   assert.match(source, /data-schedule-refresh-loaded/);
   assert.match(source, /schedule-loaded-at-chip/);
+  assert.match(source, /schedule-load-duration-chip/);
+  assert.match(source, /pendingLoadTiming/);
   assert.match(source, /visibilitychange/);
   assert.match(source, /markScheduleDataStaleAfterReturn/);
 });

@@ -1127,7 +1127,9 @@
         holidayRangeKey: '',
         activeClasses: [],
         activeClassesByPersonId: {},
-        activeClassFilterId: ''
+        activeClassFilterId: '',
+        loadDurationMsByPersonId: {},
+        pendingLoadTiming: null
     };
 
     let scheduleHolidayFetchToken = 0;
@@ -5737,13 +5739,65 @@
             requestAnimationFrame(() => {
                 applyScheduleWeekGridLayout(mode);
                 syncScheduleAdminWeekRailVisibility();
+                const pendingPersonId = scheduleState.pendingLoadTiming?.personId;
+                if (pendingPersonId) finalizeScheduleLoadTimingAfterRender(pendingPersonId);
                 if (!scheduleState.focusStagedSessionOnNextLayout || !activePersonHasDraftStagedSessions()) return;
                 scheduleState.focusStagedSessionOnNextLayout = false;
-                const person = activeSchedulePerson();
                 const date = scheduleState.pendingStagedScrollDate || getFirstDraftStagedSessionDate(person?.id);
                 if (date) focusScheduleTimelineOnFirstStagedSession(date);
             });
         });
+    }
+
+    function formatScheduleLoadDuration(ms) {
+        if (!Number.isFinite(ms) || ms < 0) return '';
+        if (ms < 1000) return `${Math.round(ms)} ms`;
+        return `${(ms / 1000).toFixed(1)} s`;
+    }
+
+    function completeScheduleLoadTiming(personId, meta = {}) {
+        const pending = scheduleState.pendingLoadTiming;
+        if (!pending || pending.personId !== personId) return false;
+        const durationMs = Math.round(performance.now() - pending.startedAt);
+        scheduleState.loadDurationMsByPersonId[personId] = durationMs;
+        scheduleState.pendingLoadTiming = null;
+        if (personId === scheduleState.activePersonId) {
+            renderScheduleControls(normalizedScheduleViewMode());
+        }
+        return true;
+    }
+
+    function abandonSchedulePendingLoadTiming(reason = '') {
+        const pending = scheduleState.pendingLoadTiming;
+        if (!pending) return;
+        scheduleState.pendingLoadTiming = null;
+    }
+
+    function finalizeScheduleLoadTimingAfterRender(personId) {
+        completeScheduleLoadTiming(personId, { phase: 'render' });
+    }
+
+    function scheduleLoadTimingAfterPaint(personId) {
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => finalizeScheduleLoadTimingAfterRender(personId));
+        });
+    }
+
+    function buildScheduleLoadDurationChipHtml() {
+        const person = activeSchedulePerson();
+        if (!person) return '';
+        const pending = scheduleState.pendingLoadTiming;
+        if (pending?.personId === person.id) {
+            const phaseLabel = scheduleState.loadingPersonId === person.id ? 'Loading…' : 'Rendering…';
+            const title = 'Measuring time from schedule fetch to rendered calendar';
+            return `<span class="schedule-load-duration-chip is-active" title="${escapeHtml(title)}" aria-live="polite"><i class="bi bi-stopwatch" aria-hidden="true"></i><span>${escapeHtml(phaseLabel)}</span></span>`;
+        }
+        if (!scheduleState.loadedPersonIds.has(person.id)) return '';
+        const durationMs = scheduleState.loadDurationMsByPersonId[person.id];
+        if (!Number.isFinite(durationMs)) return '';
+        const label = `Loaded in ${formatScheduleLoadDuration(durationMs)}`;
+        const title = 'Time from schedule fetch to rendered calendar';
+        return `<span class="schedule-load-duration-chip" title="${escapeHtml(title)}" aria-label="${escapeHtml(label)}"><i class="bi bi-stopwatch" aria-hidden="true"></i><span>${escapeHtml(label)}</span></span>`;
     }
 
     function syncScheduleAdminWeekRailVisibility() {
@@ -6219,6 +6273,19 @@
     }
 
     function buildScheduleLoadedAtChipHtml() {
+        return buildScheduleLoadStatusChipsHtml();
+    }
+
+    function buildScheduleLoadStatusChipsHtml() {
+        const person = activeSchedulePerson();
+        if (!person) return '';
+        const refreshChip = buildScheduleLoadedAtRefreshChipHtml();
+        const durationChip = buildScheduleLoadDurationChipHtml();
+        if (!refreshChip && !durationChip) return '';
+        return `<div class="schedule-loaded-at-wrap">${refreshChip}${durationChip}</div>`;
+    }
+
+    function buildScheduleLoadedAtRefreshChipHtml() {
         const person = activeSchedulePerson();
         if (!person) return '';
         if (scheduleState.loadingPersonId === person.id) return '';
@@ -6239,7 +6306,7 @@
         const toggleTitle = autoDetectOn
             ? 'Auto-detect schedule changes is on. Click to turn off.'
             : 'Auto-detect schedule changes is off. Click to turn on.';
-        return `<div class="schedule-loaded-at-wrap"><div class="schedule-loaded-at-chip-shell"><button type="button" class="schedule-loaded-at-chip${staleClass}" data-schedule-refresh-loaded title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i><span>${escapeHtml(label)}</span></button><button type="button" class="schedule-auto-detect-toggle ${toggleClass}" data-schedule-auto-detect-toggle aria-pressed="${autoDetectOn ? 'true' : 'false'}" title="${escapeHtml(toggleTitle)}" aria-label="${escapeHtml(toggleTitle)}">Auto ${escapeHtml(toggleLabel)}</button></div></div>`;
+        return `<div class="schedule-loaded-at-chip-shell"><button type="button" class="schedule-loaded-at-chip${staleClass}" data-schedule-refresh-loaded title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i><span>${escapeHtml(label)}</span></button><button type="button" class="schedule-auto-detect-toggle ${toggleClass}" data-schedule-auto-detect-toggle aria-pressed="${autoDetectOn ? 'true' : 'false'}" title="${escapeHtml(toggleTitle)}" aria-label="${escapeHtml(toggleTitle)}">Auto ${escapeHtml(toggleLabel)}</button></div>`;
     }
 
     function markScheduleDataStaleAfterReturn() {
@@ -6804,6 +6871,7 @@
             setSchedulePrintEnabled(false);
             container.innerHTML = `<div class="alert alert-danger text-center"><i class="bi bi-x-circle me-2"></i>${escapeHtml(scheduleState.errorByPersonId[person.id])}</div>`;
             syncScheduleAdminWeekRailVisibility();
+            scheduleLoadTimingAfterPaint(person.id);
             return;
         }
         const events = getScheduleEventsForPerson(person.id);
@@ -6822,6 +6890,7 @@
             renderCalendarView(grouped, range.startDate, range.endDate, container);
             setSchedulePrintEnabled(true);
             syncScheduleAdminWeekRailVisibility();
+            scheduleLoadTimingAfterPaint(person.id);
             return;
         }
         clearScheduleMonthViewLayout(container);
@@ -6830,6 +6899,7 @@
             container.innerHTML = `<div class="alert alert-light text-center border py-5 text-muted"><i class="bi bi-calendar-x fs-1 d-block mb-2"></i>No schedule items found in this date range.</div>`;
             setSchedulePrintEnabled(true);
             syncScheduleAdminWeekRailVisibility();
+            scheduleLoadTimingAfterPaint(person.id);
             return;
         }
         const rendered = mode === 'timeline'
@@ -6837,6 +6907,7 @@
             : renderVerticalTimelineView(grouped, container);
         if (!rendered) {
             container.innerHTML = `<div class="alert alert-light text-center border py-5 text-muted"><i class="bi bi-calendar-x fs-1 d-block mb-2"></i>No schedule items found in this date range.</div>`;
+            scheduleLoadTimingAfterPaint(person.id);
         } else {
             scheduleWeekGridLayoutAfterRender(mode);
             bindScheduleDragCreate(container, mode);
@@ -6859,6 +6930,10 @@
         if (!silent && typeof window.showLoading === 'function') window.showLoading(`Loading schedule for ${person.name || person.id}...`);
         try {
             await syncScheduleHolidayDates();
+            scheduleState.pendingLoadTiming = { personId: person.id, startedAt: performance.now() };
+            if (person.id === scheduleState.activePersonId) {
+                renderScheduleControls(normalizedScheduleViewMode());
+            }
             const params = new URLSearchParams({ personId: person.id, startDate: range.startDate, endDate: range.endDate });
             if (role) params.set('role', role);
             if (hasCasesOnly()) params.set('hasCases', '1');
@@ -6870,7 +6945,10 @@
             const guarded = typeof window.applyGuardedApiResult === 'function'
                 ? await window.applyGuardedApiResult(result, { busyTitle: 'Schedule Load In Progress', replayTitle: 'Schedule Already Loaded' })
                 : { stop: false };
-            if (guarded.stop) return false;
+            if (guarded.stop) {
+                scheduleState.pendingLoadTiming = null;
+                return false;
+            }
             if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Unable to load schedule.');
             if (Array.isArray(result.availableRoles)) person.availableRoles = result.availableRoles;
             person.selectedRole = result.selectedRole || role;
@@ -6898,9 +6976,22 @@
             if (person.id === scheduleState.activePersonId) stopScheduleAutoRefresh();
             return false;
         } finally {
+            const loadedPersonId = person.id;
+            const activeOnComplete = loadedPersonId === scheduleState.activePersonId;
             scheduleState.loadingPersonId = '';
             if (!silent && typeof window.hideLoading === 'function') window.hideLoading({ force: true });
             refreshScheduleActiveView();
+            if (scheduleState.pendingLoadTiming?.personId === loadedPersonId) {
+                if (!activeOnComplete) {
+                    completeScheduleLoadTiming(loadedPersonId, { phase: 'data-only' });
+                } else {
+                    const mode = normalizedScheduleViewMode();
+                    const weekGridMode = mode === 'verticalTimeline' || mode === 'timeline';
+                    if (!weekGridMode) {
+                        scheduleLoadTimingAfterPaint(loadedPersonId);
+                    }
+                }
+            }
             if (scheduleState.remoteUpdatePending) void promptScheduleRemoteUpdateIfNeeded();
         }
     }
@@ -7196,6 +7287,12 @@ if (canLoadAllSchedules) {
         const previousActivePersonId = scheduleState.activePersonId;
         scheduleState.activePersonId = personId || scheduleState.activePersonId;
         if (previousActivePersonId !== scheduleState.activePersonId) {
+            const pending = scheduleState.pendingLoadTiming;
+            if (pending
+                && pending.personId !== scheduleState.activePersonId
+                && scheduleState.loadingPersonId !== pending.personId) {
+                abandonSchedulePendingLoadTiming('active-person-changed-before-finalize');
+            }
             queueScheduleWorkspaceAutoPersist();
             notifyActiveSchedulePersonChanged();
         }
