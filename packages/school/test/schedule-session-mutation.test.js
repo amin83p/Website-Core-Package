@@ -43,6 +43,14 @@ test('schedule routes expose saved session mutation endpoints', () => {
   assert.match(routeSource, /\/api\/update-work-session-schedule/);
   assert.match(routeSource, /postUpdateClassSessionSchedule/);
   assert.match(routeSource, /postBulkUpdateClassSessionSchedule/);
+  assert.match(
+    routeSource,
+    /\/api\/bulk-update-class-session-schedule'[\s\S]*?trackActionState\(SECTIONS\.SCHOOL_SCHEDULES,\s*OPERATIONS\.READ_ALL\),\s*\n\s*ctrl\.postBulkUpdateClassSessionSchedule/
+  );
+  assert.doesNotMatch(
+    routeSource,
+    /\/api\/bulk-update-class-session-schedule'[\s\S]*?requireToken:\s*true/
+  );
   assert.match(routeSource, /postUpdateClassSessionStatus/);
   assert.match(routeSource, /postUpdateWorkSessionSchedule/);
 });

@@ -269,7 +269,7 @@ router.post('/api/bulk-delete-sessions',
 router.post('/api/bulk-update-class-session-schedule',
   requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
   requireAccess(SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL, { requireToken: true, keepActive: true }),
+  trackActionState(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
   ctrl.postBulkUpdateClassSessionSchedule);
 router.post('/api/update-class-session-schedule',
   requireAccess(SECTIONS.SCHOOL_SCHEDULES, OPERATIONS.READ_ALL),
