@@ -101,11 +101,13 @@ async function buildEngagementForClasses({
       presentMinutes: 0,
       scheduledMinutes: 0,
       percent: null,
-      classCount: 0
+      classCount: 0,
+      classes: []
     };
   }
 
   let totals = { presentMinutes: 0, scheduledMinutes: 0, percent: null };
+  const classResults = [];
   let processedCount = 0;
 
   for (const classId of normalizedClassIds) {
@@ -130,6 +132,12 @@ async function buildEngagementForClasses({
         endDate: normalizedEndDate
       });
       if (!filteredSessions.length) {
+        classResults.push({
+          classId,
+          presentMinutes: 0,
+          scheduledMinutes: 0,
+          percent: null
+        });
         processedCount += 1;
         continue;
       }
@@ -153,6 +161,12 @@ async function buildEngagementForClasses({
         orgPolicyCatalog
       );
       totals = mergeEngagementTotals(totals, classEngagement);
+      classResults.push({
+        classId,
+        presentMinutes: classEngagement.presentMinutes,
+        scheduledMinutes: classEngagement.scheduledMinutes,
+        percent: classEngagement.percent
+      });
       processedCount += 1;
     } catch (error) {
       console.warn(`[weeklyReportsEngagementService] Skipping class ${classId}: ${error.message}`);
@@ -163,12 +177,14 @@ async function buildEngagementForClasses({
     presentMinutes: totals.presentMinutes,
     scheduledMinutes: totals.scheduledMinutes,
     percent: totals.percent,
-    classCount: processedCount
+    classCount: processedCount,
+    classes: classResults
   };
 }
 
 module.exports = {
   summarizeEngagementFromMatrix,
+  mergeEngagementTotals,
   buildEngagementForClasses,
   parseClassIdList
 };

@@ -78,6 +78,35 @@ test('summarizeEngagementFromMatrix counts unmarked as zero attendance but inclu
   assert.equal(result.percent, 50);
 });
 
+test('mergeEngagementTotals combines class summaries into aggregate percent', () => {
+  const first = { presentMinutes: 60, scheduledMinutes: 120, percent: 50 };
+  const second = { presentMinutes: 30, scheduledMinutes: 60, percent: 50 };
+  const merged = weeklyReportsEngagementService.mergeEngagementTotals(
+    weeklyReportsEngagementService.mergeEngagementTotals({ presentMinutes: 0, scheduledMinutes: 0, percent: null }, first),
+    second
+  );
+  assert.equal(merged.presentMinutes, 90);
+  assert.equal(merged.scheduledMinutes, 180);
+  assert.equal(merged.percent, 50);
+});
+
+test('per-class engagement breakdown merges to the same aggregate as list teacher groups', () => {
+  const classes = [
+    { classId: 'class-a', presentMinutes: 60, scheduledMinutes: 120, percent: 50 },
+    { classId: 'class-b', presentMinutes: 30, scheduledMinutes: 60, percent: 50 }
+  ];
+  let totals = { presentMinutes: 0, scheduledMinutes: 0, percent: null };
+  classes.forEach(function (row) {
+    totals = weeklyReportsEngagementService.mergeEngagementTotals(totals, row);
+  });
+  assert.equal(classes.length, 2);
+  assert.equal(classes[0].classId, 'class-a');
+  assert.equal(classes[1].classId, 'class-b');
+  assert.equal(totals.presentMinutes, 90);
+  assert.equal(totals.scheduledMinutes, 180);
+  assert.equal(totals.percent, 50);
+});
+
 test('summarizeEngagementFromMatrix counts partial presence for late minutes', () => {
   const matrix = [{
     records: [{

@@ -507,6 +507,356 @@
     color: #dc2626;
   }
 
+  .school-master-hub .hub-weekly-reports-class-board--decks {
+    grid-template-columns: repeat(auto-fill, minmax(440px, 1fr));
+    grid-auto-rows: 1fr;
+    align-items: stretch;
+  }
+
+  .school-master-hub .hub-wr-teacher-deck {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    min-width: 0;
+    height: 100%;
+    min-height: 100%;
+    outline: none;
+    border-radius: 1rem;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+    padding: 1rem 1.1rem 1.15rem;
+    box-sizing: border-box;
+  }
+
+  .school-master-hub .hub-wr-teacher-deck:focus-visible {
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.35), 0 10px 24px rgba(15, 23, 42, 0.08);
+  }
+
+  .school-master-hub .hub-wr-teacher-deck-header {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.35rem;
+    padding-bottom: 0.65rem;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+  }
+
+  .school-master-hub .hub-wr-teacher-deck-header-main {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    min-width: 0;
+  }
+
+  .school-master-hub .hub-wr-teacher-deck-nav {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.3rem;
+    min-height: 1.35rem;
+  }
+
+  .school-master-hub .hub-wr-teacher-deck-nav--placeholder {
+    visibility: hidden;
+    pointer-events: none;
+  }
+
+  .school-master-hub .hub-wr-teacher-deck-nav .btn.hub-wr-deck-nav-btn {
+    padding: 0.05rem 0.3rem;
+    font-size: 0.65rem;
+    line-height: 1;
+    border-radius: 0.35rem;
+    min-width: 1.35rem;
+  }
+
+  .school-master-hub .hub-wr-teacher-deck-nav .btn.hub-wr-deck-nav-btn .bi {
+    font-size: 0.72rem;
+  }
+
+  .school-master-hub .hub-wr-teacher-deck-nav .hub-wr-teacher-deck-index {
+    font-size: 0.68rem;
+    min-width: 2.75rem;
+    padding: 0 0.15rem;
+  }
+
+  .school-master-hub .hub-wr-teacher-deck-header .hub-weekly-reports-teacher-name {
+    font-weight: 700;
+    font-size: 1.05rem;
+    line-height: 1.3;
+    color: #0f172a;
+    flex: 1 1 auto;
+    min-width: 0;
+    word-break: break-word;
+  }
+
+  .school-master-hub .hub-wr-teacher-deck-count {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+    white-space: nowrap;
+    background: #fff;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 999px;
+    padding: 0.15rem 0.55rem;
+  }
+
+  .school-master-hub .hub-wr-class-stack {
+    position: relative;
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    box-sizing: border-box;
+    isolation: isolate;
+  }
+
+  .school-master-hub .hub-wr-class-stack--multi {
+    cursor: default;
+    padding-bottom: 1.05rem;
+  }
+
+  .school-master-hub .hub-wr-class-stack-peeks {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 0;
+    height: calc(100% - 1.05rem);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .school-master-hub .hub-wr-class-stack-peek {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: calc(100% - 1.15rem);
+    height: 100%;
+    border-radius: 0.85rem;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-left-width: 6px;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.1);
+    box-sizing: border-box;
+    pointer-events: none;
+    overflow: hidden;
+  }
+
+  .school-master-hub .hub-wr-class-stack-peek--1 {
+    transform: translate(0.5rem, 0.6rem);
+    z-index: 2;
+    opacity: 0.94;
+  }
+
+  .school-master-hub .hub-wr-class-stack-peek--2 {
+    transform: translate(0.25rem, 1.05rem);
+    z-index: 1;
+    opacity: 0.8;
+  }
+
+  .school-master-hub .hub-wr-class-stack--multi.hub-wr-class-stack--deep .hub-wr-class-stack-peek {
+    width: calc(100% - 1.45rem);
+  }
+
+  .school-master-hub .hub-wr-class-stack--multi.hub-wr-class-stack--deep .hub-wr-class-stack-peek--1 {
+    transform: translate(0.55rem, 0.65rem);
+  }
+
+  .school-master-hub .hub-wr-class-stack--multi.hub-wr-class-stack--deep .hub-wr-class-stack-peek--2 {
+    transform: translate(0.3rem, 1.15rem);
+  }
+
+  .school-master-hub .hub-wr-class-stack-peek-name {
+    display: none;
+  }
+
+  .school-master-hub .hub-wr-class-stack--multi .hub-wr-class-stack-front {
+    margin-left: 1.15rem;
+    width: calc(100% - 1.15rem);
+  }
+
+  .school-master-hub .hub-wr-class-stack--multi.hub-wr-class-stack--deep .hub-wr-class-stack-front {
+    margin-left: 1.45rem;
+    width: calc(100% - 1.45rem);
+  }
+
+  .school-master-hub .hub-wr-class-stack-front {
+    position: relative;
+    z-index: 3;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    min-width: 0;
+  }
+
+  .school-master-hub .hub-wr-class-stack--multi .hub-wr-teacher-deck-card.is-front {
+    box-shadow: -5px 0 0 0 #fff, 0 10px 22px rgba(15, 23, 42, 0.12);
+  }
+
+  .school-master-hub .hub-wr-teacher-deck-card {
+    position: relative;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    border-radius: 0.85rem;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    border-left-width: 6px;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.1);
+    background: #fff;
+    padding: 1rem 1.1rem 1.15rem;
+    box-sizing: border-box;
+    overflow: visible;
+  }
+
+  .school-master-hub .hub-wr-teacher-deck-card.is-front.hub-wr-stack-flip-next {
+    animation: hub-wr-stack-flip-next 0.28s ease-out;
+  }
+
+  .school-master-hub .hub-wr-teacher-deck-card.is-front.hub-wr-stack-flip-prev {
+    animation: hub-wr-stack-flip-prev 0.28s ease-out;
+  }
+
+  @keyframes hub-wr-stack-flip-next {
+    from { opacity: 0; transform: translateX(12px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes hub-wr-stack-flip-prev {
+    from { opacity: 0; transform: translateX(-12px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .school-master-hub .hub-wr-deck-card-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .school-master-hub .hub-wr-deck-card-head-text {
+    flex: 1 1 auto;
+    min-width: 0;
+    height: 3.55rem;
+    min-height: 3.55rem;
+    max-height: 3.55rem;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .school-master-hub .hub-wr-deck-card-title-slot {
+    flex: 0 0 2.65rem;
+    height: 2.65rem;
+    max-height: 2.65rem;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+  }
+
+  .school-master-hub .hub-wr-deck-card-head .hub-weekly-reports-class-tile-name {
+    font-size: 1.05rem;
+    font-weight: 700;
+    line-height: 1.25;
+    word-break: break-word;
+    width: 100%;
+  }
+
+  .school-master-hub .hub-wr-deck-card-head .hub-weekly-reports-class-tile-department {
+    flex: 0 0 0.85rem;
+    font-size: 0.78rem;
+    margin-top: 0.05rem;
+    line-height: 0.85rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .school-master-hub .hub-wr-teacher-deck-metrics {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+    margin-top: 0.35rem;
+    overflow: visible;
+  }
+
+  .school-master-hub .hub-wr-deck-metric-section {
+    border-radius: 0.55rem;
+    padding: 0.45rem 0.55rem;
+    border: 1px solid rgba(15, 23, 42, 0.06);
+  }
+
+  .school-master-hub .hub-wr-deck-metric-section-row {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.5rem 0.75rem;
+  }
+
+  .school-master-hub .hub-wr-deck-metric-section-title {
+    flex: 0 0 5.75rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    line-height: 1.35;
+    margin: 0;
+    padding-top: 0.15rem;
+    opacity: 0.92;
+    text-align: left;
+  }
+
+  .school-master-hub .hub-wr-deck-metric-section-cols {
+    flex: 1 1 auto;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 0.35rem 0.85rem;
+    min-width: 0;
+  }
+
+  .school-master-hub .hub-wr-deck-metric-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 3.1rem;
+    text-align: center;
+  }
+
+  .school-master-hub .hub-wr-deck-metric-col-label {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+    line-height: 1.2;
+    margin-bottom: 0.15rem;
+    white-space: nowrap;
+  }
+
+  .school-master-hub .hub-wr-deck-metric-col-value {
+    font-size: 0.92rem;
+    font-weight: 600;
+    line-height: 1.25;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .school-master-hub .hub-wr-deck-metric-col-value .hub-weekly-reports-metric-primary {
+    font-size: 0.95rem;
+  }
+
+  .school-master-hub .hub-wr-deck-metric-col-value .hub-weekly-reports-metric-hint {
+    font-size: 0.68rem;
+    font-weight: 600;
+    color: #64748b;
+    margin-top: 0.1rem;
+  }
+
+  .school-master-hub .hub-wr-deck-metric-section {
+    padding: 0.5rem 0.6rem;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .school-master-hub .hub-wr-teacher-deck-card.is-front.hub-wr-stack-flip-next,
+    .school-master-hub .hub-wr-teacher-deck-card.is-front.hub-wr-stack-flip-prev {
+      animation: none;
+    }
+  }
+
   .school-master-hub .hub-weekly-reports-student-board {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
@@ -1962,6 +2312,20 @@
     body.hub-print-weekly-reports .school-master-hub tr {
       page-break-inside: avoid;
     }
+
+    body.hub-print-weekly-reports .hub-wr-teacher-deck-nav,
+    body.hub-print-weekly-reports .hub-wr-class-stack-peeks {
+      display: none !important;
+    }
+
+    body.hub-print-weekly-reports .hub-wr-class-stack--multi {
+      padding-bottom: 0 !important;
+    }
+
+    body.hub-print-weekly-reports .hub-wr-class-stack--multi .hub-wr-class-stack-front {
+      margin-left: 0 !important;
+      width: 100% !important;
+    }
   }
 </style>
 
@@ -3203,9 +3567,13 @@
     lastRangeLabel: '',
     lastError: '',
     teacherGroupCollapsed: {},
+    teacherBoardDeckIndex: {},
     teacherEngagement: {},
-    teacherEngagementSnapshot: ''
+    teacherEngagementSnapshot: '',
+    classEngagement: {},
+    classEngagementSnapshot: ''
   };
+  let hubWeeklyReportsTeacherDeckFlip = { groupKey: '', dir: '' };
   let hubWeeklyReportsSuppressUrlSync = false;
   let hubWeeklyReportsPendingShareView = null;
   let hubWeeklyReportsEngagementToken = 0;
@@ -4931,8 +5299,11 @@
       lastRangeLabel: '',
       lastError: '',
       teacherGroupCollapsed: {},
+      teacherBoardDeckIndex: {},
       teacherEngagement: {},
-      teacherEngagementSnapshot: ''
+      teacherEngagementSnapshot: '',
+      classEngagement: {},
+      classEngagementSnapshot: ''
     };
   }
 
@@ -4992,8 +5363,11 @@
       lastRangeLabel: hubWeeklyReportsState.lastRangeLabel,
       lastError: hubWeeklyReportsState.lastError,
       teacherGroupCollapsed: Object.assign({}, hubWeeklyReportsState.teacherGroupCollapsed || {}),
+      teacherBoardDeckIndex: Object.assign({}, hubWeeklyReportsState.teacherBoardDeckIndex || {}),
       teacherEngagement: Object.assign({}, hubWeeklyReportsState.teacherEngagement || {}),
-      teacherEngagementSnapshot: String(hubWeeklyReportsState.teacherEngagementSnapshot || '')
+      teacherEngagementSnapshot: String(hubWeeklyReportsState.teacherEngagementSnapshot || ''),
+      classEngagement: Object.assign({}, hubWeeklyReportsState.classEngagement || {}),
+      classEngagementSnapshot: String(hubWeeklyReportsState.classEngagementSnapshot || '')
     };
   }
 
@@ -5014,8 +5388,11 @@
     hubWeeklyReportsState.lastRangeLabel = String(next.lastRangeLabel || '');
     hubWeeklyReportsState.lastError = String(next.lastError || '');
     hubWeeklyReportsState.teacherGroupCollapsed = Object.assign({}, next.teacherGroupCollapsed || {});
+    hubWeeklyReportsState.teacherBoardDeckIndex = Object.assign({}, next.teacherBoardDeckIndex || {});
     hubWeeklyReportsState.teacherEngagement = Object.assign({}, next.teacherEngagement || {});
     hubWeeklyReportsState.teacherEngagementSnapshot = String(next.teacherEngagementSnapshot || '');
+    hubWeeklyReportsState.classEngagement = Object.assign({}, next.classEngagement || {});
+    hubWeeklyReportsState.classEngagementSnapshot = String(next.classEngagementSnapshot || '');
   }
 
   function weeklyReportsShareApi() {
@@ -5199,6 +5576,37 @@
     return [
       'border-left-color:' + color + ';',
       'background:linear-gradient(145deg, ' + hexToRgba(color, 0.14) + ', ' + hexToRgba(color, 0.06) + ');'
+    ].join('');
+  }
+
+  const WEEKLY_REPORTS_BOARD_DECK_PALETTE = [
+    { border: '#1d4ed8', bgStart: 'rgba(219, 234, 254, 0.95)', bgEnd: 'rgba(239, 246, 255, 0.98)', peek: '#bfdbfe' },
+    { border: '#2563eb', bgStart: 'rgba(191, 219, 254, 0.92)', bgEnd: 'rgba(248, 250, 252, 0.98)', peek: '#93c5fd' },
+    { border: '#0284c7', bgStart: 'rgba(186, 230, 253, 0.92)', bgEnd: 'rgba(240, 249, 255, 0.98)', peek: '#7dd3fc' },
+    { border: '#059669', bgStart: 'rgba(209, 250, 229, 0.92)', bgEnd: 'rgba(236, 253, 245, 0.98)', peek: '#6ee7b7' },
+    { border: '#10b981', bgStart: 'rgba(167, 243, 208, 0.9)', bgEnd: 'rgba(240, 253, 244, 0.98)', peek: '#34d399' },
+    { border: '#047857', bgStart: 'rgba(153, 246, 228, 0.88)', bgEnd: 'rgba(236, 253, 245, 0.98)', peek: '#2dd4bf' }
+  ];
+
+  function weeklyReportsBoardDeckPaletteEntry(classIndex) {
+    const list = WEEKLY_REPORTS_BOARD_DECK_PALETTE;
+    const idx = Math.abs(Number(classIndex) || 0) % list.length;
+    return list[idx];
+  }
+
+  function buildWeeklyReportsBoardDeckCardStyle(classIndex) {
+    const entry = weeklyReportsBoardDeckPaletteEntry(classIndex);
+    return [
+      'border-left-color:', entry.border, ';',
+      'background:linear-gradient(145deg, ', entry.bgStart, ', ', entry.bgEnd, ');'
+    ].join('');
+  }
+
+  function buildWeeklyReportsBoardDeckPeekStyle(classIndex) {
+    const entry = weeklyReportsBoardDeckPaletteEntry(classIndex);
+    return [
+      'border-left-color:', entry.border, ';',
+      'background:', entry.peek, ';'
     ].join('');
   }
 
@@ -5795,6 +6203,60 @@
     return 'name:' + name;
   }
 
+  function clampWeeklyReportsTeacherDeckIndex(index, classCount) {
+    const count = Math.max(0, Number(classCount) || 0);
+    if (count <= 0) return 0;
+    const value = Number(index);
+    if (!Number.isFinite(value)) return 0;
+    return Math.max(0, Math.min(count - 1, Math.round(value)));
+  }
+
+  function getWeeklyReportsTeacherDeckIndex(groupKey, classCount) {
+    const map = hubWeeklyReportsState.teacherBoardDeckIndex || {};
+    return clampWeeklyReportsTeacherDeckIndex(map[groupKey], classCount);
+  }
+
+  function findWeeklyReportsTeacherGroupByKey(groupKey) {
+    const key = String(groupKey || '').trim();
+    if (!key) return null;
+    const rows = Array.isArray(hubWeeklyReportsState.classRows) ? hubWeeklyReportsState.classRows : [];
+    const groups = groupWeeklyReportsClassesByTeacher(rows);
+    return groups.find(function (group) { return weeklyReportsTeacherGroupKey(group) === key; }) || null;
+  }
+
+  function setWeeklyReportsTeacherDeckIndex(groupKey, index, classCount) {
+    if (!hubWeeklyReportsState.teacherBoardDeckIndex) {
+      hubWeeklyReportsState.teacherBoardDeckIndex = {};
+    }
+    hubWeeklyReportsState.teacherBoardDeckIndex[groupKey] = clampWeeklyReportsTeacherDeckIndex(index, classCount);
+    if (hubWeeklyReportsState.viewMode === 'board') {
+      refreshWeeklyReportsTeacherDeckPanel(groupKey);
+    } else {
+      renderWeeklyReportsResultsPanel();
+    }
+    syncWeeklyReportsShareUrl();
+  }
+
+  function cycleWeeklyReportsTeacherDeckIndex(groupKey, classCount, delta) {
+    const count = Math.max(0, Number(classCount) || 0);
+    if (count <= 1) return;
+    const current = getWeeklyReportsTeacherDeckIndex(groupKey, count);
+    const next = (current + Number(delta || 0) + count) % count;
+    hubWeeklyReportsTeacherDeckFlip = {
+      groupKey: String(groupKey || ''),
+      dir: Number(delta || 0) >= 0 ? 'next' : 'prev'
+    };
+    setWeeklyReportsTeacherDeckIndex(groupKey, next, count);
+  }
+
+  function weeklyReportsShouldScheduleTeacherEngagement() {
+    return hubWeeklyReportsState.level === 'classes'
+      && (hubWeeklyReportsState.viewMode === 'list' || hubWeeklyReportsState.viewMode === 'board')
+      && !hubWeeklyReportsState.lastError
+      && Array.isArray(hubWeeklyReportsState.classRows)
+      && hubWeeklyReportsState.classRows.length > 0;
+  }
+
   function isWeeklyReportsTeacherGroupCollapsed(groupKey) {
     const map = hubWeeklyReportsState.teacherGroupCollapsed || {};
     return map[groupKey] === true;
@@ -5814,6 +6276,29 @@
   function getWeeklyReportsTeacherEngagementEntry(groupKey) {
     const map = hubWeeklyReportsState.teacherEngagement || {};
     return map[groupKey] || { loading: true };
+  }
+
+  function getWeeklyReportsClassEngagementEntry(classId) {
+    const id = String(classId || '').trim();
+    const map = hubWeeklyReportsState.classEngagement || {};
+    return map[id] || { loading: true };
+  }
+
+  function renderWeeklyReportsClassEngagementBlock(classId) {
+    const id = String(classId || '').trim();
+    const entry = getWeeklyReportsClassEngagementEntry(id);
+    const stateClass = entry.loading
+      ? 'hub-weekly-reports-engagement-ring--loading'
+      : (entry.percent == null && !entry.error ? 'hub-weekly-reports-engagement-ring--empty' : '');
+    return [
+      '<div class="hub-weekly-reports-engagement-block hub-wr-deck-class-engagement">',
+      '<div class="hub-weekly-reports-engagement-ring hub-weekly-reports-engagement-ring--compact ', stateClass,
+      '" data-hub-wr-class-engagement-id="', escapeHtml(id), '">',
+      buildWeeklyReportsEngagementRingInner(entry),
+      '</div>',
+      '<span class="hub-weekly-reports-engagement-label">Engagement</span>',
+      '</div>'
+    ].join('');
   }
 
   function weeklyReportsEngagementStrokeColor(percent) {
@@ -5886,6 +6371,28 @@
       el.innerHTML = buildWeeklyReportsEngagementRingInner(entry);
       if (compact) el.classList.add('hub-weekly-reports-engagement-ring--compact');
     });
+    panel.querySelectorAll('[data-hub-wr-class-engagement-id]').forEach(function (el) {
+      const classId = el.getAttribute('data-hub-wr-class-engagement-id') || '';
+      const entry = getWeeklyReportsClassEngagementEntry(classId);
+      el.classList.remove('hub-weekly-reports-engagement-ring--loading', 'hub-weekly-reports-engagement-ring--empty');
+      if (entry.loading) el.classList.add('hub-weekly-reports-engagement-ring--loading');
+      else if (entry.percent == null && !entry.error) el.classList.add('hub-weekly-reports-engagement-ring--empty');
+      el.innerHTML = buildWeeklyReportsEngagementRingInner(entry);
+      el.classList.add('hub-weekly-reports-engagement-ring--compact');
+    });
+  }
+
+  function weeklyReportsClassEngagementReadyForRows(rows, snapshot) {
+    const list = Array.isArray(rows) ? rows : [];
+    if (!list.length) return true;
+    const map = hubWeeklyReportsState.classEngagement || {};
+    return list.every(function (row) {
+      const id = String(row.classId || '').trim();
+      if (!id) return true;
+      const entry = map[id];
+      if (!entry || entry.snapshot !== snapshot) return false;
+      return !entry.loading;
+    });
   }
 
   function scheduleWeeklyReportsTeacherEngagement() {
@@ -5900,15 +6407,18 @@
   }
 
   async function loadWeeklyReportsTeacherEngagement() {
-    if (hubWeeklyReportsState.level !== 'classes' || hubWeeklyReportsState.viewMode !== 'list') return;
+    if (hubWeeklyReportsState.level !== 'classes') return;
+    if (hubWeeklyReportsState.viewMode !== 'list' && hubWeeklyReportsState.viewMode !== 'board') return;
     const rows = Array.isArray(hubWeeklyReportsState.classRows) ? hubWeeklyReportsState.classRows : [];
     if (!rows.length) return;
 
     const snapshot = weeklyReportsEngagementSnapshotKey();
     if (
       hubWeeklyReportsState.teacherEngagementSnapshot === snapshot
+      && hubWeeklyReportsState.classEngagementSnapshot === snapshot
       && Object.keys(hubWeeklyReportsState.teacherEngagement || {}).length
       && !Object.values(hubWeeklyReportsState.teacherEngagement).some(function (row) { return row && row.loading; })
+      && weeklyReportsClassEngagementReadyForRows(rows, snapshot)
     ) {
       return;
     }
@@ -5924,9 +6434,14 @@
     }).filter(function (item) { return item.classIds.length; });
 
     hubWeeklyReportsState.teacherEngagement = {};
+    hubWeeklyReportsState.classEngagement = {};
     hubWeeklyReportsState.teacherEngagementSnapshot = snapshot;
+    hubWeeklyReportsState.classEngagementSnapshot = snapshot;
     queue.forEach(function (item) {
       hubWeeklyReportsState.teacherEngagement[item.groupKey] = { loading: true, snapshot: snapshot };
+      item.classIds.forEach(function (classId) {
+        hubWeeklyReportsState.classEngagement[classId] = { loading: true, snapshot: snapshot };
+      });
     });
     updateWeeklyReportsEngagementRings();
 
@@ -5965,6 +6480,28 @@
           scheduledMinutes: payload.scheduledMinutes,
           snapshot: snapshot
         };
+        const classBreakdown = Array.isArray(payload.classes) ? payload.classes : [];
+        classBreakdown.forEach(function (classRow) {
+          const classId = String(classRow.classId || '').trim();
+          if (!classId) return;
+          hubWeeklyReportsState.classEngagement[classId] = {
+            loading: false,
+            percent: classRow.percent,
+            presentMinutes: classRow.presentMinutes,
+            scheduledMinutes: classRow.scheduledMinutes,
+            snapshot: snapshot
+          };
+        });
+        item.classIds.forEach(function (classId) {
+          if (hubWeeklyReportsState.classEngagement[classId] && !hubWeeklyReportsState.classEngagement[classId].loading) return;
+          hubWeeklyReportsState.classEngagement[classId] = {
+            loading: false,
+            percent: null,
+            presentMinutes: 0,
+            scheduledMinutes: 0,
+            snapshot: snapshot
+          };
+        });
       } catch (error) {
         if (token !== hubWeeklyReportsEngagementToken) return;
         hubWeeklyReportsState.teacherEngagement[item.groupKey] = {
@@ -5973,6 +6510,14 @@
           message: error.message || 'Error',
           snapshot: snapshot
         };
+        item.classIds.forEach(function (classId) {
+          hubWeeklyReportsState.classEngagement[classId] = {
+            loading: false,
+            error: true,
+            message: error.message || 'Error',
+            snapshot: snapshot
+          };
+        });
       }
       updateWeeklyReportsEngagementRings();
     }
@@ -6218,6 +6763,366 @@
     );
   }
 
+  function renderWeeklyReportsBoardMetricColumn(label, valueHtml) {
+    return [
+      '<div class="hub-wr-deck-metric-col">',
+      '<div class="hub-wr-deck-metric-col-label">', escapeHtml(label), '</div>',
+      '<div class="hub-wr-deck-metric-col-value">', valueHtml, '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsBoardMetricSection(title, bandClass, columnsHtml) {
+    return [
+      '<div class="hub-wr-deck-metric-section hub-wr-col-', escapeHtml(bandClass), '">',
+      '<div class="hub-wr-deck-metric-section-row">',
+      '<div class="hub-wr-deck-metric-section-title">', escapeHtml(title), '</div>',
+      '<div class="hub-wr-deck-metric-section-cols">', columnsHtml, '</div>',
+      '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsClassOperationalBoardMetrics(row) {
+    const classId = String(row.classId || '').trim();
+    const m = readWeeklyReportsOperationalMetrics(row);
+    const scheduledHours = Number(row.scheduledHours || 0);
+    return [
+      '<div class="hub-wr-teacher-deck-metrics">',
+      renderWeeklyReportsBoardMetricSection('Sessions', 'sessions', [
+        renderWeeklyReportsBoardMetricColumn('Total', renderWeeklyReportsDrillCount(classId, 'sessionsTotal', m.sessions.total)),
+        renderWeeklyReportsBoardMetricColumn('Final', renderWeeklyReportsDrillCount(classId, 'sessionsFinalized', m.sessions.finalized, 'success')),
+        renderWeeklyReportsBoardMetricColumn('Open', renderWeeklyReportsDrillCount(classId, 'sessionsUncompleted', m.sessions.uncompleted, 'danger'))
+      ].join('')),
+      renderWeeklyReportsBoardMetricSection('Book coverage', 'book', [
+        renderWeeklyReportsBoardMetricColumn('With', renderWeeklyReportsDrillCount(classId, 'bookCoverageWith', m.bookCoverage.with, 'success')),
+        renderWeeklyReportsBoardMetricColumn('Without', renderWeeklyReportsDrillCount(classId, 'bookCoverageWithout', m.bookCoverage.without, 'warning'))
+      ].join('')),
+      renderWeeklyReportsBoardMetricSection('Gradebooks', 'gradebooks', [
+        renderWeeklyReportsBoardMetricColumn('With', renderWeeklyReportsDrillCount(classId, 'gradebooksWith', m.gradebooks.with, 'success')),
+        renderWeeklyReportsBoardMetricColumn('Without', renderWeeklyReportsDrillCount(classId, 'gradebooksWithout', m.gradebooks.without, 'warning'))
+      ].join('')),
+      renderWeeklyReportsBoardMetricSection('Notes', 'notes', [
+        renderWeeklyReportsBoardMetricColumn('With', renderWeeklyReportsDrillCount(classId, 'notesWith', m.notes.with)),
+        renderWeeklyReportsBoardMetricColumn('Without', renderWeeklyReportsDrillCount(classId, 'notesWithout', m.notes.without))
+      ].join('')),
+      renderWeeklyReportsBoardMetricSection('Student reports', 'reports', [
+        renderWeeklyReportsBoardMetricColumn('Assigned', renderWeeklyReportsDrillCount(classId, 'reportInstancesAssigned', m.reports.assigned, 'info')),
+        renderWeeklyReportsBoardMetricColumn('Done', renderWeeklyReportsDrillCount(classId, 'reportInstancesCompleted', m.reports.completed, 'success')),
+        renderWeeklyReportsBoardMetricColumn('Open', renderWeeklyReportsDrillCount(classId, 'reportInstancesIncomplete', m.reports.incomplete, 'danger'))
+      ].join('')),
+      renderWeeklyReportsBoardMetricSection('Cases & hours', 'cases', [
+        renderWeeklyReportsBoardMetricColumn('Cases', renderWeeklyReportsDrillCount(classId, 'studentCases', m.studentCases.total)),
+        renderWeeklyReportsBoardMetricColumn('Hours', renderWeeklyReportsMetricStack(formatWeeklyReportsScheduledHours(scheduledHours), ''))
+      ].join('')),
+      renderWeeklyReportsBoardMetricSection('Attendance', 'attendance', [
+        renderWeeklyReportsBoardMetricColumn('Absence', renderWeeklyReportsAttendanceDrillRatio(classId, 'attendanceAbsence', m.attendance.absence, 'danger')),
+        renderWeeklyReportsBoardMetricColumn('Late', renderWeeklyReportsAttendanceDrillRatio(classId, 'attendanceLate', m.attendance.late, 'warning')),
+        renderWeeklyReportsBoardMetricColumn('Early', renderWeeklyReportsAttendanceDrillRatio(classId, 'attendanceEarly', m.attendance.early, 'early'))
+      ].join('')),
+      '</div>'
+    ].join('');
+  }
+
+  function fitWeeklyReportsDeckClassTitle(nameEl) {
+    if (!nameEl) return;
+    const slot = nameEl.closest('.hub-wr-deck-card-title-slot');
+    if (!slot) return;
+    const maxPx = 16.8;
+    const minPx = 11.5;
+    nameEl.style.fontSize = maxPx + 'px';
+    const limit = slot.clientHeight;
+    if (!limit) return;
+    let sizePx = maxPx;
+    let guard = 0;
+    while (guard < 48 && nameEl.scrollHeight > limit + 1 && sizePx > minPx) {
+      sizePx -= 0.5;
+      nameEl.style.fontSize = sizePx + 'px';
+      guard += 1;
+    }
+  }
+
+  function fitWeeklyReportsDeckClassTitles(root) {
+    const scope = root && typeof root.querySelectorAll === 'function' ? root : document;
+    scope.querySelectorAll('.hub-wr-deck-card-title-slot .hub-weekly-reports-class-tile-name').forEach(function (el) {
+      fitWeeklyReportsDeckClassTitle(el);
+    });
+  }
+
+  function scheduleFitWeeklyReportsDeckClassTitles(root) {
+    const run = function () { fitWeeklyReportsDeckClassTitles(root); };
+    if (typeof window.requestAnimationFrame === 'function') {
+      window.requestAnimationFrame(run);
+    } else {
+      run();
+    }
+  }
+
+  function renderWeeklyReportsClassStackPeek(row, layerClass, classIndex) {
+    const className = String(row.className || row.classId || 'Class').trim();
+    const tileStyle = buildWeeklyReportsBoardDeckPeekStyle(classIndex);
+    return [
+      '<div class="hub-wr-class-stack-peek ', escapeHtml(layerClass), '" style="', tileStyle, '"',
+      ' title="', escapeHtml(className), '" aria-hidden="true">',
+      '<span class="hub-wr-class-stack-peek-name">', escapeHtml(className), '</span>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsTeacherClassDetailCard(row, options) {
+    const opts = options || {};
+    const classId = String(row.classId || '').trim();
+    const className = String(row.className || row.classId || 'Class').trim();
+    const classIndex = Number.isFinite(Number(opts.classIndex)) ? Number(opts.classIndex) : 0;
+    const tileStyle = buildWeeklyReportsBoardDeckCardStyle(classIndex);
+    const departmentSubtitle = row.departmentName
+      ? '<div class="hub-weekly-reports-class-tile-department">' + escapeHtml(row.departmentName) + '</div>'
+      : '';
+    const flipClass = opts.flipClass ? ' ' + opts.flipClass : '';
+    const frontClass = opts.isFront ? ' is-front' : '';
+    return [
+      '<div class="hub-wr-teacher-deck-card', frontClass, flipClass, '" style="', tileStyle, '">',
+      '<div class="hub-weekly-reports-class-tile-body">',
+      '<div class="hub-wr-deck-card-head">',
+      '<div class="hub-wr-deck-card-head-text">',
+      '<div class="hub-wr-deck-card-title-slot">',
+      '<div class="hub-weekly-reports-class-tile-name hub-weekly-reports-class-open" role="button" tabindex="0"',
+      ' title="', escapeHtml(className), '"',
+      ' data-hub-weekly-reports-class-id="', escapeHtml(classId), '"',
+      ' data-hub-weekly-reports-class-name="', escapeHtml(className), '">',
+      escapeHtml(className),
+      '</div>',
+      '</div>',
+      departmentSubtitle,
+      '</div>',
+      renderWeeklyReportsClassEngagementBlock(classId),
+      '</div>',
+      renderWeeklyReportsClassOperationalBoardMetrics(row),
+      '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function weeklyReportsStackPeekIndices(activeIndex, classCount) {
+    if (classCount <= 1) return [];
+    const indices = [];
+    const next = (activeIndex + 1) % classCount;
+    indices.push(next);
+    if (classCount > 2) {
+      indices.push((activeIndex + 2) % classCount);
+    }
+    return indices;
+  }
+
+  function weeklyReportsTeacherDeckFlipClassForGroup(groupKey) {
+    const key = String(groupKey || '');
+    const flip = hubWeeklyReportsTeacherDeckFlip || { groupKey: '', dir: '' };
+    if (flip.groupKey !== key) return '';
+    if (flip.dir === 'next') return 'hub-wr-stack-flip-next';
+    if (flip.dir === 'prev') return 'hub-wr-stack-flip-prev';
+    return '';
+  }
+
+  function renderWeeklyReportsTeacherDeckNav(group) {
+    const classes = Array.isArray(group.classes) ? group.classes : [];
+    const groupKey = weeklyReportsTeacherGroupKey(group);
+    const classCount = classes.length;
+    if (classCount <= 1) {
+      return '<div class="hub-wr-teacher-deck-nav hub-wr-teacher-deck-nav--placeholder hub-no-print" data-hub-wr-deck-nav="1" aria-hidden="true"></div>';
+    }
+    const activeIndex = getWeeklyReportsTeacherDeckIndex(groupKey, classCount);
+    return [
+      '<div class="hub-wr-teacher-deck-nav hub-no-print" data-hub-wr-deck-nav="1">',
+      '<button type="button" class="btn btn-outline-secondary btn-sm hub-wr-deck-nav-btn" data-hub-wr-deck-prev="1" data-hub-wr-deck-key="', escapeHtml(groupKey), '" aria-label="Previous class"><i class="bi bi-chevron-left"></i></button>',
+      '<span class="hub-wr-teacher-deck-index" aria-live="polite">', escapeHtml(String(activeIndex + 1)), ' / ', escapeHtml(String(classCount)), '</span>',
+      '<button type="button" class="btn btn-outline-secondary btn-sm hub-wr-deck-nav-btn" data-hub-wr-deck-next="1" data-hub-wr-deck-key="', escapeHtml(groupKey), '" aria-label="Next class"><i class="bi bi-chevron-right"></i></button>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsTeacherDeckStack(group) {
+    const classes = Array.isArray(group.classes) ? group.classes : [];
+    const groupKey = weeklyReportsTeacherGroupKey(group);
+    const classCount = classes.length;
+    const activeIndex = getWeeklyReportsTeacherDeckIndex(groupKey, classCount);
+    const activeRow = classes[activeIndex] || classes[0];
+    const flipClass = weeklyReportsTeacherDeckFlipClassForGroup(groupKey);
+    const peekIndices = weeklyReportsStackPeekIndices(activeIndex, classCount);
+    const peekLayers = peekIndices.map(function (peekIndex, i) {
+      const layerClass = i === 0 ? 'hub-wr-class-stack-peek--1' : 'hub-wr-class-stack-peek--2';
+      return renderWeeklyReportsClassStackPeek(classes[peekIndex], layerClass, peekIndex);
+    }).join('');
+    const stackMultiClass = classCount > 1
+      ? ' hub-wr-class-stack--multi' + (classCount > 2 ? ' hub-wr-class-stack--deep' : '')
+      : '';
+    const stackHint = classCount > 1 ? ' title="Scroll to browse classes"' : '';
+    const peekWrap = peekLayers
+      ? '<div class="hub-wr-class-stack-peeks" aria-hidden="true">' + peekLayers + '</div>'
+      : '';
+    return [
+      '<div class="hub-wr-class-stack', stackMultiClass, '" data-hub-wr-deck-stack="1" tabindex="0"', stackHint, '>',
+      peekWrap,
+      '<div class="hub-wr-class-stack-front">',
+      renderWeeklyReportsTeacherClassDetailCard(activeRow, { isFront: true, flipClass: flipClass, classIndex: activeIndex }),
+      '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function findWeeklyReportsTeacherDeckElement(panel, groupKey) {
+    if (!panel) return null;
+    const key = String(groupKey || '');
+    const decks = panel.querySelectorAll('.hub-wr-teacher-deck');
+    for (let i = 0; i < decks.length; i++) {
+      if (decks[i].getAttribute('data-hub-wr-deck-key') === key) return decks[i];
+    }
+    return null;
+  }
+
+  function bindWeeklyReportsTeacherDeckContent(deckEl, panel) {
+    if (!deckEl || !panel) return;
+    const openWeeklyReportsClassFromTarget = function (target) {
+      const classId = target.getAttribute('data-hub-weekly-reports-class-id') || '';
+      const className = target.getAttribute('data-hub-weekly-reports-class-name') || classId;
+      if (!classId) return;
+      drillIntoWeeklyReportsClass(classId, className);
+    };
+    deckEl.querySelectorAll('[data-hub-wr-deck-prev]').forEach(function (button) {
+      button.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        const groupKey = button.getAttribute('data-hub-wr-deck-key') || '';
+        const classCount = Number(deckEl.getAttribute('data-hub-wr-deck-count') || 0);
+        if (!groupKey || classCount <= 1) return;
+        cycleWeeklyReportsTeacherDeckIndex(groupKey, classCount, -1);
+      });
+    });
+    deckEl.querySelectorAll('[data-hub-wr-deck-next]').forEach(function (button) {
+      button.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        const groupKey = button.getAttribute('data-hub-wr-deck-key') || '';
+        const classCount = Number(deckEl.getAttribute('data-hub-wr-deck-count') || 0);
+        if (!groupKey || classCount <= 1) return;
+        cycleWeeklyReportsTeacherDeckIndex(groupKey, classCount, 1);
+      });
+    });
+    deckEl.querySelectorAll('[data-hub-wr-deck-stack]').forEach(function (stack) {
+      let lastWheelAt = 0;
+      stack.addEventListener('wheel', function (event) {
+        const groupKey = deckEl.getAttribute('data-hub-wr-deck-key') || '';
+        const classCount = Number(deckEl.getAttribute('data-hub-wr-deck-count') || 0);
+        if (!groupKey || classCount <= 1) return;
+        if (Math.abs(event.deltaY) < 4) return;
+        const now = Date.now();
+        if (now - lastWheelAt < 280) {
+          event.preventDefault();
+          return;
+        }
+        lastWheelAt = now;
+        event.preventDefault();
+        event.stopPropagation();
+        cycleWeeklyReportsTeacherDeckIndex(groupKey, classCount, event.deltaY > 0 ? 1 : -1);
+      }, { passive: false });
+    });
+    deckEl.querySelectorAll('.hub-weekly-reports-class-open').forEach(function (target) {
+      target.addEventListener('click', function (event) {
+        event.stopPropagation();
+        openWeeklyReportsClassFromTarget(target);
+      });
+      target.addEventListener('keydown', function (event) {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        event.preventDefault();
+        openWeeklyReportsClassFromTarget(target);
+      });
+    });
+    deckEl.querySelectorAll('[data-hub-wr-drill]').forEach(function (button) {
+      button.addEventListener('click', function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        openWeeklyReportsDrilldown(
+          button.getAttribute('data-class-id') || '',
+          button.getAttribute('data-metric-key') || ''
+        );
+      });
+    });
+    if (deckEl.getAttribute('data-hub-wr-deck-keybound') !== '1') {
+      deckEl.setAttribute('data-hub-wr-deck-keybound', '1');
+      deckEl.addEventListener('keydown', function (event) {
+        const key = String(event.key || '');
+        if (key !== 'ArrowLeft' && key !== 'ArrowRight') return;
+        const groupKey = deckEl.getAttribute('data-hub-wr-deck-key') || '';
+        const classCount = Number(deckEl.getAttribute('data-hub-wr-deck-count') || 0);
+        if (!groupKey || classCount <= 1) return;
+        event.preventDefault();
+        cycleWeeklyReportsTeacherDeckIndex(groupKey, classCount, key === 'ArrowRight' ? 1 : -1);
+      });
+    }
+  }
+
+  function refreshWeeklyReportsTeacherDeckPanel(groupKey) {
+    const panel = document.getElementById('hubWeeklyReportsResults');
+    const group = findWeeklyReportsTeacherGroupByKey(groupKey);
+    const deckEl = findWeeklyReportsTeacherDeckElement(panel, groupKey);
+    if (!panel || !group || !deckEl) {
+      renderWeeklyReportsResultsPanel();
+      return;
+    }
+    const classes = Array.isArray(group.classes) ? group.classes : [];
+    const classCount = classes.length;
+    const activeIndex = getWeeklyReportsTeacherDeckIndex(groupKey, classCount);
+    const activeRow = classes[activeIndex] || classes[0];
+    const activeName = String(activeRow.className || activeRow.classId || 'Class').trim();
+    const teacherName = String(group.teacherName || 'Unassigned').trim() || 'Unassigned';
+    const ariaLabel = teacherName + ' classes, showing ' + String(activeIndex + 1) + ' of ' + String(classCount) + ': ' + activeName;
+    deckEl.setAttribute('aria-label', ariaLabel);
+    const header = deckEl.querySelector('.hub-wr-teacher-deck-header');
+    while (deckEl.lastElementChild && deckEl.lastElementChild !== header) {
+      deckEl.removeChild(deckEl.lastElementChild);
+    }
+    const navEl = deckEl.querySelector('[data-hub-wr-deck-nav]');
+    if (navEl) {
+      navEl.outerHTML = renderWeeklyReportsTeacherDeckNav(group);
+    }
+    const temp = document.createElement('div');
+    temp.innerHTML = renderWeeklyReportsTeacherDeckStack(group);
+    while (temp.firstChild) {
+      deckEl.appendChild(temp.firstChild);
+    }
+    bindWeeklyReportsTeacherDeckContent(deckEl, panel);
+    updateWeeklyReportsEngagementRings();
+    scheduleFitWeeklyReportsDeckClassTitles(deckEl);
+    hubWeeklyReportsTeacherDeckFlip = { groupKey: '', dir: '' };
+    persistActiveWeeklyReportsTab();
+  }
+
+  function renderWeeklyReportsTeacherDeck(group) {
+    const classes = Array.isArray(group.classes) ? group.classes : [];
+    if (!classes.length) return '';
+    const groupKey = weeklyReportsTeacherGroupKey(group);
+    const classCount = classes.length;
+    const activeIndex = getWeeklyReportsTeacherDeckIndex(groupKey, classCount);
+    const activeRow = classes[activeIndex] || classes[0];
+    const activeName = String(activeRow.className || activeRow.classId || 'Class').trim();
+    const teacherName = String(group.teacherName || 'Unassigned').trim() || 'Unassigned';
+    const countLabel = classCount === 1 ? '1 class' : String(classCount) + ' classes';
+    const ariaLabel = teacherName + ' classes, showing ' + String(activeIndex + 1) + ' of ' + String(classCount) + ': ' + activeName;
+
+    return [
+      '<article class="hub-wr-teacher-deck" tabindex="0" data-hub-wr-deck-key="', escapeHtml(groupKey), '" data-hub-wr-deck-count="', escapeHtml(String(classCount)), '" aria-label="', escapeHtml(ariaLabel), '">',
+      '<header class="hub-wr-teacher-deck-header">',
+      '<div class="hub-wr-teacher-deck-header-main">',
+      renderWeeklyReportsEngagementRing(groupKey),
+      '<div class="hub-weekly-reports-teacher-name">', escapeHtml(teacherName), '</div>',
+      '<span class="hub-wr-teacher-deck-count">', escapeHtml(countLabel), '</span>',
+      '</div>',
+      renderWeeklyReportsTeacherDeckNav(group),
+      '</header>',
+      renderWeeklyReportsTeacherDeckStack(group),
+      '</article>'
+    ].join('');
+  }
+
   function renderWeeklyReportsOperationalMetricCells(row) {
     const classId = String(row.classId || '').trim();
     const m = readWeeklyReportsOperationalMetrics(row);
@@ -6415,36 +7320,13 @@
   }
 
   function renderWeeklyReportsClassBoard(rows) {
-    const sortedRows = sortWeeklyReportsClassRows(rows);
-    if (!sortedRows.length) {
+    const groups = groupWeeklyReportsClassesByTeacher(rows);
+    if (!groups.length) {
       return renderWeeklyReportsEmptyState('No classes found.', weeklyReportsNoResultsHint());
     }
     return [
-      '<div class="alert alert-light border small py-2 mb-3">Operational metrics (sessions, book coverage, reports, cases) are available in <strong>List</strong> view. Click any number to see session details.</div>',
-      '<div class="hub-weekly-reports-class-board">',
-      sortedRows.map(function (row) {
-        const metrics = formatWeeklyReportsClassMetrics(row);
-        const hoursLabel = formatWeeklyReportsScheduledHours(row.scheduledHours);
-        const tileStyle = buildWeeklyReportsClassTileStyle(row.departmentId);
-        const departmentSubtitle = row.departmentName
-          ? '<div class="hub-weekly-reports-class-tile-department">' + escapeHtml(row.departmentName) + '</div>'
-          : '';
-        return [
-          '<div class="hub-weekly-reports-class-tile" style="' + tileStyle + '" title="' + escapeHtml(row.className || row.classId || '') + '">',
-          '<div class="hub-weekly-reports-class-tile-body">',
-          '<div class="hub-weekly-reports-class-tile-name hub-weekly-reports-class-open" role="button" tabindex="0" data-hub-weekly-reports-class-id="' + escapeHtml(row.classId || '') + '" data-hub-weekly-reports-class-name="' + escapeHtml(row.className || row.classId || '') + '">' + escapeHtml(row.className || row.classId || 'Class') + '</div>',
-          departmentSubtitle,
-          '<div class="hub-weekly-reports-class-tile-metrics">',
-          renderWeeklyReportsClassMetricLine('Sessions', metrics.sessionLabel),
-          renderWeeklyReportsClassMetricLine('Scheduled hours', hoursLabel),
-          renderWeeklyReportsClassMetricLine('Avg students / session', metrics.avgLabel),
-          renderWeeklyReportsClassMetricLine('Absences · Late · Early leave', metrics.attendanceLabel),
-          renderWeeklyReportsClassMetricLine('Gradebooks', metrics.gradebookLabel),
-          '</div>',
-          '</div>',
-          '</div>'
-        ].join('');
-      }).join(''),
+      '<div class="hub-weekly-reports-class-board hub-weekly-reports-class-board--decks">',
+      groups.map(function (group) { return renderWeeklyReportsTeacherDeck(group); }).join(''),
       '</div>'
     ].join('');
   }
@@ -6945,6 +7827,13 @@
     panel.innerHTML = renderWeeklyReportsResultsContent();
     bindWeeklyReportsResultsControls();
     bindWeeklyReportsSharePrintControls(panel);
+    if (hubWeeklyReportsState.level === 'classes' && (hubWeeklyReportsState.viewMode === 'list' || hubWeeklyReportsState.viewMode === 'board')) {
+      updateWeeklyReportsEngagementRings();
+    }
+    if (hubWeeklyReportsState.level === 'classes' && hubWeeklyReportsState.viewMode === 'board') {
+      scheduleFitWeeklyReportsDeckClassTitles(panel);
+    }
+    hubWeeklyReportsTeacherDeckFlip = { groupKey: '', dir: '' };
     persistActiveWeeklyReportsTab();
   }
 
@@ -6955,11 +7844,14 @@
       button.addEventListener('click', function () {
         hubWeeklyReportsState.viewMode = button.getAttribute('data-hub-weekly-reports-view') === 'list' ? 'list' : 'board';
         renderWeeklyReportsResultsPanel();
-        if (hubWeeklyReportsState.viewMode === 'list' && hubWeeklyReportsState.level === 'classes') {
+        if (weeklyReportsShouldScheduleTeacherEngagement()) {
           scheduleWeeklyReportsTeacherEngagement();
         }
         syncWeeklyReportsShareUrl();
       });
+    });
+    panel.querySelectorAll('.hub-wr-teacher-deck').forEach(function (deck) {
+      bindWeeklyReportsTeacherDeckContent(deck, panel);
     });
     panel.querySelectorAll('[data-hub-weekly-reports-sort]').forEach(function (header) {
       header.addEventListener('click', function () {
@@ -7176,6 +8068,8 @@
       hubWeeklyReportsEngagementToken += 1;
       hubWeeklyReportsState.teacherEngagement = {};
       hubWeeklyReportsState.teacherEngagementSnapshot = '';
+      hubWeeklyReportsState.classEngagement = {};
+      hubWeeklyReportsState.classEngagementSnapshot = '';
     }
     renderWeeklyReportsResultsPanel();
 
@@ -7227,13 +8121,7 @@
       }
       renderWeeklyReportsTabBar();
       renderWeeklyReportsResultsPanel();
-      if (
-        hubWeeklyReportsState.level === 'classes'
-        && hubWeeklyReportsState.viewMode === 'list'
-        && !hubWeeklyReportsState.lastError
-        && Array.isArray(hubWeeklyReportsState.classRows)
-        && hubWeeklyReportsState.classRows.length
-      ) {
+      if (weeklyReportsShouldScheduleTeacherEngagement()) {
         scheduleWeeklyReportsTeacherEngagement();
       }
       syncWeeklyReportsShareUrl();
