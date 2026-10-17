@@ -1480,15 +1480,25 @@ body.is-schedule-draft-moving [data-event-type="schedule_draft"][data-session-id
   max-width: 11rem;
 }
 
+#sessionEnrollmentStageThroughDatePreview {
+  color: var(--bs-primary, #0d6efd);
+}
+
 .session-stage-limit-mode .form-check-label {
   color: var(--bs-secondary-color, #6c757d);
 }
 
-#sessionEnrollmentStageModal.is-stage-limit-through-date #sessionEnrollmentStageCountSection {
+#sessionEnrollmentStageThroughDateSection {
   display: none;
 }
 
-#sessionEnrollmentStageModal.is-stage-limit-through-date #sessionEnrollmentStageThroughDateSection {
+#sessionEnrollmentStageModal.is-stage-limit-through-date #sessionEnrollmentStageCountSection,
+.session-stage-section:has(#sessionEnrollmentStageLimitModeThroughDate:checked) #sessionEnrollmentStageCountSection {
+  display: none !important;
+}
+
+#sessionEnrollmentStageModal.is-stage-limit-through-date #sessionEnrollmentStageThroughDateSection,
+.session-stage-section:has(#sessionEnrollmentStageLimitModeThroughDate:checked) #sessionEnrollmentStageThroughDateSection {
   display: block !important;
 }
 

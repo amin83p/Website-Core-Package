@@ -40,6 +40,7 @@
   let stageSessionCount = 4;
   let stageWeekdays = new Set();
   let stageModalBound = false;
+  let stageThroughDatePreviewDelegated = false;
 
   function isManageMode() {
     return String(state?.mode || '').trim() === 'manageEnrollmentSessions';
@@ -2479,6 +2480,10 @@
     if (countRadio) countRadio.checked = mode === 'count';
     if (throughRadio) throughRadio.checked = mode === 'throughDate';
     stageModalEl.classList.toggle('is-stage-limit-through-date', mode === 'throughDate');
+    const countSection = stageModalEl.querySelector('#sessionEnrollmentStageCountSection');
+    const throughSection = stageModalEl.querySelector('#sessionEnrollmentStageThroughDateSection');
+    if (countSection) countSection.classList.toggle('d-none', mode === 'throughDate');
+    if (throughSection) throughSection.classList.toggle('d-none', mode !== 'throughDate');
     if (mode === 'throughDate') {
       const throughInput = stageModalEl.querySelector('#sessionEnrollmentStageThroughDate');
       const anchorDate = core.normalizeDateOnly(stageContext?.date || state?.startDate || '');
@@ -2495,6 +2500,7 @@
 
   function setStageLimitMode(limitMode) {
     syncStageLimitModeUi(limitMode);
+    updateStageCapacityWarning().catch(() => {});
   }
 
   function capStageThroughDateToEnrollment(throughDate) {
@@ -2745,26 +2751,84 @@
 
   let stageCapacityPreviewToken = 0;
 
+  function formatStageThroughDatePreviewMessage(sessionCount) {
+    const count = Math.max(0, Number(sessionCount) || 0);
+    if (!count) return 'No sessions in this date range with current settings.';
+    if (count === 1) return '1 session will be staged.';
+    return `${String(count)} sessions will be staged.`;
+  }
+
+  function setStageThroughDatePreviewMessage(message, visible) {
+    stageModalEl = resolveStageOverlayEl();
+    const previewEl = stageModalEl?.querySelector('#sessionEnrollmentStageThroughDatePreview')
+      || qs('sessionEnrollmentStageThroughDatePreview');
+    if (!previewEl) return;
+    const text = String(message || '').trim();
+    if (!visible || !text) {
+      previewEl.classList.add('d-none');
+      previewEl.textContent = '';
+      return;
+    }
+    previewEl.textContent = text;
+    previewEl.classList.remove('d-none');
+  }
+
+  function bindStageThroughDatePreviewDelegation() {
+    if (stageThroughDatePreviewDelegated) return;
+    stageThroughDatePreviewDelegated = true;
+    const onThroughDateInput = (event) => {
+      const target = event.target;
+      if (!target || target.id !== 'sessionEnrollmentStageThroughDate') return;
+      const modal = target.closest('#sessionEnrollmentStageModal');
+      if (!modal || modal.classList.contains('d-none')) return;
+      updateStageCapacityWarning().catch(() => {});
+    };
+    document.addEventListener('change', onThroughDateInput);
+    document.addEventListener('input', onThroughDateInput);
+  }
+
   async function updateStageCapacityWarning() {
-    const warningEl = qs('sessionEnrollmentStageCapacityWarning');
-    if (!warningEl || !stageContext || !state) {
+    stageModalEl = resolveStageOverlayEl();
+    const warningEl = stageModalEl?.querySelector('#sessionEnrollmentStageCapacityWarning')
+      || qs('sessionEnrollmentStageCapacityWarning');
+    if (!stageContext || !state) {
       if (warningEl) warningEl.classList.add('d-none');
+      setStageThroughDatePreviewMessage('', false);
       return;
     }
     const token = ++stageCapacityPreviewToken;
+    if (readStageLimitMode() === 'throughDate' && !readStageThroughDate()) {
+      if (token !== stageCapacityPreviewToken) return;
+      if (warningEl) {
+        warningEl.classList.add('d-none');
+        warningEl.textContent = '';
+      }
+      setStageThroughDatePreviewMessage('Choose a through date to preview session count.', true);
+      syncStageHolidayHint(
+        isPartialMode() ? stageContext?.date : state.startDate,
+        resolveStageHolidayRangeEnd()
+      ).catch(() => {});
+      return;
+    }
     const preview = core.generateRotatingWeekdaySessions(await buildStageGenerationOptions());
     if (token !== stageCapacityPreviewToken) return;
     if (readStageLimitMode() === 'throughDate') {
-      warningEl.classList.add('d-none');
-      warningEl.textContent = '';
-    } else {
-      const requested = readStageSessionCount();
-      if (preview.capacity < requested) {
-        warningEl.textContent = `Only ${preview.capacity} of ${requested} can fit in the enrollment window.`;
-        warningEl.classList.remove('d-none');
-      } else {
+      if (warningEl) {
         warningEl.classList.add('d-none');
         warningEl.textContent = '';
+      }
+      setStageThroughDatePreviewMessage(formatStageThroughDatePreviewMessage(preview.sessions.length), true);
+    } else {
+      setStageThroughDatePreviewMessage('', false);
+      const requested = readStageSessionCount();
+      if (warningEl) {
+        if (preview.capacity < requested) {
+          warningEl.textContent = `Only ${preview.capacity} of ${requested} can fit in the enrollment window.`;
+          warningEl.classList.remove('d-none');
+        } else {
+          warningEl.classList.add('d-none');
+          warningEl.textContent = '';
+        }
       }
     }
     syncStageHolidayHint(
@@ -2777,6 +2841,7 @@
     if (!context || !state) return;
     stageContext = context;
     showStageQuickModalLayer();
+    bindStageThroughDatePreviewDelegation();
     bindStageModalEvents();
     stageDurationHours = 1;
     stageSessionCount = 4;
@@ -2816,10 +2881,12 @@
   }
 
   function bindStageModalEvents() {
+    stageModalEl = resolveStageOverlayEl();
+    if (!stageModalEl) return;
     if (stageModalBound) return;
     stageModalBound = true;
+    bindStageThroughDatePreviewDelegation();
     bindStackEscapeHandler();
-    stageModalEl = resolveStageOverlayEl();
 
     stageModalEl?.addEventListener('click', (event) => {
       if (event.target.closest('#btn_sessionEnrollmentStageCreate')) {
@@ -2892,19 +2959,17 @@
       });
     });
 
-    stageModalEl?.querySelector('#sessionEnrollmentStageLimitModeCount')?.addEventListener('change', () => {
-      if (stageModalEl?.querySelector('#sessionEnrollmentStageLimitModeCount')?.checked) {
-        setStageLimitMode('count');
-        updateStageCapacityWarning().catch(() => {});
-      }
-    });
-    stageModalEl?.querySelector('#sessionEnrollmentStageLimitModeThroughDate')?.addEventListener('change', () => {
-      if (stageModalEl?.querySelector('#sessionEnrollmentStageLimitModeThroughDate')?.checked) {
-        setStageLimitMode('throughDate');
-        updateStageCapacityWarning().catch(() => {});
-      }
+    stageModalEl.querySelector('.session-stage-limit-mode')?.addEventListener('change', (event) => {
+      const input = event.target;
+      if (!input || input.name !== 'sessionEnrollmentStageLimitMode') return;
+      const mode = String(input.value || '').trim() === 'throughDate' ? 'throughDate' : 'count';
+      setStageLimitMode(mode);
+      updateStageCapacityWarning().catch(() => {});
     });
     stageModalEl?.querySelector('#sessionEnrollmentStageThroughDate')?.addEventListener('change', () => {
+      updateStageCapacityWarning().catch(() => {});
+    });
+    stageModalEl?.querySelector('#sessionEnrollmentStageThroughDate')?.addEventListener('input', () => {
       updateStageCapacityWarning().catch(() => {});
     });
 

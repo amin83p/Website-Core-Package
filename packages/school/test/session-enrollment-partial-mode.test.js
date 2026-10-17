@@ -47,6 +47,7 @@ test('stage modal supports count and through-date limit modes', () => {
   assert.match(stageModal, /sessionEnrollmentStageLimitModeCount/);
   assert.match(stageModal, /sessionEnrollmentStageLimitModeThroughDate/);
   assert.match(stageModal, /sessionEnrollmentStageThroughDate/);
+  assert.match(stageModal, /sessionEnrollmentStageThroughDatePreview/);
   assert.match(stageModal, /sessionEnrollmentStageCountSection/);
 });
 
