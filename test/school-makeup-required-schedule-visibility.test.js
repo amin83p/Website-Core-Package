@@ -389,7 +389,8 @@ test('status policy and schedule surfaces expose the informational make-up treat
   const reportIntegrity = read('packages/school/MVC/services/school/reportIntegrityService.js');
   const viewPaths = [
     'packages/school/MVC/views/school/schedule/mySchedule.ejs',
-    'packages/school/MVC/views/school/schedule/personSchedule.ejs',
+    'packages/school/MVC/views/school/schedule/personScheduleAdmin.ejs',
+    'packages/school/MVC/views/school/schedule/personScheduleSelf.ejs',
     'packages/school/MVC/views/school/schedule/globalSchedule.ejs',
     'packages/school/MVC/views/school/masterAcademiaHub.ejs'
   ];

@@ -28,7 +28,7 @@ test('schedulePersonNoteService normalizes and validates notes', () => {
 test('schedule person note API and viewer wiring are present', () => {
   const routes = read('MVC/routes/scheduleRoutes.js');
   const controller = read('MVC/controllers/school/scheduleController.js');
-  const view = read('MVC/views/school/schedule/personSchedule.ejs');
+  const view = read('MVC/views/school/schedule/personScheduleAdmin.ejs');
   const viewer = read('public/scripts/masterScheduleViewer.js');
   const noteScript = read('public/scripts/masterSchedulePersonNote.js');
 

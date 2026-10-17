@@ -5,6 +5,10 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 const repoRoot = path.join(root, '..', '..');
+const {
+  readPersonScheduleAdminBundle,
+  readPersonScheduleSelfBundle
+} = require('./helpers/scheduleViewerSource');
 
 function read(relPath) {
   return fs.readFileSync(path.join(root, relPath), 'utf8');
@@ -18,15 +22,18 @@ function readMasterScheduleViewerJs() {
 }
 
 test('personSchedule links external master schedule viewer scripts and JSON bootstrap', () => {
-  const view = read('MVC/views/school/schedule/personSchedule.ejs');
-  assert.match(view, /id="masterScheduleViewerConfig"/);
-  assert.match(view, /type="application\/json"/);
-  assert.match(view, /masterScheduleViewerClientConfig/);
-  assert.match(view, /href="\/styles\/schedule-viewer\.css"/);
-  assert.match(view, /src="\/scripts\/masterScheduleViewer\.js"/);
-  assert.match(view, /if \(canDragCreateSessions\) \{ %>\s*<script src="\/scripts\/masterScheduleViewerStaging\.js"><\/script>/);
-  assert.doesNotMatch(view, /^<script>\s*document\.addEventListener/m);
-  assert.doesNotMatch(view, /document\.addEventListener\('DOMContentLoaded'/);
+  const adminView = readPersonScheduleAdminBundle();
+  const selfView = readPersonScheduleSelfBundle();
+  assert.match(adminView, /id="masterScheduleViewerConfig"/);
+  assert.match(selfView, /id="masterScheduleViewerConfig"/);
+  assert.match(adminView, /type="application\/json"/);
+  assert.match(adminView, /masterScheduleViewerClientConfig/);
+  assert.match(adminView, /href="\/styles\/schedule-viewer\.css"/);
+  assert.match(adminView, /src="\/scripts\/masterScheduleViewer\.js"/);
+  assert.match(adminView, /masterScheduleViewerStaging\.js/);
+  assert.doesNotMatch(selfView, /masterScheduleViewerStaging\.js/);
+  assert.doesNotMatch(adminView, /^<script>\s*document\.addEventListener/m);
+  assert.doesNotMatch(adminView, /document\.addEventListener\('DOMContentLoaded'/);
 });
 
 test('masterScheduleViewer.js reads bootstrap config and avoids inline secrets', () => {
@@ -66,6 +73,8 @@ test('masterScheduleViewerStaging uses core helpers via deps only', () => {
 
 test('schedule controller builds whitelisted client config', () => {
   const controller = read('MVC/controllers/school/scheduleController.js');
+  assert.match(controller, /personScheduleAdmin/);
+  assert.match(controller, /personScheduleSelf/);
   assert.match(controller, /buildMasterScheduleViewerClientConfig/);
   assert.match(controller, /masterScheduleViewerClientConfig/);
   const helper = read('MVC/services/school/masterScheduleViewerClientConfig.js');
@@ -97,8 +106,22 @@ test('schedule events expose co-teacher card metadata and viewer wires badges', 
   assert.match(styles, /\.schedule-co-teacher-badges/);
 });
 
+test('master schedule viewer templates expose core DOM hooks', () => {
+  const adminView = readPersonScheduleAdminBundle();
+  const selfView = readPersonScheduleSelfBundle();
+  const requiredIds = ['sch_startDate', 'sch_endDate', 'scheduleContainer', 'scheduleSessionContextMenu', 'btn_loadSchedule'];
+  requiredIds.forEach((id) => {
+    assert.match(adminView, new RegExp(`id="${id}"`));
+    assert.match(selfView, new RegExp(`id="${id}"`));
+  });
+  assert.match(adminView, /scheduleAdminWeekRail/);
+  assert.doesNotMatch(selfView, /scheduleAdminWeekRail/);
+});
+
 test('personSchedule includes master schedule person note script', () => {
-  const view = read('MVC/views/school/schedule/personSchedule.ejs');
-  assert.match(view, /data-schedule-admin-action="person-schedule-note"/);
-  assert.match(view, /masterSchedulePersonNote\.js/);
+  const adminView = readPersonScheduleAdminBundle();
+  const selfView = readPersonScheduleSelfBundle();
+  assert.match(adminView, /data-schedule-admin-action="person-schedule-note"/);
+  assert.match(adminView, /masterSchedulePersonNote\.js/);
+  assert.doesNotMatch(selfView, /masterSchedulePersonNote\.js/);
 });

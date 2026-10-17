@@ -3,7 +3,12 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const root = path.resolve(__dirname, '..');
-const person = fs.readFileSync(path.join(root, 'packages/school/MVC/views/school/schedule/personSchedule.ejs'), 'utf8');
+const scheduleViewDir = path.join(root, 'packages/school/MVC/views/school/schedule');
+const person = [
+  fs.readFileSync(path.join(scheduleViewDir, 'personScheduleAdmin.ejs'), 'utf8'),
+  fs.readFileSync(path.join(scheduleViewDir, 'personScheduleSelf.ejs'), 'utf8'),
+  fs.readFileSync(path.join(root, 'packages/school/public/scripts/masterScheduleViewer.js'), 'utf8')
+].join('\n');
 const hub = fs.readFileSync(path.join(root, 'packages/school/MVC/views/school/masterAcademiaHub.ejs'), 'utf8');
 const controller = fs.readFileSync(path.join(root, 'packages/school/MVC/controllers/school/scheduleController.js'), 'utf8');
 test('schedule pages mark report events and mirror day/month switching', () => {

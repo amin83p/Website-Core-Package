@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT = path.join(__dirname, '..');
-const EJS_PATH = path.join(ROOT, 'packages/school/MVC/views/school/schedule/personSchedule.ejs');
+const EJS_PATH = path.join(ROOT, 'packages/school/MVC/views/school/schedule/personScheduleAdmin.ejs');
 const CORE_OUT = path.join(ROOT, 'packages/school/public/scripts/masterScheduleViewer.js');
 const STAGING_OUT = path.join(ROOT, 'packages/school/public/scripts/masterScheduleViewerStaging.js');
 

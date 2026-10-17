@@ -1289,7 +1289,9 @@
 
         function bindScheduleDragCreate(container, mode) {
             if (!container || !deps.scheduleCalendarCore?.bindCalendarDragCreate) return;
-            const weekGridDragEnabled = isScheduleWeekGridDragMode(mode) && deps.canDragCreateSessions === true;
+            const weekGridDragEnabled = isScheduleWeekGridDragMode(mode)
+                && deps.canDragCreateSessions === true
+                && (typeof deps.isScheduleOnScreenManageEnabled === 'function' ? deps.isScheduleOnScreenManageEnabled() === true : false);
             deps.scheduleCalendarCore.bindCalendarDragCreate(container, {
                 enabled: weekGridDragEnabled,
                 onDragComplete: openScheduleClassPickerModal,

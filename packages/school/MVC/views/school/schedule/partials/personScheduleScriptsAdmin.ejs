@@ -1,0 +1,26 @@
+<%
+  const caps = (typeof scheduleCapabilities !== 'undefined' && scheduleCapabilities) ? scheduleCapabilities : {};
+  const scheduleAccess = (typeof viewerScheduleAccess !== 'undefined' && viewerScheduleAccess) ? viewerScheduleAccess : {};
+  const canDragCreateSessions = caps.canDragCreateSessions === true || scheduleAccess.canDragCreateSessions === true;
+  const showCreateClassFromTemplateModal = typeof includeClassCreateFromTemplateModal !== 'undefined' && includeClassCreateFromTemplateModal === true;
+%>
+<% if (canDragCreateSessions) { %>
+<script src="/scripts/sessionEnrollmentCalendarModal.js"></script>
+<script src="/scripts/masterScheduleViewerStaging.js"></script>
+<script src="/scripts/masterScheduleDraftSaveWork.js"></script>
+<script src="/scripts/masterScheduleDraftSaveOrchestrator.js"></script>
+<% } %>
+<script src="/scripts/masterScheduleViewerAdmin.js"></script>
+<script src="/scripts/studentClaimNumbersManager.js"></script>
+<script src="/scripts/rollingEnrollmentGroupClient.js"></script>
+<script src="/scripts/masterScheduleEnrollStudents.js"></script>
+<script src="/scripts/masterScheduleManageEnrollment.js"></script>
+<script src="/scripts/masterScheduleMoveSessions.js"></script>
+<script src="/scripts/masterScheduleMergeSessions.js"></script>
+<script src="/scripts/masterScheduleTakeOverSessions.js"></script>
+<script src="/scripts/masterScheduleAddCoTeacher.js"></script>
+<% if (showCreateClassFromTemplateModal) { %>
+<script src="/scripts/classCreateFromTemplateModal.js"></script>
+<script src="/scripts/masterScheduleCreateClassFromTemplate.js"></script>
+<% } %>
+<script src="/scripts/masterSchedulePersonNote.js"></script>

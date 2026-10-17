@@ -5,21 +5,31 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 const repoRoot = path.join(root, '..', '..');
+const {
+  readPersonScheduleAdminView,
+  readPersonScheduleSelfView,
+  readPersonScheduleAdminBundle,
+  readPersonScheduleView
+} = require('./helpers/scheduleViewerSource');
 
 function read(relPath) {
   return fs.readFileSync(path.join(root, relPath), 'utf8');
 }
 
 test('personSchedule links external schedule-viewer stylesheet', () => {
-  const view = read('MVC/views/school/schedule/personSchedule.ejs');
-  assert.match(view, /href="\/styles\/schedule-viewer\.css"/);
-  assert.doesNotMatch(view, /^<style>/m);
+  const adminView = readPersonScheduleAdminView();
+  const selfView = readPersonScheduleSelfView();
+  assert.match(adminView, /href="\/styles\/schedule-viewer\.css"/);
+  assert.match(selfView, /href="\/styles\/schedule-viewer\.css"/);
+  assert.doesNotMatch(adminView, /^<style>/m);
+  assert.doesNotMatch(selfView, /^<style>/m);
 });
 
 test('personSchedule loads session-calendar.css at most once', () => {
-  const view = read('MVC/views/school/schedule/personSchedule.ejs');
-  const matches = view.match(/session-calendar\.css/g) || [];
-  assert.equal(matches.length, 1);
+  const adminView = readPersonScheduleAdminView();
+  const selfView = readPersonScheduleSelfView();
+  assert.equal((adminView.match(/session-calendar\.css/g) || []).length, 1);
+  assert.equal((selfView.match(/session-calendar\.css/g) || []).length, 1);
 });
 
 test('schedule-viewer.css includes critical layout selectors', () => {
@@ -36,9 +46,12 @@ test('schedule-viewer.css includes critical layout selectors', () => {
 });
 
 test('admin Master Schedule week rail markup and sync wiring', () => {
-  const view = read('MVC/views/school/schedule/personSchedule.ejs');
+  const view = readPersonScheduleAdminBundle();
+  const selfView = readPersonScheduleSelfView();
   const core = read('public/scripts/masterScheduleViewer.js');
-  assert.match(view, /if \(canSelectAnyPerson\) \{ %>\s*<aside id="scheduleAdminWeekRail"/s);
+  assert.match(view, /<aside id="scheduleAdminWeekRail"/);
+  assert.match(view, /schedule-on-screen-manage-toggle/);
+  assert.doesNotMatch(selfView, /scheduleAdminWeekRail/);
   assert.match(view, /data-schedule-admin-action="enroll-students"/);
   assert.match(view, /data-schedule-admin-action="manage-enrollment"/);
   assert.match(view, /data-schedule-admin-action="move-enrollments"/);
@@ -49,16 +62,19 @@ test('admin Master Schedule week rail markup and sync wiring', () => {
   );
   assert.match(view, /schedule-view-icon-btn[\s\S]*Enroll Students/);
   assert.match(view, /Manage Enrollment/);
-  const nonAdminBlock = view.split('<% if (canSelectAnyPerson) { %>')[0];
-  assert.doesNotMatch(nonAdminBlock, /scheduleAdminWeekRail/);
   assert.match(core, /function syncScheduleAdminWeekRailVisibility/);
   assert.match(core, /function syncScheduleAdminWeekRailStickyTop/);
   assert.match(core, /--schedule-admin-rail-sticky-top/);
   assert.match(core, /bindScheduleAdminWeekRail/);
+  assert.match(core, /schedule-master-admin-viewer/);
+  assert.match(core, /schedule-master-self-viewer/);
+  const css = read('public/styles/schedule-viewer.css');
+  assert.match(css, /schedule-master-admin-viewer:not\(\.schedule-on-screen-manage-active\)/);
+  assert.match(css, /schedule-master-self-viewer #visualDisplayArea .vertical-event-block/);
 });
 
 test('personSchedule keeps schedule layout in external assets without inline style or script blocks', () => {
-  const view = read('MVC/views/school/schedule/personSchedule.ejs');
+  const view = readPersonScheduleView();
   assert.doesNotMatch(view, /<style[\s>]/i);
   assert.doesNotMatch(view, /<script(?![^>]*\ssrc=)(?![^>]*type="application\/json")[^>]*>/i);
   assert.match(view, /schedule-calendar-card-body/);

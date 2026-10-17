@@ -5,6 +5,11 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 const {
+  readPersonScheduleAdminBundle,
+  readPersonScheduleSelfBundle,
+  readPersonScheduleView
+} = require('./helpers/scheduleViewerSource');
+const {
   createService,
   extractPreferences,
   sanitizeForAccess,
@@ -293,10 +298,13 @@ test('schedule routes expose viewer-preferences endpoints', () => {
 });
 
 test('personSchedule loads person chip color admin assets only for canSelectAnyPerson', () => {
-  const view = read('MVC/views/school/schedule/personSchedule.ejs');
+  const adminView = readPersonScheduleAdminBundle();
+  const selfView = readPersonScheduleSelfBundle();
   const adminJs = read('public/scripts/masterScheduleViewerAdmin.js');
-  assert.match(view, /if \(canSelectAnyPerson \|\| canDragCreateSessions\) \{ %>\s*<link rel="stylesheet" href="\/styles\/schedule-viewer-admin\.css"/s);
-  assert.match(view, /if \(canSelectAnyPerson\) \{ %>\s*<script src="\/scripts\/masterScheduleViewerAdmin\.js"><\/script>/s);
+  assert.match(adminView, /<link rel="stylesheet" href="\/styles\/schedule-viewer-admin\.css"/);
+  assert.match(adminView, /<script src="\/scripts\/masterScheduleViewerAdmin\.js"><\/script>/);
+  assert.doesNotMatch(selfView, /schedule-viewer-admin\.css/);
+  assert.doesNotMatch(selfView, /masterScheduleViewerAdmin\.js/);
   assert.match(adminJs, /schedule-person-chip-color-popover/);
   assert.match(adminJs, /chipBgColor/);
   const core = read('public/scripts/masterScheduleViewer.js');
@@ -307,7 +315,7 @@ test('personSchedule loads person chip color admin assets only for canSelectAnyP
 });
 
 test('personSchedule wires workspace save and user-settings restore', () => {
-  const view = read('MVC/views/school/schedule/personSchedule.ejs');
+  const view = readPersonScheduleAdminBundle();
   const source = readMasterScheduleViewerJs();
 
   assert.match(view, /masterScheduleViewerConfig/);
@@ -414,7 +422,7 @@ test('personSchedule uiAlert and uiConfirm route through window.showMessageModal
 });
 
 test('saved session bulk edit exposes markup and applies schedule per session without changing date', () => {
-  const view = read('MVC/views/school/schedule/personSchedule.ejs');
+  const view = readPersonScheduleAdminBundle();
   const source = read('public/scripts/masterScheduleViewer.js');
   assert.match(view, /btn_scheduleSessionContextEditSelected/);
   assert.match(view, /scheduleSavedBulkEditOverlay/);
@@ -428,10 +436,9 @@ test('saved session bulk edit exposes markup and applies schedule per session wi
     source.indexOf('async function applyScheduleSavedBulkEditOverlay'),
     source.indexOf('function isSavedSessionBulkContextMenu')
   );
-  assert.match(bulkApplyBlock, /applySavedSessionScheduleUpdate\(\{/);
-  assert.match(bulkApplyBlock, /date: sessionDate/);
-  assert.match(bulkApplyBlock, /lookupSessionDate: sessionDate/);
-  assert.match(bulkApplyBlock, /deferPostUpdate: true/);
+  assert.match(bulkApplyBlock, /postBulkSavedSessionScheduleUpdates/);
+  assert.match(bulkApplyBlock, /patchBulkSavedSessionScheduleResults/);
+  assert.match(bulkApplyBlock, /SESSION_METADATA_CONFLICTS/);
 });
 
 test('commit staged sessions and bulk delete update state without reloading schedule', () => {
@@ -441,10 +448,7 @@ test('commit staged sessions and bulk delete update state without reloading sche
     staging.indexOf('async function commitScheduleDraftSessions'),
     staging.indexOf('let scheduleStageEditAttemptId')
   );
-  assert.match(commitBlock, /appendSavedClassSessionsToState/);
-  assert.match(commitBlock, /acknowledgeLocalScheduleMutation/);
-  assert.match(commitBlock, /loadSchedulePerson\(person, \{ silent: true \}\)/);
-  assert.match(commitBlock, /totalAppended <= 0/);
+  assert.match(commitBlock, /MasterScheduleDraftSaveWork\.openSaveDraftWorkModal/);
 
   const bulkDeleteBlock = source.slice(
     source.indexOf('async function openScheduleBulkSessionDeleteModal'),
@@ -492,7 +496,7 @@ test('Master Schedule Viewer active class filter chip is wired in personSchedule
 });
 
 test('Master Schedule Viewer session context menu opens rolling enrollment', () => {
-  const view = read('MVC/views/school/schedule/personSchedule.ejs');
+  const view = readPersonScheduleView();
   const source = readMasterScheduleViewerJs();
   assert.match(view, /btn_scheduleSessionContextRollingEnrollment/);
   assert.match(view, /schedule-session-context-header-icon/);

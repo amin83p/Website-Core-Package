@@ -7,6 +7,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
+const {
+  readPersonScheduleAdminBundle,
+  readPersonScheduleSelfBundle
+} = require('./helpers/scheduleViewerSource');
 
 function read(relativePath) {
   return fs.readFileSync(path.join(ROOT_DIR, relativePath), 'utf8');
@@ -59,20 +63,24 @@ test('schedule controller uses scheduleAccessService and scoped repository reads
 });
 
 test('person schedule view conditionally loads admin-only assets', () => {
-  const view = read('MVC/views/school/schedule/personSchedule.ejs');
-  assert.match(view, /scheduleCapabilities/);
-  assert.match(view, /canDragCreateSessions/);
-  assert.match(view, /if \(canDragCreateSessions\)/);
-  assert.match(view, /masterScheduleViewerStaging\.js/);
-  assert.match(view, /if \(canSelectAnyPerson\)/);
-  assert.match(view, /btn_loadAllSchedules/);
-  assert.match(view, /masterScheduleViewer\.js/);
+  const adminView = readPersonScheduleAdminBundle();
+  const selfView = readPersonScheduleSelfBundle();
+  assert.match(adminView, /const canDragCreateSessions/);
+  assert.match(adminView, /if \(canDragCreateSessions\)/);
+  assert.match(adminView, /masterScheduleViewerStaging\.js/);
+  assert.match(adminView, /btn_loadAllSchedules/);
+  assert.match(adminView, /masterScheduleViewer\.js/);
+  assert.match(selfView, /masterScheduleViewer\.js/);
+  assert.doesNotMatch(selfView, /masterScheduleViewerStaging\.js/);
 });
 
 test('self-only schedule page does not always include admin modals in template branches', () => {
-  const view = read('MVC/views/school/schedule/personSchedule.ejs');
-  assert.match(view, /if \(canDragCreateSessions\) \{ %>\s*<%- include\('school\/partials\/sessionEnrollmentCalendarModal'\) %>/);
-  assert.match(view, /if \(canSelectAnyPerson\) \{ %>\s*<%- include\('partials\/modal_GenericPicker'\) %>/);
+  const adminView = readPersonScheduleAdminBundle();
+  const selfView = readPersonScheduleSelfBundle();
+  assert.match(adminView, /sessionEnrollmentCalendarModal/);
+  assert.match(adminView, /modal_GenericPicker/);
+  assert.doesNotMatch(selfView, /modal_GenericPicker/);
+  assert.doesNotMatch(selfView, /sessionEnrollmentCalendarModal/);
 });
 
 test('enrollment period lookup respects caller scope in mongo repository', () => {

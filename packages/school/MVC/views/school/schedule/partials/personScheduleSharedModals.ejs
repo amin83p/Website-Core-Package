@@ -1,0 +1,74 @@
+<div class="modal fade" id="scheduleLegendModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-2 px-3">
+        <h6 class="modal-title mb-0 fw-semibold"><i class="bi bi-info-circle me-1"></i>Schedule Legend</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="scheduleLegendModalBody" class="schedule-legend-modal-body"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="scheduleSessionContextInfoModal" tabindex="-1" aria-hidden="true" aria-labelledby="scheduleSessionContextInfoModalTitle">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="scheduleSessionContextInfoModalTitle">Session info</h5>
+          <div class="small text-muted" id="scheduleSessionContextInfoModalSubtitle"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="scheduleSessionContextInfoModalBody"></div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="scheduleSessionAttendanceModal" tabindex="-1" aria-hidden="true" aria-labelledby="scheduleSessionAttendanceModalTitle">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="scheduleSessionAttendanceModalTitle">Attendance List</h5>
+          <div class="small text-muted" id="scheduleSessionAttendanceModalSubtitle"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0" id="scheduleSessionAttendanceModalBody"></div>
+      <div class="modal-footer flex-wrap gap-2">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+        <a href="#" class="btn btn-outline-primary" id="btn_scheduleSessionAttendanceOpenMatrix" target="_blank" rel="noopener">Open Attendance Matrix</a>
+        <a href="#" class="btn btn-primary" id="btn_scheduleSessionAttendanceOpenSession" target="_blank" rel="noopener">Open Session</a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="scheduleSessionEnrollmentModal" tabindex="-1" aria-hidden="true" aria-labelledby="scheduleSessionEnrollmentModalTitle">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="scheduleSessionEnrollmentModalTitle">Enrollment List</h5>
+          <div class="small text-muted" id="scheduleSessionEnrollmentModalSubtitle"></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0" id="scheduleSessionEnrollmentModalBody"></div>
+      <div class="modal-footer flex-wrap gap-2 justify-content-between">
+        <div class="small text-muted" id="scheduleSessionEnrollmentAsOfNote"></div>
+        <div class="d-flex flex-wrap gap-2">
+          <button type="button" class="btn btn-outline-secondary" id="btn_scheduleSessionEnrollmentRefreshCurrent" title="Refresh enrollment usage as of today">Update to today</button>
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+          <a href="#" class="btn btn-primary" id="btn_scheduleSessionEnrollmentOpenSession" target="_blank" rel="noopener">Open Session</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -3,7 +3,7 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
-const p = path.join(__dirname, '..', 'packages/school/MVC/views/school/schedule/personSchedule.ejs');
+const p = path.join(__dirname, '..', 'packages/school/MVC/views/school/schedule/personScheduleAdmin.ejs');
 const lines = fs.readFileSync(p, 'utf8').split(/\r?\n/);
 const head = lines.slice(0, 363).join('\n');
 const tail = [

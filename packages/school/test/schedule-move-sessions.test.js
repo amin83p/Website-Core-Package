@@ -287,7 +287,7 @@ test('apply creates only missing sessions, keeps matches, moves enrollments, and
 });
 
 test('move sessions wizard is wired to the schedule rail', () => {
-  const view = fs.readFileSync(path.join(__dirname, '../MVC/views/school/schedule/personSchedule.ejs'), 'utf8');
+  const view = fs.readFileSync(path.join(__dirname, '../MVC/views/school/schedule/personScheduleAdmin.ejs'), 'utf8');
   const routes = fs.readFileSync(path.join(__dirname, '../MVC/routes/scheduleRoutes.js'), 'utf8');
   const viewer = fs.readFileSync(path.join(__dirname, '../public/scripts/masterScheduleViewer.js'), 'utf8');
   assert.match(view, /scheduleMoveSessionsModal/);

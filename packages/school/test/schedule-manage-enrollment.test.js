@@ -262,7 +262,8 @@ test('listFunderOptionsForClass returns active funders for the class organizatio
 });
 
 test('manage enrollment is wired to the schedule admin rail only', () => {
-  const view = read('MVC/views/school/schedule/personSchedule.ejs');
+  const view = read('MVC/views/school/schedule/personScheduleAdmin.ejs');
+  const selfView = read('MVC/views/school/schedule/personScheduleSelf.ejs');
   const routes = read('MVC/routes/scheduleRoutes.js');
   const viewer = read('public/scripts/masterScheduleViewer.js');
   const script = read('public/scripts/masterScheduleManageEnrollment.js');
@@ -278,12 +279,9 @@ test('manage enrollment is wired to the schedule admin rail only', () => {
   assert.match(view, /enrollmentPeriodEditModal/);
   assert.match(view, /masterScheduleManageEnrollment\.js/);
 
-  const adminBlocks = view.split('<% if (canSelectAnyPerson) { %>');
-  assert.ok(adminBlocks.length > 1);
-  const nonAdminPrefix = adminBlocks[0];
-  assert.doesNotMatch(nonAdminPrefix, /scheduleManageEnrollmentModal/);
-  assert.doesNotMatch(nonAdminPrefix, /masterScheduleManageEnrollment\.js/);
-  assert.doesNotMatch(nonAdminPrefix, /enrollmentPeriodEditModal/);
+  assert.doesNotMatch(selfView, /scheduleManageEnrollmentModal/);
+  assert.doesNotMatch(selfView, /masterScheduleManageEnrollment\.js/);
+  assert.doesNotMatch(selfView, /enrollmentPeriodEditModal/);
 
   assert.match(routes, /\/api\/manage-enrollments\/list/);
   assert.match(routes, /\/api\/manage-enrollments\/funder-options/);

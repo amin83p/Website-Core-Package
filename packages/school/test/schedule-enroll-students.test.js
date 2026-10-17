@@ -5,6 +5,10 @@ const path = require('node:path');
 
 const root = path.join(__dirname, '..');
 const repoRoot = path.join(root, '..', '..');
+const {
+  readPersonScheduleAdminBundle,
+  readPersonScheduleSelfBundle
+} = require('./helpers/scheduleViewerSource');
 const scheduleEnrollStudentsService = require('../MVC/services/school/scheduleEnrollStudentsService');
 const schoolDataService = require('../MVC/services/school/schoolDataService');
 
@@ -37,13 +41,14 @@ test('schedule routes expose enroll-students API endpoints', () => {
 });
 
 test('personSchedule loads enroll students modals and client scripts for admin viewer', () => {
-  const view = read('MVC/views/school/schedule/personSchedule.ejs');
+  const view = readPersonScheduleAdminBundle();
+  const selfView = readPersonScheduleSelfBundle();
   assert.match(view, /scheduleEnrollStudentsModals/);
   assert.match(view, /masterScheduleEnrollStudents\.js/);
   assert.match(view, /studentClaimNumbersManager\.js/);
   assert.match(view, /studentClaimNumbersModal/);
   assert.match(view, /rollingEnrollmentGroupClient\.js/);
-  assert.match(view, /if \(canSelectAnyPerson\) \{[\s\S]*masterScheduleEnrollStudents\.js/s);
+  assert.doesNotMatch(selfView, /masterScheduleEnrollStudents\.js/);
 });
 
 test('master schedule viewer wires enroll students rail handler', () => {
@@ -75,7 +80,7 @@ test('staging save opens draft work selection modal instead of inline commit', (
 
 test('staged save orchestration is wired for admin master schedule', () => {
   const viewer = read('public/scripts/masterScheduleViewer.js');
-  const personSchedule = read('MVC/views/school/schedule/personSchedule.ejs');
+  const personSchedule = readPersonScheduleAdminBundle();
   const draftWork = read('public/scripts/masterScheduleDraftSaveWork.js');
   const orchestrator = read('public/scripts/masterScheduleDraftSaveOrchestrator.js');
   const modal = read('MVC/views/school/schedule/partials/scheduleSaveDraftWorkModal.ejs');

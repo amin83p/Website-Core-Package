@@ -1,0 +1,39 @@
+<%
+  const caps = (typeof scheduleCapabilities !== 'undefined' && scheduleCapabilities) ? scheduleCapabilities : {};
+  const scheduleAccess = (typeof viewerScheduleAccess !== 'undefined' && viewerScheduleAccess) ? viewerScheduleAccess : {};
+  const canOpenRollingEnrollment = caps.canOpenRollingEnrollment === true || scheduleAccess.canOpenRollingEnrollment === true;
+%>
+<div id="scheduleSessionContextMenu" class="schedule-session-context-menu d-none" role="menu" aria-hidden="true">
+  <div class="schedule-session-context-menu-header" id="scheduleSessionContextMenuHeader">
+    <div class="schedule-session-context-menu-title-row">
+      <button type="button" class="schedule-session-context-menu-title" id="scheduleSessionContextMenuTitle"></button>
+    </div>
+    <div class="schedule-session-context-header-tools">
+      <% if (canOpenRollingEnrollment) { %>
+      <button type="button" class="schedule-session-context-header-icon d-none" id="btn_scheduleSessionContextRollingEnrollment" role="menuitem" title="Rolling Enrollment (opens in new tab)" aria-label="Rolling Enrollment (opens in new tab)">
+        <i class="bi bi-calendar-week" aria-hidden="true"></i>
+      </button>
+      <% } %>
+      <button type="button" class="schedule-session-context-header-icon d-none" id="btn_scheduleSessionContextOpenSession" role="menuitem" title="Manage Session (opens in new tab)" aria-label="Manage Session (opens in new tab)">
+        <i class="bi bi-easel2" aria-hidden="true"></i>
+      </button>
+      <button type="button" class="schedule-session-context-header-icon schedule-session-context-header-icon-info d-none" id="btn_scheduleSessionContextInfo" role="menuitem" title="Session info" aria-label="Session info">
+        <i class="bi bi-info-circle" aria-hidden="true"></i>
+      </button>
+    </div>
+    <div class="schedule-session-context-menu-meta" id="scheduleSessionContextMenuMeta"></div>
+  </div>
+  <div class="schedule-session-context-menu-actions">
+    <button type="button" class="schedule-session-context-action" id="btn_scheduleSessionContextAttendance" role="menuitem">
+      <i class="bi bi-clipboard2-check" aria-hidden="true"></i>
+      <span>Attendance List</span>
+    </button>
+    <button type="button" class="schedule-session-context-action" id="btn_scheduleSessionContextEnrollment" role="menuitem">
+      <i class="bi bi-people" aria-hidden="true"></i>
+      <span>Enrollment List</span>
+    </button>
+  </div>
+  <div class="schedule-session-context-menu-divider"></div>
+  <div class="schedule-session-context-menu-section-label">Session status</div>
+  <div id="scheduleSessionContextStatusList" class="schedule-session-context-status-list"></div>
+</div>

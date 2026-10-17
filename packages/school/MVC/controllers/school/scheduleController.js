@@ -2230,7 +2230,10 @@ async function showSchedulePage(req, res) {
         });
         const canCreateClasses = await canCreateOrgScopedItem(req.user, { scopeLabel: 'classes' });
 
-        res.render('school/schedule/personSchedule', {
+        const scheduleView = viewerScheduleAccess.canSelectAnyPerson
+            ? 'school/schedule/personScheduleAdmin'
+            : 'school/schedule/personScheduleSelf';
+        res.render(scheduleView, {
             title: 'Master Schedule Viewer',
             includeModal: true,
             includePrintManager: true,

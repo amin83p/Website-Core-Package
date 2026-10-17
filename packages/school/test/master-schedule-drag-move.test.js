@@ -16,6 +16,7 @@ test('master schedule staging enables week-grid drag for vertical and horizontal
   assert.match(staging, /function isScheduleWeekGridDragMode\(mode\)/);
   assert.match(staging, /mode === 'verticalTimeline' \|\| mode === 'timeline'/);
   assert.match(staging, /enabled: weekGridDragEnabled/);
+  assert.match(staging, /isScheduleOnScreenManageEnabled/);
   assert.match(staging, /onMoveOutOfWeek/);
 });
 

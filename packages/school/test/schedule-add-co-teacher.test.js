@@ -323,7 +323,7 @@ test('overlapping selected sessions block a new co-teacher, and an existing co-t
 });
 
 test('add co-teacher sits under take over on the schedule rail', () => {
-  const view = fs.readFileSync(path.join(__dirname, '../MVC/views/school/schedule/personSchedule.ejs'), 'utf8');
+  const view = fs.readFileSync(path.join(__dirname, '../MVC/views/school/schedule/personScheduleAdmin.ejs'), 'utf8');
   const modal = fs.readFileSync(path.join(__dirname, '../MVC/views/school/schedule/partials/scheduleAddCoTeacherModal.ejs'), 'utf8');
   const routes = fs.readFileSync(path.join(__dirname, '../MVC/routes/scheduleRoutes.js'), 'utf8');
   const viewer = fs.readFileSync(path.join(__dirname, '../public/scripts/masterScheduleViewer.js'), 'utf8');

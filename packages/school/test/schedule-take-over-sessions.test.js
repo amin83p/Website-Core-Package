@@ -235,7 +235,7 @@ test('a conflicting teacher schedule blocks take over and a clear schedule is sa
 });
 
 test('take over is wired beside merge on the schedule rail', () => {
-  const view = fs.readFileSync(path.join(__dirname, '../MVC/views/school/schedule/personSchedule.ejs'), 'utf8');
+  const view = fs.readFileSync(path.join(__dirname, '../MVC/views/school/schedule/personScheduleAdmin.ejs'), 'utf8');
   const routes = fs.readFileSync(path.join(__dirname, '../MVC/routes/scheduleRoutes.js'), 'utf8');
   const viewer = fs.readFileSync(path.join(__dirname, '../public/scripts/masterScheduleViewer.js'), 'utf8');
   const script = fs.readFileSync(path.join(__dirname, '../public/scripts/masterScheduleTakeOverSessions.js'), 'utf8');

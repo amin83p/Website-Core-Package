@@ -593,7 +593,11 @@ test('buildActivityScheduleCompletionScan maps completion and attendance assigne
 });
 
 test('Schedule completion display script is wired into schedule views', () => {
-  const personSchedule = readText('packages/school/MVC/views/school/schedule/personSchedule.ejs');
+  const personSchedule = [
+    readText('packages/school/MVC/views/school/schedule/personScheduleAdmin.ejs'),
+    readText('packages/school/MVC/views/school/schedule/personScheduleSelf.ejs'),
+    readText('packages/school/MVC/views/school/schedule/partials/personScheduleScriptsCore.ejs')
+  ].join('\n');
   const masterHub = readText('packages/school/MVC/views/school/masterAcademiaHub.ejs');
   const helper = readText('packages/school/public/scripts/scheduleCompletionDisplay.js');
 

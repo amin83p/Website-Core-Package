@@ -1,0 +1,99 @@
+<%- include('school/attendance/_attendanceMarkAppearance') %>
+
+<%
+  const dashHref = typeof schoolSectionDashboardHref === 'string' && schoolSectionDashboardHref
+    ? schoolSectionDashboardHref
+    : '/dashboard/section-nav/SCHOOL';
+  const caps = (typeof scheduleCapabilities !== 'undefined' && scheduleCapabilities) ? scheduleCapabilities : {};
+  const scheduleAccess = (typeof viewerScheduleAccess !== 'undefined' && viewerScheduleAccess) ? viewerScheduleAccess : {};
+  const canDragCreateSessions = caps.canDragCreateSessions === true || scheduleAccess.canDragCreateSessions === true;
+  const canLoadAllSchedules = caps.canLoadAllSchedules === true || scheduleAccess.canLoadAllSchedules === true;
+  const canUseGlobalComparison = caps.canUseGlobalComparison === true || scheduleAccess.canUseGlobalComparison === true;
+  const canDeleteClassSessions = caps.canDeleteClassSessions === true || scheduleAccess.canDeleteClassSessions === true;
+  const canOpenRollingEnrollment = caps.canOpenRollingEnrollment === true || scheduleAccess.canOpenRollingEnrollment === true;
+  const scheduleRoles = Array.isArray(scheduleAccess.availableRoles) ? scheduleAccess.availableRoles : [];
+  const defaultRole = scheduleAccess.selectedRole || (scheduleRoles.length >= 1 ? scheduleRoles[0].key : '');
+  const lockedPersonId = scheduleAccess.lockedPersonId || (typeof prefillId !== 'undefined' ? prefillId : '') || '';
+  const lockedPersonName = scheduleAccess.lockedPersonName || (typeof prefillName !== 'undefined' ? prefillName : '') || '';
+  const showCreateClassFromTemplateModal = typeof includeClassCreateFromTemplateModal !== 'undefined' && includeClassCreateFromTemplateModal === true;
+%>
+
+<link rel="stylesheet" href="/styles/schedule-viewer.css">
+<link rel="stylesheet" href="/styles/session-calendar.css">
+
+<%- include('partials/tablePages-start', {
+  title: 'Master Schedule Viewer',
+  newUrl: null,
+  newLabel: null,
+  user,
+  tableName: null,
+  btn_export: false,
+  print: false,
+  optionalBtnsBeforePrint: [
+    '<button type="button" id="btn_printSchedule" class="btn btn-filled btn-edit btn-md me-2 mb-2" disabled title="Load a schedule first">🖨 Print</button>'
+  ],
+  headerManageBtns: [
+    '<a href="' + dashHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-journal-bookmark me-1"></i> School Academia</a>'
+  ],
+  manageBtns: []
+}) %>
+
+<div class="schedule-shell">
+  <input type="hidden" id="sch_role" value="<%= defaultRole %>">
+  <input type="hidden" id="sch_personId" value="<%= lockedPersonId %>">
+  <input type="hidden" id="sch_personName" value="<%= lockedPersonName %>">
+  <div class="card border-0 shadow-sm mb-3 schedule-filter-card" id="scheduleFilterCard">
+    <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+      <div id="scheduleFilterTitleToggle" class="fw-bold text-dark schedule-filter-title-toggle" role="button" tabindex="0" aria-controls="scheduleFilterCollapse">
+        <i class="bi bi-calendar3 me-2"></i>Choose dates
+      </div>
+      <button
+        id="scheduleFilterToggleBtn"
+        type="button"
+        class="btn btn-outline-secondary btn-sm px-2 schedule-filter-toggle"
+        data-bs-toggle="collapse"
+        data-bs-target="#scheduleFilterCollapse"
+        aria-expanded="false"
+        aria-controls="scheduleFilterCollapse"
+        aria-label="Open filters">
+        <i id="scheduleFilterToggleIcon" class="bi bi-chevron-down"></i>
+      </button>
+    </div>
+    <div class="schedule-filter-summary">
+      <div class="schedule-filter-summary-row">
+        <div class="schedule-date-field">
+          <label for="sch_startDate">Start date</label>
+          <input type="date" id="sch_startDate" class="form-control schedule-date-input">
+        </div>
+        <div class="schedule-date-field">
+          <label for="sch_endDate">End date</label>
+          <input type="date" id="sch_endDate" class="form-control schedule-date-input">
+        </div>
+        <div class="schedule-date-action schedule-filter-summary-action">
+          <label class="d-none d-md-block" aria-hidden="true">&nbsp;</label>
+          <button type="button" id="btn_loadSchedule" class="btn btn-primary schedule-show-btn w-100">
+            <i class="bi bi-arrow-clockwise me-1"></i> Show schedule
+          </button>
+        </div>
+      </div>
+    </div>
+    <div class="collapse" id="scheduleFilterCollapse">
+      <div class="card-body filter-panel p-3" id="scheduleFilterForm">
+        <div class="schedule-date-panel">
+          <%- include('school/schedule/partials/personScheduleQuickRangeChips') %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <%- include('school/schedule/partials/personScheduleCalendarShell', { personScheduleIncludeAdminRail: false }) %>
+</div>
+
+<%- include('school/schedule/partials/personScheduleSharedModals') %>
+<%- include('school/schedule/partials/personScheduleSessionContextMenuSelf') %>
+
+<%- include('partials/tablePages-end') %>
+
+<%- include('school/schedule/partials/personScheduleScriptsCore') %>
+<script src="/scripts/masterScheduleViewer.js"></script>

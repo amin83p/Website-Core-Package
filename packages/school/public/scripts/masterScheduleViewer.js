@@ -464,7 +464,7 @@
         return `<label class="schedule-session-select${stateClass}" title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}"><input type="checkbox" class="form-check-input" data-schedule-session-select data-session-key="${escapeHtml(key)}" data-session-class-id="${escapeHtml(event?.classId || '')}" ${checked ? 'checked' : ''} ${disabled ? 'disabled' : ''}><span class="schedule-session-select-icon"><i class="bi ${escapeHtml(icon)}" aria-hidden="true"></i></span></label>`;
     }
     function scheduleDraftSelectHtml(event) {
-        if (!canDragCreateSessions) return '';
+        if (!isScheduleOnScreenManageEnabled()) return '';
         if (event?.isDraft !== true && event?.isStaged !== true) return '';
         const sessionId = String(event?.sessionId || event?.id || '').trim();
         if (!sessionId) return '';
@@ -480,7 +480,7 @@
     }
     function buildScheduleSessionSelectedClass(event) {
         if (event?.isDraft === true || event?.isStaged === true) {
-            if (!canDragCreateSessions) return '';
+            if (!isScheduleOnScreenManageEnabled()) return '';
             return isDraftSessionSelected(event) ? ' is-session-selected is-draft-selected' : '';
         }
         if (!canSelectAnyPerson) return '';
@@ -1045,6 +1045,44 @@
         return 'verticalTimeline';
     }
 
+    const SCHEDULE_ON_SCREEN_MANAGE_KEY = 'schoolMasterViewer.onScreenManageEnabled';
+
+    function readScheduleOnScreenManageEnabled() {
+        if (!canDragCreateSessions || !window.localStorage) return false;
+        try {
+            return window.localStorage.getItem(SCHEDULE_ON_SCREEN_MANAGE_KEY) === '1';
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function saveScheduleOnScreenManageEnabled(enabled) {
+        if (!canDragCreateSessions || !window.localStorage) return;
+        try {
+            if (enabled) window.localStorage.setItem(SCHEDULE_ON_SCREEN_MANAGE_KEY, '1');
+            else window.localStorage.removeItem(SCHEDULE_ON_SCREEN_MANAGE_KEY);
+        } catch (_) { /* storage unavailable */ }
+    }
+
+    function isScheduleOnScreenManageEnabled() {
+        return canDragCreateSessions && scheduleState.onScreenManageEnabled === true;
+    }
+
+    function syncScheduleOnScreenManageRailButton() {
+        if (!canSelectAnyPerson) return;
+        const btn = document.querySelector('[data-schedule-admin-action="toggle-on-screen-manage"]');
+        if (!btn) return;
+        const on = isScheduleOnScreenManageEnabled();
+        btn.classList.toggle('is-on', on);
+        btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        const label = on
+            ? 'On-screen manage is on (draw sessions, drag, resize). Click to turn off.'
+            : 'Turn on on-screen manage (draw sessions, drag, resize)';
+        btn.title = label;
+        btn.setAttribute('aria-label', label);
+        document.documentElement.classList.toggle('schedule-on-screen-manage-active', on);
+    }
+
     const scheduleState = {
         persons: [],
         activePersonId: '',
@@ -1076,6 +1114,7 @@
         hideEmptyDays: false,
         isAdminViewer: canSelectAnyPerson,
         canDragCreateSessions,
+        onScreenManageEnabled: readScheduleOnScreenManageEnabled(),
         verticalDayWidthUserAdjusted: false,
         horizontalSliderUserAdjusted: false,
         suppressGridClick: false,
@@ -1481,7 +1520,7 @@
         setDateRangeFromIso, setActiveRangeChip, schedulePersistDraftBackup,
         fetchWithScheduleTimeout, SCHEDULE_COMMIT_STAGED_API, countAllPendingDraftSessions,
         clearScheduleDraftBackup, getScheduleEventsForPerson, focusScheduleTimelineOnFirstStagedSession,
-        canDragCreateSessions, SCHEDULE_DRAGGABLE_BLOCK_SELECTOR, getEventTitle,
+        canDragCreateSessions, isScheduleOnScreenManageEnabled, SCHEDULE_DRAGGABLE_BLOCK_SELECTOR, getEventTitle,
         formatScheduleClockRange, timeToMinutes, calculatePosition, normalizeSessionStatus,
         sessionStatusMetaMap, getStatusMeta, activeSchedulePerson, refreshScheduleActiveView,
         loadActiveSchedulePerson, acknowledgeLocalScheduleMutation, getScheduleHolidayDatesForRender,
@@ -1771,7 +1810,7 @@
         const classId = escapeHtml(String(event.classId || '').trim());
         const sessionId = escapeHtml(String(event.sessionId || '').trim());
         const sessionDate = escapeHtml(String(event.date || '').trim());
-        const editableAttr = (canDragCreateSessions && isScheduledClassSessionScheduleEditable(event)) ? ' data-schedule-editable="1"' : '';
+        const editableAttr = (isScheduleOnScreenManageEnabled() && isScheduledClassSessionScheduleEditable(event)) ? ' data-schedule-editable="1"' : '';
         return `${keyAttr} data-class-id="${classId}" data-session-id="${sessionId}" data-session-date="${sessionDate}" data-event-type="class_session"${editableAttr}`;
     }
 
@@ -2493,7 +2532,7 @@
         skipLoading = false,
         errorElementId = ''
     } = {}) {
-        if (!canDragCreateSessions || !event) return false;
+        if (!isScheduleOnScreenManageEnabled() || !event) return false;
         const sessionId = String(event.sessionId || '').trim();
         const sessionLookupDate = String(lookupSessionDate || event.date || '').trim();
         const resolvedEnd = endTime || (scheduleCalendarCore?.addDurationToTime
@@ -2619,7 +2658,7 @@
     }
 
     async function applyClassSessionStatusUpdate(event, status) {
-        if (!canDragCreateSessions || !event || !status) return false;
+        if (!isScheduleOnScreenManageEnabled() || !event || !status) return false;
         if (!canScheduleSessionChangeStatus(event)) {
             if (typeof uiAlert === 'function') {
                 uiAlert(formatSessionManagementBlockerMessage(event, 'This session status cannot be changed from Master Schedule.'), 'Session status', { icon: 'warning' });
@@ -2667,7 +2706,7 @@
     }
 
     async function applyWorkSessionStatusUpdate(event, item) {
-        if (!canDragCreateSessions || !event || !item) return false;
+        if (!isScheduleOnScreenManageEnabled() || !event || !item) return false;
         const person = activeSchedulePerson();
         if (!person?.id) return false;
         const previousKey = scheduleSessionSelectionKey(event);
@@ -2770,7 +2809,7 @@
 
     function isScheduleSessionContextStatusItemActionable(event, item) {
         if (!item || item.isCurrent) return false;
-        if (!canDragCreateSessions || !isScheduleEventMutableUnderClassFocus(event)) return false;
+        if (!isScheduleOnScreenManageEnabled() || !isScheduleEventMutableUnderClassFocus(event)) return false;
         if (isWorkSessionScheduleEvent(event)) return true;
         return canScheduleSessionChangeStatus(event);
     }
@@ -3208,7 +3247,7 @@
 
         visualArea.addEventListener('dblclick', (mouseEvent) => {
             if (isScheduleDraftEditInteractionTarget(mouseEvent.target)) return;
-            if (canDragCreateSessions) {
+            if (isScheduleOnScreenManageEnabled()) {
                 if (openScheduleDraftEditFromTarget(mouseEvent.target, 'timeline')) {
                     mouseEvent.preventDefault();
                     mouseEvent.stopPropagation();
@@ -3405,7 +3444,7 @@
     }
 
     function getActiveDraftSelectionSet() {
-        if (!canDragCreateSessions) return new Set();
+        if (!isScheduleOnScreenManageEnabled()) return new Set();
         const person = activeSchedulePerson();
         if (!person?.id) return new Set();
         if (!(scheduleState.selectedDraftSessionIdsByPersonId[person.id] instanceof Set)) {
@@ -3447,7 +3486,7 @@
 
     function toggleDraftSessionSelection(sessionId) {
         const id = String(sessionId || '').trim();
-        if (!id || !canDragCreateSessions) return;
+        if (!id || !isScheduleOnScreenManageEnabled()) return;
         if (countActiveScheduleSelectedSessions() > 0) {
             if (typeof uiAlert === 'function') {
                 uiAlert('Clear saved session selections before selecting staged sessions.', 'Staged session selection', { icon: 'info' });
@@ -3488,7 +3527,7 @@
     }
 
     function selectDraftSessionsInStagingPass(event, source = 'timeline') {
-        if (!canDragCreateSessions || !event) return;
+        if (!isScheduleOnScreenManageEnabled() || !event) return;
         if (countActiveScheduleSelectedSessions() > 0) {
             if (typeof uiAlert === 'function') {
                 uiAlert('Clear saved session selections before selecting staged sessions.', 'Staged session selection', { icon: 'info' });
@@ -3760,7 +3799,7 @@
     function canOpenScheduleSessionBulkSelectModal(anchorEvent, mode = 'saved') {
         if (!anchorEvent) return false;
         if (mode === 'draft') {
-            if (!canDragCreateSessions || anchorEvent.isDraft !== true) return false;
+            if (!isScheduleOnScreenManageEnabled() || anchorEvent.isDraft !== true) return false;
             return countActiveScheduleSelectedSessions() === 0;
         }
         if (!canSelectAnyPerson || !isClassSessionScheduleEvent(anchorEvent)) return false;
@@ -4734,14 +4773,8 @@
         let loadingToken = typeof window.showLoading === 'function'
             ? window.showLoading('Updating selected sessions...')
             : null;
-        // #region agent log
-        fetch('http://127.0.0.1:7806/ingest/c7fa1798-3774-4efe-9724-2848436aa81e',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ae2ae1'},body:JSON.stringify({sessionId:'ae2ae1',hypothesisId:'A',location:'masterScheduleViewer.js:applyScheduleSavedBulkEditOverlay',message:'bulk edit start',data:{sessionCount:selectedEvents.length,api:'bulk'},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         try {
             let { res, result } = await postBulkSavedSessionScheduleUpdates(selectedEvents, validation, { forceConflicts: false });
-            // #region agent log
-            fetch('http://127.0.0.1:7806/ingest/c7fa1798-3774-4efe-9724-2848436aa81e',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'ae2ae1'},body:JSON.stringify({sessionId:'ae2ae1',hypothesisId:'B',location:'masterScheduleViewer.js:applyScheduleSavedBulkEditOverlay',message:'bulk edit response',data:{status:res.status,resultStatus:String(result?.status||''),code:String(result?.code||'')},timestamp:Date.now()})}).catch(()=>{});
-            // #endregion
             if (res.status === 409 && result.code === 'SESSION_METADATA_CONFLICTS') {
                 const conflicts = Array.isArray(result.data?.conflicts) ? result.data.conflicts : [];
                 const lines = conflicts.slice(0, 5).map((row) => {
@@ -5729,7 +5762,10 @@
             && weekGridMode
         );
         rail.classList.toggle('d-none', !show);
-        if (show) syncScheduleAdminWeekRailStickyTop();
+        if (show) {
+            syncScheduleAdminWeekRailStickyTop();
+            syncScheduleOnScreenManageRailButton();
+        }
     }
 
     function syncScheduleAdminWeekRailStickyTop() {
@@ -5757,6 +5793,13 @@
             if (!actionEl) return;
             clickEvent.preventDefault();
             const action = String(actionEl.getAttribute('data-schedule-admin-action') || '').trim();
+            if (action === 'toggle-on-screen-manage') {
+                scheduleState.onScreenManageEnabled = !scheduleState.onScreenManageEnabled;
+                saveScheduleOnScreenManageEnabled(scheduleState.onScreenManageEnabled);
+                syncScheduleOnScreenManageRailButton();
+                refreshScheduleActiveView();
+                return;
+            }
             if (action === 'enroll-students' && typeof enrollStudentsRailHandler === 'function') {
                 void enrollStudentsRailHandler();
             }
@@ -7458,7 +7501,7 @@ if (canLoadAllSchedules) {
             },
             dayWidth: readScheduleVerticalDayWidth(),
             filterEmptyDays: scheduleState.hideEmptyDays === true && !activePersonHasDraftStagedSessions(),
-            enableTimeHover: canDragCreateSessions === true,
+            enableTimeHover: isScheduleOnScreenManageEnabled(),
             buildPositionedBlockHtml: buildSchedulePositionedBlockHtml,
             buildDayHeaderBadgeHtml: (day, dayEvents, inRange) => {
                 if (!inRange) return '';
@@ -7503,7 +7546,7 @@ if (canLoadAllSchedules) {
                 const tipLabel = buildScheduleEventTooltip(ev, sessionStatusMetaMap, scan);
                 const tipStyle = scheduleStatusTipStyle(ev, sessionStatusMetaMap);
                 const soloStudentHtml = scheduleSoloStudentHtml(ev);
-        const resizeHandles = canDragCreateSessions && isScheduleEventMutableUnderClassFocus(ev) && (ev.isDraft || canScheduleSessionChangeTime(ev))
+        const resizeHandles = isScheduleOnScreenManageEnabled() && isScheduleEventMutableUnderClassFocus(ev) && (ev.isDraft || canScheduleSessionChangeTime(ev))
             ? buildScheduleDraftResizeHandlesHtml()
             : '';
         return `
@@ -7824,7 +7867,7 @@ if (canLoadAllSchedules) {
         const draftInput = event.target.closest('[data-schedule-draft-select]');
         const draftLabel = event.target.closest('.schedule-draft-select');
         if (draftInput || draftLabel) {
-            if (!canDragCreateSessions) return;
+            if (!isScheduleOnScreenManageEnabled()) return;
             event.preventDefault();
             event.stopPropagation();
             const checkbox = draftInput || draftLabel?.querySelector('[data-schedule-draft-select]');
@@ -8262,7 +8305,11 @@ if (canLoadAllSchedules) {
             activeSchedulePerson
         });
     }
+    document.documentElement.classList.add(
+        canSelectAnyPerson ? 'schedule-master-admin-viewer' : 'schedule-master-self-viewer'
+    );
     bindScheduleAdminWeekRail();
+    syncScheduleOnScreenManageRailButton();
     if (typeof bindScheduleDraftUnloadGuard === 'function') bindScheduleDraftUnloadGuard();
     void initializeScheduleViewer();
 

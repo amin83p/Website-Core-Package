@@ -16,12 +16,45 @@ function readMasterScheduleViewerJs() {
   ].join('\n');
 }
 
+function readPersonScheduleAdminView() {
+  return readPackageFile('MVC/views/school/schedule/personScheduleAdmin.ejs');
+}
+
+function readPersonScheduleSelfView() {
+  return readPackageFile('MVC/views/school/schedule/personScheduleSelf.ejs');
+}
+
+function readPersonScheduleAdminBundle() {
+  return [
+    readPersonScheduleAdminView(),
+    readPackageFile('MVC/views/school/schedule/partials/personScheduleCalendarShell.ejs'),
+    readPackageFile('MVC/views/school/schedule/partials/personScheduleSharedModals.ejs'),
+    readPackageFile('MVC/views/school/schedule/partials/personScheduleSessionContextMenuAdmin.ejs'),
+    readPackageFile('MVC/views/school/schedule/partials/personScheduleAdminStagingModals.ejs'),
+    readPackageFile('MVC/views/school/schedule/partials/personScheduleScriptsCore.ejs'),
+    readPackageFile('MVC/views/school/schedule/partials/personScheduleScriptsAdmin.ejs')
+  ].join('\n');
+}
+
+function readPersonScheduleSelfBundle() {
+  return [
+    readPersonScheduleSelfView(),
+    readPackageFile('MVC/views/school/schedule/partials/personScheduleSharedModals.ejs'),
+    readPackageFile('MVC/views/school/schedule/partials/personScheduleSessionContextMenuSelf.ejs'),
+    readPackageFile('MVC/views/school/schedule/partials/personScheduleScriptsCore.ejs')
+  ].join('\n');
+}
+
 function readPersonScheduleView() {
-  return readPackageFile('MVC/views/school/schedule/personSchedule.ejs');
+  return `${readPersonScheduleAdminBundle()}\n${readPersonScheduleSelfBundle()}`;
 }
 
 module.exports = {
   readMasterScheduleViewerJs,
+  readPersonScheduleAdminView,
+  readPersonScheduleSelfView,
+  readPersonScheduleAdminBundle,
+  readPersonScheduleSelfBundle,
   readPersonScheduleView,
   readPackageFile
 };

@@ -72,7 +72,7 @@ test('wide page width mode uses the same left gutter as full mode', () => {
 });
 
 test('Master Schedule Viewer uses standard sections-page wrapper', () => {
-  const source = read('packages/school/MVC/views/school/schedule/personSchedule.ejs');
+  const source = read('packages/school/MVC/views/school/schedule/personScheduleAdmin.ejs');
   assert.match(source, /include\('partials\/tablePages-start'/);
   assert.doesNotMatch(source, /sectionsPageClass:\s*'master-schedule-viewer-page'/);
 });

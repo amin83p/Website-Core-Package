@@ -9,8 +9,22 @@ function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), 'utf8');
 }
 
+function readPersonScheduleViewerSource() {
+  return [
+    read('packages/school/public/scripts/masterScheduleViewer.js'),
+    read('packages/school/public/scripts/masterScheduleViewerStaging.js')
+  ].join('\n');
+}
+
+function readPersonScheduleAdminMarkup() {
+  return [
+    read('packages/school/MVC/views/school/schedule/personScheduleAdmin.ejs'),
+    read('packages/school/MVC/views/school/schedule/partials/personScheduleAdminStagingModals.ejs')
+  ].join('\n');
+}
+
 test('person schedule includes draft session context menu and attempt tracking', () => {
-  const view = read('packages/school/MVC/views/school/schedule/personSchedule.ejs');
+  const view = `${readPersonScheduleAdminMarkup()}\n${readPersonScheduleViewerSource()}`;
   const partial = read('packages/school/MVC/views/school/partials/scheduleDraftSessionContextMenu.ejs');
   assert.match(partial, /id="scheduleDraftSessionContextMenu"/);
   assert.match(partial, /id="scheduleDraftAttemptPickerModal"/);
@@ -68,21 +82,21 @@ test('session-calendar.css includes draft context-menu cursor styles', () => {
 });
 
 test('person schedule filters blocking events for conflict checks', () => {
-  const view = read('packages/school/MVC/views/school/schedule/personSchedule.ejs');
+  const view = `${readPersonScheduleAdminMarkup()}\n${readPersonScheduleViewerSource()}`;
   assert.match(view, /function doesScheduleEventBlockConflicts/);
   assert.match(view, /scheduleDisplayOnly !== true && event\?\.blocksConflicts !== false/);
   assert.match(view, /\.filter\(\(ev\) => doesScheduleEventBlockConflicts\(ev\)\)/);
 });
 
 test('commitScheduleStageCreate passes full schedule as existingSessions', () => {
-  const view = read('packages/school/MVC/views/school/schedule/personSchedule.ejs');
+  const view = `${readPersonScheduleAdminMarkup()}\n${readPersonScheduleViewerSource()}`;
   const block = view.slice(view.indexOf('async function commitScheduleStageCreate'), view.indexOf('function openScheduleStageModal'));
   assert.match(block, /existingSessions:\s*collectScheduleConflictSessionsForPerson/);
   assert.match(block, /conflictScheduleEvents\s*=\s*collectScheduleConflictSessionsForPerson/);
 });
 
 test('applyDraftStagedSessionsToSchedule merges batches by attemptId', () => {
-  const view = read('packages/school/MVC/views/school/schedule/personSchedule.ejs');
+  const view = `${readPersonScheduleAdminMarkup()}\n${readPersonScheduleViewerSource()}`;
   const block = view.slice(view.indexOf('function applyDraftStagedSessionsToSchedule'), view.indexOf('async function commitScheduleStageCreate'));
   assert.match(block, /payloadAttemptIds/);
   assert.match(block, /!payloadAttemptIds\.has\(attemptId\)/);
@@ -107,7 +121,7 @@ test('partial modal merges conflictScheduleEvents into conflict checks', () => {
 });
 
 test('uiConfirm uses explicit Yes/No buttons', () => {
-  const view = read('packages/school/MVC/views/school/schedule/personSchedule.ejs');
+  const view = `${readPersonScheduleAdminMarkup()}\n${readPersonScheduleViewerSource()}`;
   assert.match(view, /return res === 'Yes'/);
   assert.match(view, /text: 'No', class: 'btn-secondary btn-md'/);
   assert.match(view, /text: 'Yes', class: 'btn-danger btn-md'/);
@@ -115,7 +129,7 @@ test('uiConfirm uses explicit Yes/No buttons', () => {
 });
 
 test('delete all staged routes through promptDeleteDraftAttempt', () => {
-  const view = read('packages/school/MVC/views/school/schedule/personSchedule.ejs');
+  const view = `${readPersonScheduleAdminMarkup()}\n${readPersonScheduleViewerSource()}`;
   assert.match(view, /async function promptDeleteDraftAttempt/);
   assert.match(view, /void promptDeleteDraftAttempt\(attempts\[0\]\.attemptId, source\)/);
   assert.match(view, /void promptDeleteDraftAttempt\(attemptId, pickerSource\)/);
@@ -129,13 +143,13 @@ test('bindCalendarDragResize is exported for draft duration resize', () => {
 });
 
 test('draft blocks include resize handle markup', () => {
-  const view = read('packages/school/MVC/views/school/schedule/personSchedule.ejs');
+  const view = `${readPersonScheduleAdminMarkup()}\n${readPersonScheduleViewerSource()}`;
   assert.match(view, /buildScheduleDraftResizeHandlesHtml/);
   assert.match(view, /session-cal-draft-resize-handle-top/);
 });
 
 test('schedule loaded chip includes auto-detect toggle', () => {
-  const view = read('packages/school/MVC/views/school/schedule/personSchedule.ejs');
+  const view = `${readPersonScheduleAdminMarkup()}\n${readPersonScheduleViewerSource()}`;
   assert.match(view, /initialScheduleViewerPrefs/);
   assert.match(view, /persistScheduleViewerPreferencesPartial/);
   assert.match(view, /data-schedule-auto-detect-toggle/);
@@ -151,13 +165,13 @@ test('draft context menu includes move session modal and omits adjust start time
   assert.match(partial, /btn_scheduleDraftContextMoveSession/);
   assert.match(partial, /Move session/);
   assert.match(partial, /id="scheduleDraftMoveOverlay"/);
-  const view = read('packages/school/MVC/views/school/schedule/personSchedule.ejs');
+  const view = `${readPersonScheduleAdminMarkup()}\n${readPersonScheduleViewerSource()}`;
   assert.match(view, /openScheduleDraftMoveOverlay/);
   assert.match(view, /moveStagedSession/);
 });
 
 test('double-click on staged sessions opens edit overlay in master schedule and partial modal', () => {
-  const view = read('packages/school/MVC/views/school/schedule/personSchedule.ejs');
+  const view = `${readPersonScheduleAdminMarkup()}\n${readPersonScheduleViewerSource()}`;
   const modal = read('packages/school/public/scripts/sessionEnrollmentCalendarModal.js');
   assert.match(view, /visualArea\.addEventListener\('dblclick'/);
   assert.match(view, /openScheduleDraftEditFromTarget/);
@@ -168,7 +182,7 @@ test('double-click on staged sessions opens edit overlay in master schedule and 
 });
 
 test('staged session multi-select state, controls, and bulk actions', () => {
-  const view = read('packages/school/MVC/views/school/schedule/personSchedule.ejs');
+  const view = `${readPersonScheduleAdminMarkup()}\n${readPersonScheduleViewerSource()}`;
   const partial = read('packages/school/MVC/views/school/partials/scheduleDraftSessionContextMenu.ejs');
   const modal = read('packages/school/public/scripts/sessionEnrollmentCalendarModal.js');
   assert.match(view, /selectedDraftSessionIdsByPersonId/);
@@ -203,7 +217,7 @@ test('session-calendar.css includes draft multi-select toolbar styles', () => {
 
 test('saved session schedule editing styles and context menu wiring', () => {
   const css = read('packages/school/public/styles/session-calendar.css');
-  const view = read('packages/school/MVC/views/school/schedule/personSchedule.ejs');
+  const view = `${readPersonScheduleAdminMarkup()}\n${readPersonScheduleViewerSource()}`;
   assert.match(css, /\.schedule-session-context-status-item\.is-actionable/);
   assert.match(css, /\[data-event-type="class_session"\]\[data-schedule-editable="1"\]/);
   assert.match(view, /data-schedule-session-status/);

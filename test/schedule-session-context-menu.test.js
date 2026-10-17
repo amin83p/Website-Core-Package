@@ -10,7 +10,13 @@ function read(relativePath) {
 }
 
 test('person schedule includes session context menu and modal hooks', () => {
-  const view = read('packages/school/MVC/views/school/schedule/personSchedule.ejs');
+  const view = [
+    read('packages/school/MVC/views/school/schedule/personScheduleAdmin.ejs'),
+    read('packages/school/MVC/views/school/schedule/partials/personScheduleSessionContextMenuAdmin.ejs'),
+    read('packages/school/MVC/views/school/schedule/partials/personScheduleSessionContextMenuSelf.ejs'),
+    read('packages/school/MVC/views/school/schedule/partials/personScheduleSharedModals.ejs'),
+    read('packages/school/public/scripts/masterScheduleViewer.js')
+  ].join('\n');
   assert.match(view, /id="scheduleSessionContextMenu"/);
   assert.match(view, /id="scheduleSessionAttendanceModal"/);
   assert.match(view, /id="scheduleSessionEnrollmentModal"/);
