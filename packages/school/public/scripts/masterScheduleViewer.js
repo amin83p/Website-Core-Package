@@ -5620,12 +5620,24 @@
         return Math.max(1, blocks.length || 1);
     }
 
+    function scheduleLayoutViewportHeight() {
+        const vv = window.visualViewport;
+        if (vv && Number.isFinite(vv.height) && vv.height > 0) return vv.height;
+        return window.innerHeight;
+    }
+
+    function isScheduleNarrowViewport() {
+        return window.matchMedia('(max-width: 767.98px)').matches;
+    }
+
+    const SCHEDULE_MOBILE_DAY_WIDTH = 92;
+
     function computeScheduleGridViewportHeight(container, weekCount = 1) {
         const el = container || document.getElementById('visualDisplayArea');
         if (!el) return SCHEDULE_GRID_MIN_HEIGHT;
         const top = el.getBoundingClientRect().top || 0;
         const weeks = Math.max(1, Number(weekCount) || 1);
-        const viewportRemainder = Math.max(SCHEDULE_GRID_MIN_HEIGHT, window.innerHeight - top - 16);
+        const viewportRemainder = Math.max(SCHEDULE_GRID_MIN_HEIGHT, scheduleLayoutViewportHeight() - top - 16);
         const singleWeekHeight = Math.min(viewportRemainder, SCHEDULE_GRID_SINGLE_WEEK_MAX);
         if (weeks <= 1) {
             return singleWeekHeight;
@@ -5675,7 +5687,9 @@
     function computeScheduleWeekGridLayout(mode, container, options = {}) {
         const el = container || document.getElementById('visualDisplayArea');
         const isVertical = mode === 'verticalTimeline';
-        const autoFit = isVertical && !scheduleState.verticalDayWidthUserAdjusted;
+        const narrowViewport = isScheduleNarrowViewport();
+        const mobileScrollDays = isVertical && !scheduleState.verticalDayWidthUserAdjusted && narrowViewport;
+        const autoFit = isVertical && !scheduleState.verticalDayWidthUserAdjusted && !narrowViewport;
         const scrollEl = el?.querySelector('.session-cal-vertical-scroll');
         const weekRows = scrollEl ? scrollEl.querySelectorAll('.session-cal-week-row') : [];
         const weekCount = options.weekCountOverride || weekRows.length || estimateScheduleWeekCountForRange();
@@ -5692,6 +5706,8 @@
                 padding: 24,
                 fallback: 120
             });
+        } else if (mobileScrollDays) {
+            dayWidth = SCHEDULE_MOBILE_DAY_WIDTH;
         } else {
             dayWidth = readScheduleVerticalDayWidth();
         }
@@ -5706,16 +5722,18 @@
             trackStep = readScheduleTrackStepFromSlider(undefined, 'timeline');
         }
 
-        return { dayWidth, hourHeight, trackStep, autoFit, gridHeight, dayCount, weekCount };
+        return { dayWidth, hourHeight, trackStep, autoFit, mobileScrollDays, gridHeight, dayCount, weekCount };
     }
 
     function applyScheduleWeekGridLayout(mode) {
         const container = document.getElementById('visualDisplayArea');
         if (!container || !container.classList.contains('schedule-week-grid-host')) return null;
         const isVertical = mode === 'verticalTimeline';
-        container.classList.toggle('session-cal-auto-day-width', isVertical && !scheduleState.verticalDayWidthUserAdjusted);
+        const narrowViewport = isScheduleNarrowViewport();
+        const mobileScrollDays = isVertical && !scheduleState.verticalDayWidthUserAdjusted && narrowViewport;
+        container.classList.toggle('session-cal-auto-day-width', isVertical && !scheduleState.verticalDayWidthUserAdjusted && !narrowViewport);
         container.classList.toggle('schedule-cal-horizontal-mode', mode === 'timeline');
-        container.classList.toggle('schedule-week-grid-manual-day-width', isVertical && scheduleState.verticalDayWidthUserAdjusted);
+        container.classList.toggle('schedule-week-grid-manual-day-width', isVertical && (scheduleState.verticalDayWidthUserAdjusted || mobileScrollDays));
         container.classList.toggle('schedule-week-grid-manual-track-height', mode === 'timeline' && scheduleState.horizontalSliderUserAdjusted);
         const layout = computeScheduleWeekGridLayout(mode, container);
         container.style.setProperty('--session-day-width', `${layout.dayWidth}px`);
@@ -5830,8 +5848,10 @@
         const viewbarTop = Number.parseFloat(viewbarTopRaw) || 110;
         const railHeight = railInner.offsetHeight || 140;
         const minTop = viewbarTop + 8;
-        const maxTop = Math.max(minTop, window.innerHeight - railHeight - 8);
-        const centeredTop = (window.innerHeight - railHeight) / 2;
+        const viewportHeight = scheduleLayoutViewportHeight();
+        const safeBottom = 8;
+        const maxTop = Math.max(minTop, viewportHeight - railHeight - safeBottom);
+        const centeredTop = (viewportHeight - railHeight) / 2;
         const stickyTop = Math.min(maxTop, Math.max(minTop, centeredTop));
         document.documentElement.style.setProperty('--schedule-admin-rail-sticky-top', `${stickyTop.toFixed(2)}px`);
     }
@@ -7619,6 +7639,10 @@ if (canLoadAllSchedules) {
         };
     }
 
+    function buildScheduleEventInfoButtonHtml() {
+        return '<button type="button" class="schedule-event-info-btn" aria-label="Session details" title="Session details"><i class="bi bi-info-circle" aria-hidden="true"></i></button>';
+    }
+
     function buildScheduleVerticalBlockInner(ev, layout = {}) {
         const scd = window.ScheduleCompletionDisplay;
                 const eventTitle = getEventTitle(ev);
@@ -7658,6 +7682,7 @@ if (canLoadAllSchedules) {
                              tabindex="0"
                              ${clickHandler}>
                              ${selectionControl}
+                             ${buildScheduleEventInfoButtonHtml()}
                              ${statusChip}
                              ${coTeacherBadges}
                              ${buildScheduleDraftBadge(ev)}
@@ -7710,6 +7735,7 @@ if (canLoadAllSchedules) {
                          tabindex="0"
                          ${clickHandler}>
                          ${selectionControl}
+                         ${buildScheduleEventInfoButtonHtml()}
                          ${statusChip}
                          ${coTeacherBadges}
                          ${buildScheduleDraftBadge(ev)}
@@ -7790,7 +7816,7 @@ if (canLoadAllSchedules) {
         const tooltip = buildScheduleEventTooltip(event, statusMap, scan);
         const contextAttrs = buildScheduleSessionContextDataAttrs(event);
         const mutedClass = buildScheduleClassFilterMutedClass(event);
-        return `<div class="cal-session-chip ${stateClass}${mutedClass}" ${contextAttrs} title="${escapeHtml(tooltip)}"><span class="cal-session-time">${escapeHtml(timeLabel)}${makeupMark}</span></div>`;
+        return `<div class="cal-session-chip ${stateClass}${mutedClass}" ${contextAttrs} data-tip="${escapeHtml(tooltip)}" title="${escapeHtml(tooltip)}"><span class="cal-session-time">${escapeHtml(timeLabel)}${makeupMark}</span>${buildScheduleEventInfoButtonHtml()}</div>`;
     }
 
     function buildCalendarDaySessionsHtml(dayEvents, scd, statusMap, maxVisible = 4) {
@@ -7912,10 +7938,12 @@ if (canLoadAllSchedules) {
     scheduleTipEl.setAttribute('role', 'tooltip');
     scheduleTipEl.hidden = true;
     document.body.appendChild(scheduleTipEl);
+    let scheduleTipAnchor = null;
 
     const hideScheduleTip = () => {
         scheduleTipEl.classList.remove('is-visible', 'is-below');
         scheduleTipEl.hidden = true;
+        scheduleTipAnchor = null;
     };
     const showScheduleTip = (target) => {
         if (document.body.classList.contains('is-schedule-draft-moving')) {
@@ -7957,10 +7985,24 @@ if (canLoadAllSchedules) {
             scheduleTipEl.style.top = `${Math.max(8, rect.top)}px`;
         }
         scheduleTipEl.classList.add('is-visible');
+        scheduleTipAnchor = target;
     };
 
     const visualArea = document.getElementById('visualDisplayArea');
     visualArea.addEventListener('click', (event) => {
+        const infoBtn = event.target.closest('.schedule-event-info-btn');
+        if (infoBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            const block = infoBtn.closest('.event-block[data-tip], .vertical-event-block[data-tip], .cal-session-chip[data-tip]');
+            if (!block) return;
+            if (scheduleTipAnchor === block && scheduleTipEl.classList.contains('is-visible')) {
+                hideScheduleTip();
+                return;
+            }
+            showScheduleTip(block);
+            return;
+        }
         const draftInput = event.target.closest('[data-schedule-draft-select]');
         const draftLabel = event.target.closest('.schedule-draft-select');
         if (draftInput || draftLabel) {
@@ -8011,12 +8053,12 @@ if (canLoadAllSchedules) {
         refreshScheduleActiveView();
     }, true);
     visualArea.addEventListener('pointerover', (event) => {
-        const target = event.target.closest('.event-block[data-tip], .vertical-event-block[data-tip]');
+        const target = event.target.closest('.event-block[data-tip], .vertical-event-block[data-tip], .cal-session-chip[data-tip]');
         if (!target || !visualArea.contains(target)) return;
         showScheduleTip(target);
     });
     visualArea.addEventListener('pointerout', (event) => {
-        const target = event.target.closest('.event-block[data-tip], .vertical-event-block[data-tip]');
+        const target = event.target.closest('.event-block[data-tip], .vertical-event-block[data-tip], .cal-session-chip[data-tip]');
         if (!target) return;
         const next = event.relatedTarget;
         if (next && target.contains(next)) return;

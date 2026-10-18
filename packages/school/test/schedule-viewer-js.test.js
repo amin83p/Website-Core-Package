@@ -7,7 +7,9 @@ const root = path.join(__dirname, '..');
 const repoRoot = path.join(root, '..', '..');
 const {
   readPersonScheduleAdminBundle,
-  readPersonScheduleSelfBundle
+  readPersonScheduleSelfBundle,
+  readPersonScheduleAdminView,
+  readPersonScheduleSelfView
 } = require('./helpers/scheduleViewerSource');
 
 function read(relPath) {
@@ -28,6 +30,8 @@ test('personSchedule links external master schedule viewer scripts and JSON boot
   assert.match(selfView, /id="masterScheduleViewerConfig"/);
   assert.match(adminView, /type="application\/json"/);
   assert.match(adminView, /masterScheduleViewerClientConfig/);
+  assert.match(readPersonScheduleAdminView(), /sectionsPageClass:\s*'schedule-viewer-page'/);
+  assert.match(readPersonScheduleSelfView(), /sectionsPageClass:\s*'schedule-viewer-page'/);
   assert.match(adminView, /href="\/styles\/schedule-viewer\.css"/);
   assert.match(adminView, /src="\/scripts\/masterScheduleViewer\.js"/);
   assert.match(adminView, /masterScheduleViewerStaging\.js/);
@@ -109,13 +113,19 @@ test('schedule events expose co-teacher card metadata and viewer wires badges', 
 test('master schedule viewer templates expose core DOM hooks', () => {
   const adminView = readPersonScheduleAdminBundle();
   const selfView = readPersonScheduleSelfBundle();
+  const calendarShell = read('MVC/views/school/schedule/partials/personScheduleCalendarShell.ejs');
   const requiredIds = ['sch_startDate', 'sch_endDate', 'scheduleContainer', 'scheduleSessionContextMenu', 'btn_loadSchedule'];
   requiredIds.forEach((id) => {
     assert.match(adminView, new RegExp(`id="${id}"`));
-    assert.match(selfView, new RegExp(`id="${id}"`));
+    if (id === 'scheduleContainer') {
+      assert.match(readPersonScheduleSelfView(), /personScheduleCalendarShell/);
+      assert.match(calendarShell, new RegExp(`id="${id}"`));
+    } else {
+      assert.match(selfView, new RegExp(`id="${id}"`));
+    }
   });
   assert.match(adminView, /scheduleAdminWeekRail/);
-  assert.doesNotMatch(selfView, /scheduleAdminWeekRail/);
+  assert.match(readPersonScheduleSelfView(), /personScheduleIncludeAdminRail:\s*false/);
 });
 
 test('personSchedule includes master schedule person note script', () => {

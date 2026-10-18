@@ -2171,3 +2171,47 @@ button.schedule-session-context-status-chip-toggle:disabled {
 #scheduleDraftSessionContextMenuBulk .schedule-session-context-action {
   font-weight: 600;
 }
+
+@media (max-width: 767.98px) {
+  .schedule-calendar-card-body {
+    min-height: min(72dvh, 720px);
+  }
+
+  .schedule-visual-area.schedule-week-grid-host {
+    min-height: min(70dvh, 640px);
+    height: min(72dvh, 680px);
+    max-height: min(calc(100dvh - 12rem), 720px);
+  }
+
+  .schedule-visual-area.schedule-week-grid-host .session-cal-vertical-scroll {
+    min-height: 240px;
+    -webkit-overflow-scrolling: touch;
+    min-width: 0;
+  }
+
+  .schedule-visual-area.schedule-week-grid-host.session-cal-auto-day-width .session-cal-day-header-row .session-cal-day-header,
+  .schedule-visual-area.schedule-week-grid-host.session-cal-auto-day-width .session-cal-day-cell {
+    min-width: 0;
+  }
+
+  .schedule-visual-area.schedule-week-grid-host.schedule-week-grid-manual-day-width .session-cal-vertical-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .schedule-visual-area.schedule-week-grid-host.schedule-week-grid-manual-day-width .session-cal-week-grid-vertical {
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .schedule-visual-layout > .schedule-visual-area {
+    min-width: 0;
+  }
+
+  .schedule-vertical-scroll {
+    -webkit-overflow-scrolling: touch;
+    min-width: 0;
+  }
+}

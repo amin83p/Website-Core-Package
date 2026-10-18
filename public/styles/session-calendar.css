@@ -1,6 +1,8 @@
 /* Session enrollment calendar — shared layout for picker modal and schedule views */
 
 #sessionEnrollmentCalendarModal .modal-dialog.session-enrollment-calendar-dialog {
+  width: min(96vw, 1680px);
+  max-width: min(96vw, 1680px);
   height: calc(100vh - 2rem);
   max-height: calc(100vh - 2rem);
   margin: 1rem auto;
@@ -44,6 +46,47 @@
   flex: 1 1 auto;
   min-height: 0;
   max-height: none;
+}
+
+.session-enrollment-viewmode-group .schedule-view-icon-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.session-enrollment-viewmode-group .schedule-view-icon-btn .bi {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+.session-enrollment-viewmode-group .schedule-view-icon-btn.active {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #fff;
+  box-shadow: 0 1px 2px rgba(29, 78, 216, 0.25);
+}
+
+.session-enrollment-viewbar-controls .schedule-view-icon-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.session-enrollment-viewbar-controls .schedule-view-icon-btn .bi {
+  font-size: 1.05rem;
+  line-height: 1;
+}
+
+#sessionEnrollmentCalendarModal .modal-footer {
+  gap: 0.5rem;
 }
 
 .session-cal-week-stack {
@@ -399,6 +442,31 @@
   pointer-events: none;
   z-index: 9;
   display: none;
+}
+
+.session-cal-drag-preview-horizontal {
+  position: absolute;
+  top: 4px;
+  height: calc(100% - 8px);
+  background: rgba(25, 135, 84, 0.18);
+  border: 2px solid #198754;
+  border-radius: 0.35rem;
+  box-shadow: 0 0 0 1px rgba(25, 135, 84, 0.25);
+  pointer-events: none;
+  z-index: 9;
+  display: none;
+}
+
+.session-cal-day-cell.is-drag-move-target,
+.session-cal-timeline-day-row.is-drag-move-target {
+  outline: 2px solid rgba(25, 135, 84, 0.4);
+  outline-offset: -2px;
+}
+
+body.is-schedule-draft-moving [data-event-type="class_session"][data-schedule-editable="1"],
+body.is-schedule-draft-moving .is-schedule-draft[data-session-id],
+body.is-schedule-draft-moving [data-event-type="schedule_draft"][data-session-id] {
+  cursor: grabbing;
 }
 
 .session-cal-drag-info {
@@ -1051,6 +1119,191 @@
   flex-shrink: 0;
 }
 
+.session-enrollment-student-banner {
+  padding: 0.65rem 0.85rem;
+  border-radius: 0.65rem;
+  border: 1px solid #d7e3f4;
+  background: linear-gradient(135deg, #f5f9ff 0%, #eef5ff 55%, #f8fbff 100%);
+}
+
+.session-enrollment-student-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #17324d;
+  line-height: 1.25;
+  letter-spacing: 0.01em;
+}
+
+.session-enrollment-student-meta {
+  margin-top: 0.2rem;
+  font-size: 0.78rem;
+  color: #5c6b7a;
+  line-height: 1.35;
+}
+
+.session-enrollment-summary {
+  border: 1px solid #dde5ef;
+  border-radius: 0.5rem;
+  background: #f8fafc;
+  padding: 0.45rem 0.7rem;
+  line-height: 1.35;
+}
+
+.session-enrollment-summary.is-plain {
+  font-size: 0.85rem;
+  color: #495057;
+}
+
+.session-enrollment-summary-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2rem 0;
+  font-size: 0.8rem;
+  color: #495057;
+}
+
+.session-enrollment-summary-line .ses-sum-sep {
+  margin: 0 0.45rem;
+  color: #c0c8d1;
+  font-weight: 400;
+}
+
+.session-enrollment-summary-line .ses-sum-k {
+  color: #6c7a89;
+  font-weight: 600;
+  margin-right: 0.25rem;
+}
+
+.session-enrollment-summary-line .ses-sum-v {
+  color: #17324d;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.session-enrollment-summary-line .ses-sum-v.is-warn {
+  color: #997404;
+}
+
+.session-enrollment-summary-line .ses-sum-v.is-ok {
+  color: #0f5132;
+}
+
+.session-enrollment-cap-summary-table {
+  width: 100%;
+  table-layout: fixed;
+  font-size: 0.84rem;
+}
+
+.session-enrollment-cap-summary-table td {
+  vertical-align: middle;
+  padding: 0.15rem 0.5rem;
+  white-space: nowrap;
+}
+
+.session-enrollment-cap-summary-table td:not(:last-child) {
+  border-right: 1px solid #e3e9f0;
+}
+
+.session-enrollment-cap-summary-table .ses-sum-k {
+  color: #6c7a89;
+  font-weight: 600;
+  margin-right: 0.2rem;
+}
+
+.session-enrollment-cap-summary-table .ses-sum-v {
+  color: #17324d;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.session-enrollment-cap-summary-table .ses-sum-v.is-warn {
+  color: #997404;
+}
+
+.session-enrollment-cap-summary-table .ses-sum-v.is-ok {
+  color: #0f5132;
+}
+
+.session-enrollment-legend-modal-body .session-enrollment-legend-items {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.75rem;
+}
+
+.session-enrollment-legend-modal-body .session-enrollment-legend-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  width: 100%;
+  font-size: 0.92rem;
+  line-height: 1.35;
+  color: #243447;
+}
+
+.session-enrollment-legend-modal-body .session-enrollment-legend-item > span:last-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.session-enrollment-legend-modal-body .session-enrollment-legend-hint {
+  margin-top: 0.15rem;
+  padding-top: 0.65rem;
+  border-top: 1px solid #e9ecef;
+  font-size: 0.84rem;
+}
+
+.session-enrollment-legend-modal-body .session-enrollment-legend-hint .bi {
+  margin-top: 0.15rem;
+  flex-shrink: 0;
+}
+
+.session-enrollment-legend-swatch {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 0.25rem;
+  border: 2px solid transparent;
+  flex-shrink: 0;
+  margin-top: 0.15rem;
+}
+
+.session-enrollment-legend-swatch.is-open {
+  background: #f0f6ff;
+  border-color: #9ec5fe;
+}
+
+.session-enrollment-legend-swatch.is-attendance {
+  background: #e8f5ee;
+  border-color: #a3cfbb;
+}
+
+.session-enrollment-legend-swatch.is-na-saved {
+  background: #fde8ea;
+  border-color: #f1aeb5;
+}
+
+.session-enrollment-legend-swatch.is-na-pending {
+  background: #fff8e1;
+  border-color: #ffda6a;
+  border-style: dashed;
+}
+
+.session-enrollment-legend-swatch.is-na-projected {
+  background: #f8f9fa;
+  border-color: #ced4da;
+  border-style: dashed;
+}
+
+.session-enrollment-legend-swatch.is-blocked {
+  background: #fff3cd;
+  border-color: #f1aeb5;
+}
+
+#sessionEnrollmentCalendarLegendModal {
+  z-index: 1065;
+}
+
 #sessionEnrollmentDayWidth {
   width: 120px;
 }
@@ -1108,6 +1361,53 @@
   max-height: calc(100% - 2rem);
   overflow: auto;
   pointer-events: auto;
+}
+
+.session-enrollment-context-menu {
+  position: fixed !important;
+  z-index: 2100;
+  display: none;
+  flex-direction: column;
+  align-items: stretch;
+  min-width: 200px;
+  padding: 0.35rem 0;
+  margin: 0;
+  inset: auto;
+  background-color: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 0.375rem;
+  box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15);
+  overflow: hidden;
+}
+
+.session-enrollment-context-menu.show {
+  display: flex;
+}
+
+.session-enrollment-context-menu.d-none {
+  display: none !important;
+}
+
+.session-enrollment-context-menu .dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.875rem;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  white-space: nowrap;
+  border: 0;
+  border-radius: 0;
+  background-color: transparent;
+  color: #212529;
+  text-align: left;
+  cursor: pointer;
+}
+
+.session-enrollment-context-menu .dropdown-item:hover,
+.session-enrollment-context-menu .dropdown-item:focus {
+  background-color: rgba(13, 110, 253, 0.08);
+  color: #212529;
+  outline: none;
 }
 
 .session-stage-label {
@@ -1176,6 +1476,32 @@
   border-right: 0;
 }
 
+.session-stage-through-date-input {
+  max-width: 11rem;
+}
+
+#sessionEnrollmentStageThroughDatePreview {
+  color: var(--bs-primary, #0d6efd);
+}
+
+.session-stage-limit-mode .form-check-label {
+  color: var(--bs-secondary-color, #6c757d);
+}
+
+#sessionEnrollmentStageThroughDateSection {
+  display: none;
+}
+
+#sessionEnrollmentStageModal.is-stage-limit-through-date #sessionEnrollmentStageCountSection,
+.session-stage-section:has(#sessionEnrollmentStageLimitModeThroughDate:checked) #sessionEnrollmentStageCountSection {
+  display: none !important;
+}
+
+#sessionEnrollmentStageModal.is-stage-limit-through-date #sessionEnrollmentStageThroughDateSection,
+.session-stage-section:has(#sessionEnrollmentStageLimitModeThroughDate:checked) #sessionEnrollmentStageThroughDateSection {
+  display: block !important;
+}
+
 /* Master Schedule Viewer — week grid host */
 .schedule-calendar-card-body {
   min-height: min(92vh, 1280px);
@@ -1210,6 +1536,7 @@
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
+  scroll-margin-top: calc(var(--header-height, 110px) + var(--notice-height, 0px) + 12px);
 }
 
 .schedule-visual-area.schedule-week-grid-host .session-cal-week-grid-vertical {
@@ -1340,10 +1667,6 @@
   min-height: 0;
 }
 
-.schedule-visual-area.schedule-week-grid-host:not(.session-cal-auto-day-width):not(.schedule-week-grid-manual-day-width) .session-cal-vertical-scroll {
-  overflow-x: auto;
-}
-
 .schedule-visual-area .session-cal-day-header.conflict {
   background: #dc3545;
   color: #fff;
@@ -1377,6 +1700,91 @@
 
 .schedule-visual-area .session-cal-positioned-session.session-cal-positioned-horizontal .event-block {
   min-height: 48px;
+}
+
+/* Simultaneous sessions: side-by-side lanes (vertical day view) */
+.schedule-visual-area .session-cal-positioned-vertical.is-overlap-lane {
+  padding: 0 1px;
+  box-sizing: border-box;
+}
+
+.schedule-visual-area .session-cal-positioned-vertical.is-overlap-lane + .session-cal-positioned-vertical.is-overlap-lane {
+  border-left: 1px solid rgba(15, 23, 42, 0.08);
+}
+
+.schedule-visual-area .session-cal-positioned-vertical[data-track-count="2"] .vertical-event-block.is-schedule-overlap-lane {
+  padding: 1.25rem 0.45rem 4px 6px;
+  font-size: 0.72rem;
+  min-height: 40px;
+}
+
+.schedule-visual-area .session-cal-positioned-vertical[data-track-count="3"] .vertical-event-block.is-schedule-overlap-lane,
+.schedule-visual-area .session-cal-positioned-vertical[data-track-count="4"] .vertical-event-block.is-schedule-overlap-lane {
+  padding: 1.05rem 0.35rem 3px 5px;
+  font-size: 0.66rem;
+  min-height: 36px;
+}
+
+.schedule-visual-area .vertical-event-block.is-schedule-overlap-lane {
+  gap: 1px;
+  min-width: 0;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.14);
+}
+
+.schedule-visual-area .vertical-event-block.is-schedule-overlap-lane .schedule-event-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+  line-height: 1.15;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.schedule-visual-area .vertical-event-block.is-schedule-overlap-lane .schedule-status-chip {
+  font-size: 0.58rem;
+  padding: 0.12rem 0.35rem;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.schedule-visual-area .vertical-event-block.is-schedule-overlap-lane .schedule-co-teacher-badges {
+  display: none;
+}
+
+.schedule-visual-area .vertical-event-block.is-schedule-overlap-lane .event-meta {
+  font-size: 0.62rem;
+  margin-top: 0;
+}
+
+.schedule-visual-area .vertical-event-block.is-schedule-overlap-lane .schedule-embedded-reports {
+  display: none;
+}
+
+.schedule-visual-area .vertical-event-block.is-schedule-overlap-lane:hover {
+  z-index: 25;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.2);
+}
+
+/* Stacked lanes (horizontal day view) */
+.schedule-visual-area .session-cal-positioned-horizontal.is-overlap-lane .event-block.is-schedule-overlap-lane {
+  padding: 1.35rem 0.5rem 4px 7px;
+  font-size: 0.72rem;
+  min-height: 0;
+}
+
+.schedule-visual-area .event-block.is-schedule-overlap-lane .schedule-event-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  line-height: 1.15;
+}
+
+.schedule-visual-area .event-block.is-schedule-overlap-lane .schedule-co-teacher-badges {
+  display: none;
 }
 
 .schedule-hide-empty-days-wrap {
@@ -1597,7 +2005,7 @@
 }
 
 .schedule-session-context-status-list {
-  padding: 0.35rem 0.75rem 0.75rem;
+  padding: 0.15rem 0.75rem 0.65rem;
 }
 
 .schedule-session-context-status-empty {
@@ -1655,8 +2063,7 @@ button.schedule-session-context-status-chip-toggle:disabled {
   left: 0;
   top: calc(100% + 0.35rem);
   z-index: 30;
-  min-width: 12rem;
-  max-width: calc(100vw - 2rem);
+  min-width: 100%;
   max-height: 200px;
   overflow-y: auto;
   padding: 0.35rem;
@@ -1746,40 +2153,6 @@ button.schedule-session-context-status-chip-toggle:disabled {
   cursor: context-menu;
 }
 
-body.is-schedule-draft-moving .sch-event-tip {
-  display: none !important;
-}
-
-body.is-schedule-draft-moving .session-cal-draft-resize-handle,
-body.is-schedule-draft-resizing .session-cal-draft-resize-handle {
-  pointer-events: none;
-}
-
-.session-cal-draft-resize-handle {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: 8px;
-  z-index: 3;
-  touch-action: none;
-}
-
-.session-cal-draft-resize-handle-top {
-  top: 0;
-  cursor: ns-resize;
-}
-
-.session-cal-draft-resize-handle-bottom {
-  bottom: 0;
-  cursor: ns-resize;
-}
-
-.vertical-event-block.is-schedule-draft,
-.event-block.is-schedule-draft,
-.session-enrollment-block.is-staged {
-  position: relative;
-}
-
 .schedule-draft-select {
   z-index: 3;
 }
@@ -1797,4 +2170,48 @@ body.is-schedule-draft-resizing .session-cal-draft-resize-handle {
 
 #scheduleDraftSessionContextMenuBulk .schedule-session-context-action {
   font-weight: 600;
+}
+
+@media (max-width: 767.98px) {
+  .schedule-calendar-card-body {
+    min-height: min(72dvh, 720px);
+  }
+
+  .schedule-visual-area.schedule-week-grid-host {
+    min-height: min(70dvh, 640px);
+    height: min(72dvh, 680px);
+    max-height: min(calc(100dvh - 12rem), 720px);
+  }
+
+  .schedule-visual-area.schedule-week-grid-host .session-cal-vertical-scroll {
+    min-height: 240px;
+    -webkit-overflow-scrolling: touch;
+    min-width: 0;
+  }
+
+  .schedule-visual-area.schedule-week-grid-host.session-cal-auto-day-width .session-cal-day-header-row .session-cal-day-header,
+  .schedule-visual-area.schedule-week-grid-host.session-cal-auto-day-width .session-cal-day-cell {
+    min-width: 0;
+  }
+
+  .schedule-visual-area.schedule-week-grid-host.schedule-week-grid-manual-day-width .session-cal-vertical-scroll {
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .schedule-visual-area.schedule-week-grid-host.schedule-week-grid-manual-day-width .session-cal-week-grid-vertical {
+    overflow-x: auto;
+    overflow-y: hidden;
+    overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .schedule-visual-layout > .schedule-visual-area {
+    min-width: 0;
+  }
+
+  .schedule-vertical-scroll {
+    -webkit-overflow-scrolling: touch;
+    min-width: 0;
+  }
 }

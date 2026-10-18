@@ -43,6 +43,9 @@ test('schedule-viewer.css includes critical layout selectors', () => {
   assert.match(css, /\.schedule-workspace-actions\b/);
   assert.match(css, /\.schedule-admin-week-rail-inner\b/);
   assert.match(css, /--schedule-admin-rail-sticky-top/);
+  assert.match(css, /\.schedule-event-info-btn/);
+  assert.match(css, /@media \(max-width: 767\.98px\)[\s\S]*\.schedule-viewbar-row/);
+  assert.match(css, /\.schedule-viewer-page \.page-heading/);
 });
 
 test('admin Master Schedule week rail markup and sync wiring', () => {
