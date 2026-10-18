@@ -6,6 +6,10 @@ const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatri
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const gradebookSkillCatalogService = require('./gradebookSkillCatalogService');
 const weeklyReportsClassMetricsService = require('./weeklyReportsClassMetricsService');
+
+function getWeeklyReportsEngagementService() {
+  return require('./weeklyReportsEngagementService');
+}
 const { buildAttendanceMatrixPayload } = require('../../controllers/school/attendanceController');
 const { buildGradesMatrixPayload } = require('../../controllers/school/gradesMatrixController');
 const { requireCoreModule } = require('./schoolCoreContracts');
@@ -307,6 +311,9 @@ function formatStudentSessionLabel(record = {}) {
     if (absenceExcused) {
       return status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ACF ? 'Excused ACF' : 'Excused';
     }
+    if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.ACF) {
+      return 'ACF';
+    }
     return 'Absent';
   }
   if (attendanceMatrixMetricsService.isUnmarkedAttendanceStatus(status)) return 'Unmarked';
@@ -360,28 +367,116 @@ function computeStudentAttendanceHealth(matrixRow = {}, classData = {}, orgPolic
 }
 
 function countStudentAttendanceBuckets(matrixRow = {}) {
-  let presentCount = 0;
-  let lateCount = 0;
-  let absenceCount = 0;
+  const summary = summarizeStudentAttendanceForWeeklyReport(matrixRow);
+  return {
+    presentCount: summary.presentCount,
+    lateCount: summary.lateCount,
+    absenceCount: summary.absenceCount
+  };
+}
+
+function emptyStudentAttendanceSummary() {
+  return {
+    sessionCount: 0,
+    presentCount: 0,
+    lateCount: 0,
+    lateMinutes: 0,
+    lateExcusedCount: 0,
+    lateExcusedMinutes: 0,
+    earlyCount: 0,
+    earlyMinutes: 0,
+    earlyExcusedCount: 0,
+    earlyExcusedMinutes: 0,
+    absenceCount: 0,
+    absenceExcusedCount: 0,
+    acfCount: 0,
+    acfExcusedCount: 0,
+    naCount: 0
+  };
+}
+
+function mergeStudentAttendanceSummaries(existing = {}, incoming = {}) {
+  const base = emptyStudentAttendanceSummary();
+  const left = { ...base, ...(existing && typeof existing === 'object' ? existing : {}) };
+  const right = incoming && typeof incoming === 'object' ? incoming : {};
+  Object.keys(base).forEach((key) => {
+    left[key] = Number(left[key] || 0) + Number(right[key] || 0);
+  });
+  return left;
+}
+
+function summarizeStudentAttendanceForWeeklyReport(matrixRow = {}) {
+  const summary = emptyStudentAttendanceSummary();
+  const ST = attendanceMatrixMetricsService.ATTENDANCE_STATUS;
+
+  const trackEarly = (record, earlyMinutes, earlyExcused) => {
+    if (earlyMinutes <= 0) return;
+    summary.earlyCount += 1;
+    summary.earlyMinutes += earlyMinutes;
+    if (earlyExcused) {
+      summary.earlyExcusedCount += 1;
+      summary.earlyExcusedMinutes += earlyMinutes;
+    }
+  };
+
   (Array.isArray(matrixRow?.records) ? matrixRow.records : []).forEach((record) => {
     if (record?.expectedForSession !== true) return;
+    summary.sessionCount += 1;
+
     const status = attendanceMatrixMetricsService.normalizeStatus(record?.status);
     const lateMinutes = Math.max(0, Number(record?.lateMinutes) || 0);
+    const earlyMinutes = Math.max(0, Number(record?.earlyLeaveMinutes) || 0);
+    const lateExcused = Boolean(record?.lateExcused);
+    const earlyExcused = Boolean(record?.earlyLeaveExcused);
     const absenceExcused = attendanceMatrixMetricsService.isAbsenceExcused(record)
-      || status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.EXCUSED;
-    if (attendanceMatrixMetricsService.isAbsentLikeStatus(status)) {
-      if (!absenceExcused) absenceCount += 1;
+      || status === ST.EXCUSED;
+
+    if (status === ST.NOT_APPLICABLE) {
+      summary.naCount += 1;
       return;
     }
-    if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.LATE || lateMinutes > 0) {
-      lateCount += 1;
+
+    if (status === ST.ACF) {
+      if (absenceExcused) summary.acfExcusedCount += 1;
+      else summary.acfCount += 1;
       return;
     }
-    if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT) {
-      presentCount += 1;
+
+    if (status === ST.ABSENT || attendanceMatrixMetricsService.isAbsentLikeStatus(status)) {
+      if (absenceExcused) summary.absenceExcusedCount += 1;
+      else summary.absenceCount += 1;
+      return;
+    }
+
+    if (status === ST.LATE || lateMinutes > 0) {
+      summary.lateCount += 1;
+      summary.lateMinutes += lateMinutes;
+      if (lateExcused) {
+        summary.lateExcusedCount += 1;
+        summary.lateExcusedMinutes += lateMinutes;
+      }
+      trackEarly(record, earlyMinutes, earlyExcused);
+      return;
+    }
+
+    trackEarly(record, earlyMinutes, earlyExcused);
+
+    if (status === ST.PRESENT) {
+      summary.presentCount += 1;
     }
   });
-  return { presentCount, lateCount, absenceCount };
+
+  return summary;
+}
+
+function buildStudentCaseItems(caseRows = [], personId = '', sessionIdSet = new Set(), classRow = {}, sessions = []) {
+  const normalizedPersonId = toPublicId(personId);
+  if (!normalizedPersonId || !(sessionIdSet instanceof Set) || !sessionIdSet.size) return [];
+  const filtered = (Array.isArray(caseRows) ? caseRows : []).filter((row) => {
+    if (!idsEqual(row?.studentPersonId || row?.personId, normalizedPersonId)) return false;
+    return sessionIdSet.has(toPublicId(row?.sessionId));
+  });
+  return weeklyReportsClassMetricsService.buildWeeklyReportCaseItems(filtered, classRow, sessions);
 }
 
 function findGradebookItem(session = {}, itemId = '') {
@@ -488,9 +583,12 @@ function mergeStudentDetailIntoMap(studentMap, classId, detailRow = {}) {
     lateCount: 0,
     absenceCount: 0,
     attendanceHealth: 100,
+    attendance: emptyStudentAttendanceSummary(),
+    engagement: { presentMinutes: 0, scheduledMinutes: 0, percent: null },
     sessions: [],
     skillAverages: [],
     caseCount: 0,
+    studentCaseItems: [],
     classIds: new Set()
   };
 
@@ -512,28 +610,45 @@ function mergeStudentDetailIntoMap(studentMap, classId, detailRow = {}) {
   existing.presentCount = Number(existing.presentCount || 0) + Number(detailRow.presentCount || 0);
   existing.lateCount = Number(existing.lateCount || 0) + Number(detailRow.lateCount || 0);
   existing.absenceCount = Number(existing.absenceCount || 0) + Number(detailRow.absenceCount || 0);
+  existing.attendance = mergeStudentAttendanceSummaries(existing.attendance, detailRow.attendance);
+  existing.engagement = getWeeklyReportsEngagementService().mergeEngagementTotals(
+    existing.engagement,
+    detailRow.engagement
+  );
   existing.attendanceHealth = mergedHealth;
   existing.sessions = mergedSessions;
   existing.skillAverages = mergeSkillAverages(existing.skillAverages, detailRow.skillAverages);
   existing.caseCount = Number(existing.caseCount || 0) + Number(detailRow.caseCount || 0);
+  const incomingCases = Array.isArray(detailRow.studentCaseItems) ? detailRow.studentCaseItems : [];
+  existing.studentCaseItems = existing.studentCaseItems.concat(incomingCases)
+    .sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
   if (normalizedClassId) existing.classIds.add(normalizedClassId);
   studentMap.set(studentId, existing);
   return studentMap;
 }
 
 function buildWeeklyReportsStudentDetailRow(row = {}) {
+  const attendance = row.attendance && typeof row.attendance === 'object'
+    ? row.attendance
+    : emptyStudentAttendanceSummary();
+  const engagement = row.engagement && typeof row.engagement === 'object'
+    ? row.engagement
+    : { presentMinutes: 0, scheduledMinutes: 0, percent: null };
   return {
     studentId: row.studentId,
     personId: row.personId || '',
     name: row.name || row.studentId,
     sessionCount: Number(row.sessionCount || 0),
     attendanceHealth: Number(row.attendanceHealth || 0),
-    presentCount: Number(row.presentCount || 0),
-    lateCount: Number(row.lateCount || 0),
-    absenceCount: Number(row.absenceCount || 0),
+    presentCount: Number(row.presentCount != null ? row.presentCount : attendance.presentCount || 0),
+    lateCount: Number(row.lateCount != null ? row.lateCount : attendance.lateCount || 0),
+    absenceCount: Number(row.absenceCount != null ? row.absenceCount : attendance.absenceCount || 0),
+    attendance,
+    engagement,
     sessions: Array.isArray(row.sessions) ? row.sessions : [],
     skillAverages: Array.isArray(row.skillAverages) ? row.skillAverages : [],
     caseCount: Number(row.caseCount || 0),
+    studentCaseItems: Array.isArray(row.studentCaseItems) ? row.studentCaseItems : [],
     classCount: row.classIds instanceof Set ? row.classIds.size : Number(row.classCount || 0),
     classIds: row.classIds instanceof Set ? Array.from(row.classIds) : (Array.isArray(row.classIds) ? row.classIds : [])
   };
@@ -551,19 +666,34 @@ function buildStudentDetailRowFromClass({
 } = {}) {
   const studentId = toPublicId(matrixRow?.studentRecordId);
   const personId = toPublicId(matrixRow?.personId);
-  const attendanceBuckets = countStudentAttendanceBuckets(matrixRow);
+  const attendance = summarizeStudentAttendanceForWeeklyReport(matrixRow);
+  const engagement = getWeeklyReportsEngagementService().summarizeEngagementFromStudentMatrixRow(
+    matrixRow,
+    classData,
+    orgPolicyLayer
+  );
+  const studentCaseItems = buildStudentCaseItems(
+    caseRows,
+    personId,
+    sessionIdSet,
+    classData,
+    sessions
+  );
   return buildWeeklyReportsStudentDetailRow({
     studentId,
     personId,
     name: String(matrixRow?.name || '').trim() || studentId,
     sessionCount: countExpectedSessionsFromMatrixRow(matrixRow),
     attendanceHealth: computeStudentAttendanceHealth(matrixRow, classData, orgPolicyLayer),
-    presentCount: attendanceBuckets.presentCount,
-    lateCount: attendanceBuckets.lateCount,
-    absenceCount: attendanceBuckets.absenceCount,
+    presentCount: attendance.presentCount,
+    lateCount: attendance.lateCount,
+    absenceCount: attendance.absenceCount,
+    attendance,
+    engagement,
     sessions: buildStudentSessionRows(matrixRow, sessions),
     skillAverages: buildStudentSkillAverages(gradesPayload, personId, sessionsById),
-    caseCount: countStudentCases(caseRows, personId, sessionIdSet),
+    caseCount: studentCaseItems.length || countStudentCases(caseRows, personId, sessionIdSet),
+    studentCaseItems,
     classIds: new Set()
   });
 }
@@ -913,10 +1043,16 @@ async function buildWeeklyReportsStudentBoard({
   });
 
   const studentMap = new Map();
+  let showAcfColumn = false;
 
   for (const classRow of classes) {
     const classId = toPublicId(classRow?.id);
     if (!classId) continue;
+
+    const enabledStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classRow);
+    if (enabledStatuses.includes(attendanceMatrixMetricsService.ATTENDANCE_STATUS.ACF)) {
+      showAcfColumn = true;
+    }
 
     try {
       const [attendancePayload, gradesPayload, allSessions, caseRows] = await Promise.all([
@@ -993,6 +1129,7 @@ async function buildWeeklyReportsStudentBoard({
     view: 'students',
     rows,
     total: rows.length,
+    classContext: { showAcfColumn },
     filters: {
       classIds: normalizedClassIds,
       studentIds: normalizedStudentIds,
@@ -1028,6 +1165,10 @@ module.exports = {
   buildStudentSessionRows,
   computeStudentAttendanceHealth,
   countStudentAttendanceBuckets,
+  emptyStudentAttendanceSummary,
+  mergeStudentAttendanceSummaries,
+  summarizeStudentAttendanceForWeeklyReport,
+  buildStudentCaseItems,
   buildStudentSkillAverages,
   countStudentCases,
   mergeSkillAverages,

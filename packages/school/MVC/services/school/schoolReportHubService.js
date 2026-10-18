@@ -1219,6 +1219,7 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       view: board.view || view,
       rows: board.rows,
       total: board.total,
+      classContext: board.classContext || {},
       filters: board.filters,
       departmentOptions,
       programOptions,

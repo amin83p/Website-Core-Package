@@ -835,6 +835,53 @@ function computeRosterAttendancePercent(records, classData = {}, orgPolicyLayer 
  * @param {object} classData — optional attendancePolicy
  * @param {object|Array} orgPolicyLayer — flat org policy OR catalog `{ items }` for per-session exact match
  */
+/**
+ * Time-weighted engagement: sum of policy-weighted present minutes / scheduled minutes
+ * for each expected, non–N/A session in the matrix row.
+ */
+function computeStudentEngagementMinutes(records, classData = {}, orgPolicyLayer = {}) {
+  const allRecords = Array.isArray(records) ? records : [];
+  const enabledStatuses = resolveEnabledAttendanceStatuses(classData);
+  let presentMinutes = 0;
+  let scheduledMinutes = 0;
+
+  for (const rec of allRecords) {
+    if (rec?.expectedForSession !== true) continue;
+    const policy = resolvePolicyForScheduledMinutes(classData, orgPolicyLayer, rec?.scheduledMinutes);
+    const effectiveStatus = resolveEffectiveAttendanceStatus(rec, policy, enabledStatuses);
+    if (isNotApplicableStatus(effectiveStatus)) continue;
+
+    const span = scheduledMinutesForRecord(rec, policy);
+    if (!Number.isFinite(span) || span <= 0) continue;
+    scheduledMinutes += span;
+
+    if (effectiveStatus === ATTENDANCE_STATUS.ACF) {
+      continue;
+    }
+
+    const sessionCredit = computeSessionCredit(
+      { ...rec, status: effectiveStatus },
+      100,
+      policy
+    );
+    if (sessionCredit.exempt) {
+      scheduledMinutes -= span;
+      continue;
+    }
+    presentMinutes += span * (Math.max(0, Number(sessionCredit.credit) || 0) / 100);
+  }
+
+  const percent = scheduledMinutes > 0
+    ? Math.round((presentMinutes / scheduledMinutes) * 1000) / 10
+    : null;
+
+  return {
+    presentMinutes: Math.round(presentMinutes * 10) / 10,
+    scheduledMinutes: Math.round(scheduledMinutes * 10) / 10,
+    percent
+  };
+}
+
 function computeStudentMatrixSummary(records, classData = {}, orgPolicyLayer = {}) {
   const allRecords = Array.isArray(records) ? records : [];
   const enabledStatuses = resolveEnabledAttendanceStatuses(classData);
@@ -940,6 +987,7 @@ module.exports = {
   computePresenceRatio,
   computeSessionCredit,
   computeRosterAttendancePercent,
+  computeStudentEngagementMinutes,
   computeStudentMatrixSummary,
   applyAttendanceMatrixRosterRules,
   parseNonNegIntRoster

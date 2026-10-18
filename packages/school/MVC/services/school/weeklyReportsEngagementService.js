@@ -36,31 +36,29 @@ function sessionSpanMinutesForRecord(record, classData, orgPolicyLayer) {
   return { policy, span };
 }
 
+function summarizeEngagementFromStudentMatrixRow(studentRow = {}, classData = {}, orgPolicyLayer = {}) {
+  const records = Array.isArray(studentRow?.records) ? studentRow.records : [];
+  const totals = attendanceMatrixMetricsService.computeStudentEngagementMinutes(
+    records,
+    classData,
+    orgPolicyLayer
+  );
+
+  return {
+    presentMinutes: roundOneDecimal(totals.presentMinutes),
+    scheduledMinutes: roundOneDecimal(totals.scheduledMinutes),
+    percent: totals.percent != null ? roundOneDecimal(totals.percent) : null
+  };
+}
+
 function summarizeEngagementFromMatrix(matrix = [], classData = {}, orgPolicyLayer = {}) {
   let presentMinutes = 0;
   let scheduledMinutes = 0;
 
   (Array.isArray(matrix) ? matrix : []).forEach((studentRow) => {
-    (Array.isArray(studentRow?.records) ? studentRow.records : []).forEach((record) => {
-      if (record?.expectedForSession !== true) return;
-
-      const status = attendanceMatrixMetricsService.normalizeStatus(record?.status);
-      if (attendanceMatrixMetricsService.isNotApplicableStatus(status)) {
-        return;
-      }
-
-      const { policy, span } = sessionSpanMinutesForRecord(record, classData, orgPolicyLayer);
-      if (span <= 0) return;
-
-      scheduledMinutes += span;
-
-      if (attendanceMatrixMetricsService.isUnmarkedAttendanceStatus(status)) {
-        return;
-      }
-
-      const ratio = attendanceMatrixMetricsService.computePresenceRatio(record, policy);
-      presentMinutes += span * Math.max(0, Math.min(1, Number(ratio) || 0));
-    });
+    const rowEngagement = summarizeEngagementFromStudentMatrixRow(studentRow, classData, orgPolicyLayer);
+    presentMinutes += Number(rowEngagement.presentMinutes || 0);
+    scheduledMinutes += Number(rowEngagement.scheduledMinutes || 0);
   });
 
   const percent = scheduledMinutes > 0
@@ -194,6 +192,7 @@ async function buildEngagementForClasses({
 }
 
 module.exports = {
+  summarizeEngagementFromStudentMatrixRow,
   summarizeEngagementFromMatrix,
   mergeEngagementTotals,
   averageClassEngagementPercent,
