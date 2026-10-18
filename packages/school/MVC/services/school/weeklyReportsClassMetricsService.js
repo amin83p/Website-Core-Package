@@ -152,6 +152,58 @@ function buildSessionListItem(classRow, sessionRow, statusMap, extra = {}) {
   };
 }
 
+function formatWeeklyReportCaseStatusLabel(caseRow = {}) {
+  const status = cleanText(caseRow?.status).toLowerCase();
+  if (status === 'resolved') return 'Resolved';
+  if (status === 'cancelled') return 'Cancelled';
+  if (status === 'active') return 'Active';
+  if (status) {
+    return status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ');
+  }
+  const severity = cleanText(caseRow?.severity);
+  if (severity) return severity.charAt(0).toUpperCase() + severity.slice(1);
+  return 'Case';
+}
+
+function buildStudentCaseSessionHref(classId, sessionId, caseId) {
+  const classToken = toPublicId(classId);
+  const sessionToken = toPublicId(sessionId);
+  const caseToken = toPublicId(caseId);
+  if (!classToken || !sessionToken || !caseToken) return '';
+  const base = `/school/classes/${encodeURIComponent(classToken)}/sessions/${encodeURIComponent(sessionToken)}`;
+  return `${base}?caseId=${encodeURIComponent(caseToken)}`;
+}
+
+function buildWeeklyReportCaseItem(caseRow = {}, classRow = {}, sessionRow = {}) {
+  const classId = toPublicId(classRow?.id || caseRow?.classId);
+  const sessionId = toPublicId(caseRow?.sessionId);
+  const caseId = toPublicId(caseRow?.id);
+  const detail = cleanText(caseRow?.summary || caseRow?.details || caseRow?.title);
+  const category = cleanText(caseRow?.category);
+  return {
+    caseId,
+    sessionId,
+    date: cleanText(sessionRow?.date || caseRow?.sessionDate),
+    startTime: cleanText(sessionRow?.startTime) || '--:--',
+    endTime: cleanText(sessionRow?.endTime) || '--:--',
+    studentName: cleanText(caseRow?.studentName),
+    category,
+    statusLabel: formatWeeklyReportCaseStatusLabel(caseRow),
+    detail,
+    href: buildStudentCaseSessionHref(classId, sessionId, caseId)
+  };
+}
+
+function buildWeeklyReportCaseItems(classCases = [], classRow = {}, sessions = []) {
+  const sessionById = new Map(
+    (Array.isArray(sessions) ? sessions : []).map((row) => [resolveSessionId(row), row])
+  );
+  return (Array.isArray(classCases) ? classCases : []).map((caseRow) => {
+    const sessionRow = sessionById.get(toPublicId(caseRow?.sessionId)) || {};
+    return buildWeeklyReportCaseItem(caseRow, classRow, sessionRow);
+  }).sort((a, b) => String(a.date || '').localeCompare(String(b.date || '')));
+}
+
 function countUnmarkedAttendanceCells(matrix = [], sessions = []) {
   const sessionList = Array.isArray(sessions) ? sessions : [];
   let unmarkedCount = 0;
@@ -439,18 +491,8 @@ function buildWeeklyReportsDrilldown({
       }));
     });
   } else if (key === 'studentCases') {
-    const sessionById = new Map(sessions.map((row) => [resolveSessionId(row), row]));
-    (built._internal.classCases || []).forEach((caseRow) => {
-      const sessionRow = sessionById.get(toPublicId(caseRow?.sessionId)) || {};
-      rows.push({
-        sessionId: toPublicId(caseRow?.sessionId),
-        date: cleanText(sessionRow?.date || caseRow?.sessionDate),
-        startTime: cleanText(sessionRow?.startTime) || '--:--',
-        endTime: cleanText(sessionRow?.endTime) || '--:--',
-        statusLabel: cleanText(caseRow?.status || caseRow?.severity || 'Case'),
-        detail: cleanText(caseRow?.summary || caseRow?.category || caseRow?.title),
-        href: ''
-      });
+    buildWeeklyReportCaseItems(built._internal.classCases, classRow, sessions).forEach((item) => {
+      rows.push({ ...item });
     });
   } else if (key === 'reportInstancesAssigned' || key === 'reportInstancesCompleted' || key === 'reportInstancesIncomplete') {
     const classToken = toPublicId(classRow?.id);
@@ -536,5 +578,9 @@ module.exports = {
   buildWeeklyReportsDrilldown,
   loadWeeklyReportsOrgCaches,
   dateInRange,
-  buildSessionListItem
+  buildSessionListItem,
+  buildStudentCaseSessionHref,
+  buildWeeklyReportCaseItem,
+  buildWeeklyReportCaseItems,
+  formatWeeklyReportCaseStatusLabel
 };

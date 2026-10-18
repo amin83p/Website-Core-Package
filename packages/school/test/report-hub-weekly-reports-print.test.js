@@ -45,3 +45,10 @@ test('weekly reports print uses dedicated teacher summary and class title engage
   assert.match(reportHubView, /renderWeeklyReportsPrintHeroStatCard\('Sessions'/);
   assert.match(reportHubView, /renderWeeklyReportsPrintHeroStatCard\('Hours'/);
 });
+
+test('weekly reports print includes teacher cases appendix page', () => {
+  assert.match(reportHubView, /function renderWeeklyReportsPrintTeacherCasesPage\(/);
+  assert.match(reportHubView, /hub-wr-print-teacher-cases-page/);
+  assert.match(reportHubView, /studentCaseItems/);
+  assert.match(reportHubView, /\.hub-wr-print-doc > \*:last-child/);
+});

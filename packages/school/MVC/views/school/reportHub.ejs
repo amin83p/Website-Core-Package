@@ -2459,6 +2459,60 @@
     color: #64748b;
   }
 
+  .hub-wr-print-teacher-cases-page {
+    margin-bottom: 1.5rem;
+  }
+
+  .hub-wr-print-cases-header {
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid #374151;
+  }
+
+  .hub-wr-print-cases-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .hub-wr-print-cases-teacher {
+    font-size: 1rem;
+    font-weight: 600;
+    margin-top: 0.15rem;
+  }
+
+  .hub-wr-print-cases-class-block {
+    margin-bottom: 1rem;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .hub-wr-print-cases-class-title {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin: 0 0 0.35rem;
+    color: #1e293b;
+  }
+
+  .hub-wr-print-cases-table {
+    font-size: 9px;
+    width: 100%;
+  }
+
+  .hub-wr-print-case-status {
+    font-weight: 600;
+  }
+
+  .hub-wr-print-case-link {
+    margin-top: 0.2rem;
+    word-break: break-all;
+    font-size: 8px;
+  }
+
+  .hub-weekly-reports-drilldown-case-row {
+    cursor: pointer;
+  }
+
   .hub-wr-print-class-block {
     margin-bottom: 1.25rem;
   }
@@ -2575,12 +2629,13 @@
       -webkit-print-color-adjust: exact;
     }
 
-    .hub-wr-print-teacher-page {
+    .hub-wr-print-teacher-page,
+    .hub-wr-print-teacher-cases-page {
       break-after: page;
       page-break-after: always;
     }
 
-    .hub-wr-print-teacher-page:last-child {
+    .hub-wr-print-doc > *:last-child {
       break-after: auto;
       page-break-after: auto;
     }
@@ -5969,6 +6024,68 @@
     ].join('');
   }
 
+  function resolveWeeklyReportsAbsoluteUrl(href) {
+    const path = String(href || '').trim();
+    if (!path) return '';
+    if (/^https?:\/\//i.test(path)) return path;
+    const origin = (typeof window !== 'undefined' && window.location && window.location.origin)
+      ? window.location.origin
+      : '';
+    return origin + (path.charAt(0) === '/' ? path : '/' + path);
+  }
+
+  function renderWeeklyReportsPrintTeacherCasesPage(group, classes) {
+    const list = Array.isArray(classes) ? classes : [];
+    const withCases = list.filter(function (row) {
+      return Array.isArray(row.studentCaseItems) && row.studentCaseItems.length > 0;
+    });
+    if (!withCases.length) return '';
+    const rangeLabel = hubWeeklyReportsState.lastRangeLabel || formatWeeklyReportsRangeLabel();
+    const teacherName = String(group.teacherName || 'Unassigned').trim() || 'Unassigned';
+    const sections = withCases.map(function (row) {
+      const items = row.studentCaseItems;
+      const body = items.map(function (item) {
+        const timeLine = (item.startTime || '--:--') + ' – ' + (item.endTime || '--:--');
+        const absUrl = resolveWeeklyReportsAbsoluteUrl(item.href);
+        const urlCell = absUrl
+          ? '<div class="hub-wr-print-case-link text-muted">' + escapeHtml(absUrl) + '</div>'
+          : '';
+        const categoryBit = item.category
+          ? '<div class="small text-muted">' + escapeHtml(item.category) + '</div>'
+          : '';
+        const detailHref = item.href
+          ? '<a href="' + escapeHtml(item.href) + '" class="text-decoration-none">' + escapeHtml(item.detail || 'View case') + '</a>'
+          : escapeHtml(item.detail || '—');
+        return [
+          '<tr>',
+          '<td class="ps-2 align-middle">', formatHubTableDateCellHtml(item.date, timeLine), '</td>',
+          '<td class="align-middle">', escapeHtml(item.studentName || '—'), categoryBit, '</td>',
+          '<td class="align-middle"><span class="hub-wr-print-case-status">', escapeHtml(item.statusLabel || '-'), '</span></td>',
+          '<td class="align-middle pe-2">', detailHref, urlCell, '</td>',
+          '</tr>'
+        ].join('');
+      }).join('');
+      return [
+        '<section class="hub-wr-print-cases-class-block">',
+        '<h3 class="hub-wr-print-cases-class-title">', escapeHtml(row.className || row.classId || 'Class'), '</h3>',
+        '<table class="table table-sm hub-wr-print-cases-table mb-0">',
+        '<thead><tr><th class="ps-2">Session</th><th>Student</th><th>Status</th><th class="pe-2">Details</th></tr></thead>',
+        '<tbody>', body, '</tbody></table>',
+        '</section>'
+      ].join('');
+    }).join('');
+    return [
+      '<div class="hub-wr-print-teacher-cases-page">',
+      '<header class="hub-wr-print-cases-header">',
+      '<div class="hub-wr-print-cases-title">Student cases</div>',
+      '<div class="hub-wr-print-cases-teacher">', escapeHtml(teacherName), '</div>',
+      '<div class="text-muted small">', escapeHtml(rangeLabel), '</div>',
+      '</header>',
+      sections,
+      '</div>'
+    ].join('');
+  }
+
   function renderWeeklyReportsPrintDocument() {
     const rows = Array.isArray(hubWeeklyReportsState.classRows) ? hubWeeklyReportsState.classRows : [];
     const groups = groupWeeklyReportsClassesByTeacher(rows);
@@ -5979,11 +6096,13 @@
       const classSections = classes.map(function (row) {
         return renderWeeklyReportsPrintClassSection(row);
       }).join('');
+      const casesPage = renderWeeklyReportsPrintTeacherCasesPage(group, classes);
       return [
         '<div class="hub-wr-print-teacher-page">',
         renderWeeklyReportsTeacherPrintHeader(group, classes, groupKey),
         classSections,
-        '</div>'
+        '</div>',
+        casesPage
       ].join('');
     }).join('');
     return [
@@ -7776,8 +7895,44 @@
 
   function renderWeeklyReportsDrilldownTable(payload) {
     const rows = Array.isArray(payload && payload.rows) ? payload.rows : [];
+    const metricKey = String(payload && payload.metricKey || '').trim();
     if (!rows.length) {
       return '<div class="text-muted small py-3">No items in this bucket for the selected period.</div>';
+    }
+    if (metricKey === 'studentCases') {
+      const summary = '<div class="hub-weekly-reports-drilldown-summary">' + escapeHtml(String(rows.length)) + ' case' + (rows.length === 1 ? '' : 's') + '</div>';
+      const body = rows.map(function (row) {
+        const timeLine = (row.startTime || '--:--') + ' – ' + (row.endTime || '--:--');
+        const statusBadge = '<span class="badge rounded-pill text-bg-light border hub-weekly-reports-drill-status">' + escapeHtml(row.statusLabel || '-') + '</span>';
+        const link = row.href
+          ? '<a href="' + escapeHtml(row.href) + '" class="btn btn-outline-primary btn-sm hub-wr-drill-case-link">Open case</a>'
+          : '';
+        const studentLine = escapeHtml(row.studentName || '—');
+        const categoryBit = row.category
+          ? '<div class="small text-muted">' + escapeHtml(row.category) + '</div>'
+          : '';
+        const detail = row.detail
+          ? '<div class="small text-break text-muted mt-1">' + escapeHtml(row.detail) + '</div>'
+          : '';
+        const rowAttrs = row.href
+          ? ' class="hub-weekly-reports-drilldown-case-row" data-hub-wr-case-href="' + escapeHtml(row.href) + '" role="link" tabindex="0"'
+          : '';
+        return [
+          '<tr', rowAttrs, '>',
+          '<td class="ps-3 align-middle">' + formatHubTableDateCellHtml(row.date, timeLine) + '</td>',
+          '<td class="align-middle">' + studentLine + categoryBit + detail + '</td>',
+          '<td class="align-middle">' + statusBadge + '</td>',
+          '<td class="pe-3 text-end align-middle">' + link + '</td>',
+          '</tr>'
+        ].join('');
+      }).join('');
+      return [
+        summary,
+        '<div class="hub-table-wrap border rounded hub-wr-drilldown-cases-wrap">',
+        '<table class="table table-sm table-hover hub-weekly-reports-data-table mb-0">',
+        '<thead class="table-light"><tr><th class="ps-3">Session</th><th>Student / details</th><th>Status</th><th class="pe-3 text-end">Action</th></tr></thead>',
+        '<tbody>', body, '</tbody></table></div>'
+      ].join('');
     }
     const summary = '<div class="hub-weekly-reports-drilldown-summary">' + escapeHtml(String(rows.length)) + ' session' + (rows.length === 1 ? '' : 's') + '</div>';
     const body = rows.map(function (row) {
@@ -7804,6 +7959,24 @@
       '<thead class="table-light"><tr><th class="ps-3">Session</th><th>Status</th><th class="pe-3 text-end">Action</th></tr></thead>',
       '<tbody>', body, '</tbody></table></div>'
     ].join('');
+  }
+
+  function bindWeeklyReportsDrilldownCaseRows(container) {
+    if (!container) return;
+    container.querySelectorAll('.hub-weekly-reports-drilldown-case-row[data-hub-wr-case-href]').forEach(function (rowEl) {
+      const href = String(rowEl.getAttribute('data-hub-wr-case-href') || '').trim();
+      if (!href) return;
+      rowEl.addEventListener('click', function (event) {
+        if (event.target.closest('a, button')) return;
+        window.location.href = href;
+      });
+      rowEl.addEventListener('keydown', function (event) {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        if (event.target.closest('a, button')) return;
+        event.preventDefault();
+        window.location.href = href;
+      });
+    });
   }
 
   async function openWeeklyReportsDrilldown(classId, metricKey) {
@@ -7850,7 +8023,10 @@
       if (subtitleEl) {
         subtitleEl.textContent = dateBits.length ? dateBits.join(' – ') : '';
       }
-      if (bodyEl) bodyEl.innerHTML = renderWeeklyReportsDrilldownTable(payload);
+      if (bodyEl) {
+        bodyEl.innerHTML = renderWeeklyReportsDrilldownTable(payload);
+        bindWeeklyReportsDrilldownCaseRows(bodyEl);
+      }
     } catch (error) {
       if (titleEl) titleEl.textContent = 'Unable to load';
       if (subtitleEl) subtitleEl.textContent = '';

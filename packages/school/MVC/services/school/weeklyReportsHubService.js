@@ -222,7 +222,7 @@ function sumSessionScheduledHours(sessions = []) {
   }, 0));
 }
 
-function buildClassBoardRow(classRow = {}, summary = {}, gradebookCount = 0, scheduledHours = 0, operationalMetrics = null, orgNameMap = new Map()) {
+function buildClassBoardRow(classRow = {}, summary = {}, gradebookCount = 0, scheduledHours = 0, operationalMetrics = null, orgNameMap = new Map(), studentCaseItems = []) {
   const classId = toPublicId(classRow?.id);
   const orgId = toPublicId(classRow?.orgId) || '';
   const orgName = resolveWeeklyReportsOrgName(orgId, orgNameMap);
@@ -248,7 +248,8 @@ function buildClassBoardRow(classRow = {}, summary = {}, gradebookCount = 0, sch
     lateCount: Number(summary.lateCount || 0),
     earlyLeaveCount: Number(summary.earlyLeaveCount || 0),
     gradebookCount: Number(gradebookCount || 0),
-    operationalMetrics: metrics
+    operationalMetrics: metrics,
+    studentCaseItems: Array.isArray(studentCaseItems) ? studentCaseItems : []
   };
 }
 
@@ -761,6 +762,11 @@ async function buildWeeklyReportsClassBoard({
         startDate: normalizedStartDate,
         endDate: normalizedEndDate
       });
+      const studentCaseItems = weeklyReportsClassMetricsService.buildWeeklyReportCaseItems(
+        weeklyMetrics._internal.classCases,
+        classRow,
+        weeklyMetrics._internal.sessions
+      );
 
       rows.push(buildClassBoardRow(
         classRow,
@@ -768,7 +774,8 @@ async function buildWeeklyReportsClassBoard({
         gradebookCount,
         scheduledHours,
         weeklyMetrics.metrics,
-        orgNameMap
+        orgNameMap,
+        studentCaseItems
       ));
     } catch (error) {
       console.warn(`[weeklyReportsHubService] Skipping class ${classId}: ${error.message}`);
