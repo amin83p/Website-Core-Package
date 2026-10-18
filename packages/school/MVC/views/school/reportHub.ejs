@@ -972,8 +972,8 @@
   .school-master-hub .hub-weekly-reports-teacher-cell {
     vertical-align: top;
     border-right: 1px solid rgba(15, 23, 42, 0.1);
-    width: var(--hub-wr-teacher-col-width, 15rem);
-    min-width: var(--hub-wr-teacher-col-width, 15rem);
+    width: var(--hub-wr-teacher-col-width, 12rem);
+    min-width: var(--hub-wr-teacher-col-width, 12rem);
     max-width: none;
     padding: 0.75rem 0.85rem !important;
     box-sizing: border-box;
@@ -1144,9 +1144,9 @@
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: baseline;
     gap: 0.35rem 0.5rem;
-    font-size: 0.72rem;
-    line-height: 1.3;
-    padding: 0.35rem 0.45rem;
+    font-size: 0.82rem;
+    line-height: 1.35;
+    padding: 0.4rem 0.5rem;
     border-radius: 0.35rem;
     background: rgba(255, 255, 255, 0.72);
     border: 1px solid rgba(15, 23, 42, 0.06);
@@ -1157,11 +1157,12 @@
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: #64748b;
-    font-size: 0.65rem;
+    font-size: 0.72rem;
   }
 
   .school-master-hub .hub-weekly-reports-teacher-stat .stat-value {
     font-weight: 700;
+    font-size: 0.92rem;
     font-variant-numeric: tabular-nums;
     color: #0f172a;
     text-align: right;
@@ -1197,7 +1198,7 @@
     align-items: baseline;
     justify-content: space-between;
     gap: 0.5rem;
-    font-size: 0.7rem;
+    font-size: 0.8rem;
     line-height: 1.35;
   }
 
@@ -1303,7 +1304,7 @@
   .school-master-hub .hub-weekly-reports-data-table {
     --hub-wr-table-border: #e2e8f0;
     --hub-wr-class-col-width: 11rem;
-    --hub-wr-teacher-col-width: 15rem;
+    --hub-wr-teacher-col-width: 12rem;
     --hub-wr-metric-col-width: 2.65rem;
     --hub-wr-metric-col-width-attendance: 3.15rem;
     width: max-content;
@@ -2272,59 +2273,325 @@
     }
   }
 
+  #hubWeeklyReportsPrintRoot.hub-wr-print-root {
+    display: none;
+  }
+
+  .hub-wr-print-doc {
+    font-size: 11px;
+    color: #111827;
+  }
+
+  .hub-wr-print-doc-meta {
+    margin-bottom: 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #d1d5db;
+  }
+
+  .hub-wr-print-doc-title {
+    font-size: 1.1rem;
+    font-weight: 600;
+    margin-bottom: 0.25rem;
+  }
+
+  .hub-wr-print-teacher-page {
+    margin-bottom: 1.5rem;
+  }
+
+  .hub-wr-print-teacher-header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 1rem 1.25rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 2px solid #374151;
+  }
+
+  .hub-wr-print-teacher-identity {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    flex: 0 0 auto;
+  }
+
+  .hub-wr-print-teacher-engagement-ring {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+    padding: 0.35rem 0.5rem 0.25rem;
+    border-radius: 12px;
+    border: 1px solid #cbd5e1;
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  }
+
+  .hub-wr-print-teacher-engagement-ring .hub-weekly-reports-engagement-ring {
+    width: 4.75rem;
+    height: 4.75rem;
+  }
+
+  .hub-wr-print-teacher-engagement-ring .hub-wr-engagement-text {
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .hub-wr-print-engagement-caption {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #475569;
+    line-height: 1.1;
+  }
+
+  .hub-wr-print-teacher-name {
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1.25;
+    color: #0f172a;
+    max-width: 14rem;
+  }
+
+  .hub-wr-print-teacher-summary {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.65rem;
+    flex: 1 1 18rem;
+    align-items: stretch;
+  }
+
+  .hub-wr-print-stat-card {
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 0.4rem 0.65rem;
+    background: #fff;
+    min-width: 4.75rem;
+    box-sizing: border-box;
+  }
+
+  .hub-wr-print-stat-card--hero {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    min-width: 5.25rem;
+    min-height: 4.5rem;
+    padding: 0.5rem 0.75rem;
+  }
+
+  .hub-wr-print-stat-card--hero .hub-wr-print-stat-label {
+    margin-bottom: 0.35rem;
+    width: 100%;
+  }
+
+  .hub-wr-print-stat-card--attendance {
+    flex: 1 1 11rem;
+    min-width: 11rem;
+  }
+
+  .hub-wr-print-stat-label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    margin-bottom: 0.2rem;
+  }
+
+  .hub-wr-print-stat-value {
+    font-size: 1rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    color: #0f172a;
+    line-height: 1.2;
+  }
+
+  .hub-wr-print-stat-value--hero {
+    font-size: 1.75rem;
+    font-weight: 800;
+    line-height: 1;
+    width: 100%;
+    text-align: center;
+  }
+
+  .hub-wr-print-attendance-line {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 0.65rem;
+    font-size: 0.78rem;
+    line-height: 1.35;
+    padding: 0.12rem 0;
+  }
+
+  .hub-wr-print-attendance-line + .hub-wr-print-attendance-line {
+    border-top: 1px solid #e2e8f0;
+    margin-top: 0.1rem;
+    padding-top: 0.18rem;
+  }
+
+  .hub-wr-print-attendance-key {
+    font-weight: 600;
+    color: #64748b;
+    flex-shrink: 0;
+  }
+
+  .hub-wr-print-attendance-val {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.35rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .hub-wr-print-attendance-val .hub-wr-print-attendance-count {
+    font-size: 0.85rem;
+  }
+
+  .hub-wr-print-attendance-val .hub-wr-print-attendance-mins {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #64748b;
+  }
+
+  .hub-wr-print-class-block {
+    margin-bottom: 1.25rem;
+  }
+
+  .hub-wr-print-class-title-row {
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .hub-wr-print-class-title-row .hub-weekly-reports-engagement-ring {
+    width: 2.35rem;
+    height: 2.35rem;
+    flex-shrink: 0;
+  }
+
+  .hub-wr-print-class-title-row .hub-wr-engagement-text {
+    font-size: 9px;
+    font-weight: 800;
+  }
+
+  .hub-wr-print-class-title {
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: #0f172a;
+    min-width: 0;
+  }
+
+  .hub-wr-print-class-subtitle {
+    font-size: 0.85rem;
+    color: #4b5563;
+    margin-bottom: 0.5rem;
+  }
+
+  .hub-wr-print-metrics-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10px;
+  }
+
+  .hub-wr-print-metrics-table th,
+  .hub-wr-print-metrics-table td {
+    border: 1px solid #9ca3af;
+    padding: 0.2rem 0.25rem;
+    vertical-align: middle;
+  }
+
+  .hub-wr-print-metrics-table thead th {
+    background: #f3f4f6;
+    font-weight: 600;
+  }
+
+  .hub-wr-print-doc .hub-weekly-reports-metric-primary {
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  .hub-wr-print-doc .hub-wr-metric--success,
+  .hub-wr-print-doc .hub-weekly-reports-metric-primary.hub-wr-metric--success {
+    color: #15803d;
+  }
+
+  .hub-wr-print-doc .hub-wr-metric--danger,
+  .hub-wr-print-doc .hub-weekly-reports-metric-primary.hub-wr-metric--danger {
+    color: #dc2626;
+  }
+
+  .hub-wr-print-doc .hub-wr-metric--warning,
+  .hub-wr-print-doc .hub-weekly-reports-metric-primary.hub-wr-metric--warning {
+    color: #c2410c;
+  }
+
+  .hub-wr-print-doc .hub-wr-metric--early,
+  .hub-wr-print-doc .hub-weekly-reports-metric-primary.hub-wr-metric--early {
+    color: #b45309;
+  }
+
+  .hub-wr-print-doc .hub-wr-metric--info,
+  .hub-wr-print-doc .hub-weekly-reports-metric-primary.hub-wr-metric--info {
+    color: #0369a1;
+  }
+
+  .hub-wr-print-doc .hub-weekly-reports-metric-hint {
+    color: #64748b;
+    font-size: 0.85em;
+  }
+
   @media print {
-    body.hub-print-weekly-reports .hub-no-print,
-    body.hub-print-weekly-reports .hub-page-header,
-    body.hub-print-weekly-reports .hub-section-panel,
-    body.hub-print-weekly-reports .hub-weekly-reports-tabs,
-    body.hub-print-weekly-reports .hub-weekly-reports-tab-close {
+    body.hub-print-weekly-reports #main-header,
+    body.hub-print-weekly-reports .header-side-controls,
+    body.hub-print-weekly-reports footer,
+    body.hub-print-weekly-reports .school-master-hub,
+    body.hub-print-weekly-reports #globalLoadingModal,
+    body.hub-print-weekly-reports .app-loading-modal,
+    body.hub-print-weekly-reports .swal2-container {
       display: none !important;
     }
 
-    body.hub-print-weekly-reports .school-master-hub .hub-workspace-card {
-      border: none !important;
-      box-shadow: none !important;
+    body.hub-print-weekly-reports #hubWeeklyReportsPrintRoot.hub-wr-print-root {
+      display: block !important;
     }
 
-    body.hub-print-weekly-reports .school-master-hub .hub-table-wrap {
-      overflow: visible !important;
-      border: none !important;
+    body.hub-print-weekly-reports {
+      margin: 0;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
     }
 
-    body.hub-print-weekly-reports .school-master-hub .hub-weekly-reports-class-list-wrap {
-      max-height: none !important;
+    body.hub-print-weekly-reports #hubWeeklyReportsPrintRoot.hub-wr-print-root,
+    body.hub-print-weekly-reports #hubWeeklyReportsPrintRoot.hub-wr-print-root * {
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
     }
 
-    body.hub-print-weekly-reports .school-master-hub .hub-weekly-reports-class-list-wrap .hub-weekly-reports-data-table thead th,
-    body.hub-print-weekly-reports .school-master-hub .hub-weekly-reports-class-list-wrap .hub-weekly-reports-data-table .hub-wr-col-teacher {
-      position: static !important;
-      box-shadow: none !important;
+    .hub-wr-print-teacher-page {
+      break-after: page;
+      page-break-after: always;
     }
 
-    body.hub-print-weekly-reports .school-master-hub table {
-      page-break-inside: auto;
+    .hub-wr-print-teacher-page:last-child {
+      break-after: auto;
+      page-break-after: auto;
     }
 
-    body.hub-print-weekly-reports .school-master-hub thead {
-      display: table-header-group;
-    }
-
-    body.hub-print-weekly-reports .school-master-hub tr {
+    .hub-wr-print-class-block {
+      break-inside: avoid;
       page-break-inside: avoid;
     }
 
-    body.hub-print-weekly-reports .hub-wr-teacher-deck-nav,
-    body.hub-print-weekly-reports .hub-wr-class-stack-peeks {
-      display: none !important;
-    }
-
-    body.hub-print-weekly-reports .hub-wr-class-stack--multi {
-      padding-bottom: 0 !important;
-    }
-
-    body.hub-print-weekly-reports .hub-wr-class-stack--multi .hub-wr-class-stack-front {
-      margin-left: 0 !important;
-      width: 100% !important;
+    .hub-wr-print-metrics-table {
+      font-size: 9px;
     }
   }
 </style>
@@ -2434,6 +2701,16 @@
     }
     const date = new Date(value);
     return Number.isNaN(date.getTime()) ? 'just now' : date.toLocaleString();
+  }
+
+  function formatHubPrepareDuration(ms) {
+    const value = Number(ms);
+    if (!Number.isFinite(value) || value < 0) return '';
+    if (value < 1000) return Math.round(value) + ' ms';
+    if (value < 60000) return (value / 1000).toFixed(1) + ' s';
+    const minutes = Math.floor(value / 60000);
+    const seconds = Math.round((value % 60000) / 1000);
+    return minutes + ' min ' + seconds + ' s';
   }
 
   function hubTodayIso() {
@@ -3537,6 +3814,7 @@
   let hubWeeklyReportsTabs = [];
   let hubWeeklyReportsActiveTabId = '';
   let hubWeeklyReportsTabSeq = 0;
+  let hubWeeklyReportsPrintInProgress = false;
   let hubWeeklyReportsDepartmentOptions = [];
   let hubWeeklyReportsProgramOptions = [];
   let hubWeeklyReportsTeacherOptions = [];
@@ -3564,6 +3842,7 @@
     studentDetailName: '',
     loading: false,
     lastLoadedAt: '',
+    lastPrepareDurationMs: 0,
     lastRangeLabel: '',
     lastError: '',
     teacherGroupCollapsed: {},
@@ -5483,14 +5762,317 @@
     }
   }
 
-  function printWeeklyReportsHub() {
-    const cleanup = function () {
-      document.body.classList.remove('hub-print-weekly-reports');
-    };
-    document.body.classList.add('hub-print-weekly-reports');
-    window.addEventListener('afterprint', cleanup, { once: true });
-    window.print();
-    window.setTimeout(cleanup, 1500);
+  function weeklyReportsEngagementStillLoadingForPrint() {
+    const rows = Array.isArray(hubWeeklyReportsState.classRows) ? hubWeeklyReportsState.classRows : [];
+    if (!rows.length) return false;
+    const snapshot = weeklyReportsEngagementSnapshotKey();
+    const teacherEng = hubWeeklyReportsState.teacherEngagement || {};
+    if (Object.values(teacherEng).some(function (entry) { return entry && entry.loading; })) {
+      return true;
+    }
+    return !weeklyReportsClassEngagementReadyForRows(rows, snapshot);
+  }
+
+  function setWeeklyReportsPrintButtonsBusy(busy) {
+    document.querySelectorAll('[data-hub-weekly-reports-print]').forEach(function (button) {
+      if (busy) {
+        if (!button.dataset.hubWrPrintOriginalHtml) {
+          button.dataset.hubWrPrintOriginalHtml = button.innerHTML;
+        }
+        button.disabled = true;
+        button.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Preparing…';
+      } else {
+        button.disabled = false;
+        if (button.dataset.hubWrPrintOriginalHtml) {
+          button.innerHTML = button.dataset.hubWrPrintOriginalHtml;
+          delete button.dataset.hubWrPrintOriginalHtml;
+        }
+      }
+    });
+  }
+
+  async function ensureWeeklyReportsEngagementForPrint(timeoutMs) {
+    if (!weeklyReportsShouldScheduleTeacherEngagement()) return false;
+    if (!weeklyReportsEngagementStillLoadingForPrint()) return false;
+    scheduleWeeklyReportsTeacherEngagement();
+    const waitMs = Math.max(1000, Number(timeoutMs) || 15000);
+    const started = Date.now();
+    while (Date.now() - started < waitMs) {
+      if (!weeklyReportsEngagementStillLoadingForPrint()) return true;
+      await new Promise(function (resolve) { window.setTimeout(resolve, 120); });
+    }
+    return !weeklyReportsEngagementStillLoadingForPrint();
+  }
+
+  function ensureWeeklyReportsPrintRootElement() {
+    let root = document.getElementById('hubWeeklyReportsPrintRoot');
+    if (root) return root;
+    root = document.createElement('div');
+    root.id = 'hubWeeklyReportsPrintRoot';
+    root.className = 'hub-wr-print-root';
+    root.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(root);
+    return root;
+  }
+
+  function formatWeeklyReportsPrintInteger(value) {
+    const n = Number(value);
+    if (!Number.isFinite(n)) return '0';
+    return Math.round(n).toLocaleString();
+  }
+
+  function formatWeeklyReportsPrintMinutes(minutes) {
+    return formatWeeklyReportsPrintInteger(minutes) + ' min';
+  }
+
+  function renderWeeklyReportsPrintAttendanceLine(label, bucket, tone) {
+    const values = readWeeklyReportsAttendanceBucketValues(bucket);
+    const toneClass = weeklyReportsMetricToneClass(tone);
+    return [
+      '<div class="hub-wr-print-attendance-line">',
+      '<span class="hub-wr-print-attendance-key">', escapeHtml(label), '</span>',
+      '<span class="hub-wr-print-attendance-val hub-wr-metric', toneClass, '">',
+      '<span class="hub-wr-print-attendance-count">', escapeHtml(formatWeeklyReportsPrintInteger(values.count)), '</span>',
+      '<span class="hub-wr-print-attendance-mins">', escapeHtml(formatWeeklyReportsPrintMinutes(values.minutes)), '</span>',
+      '</span>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsPrintHeroStatCard(label, value) {
+    return [
+      '<div class="hub-wr-print-stat-card hub-wr-print-stat-card--hero">',
+      '<div class="hub-wr-print-stat-label">', escapeHtml(label), '</div>',
+      '<div class="hub-wr-print-stat-value hub-wr-print-stat-value--hero">', escapeHtml(String(value)), '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsPrintTeacherSummaryStats(teacherTotals, teacherHours, classCount) {
+    const att = teacherTotals && teacherTotals.attendance ? teacherTotals.attendance : {};
+    return [
+      '<div class="hub-wr-print-teacher-summary">',
+      renderWeeklyReportsPrintHeroStatCard('Classes', formatWeeklyReportsPrintInteger(classCount)),
+      renderWeeklyReportsPrintHeroStatCard('Sessions', formatWeeklyReportsPrintInteger(teacherTotals.sessions.total)),
+      renderWeeklyReportsPrintHeroStatCard('Hours', formatWeeklyReportsScheduledHours(teacherHours)),
+      '<div class="hub-wr-print-stat-card hub-wr-print-stat-card--attendance">',
+      '<div class="hub-wr-print-stat-label">Attendance</div>',
+      renderWeeklyReportsPrintAttendanceLine('Absences', att.absence, 'danger'),
+      renderWeeklyReportsPrintAttendanceLine('Late', att.late, 'warning'),
+      renderWeeklyReportsPrintAttendanceLine('Early leave', att.early, 'early'),
+      '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsPrintDocumentMeta() {
+    const rangeLabel = hubWeeklyReportsState.lastRangeLabel || formatWeeklyReportsRangeLabel();
+    const updated = hubWeeklyReportsState.lastLoadedAt
+      ? 'Updated ' + formatHubInstant(hubWeeklyReportsState.lastLoadedAt)
+      : '';
+    const prepared = hubWeeklyReportsState.lastPrepareDurationMs
+      ? 'Prepared in ' + formatHubPrepareDuration(hubWeeklyReportsState.lastPrepareDurationMs)
+      : '';
+    const metaParts = [escapeHtml(rangeLabel)];
+    if (updated) metaParts.push(escapeHtml(updated));
+    if (prepared) metaParts.push(escapeHtml(prepared));
+    return [
+      '<div class="hub-wr-print-doc-meta">',
+      '<div class="hub-wr-print-doc-title">Weekly Reports — Classes</div>',
+      '<div class="text-muted small">', metaParts.join(' &nbsp;|&nbsp; '), '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsTeacherPrintHeader(group, classes, groupKey) {
+    const teacherTotals = sumWeeklyReportsOperationalMetrics(classes);
+    const teacherHours = classes.reduce(function (sum, row) { return sum + Number(row.scheduledHours || 0); }, 0);
+    return [
+      '<header class="hub-wr-print-teacher-header">',
+      '<div class="hub-wr-print-teacher-identity">',
+      '<div class="hub-wr-print-teacher-engagement-ring hub-wr-print-engagement">',
+      renderWeeklyReportsEngagementRing(groupKey),
+      '<div class="hub-wr-print-engagement-caption">Engagement</div>',
+      '</div>',
+      '<div class="hub-wr-print-teacher-name">', escapeHtml(group.teacherName || 'Unassigned'), '</div>',
+      '</div>',
+      renderWeeklyReportsPrintTeacherSummaryStats(teacherTotals, teacherHours, classes.length),
+      '</header>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsClassMetricsTableHead(options) {
+    const opts = options || {};
+    const forPrint = !!opts.print;
+    const classSortIndicator = forPrint ? '' : weeklyReportsClassSortIndicator('className');
+    const resizeHandle = forPrint
+      ? ''
+      : '<span class="hub-wr-col-resize-handle" data-hub-wr-resize-class-col="1" role="separator" aria-orientation="vertical" aria-label="Resize class column" title="Drag to resize column"></span>';
+    const teacherTh = forPrint
+      ? ''
+      : '<th class="ps-3 hub-wr-col-teacher" rowspan="2">Teacher</th>';
+    const classTh = forPrint
+      ? ''
+      : [
+        '<th rowspan="2" class="hub-weekly-reports-list-sort hub-wr-col-class hub-wr-col-class-resizable" data-hub-weekly-reports-class-sort="className">',
+        'Class' + classSortIndicator,
+        resizeHandle,
+        '</th>'
+      ].join('');
+    const theadOpen = forPrint
+      ? '<thead class="hub-wr-print-metrics-thead">'
+      : '<thead>';
+    return [
+      theadOpen,
+      '<tr>',
+      teacherTh,
+      classTh,
+      '<th colspan="3" class="text-center hub-weekly-reports-col-group hub-wr-col-sessions hub-wr-col-band">Sessions</th>',
+      '<th colspan="2" class="text-center hub-weekly-reports-col-group hub-wr-col-book hub-wr-col-band">Book coverage</th>',
+      '<th colspan="2" class="text-center hub-weekly-reports-col-group hub-wr-col-gradebooks hub-wr-col-band">Gradebooks</th>',
+      '<th colspan="2" class="text-center hub-weekly-reports-col-group hub-wr-col-notes hub-wr-col-band">Notes</th>',
+      '<th colspan="3" class="text-center hub-weekly-reports-col-group hub-wr-col-reports hub-wr-col-band">Student reports</th>',
+      '<th rowspan="2" class="text-center hub-weekly-reports-col-group hub-wr-col-cases hub-wr-col-band">Cases</th>',
+      '<th rowspan="2" class="text-center hub-wr-col-hours hub-wr-col-band">Hours</th>',
+      '<th colspan="3" class="text-center hub-weekly-reports-col-group hub-wr-col-attendance hub-wr-col-band">Attendance</th>',
+      '</tr>',
+      '<tr>',
+      '<th class="text-center small hub-wr-col-sessions hub-wr-col-band">Total</th><th class="text-center small hub-wr-col-sessions">Final</th><th class="text-center small hub-wr-col-sessions">Open</th>',
+      '<th class="text-center small hub-wr-col-book hub-wr-col-band">With</th><th class="text-center small hub-wr-col-book">Without</th>',
+      '<th class="text-center small hub-wr-col-gradebooks hub-wr-col-band">With</th><th class="text-center small hub-wr-col-gradebooks">Without</th>',
+      '<th class="text-center small hub-wr-col-notes hub-wr-col-band">With</th><th class="text-center small hub-wr-col-notes">Without</th>',
+      '<th class="text-center small hub-wr-col-reports hub-wr-col-band">Assigned</th><th class="text-center small hub-wr-col-reports">Done</th><th class="text-center small hub-wr-col-reports">Open</th>',
+      '<th class="text-center small hub-wr-col-attendance hub-wr-col-band">Absence</th><th class="text-center small hub-wr-col-attendance">Late</th><th class="text-center small hub-wr-col-attendance pe-3">Early</th>',
+      '</tr>',
+      '</thead>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsPrintClassSection(row) {
+    const department = String(row.departmentName || '').trim();
+    const subtitle = department
+      ? '<div class="hub-wr-print-class-subtitle">' + escapeHtml(department) + '</div>'
+      : '';
+    return [
+      '<section class="hub-wr-print-class-block">',
+      renderWeeklyReportsPrintClassTitleRow(row),
+      subtitle,
+      '<div class="hub-table-wrap">',
+      '<table class="table table-sm align-middle hub-workspace-table hub-weekly-reports-data-table hub-wr-print-metrics-table mb-0">',
+      renderWeeklyReportsClassMetricsTableHead({ print: true }),
+      '<tbody><tr>',
+      renderWeeklyReportsOperationalMetricCells(row, { print: true }),
+      '</tr></tbody>',
+      '</table>',
+      '</div>',
+      '</section>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsPrintDocument() {
+    const rows = Array.isArray(hubWeeklyReportsState.classRows) ? hubWeeklyReportsState.classRows : [];
+    const groups = groupWeeklyReportsClassesByTeacher(rows);
+    const teacherPages = groups.map(function (group) {
+      const classes = Array.isArray(group.classes) ? group.classes : [];
+      if (!classes.length) return '';
+      const groupKey = weeklyReportsTeacherGroupKey(group);
+      const classSections = classes.map(function (row) {
+        return renderWeeklyReportsPrintClassSection(row);
+      }).join('');
+      return [
+        '<div class="hub-wr-print-teacher-page">',
+        renderWeeklyReportsTeacherPrintHeader(group, classes, groupKey),
+        classSections,
+        '</div>'
+      ].join('');
+    }).join('');
+    return [
+      '<div class="hub-wr-print-doc">',
+      renderWeeklyReportsPrintDocumentMeta(),
+      teacherPages,
+      '</div>'
+    ].join('');
+  }
+
+  async function printWeeklyReportsHub() {
+    if (hubWeeklyReportsPrintInProgress) {
+      void showHubMessage({
+        title: 'Print',
+        icon: 'info',
+        message: 'Print is already preparing. Please wait…'
+      });
+      return;
+    }
+    if (hubWeeklyReportsState.level !== 'classes') {
+      void showHubMessage({
+        title: 'Print',
+        icon: 'info',
+        message: 'Print is available for the class report; student print coming later.'
+      });
+      return;
+    }
+    const rows = Array.isArray(hubWeeklyReportsState.classRows) ? hubWeeklyReportsState.classRows : [];
+    if (!rows.length) {
+      void showHubMessage({
+        title: 'Print',
+        icon: 'info',
+        message: 'Load the class report before printing.'
+      });
+      return;
+    }
+
+    hubWeeklyReportsPrintInProgress = true;
+    setWeeklyReportsPrintButtonsBusy(true);
+    const engagementPending = weeklyReportsEngagementStillLoadingForPrint();
+    if (engagementPending) {
+      void showHubMessage({
+        title: 'Print',
+        icon: 'info',
+        message: 'Please wait while class engagement finishes loading, then we will open the print dialog.'
+      });
+    }
+
+    try {
+      const engagementReady = await ensureWeeklyReportsEngagementForPrint(15000);
+      if (!engagementReady && weeklyReportsEngagementStillLoadingForPrint()) {
+        void showHubMessage({
+          title: 'Print',
+          icon: 'warning',
+          message: 'Engagement is still loading. Try Print again in a moment.'
+        });
+        return;
+      }
+      const root = ensureWeeklyReportsPrintRootElement();
+      root.innerHTML = renderWeeklyReportsPrintDocument();
+      root.setAttribute('aria-hidden', 'false');
+      const cleanup = function () {
+        document.body.classList.remove('hub-print-weekly-reports');
+        root.innerHTML = '';
+        root.setAttribute('aria-hidden', 'true');
+      };
+      if (typeof window.hideLoading === 'function') {
+        window.hideLoading({ force: true });
+      }
+      document.body.classList.add('hub-print-weekly-reports');
+      await new Promise(function (resolve) {
+        if (typeof window.requestAnimationFrame === 'function') {
+          window.requestAnimationFrame(function () {
+            window.requestAnimationFrame(resolve);
+          });
+        } else {
+          window.setTimeout(resolve, 0);
+        }
+      });
+      window.addEventListener('afterprint', cleanup, { once: true });
+      window.print();
+      window.setTimeout(cleanup, 1500);
+    } finally {
+      hubWeeklyReportsPrintInProgress = false;
+      setWeeklyReportsPrintButtonsBusy(false);
+      if (typeof window.hideLoading === 'function') {
+        window.hideLoading({ force: true });
+      }
+    }
   }
 
   function renderWeeklyReportsSharePrintButtons(options) {
@@ -5518,7 +6100,7 @@
     });
     root.querySelectorAll('[data-hub-weekly-reports-print]').forEach(function (button) {
       button.onclick = function () {
-        printWeeklyReportsHub();
+        void printWeeklyReportsHub();
       };
     });
   }
@@ -6284,18 +6866,36 @@
     return map[id] || { loading: true };
   }
 
-  function renderWeeklyReportsClassEngagementBlock(classId) {
+  function renderWeeklyReportsPrintClassEngagementRing(classId) {
     const id = String(classId || '').trim();
     const entry = getWeeklyReportsClassEngagementEntry(id);
     const stateClass = entry.loading
       ? 'hub-weekly-reports-engagement-ring--loading'
       : (entry.percent == null && !entry.error ? 'hub-weekly-reports-engagement-ring--empty' : '');
     return [
-      '<div class="hub-weekly-reports-engagement-block hub-wr-deck-class-engagement">',
       '<div class="hub-weekly-reports-engagement-ring hub-weekly-reports-engagement-ring--compact ', stateClass,
       '" data-hub-wr-class-engagement-id="', escapeHtml(id), '">',
       buildWeeklyReportsEngagementRingInner(entry),
-      '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsPrintClassTitleRow(row) {
+    const classId = String(row.classId || '').trim();
+    const className = String(row.className || row.classId || 'Class').trim();
+    return [
+      '<div class="hub-wr-print-class-title-row hub-wr-print-engagement">',
+      renderWeeklyReportsPrintClassEngagementRing(classId),
+      '<div class="hub-wr-print-class-title">', escapeHtml(className), '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsClassEngagementBlock(classId) {
+    const id = String(classId || '').trim();
+    return [
+      '<div class="hub-weekly-reports-engagement-block hub-wr-deck-class-engagement">',
+      renderWeeklyReportsPrintClassEngagementRing(id),
       '<span class="hub-weekly-reports-engagement-label">Engagement</span>',
       '</div>'
     ].join('');
@@ -6743,23 +7343,25 @@
     return totals;
   }
 
-  function renderWeeklyReportsDrillCount(classId, metricKey, value, tone) {
+  function renderWeeklyReportsDrillCount(classId, metricKey, value, tone, printMode) {
     const count = Number(value || 0);
-    const primary = count > 0
+    const useButton = !printMode && count > 0;
+    const primary = useButton
       ? '<button type="button" class="btn btn-link btn-sm p-0 hub-weekly-reports-drill" data-hub-wr-drill="1" data-class-id="' + escapeHtml(classId || '') + '" data-metric-key="' + escapeHtml(metricKey || '') + '">' + escapeHtml(String(count)) + '</button>'
       : escapeHtml(String(count));
-    return renderWeeklyReportsMetricStack(primary, '', { rawPrimary: count > 0, tone: tone });
+    return renderWeeklyReportsMetricStack(primary, '', { rawPrimary: useButton, tone: tone });
   }
 
-  function renderWeeklyReportsAttendanceDrillRatio(classId, metricKey, bucket, tone) {
+  function renderWeeklyReportsAttendanceDrillRatio(classId, metricKey, bucket, tone, printMode) {
     const values = readWeeklyReportsAttendanceBucketValues(bucket);
-    const countHtml = values.count > 0
+    const useButton = !printMode && values.count > 0;
+    const countHtml = useButton
       ? '<button type="button" class="btn btn-link btn-sm p-0 hub-weekly-reports-drill" data-hub-wr-drill="1" data-class-id="' + escapeHtml(classId || '') + '" data-metric-key="' + escapeHtml(metricKey || '') + '">' + escapeHtml(String(values.count)) + '</button>'
-      : escapeHtml('0');
+      : escapeHtml(values.count > 0 ? String(values.count) : '0');
     return renderWeeklyReportsMetricStack(
       countHtml,
       formatWeeklyReportsAttendanceMinutesLabel(values.minutes),
-      { rawPrimary: values.count > 0, tone: tone }
+      { rawPrimary: useButton, tone: tone }
     );
   }
 
@@ -7123,28 +7725,30 @@
     ].join('');
   }
 
-  function renderWeeklyReportsOperationalMetricCells(row) {
+  function renderWeeklyReportsOperationalMetricCells(row, options) {
+    const opts = options || {};
+    const printMode = !!opts.print;
     const classId = String(row.classId || '').trim();
     const m = readWeeklyReportsOperationalMetrics(row);
     const scheduledHours = Number(row.scheduledHours || 0);
     return [
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-sessions hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'sessionsTotal', m.sessions.total) + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-sessions">' + renderWeeklyReportsDrillCount(classId, 'sessionsFinalized', m.sessions.finalized, 'success') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-sessions">' + renderWeeklyReportsDrillCount(classId, 'sessionsUncompleted', m.sessions.uncompleted, 'danger') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-book hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'bookCoverageWith', m.bookCoverage.with, 'success') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-book">' + renderWeeklyReportsDrillCount(classId, 'bookCoverageWithout', m.bookCoverage.without, 'warning') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-gradebooks hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'gradebooksWith', m.gradebooks.with, 'success') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-gradebooks">' + renderWeeklyReportsDrillCount(classId, 'gradebooksWithout', m.gradebooks.without, 'warning') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-notes hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'notesWith', m.notes.with) + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-notes">' + renderWeeklyReportsDrillCount(classId, 'notesWithout', m.notes.without) + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-reports hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'reportInstancesAssigned', m.reports.assigned, 'info') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-reports">' + renderWeeklyReportsDrillCount(classId, 'reportInstancesCompleted', m.reports.completed, 'success') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-reports">' + renderWeeklyReportsDrillCount(classId, 'reportInstancesIncomplete', m.reports.incomplete, 'danger') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-cases hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'studentCases', m.studentCases.total) + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-sessions hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'sessionsTotal', m.sessions.total, '', printMode) + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-sessions">' + renderWeeklyReportsDrillCount(classId, 'sessionsFinalized', m.sessions.finalized, 'success', printMode) + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-sessions">' + renderWeeklyReportsDrillCount(classId, 'sessionsUncompleted', m.sessions.uncompleted, 'danger', printMode) + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-book hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'bookCoverageWith', m.bookCoverage.with, 'success', printMode) + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-book">' + renderWeeklyReportsDrillCount(classId, 'bookCoverageWithout', m.bookCoverage.without, 'warning', printMode) + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-gradebooks hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'gradebooksWith', m.gradebooks.with, 'success', printMode) + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-gradebooks">' + renderWeeklyReportsDrillCount(classId, 'gradebooksWithout', m.gradebooks.without, 'warning', printMode) + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-notes hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'notesWith', m.notes.with, '', printMode) + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-notes">' + renderWeeklyReportsDrillCount(classId, 'notesWithout', m.notes.without, '', printMode) + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-reports hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'reportInstancesAssigned', m.reports.assigned, 'info', printMode) + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-reports">' + renderWeeklyReportsDrillCount(classId, 'reportInstancesCompleted', m.reports.completed, 'success', printMode) + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-reports">' + renderWeeklyReportsDrillCount(classId, 'reportInstancesIncomplete', m.reports.incomplete, 'danger', printMode) + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-cases hub-wr-col-band">' + renderWeeklyReportsDrillCount(classId, 'studentCases', m.studentCases.total, '', printMode) + '</td>',
       '<td class="text-center hub-weekly-reports-metric-cell hub-wr-col-hours hub-wr-col-band">' + renderWeeklyReportsMetricStack(formatWeeklyReportsScheduledHours(scheduledHours), '') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-attendance hub-wr-col-band">' + renderWeeklyReportsAttendanceDrillRatio(classId, 'attendanceAbsence', m.attendance.absence, 'danger') + '</td>',
-      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-attendance">' + renderWeeklyReportsAttendanceDrillRatio(classId, 'attendanceLate', m.attendance.late, 'warning') + '</td>',
-      '<td class="text-center pe-3 hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-attendance">' + renderWeeklyReportsAttendanceDrillRatio(classId, 'attendanceEarly', m.attendance.early, 'early') + '</td>'
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-attendance hub-wr-col-band">' + renderWeeklyReportsAttendanceDrillRatio(classId, 'attendanceAbsence', m.attendance.absence, 'danger', printMode) + '</td>',
+      '<td class="text-center hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-attendance">' + renderWeeklyReportsAttendanceDrillRatio(classId, 'attendanceLate', m.attendance.late, 'warning', printMode) + '</td>',
+      '<td class="text-center pe-3 hub-weekly-reports-metric-cell hub-weekly-reports-col-group hub-wr-col-attendance">' + renderWeeklyReportsAttendanceDrillRatio(classId, 'attendanceEarly', m.attendance.early, 'early', printMode) + '</td>'
     ].join('');
   }
 
@@ -7575,31 +8179,7 @@
       '<col class="hub-wr-col-teacher-col">',
       '<col class="hub-wr-col-class-col">',
       '</colgroup>',
-      '<thead>',
-      '<tr>',
-      '<th class="ps-3 hub-wr-col-teacher" rowspan="2">Teacher</th>',
-      '<th rowspan="2" class="hub-weekly-reports-list-sort hub-wr-col-class hub-wr-col-class-resizable" data-hub-weekly-reports-class-sort="className">',
-      'Class' + weeklyReportsClassSortIndicator('className'),
-      '<span class="hub-wr-col-resize-handle" data-hub-wr-resize-class-col="1" role="separator" aria-orientation="vertical" aria-label="Resize class column" title="Drag to resize column"></span>',
-      '</th>',
-      '<th colspan="3" class="text-center hub-weekly-reports-col-group hub-wr-col-sessions hub-wr-col-band">Sessions</th>',
-      '<th colspan="2" class="text-center hub-weekly-reports-col-group hub-wr-col-book hub-wr-col-band">Book coverage</th>',
-      '<th colspan="2" class="text-center hub-weekly-reports-col-group hub-wr-col-gradebooks hub-wr-col-band">Gradebooks</th>',
-      '<th colspan="2" class="text-center hub-weekly-reports-col-group hub-wr-col-notes hub-wr-col-band">Notes</th>',
-      '<th colspan="3" class="text-center hub-weekly-reports-col-group hub-wr-col-reports hub-wr-col-band">Student reports</th>',
-      '<th rowspan="2" class="text-center hub-weekly-reports-col-group hub-wr-col-cases hub-wr-col-band">Cases</th>',
-      '<th rowspan="2" class="text-center hub-wr-col-hours hub-wr-col-band">Hours</th>',
-      '<th colspan="3" class="text-center hub-weekly-reports-col-group hub-wr-col-attendance hub-wr-col-band">Attendance</th>',
-      '</tr>',
-      '<tr>',
-      '<th class="text-center small hub-wr-col-sessions hub-wr-col-band">Total</th><th class="text-center small hub-wr-col-sessions">Final</th><th class="text-center small hub-wr-col-sessions">Open</th>',
-      '<th class="text-center small hub-wr-col-book hub-wr-col-band">With</th><th class="text-center small hub-wr-col-book">Without</th>',
-      '<th class="text-center small hub-wr-col-gradebooks hub-wr-col-band">With</th><th class="text-center small hub-wr-col-gradebooks">Without</th>',
-      '<th class="text-center small hub-wr-col-notes hub-wr-col-band">With</th><th class="text-center small hub-wr-col-notes">Without</th>',
-      '<th class="text-center small hub-wr-col-reports hub-wr-col-band">Assigned</th><th class="text-center small hub-wr-col-reports">Done</th><th class="text-center small hub-wr-col-reports">Open</th>',
-      '<th class="text-center small hub-wr-col-attendance hub-wr-col-band">Absence</th><th class="text-center small hub-wr-col-attendance">Late</th><th class="text-center small hub-wr-col-attendance pe-3">Early</th>',
-      '</tr>',
-      '</thead>',
+      renderWeeklyReportsClassMetricsTableHead(),
       '<tbody>', body, '</tbody>',
       '</table>',
       '</div>'
@@ -7747,6 +8327,9 @@
     const refreshed = hubWeeklyReportsState.lastLoadedAt
       ? 'Updated ' + escapeHtml(formatHubInstant(hubWeeklyReportsState.lastLoadedAt))
       : '';
+    const prepared = hubWeeklyReportsState.lastPrepareDurationMs
+      ? 'Prepared in ' + escapeHtml(formatHubPrepareDuration(hubWeeklyReportsState.lastPrepareDurationMs))
+      : '';
     const countLabel = level === 'students'
       ? '<span class="fw-semibold text-dark">' + escapeHtml(String(rows.length)) + '</span> student(s)'
       : '<span class="fw-semibold text-dark">' + escapeHtml(String(rows.length)) + '</span> class(es)';
@@ -7778,6 +8361,7 @@
       ' <span class="mx-1">|</span> ',
       escapeHtml(rangeLabel),
       refreshed ? ' <span class="mx-1">|</span> ' + refreshed : '',
+      prepared ? ' <span class="mx-1">|</span> ' + prepared : '',
       '</span>',
       '</div>',
       '<div class="d-flex align-items-center gap-2 flex-wrap">',
@@ -7997,6 +8581,10 @@
       hubWeeklyReportsState.viewMode = 'list';
     }
     hubWeeklyReportsState.lastLoadedAt = payload.refreshedAt || new Date().toISOString();
+    const serverPrepareMs = Number(payload.preparedInMs);
+    if (Number.isFinite(serverPrepareMs) && serverPrepareMs >= 0) {
+      hubWeeklyReportsState.lastPrepareDurationMs = Math.round(serverPrepareMs);
+    }
     hubWeeklyReportsState.lastRangeLabel = formatWeeklyReportsRangeLabel();
     hubWeeklyReportsState.lastError = '';
   }
@@ -8082,6 +8670,9 @@
     const loadingMessage = opts.view === 'students' ? 'Loading students...' : 'Loading classes...';
     if (typeof window.showLoading === 'function') window.showLoading(loadingMessage);
 
+    const clientLoadStartedAt = (typeof performance !== 'undefined' && performance.now)
+      ? performance.now()
+      : Date.now();
     try {
       const requestQuery = new URLSearchParams();
       appendWeeklyReportsWorkspaceQuery(requestQuery, opts);
@@ -8095,7 +8686,13 @@
       if (!response.ok || payload.status !== 'success') {
         throw new Error(payload.message || 'Unable to load weekly reports.');
       }
+      const clientFetchMs = (typeof performance !== 'undefined' && performance.now)
+        ? Math.round(performance.now() - clientLoadStartedAt)
+        : Math.round(Date.now() - clientLoadStartedAt);
       applyWeeklyReportsPayloadToState(payload, opts);
+      if (!hubWeeklyReportsState.lastPrepareDurationMs) {
+        hubWeeklyReportsState.lastPrepareDurationMs = clientFetchMs;
+      }
       applyWeeklyReportsPendingShareView();
       tab.loaded = true;
       tab.filtersSnapshot = captureWeeklyReportsFiltersSnapshot();

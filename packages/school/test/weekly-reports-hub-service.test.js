@@ -3,7 +3,14 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+const fs = require('node:fs');
+const path = require('node:path');
 const weeklyReportsHubService = require('../MVC/services/school/weeklyReportsHubService');
+
+const weeklyReportsHubServiceSource = fs.readFileSync(
+  path.join(__dirname, '..', 'MVC', 'services', 'school', 'weeklyReportsHubService.js'),
+  'utf8'
+);
 
 test('resolvePrimaryInstructor uses first instructor on class', () => {
   const result = weeklyReportsHubService.resolvePrimaryInstructor({
@@ -63,4 +70,9 @@ test('buildClassBoardRow includes teacher and scheduled hours', () => {
   assert.equal(row.scheduledHours, 6.5);
   assert.equal(row.sessionCount, 4);
   assert.equal(row.gradebookCount, 2);
+});
+
+test('class and student boards skip classes with no sessions in report window', () => {
+  const matches = weeklyReportsHubServiceSource.match(/if \(!filteredSessions\.length\) \{\s*continue;\s*\}/g);
+  assert.ok(matches && matches.length >= 2);
 });

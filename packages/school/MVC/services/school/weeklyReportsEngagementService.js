@@ -85,6 +85,17 @@ function mergeEngagementTotals(target, addition) {
   return next;
 }
 
+/** Teacher/group ring: simple average of each class percent (null counts as 0). */
+function averageClassEngagementPercent(classResults = []) {
+  const list = Array.isArray(classResults) ? classResults : [];
+  if (!list.length) return null;
+  const sum = list.reduce((total, row) => {
+    const pct = row && row.percent != null ? Number(row.percent) : 0;
+    return total + (Number.isFinite(pct) ? pct : 0);
+  }, 0);
+  return roundOneDecimal(sum / list.length);
+}
+
 async function buildEngagementForClasses({
   reqUser,
   classIds = [],
@@ -176,7 +187,7 @@ async function buildEngagementForClasses({
   return {
     presentMinutes: totals.presentMinutes,
     scheduledMinutes: totals.scheduledMinutes,
-    percent: totals.percent,
+    percent: averageClassEngagementPercent(classResults),
     classCount: processedCount,
     classes: classResults
   };
@@ -185,6 +196,7 @@ async function buildEngagementForClasses({
 module.exports = {
   summarizeEngagementFromMatrix,
   mergeEngagementTotals,
+  averageClassEngagementPercent,
   buildEngagementForClasses,
   parseClassIdList
 };

@@ -1182,6 +1182,7 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       queryInput?.teacherPersonId || queryInput?.teacherId || ''
     );
     const view = lower(queryInput?.view || 'classes');
+    const workspaceStartedAt = Date.now();
     const [board, departmentOptions, programOptions, teacherOptions] = await Promise.all([
       view === 'students'
         ? weeklyReportsHubService.buildWeeklyReportsStudentBoard({
@@ -1207,6 +1208,7 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       weeklyReportsHubService.resolveWeeklyReportsProgramOptions(req.user),
       weeklyReportsHubService.resolveWeeklyReportsTeacherOptions(req.user)
     ]);
+    const workspacePreparedInMs = Date.now() - workspaceStartedAt;
     return {
       section: {
         key: 'weekly-reports',
@@ -1221,7 +1223,8 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       departmentOptions,
       programOptions,
       teacherOptions,
-      refreshedAt: board.refreshedAt
+      refreshedAt: board.refreshedAt,
+      preparedInMs: Number(board.preparedInMs) || workspacePreparedInMs
     };
   }
 

@@ -690,6 +690,7 @@ async function buildWeeklyReportsClassBoard({
   const normalizedStartDate = String(startDate || '').trim();
   const normalizedEndDate = String(endDate || '').trim();
 
+  const boardStartedAt = Date.now();
   const classes = await resolveWeeklyReportsClasses({
     reqUser,
     classIds: normalizedClassIds,
@@ -705,6 +706,7 @@ async function buildWeeklyReportsClassBoard({
     dataService.fetchData('organizations', {}, reqUser).catch(() => [])
   ]);
   const orgNameMap = buildWeeklyReportsOrgNameMap(organizations);
+  const statusMapByOrgKey = new Map();
 
   for (const classRow of classes) {
     const classId = toPublicId(classRow?.id);
@@ -712,16 +714,26 @@ async function buildWeeklyReportsClassBoard({
 
     try {
       const allSessions = await schoolDataService.getClassSessions(classId, reqUser);
-      const statusMap = await sessionStatusPolicyService.getStatusMap(
-        classRow?.orgId || activeOrgId,
-        { includeInactive: true }
-      );
+
+      const orgKey = String(toPublicId(classRow?.orgId) || activeOrgId || '').trim();
+      let statusMap = statusMapByOrgKey.get(orgKey);
+      if (!statusMap) {
+        statusMap = await sessionStatusPolicyService.getStatusMap(
+          classRow?.orgId || activeOrgId,
+          { includeInactive: true }
+        );
+        statusMapByOrgKey.set(orgKey, statusMap);
+      }
+
       const filteredSessions = filterSessionsForWeeklyReport({
         sessions: allSessions,
         statusMap,
         startDate: normalizedStartDate,
         endDate: normalizedEndDate
       });
+      if (!filteredSessions.length) {
+        continue;
+      }
 
       const payload = await buildAttendanceMatrixPayload({
         user: reqUser,
@@ -765,6 +777,8 @@ async function buildWeeklyReportsClassBoard({
 
   rows.sort((a, b) => String(a.className || '').localeCompare(String(b.className || '')));
 
+  const preparedInMs = Date.now() - boardStartedAt;
+
   return {
     view: 'classes',
     rows,
@@ -777,7 +791,8 @@ async function buildWeeklyReportsClassBoard({
       startDate: normalizedStartDate,
       endDate: normalizedEndDate
     },
-    refreshedAt: new Date().toISOString()
+    refreshedAt: new Date().toISOString(),
+    preparedInMs
   };
 }
 
@@ -929,6 +944,9 @@ async function buildWeeklyReportsStudentBoard({
         startDate: normalizedStartDate,
         endDate: normalizedEndDate
       });
+      if (!filteredSessions.length) {
+        continue;
+      }
       const sessionsById = new Map(
         filteredSessions.map((sessionRow) => [toPublicId(sessionRow?.sessionId || sessionRow?.id), sessionRow])
       );
