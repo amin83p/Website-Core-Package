@@ -331,6 +331,78 @@ function buildOverallExportOptions(student, policy, overallTemplates = [], class
     .filter(Boolean);
 }
 
+async function loadEnrollmentPeriodRowsForClassIds(classIds = [], reqUser) {
+  const uniqueIds = [...new Set(classIds.map((id) => clean(id)).filter(Boolean))];
+  const periodRows = [];
+  for (const classId of uniqueIds) {
+    // eslint-disable-next-line no-await-in-loop
+    const rows = await schoolDataService.getClassEnrollmentPeriodsByClassId(classId, reqUser).catch(() => []);
+    if (Array.isArray(rows)) periodRows.push(...rows);
+  }
+  return periodRows;
+}
+
+function applyOverallTemplateVariantToOption(option, overallTemplate, policy, funderKey = '') {
+  if (!option || !overallTemplate) return option;
+  const templateVariantOptions = overallReportService.buildOverallTemplateVariantOptions(overallTemplate);
+  const { suggestedTemplateVariantKey } = overallReportService.suggestOverallTemplateVariantKeys(
+    overallTemplate,
+    funderKey
+  );
+  const variantKey = overallReportService.resolveOverallTemplateVariantKey(
+    overallTemplate,
+    suggestedTemplateVariantKey,
+    suggestedTemplateVariantKey
+  );
+  const variantRow = templateVariantOptions.find((row) => row.key === variantKey) || templateVariantOptions[0];
+  const rawOverallMeta = {
+    hasDocx: variantRow?.hasDocx ?? overallReportService.templateHasAttachedDocx(overallTemplate, variantKey),
+    hasPdf: variantRow?.hasPdf ?? overallReportService.templateHasAttachedPdf(overallTemplate, variantKey)
+  };
+  const effectiveOverall = studentAttendanceReportExportFormatService.resolveEffectiveOverallExportFlags(
+    policy,
+    option.templateId,
+    rawOverallMeta
+  );
+  return {
+    ...option,
+    templateVariantOptions,
+    suggestedTemplateVariantKey: variantKey,
+    hasDocx: effectiveOverall.hasDocx,
+    hasPdf: effectiveOverall.hasPdf,
+    hasPayload: effectiveOverall.hasPayload
+  };
+}
+
+async function enrichOverallExportOptionsForStudent({
+  student,
+  classRows = [],
+  overallOptions = [],
+  overallTemplates = [],
+  policy = {},
+  startDate = '',
+  endDate = '',
+  reqUser
+} = {}) {
+  const classIds = classRows.map((row) => clean(row.classId)).filter(Boolean);
+  const periodRows = await loadEnrollmentPeriodRowsForClassIds(classIds, reqUser);
+  const funder = reportFunderDocxService.resolveStudentFunderForReportPeriod({
+    periodRows,
+    personId: clean(student.personId),
+    windowStart: startDate,
+    windowEnd: endDate
+  });
+  const funderKey = funder.funderKey || '';
+  const templateById = new Map(
+    (Array.isArray(overallTemplates) ? overallTemplates : []).map((template) => [clean(template.id), template])
+  );
+  return (Array.isArray(overallOptions) ? overallOptions : []).map((option) => {
+    const overallTemplate = templateById.get(clean(option.templateId));
+    if (!overallTemplate) return option;
+    return applyOverallTemplateVariantToOption(option, overallTemplate, policy, funderKey);
+  });
+}
+
 async function buildStudentAttendanceReportExportPlan(req, options = {}) {
   const ctx = await loadGenerationContext(req, options);
   const { policy, overallTemplates, students, startDate, endDate } = ctx;
@@ -338,18 +410,30 @@ async function buildStudentAttendanceReportExportPlan(req, options = {}) {
   const templateIds = [policy.reportTemplateId];
   const templateMetaMap = await loadTemplateMetaMap(templateIds, req.user, policy);
 
-  const planStudents = students.map((student) => {
+  const planStudents = [];
+  for (const student of students) {
     const classRows = buildClassExportRowsForStudent(student, policy, null, templateMetaMap);
-    const overallOptions = buildOverallExportOptions(student, policy, overallTemplates, classRows);
+    let overallOptions = buildOverallExportOptions(student, policy, overallTemplates, classRows);
+    // eslint-disable-next-line no-await-in-loop
+    overallOptions = await enrichOverallExportOptionsForStudent({
+      student,
+      classRows,
+      overallOptions,
+      overallTemplates,
+      policy,
+      startDate,
+      endDate,
+      reqUser: req.user
+    });
     const overall = overallOptions.find((option) => option.eligible) || overallOptions[0] || null;
-    return {
+    planStudents.push({
       personId: clean(student.personId),
       name: clean(student.name) || clean(student.personId),
       classes: classRows,
       overall,
       overallOptions
-    };
-  });
+    });
+  }
 
   const defaultReportMeta = templateMetaMap.get(clean(policy.reportTemplateId)) || {};
   const overallTemplateSummaries = overallTemplates.map((template) => {
@@ -562,7 +646,15 @@ function resolveEligibleOverallTemplateForTarget({ student, selectedClassIds, ov
   throw error;
 }
 
-async function exportOverallTarget(student, selectedClassIds, overallTemplateId, format, ctx, reqUser) {
+async function exportOverallTarget(
+  student,
+  selectedClassIds,
+  overallTemplateId,
+  format,
+  ctx,
+  reqUser,
+  templateVariantKey = ''
+) {
   const { startDate, endDate } = ctx;
 
   const {
@@ -578,6 +670,12 @@ async function exportOverallTarget(student, selectedClassIds, overallTemplateId,
     format
   );
 
+  const variantKey = overallReportService.resolveOverallTemplateVariantKey(
+    overallTemplate,
+    templateVariantKey,
+    'default'
+  );
+
   const pipeline = await overallReportGenerationEngineService.generateOverallPipeline({
     filterStartDate: startDate,
     filterEndDate: endDate,
@@ -585,7 +683,9 @@ async function exportOverallTarget(student, selectedClassIds, overallTemplateId,
     sourceRuns,
     overallTemplateId: chosenTemplateId,
     format: format === 'json' ? 'json' : (format === 'pdf' ? 'pdf' : 'docx'),
-    docxMode: 'single'
+    docxMode: 'single',
+    selectedDocxKey: variantKey,
+    selectedPdfKey: variantKey
   }, reqUser);
 
   const overall = pipeline.overall || {};
@@ -677,7 +777,7 @@ async function zipGenericFiles(files = []) {
   return Buffer.from(await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' }));
 }
 
-async function bundleExportFiles(files, format, startDate, endDate) {
+async function bundleExportFiles(files, format, startDate, endDate, options = {}) {
   const warnings = files.flatMap((row) => row.warnings || []);
   if (!files.length) {
     const error = new Error('No export files were produced.');
@@ -690,6 +790,28 @@ async function bundleExportFiles(files, format, startDate, endDate) {
       buffer: files[0].buffer,
       contentType: files[0].contentType,
       fileName: files[0].fileName,
+      warnings
+    };
+  }
+
+  const mergeDocuments = Boolean(options.mergeDocuments);
+
+  if (format === 'docx' && mergeDocuments) {
+    const buffer = reportDocxRenderService.mergeReportInstanceDocxBuffers(files.map((row) => row.buffer));
+    return {
+      buffer,
+      contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      fileName: `student_attendance_overall_reports_${startDate}_${endDate}.docx`,
+      warnings
+    };
+  }
+
+  if (format === 'pdf' && mergeDocuments) {
+    const buffer = await reportPdfRenderService.mergeReportInstancePdfBuffers(files.map((row) => row.buffer));
+    return {
+      buffer,
+      contentType: 'application/pdf',
+      fileName: `student_attendance_overall_reports_${startDate}_${endDate}.pdf`,
       warnings
     };
   }
@@ -768,7 +890,15 @@ async function exportStudentAttendanceReportSelections(req, options = {}) {
       const classIds = Array.isArray(target?.classIds)
         ? target.classIds.map((id) => clean(id)).filter(Boolean)
         : [];
-      files.push(await exportOverallTarget(student, classIds, clean(target?.overallTemplateId), format, ctx, req.user));
+      files.push(await exportOverallTarget(
+        student,
+        classIds,
+        clean(target?.overallTemplateId),
+        format,
+        ctx,
+        req.user,
+        clean(target?.templateVariantKey)
+      ));
       continue;
     }
 
@@ -777,7 +907,9 @@ async function exportStudentAttendanceReportSelections(req, options = {}) {
     throw error;
   }
 
-  return bundleExportFiles(files, format, ctx.startDate, ctx.endDate);
+  const bundleMode = clean(body.bundleMode).toLowerCase();
+  const mergeDocuments = bundleMode === 'merge' && (format === 'docx' || format === 'pdf');
+  return bundleExportFiles(files, format, ctx.startDate, ctx.endDate, { mergeDocuments });
 }
 
 async function generateDocxForStudentWithoutOverall(student, policy, startDate, endDate, reqUser) {
@@ -947,7 +1079,9 @@ module.exports = {
   buildClassExportRowsForStudent,
   buildOverallExportBlock,
   buildOverallExportOptions,
+  enrichOverallExportOptionsForStudent,
   buildStudentAttendanceReportExportPlan,
   exportStudentAttendanceReportSelections,
-  generateStudentAttendanceReports
+  generateStudentAttendanceReports,
+  bundleExportFiles
 };

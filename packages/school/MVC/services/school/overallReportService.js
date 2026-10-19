@@ -1640,6 +1640,63 @@ function templateHasAttachedPdf(template = {}, pdfKey = 'default') {
   return Boolean(resolved?.pdfTemplate);
 }
 
+function buildOverallTemplateVariantOptions(template = {}) {
+  const docxOptions = reportFunderDocxService.buildAvailableDocxOptions(template);
+  const pdfOptions = reportFunderPdfService.buildAvailablePdfOptions(template);
+  const labelByKey = new Map();
+  docxOptions.forEach((row) => {
+    const key = clean(row.key);
+    if (!key) return;
+    labelByKey.set(key, clean(row.label) || key);
+  });
+  pdfOptions.forEach((row) => {
+    const key = clean(row.key);
+    if (!key) return;
+    if (!labelByKey.has(key)) labelByKey.set(key, clean(row.label) || key);
+  });
+  const keys = [...new Set([
+    ...docxOptions.map((row) => clean(row.key)).filter(Boolean),
+    ...pdfOptions.map((row) => clean(row.key)).filter(Boolean)
+  ])];
+  return keys.map((key) => ({
+    key,
+    label: labelByKey.get(key) || key,
+    hasDocx: templateHasAttachedDocx(template, key),
+    hasPdf: templateHasAttachedPdf(template, key)
+  }));
+}
+
+function suggestOverallTemplateVariantKeys(template = {}, funderKey = '') {
+  const key = clean(funderKey);
+  const suggestedDocxKey = reportFunderDocxService.suggestDocxKeyForFunder({ template, funderKey: key });
+  const suggestedPdfKey = reportFunderPdfService.suggestPdfKeyForFunder({ template, funderKey: key });
+  const suggestedTemplateVariantKey = clean(suggestedDocxKey) || clean(suggestedPdfKey) || 'default';
+  return {
+    suggestedDocxKey: clean(suggestedDocxKey) || 'default',
+    suggestedPdfKey: clean(suggestedPdfKey) || 'default',
+    suggestedTemplateVariantKey
+  };
+}
+
+function resolveOverallTemplateVariantKey(template = {}, requestedKey = '', fallbackKey = 'default') {
+  const options = buildOverallTemplateVariantOptions(template);
+  const requested = clean(requestedKey);
+  if (requested) {
+    const match = options.find((row) => (
+      idsEqual(row.key, requested)
+      || String(row.key || '').toLowerCase() === requested.toLowerCase()
+    ));
+    if (match) return match.key;
+  }
+  const fallback = clean(fallbackKey) || 'default';
+  const fallbackMatch = options.find((row) => (
+    idsEqual(row.key, fallback)
+    || String(row.key || '').toLowerCase() === fallback.toLowerCase()
+  ));
+  if (fallbackMatch) return fallbackMatch.key;
+  return options[0]?.key || 'default';
+}
+
 async function buildNormalizedStudentEntries({
   template,
   studentEntries,
@@ -2230,6 +2287,9 @@ module.exports = {
   templateHasOverallFields,
   templateHasAttachedDocx,
   templateHasAttachedPdf,
+  buildOverallTemplateVariantOptions,
+  suggestOverallTemplateVariantKeys,
+  resolveOverallTemplateVariantKey,
   previewStudentEntry,
   saveStudentAnswers,
   generateStudentDocx,

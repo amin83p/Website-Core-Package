@@ -16,7 +16,10 @@ const reportPdfRenderService = require('./reportPdfRenderService');
 const reportFunderDocxService = require('./reportFunderDocxService');
 const reportFunderPdfService = require('./reportFunderPdfService');
 
-const { sortClasses } = studentAttendanceReportGenerationService;
+const {
+  sortClasses,
+  enrichOverallExportOptionsForStudent
+} = studentAttendanceReportGenerationService;
 
 function clean(value = '') {
   return String(value ?? '').trim();
@@ -387,17 +390,32 @@ async function buildSemiMonthlyReportExportPlan(req, options = {}) {
   const templateIds = semiMonthlyReportPolicyService.normalizeIdList(policy.reportTemplateIds);
   const templateMetaMap = await loadTemplateMetaMap(templateIds, req.user, policy);
 
-  const planStudents = students.map((student) => {
-    const overallOptions = buildSmmrOverallExportOptions(student, policy, overallTemplates);
+  const planStudents = [];
+  for (const student of students) {
+    let overallOptions = buildSmmrOverallExportOptions(student, policy, overallTemplates);
+    const classRows = sortClasses(student.classes).map((classRow) => ({
+      classId: clean(classRow.classId)
+    }));
+    // eslint-disable-next-line no-await-in-loop
+    overallOptions = await enrichOverallExportOptionsForStudent({
+      student,
+      classRows,
+      overallOptions,
+      overallTemplates,
+      policy,
+      startDate,
+      endDate,
+      reqUser: req.user
+    });
     const overall = overallOptions.find((option) => option.eligible) || overallOptions[0] || null;
-    return {
+    planStudents.push({
       personId: clean(student.personId),
       name: clean(student.name) || clean(student.personId),
       instances: flattenInstanceRows(student, templateMetaMap, policy),
       overall,
       overallOptions
-    };
-  });
+    });
+  }
 
   const reportTemplateSummaries = templateIds.map((templateId) => {
     const meta = templateMetaMap.get(templateId) || {};
@@ -612,7 +630,15 @@ function buildSourceRunsForOverallTarget(fullStudent, overallTemplate, option, i
   return { sourceRuns: runs, warnings };
 }
 
-async function exportOverallTarget(planStudent, overallTemplateId, format, instanceIdsBySlot, ctx, reqUser) {
+async function exportOverallTarget(
+  planStudent,
+  overallTemplateId,
+  format,
+  instanceIdsBySlot,
+  ctx,
+  reqUser,
+  templateVariantKey = ''
+) {
   const { startDate, endDate } = ctx;
   const { overallTemplate, option } = resolveOverallOption(planStudent, overallTemplateId, ctx);
   const chosenTemplateId = clean(overallTemplate.id);
@@ -621,6 +647,12 @@ async function exportOverallTarget(planStudent, overallTemplateId, format, insta
     'overall',
     chosenTemplateId,
     format
+  );
+
+  const variantKey = overallReportService.resolveOverallTemplateVariantKey(
+    overallTemplate,
+    templateVariantKey,
+    'default'
   );
 
   const fullStudent = ctx.students.find((row) => clean(row.personId) === clean(planStudent.personId)) || planStudent;
@@ -643,7 +675,9 @@ async function exportOverallTarget(planStudent, overallTemplateId, format, insta
     sourceBatch,
     studentIds: [exportPersonId],
     format: format === 'json' ? 'json' : (format === 'pdf' ? 'pdf' : 'docx'),
-    docxMode: 'single'
+    docxMode: 'single',
+    selectedDocxKey: variantKey,
+    selectedPdfKey: variantKey
   }, reqUser);
 
   const mergedWarnings = [
@@ -732,7 +766,7 @@ async function zipGenericFiles(files = []) {
   return Buffer.from(await zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' }));
 }
 
-async function bundleExportFiles(files, format, startDate, endDate) {
+async function bundleExportFiles(files, format, startDate, endDate, options = {}) {
   const warnings = files.flatMap((row) => row.warnings || []);
   if (!files.length) {
     const error = new Error('No export files were produced.');
@@ -745,6 +779,28 @@ async function bundleExportFiles(files, format, startDate, endDate) {
       buffer: files[0].buffer,
       contentType: files[0].contentType,
       fileName: files[0].fileName,
+      warnings
+    };
+  }
+
+  const mergeDocuments = Boolean(options.mergeDocuments);
+
+  if (format === 'docx' && mergeDocuments) {
+    const buffer = reportDocxRenderService.mergeReportInstanceDocxBuffers(files.map((row) => row.buffer));
+    return {
+      buffer,
+      contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      fileName: `semi_monthly_overall_reports_${startDate}_${endDate}.docx`,
+      warnings
+    };
+  }
+
+  if (format === 'pdf' && mergeDocuments) {
+    const buffer = await reportPdfRenderService.mergeReportInstancePdfBuffers(files.map((row) => row.buffer));
+    return {
+      buffer,
+      contentType: 'application/pdf',
+      fileName: `semi_monthly_overall_reports_${startDate}_${endDate}.pdf`,
       warnings
     };
   }
@@ -854,7 +910,8 @@ async function exportSemiMonthlyReportSelections(req, options = {}) {
         format,
         instanceIdsBySlot,
         ctx,
-        req.user
+        req.user,
+        clean(target?.templateVariantKey)
       ));
       continue;
     }
@@ -870,7 +927,9 @@ async function exportSemiMonthlyReportSelections(req, options = {}) {
     throw error;
   }
 
-  return bundleExportFiles(files, format, ctx.startDate, ctx.endDate);
+  const bundleMode = clean(body.bundleMode).toLowerCase();
+  const mergeDocuments = bundleMode === 'merge' && (format === 'docx' || format === 'pdf');
+  return bundleExportFiles(files, format, ctx.startDate, ctx.endDate, { mergeDocuments });
 }
 
 module.exports = {

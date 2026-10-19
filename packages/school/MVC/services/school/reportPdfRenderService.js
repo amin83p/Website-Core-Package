@@ -264,6 +264,23 @@ async function renderReportInstancePdf({
   };
 }
 
+async function mergeReportInstancePdfBuffers(buffers = []) {
+  const entries = (Array.isArray(buffers) ? buffers : []).filter((buffer) => buffer && buffer.length);
+  if (!entries.length) throw new Error('No rendered report PDFs were available to merge.');
+  if (entries.length === 1) return entries[0];
+  const { PDFDocument } = getPdfDependencies();
+  const merged = await PDFDocument.create();
+  for (const buffer of entries) {
+    // eslint-disable-next-line no-await-in-loop
+    const source = await PDFDocument.load(buffer);
+    const pageIndices = source.getPageIndices();
+    // eslint-disable-next-line no-await-in-loop
+    const pages = await merged.copyPages(source, pageIndices);
+    pages.forEach((page) => merged.addPage(page));
+  }
+  return Buffer.from(await merged.save());
+}
+
 async function zipReportInstancePdfFiles(files = []) {
   const entries = (Array.isArray(files) ? files : [])
     .filter((row) => row && row.buffer)
@@ -300,5 +317,6 @@ module.exports = {
   buildValueLookup,
   resolveMappedPdfValues,
   renderReportInstancePdf,
+  mergeReportInstancePdfBuffers,
   zipReportInstancePdfFiles
 };

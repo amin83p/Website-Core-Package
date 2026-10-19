@@ -1896,6 +1896,42 @@
         return getOverallOptionsForStudent(student).find((row) => String(row.templateId || '').trim() === id) || null;
     }
 
+    function getOverallVariantOptionsForOption(option) {
+        const rows = Array.isArray(option?.templateVariantOptions) ? option.templateVariantOptions : [];
+        return rows.filter((row) => row && String(row.key || '').trim());
+    }
+
+    function resolveOverallFormatFlagsForOption(option, variantKey = '') {
+        const variants = getOverallVariantOptionsForOption(option);
+        const key = String(variantKey || option?.suggestedTemplateVariantKey || variants[0]?.key || '').trim();
+        const variant = variants.find((row) => String(row.key || '').trim() === key) || variants[0];
+        if (variant) {
+            return {
+                hasDocx: Boolean(variant.hasDocx),
+                hasPdf: Boolean(variant.hasPdf),
+                hasPayload: option?.hasPayload !== false
+            };
+        }
+        return {
+            hasDocx: Boolean(option?.hasDocx),
+            hasPdf: Boolean(option?.hasPdf),
+            hasPayload: option?.hasPayload !== false
+        };
+    }
+
+    function buildSarOverallVariantSelectHtml(personId, option) {
+        const variants = getOverallVariantOptionsForOption(option);
+        if (!variants.length) return '';
+        const suggested = String(option?.suggestedTemplateVariantKey || variants[0]?.key || '').trim();
+        const optionsHtml = variants.map((row) => {
+            const key = String(row.key || '').trim();
+            const selected = key === suggested ? ' selected' : '';
+            return `<option value="${escapeHtml(key)}"${selected}>${escapeHtml(row.label || key)}</option>`;
+        }).join('');
+        const disabled = variants.length <= 1 ? ' disabled' : '';
+        return `<select class="form-select form-select-sm js-sar-overall-variant-select mb-1" data-student-id="${escapeHtml(personId)}"${disabled} aria-label="Document template for overall report">${optionsHtml}</select>`;
+    }
+
     function evaluateOverallEligibilityForStudent(studentId, templateId) {
         const student = findSarExportStudent(studentId);
         const option = getOverallOptionById(student || {}, templateId)
@@ -1956,6 +1992,7 @@
         const eligibleOptions = getEligibleOverallOptionsForStudent(studentId);
         const checkbox = cell.querySelector('.js-sar-export-check[data-sar-export-type="overall"]');
         const selectEl = cell.querySelector('.js-sar-overall-template-select');
+        let variantSelectEl = cell.querySelector('.js-sar-overall-variant-select');
         const statusEl = cell.querySelector('.js-sar-overall-status');
         const actionsEl = cell.querySelector('.js-sar-overall-actions');
         const badgesEl = cell.querySelector('.js-sar-overall-badges');
@@ -1964,6 +2001,7 @@
             || eligibleOptions[0]
             || null;
         const eligible = Boolean(selectedOption);
+        const previousVariantKey = String(variantSelectEl?.value || '').trim();
 
         if (selectEl) {
             selectEl.innerHTML = eligibleOptions.length
@@ -1973,6 +2011,24 @@
             selectEl.disabled = eligibleOptions.length <= 1;
         }
 
+        const variantHost = cell.querySelector('.js-sar-overall-variant-host');
+        if (variantHost && selectedOption) {
+            variantHost.innerHTML = buildSarOverallVariantSelectHtml(studentId, selectedOption);
+            variantSelectEl = variantHost.querySelector('.js-sar-overall-variant-select');
+        }
+        if (variantSelectEl && selectedOption) {
+            const variants = getOverallVariantOptionsForOption(selectedOption);
+            const keepKey = variants.some((row) => String(row.key || '').trim() === previousVariantKey)
+                ? previousVariantKey
+                : String(selectedOption.suggestedTemplateVariantKey || variants[0]?.key || '').trim();
+            if (keepKey) variantSelectEl.value = keepKey;
+        }
+
+        const variantKey = String(variantSelectEl?.value || selectedOption?.suggestedTemplateVariantKey || '').trim();
+        const formatFlags = selectedOption
+            ? resolveOverallFormatFlagsForOption(selectedOption, variantKey)
+            : { hasDocx: false, hasPdf: false, hasPayload: false };
+
         if (checkbox) {
             checkbox.disabled = !eligible;
             checkbox.setAttribute('data-overall-template-id', selectedOption?.templateId || '');
@@ -1981,7 +2037,7 @@
         }
 
         if (badgesEl) {
-            badgesEl.innerHTML = eligible ? buildSarFormatBadges({ hasDocx: selectedOption.hasDocx, hasPdf: selectedOption.hasPdf, hasPayload: selectedOption.hasPayload }, 'overall') : '';
+            badgesEl.innerHTML = eligible ? buildSarFormatBadges(formatFlags, 'overall') : '';
         }
 
         if (statusEl) {
@@ -1994,7 +2050,7 @@
 
         if (actionsEl) {
             actionsEl.classList.toggle('d-none', !eligible);
-            actionsEl.innerHTML = eligible ? buildSarFormatButtons({ hasDocx: selectedOption.hasDocx, hasPdf: selectedOption.hasPdf, hasPayload: selectedOption.hasPayload }, 'overall') : '';
+            actionsEl.innerHTML = eligible ? buildSarFormatButtons(formatFlags, 'overall') : '';
             actionsEl.querySelectorAll('.js-sar-row-export').forEach((btn) => {
                 btn.disabled = !eligible || !(checkbox && checkbox.checked);
             });
@@ -2129,13 +2185,14 @@
                                     <select class="form-select form-select-sm js-sar-overall-template-select mb-1" data-student-id="${escapeHtml(personId)}" ${eligibleOptions.length <= 1 ? 'disabled' : ''} aria-label="Overall template for ${escapeHtml(student.name || personId)}">
                                         ${selectOptions}
                                     </select>
+                                    <div class="js-sar-overall-variant-host">${initialEligible && selectedOption ? buildSarOverallVariantSelectHtml(personId, selectedOption) : ''}</div>
                                     <div class="small text-muted">Overall merged report</div>
-                                    <div class="js-sar-overall-badges">${initialEligible ? buildSarFormatBadges({ hasDocx: selectedOption.hasDocx, hasPdf: selectedOption.hasPdf, hasPayload: selectedOption.hasPayload }, 'overall') : ''}</div>
+                                    <div class="js-sar-overall-badges">${initialEligible ? buildSarFormatBadges(resolveOverallFormatFlagsForOption(selectedOption, selectedOption?.suggestedTemplateVariantKey), 'overall') : ''}</div>
                                     <div class="small text-warning js-sar-overall-status ${initialEligible ? 'd-none' : ''}">
                                         ${escapeHtml((options[0]?.warnings || []).join(' ') || 'Overall report not available for this student.')}
                                     </div>
                                     <div class="js-sar-overall-actions ${initialEligible ? '' : 'd-none'}">
-                                        ${initialEligible ? buildSarFormatButtons({ hasDocx: selectedOption.hasDocx, hasPdf: selectedOption.hasPdf, hasPayload: selectedOption.hasPayload }, 'overall') : ''}
+                                        ${initialEligible ? buildSarFormatButtons(resolveOverallFormatFlagsForOption(selectedOption, selectedOption?.suggestedTemplateVariantKey), 'overall') : ''}
                                     </div>
                                 </div>
                             </div>
@@ -2186,9 +2243,11 @@
                 const student = findSarExportStudent(studentId);
                 const overall = getOverallOptionById(student || {}, overallTemplateId);
                 if (!overall?.defined || !overallTemplateId) return;
-                if (normalizedFormat === 'pdf' && !overall.hasPdf) return;
-                if (normalizedFormat === 'docx' && !overall.hasDocx) return;
-                if (normalizedFormat === 'json' && overall.hasPayload === false) return;
+                const templateVariantKey = String(cell?.querySelector('.js-sar-overall-variant-select')?.value || overall.suggestedTemplateVariantKey || '').trim();
+                const formatFlags = resolveOverallFormatFlagsForOption(overall, templateVariantKey);
+                if (normalizedFormat === 'pdf' && !formatFlags.hasPdf) return;
+                if (normalizedFormat === 'docx' && !formatFlags.hasDocx) return;
+                if (normalizedFormat === 'json' && formatFlags.hasPayload === false) return;
                 const classIds = [];
                 root.querySelectorAll(
                     `.js-sar-export-check[data-sar-export-type="class"][data-student-id="${CSS.escape(studentId)}"]:checked`
@@ -2196,7 +2255,13 @@
                     const classId = String(classCheckbox.getAttribute('data-class-id') || '').trim();
                     if (classId) classIds.push(classId);
                 });
-                targets.push({ type: 'overall', studentId, overallTemplateId, classIds });
+                targets.push({
+                    type: 'overall',
+                    studentId,
+                    overallTemplateId,
+                    templateVariantKey,
+                    classIds
+                });
             });
         }
 
@@ -2238,7 +2303,7 @@
         return message;
     }
 
-    async function runSarExport(format, targets = []) {
+    async function runSarExport(format, targets = [], exportOptions = {}) {
         const filters = validateSarFilters();
         if (!filters) return;
         if (!targets.length) {
@@ -2247,7 +2312,17 @@
         }
 
         const loadingToken = showSarExportWaiting(format, targets.length);
+        const bundleMode = String(exportOptions.bundleMode || '').trim().toLowerCase();
         try {
+            const params = {
+                actionStateId: sarActionStateId,
+                startDate: filters.startDate,
+                endDate: filters.endDate,
+                studentIds: filters.studentIds.join(','),
+                format: String(format || 'json'),
+                targets: JSON.stringify(targets)
+            };
+            if (bundleMode) params.bundleMode = bundleMode;
             const response = await fetch('/school/attendances/report/api/export', {
                 method: 'POST',
                 credentials: 'same-origin',
@@ -2256,14 +2331,7 @@
                     Accept: 'application/octet-stream, application/json',
                     'X-AJAX-Request': 'true'
                 },
-                body: new URLSearchParams({
-                    actionStateId: sarActionStateId,
-                    startDate: filters.startDate,
-                    endDate: filters.endDate,
-                    studentIds: filters.studentIds.join(','),
-                    format: String(format || 'json'),
-                    targets: JSON.stringify(targets)
-                }).toString()
+                body: new URLSearchParams(params).toString()
             });
 
             if (!response.ok) {
@@ -2414,6 +2482,9 @@
             } else if (exportType === 'overall') {
                 const overallTemplateId = String(rowHost?.querySelector('.js-sar-overall-template-select')?.value || checkbox.getAttribute('data-overall-template-id') || '').trim();
                 if (!overallTemplateId) return;
+                const studentPlan = findSarExportStudent(studentId);
+                const overallOption = getOverallOptionById(studentPlan || {}, overallTemplateId);
+                const templateVariantKey = String(rowHost?.querySelector('.js-sar-overall-variant-select')?.value || overallOption?.suggestedTemplateVariantKey || '').trim();
                 const classIds = [];
                 getSarExportRoot()?.querySelectorAll(
                     `.js-sar-export-check[data-sar-export-type="class"][data-student-id="${CSS.escape(studentId)}"]:checked`
@@ -2421,7 +2492,7 @@
                     const classId = String(classCheckbox.getAttribute('data-class-id') || '').trim();
                     if (classId) classIds.push(classId);
                 });
-                targets.push({ type: 'overall', studentId, overallTemplateId, classIds });
+                targets.push({ type: 'overall', studentId, overallTemplateId, templateVariantKey, classIds });
             }
             runSarExport(format, targets).catch((error) => {
                 showReportMessage({ icon: 'error', message: error.message || 'Export failed.' });
@@ -2440,13 +2511,22 @@
                 showReportMessage({ icon: 'warning', message: `Select at least one ${scopeLabel} that supports this format.` });
                 return;
             }
-            runSarExport(format, targets).catch((error) => {
+            const normalizedFormat = String(format || '').trim().toLowerCase();
+            const bundleMode = scope === 'overall' && (normalizedFormat === 'docx' || normalizedFormat === 'pdf')
+                ? 'merge'
+                : '';
+            runSarExport(format, targets, { bundleMode }).catch((error) => {
                 showReportMessage({ icon: 'error', message: error.message || 'Export failed.' });
             });
         }
     });
 
     document.getElementById('sarExportModal')?.addEventListener('change', (event) => {
+        const variantSelect = event.target.closest('.js-sar-overall-variant-select');
+        if (variantSelect) {
+            updateOverallEligibilityUi(String(variantSelect.getAttribute('data-student-id') || '').trim());
+            return;
+        }
         const select = event.target.closest('.js-sar-overall-template-select');
         if (select) {
             updateOverallEligibilityUi(String(select.getAttribute('data-student-id') || '').trim());

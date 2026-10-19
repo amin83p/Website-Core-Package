@@ -738,6 +738,89 @@
     return student.overall ? [student.overall] : [];
   }
 
+  function getSmmrOverallVariantOptionsForOption(option) {
+    const rows = Array.isArray(option?.templateVariantOptions) ? option.templateVariantOptions : [];
+    return rows.filter((row) => row && String(row.key || '').trim());
+  }
+
+  function resolveSmmrOverallFormatFlagsForOption(option, variantKey = '') {
+    const variants = getSmmrOverallVariantOptionsForOption(option);
+    const key = String(variantKey || option?.suggestedTemplateVariantKey || variants[0]?.key || '').trim();
+    const variant = variants.find((row) => String(row.key || '').trim() === key) || variants[0];
+    if (variant) {
+      return {
+        hasDocx: Boolean(variant.hasDocx),
+        hasPdf: Boolean(variant.hasPdf),
+        hasPayload: option?.hasPayload !== false
+      };
+    }
+    return {
+      hasDocx: Boolean(option?.hasDocx),
+      hasPdf: Boolean(option?.hasPdf),
+      hasPayload: option?.hasPayload !== false
+    };
+  }
+
+  function buildSmmrOverallVariantSelectHtml(personId, option) {
+    const variants = getSmmrOverallVariantOptionsForOption(option);
+    if (!variants.length) return '';
+    const suggested = String(option?.suggestedTemplateVariantKey || variants[0]?.key || '').trim();
+    const optionsHtml = variants.map((row) => {
+      const key = String(row.key || '').trim();
+      const selected = key === suggested ? ' selected' : '';
+      return `<option value="${escapeHtml(key)}"${selected}>${escapeHtml(row.label || key)}</option>`;
+    }).join('');
+    const disabled = variants.length <= 1 ? ' disabled' : '';
+    return `<select class="form-select form-select-sm js-smmr-overall-variant-select mb-1" data-student-id="${escapeHtml(personId)}"${disabled} aria-label="Document template for overall report">${optionsHtml}</select>`;
+  }
+
+  function updateSmmrOverallCellUi(studentId) {
+    const cell = document.querySelector(`.js-smmr-overall-cell[data-student-id="${CSS.escape(String(studentId || ''))}"]`);
+    if (!cell) return;
+    const student = findSmmrExportStudent(studentId);
+    const templateSelect = cell.querySelector('.js-smmr-overall-template-select');
+    const previousVariantKey = String(cell.querySelector('.js-smmr-overall-variant-select')?.value || '').trim();
+    const templateId = String(templateSelect?.value || '').trim();
+    const options = getSmmrOverallOptions(student).filter((opt) => opt?.defined);
+    const eligible = options.filter((opt) => opt.eligible);
+    const option = eligible.find((row) => String(row.templateId || '').trim() === templateId)
+      || eligible[0]
+      || options.find((row) => String(row.templateId || '').trim() === templateId)
+      || options[0]
+      || null;
+    const checkbox = cell.querySelector('.js-smmr-export-check[data-export-type="overall"]');
+    if (checkbox) {
+      checkbox.setAttribute('data-overall-template-id', option?.templateId || '');
+      checkbox.disabled = !option?.eligible;
+      if (!option?.eligible) checkbox.checked = false;
+    }
+    const variantHost = cell.querySelector('.js-smmr-overall-variant-host');
+    if (variantHost && option) {
+      variantHost.innerHTML = buildSmmrOverallVariantSelectHtml(studentId, option);
+      const variantSelect = variantHost.querySelector('.js-smmr-overall-variant-select');
+      const variants = getSmmrOverallVariantOptionsForOption(option);
+      const keepKey = variants.some((row) => String(row.key || '').trim() === previousVariantKey)
+        ? previousVariantKey
+        : String(option.suggestedTemplateVariantKey || variants[0]?.key || '').trim();
+      if (variantSelect && keepKey) variantSelect.value = keepKey;
+    }
+    const variantKey = String(cell.querySelector('.js-smmr-overall-variant-select')?.value || option?.suggestedTemplateVariantKey || '').trim();
+    const formatFlags = option ? resolveSmmrOverallFormatFlagsForOption(option, variantKey) : null;
+    const actionsEl = cell.querySelector('.js-smmr-overall-actions');
+    if (actionsEl) {
+      if (option?.eligible && formatFlags) {
+        actionsEl.innerHTML = buildSmmrFormatButtons({
+          ...option,
+          ...formatFlags,
+          personId: studentId,
+          studentId: studentId
+        }, 'overall');
+      } else {
+        actionsEl.innerHTML = `<div class="small text-warning">${escapeHtml((option?.warnings || []).join(' ') || 'Overall not available.')}</div>`;
+      }
+    }
+  }
+
   function buildSmmrFormatButtons(row = {}, exportType = 'instance') {
     const personId = String(row.personId || row.studentId || '').trim();
     const instanceId = String(row.instanceId || '').trim();
@@ -787,13 +870,17 @@
         const selectHtml = eligible.length
           ? eligible.map((opt) => `<option value="${escapeHtml(opt.templateId)}">${escapeHtml(opt.templateTitle || opt.templateId)}</option>`).join('')
           : '<option value="">No eligible overall template</option>';
+        const initialFlags = selected
+          ? resolveSmmrOverallFormatFlagsForOption(selected, selected.suggestedTemplateVariantKey)
+          : null;
         return `
           <td class="align-top js-smmr-overall-cell" data-student-id="${escapeHtml(personId)}">
             <div class="d-flex gap-2 align-items-start">
               <input type="checkbox" class="form-check-input mt-1 js-smmr-export-check" data-export-type="overall" data-student-id="${escapeHtml(personId)}" data-overall-template-id="${escapeHtml(selected?.templateId || '')}" ${selected?.eligible ? 'checked' : 'disabled'}>
               <div class="flex-grow-1">
                 <select class="form-select form-select-sm js-smmr-overall-template-select mb-1" data-student-id="${escapeHtml(personId)}" ${eligible.length <= 1 ? 'disabled' : ''}>${selectHtml}</select>
-                ${selected?.eligible ? buildSmmrFormatButtons({ ...selected, personId, studentId: personId }, 'overall') : `<div class="small text-warning">${escapeHtml((selected?.warnings || []).join(' ') || 'Overall not available.')}</div>`}
+                <div class="js-smmr-overall-variant-host">${selected ? buildSmmrOverallVariantSelectHtml(personId, selected) : ''}</div>
+                <div class="js-smmr-overall-actions">${selected?.eligible && initialFlags ? buildSmmrFormatButtons({ ...selected, ...initialFlags, personId, studentId: personId }, 'overall') : `<div class="small text-warning">${escapeHtml((selected?.warnings || []).join(' ') || 'Overall not available.')}</div>`}</div>
               </div>
             </div>
           </td>`;
@@ -839,16 +926,18 @@
         const student = findSmmrExportStudent(studentId);
         const option = getSmmrOverallOptions(student).find((row) => String(row.templateId || '').trim() === overallTemplateId);
         if (!overallTemplateId || !option?.eligible) return;
-        if (normalizedFormat === 'docx' && !option.hasDocx) return;
-        if (normalizedFormat === 'pdf' && !option.hasPdf) return;
-        if (normalizedFormat === 'json' && option.hasPayload === false) return;
-        targets.push({ type: 'overall', studentId, overallTemplateId });
+        const templateVariantKey = String(cell?.querySelector('.js-smmr-overall-variant-select')?.value || option.suggestedTemplateVariantKey || '').trim();
+        const formatFlags = resolveSmmrOverallFormatFlagsForOption(option, templateVariantKey);
+        if (normalizedFormat === 'docx' && !formatFlags.hasDocx) return;
+        if (normalizedFormat === 'pdf' && !formatFlags.hasPdf) return;
+        if (normalizedFormat === 'json' && formatFlags.hasPayload === false) return;
+        targets.push({ type: 'overall', studentId, overallTemplateId, templateVariantKey });
       });
     }
     return targets;
   }
 
-  async function runSmmrExport(format, targets = []) {
+  async function runSmmrExport(format, targets = [], exportOptions = {}) {
     const filters = validateSmmrFilters();
     if (!filters) return;
     if (!targets.length) {
@@ -858,7 +947,17 @@
     const loadingToken = typeof window.showLoading === 'function'
       ? window.showLoading({ title: 'Exporting Reports', note: 'Generating files…', operation: 'Export' })
       : null;
+    const bundleMode = String(exportOptions.bundleMode || '').trim().toLowerCase();
     try {
+      const params = {
+        actionStateId: smmrActionStateId,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        studentIds: filters.studentIds.join(','),
+        format: String(format || 'json'),
+        targets: JSON.stringify(targets)
+      };
+      if (bundleMode) params.bundleMode = bundleMode;
       const response = await fetch('/school/reports/semi-monthly/api/export', {
         method: 'POST',
         credentials: 'same-origin',
@@ -867,14 +966,7 @@
           Accept: 'application/octet-stream, application/json',
           'X-AJAX-Request': 'true'
         },
-        body: new URLSearchParams({
-          actionStateId: smmrActionStateId,
-          startDate: filters.startDate,
-          endDate: filters.endDate,
-          studentIds: filters.studentIds.join(','),
-          format: String(format || 'json'),
-          targets: JSON.stringify(targets)
-        }).toString()
+        body: new URLSearchParams(params).toString()
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
@@ -1043,7 +1135,12 @@
           || cell?.querySelector('.js-smmr-overall-template-select')?.value
           || ''
         ).trim();
-        if (studentId && overallTemplateId) targets.push({ type: 'overall', studentId, overallTemplateId });
+        if (studentId && overallTemplateId) {
+          const studentPlan = findSmmrExportStudent(studentId);
+          const overallOption = getSmmrOverallOptions(studentPlan).find((row) => String(row.templateId || '').trim() === overallTemplateId);
+          const templateVariantKey = String(cell?.querySelector('.js-smmr-overall-variant-select')?.value || overallOption?.suggestedTemplateVariantKey || '').trim();
+          targets.push({ type: 'overall', studentId, overallTemplateId, templateVariantKey });
+        }
       }
       runSmmrExport(format, targets);
       return;
@@ -1053,23 +1150,22 @@
       event.preventDefault();
       const format = String(bulkBtn.getAttribute('data-format') || 'json').trim().toLowerCase();
       const scope = String(bulkBtn.getAttribute('data-export-scope') || 'all').trim().toLowerCase();
-      runSmmrExport(format, gatherSmmrExportTargets(format, scope));
+      const normalizedFormat = String(format || '').trim().toLowerCase();
+      const bundleMode = scope === 'overall' && (normalizedFormat === 'docx' || normalizedFormat === 'pdf')
+        ? 'merge'
+        : '';
+      runSmmrExport(format, gatherSmmrExportTargets(format, scope), { bundleMode });
     }
   });
   document.getElementById('smmrExportModal')?.addEventListener('change', (event) => {
+    const variantSelect = event.target.closest('.js-smmr-overall-variant-select');
+    if (variantSelect) {
+      updateSmmrOverallCellUi(String(variantSelect.getAttribute('data-student-id') || '').trim());
+      return;
+    }
     const select = event.target.closest('.js-smmr-overall-template-select');
     if (!select) return;
-    const studentId = String(select.getAttribute('data-student-id') || '').trim();
-    const cell = select.closest('.js-smmr-overall-cell');
-    const checkbox = cell?.querySelector('.js-smmr-export-check[data-export-type="overall"]');
-    const templateId = String(select.value || '').trim();
-    const student = findSmmrExportStudent(studentId);
-    const option = getSmmrOverallOptions(student).find((row) => String(row.templateId || '').trim() === templateId);
-    if (checkbox) {
-      checkbox.setAttribute('data-overall-template-id', templateId);
-      checkbox.disabled = !option?.eligible;
-      checkbox.checked = Boolean(option?.eligible);
-    }
+    updateSmmrOverallCellUi(String(select.getAttribute('data-student-id') || '').trim());
   });
   document.getElementById('btn_expandAllStudents')?.addEventListener('click', () => setAllStudentSectionsExpanded(true));
   document.getElementById('btn_collapseAllStudents')?.addEventListener('click', () => setAllStudentSectionsExpanded(false));
