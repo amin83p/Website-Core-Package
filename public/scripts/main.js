@@ -3841,6 +3841,18 @@ function initHeaderShortcuts() {
             if (!orgSwitchTrigger) return;
             event.preventDefault();
             triggerElement(orgSwitchTrigger);
+            return;
+        }
+
+        if (key === 'r') {
+            const reportsNav = document.querySelector('.school-navigator-reports-dashboard');
+            if (!reportsNav) return;
+            event.preventDefault();
+            if (reportsNav instanceof HTMLAnchorElement && reportsNav.href) {
+                window.location.assign(reportsNav.href);
+                return;
+            }
+            triggerElement(reportsNav);
         }
     });
 }

@@ -516,10 +516,56 @@ async function collectStudentClassMatrixPayloadsForExport(req, options = {}) {
   };
 }
 
+function formatLocalDateYmd(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function getWeekStartKeyForDate(dateToken = '') {
+  const normalized = normalizeDateOnly(dateToken);
+  if (!normalized) return '';
+  const d = new Date(`${normalized}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return '';
+  const dayOfWeek = d.getDay() || 7;
+  const monday = new Date(d);
+  monday.setDate(d.getDate() - (dayOfWeek - 1));
+  return formatLocalDateYmd(monday);
+}
+
+function buildWeekBoundaryFlagsForDays(visibleDays = []) {
+  const days = Array.isArray(visibleDays) ? visibleDays : [];
+  const weekKeys = days.map((day) => getWeekStartKeyForDate(day));
+  return days.map((_, index) => {
+    if (index <= 0) return false;
+    return weekKeys[index] !== weekKeys[index - 1];
+  });
+}
+
+function filterReportDaysWithSessionForStudent(student = {}, allDays = [], options = {}) {
+  const days = Array.isArray(allDays) ? allDays : [];
+  if (!options.hideDaysWithoutSession) {
+    return days.slice();
+  }
+  const sessionDates = new Set();
+  (Array.isArray(student?.classes) ? student.classes : []).forEach((classRow) => {
+    (Array.isArray(classRow?.days) ? classRow.days : []).forEach((cell) => {
+      if (!cell?.hasSession) return;
+      const date = normalizeDateOnly(cell.date);
+      if (date) sessionDates.add(date);
+    });
+  });
+  return days.filter((day) => sessionDates.has(normalizeDateOnly(day)));
+}
+
 module.exports = {
   buildDateRangeDays,
   buildClassDayCells,
   buildStudentAttendanceReportPayload,
   collectStudentClassMatrixPayloadsForExport,
-  resolveSelectedStudents
+  resolveSelectedStudents,
+  filterReportDaysWithSessionForStudent,
+  getWeekStartKeyForDate,
+  buildWeekBoundaryFlagsForDays
 };

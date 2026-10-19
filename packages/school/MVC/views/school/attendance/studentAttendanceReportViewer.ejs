@@ -68,6 +68,10 @@
         box-shadow: 2px 0 2px -1px rgba(0, 0, 0, 0.06);
     }
     .student-report-table td.matrix-sticky-class { background-color: #fff; z-index: 1; }
+    #resultsContainer.sar-week-separators-on .student-report-table th.sar-week-boundary,
+    #resultsContainer.sar-week-separators-on .student-report-table td.sar-week-boundary {
+        border-left: 2px solid #6c757d;
+    }
     .student-summary-chip { font-size: 0.82rem; }
     .sar-selected-students-menu {
         min-width: 320px;
@@ -253,7 +257,7 @@
   optionalBtnsBeforePrint,
   headerManageBtns: [
     '<a href="' + dashHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
-    '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-journal-bookmark me-1"></i> School Academia</a>'
+    '<a href="/dashboard/section-nav/SCHOOL_REPORTS" class="school-navigator-dashboard school-navigator-reports-dashboard btn btn-filled btn-secondary btn-md mb-2" title="School Reports (Alt+Shift+R)" aria-keyshortcuts="Alt+Shift+R"><i class="bi bi-file-earmark-richtext me-1"></i> School Reports</a>'
   ],
   manageBtns
 }) %>
@@ -342,24 +346,42 @@
     <div class="card border-0 shadow-sm d-none" id="resultsContainer">
         <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div class="fw-semibold text-muted small">Student Attendance Report</div>
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-                <button type="button"
-                    class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn attendance-history-toggle-btn"
-                    id="btn_sarAttendanceHistory"
-                    aria-label="Toggle change history"
-                    title="Toggle change history"
-                    aria-pressed="false">
-                    <i class="bi bi-clock-history" aria-hidden="true"></i>
-                </button>
-                <button type="button"
-                    class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
-                    id="btn_sarAttendanceLegend"
-                    aria-label="Legend"
-                    title="Legend">
-                    <i class="bi bi-info-circle" aria-hidden="true"></i>
-                </button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_expandAllStudents">Expand All</button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_collapseAllStudents">Collapse All</button>
+            <div class="d-flex align-items-center gap-2 flex-wrap ms-md-auto">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <button type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        id="btn_sarHideDaysWithoutSession"
+                        aria-pressed="false"
+                        title="When on, each student's table only shows dates where at least one of their classes had a scheduled session.">
+                        Hide days without sessions
+                    </button>
+                    <button type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        id="btn_sarWeekSeparators"
+                        aria-pressed="false"
+                        title="When on, show a vertical line between calendar weeks (Monday start).">
+                        Week separators
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_expandAllStudents">Expand All</button>
+                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_collapseAllStudents">Collapse All</button>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <button type="button"
+                        class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn attendance-history-toggle-btn"
+                        id="btn_sarAttendanceHistory"
+                        aria-label="Toggle change history"
+                        title="Toggle change history"
+                        aria-pressed="false">
+                        <i class="bi bi-clock-history" aria-hidden="true"></i>
+                    </button>
+                    <button type="button"
+                        class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
+                        id="btn_sarAttendanceLegend"
+                        aria-label="Legend"
+                        title="Legend">
+                        <i class="bi bi-info-circle" aria-hidden="true"></i>
+                    </button>
+                </div>
             </div>
         </div>
         <div class="card-body" id="studentReportSections"></div>
@@ -634,6 +656,9 @@
     let sarExportModalInstance = null;
     let sarReportLoadToken = null;
     let sarReportLoadWaitingPoll = null;
+    let sarHideDaysWithoutSession = false;
+    let sarShowWeekSeparators = false;
+    let sarLastReportPayload = null;
     window.sarAttendanceHistoryModeOn = false;
 
     function renderSarAttendanceLegend() {
@@ -676,9 +701,37 @@
         return `<button type="button" class="btn btn-link btn-sm p-0 position-absolute top-0 start-0 ps-1 pt-1 attendance-cell-history-btn" title="View change history" aria-label="View change history" data-class-id="${escapeHtml(classId)}" data-session-id="${escapeHtml(sessionId)}" data-session-date="${escapeHtml(detail.date || '')}" data-person-id="${escapeHtml(personId)}" data-student-name="${escapeHtml(detail.studentName || '')}" onclick="event.stopPropagation(); openAttendanceCellHistory(this);"><i class="bi bi-info-circle" style="font-size:0.65rem;"></i></button>`;
     }
 
-    function buildSarAttendanceCellHtml(dayCell, personId, classId, studentName) {
+    function formatLocalDateYmd(date) {
+        const y = date.getFullYear();
+        const m = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+
+    function getWeekStartKey(dateToken) {
+        const normalized = String(dateToken || '').trim();
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) return '';
+        const d = new Date(`${normalized}T00:00:00`);
+        if (Number.isNaN(d.getTime())) return '';
+        const dayOfWeek = d.getDay() || 7;
+        const monday = new Date(d);
+        monday.setDate(d.getDate() - (dayOfWeek - 1));
+        return formatLocalDateYmd(monday);
+    }
+
+    function buildWeekBoundaryFlagsForDays(visibleDays) {
+        const days = Array.isArray(visibleDays) ? visibleDays : [];
+        const weekKeys = days.map((day) => getWeekStartKey(day));
+        return days.map((_, index) => {
+            if (index <= 0) return false;
+            return weekKeys[index] !== weekKeys[index - 1];
+        });
+    }
+
+    function buildSarAttendanceCellHtml(dayCell, personId, classId, studentName, weekBoundary = false) {
+        const boundaryClass = sarShowWeekSeparators && weekBoundary ? ' sar-week-boundary' : '';
         if (!dayCell?.hasSession) {
-            return '<td class="attendance-no-session-cell" title="No session scheduled"><i class="bi bi-x-lg sar-no-session-icon" aria-hidden="true"></i><span class="visually-hidden">No session scheduled</span></td>';
+            return `<td class="attendance-no-session-cell${boundaryClass}" title="No session scheduled"><i class="bi bi-x-lg sar-no-session-icon" aria-hidden="true"></i><span class="visually-hidden">No session scheduled</span></td>`;
         }
         const noteBadge = dayCell.notesExist
             ? '<div class="position-absolute top-0 end-0 pe-1 pt-1"><i class="bi bi-chat-dots-fill text-primary" style="font-size: 0.65rem;"></i></div>'
@@ -693,7 +746,7 @@
             studentName
         };
         const historyBtn = window.sarAttendanceHistoryModeOn ? buildSarCellHistoryButton(detail) : '';
-        return `<td class="att-cell position-relative" data-sar-cell-key="${escapeHtml(cellKey)}" title="${escapeHtml(cellTitle)}">${historyBtn}${buildStatusIcon(dayCell)}${noteBadge}</td>`;
+        return `<td class="att-cell position-relative${boundaryClass}" data-sar-cell-key="${escapeHtml(cellKey)}" title="${escapeHtml(cellTitle)}">${historyBtn}${buildStatusIcon(dayCell)}${noteBadge}</td>`;
     }
 
     function formatAttendanceHistorySessionDate(ymd) {
@@ -893,6 +946,61 @@
             toggleBtn.classList.toggle('active', window.sarAttendanceHistoryModeOn);
             toggleBtn.setAttribute('aria-pressed', window.sarAttendanceHistoryModeOn ? 'true' : 'false');
         }
+        patchSarAttendanceCellsForHistoryMode();
+    }
+
+    function filterReportDaysWithSessionForStudent(student, allDays) {
+        const days = Array.isArray(allDays) ? allDays : [];
+        if (!sarHideDaysWithoutSession) return days.slice();
+        const sessionDates = new Set();
+        (student?.classes || []).forEach((classRow) => {
+            (classRow.days || []).forEach((cell) => {
+                if (!cell?.hasSession) return;
+                const date = String(cell.date || '').trim();
+                if (date) sessionDates.add(date);
+            });
+        });
+        return days.filter((day) => sessionDates.has(String(day || '').trim()));
+    }
+
+    function setSarHideDaysWithoutSession(enabled) {
+        sarHideDaysWithoutSession = Boolean(enabled);
+        const toggleBtn = document.getElementById('btn_sarHideDaysWithoutSession');
+        if (toggleBtn) {
+            toggleBtn.classList.toggle('active', sarHideDaysWithoutSession);
+            toggleBtn.setAttribute('aria-pressed', sarHideDaysWithoutSession ? 'true' : 'false');
+        }
+        if (sarLastReportPayload) {
+            renderStudentReportSections(sarLastReportPayload);
+        }
+    }
+
+    function setSarWeekSeparators(enabled) {
+        sarShowWeekSeparators = Boolean(enabled);
+        const toggleBtn = document.getElementById('btn_sarWeekSeparators');
+        const resultsContainer = document.getElementById('resultsContainer');
+        if (toggleBtn) {
+            toggleBtn.classList.toggle('active', sarShowWeekSeparators);
+            toggleBtn.setAttribute('aria-pressed', sarShowWeekSeparators ? 'true' : 'false');
+        }
+        if (resultsContainer) {
+            resultsContainer.classList.toggle('sar-week-separators-on', sarShowWeekSeparators);
+        }
+        if (sarLastReportPayload) {
+            renderStudentReportSections(sarLastReportPayload);
+        }
+    }
+
+    function renderStudentReportSections(payload) {
+        if (!payload) return;
+        const days = Array.isArray(payload.days) ? payload.days : [];
+        const students = orderReportStudentsBySelection(Array.isArray(payload.students) ? payload.students : []);
+        const container = document.getElementById('studentReportSections');
+        container.innerHTML = students.length
+            ? students.map((student) => buildStudentSection(student, days, payload.startDate, payload.endDate)).join('')
+            : '<p class="text-muted mb-0">No attendance data found for the selected students.</p>';
+        populateCellDetailsFromPayload(students, payload.startDate, payload.endDate);
+        mergeSelectedStudentsFromReportPayload(students);
         patchSarAttendanceCellsForHistoryMode();
     }
 
@@ -1565,11 +1673,12 @@
         return buildIcon('unmarked') || '<i class="bi bi-dash text-muted"></i>';
     }
 
-    function buildDayHeader(dateToken) {
+    function buildDayHeader(dateToken, options = {}) {
+        const boundaryClass = sarShowWeekSeparators && options.weekBoundary ? ' sar-week-boundary' : '';
         const d = new Date(`${dateToken}T00:00:00`);
         const shortDate = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
         const weekday = d.toLocaleDateString('en-US', { weekday: 'short' });
-        return `<th class="text-center px-1 py-2" title="${escapeHtml(dateToken)}">${escapeHtml(weekday)}<br>${escapeHtml(shortDate)}</th>`;
+        return `<th class="text-center px-1 py-2${boundaryClass}" title="${escapeHtml(dateToken)}">${escapeHtml(weekday)}<br>${escapeHtml(shortDate)}</th>`;
     }
 
     function buildAttendanceRollupCellHtml(summary = {}) {
@@ -1593,6 +1702,8 @@
 
     function buildStudentSection(student, days, startDate, endDate) {
         const personId = String(student?.personId || '').trim();
+        const visibleDays = filterReportDaysWithSessionForStudent(student, days);
+        const visibleDaySet = new Set(visibleDays);
         const collapseId = `student-report-${personId.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
         const summary = student?.summary || {};
         const rollupPct = summary.rollupPercent == null ? '—' : `${summary.rollupPercent}%`;
@@ -1604,16 +1715,24 @@
         const studentExcelExportBtn = canExportStudentMatrixExcel
             ? `<button type="button" class="btn btn-filled btn-success btn-sm flex-shrink-0 js-sar-student-excel-export" data-person-id="${escapeHtml(personId)}" title="Export attendance matrix Excel for all classes"><i class="bi bi-cloud-download me-1"></i> Export</button>`
             : '';
+        const weekBoundaryFlags = buildWeekBoundaryFlagsForDays(visibleDays);
 
         let classRows = '';
-        (student.classes || []).forEach((classRow) => {
-            const classId = String(classRow.classId || '').trim();
-            const matrixUrl = `/school/attendances?classId=${encodeURIComponent(classId)}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&studentId=${encodeURIComponent(personId)}`;
-            let cells = '';
-            (classRow.days || []).forEach((dayCell) => {
-                cells += buildSarAttendanceCellHtml(dayCell, personId, classId, studentName);
-            });
-            classRows += `
+        const enrolledClasses = student.classes || [];
+        if (enrolledClasses.length && visibleDays.length) {
+            enrolledClasses.forEach((classRow) => {
+                const classId = String(classRow.classId || '').trim();
+                const matrixUrl = `/school/attendances?classId=${encodeURIComponent(classId)}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&studentId=${encodeURIComponent(personId)}`;
+                let cells = '';
+                let visibleDayIndex = 0;
+                (classRow.days || []).forEach((dayCell) => {
+                    const date = String(dayCell?.date || '').trim();
+                    if (!visibleDaySet.has(date)) return;
+                    const weekBoundary = Boolean(weekBoundaryFlags[visibleDayIndex]);
+                    visibleDayIndex += 1;
+                    cells += buildSarAttendanceCellHtml(dayCell, personId, classId, studentName, weekBoundary);
+                });
+                classRows += `
                 <tr>
                     ${buildAttendanceRollupCellHtml(classRow.summary)}
                     <td class="matrix-sticky-class px-3 py-2 small fw-semibold">
@@ -1622,13 +1741,21 @@
                     </td>
                     ${cells}
                 </tr>`;
-        });
-
-        if (!classRows) {
-            classRows = `<tr><td class="matrix-sticky-class px-3 py-2 text-muted small" colspan="${days.length + 2}">No enrolled classes with attendance in this range.</td></tr>`;
+            });
         }
 
-        const dayHeaders = days.map((day) => buildDayHeader(day)).join('');
+        const colspan = visibleDays.length + 2;
+        if (!enrolledClasses.length) {
+            classRows = `<tr><td class="matrix-sticky-class px-3 py-2 text-muted small" colspan="${colspan}">No enrolled classes with attendance in this range.</td></tr>`;
+        } else if (!visibleDays.length) {
+            classRows = `<tr><td class="matrix-sticky-class px-3 py-2 text-muted small" colspan="${colspan}">No scheduled sessions in this date range.</td></tr>`;
+        } else if (!classRows) {
+            classRows = `<tr><td class="matrix-sticky-class px-3 py-2 text-muted small" colspan="${colspan}">No enrolled classes with attendance in this range.</td></tr>`;
+        }
+
+        const dayHeaders = visibleDays.map((day, index) => buildDayHeader(day, {
+            weekBoundary: Boolean(weekBoundaryFlags[index])
+        })).join('');
 
         return `
             <div class="card border shadow-sm mb-3 student-report-card" data-person-id="${escapeHtml(personId)}" data-student-record-id="${escapeHtml(String(student.studentRecordId || '').trim())}">
@@ -1717,17 +1844,10 @@
                 throw new Error(payload.message || 'Could not load student attendance report.');
             }
 
-            const days = Array.isArray(payload.days) ? payload.days : [];
-            const students = orderReportStudentsBySelection(Array.isArray(payload.students) ? payload.students : []);
-            const container = document.getElementById('studentReportSections');
-            container.innerHTML = students.length
-                ? students.map((student) => buildStudentSection(student, days, payload.startDate, payload.endDate)).join('')
-                : '<p class="text-muted mb-0">No attendance data found for the selected students.</p>';
-            populateCellDetailsFromPayload(students, payload.startDate, payload.endDate);
-            mergeSelectedStudentsFromReportPayload(students);
+            sarLastReportPayload = payload;
+            renderStudentReportSections(payload);
             syncSarUrlFromFilters();
             document.getElementById('resultsContainer').classList.remove('d-none');
-            patchSarAttendanceCellsForHistoryMode();
         } finally {
             hideSarReportWaiting();
             if (loadBtn) {
@@ -2520,11 +2640,20 @@
         document.getElementById('studentReportSections').innerHTML = '';
         document.getElementById('resultsContainer').classList.add('d-none');
         sarExportPlan = null;
+        sarLastReportPayload = null;
+        setSarHideDaysWithoutSession(false);
+        setSarWeekSeparators(false);
     });
     document.getElementById('btn_expandAllStudents')?.addEventListener('click', () => setAllStudentSectionsExpanded(true));
     document.getElementById('btn_collapseAllStudents')?.addEventListener('click', () => setAllStudentSectionsExpanded(false));
     document.getElementById('btn_sarAttendanceHistory')?.addEventListener('click', () => {
         setSarAttendanceHistoryMode(!window.sarAttendanceHistoryModeOn);
+    });
+    document.getElementById('btn_sarHideDaysWithoutSession')?.addEventListener('click', () => {
+        setSarHideDaysWithoutSession(!sarHideDaysWithoutSession);
+    });
+    document.getElementById('btn_sarWeekSeparators')?.addEventListener('click', () => {
+        setSarWeekSeparators(!sarShowWeekSeparators);
     });
     document.getElementById('btn_sarAttendanceLegend')?.addEventListener('click', () => {
         openSarAttendanceLegendModal();

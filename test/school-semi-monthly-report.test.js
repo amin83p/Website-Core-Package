@@ -73,6 +73,17 @@ test('instanceMatchesStudent matches person id on instance studentId', () => {
   );
 });
 
+test('semi-monthly report header shortcut targets reports dashboard', () => {
+  const view = fs.readFileSync(
+    path.join(__dirname, '../packages/school/MVC/views/school/report/semiMonthlyReportViewer.ejs'),
+    'utf8'
+  );
+  assert.match(view, /school-navigator-reports-dashboard/);
+  assert.match(view, /\/dashboard\/section-nav\/SCHOOL_REPORTS/);
+  assert.doesNotMatch(view, /SCHOOL_ACADEMIA/);
+  assert.match(view, /aria-keyshortcuts="Alt\+Shift\+R"/);
+});
+
 test('semi-monthly report viewer wires picker and data API', () => {
   const view = fs.readFileSync(
     path.join(__dirname, '../packages/school/MVC/views/school/report/semiMonthlyReportViewer.ejs'),
