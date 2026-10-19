@@ -5,6 +5,7 @@ async function buildStudentAttendanceReportExcelExport(req, options = {}) {
   const personId = String(options.personId || '').trim();
   const startDate = String(options.startDate || '').trim();
   const endDate = String(options.endDate || '').trim();
+  const sheetLayout = attendanceExcelExportService.normalizeStudentExcelSheetLayout(options.sheetLayout);
 
   const collected = await studentAttendanceReportService.collectStudentClassMatrixPayloadsForExport(req, {
     personId,
@@ -28,6 +29,8 @@ async function buildStudentAttendanceReportExcelExport(req, options = {}) {
     studentName: collected.student?.name || personId,
     startDate: collected.startDate,
     endDate: collected.endDate
+  }, {
+    sheetLayout
   });
 }
 

@@ -380,6 +380,32 @@
     </div>
 </div>
 
+<div class="modal fade" id="sarExcelExportModal" tabindex="-1" aria-labelledby="sarExcelExportModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-2 px-3">
+                <h6 class="modal-title mb-0 fw-semibold" id="sarExcelExportModalLabel"><i class="bi bi-file-earmark-spreadsheet me-1"></i>Export attendance Excel</h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-3">Choose how class attendance matrices are arranged in the workbook.</p>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="sarExcelSheetLayout" id="sarExcelSheetLayoutPerClass" value="perClass" checked>
+                    <label class="form-check-label" for="sarExcelSheetLayoutPerClass">Each class on a separate sheet</label>
+                </div>
+                <div class="form-check">
+                    <input class="form-check-input" type="radio" name="sarExcelSheetLayout" id="sarExcelSheetLayoutSingle" value="singleSheet">
+                    <label class="form-check-label" for="sarExcelSheetLayoutSingle">All classes on one sheet</label>
+                </div>
+            </div>
+            <div class="modal-footer py-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success btn-sm" id="sarExcelExportConfirmBtn"><i class="bi bi-cloud-download me-1"></i>Export</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="attendanceCellHistoryModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
@@ -1722,7 +1748,15 @@
         return { startDate, endDate, studentIds };
     }
 
-    function exportStudentAttendanceExcel(personId) {
+    let sarExcelExportPendingPersonId = '';
+
+    function getSelectedSarExcelSheetLayout() {
+        const checked = document.querySelector('#sarExcelExportModal input[name="sarExcelSheetLayout"]:checked');
+        const value = String(checked?.value || 'perClass').trim();
+        return value === 'singleSheet' ? 'singleSheet' : 'perClass';
+    }
+
+    function openSarExcelExportModal(personId) {
         const id = String(personId || '').trim();
         if (!id) return;
         const { startDate, endDate } = getSarFilterParams();
@@ -1734,10 +1768,35 @@
             });
             return;
         }
+        sarExcelExportPendingPersonId = id;
+        const perClassRadio = document.getElementById('sarExcelSheetLayoutPerClass');
+        if (perClassRadio) perClassRadio.checked = true;
+        const modalEl = document.getElementById('sarExcelExportModal');
+        if (modalEl && window.bootstrap?.Modal) {
+            window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        } else {
+            exportStudentAttendanceExcel(id, 'perClass');
+        }
+    }
+
+    function exportStudentAttendanceExcel(personId, sheetLayout = 'perClass') {
+        const id = String(personId || '').trim();
+        if (!id) return;
+        const { startDate, endDate } = getSarFilterParams();
+        if (!startDate || !endDate) {
+            showReportMessage({
+                icon: 'warning',
+                title: 'Date range required',
+                message: 'Select a start and end date before exporting.'
+            });
+            return;
+        }
+        const layout = String(sheetLayout || 'perClass').trim() === 'singleSheet' ? 'singleSheet' : 'perClass';
         const params = new URLSearchParams();
         params.set('personId', id);
         params.set('startDate', startDate);
         params.set('endDate', endDate);
+        params.set('sheetLayout', layout);
         window.location.href = `/school/attendances/report/api/export-excel.xlsx?${params.toString()}`;
     }
 
@@ -2415,7 +2474,7 @@
         if (studentExcelBtn) {
             event.preventDefault();
             event.stopPropagation();
-            exportStudentAttendanceExcel(studentExcelBtn.getAttribute('data-person-id'));
+            openSarExcelExportModal(studentExcelBtn.getAttribute('data-person-id'));
             return;
         }
         const cellTrigger = event.target.closest('[data-sar-cell-key]');
@@ -2432,6 +2491,18 @@
 
     document.getElementById('btn_sarOpenMatrix')?.addEventListener('click', () => {
         confirmOpenAttendanceMatrix(sarCurrentMatrixUrl);
+    });
+
+    document.getElementById('sarExcelExportConfirmBtn')?.addEventListener('click', () => {
+        const personId = String(sarExcelExportPendingPersonId || '').trim();
+        if (!personId) return;
+        const sheetLayout = getSelectedSarExcelSheetLayout();
+        const modalEl = document.getElementById('sarExcelExportModal');
+        if (modalEl && window.bootstrap?.Modal) {
+            window.bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+        }
+        exportStudentAttendanceExcel(personId, sheetLayout);
+        sarExcelExportPendingPersonId = '';
     });
 
     document.getElementById('btn_copyReportLink')?.addEventListener('click', () => {

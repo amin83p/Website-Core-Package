@@ -643,7 +643,11 @@ function mergeHeaderBlock(sheet, row, startCol, endCol) {
   sheet.mergeCells(`${colLetter(startCol)}${row}:${colLetter(endCol)}${row}`);
 }
 
-function appendAttendanceMatrixSheet(workbook, payload = {}, options = {}) {
+function writeAttendanceMatrixBlock(sheet, payload = {}, options = {}) {
+  const startRow = Math.max(1, Number(options.startRow) || 1);
+  const applyColumnWidths = options.applyColumnWidths !== false;
+  const rowAt = (relativeOneBased) => startRow + relativeOneBased - 1;
+
   const sessions = Array.isArray(payload.sessions) ? payload.sessions : [];
   const matrix = Array.isArray(payload.matrix) ? payload.matrix : [];
   const enabledAttendanceStatuses = payload.enabledAttendanceStatuses
@@ -655,11 +659,6 @@ function appendAttendanceMatrixSheet(workbook, payload = {}, options = {}) {
     startDate: payload.startDate,
     endDate: payload.endDate,
     sessions
-  });
-
-  const sheetName = clean(options.sheetName) || 'Attendance';
-  const sheet = workbook.addWorksheet(sheetName, {
-    views: [{ state: 'frozen', xSplit: 4, ySplit: 0 }]
   });
 
   // Funder | # | Last Name | First Name | days... | Comment | Start/End | CLBs | Att %
@@ -675,23 +674,23 @@ function appendAttendanceMatrixSheet(workbook, payload = {}, options = {}) {
   const mergeEndCol = Math.max(attPctCol, 9);
 
   // Row 1–3: title / class / teacher (merged from First Name col), legend in A + merged B–C
-  sheet.getCell(1, 5).value = title;
-  sheet.getCell(1, 5).font = { bold: true, size: 14, name: 'Calibri', color: { argb: DARK_TEXT_ARGB } };
-  sheet.getCell(1, 5).alignment = { vertical: 'middle' };
-  mergeHeaderBlock(sheet, 1, 5, mergeEndCol);
+  sheet.getCell(rowAt(1), 5).value = title;
+  sheet.getCell(rowAt(1), 5).font = { bold: true, size: 14, name: 'Calibri', color: { argb: DARK_TEXT_ARGB } };
+  sheet.getCell(rowAt(1), 5).alignment = { vertical: 'middle' };
+  mergeHeaderBlock(sheet, rowAt(1), 5, mergeEndCol);
 
-  sheet.getCell(2, 5).value = `Class: ${className}`;
-  sheet.getCell(2, 5).font = { size: 12, name: 'Calibri', color: { argb: DARK_TEXT_ARGB } };
-  sheet.getCell(2, 5).alignment = { vertical: 'middle' };
-  mergeHeaderBlock(sheet, 2, 5, mergeEndCol);
+  sheet.getCell(rowAt(2), 5).value = `Class: ${className}`;
+  sheet.getCell(rowAt(2), 5).font = { size: 12, name: 'Calibri', color: { argb: DARK_TEXT_ARGB } };
+  sheet.getCell(rowAt(2), 5).alignment = { vertical: 'middle' };
+  mergeHeaderBlock(sheet, rowAt(2), 5, mergeEndCol);
 
-  sheet.getCell(3, 5).value = `Teacher: ${teacherName}`;
-  sheet.getCell(3, 5).font = { size: 14, name: 'Calibri', color: { argb: DARK_TEXT_ARGB } };
-  sheet.getCell(3, 5).alignment = { vertical: 'middle' };
-  mergeHeaderBlock(sheet, 3, 5, mergeEndCol);
+  sheet.getCell(rowAt(3), 5).value = `Teacher: ${teacherName}`;
+  sheet.getCell(rowAt(3), 5).font = { size: 14, name: 'Calibri', color: { argb: DARK_TEXT_ARGB } };
+  sheet.getCell(rowAt(3), 5).alignment = { vertical: 'middle' };
+  mergeHeaderBlock(sheet, rowAt(3), 5, mergeEndCol);
 
   legend.forEach((entry, idx) => {
-    const row = idx + 1;
+    const row = rowAt(idx + 1);
     const codeCell = sheet.getCell(row, funderCol);
     const labelCell = sheet.getCell(row, numCol);
     codeCell.value = entry.code;
@@ -705,7 +704,7 @@ function appendAttendanceMatrixSheet(workbook, payload = {}, options = {}) {
   });
 
   const legendBottom = Math.max(legend.length, 3);
-  const headerRowIndex = legendBottom + 2;
+  const headerRowIndex = rowAt(legendBottom + 2);
   const weekdayRowIndex = headerRowIndex + 1;
 
   const headerLabels = [
@@ -812,25 +811,58 @@ function appendAttendanceMatrixSheet(workbook, payload = {}, options = {}) {
     bodyRow += 1;
   });
 
-  sheet.getColumn(funderCol).width = 14;
-  sheet.getColumn(numCol).width = 6;
-  sheet.getColumn(lastNameCol).width = 18;
-  sheet.getColumn(firstNameCol).width = 18;
-  const sessionColumnWidth = 5;
-  for (let col = firstSessionCol; col < firstSessionCol + sessions.length; col += 1) {
-    sheet.getColumn(col).width = sessionColumnWidth;
+  if (applyColumnWidths) {
+    sheet.getColumn(funderCol).width = Math.max(sheet.getColumn(funderCol).width || 0, 14);
+    sheet.getColumn(numCol).width = Math.max(sheet.getColumn(numCol).width || 0, 6);
+    sheet.getColumn(lastNameCol).width = Math.max(sheet.getColumn(lastNameCol).width || 0, 18);
+    sheet.getColumn(firstNameCol).width = Math.max(sheet.getColumn(firstNameCol).width || 0, 18);
+    const sessionColumnWidth = 5;
+    for (let col = firstSessionCol; col < firstSessionCol + sessions.length; col += 1) {
+      sheet.getColumn(col).width = Math.max(sheet.getColumn(col).width || 0, sessionColumnWidth);
+    }
+    sheet.getColumn(commentCol).width = Math.max(sheet.getColumn(commentCol).width || 0, 18);
+    sheet.getColumn(startEndCol).width = Math.max(sheet.getColumn(startEndCol).width || 0, 28);
+    fitColumnWidthToContent(sheet, clbCol, { min: 12, max: 42, padding: 2 });
+    fitColumnWidthToContent(sheet, attPctCol, { min: 14, max: 36, padding: 2 });
   }
-  sheet.getColumn(commentCol).width = 18;
-  sheet.getColumn(startEndCol).width = 28;
-  fitColumnWidthToContent(sheet, clbCol, { min: 12, max: 42, padding: 2 });
-  fitColumnWidthToContent(sheet, attPctCol, { min: 14, max: 36, padding: 2 });
+
+  const endRow = bodyRow - 1;
 
   return {
     legend,
     title,
     className,
-    threadedCommentTargets
+    threadedCommentTargets,
+    endRow,
+    headerRowIndex,
+    weekdayRowIndex
   };
+}
+
+function appendAttendanceMatrixSheet(workbook, payload = {}, options = {}) {
+  const sheetName = clean(options.sheetName) || 'Attendance';
+  const sheet = workbook.addWorksheet(sheetName, {
+    views: [{ state: 'frozen', xSplit: 4, ySplit: 0 }]
+  });
+  const result = writeAttendanceMatrixBlock(sheet, payload, { startRow: 1, applyColumnWidths: true });
+  return {
+    legend: result.legend,
+    title: result.title,
+    className: result.className,
+    threadedCommentTargets: result.threadedCommentTargets
+  };
+}
+
+const STUDENT_EXCEL_SHEET_LAYOUT_PER_CLASS = 'perClass';
+const STUDENT_EXCEL_SHEET_LAYOUT_SINGLE = 'singleSheet';
+const STUDENT_EXCEL_BLOCK_GAP_ROWS = 3;
+
+function normalizeStudentExcelSheetLayout(value = '') {
+  const token = clean(value).toLowerCase();
+  if (token === STUDENT_EXCEL_SHEET_LAYOUT_SINGLE || token === 'singlesheet') {
+    return STUDENT_EXCEL_SHEET_LAYOUT_SINGLE;
+  }
+  return STUDENT_EXCEL_SHEET_LAYOUT_PER_CLASS;
 }
 
 async function writeWorkbookBuffer(workbook, threadedCommentTargets = []) {
@@ -858,28 +890,56 @@ async function buildAttendanceExcelWorkbook(payload = {}) {
   };
 }
 
-async function buildStudentAttendanceExcelWorkbook(classEntries = [], meta = {}) {
+async function buildStudentAttendanceExcelWorkbook(classEntries = [], meta = {}, options = {}) {
   const entries = Array.isArray(classEntries) ? classEntries : [];
   if (!entries.length) {
     throw new Error('No attendance sheets to export.');
   }
+  const sheetLayout = normalizeStudentExcelSheetLayout(options.sheetLayout);
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'School Attendance';
   workbook.created = new Date();
-  const usedSheetNames = new Set();
   const threadedCommentTargets = [];
   let firstLegend = null;
   let firstTitle = null;
 
-  entries.forEach((entry) => {
-    const payload = entry?.payload && typeof entry.payload === 'object' ? entry.payload : {};
-    const requestedName = clean(entry?.sheetName) || clean(payload.className) || 'Class';
-    const sheetName = sanitizeExcelSheetName(requestedName, usedSheetNames);
-    const sheetResult = appendAttendanceMatrixSheet(workbook, payload, { sheetName });
-    if (!firstLegend) firstLegend = sheetResult.legend;
-    if (!firstTitle) firstTitle = sheetResult.title;
-    threadedCommentTargets.push(...(sheetResult.threadedCommentTargets || []));
-  });
+  if (sheetLayout === STUDENT_EXCEL_SHEET_LAYOUT_SINGLE) {
+    const usedSheetNames = new Set();
+    const sheetName = sanitizeExcelSheetName('Attendance', usedSheetNames);
+    const sheet = workbook.addWorksheet(sheetName);
+    let startRow = 1;
+    let firstWeekdayRowIndex = null;
+
+    entries.forEach((entry, index) => {
+      const payload = entry?.payload && typeof entry.payload === 'object' ? entry.payload : {};
+      const blockResult = writeAttendanceMatrixBlock(sheet, payload, {
+        startRow,
+        applyColumnWidths: true
+      });
+      if (!firstLegend) firstLegend = blockResult.legend;
+      if (!firstTitle) firstTitle = blockResult.title;
+      if (firstWeekdayRowIndex == null) firstWeekdayRowIndex = blockResult.weekdayRowIndex;
+      threadedCommentTargets.push(...(blockResult.threadedCommentTargets || []));
+      if (index < entries.length - 1) {
+        startRow = blockResult.endRow + STUDENT_EXCEL_BLOCK_GAP_ROWS + 1;
+      }
+    });
+
+    if (firstWeekdayRowIndex != null) {
+      sheet.views = [{ state: 'frozen', xSplit: 4, ySplit: firstWeekdayRowIndex }];
+    }
+  } else {
+    const usedSheetNames = new Set();
+    entries.forEach((entry) => {
+      const payload = entry?.payload && typeof entry.payload === 'object' ? entry.payload : {};
+      const requestedName = clean(entry?.sheetName) || clean(payload.className) || 'Class';
+      const sheetName = sanitizeExcelSheetName(requestedName, usedSheetNames);
+      const sheetResult = appendAttendanceMatrixSheet(workbook, payload, { sheetName });
+      if (!firstLegend) firstLegend = sheetResult.legend;
+      if (!firstTitle) firstTitle = sheetResult.title;
+      threadedCommentTargets.push(...(sheetResult.threadedCommentTargets || []));
+    });
+  }
 
   const buffer = await writeWorkbookBuffer(workbook, threadedCommentTargets);
   return {
@@ -931,7 +991,11 @@ module.exports = {
   buildStudentAttendanceExcelFilename,
   sanitizeExcelSheetName,
   fitColumnWidthToContent,
+  writeAttendanceMatrixBlock,
   appendAttendanceMatrixSheet,
+  normalizeStudentExcelSheetLayout,
+  STUDENT_EXCEL_SHEET_LAYOUT_PER_CLASS,
+  STUDENT_EXCEL_SHEET_LAYOUT_SINGLE,
   buildAttendanceExcelWorkbook,
   buildStudentAttendanceExcelWorkbook
 };

@@ -55,6 +55,47 @@ test('buildStudentAttendanceExcelWorkbook creates one sheet per class', async ()
   assert.equal(workbook.getWorksheet(2).name, 'Beta Class');
 });
 
+function collectWorksheetText(worksheet) {
+  const parts = [];
+  worksheet.eachRow({ includeEmpty: false }, (row) => {
+    row.eachCell({ includeEmpty: false }, (cell) => {
+      if (cell.value != null && cell.value !== '') parts.push(String(cell.value));
+    });
+  });
+  return parts.join('\n');
+}
+
+test('buildStudentAttendanceExcelWorkbook singleSheet stacks all classes on one worksheet', async () => {
+  const { buffer } = await attendanceExcelExportService.buildStudentAttendanceExcelWorkbook([
+    { payload: sampleClassPayload('Alpha Class', '2026-09-08'), sheetName: 'Alpha Class' },
+    { payload: sampleClassPayload('Beta Class', '2026-09-09'), sheetName: 'Beta Class' }
+  ], {
+    studentName: 'Ada Lovelace',
+    startDate: '2026-09-01',
+    endDate: '2026-09-30'
+  }, {
+    sheetLayout: 'singleSheet'
+  });
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  assert.equal(workbook.worksheets.length, 1);
+  const text = collectWorksheetText(workbook.getWorksheet(1));
+  assert.match(text, /Class: Alpha Class/);
+  assert.match(text, /Class: Beta Class/);
+});
+
+test('normalizeStudentExcelSheetLayout accepts singleSheet alias', () => {
+  assert.equal(
+    attendanceExcelExportService.normalizeStudentExcelSheetLayout('singleSheet'),
+    attendanceExcelExportService.STUDENT_EXCEL_SHEET_LAYOUT_SINGLE
+  );
+  assert.equal(
+    attendanceExcelExportService.normalizeStudentExcelSheetLayout(''),
+    attendanceExcelExportService.STUDENT_EXCEL_SHEET_LAYOUT_PER_CLASS
+  );
+});
+
 test('attendance routes expose student report export-excel.xlsx', () => {
   const routes = read('MVC/routes/attendanceRoutes.js');
   assert.match(routes, /\/report\/api\/export-excel\.xlsx/);
@@ -67,10 +108,17 @@ test('attendance routes expose student report export-excel.xlsx', () => {
 
 test('student attendance report viewer wires per-student matrix Excel export', () => {
   const viewer = read('MVC/views/school/attendance/studentAttendanceReportViewer.ejs');
+  const controller = read('MVC/controllers/school/attendanceController.js');
+  const exportService = read('MVC/services/school/studentAttendanceReportExcelExportService.js');
   assert.match(viewer, /js-sar-student-excel-export/);
   assert.match(viewer, /btn-filled btn-success/);
   assert.match(viewer, /bi-cloud-download/);
   assert.match(viewer, /exportStudentAttendanceExcel/);
+  assert.match(viewer, /openSarExcelExportModal/);
+  assert.match(viewer, /sarExcelExportModal/);
+  assert.match(viewer, /sheetLayout/);
   assert.match(viewer, /\/school\/attendances\/report\/api\/export-excel\.xlsx/);
   assert.match(viewer, /canExportStudentMatrixExcel/);
+  assert.match(controller, /sheetLayout/);
+  assert.match(exportService, /sheetLayout/);
 });
