@@ -76,3 +76,22 @@ test('class and student boards skip classes with no sessions in report window', 
   const matches = weeklyReportsHubServiceSource.match(/if \(!filteredSessions\.length\) \{\s*continue;\s*\}/g);
   assert.ok(matches && matches.length >= 2);
 });
+
+test('mapStudentBoardRows omits students with no expected sessions in the period', () => {
+  const studentMap = new Map();
+  studentMap.set('STU/1', {
+    studentId: 'STU/1',
+    name: 'Active Student',
+    sessionCount: 2,
+    attendance: { sessionCount: 2 }
+  });
+  studentMap.set('STU/2', {
+    studentId: 'STU/2',
+    name: 'No Sessions',
+    sessionCount: 0,
+    attendance: { sessionCount: 0 }
+  });
+  const rows = weeklyReportsHubService.mapStudentBoardRows(studentMap);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].studentId, 'STU/1');
+});

@@ -102,6 +102,12 @@ test('attendance views and controller wire timing excuse fields', () => {
   assert.match(viewer, /wrap_cellEarlyLeaveExcused/);
   assert.match(viewer, /syncTimingExcuseControls/);
   assert.match(viewer, /attendance-timing-excuse-left/);
+  assert.match(viewer, /sessionAttendanceTimingDetailClient\.js/);
+  assert.match(viewer, /cell_modalArrivalTime/);
+  assert.match(viewer, /cell_modalBreakLateMins/);
+  assert.match(viewer, /readCellAttendanceTimingSavePayload/);
+  assert.match(viewer, /initCellAttendanceTimingFromRecord/);
+  assert.match(viewer, /attendance-timing-table/);
   assert.match(viewer, /attendanceMarkAppearanceClient\.js/);
   assert.match(viewer, /renderAttendanceMatrixLegend/);
   assert.match(viewer, /attendanceMatrixLegend/);
@@ -143,6 +149,10 @@ test('attendance views and controller wire timing excuse fields', () => {
   assert.match(classForm, /attStatus_early_leave_excused/);
   assert.match(controller, /lateExcused/);
   assert.match(controller, /earlyLeaveExcused/);
+  assert.match(controller, /attendanceArrivalTime/);
+  assert.match(controller, /breakLateMinutes/);
+  assert.match(controller, /resolveAttendanceTimingFieldsForSave/);
+  assert.match(controller, /startTime:\s*String\(s\.startTime/);
   assert.match(routes, /\/api\/rollups'[\s\S]*?requireToken:\s*false/);
 });
 

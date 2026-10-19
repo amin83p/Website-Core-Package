@@ -209,38 +209,6 @@ function assertLateAttendanceMinutesPresent(record = {}) {
     }
 }
 
-function resolveAttendanceTimingFieldsForSave(incRec = {}, existRec = {}, session = {}, sessionMinutes) {
-    const startTime = String(session?.startTime || '').trim();
-    const endTime = String(session?.endTime || '').trim();
-    const incomingHasDetail = ['attendanceArrivalTime', 'attendanceLeaveTime', 'breakLateMinutes', 'breakEarlyLeaveMinutes']
-        .some((key) => incRec[key] !== undefined);
-
-    const detail = incomingHasDetail
-        ? sessionAttendanceTimingDetailService.normalizeAttendanceTimingDetailForSave({
-            startTime,
-            endTime,
-            arrivalTime: incRec.attendanceArrivalTime,
-            leaveTime: incRec.attendanceLeaveTime,
-            breakLateMinutes: incRec.breakLateMinutes,
-            breakEarlyLeaveMinutes: incRec.breakEarlyLeaveMinutes
-        })
-        : {
-            attendanceArrivalTime: String(existRec.attendanceArrivalTime || '').trim(),
-            attendanceLeaveTime: String(existRec.attendanceLeaveTime || '').trim(),
-            breakLateMinutes: Math.max(0, Math.floor(Number(existRec.breakLateMinutes) || 0)),
-            breakEarlyLeaveMinutes: Math.max(0, Math.floor(Number(existRec.breakEarlyLeaveMinutes) || 0))
-        };
-
-    return {
-        attendanceArrivalTime: detail.attendanceArrivalTime,
-        attendanceLeaveTime: detail.attendanceLeaveTime,
-        breakLateMinutes: detail.breakLateMinutes,
-        breakEarlyLeaveMinutes: detail.breakEarlyLeaveMinutes,
-        lateMinutes: clampAttendanceMinuteForSession(incRec.lateMinutes, sessionMinutes),
-        earlyLeaveMinutes: clampAttendanceMinuteForSession(incRec.earlyLeaveMinutes, sessionMinutes)
-    };
-}
-
 function resolveExcuseAttachmentForRosterMerge(incRec = {}, existRec = {}, canDeleteFiles = false) {
     if (incRec.excuseAttachment === undefined) {
         return existRec.excuseAttachment && typeof existRec.excuseAttachment === 'object'
@@ -4224,7 +4192,7 @@ async function saveSession1(req, res) {
                     incoming: incRec,
                     existing: existRec
                 });
-                const timingFields = resolveAttendanceTimingFieldsForSave(
+                const timingFields = sessionAttendanceTimingDetailService.resolveAttendanceTimingFieldsForSave(
                     incRec,
                     existRec,
                     sessions[sessionIndex],
@@ -6568,7 +6536,7 @@ async function saveSession(req, res) {
                     incoming: incRec,
                     existing: existRec
                 });
-                const timingFields = resolveAttendanceTimingFieldsForSave(
+                const timingFields = sessionAttendanceTimingDetailService.resolveAttendanceTimingFieldsForSave(
                     incRec,
                     existRec,
                     sessionForAttendanceWindow,

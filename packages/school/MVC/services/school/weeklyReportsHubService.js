@@ -263,6 +263,13 @@ function countExpectedSessionsFromMatrixRow(matrixRow = {}) {
     .length;
 }
 
+function studentHasScheduledSessionsInWeeklyReport(row = {}) {
+  const sessionCount = Number(row.sessionCount || 0);
+  if (sessionCount > 0) return true;
+  const attendance = row.attendance && typeof row.attendance === 'object' ? row.attendance : {};
+  return Number(attendance.sessionCount || 0) > 0;
+}
+
 function aggregateMatrixIntoStudentMap(studentMap, classId, matrix = []) {
   const normalizedClassId = toPublicId(classId);
   if (!normalizedClassId) return studentMap;
@@ -298,6 +305,7 @@ function mapStudentBoardRows(studentMap, studentFilterIds = []) {
       return filterSet.has(row.studentId) || (row.personId && filterSet.has(row.personId));
     })
     .map((row) => buildWeeklyReportsStudentDetailRow(row))
+    .filter((row) => studentHasScheduledSessionsInWeeklyReport(row))
     .sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
 }
 
@@ -1106,6 +1114,7 @@ async function buildWeeklyReportsStudentBoard({
       );
 
       (Array.isArray(attendancePayload?.matrix) ? attendancePayload.matrix : []).forEach((matrixRow) => {
+        if (!countExpectedSessionsFromMatrixRow(matrixRow)) return;
         const detailRow = buildStudentDetailRowFromClass({
           matrixRow,
           sessions: attendancePayload?.sessions || [],
@@ -1160,6 +1169,7 @@ module.exports = {
   sumSessionScheduledHours,
   buildClassBoardRow,
   countExpectedSessionsFromMatrixRow,
+  studentHasScheduledSessionsInWeeklyReport,
   aggregateMatrixIntoStudentMap,
   formatStudentSessionLabel,
   buildStudentSessionRows,

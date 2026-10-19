@@ -142,6 +142,48 @@ function parseNonNegTotalMinutes(value) {
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
 }
 
+function clampAttendanceMinuteForSession(value, maxMinutes) {
+  const max = Math.max(0, Math.floor(Number(maxMinutes) || 0));
+  const n = Number(String(value ?? '').trim());
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.min(max, Math.floor(n));
+}
+
+function resolveAttendanceTimingFieldsForSave(incRec = {}, existRec = {}, session = {}, sessionMinutes) {
+  const startTime = String(session?.startTime || '').trim();
+  const endTime = String(session?.endTime || '').trim();
+  const incomingHasDetail = ['attendanceArrivalTime', 'attendanceLeaveTime', 'breakLateMinutes', 'breakEarlyLeaveMinutes']
+    .some((key) => incRec[key] !== undefined);
+
+  const detail = incomingHasDetail
+    ? normalizeAttendanceTimingDetailForSave({
+      startTime,
+      endTime,
+      arrivalTime: incRec.attendanceArrivalTime,
+      leaveTime: incRec.attendanceLeaveTime,
+      breakLateMinutes: incRec.breakLateMinutes,
+      breakEarlyLeaveMinutes: incRec.breakEarlyLeaveMinutes
+    })
+    : {
+      attendanceArrivalTime: String(existRec.attendanceArrivalTime || '').trim(),
+      attendanceLeaveTime: String(existRec.attendanceLeaveTime || '').trim(),
+      breakLateMinutes: Math.max(0, Math.floor(Number(existRec.breakLateMinutes) || 0)),
+      breakEarlyLeaveMinutes: Math.max(0, Math.floor(Number(existRec.breakEarlyLeaveMinutes) || 0))
+    };
+
+  const lateSource = incRec.lateMinutes !== undefined ? incRec.lateMinutes : detail.lateMinutes;
+  const earlySource = incRec.earlyLeaveMinutes !== undefined ? incRec.earlyLeaveMinutes : detail.earlyLeaveMinutes;
+
+  return {
+    attendanceArrivalTime: detail.attendanceArrivalTime,
+    attendanceLeaveTime: detail.attendanceLeaveTime,
+    breakLateMinutes: detail.breakLateMinutes,
+    breakEarlyLeaveMinutes: detail.breakEarlyLeaveMinutes,
+    lateMinutes: clampAttendanceMinuteForSession(lateSource, sessionMinutes),
+    earlyLeaveMinutes: clampAttendanceMinuteForSession(earlySource, sessionMinutes)
+  };
+}
+
 function backfillRosterTimingDetailFromTotals(row = {}) {
   if (!row || typeof row !== 'object' || Array.isArray(row)) {
     return { row, changed: false };
@@ -190,5 +232,7 @@ module.exports = {
   normalizeAttendanceTimingDetailForSave,
   resolveModalDisplayTimes,
   readRosterTimingDetailFromRecord,
-  backfillRosterTimingDetailFromTotals
+  backfillRosterTimingDetailFromTotals,
+  clampAttendanceMinuteForSession,
+  resolveAttendanceTimingFieldsForSave
 };

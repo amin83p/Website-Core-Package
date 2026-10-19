@@ -882,11 +882,11 @@
 
   .school-master-hub .hub-wr-student-skill-block {
     display: grid;
-    grid-template-columns: minmax(3.25rem, 1fr) auto minmax(3.25rem, 4.25rem);
+    grid-template-columns: minmax(0, auto) auto minmax(2.75rem, 1fr);
     gap: 0.4rem;
     align-items: center;
-    font-size: 0.68rem;
-    line-height: 1.15;
+    font-size: 0.8125rem;
+    line-height: 1.2;
   }
 
   .school-master-hub .hub-wr-student-skill-block + .hub-wr-student-skill-block {
@@ -894,31 +894,32 @@
   }
 
   .school-master-hub .hub-wr-student-skill-label {
-    color: #475569;
+    color: #334155;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-weight: 600;
+    font-size: 0.875rem;
+    font-weight: 700;
     min-width: 0;
+    max-width: 6.25rem;
   }
 
   .school-master-hub .hub-wr-student-skill-bar-track {
     width: 100%;
     min-width: 3rem;
-    height: 0.45rem;
+    height: 0.5rem;
     border-radius: 999px;
     background: #e2e8f0;
     overflow: hidden;
   }
 
   .school-master-hub .hub-wr-student-skill-pct {
-    font-size: 0.65rem;
-    font-weight: 600;
-    color: #334155;
-    text-align: right;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #0f172a;
+    text-align: left;
     white-space: nowrap;
     line-height: 1.1;
-    padding-right: 0.05rem;
   }
 
   .school-master-hub .hub-wr-student-skill-bar-fill {
@@ -934,10 +935,21 @@
     gap: 0.15rem;
   }
 
+  .school-master-hub .hub-wr-student-engagement-cell .hub-weekly-reports-engagement-ring--compact {
+    width: 42px;
+    height: 42px;
+  }
+
+  .school-master-hub .hub-wr-student-engagement-cell .hub-weekly-reports-engagement-svg .hub-wr-engagement-text {
+    font-size: 0.72rem;
+    font-weight: 800;
+  }
+
   .school-master-hub .hub-wr-student-engagement-minutes {
-    font-size: 0.65rem;
-    color: #64748b;
-    line-height: 1.1;
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: #475569;
+    line-height: 1.15;
     white-space: nowrap;
   }
 
@@ -6930,6 +6942,13 @@
     return list;
   }
 
+  function filterWeeklyReportsStudentsWithSessions(rows) {
+    return (Array.isArray(rows) ? rows : []).filter(function (row) {
+      const att = readWeeklyReportsStudentAttendance(row);
+      return Number(att.sessionCount || row.sessionCount || 0) > 0;
+    });
+  }
+
   function renderWeeklyReportsAttendanceCountCell(count, options) {
     const opts = options || {};
     const excusedCount = Number(opts.excusedCount || 0);
@@ -6943,7 +6962,10 @@
       excusedHtml = ' <span class="hub-wr-attendance-excused">(' + escapeHtml(bits.join(', ')) + ')</span>';
     }
     const primary = primaryCount + excusedHtml;
-    return renderWeeklyReportsMetricStack(primary, '', { rawPrimary: !!excusedHtml });
+    return renderWeeklyReportsMetricStack(primary, '', {
+      rawPrimary: !!excusedHtml,
+      tone: opts.tone || ''
+    });
   }
 
   function renderWeeklyReportsStudentEngagementRing(engagement) {
@@ -8685,9 +8707,12 @@
   }
 
   function renderWeeklyReportsBoard(rows) {
-    const sortedRows = sortWeeklyReportsRows(rows);
+    const sortedRows = sortWeeklyReportsRows(filterWeeklyReportsStudentsWithSessions(rows));
     if (!sortedRows.length) {
-      return renderWeeklyReportsEmptyState('No enrolled students found.', weeklyReportsNoResultsHint('Try widening the date range or clearing class/student filters.'));
+      return renderWeeklyReportsEmptyState(
+        'No students with scheduled sessions in this period.',
+        weeklyReportsNoResultsHint('Try widening the date range or clearing class/student filters.')
+      );
     }
     return [
       '<div class="hub-weekly-reports-student-board">',
@@ -8705,9 +8730,12 @@
   }
 
   function renderWeeklyReportsList(rows) {
-    const sortedRows = sortWeeklyReportsRows(rows);
+    const sortedRows = sortWeeklyReportsRows(filterWeeklyReportsStudentsWithSessions(rows));
     if (!sortedRows.length) {
-      return renderWeeklyReportsEmptyState('No enrolled students found.', weeklyReportsNoResultsHint('Try widening the date range or clearing class/student filters.'));
+      return renderWeeklyReportsEmptyState(
+        'No students with scheduled sessions in this period.',
+        weeklyReportsNoResultsHint('Try widening the date range or clearing class/student filters.')
+      );
     }
     const showAcfColumn = !!(hubWeeklyReportsState.studentClassContext && hubWeeklyReportsState.studentClassContext.showAcfColumn);
     const body = sortedRows.map(function (row) {
@@ -8715,7 +8743,8 @@
       const acfCell = showAcfColumn
         ? '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsAttendanceCountCell(att.acfCount, {
           excusedCount: att.acfExcusedCount,
-          showMinutes: false
+          showMinutes: false,
+          tone: 'danger'
         }) + '</td>'
         : '';
       return [
@@ -8723,22 +8752,25 @@
         '<td class="ps-3"><div class="fw-semibold">' + hubStudentNameHtml(row.name || row.studentId, row.studentId) + '</div>',
         '<div class="small text-muted font-monospace">' + escapeHtml(row.studentId || '-') + '</div></td>',
         '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsStudentEngagementRing(row.engagement) + '</td>',
-        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsMetricStack(String(att.sessionCount), '') + '</td>',
-        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsAttendanceCountCell(att.presentCount) + '</td>',
+        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsMetricStack(String(att.sessionCount), '', { tone: 'info' }) + '</td>',
+        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsAttendanceCountCell(att.presentCount, { tone: 'success' }) + '</td>',
         '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsAttendanceCountCell(att.lateCount, {
           excusedCount: att.lateExcusedCount,
-          excusedMinutes: att.lateExcusedMinutes
+          excusedMinutes: att.lateExcusedMinutes,
+          tone: 'warning'
         }) + '</td>',
         '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsAttendanceCountCell(att.earlyCount, {
           excusedCount: att.earlyExcusedCount,
-          excusedMinutes: att.earlyExcusedMinutes
+          excusedMinutes: att.earlyExcusedMinutes,
+          tone: 'early'
         }) + '</td>',
         '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsAttendanceCountCell(att.absenceCount, {
           excusedCount: att.absenceExcusedCount,
-          showMinutes: false
+          showMinutes: false,
+          tone: 'danger'
         }) + '</td>',
         acfCell,
-        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsMetricStack(String(att.naCount), '') + '</td>',
+        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsMetricStack(String(att.naCount), '', { tone: 'info' }) + '</td>',
         '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsStudentCasesCell(row) + '</td>',
         '<td class="text-center pe-3 hub-weekly-reports-metric-cell">' + renderWeeklyReportsStudentSkillsVisual(row.skillAverages) + '</td>',
         '</tr>'

@@ -72,3 +72,40 @@ test('empty arrival and leave count as on-time boundaries', () => {
   assert.equal(totals.lateMinutes, 0);
   assert.equal(totals.earlyLeaveMinutes, 0);
 });
+
+test('resolveAttendanceTimingFieldsForSave normalizes detail and sums late minutes', () => {
+  const saved = timingDetail.resolveAttendanceTimingFieldsForSave(
+    {
+      attendanceArrivalTime: '09:10',
+      attendanceLeaveTime: '',
+      breakLateMinutes: 5,
+      breakEarlyLeaveMinutes: 0
+    },
+    {},
+    { startTime: '09:00', endTime: '12:00' },
+    180
+  );
+  assert.equal(saved.attendanceArrivalTime, '09:10');
+  assert.equal(saved.breakLateMinutes, 5);
+  assert.equal(saved.lateMinutes, 15);
+  assert.equal(saved.earlyLeaveMinutes, 0);
+});
+
+test('resolveAttendanceTimingFieldsForSave keeps existing detail when incoming omits it', () => {
+  const saved = timingDetail.resolveAttendanceTimingFieldsForSave(
+    { lateMinutes: 20 },
+    {
+      attendanceArrivalTime: '09:05',
+      attendanceLeaveTime: '',
+      breakLateMinutes: 3,
+      breakEarlyLeaveMinutes: 0,
+      lateMinutes: 8,
+      earlyLeaveMinutes: 0
+    },
+    { startTime: '09:00', endTime: '12:00' },
+    180
+  );
+  assert.equal(saved.attendanceArrivalTime, '09:05');
+  assert.equal(saved.breakLateMinutes, 3);
+  assert.equal(saved.lateMinutes, 20);
+});

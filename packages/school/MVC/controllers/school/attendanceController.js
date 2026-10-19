@@ -41,6 +41,7 @@ const attendanceAccessService = require('../../services/school/attendanceAccessS
 const sessionManagementService = require('../../services/school/sessionManagementService');
 const attendanceOperationPolicyService = require('../../services/school/attendanceOperationPolicyService');
 const attendanceEnrollmentNaLockService = require('../../services/school/attendanceEnrollmentNaLockService');
+const sessionAttendanceTimingDetailService = require('../../services/school/sessionAttendanceTimingDetailService');
 
 function buildAttendanceRouteAccessContext(req) {
     return schoolDataService.buildRouteAccessContext(req);
@@ -603,6 +604,18 @@ function buildAttendanceMatrixRecordForSession(stu, ses, context = {}) {
         hasApprovedLeave,
         lateMinutes: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE ? 0 : (rosterRecord?.lateMinutes || 0),
         earlyLeaveMinutes: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE ? 0 : (rosterRecord?.earlyLeaveMinutes || 0),
+        attendanceArrivalTime: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+            ? ''
+            : String(rosterRecord?.attendanceArrivalTime || '').trim(),
+        attendanceLeaveTime: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+            ? ''
+            : String(rosterRecord?.attendanceLeaveTime || '').trim(),
+        breakLateMinutes: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+            ? 0
+            : Math.max(0, Math.floor(Number(rosterRecord?.breakLateMinutes) || 0)),
+        breakEarlyLeaveMinutes: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+            ? 0
+            : Math.max(0, Math.floor(Number(rosterRecord?.breakEarlyLeaveMinutes) || 0)),
         lateExcused: status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
             ? false
             : Boolean(attendanceMatrixMetricsService.normalizeAttendanceTimingFields(rosterRecord).lateExcused),
@@ -924,7 +937,13 @@ async function buildAttendanceMatrixPayload(req, options = {}) {
             teacherName: resolveClassTeacherName(classData),
             startDate: String(startDate || '').trim(),
             endDate: String(endDate || '').trim(),
-            sessions: buildSessions.map(s => ({ id: s.sessionId, date: s.date, status: s.status })),
+            sessions: buildSessions.map((s) => ({
+                id: s.sessionId,
+                date: s.date,
+                status: s.status,
+                startTime: String(s.startTime || '').trim(),
+                endTime: String(s.endTime || '').trim()
+            })),
             matrix,
             enabledAttendanceStatuses,
             enrollmentSource: registrationMode === 'rolling'
@@ -1325,12 +1344,38 @@ async function updateAttendanceRosterCell(req, res) {
             const n = Number(v);
             return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
         };
+        const sessionScheduledMinutesForTiming = attendanceMatrixMetricsService.scheduledMinutesFromSession(
+            session,
+            attendanceMatrixPolicyModel.DEFAULT_POLICY.scheduledMinutes
+        );
+        const timingIncoming = {};
+        if (req.body?.attendanceArrivalTime !== undefined) {
+            timingIncoming.attendanceArrivalTime = String(req.body.attendanceArrivalTime || '').trim();
+        }
+        if (req.body?.attendanceLeaveTime !== undefined) {
+            timingIncoming.attendanceLeaveTime = String(req.body.attendanceLeaveTime || '').trim();
+        }
+        if (req.body?.breakLateMinutes !== undefined) {
+            timingIncoming.breakLateMinutes = parseNonNegInt(req.body.breakLateMinutes);
+        }
+        if (req.body?.breakEarlyLeaveMinutes !== undefined) {
+            timingIncoming.breakEarlyLeaveMinutes = parseNonNegInt(req.body.breakEarlyLeaveMinutes);
+        }
         if (req.body?.lateMinutes !== undefined) {
-            rosterRecord.lateMinutes = parseNonNegInt(req.body.lateMinutes);
+            timingIncoming.lateMinutes = parseNonNegInt(req.body.lateMinutes);
         }
         if (req.body?.earlyLeaveMinutes !== undefined) {
-            rosterRecord.earlyLeaveMinutes = parseNonNegInt(req.body.earlyLeaveMinutes);
+            timingIncoming.earlyLeaveMinutes = parseNonNegInt(req.body.earlyLeaveMinutes);
         }
+        Object.assign(
+            rosterRecord,
+            sessionAttendanceTimingDetailService.resolveAttendanceTimingFieldsForSave(
+                timingIncoming,
+                existingRosterRecord || {},
+                session,
+                sessionScheduledMinutesForTiming
+            )
+        );
         if (canMarkAttendanceExcused) {
             rosterRecord.lateExcused = attendanceMatrixMetricsService.normalizeAttendanceTimingExcuseFlag(req.body?.lateExcused);
             rosterRecord.earlyLeaveExcused = attendanceMatrixMetricsService.normalizeAttendanceTimingExcuseFlag(req.body?.earlyLeaveExcused);
@@ -1430,6 +1475,10 @@ async function updateAttendanceRosterCell(req, res) {
                 attendance: rosterRecord.attendance,
                 lateMinutes: rosterRecord.lateMinutes || 0,
                 earlyLeaveMinutes: rosterRecord.earlyLeaveMinutes || 0,
+                attendanceArrivalTime: String(rosterRecord.attendanceArrivalTime || '').trim(),
+                attendanceLeaveTime: String(rosterRecord.attendanceLeaveTime || '').trim(),
+                breakLateMinutes: Math.max(0, Math.floor(Number(rosterRecord.breakLateMinutes) || 0)),
+                breakEarlyLeaveMinutes: Math.max(0, Math.floor(Number(rosterRecord.breakEarlyLeaveMinutes) || 0)),
                 lateExcused: Boolean(rosterRecord.lateExcused),
                 earlyLeaveExcused: Boolean(rosterRecord.earlyLeaveExcused),
                 absenceExcused: Boolean(rosterRecord.absenceExcused),
