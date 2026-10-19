@@ -15,9 +15,38 @@ test('weekly reports print uses dedicated document and teacher pages', () => {
   assert.match(reportHubView, /hub-print-weekly-reports/);
 });
 
-test('weekly reports print guards student level', () => {
-  assert.match(reportHubView, /hubWeeklyReportsState\.level !== 'classes'/);
-  assert.match(reportHubView, /student print coming later/i);
+test('weekly reports print supports student documents', () => {
+  assert.match(reportHubView, /function renderWeeklyReportsPrintStudentDocument\(/);
+  assert.match(reportHubView, /hub-wr-print-student-page/);
+  assert.match(reportHubView, /Weekly Reports — Students/);
+  assert.doesNotMatch(reportHubView, /student print coming later/i);
+});
+
+test('weekly reports student print scopes rows by detail and list filters', () => {
+  assert.match(reportHubView, /function resolveWeeklyReportsPrintStudentRows\(/);
+  assert.match(reportHubView, /hubWeeklyReportsState\.studentDetailId/);
+  assert.match(reportHubView, /filterWeeklyReportsStudentsWithSessions/);
+  assert.match(reportHubView, /level === 'students'/);
+  assert.match(reportHubView, /renderWeeklyReportsPrintStudentDocument\(printRows\)/);
+});
+
+test('weekly reports student list print uses summary table with engagement and activity', () => {
+  assert.match(reportHubView, /function renderWeeklyReportsPrintStudentListTable\(/);
+  assert.match(reportHubView, /hub-wr-print-student-list-table/);
+  assert.match(reportHubView, /listCompact: true/);
+  assert.match(reportHubView, /printList: true/);
+  assert.match(reportHubView, /hub-wr-student-skill-block--print-list/);
+  assert.match(reportHubView, /hub-wr-print-student-list-engagement-ring/);
+});
+
+test('weekly reports student detail print uses card, cases, and horizontal sessions', () => {
+  assert.match(reportHubView, /function renderWeeklyReportsPrintStudentDetailCard\(/);
+  assert.match(reportHubView, /weeklyReportsPrintStudentDetailMode/);
+  assert.match(reportHubView, /renderWeeklyReportsPrintStudentCasesInlineSection/);
+  assert.match(reportHubView, /renderWeeklyReportsPrintStudentSessionsHorizontal\(row, \{ detail: true \}\)/);
+  assert.match(reportHubView, /renderWeeklyReportsPrintStudentSummaryStats\(row\)/);
+  assert.match(reportHubView, /printDetail: true/);
+  assert.match(reportHubView, /hub-wr-student-skill-block--print-detail/);
 });
 
 test('weekly reports print supports static metric cells', () => {
@@ -32,7 +61,8 @@ test('weekly reports print shows wait feedback while engagement loads', () => {
 });
 
 test('weekly reports print hides global loading overlay from print output', () => {
-  assert.match(reportHubView, /hub-print-weekly-reports #globalLoadingModal/);
+  assert.match(reportHubView, /body\.hub-print-weekly-reports > \*:not\(#hubWeeklyReportsPrintRoot\)/);
+  assert.match(reportHubView, /window\.scrollTo\(0, 0\)/);
   assert.doesNotMatch(reportHubView, /showLoading\(engagementPending/);
 });
 

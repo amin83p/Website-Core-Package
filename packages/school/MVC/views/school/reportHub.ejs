@@ -882,7 +882,7 @@
 
   .school-master-hub .hub-wr-student-skill-block {
     display: grid;
-    grid-template-columns: minmax(0, auto) auto minmax(2.75rem, 1fr);
+    grid-template-columns: minmax(0, auto) auto 3rem;
     gap: 0.4rem;
     align-items: center;
     font-size: 0.8125rem;
@@ -905,12 +905,20 @@
   }
 
   .school-master-hub .hub-wr-student-skill-bar-track {
-    width: 100%;
-    min-width: 3rem;
+    width: 3rem;
+    max-width: 3rem;
+    min-width: 2.5rem;
     height: 0.5rem;
     border-radius: 999px;
     background: #e2e8f0;
     overflow: hidden;
+  }
+
+  .school-master-hub .hub-weekly-reports-student-list-table .hub-wr-student-skill-visual {
+    min-width: 0;
+    width: max-content;
+    margin-left: auto;
+    margin-right: auto;
   }
 
   .school-master-hub .hub-wr-student-skill-pct {
@@ -2390,8 +2398,289 @@
     margin-bottom: 0.25rem;
   }
 
-  .hub-wr-print-teacher-page {
+  .hub-wr-print-teacher-page,
+  .hub-wr-print-student-page {
     margin-bottom: 1.5rem;
+  }
+
+  .hub-wr-print-student-subtitle {
+    font-size: 0.8rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    color: #64748b;
+    margin-top: 0.2rem;
+    font-weight: 500;
+  }
+
+  .hub-wr-print-student-section {
+    margin-top: 1rem;
+  }
+
+  .hub-wr-print-student-section-title {
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: #64748b;
+    margin-bottom: 0.5rem;
+  }
+
+  .hub-wr-print-student-list-table {
+    font-size: 11px;
+  }
+
+  .hub-wr-print-student-list-table th {
+    font-size: 10px;
+    font-weight: 700;
+    vertical-align: middle;
+  }
+
+  .hub-wr-print-student-list-table td {
+    font-size: 11px;
+    vertical-align: middle;
+  }
+
+  .hub-wr-print-student-list-table .hub-weekly-reports-metric-primary,
+  .hub-wr-print-student-list-table .hub-weekly-reports-metric-hint {
+    font-size: 11px;
+  }
+
+  .hub-wr-print-student-list-table .hub-wr-print-student-list-engagement-ring {
+    width: 2.15rem;
+    height: 2.15rem;
+    margin: 0 auto;
+  }
+
+  .hub-wr-print-student-list-table .hub-wr-print-student-list-engagement-ring .hub-weekly-reports-engagement-svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  .hub-wr-print-student-list-table .hub-wr-print-student-list-engagement-ring .hub-wr-engagement-text {
+    font-size: 7px;
+    font-weight: 800;
+  }
+
+  .hub-wr-print-student-list-table .hub-wr-student-skill-visual {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    min-width: 7.5rem;
+    max-width: 11rem;
+    text-align: left;
+  }
+
+  .hub-wr-print-student-list-table .hub-wr-student-skill-block--print-list {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 3.25rem auto;
+    gap: 0.3rem 0.4rem;
+    align-items: center;
+    line-height: 1.2;
+  }
+
+  .hub-wr-print-student-list-table .hub-wr-student-skill-block--print-list + .hub-wr-student-skill-block--print-list {
+    margin-top: 0.25rem;
+  }
+
+  .hub-wr-print-student-list-table .hub-wr-student-skill-label {
+    color: #334155;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 11px;
+    font-weight: 700;
+    min-width: 0;
+  }
+
+  .hub-wr-print-student-list-table .hub-wr-student-skill-bar-track {
+    width: 3.25rem;
+    max-width: 3.25rem;
+    min-width: 2.5rem;
+    height: 0.45rem;
+    border-radius: 999px;
+    background: #e2e8f0;
+    overflow: hidden;
+  }
+
+  .hub-wr-print-student-list-table .hub-wr-student-skill-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    min-width: 2px;
+  }
+
+  .hub-wr-print-student-list-table .hub-wr-student-skill-pct {
+    font-size: 10px;
+    font-weight: 700;
+    color: #0f172a;
+    white-space: nowrap;
+  }
+
+  .hub-wr-print-student-detail-card {
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 1.15rem 1.25rem;
+    background: #fff;
+    font-size: 12px;
+    color: #0f172a;
+  }
+
+  .hub-wr-print-student-detail-card-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem 1.25rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.85rem;
+    border-bottom: 2px solid #374151;
+  }
+
+  .hub-wr-print-student-detail-card-name {
+    font-size: 1.35rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.25;
+  }
+
+  .hub-wr-print-student-detail-card .hub-wr-print-student-subtitle {
+    font-size: 0.9rem;
+    margin-top: 0.35rem;
+  }
+
+  .hub-wr-print-student-detail-card .hub-wr-print-teacher-summary {
+    margin-bottom: 1.1rem;
+  }
+
+  .hub-wr-print-student-detail-card .hub-wr-print-student-section {
+    margin-top: 1.15rem;
+  }
+
+  .hub-wr-print-student-detail-card .hub-wr-print-student-section-title {
+    font-size: 0.8rem;
+    margin-bottom: 0.6rem;
+    color: #334155;
+  }
+
+  .hub-wr-print-student-detail-card .hub-wr-student-skill-visual {
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    max-width: 22rem;
+  }
+
+  .hub-wr-print-student-detail-card .hub-wr-student-skill-block--print-detail {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 5.5rem auto;
+    gap: 0.45rem 0.65rem;
+    align-items: center;
+    line-height: 1.3;
+  }
+
+  .hub-wr-print-student-detail-card .hub-wr-student-skill-block--print-detail + .hub-wr-student-skill-block--print-detail {
+    margin-top: 0.35rem;
+  }
+
+  .hub-wr-print-student-detail-card .hub-wr-student-skill-label {
+    font-size: 12px;
+    font-weight: 700;
+    color: #334155;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .hub-wr-print-student-detail-card .hub-wr-student-skill-bar-track {
+    width: 5.5rem;
+    max-width: 5.5rem;
+    height: 0.55rem;
+    border-radius: 999px;
+    background: #e2e8f0;
+    overflow: hidden;
+  }
+
+  .hub-wr-print-student-detail-card .hub-wr-student-skill-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    min-width: 2px;
+  }
+
+  .hub-wr-print-student-detail-card .hub-wr-student-skill-pct {
+    font-size: 12px;
+    font-weight: 700;
+    color: #0f172a;
+    white-space: nowrap;
+  }
+
+  .hub-wr-print-student-detail-card .hub-wr-print-cases-table th,
+  .hub-wr-print-student-detail-card .hub-wr-print-cases-table td {
+    font-size: 11px;
+    padding: 0.4rem 0.5rem;
+    vertical-align: top;
+  }
+
+  .hub-wr-print-student-detail-card .hub-wr-print-cases-table th {
+    font-weight: 700;
+    background: #f8fafc;
+  }
+
+  .hub-wr-print-student-detail-card .hub-wr-print-student-sessions-grid .hub-wr-print-session-cell {
+    font-size: 10px;
+    padding: 0.45rem 0.35rem;
+    line-height: 1.25;
+  }
+
+  .hub-wr-print-student-detail-card .hub-wr-print-session-date {
+    font-size: 10px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-bottom: 0.2rem;
+  }
+
+  .hub-wr-print-student-detail-card .hub-weekly-reports-session-status {
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 1.2;
+    word-break: break-word;
+  }
+
+  .hub-wr-print-student-detail-card .hub-weekly-reports-session-status.text-success {
+    color: #15803d;
+  }
+
+  .hub-wr-print-student-detail-card .hub-weekly-reports-session-status.text-danger {
+    color: #dc2626;
+  }
+
+  .hub-wr-print-student-detail-card .hub-weekly-reports-session-status.text-warning-emphasis {
+    color: #b45309;
+  }
+
+  .hub-wr-print-student-detail-card .hub-wr-print-student-sessions-grid--detail .hub-wr-print-session-cell {
+    min-height: 2.75rem;
+  }
+
+  .hub-wr-print-student-sessions-grid {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+  }
+
+  .hub-wr-print-student-sessions-grid .hub-wr-print-session-cell {
+    border: 1px solid #e2e8f0;
+    padding: 0.25rem 0.2rem;
+    vertical-align: top;
+    font-size: 0.65rem;
+    line-height: 1.2;
+    text-align: center;
+    word-break: break-word;
+  }
+
+  .hub-wr-print-student-sessions-grid .hub-wr-print-session-cell--empty {
+    background: #f8fafc;
+  }
+
+  .hub-wr-print-student-sessions-grid .hub-wr-print-session-date {
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 0.15rem;
   }
 
   .hub-wr-print-teacher-header {
@@ -2699,22 +2988,26 @@
   }
 
   @media print {
-    body.hub-print-weekly-reports #main-header,
-    body.hub-print-weekly-reports .header-side-controls,
-    body.hub-print-weekly-reports footer,
-    body.hub-print-weekly-reports .school-master-hub,
-    body.hub-print-weekly-reports #globalLoadingModal,
-    body.hub-print-weekly-reports .app-loading-modal,
-    body.hub-print-weekly-reports .swal2-container {
+    body.hub-print-weekly-reports > *:not(#hubWeeklyReportsPrintRoot) {
       display: none !important;
     }
 
     body.hub-print-weekly-reports #hubWeeklyReportsPrintRoot.hub-wr-print-root {
       display: block !important;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      width: 100%;
+      margin: 0;
+      padding: 0;
     }
 
     body.hub-print-weekly-reports {
       margin: 0;
+      padding: 0;
+      min-height: 0 !important;
+      height: auto !important;
       print-color-adjust: exact;
       -webkit-print-color-adjust: exact;
     }
@@ -2731,7 +3024,14 @@
       page-break-after: always;
     }
 
-    .hub-wr-print-doc > *:last-child {
+    .hub-wr-print-student-page:not(:last-child),
+    .hub-wr-print-student-cases-page:not(:last-child) {
+      break-after: page;
+      page-break-after: always;
+    }
+
+    .hub-wr-print-doc > *:last-child,
+    .hub-wr-print-student-page:last-child {
       break-after: auto;
       page-break-after: auto;
     }
@@ -2743,6 +3043,26 @@
 
     .hub-wr-print-metrics-table {
       font-size: 9px;
+    }
+
+    .hub-wr-print-metrics-table.hub-wr-print-student-list-table,
+    .hub-wr-print-metrics-table.hub-wr-print-student-list-table th,
+    .hub-wr-print-metrics-table.hub-wr-print-student-list-table td {
+      font-size: 11px;
+    }
+
+    .hub-wr-print-metrics-table.hub-wr-print-student-list-table th {
+      font-size: 10px;
+    }
+
+    .hub-wr-print-student-detail-card,
+    .hub-wr-print-student-detail-card .hub-wr-print-cases-table th,
+    .hub-wr-print-student-detail-card .hub-wr-print-cases-table td {
+      font-size: 12px;
+    }
+
+    .hub-wr-print-student-detail-card .hub-wr-print-student-sessions-grid .hub-wr-print-session-cell {
+      font-size: 10px;
     }
   }
 </style>
@@ -6022,7 +6342,10 @@
     ].join('');
   }
 
-  function renderWeeklyReportsPrintDocumentMeta() {
+  function renderWeeklyReportsPrintDocumentMeta(options) {
+    const opts = options || {};
+    const title = String(opts.title || 'Weekly Reports — Classes').trim() || 'Weekly Reports — Classes';
+    const subtitle = String(opts.subtitle || '').trim();
     const rangeLabel = hubWeeklyReportsState.lastRangeLabel || formatWeeklyReportsRangeLabel();
     const updated = hubWeeklyReportsState.lastLoadedAt
       ? 'Updated ' + formatHubInstant(hubWeeklyReportsState.lastLoadedAt)
@@ -6031,12 +6354,320 @@
       ? 'Prepared in ' + formatHubPrepareDuration(hubWeeklyReportsState.lastPrepareDurationMs)
       : '';
     const metaParts = [escapeHtml(rangeLabel)];
+    if (subtitle) metaParts.unshift(escapeHtml(subtitle));
     if (updated) metaParts.push(escapeHtml(updated));
     if (prepared) metaParts.push(escapeHtml(prepared));
     return [
       '<div class="hub-wr-print-doc-meta">',
-      '<div class="hub-wr-print-doc-title">Weekly Reports — Classes</div>',
+      '<div class="hub-wr-print-doc-title">', escapeHtml(title), '</div>',
       '<div class="text-muted small">', metaParts.join(' &nbsp;|&nbsp; '), '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsPrintStudentEngagementRing(engagement, options) {
+    const opts = options || {};
+    const listCompact = !!opts.listCompact;
+    const ringClass = listCompact
+      ? 'hub-weekly-reports-engagement-ring hub-wr-print-student-list-engagement-ring'
+      : 'hub-weekly-reports-engagement-ring hub-weekly-reports-engagement-ring--compact';
+    const data = engagement && typeof engagement === 'object' ? engagement : {};
+    const entry = {
+      loading: false,
+      error: '',
+      percent: data.percent,
+      presentMinutes: data.presentMinutes,
+      scheduledMinutes: data.scheduledMinutes
+    };
+    return [
+      '<div class="', ringClass, '">',
+      buildWeeklyReportsEngagementRingInner(entry),
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsPrintStudentCountAttendanceLine(label, count, minutes, tone, options) {
+    const opts = options || {};
+    const showMinutes = opts.showMinutes !== false;
+    const toneClass = weeklyReportsMetricToneClass(tone);
+    const countVal = formatWeeklyReportsPrintInteger(count);
+    const minsHtml = showMinutes
+      ? '<span class="hub-wr-print-attendance-mins">' + escapeHtml(formatWeeklyReportsPrintMinutes(minutes)) + '</span>'
+      : '';
+    return [
+      '<div class="hub-wr-print-attendance-line">',
+      '<span class="hub-wr-print-attendance-key">', escapeHtml(label), '</span>',
+      '<span class="hub-wr-print-attendance-val hub-wr-metric', toneClass, '">',
+      '<span class="hub-wr-print-attendance-count">', escapeHtml(countVal), '</span>',
+      minsHtml,
+      '</span>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsPrintStudentSummaryStats(row) {
+    const att = readWeeklyReportsStudentAttendance(row);
+    const caseCount = Number(row.caseCount || 0);
+    const attendanceLines = [
+      renderWeeklyReportsPrintStudentCountAttendanceLine('Absent', att.absenceCount, 0, 'danger', { showMinutes: false }),
+      renderWeeklyReportsPrintStudentCountAttendanceLine('Late', att.lateCount, att.lateMinutes, 'warning'),
+      renderWeeklyReportsPrintStudentCountAttendanceLine('Early leave', att.earlyCount, att.earlyMinutes, 'early')
+    ];
+    if (hubWeeklyReportsState.studentClassContext && hubWeeklyReportsState.studentClassContext.showAcfColumn) {
+      attendanceLines.push(
+        renderWeeklyReportsPrintStudentCountAttendanceLine('ACF', att.acfCount, 0, 'danger', { showMinutes: false })
+      );
+    }
+    attendanceLines.push(
+      renderWeeklyReportsPrintStudentCountAttendanceLine('Present', att.presentCount, 0, 'success', { showMinutes: false }),
+      renderWeeklyReportsPrintStudentCountAttendanceLine('N/A', att.naCount, 0, 'info', { showMinutes: false })
+    );
+    return [
+      '<div class="hub-wr-print-teacher-summary">',
+      renderWeeklyReportsPrintHeroStatCard('Sessions', formatWeeklyReportsPrintInteger(att.sessionCount)),
+      renderWeeklyReportsPrintHeroStatCard('Cases', formatWeeklyReportsPrintInteger(caseCount)),
+      '<div class="hub-wr-print-stat-card hub-wr-print-stat-card--attendance">',
+      '<div class="hub-wr-print-stat-label">Attendance</div>',
+      attendanceLines.join(''),
+      '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsStudentPrintHeader(row) {
+    const name = String(row.name || row.studentId || 'Student').trim() || 'Student';
+    const studentId = String(row.studentId || '').trim();
+    const idLine = studentId
+      ? '<div class="hub-wr-print-student-subtitle">' + escapeHtml(studentId) + '</div>'
+      : '';
+    return [
+      '<header class="hub-wr-print-teacher-header">',
+      '<div class="hub-wr-print-teacher-identity">',
+      '<div class="hub-wr-print-teacher-engagement-ring hub-wr-print-engagement">',
+      renderWeeklyReportsPrintStudentEngagementRing(row.engagement),
+      '<div class="hub-wr-print-engagement-caption">Engagement</div>',
+      '</div>',
+      '<div>',
+      '<div class="hub-wr-print-teacher-name">', escapeHtml(name), '</div>',
+      idLine,
+      '</div>',
+      '</div>',
+      renderWeeklyReportsPrintStudentSummaryStats(row),
+      '</header>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsPrintStudentActivitySection(row, options) {
+    const opts = options || {};
+    const list = Array.isArray(row.skillAverages) ? row.skillAverages : [];
+    if (!list.length) return '';
+    const skillOpts = opts.printDetail ? { printDetail: true } : {};
+    return [
+      '<section class="hub-wr-print-class-block hub-wr-print-student-section">',
+      '<div class="hub-wr-print-student-section-title">Activity</div>',
+      renderWeeklyReportsStudentSkillsVisual(row.skillAverages, skillOpts),
+      '</section>'
+    ].join('');
+  }
+
+  function weeklyReportsPrintStudentDetailMode() {
+    return !!String(hubWeeklyReportsState.studentDetailId || '').trim();
+  }
+
+  function renderWeeklyReportsPrintStudentListTable(rows) {
+    const list = Array.isArray(rows) ? rows : [];
+    const showAcfColumn = !!(hubWeeklyReportsState.studentClassContext && hubWeeklyReportsState.studentClassContext.showAcfColumn);
+    const body = list.map(function (row) {
+      const att = readWeeklyReportsStudentAttendance(row);
+      const acfCell = showAcfColumn
+        ? '<td class="text-center">' + renderWeeklyReportsAttendanceCountCell(att.acfCount, {
+          excusedCount: att.acfExcusedCount,
+          showMinutes: false,
+          tone: 'danger'
+        }) + '</td>'
+        : '';
+      const caseCount = Number(row.caseCount || 0);
+      return [
+        '<tr>',
+        '<td class="ps-2"><div class="fw-semibold">', escapeHtml(String(row.name || row.studentId || '')), '</div>',
+        '<div class="small text-muted font-monospace">', escapeHtml(row.studentId || '-'), '</div></td>',
+        '<td class="text-center">', renderWeeklyReportsPrintStudentEngagementRing(row.engagement, { listCompact: true }), '</td>',
+        '<td class="text-center">', renderWeeklyReportsMetricStack(String(att.sessionCount), '', { tone: 'info' }), '</td>',
+        '<td class="text-center">', renderWeeklyReportsAttendanceCountCell(att.presentCount, { tone: 'success' }), '</td>',
+        '<td class="text-center">', renderWeeklyReportsAttendanceCountCell(att.lateCount, {
+          excusedCount: att.lateExcusedCount,
+          excusedMinutes: att.lateExcusedMinutes,
+          tone: 'warning'
+        }), '</td>',
+        '<td class="text-center">', renderWeeklyReportsAttendanceCountCell(att.earlyCount, {
+          excusedCount: att.earlyExcusedCount,
+          excusedMinutes: att.earlyExcusedMinutes,
+          tone: 'early'
+        }), '</td>',
+        '<td class="text-center">', renderWeeklyReportsAttendanceCountCell(att.absenceCount, {
+          excusedCount: att.absenceExcusedCount,
+          showMinutes: false,
+          tone: 'danger'
+        }), '</td>',
+        acfCell,
+        '<td class="text-center">', renderWeeklyReportsMetricStack(String(att.naCount), '', { tone: 'info' }), '</td>',
+        '<td class="text-center">', renderWeeklyReportsMetricStack(String(caseCount), ''), '</td>',
+        '<td class="text-center pe-2">', renderWeeklyReportsStudentSkillsVisual(row.skillAverages, { printList: true }), '</td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+    const acfHeader = showAcfColumn ? '<th class="text-center">ACF</th>' : '';
+    return [
+      '<div class="hub-table-wrap">',
+      '<table class="table align-middle hub-wr-print-metrics-table hub-wr-print-student-list-table mb-0">',
+      '<thead><tr>',
+      '<th class="ps-2">Student</th>',
+      '<th class="text-center">Engagement</th>',
+      '<th class="text-center">Sessions</th>',
+      '<th class="text-center">Present</th>',
+      '<th class="text-center">Late</th>',
+      '<th class="text-center">Early</th>',
+      '<th class="text-center">Absent</th>',
+      acfHeader,
+      '<th class="text-center">N/A</th>',
+      '<th class="text-center">Cases</th>',
+      '<th class="text-center pe-2">Activity</th>',
+      '</tr></thead>',
+      '<tbody>', body, '</tbody>',
+      '</table>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsPrintStudentSessionsHorizontal(row, options) {
+    const opts = options || {};
+    const sessions = Array.isArray(row && row.sessions) ? row.sessions : [];
+    if (!sessions.length) {
+      return '<div class="text-muted">No scheduled sessions in this range for this student.</div>';
+    }
+    const colsPerRow = opts.detail ? 5 : 8;
+    const gridClass = opts.detail
+      ? 'hub-wr-print-student-sessions-grid hub-wr-print-student-sessions-grid--detail'
+      : 'hub-wr-print-student-sessions-grid';
+    const rowsHtml = [];
+    for (let i = 0; i < sessions.length; i += colsPerRow) {
+      let rowHtml = '<tr>';
+      for (let j = 0; j < colsPerRow; j += 1) {
+        const session = sessions[i + j];
+        if (!session) {
+          rowHtml += '<td class="hub-wr-print-session-cell hub-wr-print-session-cell--empty"></td>';
+          continue;
+        }
+        const statusLabel = String(session.label || session.status || 'Unmarked');
+        const statusClass = weeklyReportsSessionStatusClass(statusLabel);
+        rowHtml += [
+          '<td class="hub-wr-print-session-cell">',
+          '<div class="hub-wr-print-session-date">', formatHubDateKey(session.date, { month: 'short', day: 'numeric' }), '</div>',
+          '<div class="hub-weekly-reports-session-status ', escapeHtml(statusClass), '">', escapeHtml(statusLabel), '</div>',
+          '</td>'
+        ].join('');
+      }
+      rowHtml += '</tr>';
+      rowsHtml.push(rowHtml);
+    }
+    return [
+      '<table class="', gridClass, ' mb-0">',
+      '<tbody>', rowsHtml.join(''), '</tbody>',
+      '</table>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsPrintStudentCasesInlineSection(row) {
+    const items = Array.isArray(row.studentCaseItems) ? row.studentCaseItems : [];
+    if (!items.length) return '';
+    const body = items.map(function (item) {
+      const timeLine = (item.startTime || '--:--') + ' – ' + (item.endTime || '--:--');
+      const categoryBit = item.category
+        ? '<div class="small text-muted">' + escapeHtml(item.category) + '</div>'
+        : '';
+      const detailText = escapeHtml(item.detail || '—');
+      return [
+        '<tr>',
+        '<td class="ps-2 align-middle">', formatHubTableDateCellHtml(item.date, timeLine), categoryBit, '</td>',
+        '<td class="align-middle"><span class="hub-wr-print-case-status">', escapeHtml(item.statusLabel || '-'), '</span></td>',
+        '<td class="align-middle pe-2">', detailText, '</td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+    return [
+      '<section class="hub-wr-print-student-section">',
+      '<div class="hub-wr-print-student-section-title">Cases</div>',
+      '<table class="table hub-wr-print-cases-table mb-0">',
+      '<thead><tr><th class="ps-2">Session</th><th>Status</th><th class="pe-2">Details</th></tr></thead>',
+      '<tbody>', body, '</tbody></table>',
+      '</section>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsPrintStudentDetailCard(row) {
+    const name = String(row.name || row.studentId || 'Student').trim() || 'Student';
+    const studentId = String(row.studentId || '').trim();
+    const idLine = studentId
+      ? '<div class="hub-wr-print-student-subtitle">' + escapeHtml(studentId) + '</div>'
+      : '';
+    return [
+      '<div class="hub-wr-print-student-detail-card">',
+      '<div class="hub-wr-print-student-detail-card-head">',
+      '<div class="flex-grow-1">',
+      '<div class="hub-wr-print-student-detail-card-name">', escapeHtml(name), '</div>',
+      idLine,
+      '</div>',
+      '<div class="hub-wr-print-teacher-engagement-ring hub-wr-print-engagement">',
+      renderWeeklyReportsPrintStudentEngagementRing(row.engagement),
+      '<div class="hub-wr-print-engagement-caption">Engagement</div>',
+      '</div>',
+      '</div>',
+      renderWeeklyReportsPrintStudentSummaryStats(row),
+      renderWeeklyReportsPrintStudentActivitySection(row, { printDetail: true }),
+      renderWeeklyReportsPrintStudentCasesInlineSection(row),
+      '<section class="hub-wr-print-student-section">',
+      '<div class="hub-wr-print-student-section-title">Attendance by session</div>',
+      renderWeeklyReportsPrintStudentSessionsHorizontal(row, { detail: true }),
+      '</section>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsPrintStudentDetailPage(row) {
+    return [
+      '<div class="hub-wr-print-student-page">',
+      renderWeeklyReportsPrintStudentDetailCard(row),
+      '</div>'
+    ].join('');
+  }
+
+  function resolveWeeklyReportsPrintStudentRows() {
+    const rows = Array.isArray(hubWeeklyReportsState.rows) ? hubWeeklyReportsState.rows : [];
+    const detailId = String(hubWeeklyReportsState.studentDetailId || '').trim();
+    if (detailId) {
+      const match = rows.find(function (row) { return String(row.studentId || '') === detailId; }) || null;
+      return match ? [match] : [];
+    }
+    return sortWeeklyReportsRows(filterWeeklyReportsStudentsWithSessions(rows));
+  }
+
+  function renderWeeklyReportsPrintStudentDocument(rows) {
+    const list = Array.isArray(rows) ? rows : [];
+    const className = String(hubWeeklyReportsState.selectedClassName || '').trim();
+    const body = weeklyReportsPrintStudentDetailMode() && list.length === 1
+      ? renderWeeklyReportsPrintStudentDetailPage(list[0])
+      : [
+        '<div class="hub-wr-print-student-page">',
+        renderWeeklyReportsPrintStudentListTable(list),
+        '</div>'
+      ].join('');
+    return [
+      '<div class="hub-wr-print-doc">',
+      renderWeeklyReportsPrintDocumentMeta({
+        title: 'Weekly Reports — Students',
+        subtitle: className
+      }),
+      body,
       '</div>'
     ].join('');
   }
@@ -6209,10 +6840,40 @@
     }).join('');
     return [
       '<div class="hub-wr-print-doc">',
-      renderWeeklyReportsPrintDocumentMeta(),
+      renderWeeklyReportsPrintDocumentMeta({ title: 'Weekly Reports — Classes' }),
       teacherPages,
       '</div>'
     ].join('');
+  }
+
+  async function runWeeklyReportsPrintJob(renderPrintHtml) {
+    const root = ensureWeeklyReportsPrintRootElement();
+    root.innerHTML = renderPrintHtml();
+    root.setAttribute('aria-hidden', 'false');
+    const cleanup = function () {
+      document.body.classList.remove('hub-print-weekly-reports');
+      root.innerHTML = '';
+      root.setAttribute('aria-hidden', 'true');
+    };
+    if (typeof window.hideLoading === 'function') {
+      window.hideLoading({ force: true });
+    }
+    document.body.classList.add('hub-print-weekly-reports');
+    if (typeof window.scrollTo === 'function') {
+      window.scrollTo(0, 0);
+    }
+    await new Promise(function (resolve) {
+      if (typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(function () {
+          window.requestAnimationFrame(resolve);
+        });
+      } else {
+        window.setTimeout(resolve, 0);
+      }
+    });
+    window.addEventListener('afterprint', cleanup, { once: true });
+    window.print();
+    window.setTimeout(cleanup, 1500);
   }
 
   async function printWeeklyReportsHub() {
@@ -6224,14 +6885,33 @@
       });
       return;
     }
-    if (hubWeeklyReportsState.level !== 'classes') {
-      void showHubMessage({
-        title: 'Print',
-        icon: 'info',
-        message: 'Print is available for the class report; student print coming later.'
-      });
+    const level = hubWeeklyReportsState.level === 'students' ? 'students' : 'classes';
+    if (level === 'students') {
+      const printRows = resolveWeeklyReportsPrintStudentRows();
+      if (!printRows.length) {
+        void showHubMessage({
+          title: 'Print',
+          icon: 'info',
+          message: 'Load the student report before printing.'
+        });
+        return;
+      }
+      hubWeeklyReportsPrintInProgress = true;
+      setWeeklyReportsPrintButtonsBusy(true);
+      try {
+        await runWeeklyReportsPrintJob(function () {
+          return renderWeeklyReportsPrintStudentDocument(printRows);
+        });
+      } finally {
+        hubWeeklyReportsPrintInProgress = false;
+        setWeeklyReportsPrintButtonsBusy(false);
+        if (typeof window.hideLoading === 'function') {
+          window.hideLoading({ force: true });
+        }
+      }
       return;
     }
+
     const rows = Array.isArray(hubWeeklyReportsState.classRows) ? hubWeeklyReportsState.classRows : [];
     if (!rows.length) {
       void showHubMessage({
@@ -6263,30 +6943,9 @@
         });
         return;
       }
-      const root = ensureWeeklyReportsPrintRootElement();
-      root.innerHTML = renderWeeklyReportsPrintDocument();
-      root.setAttribute('aria-hidden', 'false');
-      const cleanup = function () {
-        document.body.classList.remove('hub-print-weekly-reports');
-        root.innerHTML = '';
-        root.setAttribute('aria-hidden', 'true');
-      };
-      if (typeof window.hideLoading === 'function') {
-        window.hideLoading({ force: true });
-      }
-      document.body.classList.add('hub-print-weekly-reports');
-      await new Promise(function (resolve) {
-        if (typeof window.requestAnimationFrame === 'function') {
-          window.requestAnimationFrame(function () {
-            window.requestAnimationFrame(resolve);
-          });
-        } else {
-          window.setTimeout(resolve, 0);
-        }
+      await runWeeklyReportsPrintJob(function () {
+        return renderWeeklyReportsPrintDocument();
       });
-      window.addEventListener('afterprint', cleanup, { once: true });
-      window.print();
-      window.setTimeout(cleanup, 1500);
     } finally {
       hubWeeklyReportsPrintInProgress = false;
       setWeeklyReportsPrintButtonsBusy(false);
@@ -6998,7 +7657,10 @@
     return text + '%';
   }
 
-  function renderWeeklyReportsStudentSkillsVisual(skillAverages) {
+  function renderWeeklyReportsStudentSkillsVisual(skillAverages, options) {
+    const opts = options || {};
+    const printList = !!opts.printList;
+    const printDetail = !!opts.printDetail;
     const list = Array.isArray(skillAverages) ? skillAverages : [];
     if (!list.length) {
       return '<span class="text-muted small">—</span>';
@@ -7010,15 +7672,22 @@
       const barWidth = Math.max(0, Math.min(100, Math.round(pct)));
       const pctLabel = formatWeeklyReportsSkillPercent(pct);
       const fillColor = weeklyReportsEngagementStrokeColor(barWidth);
-      return [
-        '<div class="hub-wr-student-skill-block">',
-        '<div class="hub-wr-student-skill-label" title="', escapeHtml(label), '">', escapeHtml(label), '</div>',
-        '<div class="hub-wr-student-skill-pct">', escapeHtml(pctLabel), '</div>',
+      const blockClass = printDetail
+        ? 'hub-wr-student-skill-block hub-wr-student-skill-block--print-detail'
+        : (printList
+          ? 'hub-wr-student-skill-block hub-wr-student-skill-block--print-list'
+          : 'hub-wr-student-skill-block');
+      const barHtml = [
         '<div class="hub-wr-student-skill-bar-track" title="', escapeHtml(pctLabel), '">',
         '<div class="hub-wr-student-skill-bar-fill" style="width:', escapeHtml(String(barWidth)), '%;background:', escapeHtml(fillColor), ';"></div>',
-        '</div>',
         '</div>'
       ].join('');
+      const pctHtml = '<div class="hub-wr-student-skill-pct">' + escapeHtml(pctLabel) + '</div>';
+      const labelHtml = '<div class="hub-wr-student-skill-label" title="' + escapeHtml(label) + '">' + escapeHtml(label) + '</div>';
+      const blockParts = (printList || printDetail)
+        ? [labelHtml, barHtml, pctHtml]
+        : [labelHtml, pctHtml, barHtml];
+      return '<div class="' + blockClass + '">' + blockParts.join('') + '</div>';
     }).join('');
     return '<div class="hub-wr-student-skill-visual">' + rows + '</div>';
   }
