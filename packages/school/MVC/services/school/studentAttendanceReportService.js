@@ -424,9 +424,102 @@ async function buildStudentAttendanceReportPayload(req, options = {}) {
   };
 }
 
+async function collectStudentClassMatrixPayloadsForExport(req, options = {}) {
+  const personId = String(options.personId || '').trim();
+  const startDate = normalizeDateOnly(options.startDate);
+  const endDate = normalizeDateOnly(options.endDate);
+
+  if (!personId) {
+    throw new Error('Student is required.');
+  }
+  if (!startDate || !endDate) {
+    throw new Error('Start date and end date are required.');
+  }
+  if (endDate < startDate) {
+    throw new Error('End date must be on or after start date.');
+  }
+
+  const selectedStudents = await resolveSelectedStudents(req, [personId]);
+  if (!selectedStudents.length) {
+    throw new Error('No matching student was found for the current selection.');
+  }
+  const student = selectedStudents[0];
+  const studentRecordId = String(student.studentRecordId || '').trim();
+  const resolvedPersonId = String(student.personId || '').trim();
+  if (!resolvedPersonId) {
+    throw new Error('No matching student was found for the current selection.');
+  }
+
+  const activeOrgId = String(req.user?.activeOrgId || '').trim();
+  const routeAccessContext = schoolDataService.buildRouteAccessContext(req);
+  const classes = await schoolDataService.fetchAllData('classes', {}, req.user, routeAccessContext);
+  const activeClasses = (Array.isArray(classes) ? classes : [])
+    .filter((row) => classBelongsToActiveOrg(row, activeOrgId))
+    .filter(isActiveAttendanceClass);
+
+  const orgPolicyCatalog = await attendanceMatrixPolicyModel.getPolicyCatalogForOrg(activeOrgId);
+  const canonicalStatuses = classEnrollmentReadService.HISTORICAL_ROLLING_ROSTER_STATUSES;
+  const entries = [];
+
+  for (const classRow of activeClasses) {
+    const classId = String(classRow?.id || '').trim();
+    if (!classId) continue;
+
+    const enrollmentSnapshot = await classEnrollmentReadService.listActiveStudentIdsForClass({
+      classId,
+      classItem: classRow,
+      reqUser: req.user,
+      activeOrgId,
+      startDate,
+      endDate,
+      canonicalStatuses
+    });
+    const enrolledStudentIds = enrollmentSnapshot.studentIds instanceof Set
+      ? enrollmentSnapshot.studentIds
+      : new Set();
+    if (!studentRecordId || !enrolledStudentIds.has(studentRecordId)) continue;
+
+    const matrixReq = {
+      user: req.user,
+      query: {
+        classId,
+        startDate,
+        endDate
+      }
+    };
+    const payload = await buildAttendanceMatrixPayload(matrixReq, {
+      applyWindow: false,
+      filterPersonIds: resolvedPersonId
+    });
+    const filteredPayload = matrixRollupService.recomputeAttendanceMatrixRollups(payload, {
+      classData: classRow,
+      orgPolicyCatalog
+    });
+    const sessions = Array.isArray(filteredPayload?.sessions) ? filteredPayload.sessions : [];
+    const matrix = Array.isArray(filteredPayload?.matrix) ? filteredPayload.matrix : [];
+    if (!sessions.length || !matrix.length) continue;
+
+    entries.push({
+      classId,
+      className: String(filteredPayload.className || classRow?.name || classId).trim(),
+      payload: filteredPayload
+    });
+  }
+
+  entries.sort((a, b) => String(a.className || '').localeCompare(String(b.className || '')));
+
+  return {
+    student,
+    startDate,
+    endDate,
+    entries
+  };
+}
+
 module.exports = {
   buildDateRangeDays,
   buildClassDayCells,
   buildStudentAttendanceReportPayload,
+  collectStudentClassMatrixPayloadsForExport,
   resolveSelectedStudents
 };

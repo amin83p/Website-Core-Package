@@ -259,34 +259,13 @@
             });
 
             setLoadingNote(`Saving staged sessions for ${classLabel}…`, 'Save staged sessions');
-            let commitResult = null;
-            try {
-              commitResult = await commitSessionsForClass({
-                person,
-                classId,
-                classLabel,
-                sessionIds,
-                extendCycleEndDate: false
-              });
-            } catch (commitError) {
-              const message = String(commitError?.message || '');
-              if (!/cycle extension/i.test(message)) throw commitError;
-              hideLoading();
-              const extend = await deps.uiConfirm?.(
-                `${message}\n\nExtend the class cycle and continue?`,
-                'Cycle extension required',
-                { icon: 'warning', cancelText: 'Cancel', confirmText: 'Extend and save', confirmClass: 'btn-warning btn-md' }
-              );
-              if (!extend) return;
-              setLoadingNote(`Saving staged sessions for ${classLabel}…`, 'Save staged sessions');
-              commitResult = await commitSessionsForClass({
-                person,
-                classId,
-                classLabel,
-                sessionIds,
-                extendCycleEndDate: true
-              });
-            }
+            const commitResult = await commitSessionsForClass({
+              person,
+              classId,
+              classLabel,
+              sessionIds,
+              extendCycleEndDate: true
+            });
             remappedEnrollmentEntries = remapEnrollmentEntriesAfterSessionCommit(enrollmentEntries, commitResult);
             if (typeof deps.replacePendingEnrollStudentsForClass === 'function' && remappedEnrollmentEntries.length) {
               const currentRows = typeof deps.getPendingEnrollStudentsForClass === 'function'

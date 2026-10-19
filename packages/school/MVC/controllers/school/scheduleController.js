@@ -2865,6 +2865,7 @@ function buildScheduleClassPickerItem(classRow = {}) {
     const programTerm = Array.isArray(classRow?.allowedProgramTerms) ? classRow.allowedProgramTerms[0] : null;
     const subject = Array.isArray(classRow?.curriculum?.subjects) ? classRow.curriculum.subjects[0] : null;
     const termLabel = [programTerm?.termCode, programTerm?.termName].filter(Boolean).join(' - ');
+    const lifecycle = buildClassLifecycleSnapshot(classRow);
     return {
         id: normalizeId(classRow?.id),
         title: String(classRow?.title || classRow?.name || '').trim() || normalizeId(classRow?.id),
@@ -2873,7 +2874,10 @@ function buildScheduleClassPickerItem(classRow = {}) {
         programName: String(programTerm?.programName || '').trim(),
         termLabel: String(termLabel || '').trim(),
         departmentName: String(classRow?.deliveryDepartmentName || '').trim(),
-        registrationMode: String(classRow?.registrationMode || '').trim()
+        registrationMode: lifecycle.registrationMode,
+        lifecycle,
+        cycleStartDate: lifecycle.cycleStartDate,
+        cycleEndDate: lifecycle.cycleEndDate
     };
 }
 

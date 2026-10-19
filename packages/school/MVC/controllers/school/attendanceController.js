@@ -1495,6 +1495,8 @@ async function updateAttendanceRosterCell(req, res) {
 async function showStudentAttendanceReportPage(req, res) {
     try {
         const reportAccess = await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip);
+        const attendanceAccess = await resolveAttendanceAccessForRequest(req);
+        const canExportAttendanceExcel = Boolean(attendanceAccess.canExportExcel);
         const q = req.query || {};
         const initialStartDate = String(q.startDate || '').trim();
         const initialEndDate = String(q.endDate || '').trim();
@@ -1537,6 +1539,7 @@ async function showStudentAttendanceReportPage(req, res) {
             initialStudents,
             canGenerateReport: Boolean(reportAccess.canGenerateReport && policy.reportTemplateId),
             canExportReport: Boolean(reportAccess.canExportReport),
+            canExportAttendanceExcel,
             canOpenReport: Boolean(reportAccess.canOpenReport),
             reportTemplateLabel: studentAttendanceReportPolicyService.formatTemplateLabel(
                 reportTemplate,
@@ -1620,6 +1623,39 @@ async function getStudentAttendanceReportExportPlan(req, res) {
             status: 'error',
             message: error.message || 'Could not build student attendance export plan.'
         });
+    }
+}
+
+async function exportStudentAttendanceReportExcel(req, res) {
+    try {
+        const reportAccess = await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip);
+        const attendanceAccess = await resolveAttendanceAccessForRequest(req);
+        if (!reportAccess.canExportReport && !attendanceAccess.canExportExcel) {
+            return res.status(403).json({
+                status: 'error',
+                message: 'You do not have permission to export student attendance Excel.'
+            });
+        }
+        const personId = String(req.query?.personId || '').trim();
+        const startDate = String(req.query?.startDate || '').trim();
+        const endDate = String(req.query?.endDate || '').trim();
+        const studentAttendanceReportExcelExportService = require('../../services/school/studentAttendanceReportExcelExportService');
+        const { buffer, filename } = await studentAttendanceReportExcelExportService.buildStudentAttendanceReportExcelExport(req, {
+            personId,
+            startDate,
+            endDate
+        });
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Length', buffer.length);
+        return res.status(200).send(buffer);
+    } catch (error) {
+        const wantsJson = String(req.headers.accept || '').includes('application/json')
+            || String(req.headers['x-ajax-request'] || '') === 'true';
+        if (wantsJson) {
+            return res.status(Number(error?.statusCode) || 400).json({ status: 'error', message: error.message });
+        }
+        return res.status(Number(error?.statusCode) || 400).send(error.message || 'Unable to export student attendance Excel.');
     }
 }
 
@@ -1737,6 +1773,7 @@ module.exports = {
     generateStudentAttendanceReport,
     getStudentAttendanceReportExportPlan,
     exportStudentAttendanceReport,
+    exportStudentAttendanceReportExcel,
     listActiveAttendanceClasses,
     buildAttendanceMatrixPayload,
     getAttendanceData,

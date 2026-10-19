@@ -590,6 +590,29 @@ function buildExportFilename({ className, startDate, endDate } = {}) {
   return `Attendance_${classPart}_${rangePart}.xlsx`.replace(/\s+/g, '_');
 }
 
+function buildStudentAttendanceExcelFilename({ studentName, startDate, endDate } = {}) {
+  const studentPart = sanitizeFilenamePart(studentName || 'Student');
+  const rangePart = [clean(startDate), clean(endDate)].filter(Boolean).join('_to_') || 'range';
+  return `Attendance_${studentPart}_${rangePart}.xlsx`.replace(/\s+/g, '_');
+}
+
+function sanitizeExcelSheetName(value = '', usedNames = new Set()) {
+  let base = clean(value)
+    .replace(/[\\/*?:[\]]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 31) || 'Class';
+  let candidate = base;
+  let suffix = 2;
+  while (usedNames.has(candidate.toLowerCase())) {
+    const tail = `_${suffix}`;
+    candidate = `${base.slice(0, Math.max(1, 31 - tail.length))}${tail}`;
+    suffix += 1;
+  }
+  usedNames.add(candidate.toLowerCase());
+  return candidate;
+}
+
 function colLetter(colNumber) {
   let n = colNumber;
   let letters = '';
@@ -620,7 +643,7 @@ function mergeHeaderBlock(sheet, row, startCol, endCol) {
   sheet.mergeCells(`${colLetter(startCol)}${row}:${colLetter(endCol)}${row}`);
 }
 
-async function buildAttendanceExcelWorkbook(payload = {}) {
+function appendAttendanceMatrixSheet(workbook, payload = {}, options = {}) {
   const sessions = Array.isArray(payload.sessions) ? payload.sessions : [];
   const matrix = Array.isArray(payload.matrix) ? payload.matrix : [];
   const enabledAttendanceStatuses = payload.enabledAttendanceStatuses
@@ -634,10 +657,8 @@ async function buildAttendanceExcelWorkbook(payload = {}) {
     sessions
   });
 
-  const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'School Attendance';
-  workbook.created = new Date();
-  const sheet = workbook.addWorksheet('Attendance', {
+  const sheetName = clean(options.sheetName) || 'Attendance';
+  const sheet = workbook.addWorksheet(sheetName, {
     views: [{ state: 'frozen', xSplit: 4, ySplit: 0 }]
   });
 
@@ -804,22 +825,72 @@ async function buildAttendanceExcelWorkbook(payload = {}) {
   fitColumnWidthToContent(sheet, clbCol, { min: 12, max: 42, padding: 2 });
   fitColumnWidthToContent(sheet, attPctCol, { min: 14, max: 36, padding: 2 });
 
+  return {
+    legend,
+    title,
+    className,
+    threadedCommentTargets
+  };
+}
+
+async function writeWorkbookBuffer(workbook, threadedCommentTargets = []) {
   const rawBuffer = Buffer.from(await workbook.xlsx.writeBuffer());
-  const buffer = threadedCommentTargets.length
-    ? await attendanceExcelThreadedComments.injectThreadedComments(
-      rawBuffer,
-      threadedCommentTargets
-    )
-    : rawBuffer;
+  const targets = Array.isArray(threadedCommentTargets) ? threadedCommentTargets : [];
+  if (!targets.length) return rawBuffer;
+  return attendanceExcelThreadedComments.injectThreadedComments(rawBuffer, targets);
+}
+
+async function buildAttendanceExcelWorkbook(payload = {}) {
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'School Attendance';
+  workbook.created = new Date();
+  const sheetResult = appendAttendanceMatrixSheet(workbook, payload, { sheetName: 'Attendance' });
+  const buffer = await writeWorkbookBuffer(workbook, sheetResult.threadedCommentTargets);
   return {
     buffer,
     filename: buildExportFilename({
-      className,
+      className: sheetResult.className,
       startDate: payload.startDate,
       endDate: payload.endDate
     }),
-    legend,
-    title
+    legend: sheetResult.legend,
+    title: sheetResult.title
+  };
+}
+
+async function buildStudentAttendanceExcelWorkbook(classEntries = [], meta = {}) {
+  const entries = Array.isArray(classEntries) ? classEntries : [];
+  if (!entries.length) {
+    throw new Error('No attendance sheets to export.');
+  }
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'School Attendance';
+  workbook.created = new Date();
+  const usedSheetNames = new Set();
+  const threadedCommentTargets = [];
+  let firstLegend = null;
+  let firstTitle = null;
+
+  entries.forEach((entry) => {
+    const payload = entry?.payload && typeof entry.payload === 'object' ? entry.payload : {};
+    const requestedName = clean(entry?.sheetName) || clean(payload.className) || 'Class';
+    const sheetName = sanitizeExcelSheetName(requestedName, usedSheetNames);
+    const sheetResult = appendAttendanceMatrixSheet(workbook, payload, { sheetName });
+    if (!firstLegend) firstLegend = sheetResult.legend;
+    if (!firstTitle) firstTitle = sheetResult.title;
+    threadedCommentTargets.push(...(sheetResult.threadedCommentTargets || []));
+  });
+
+  const buffer = await writeWorkbookBuffer(workbook, threadedCommentTargets);
+  return {
+    buffer,
+    filename: buildStudentAttendanceExcelFilename({
+      studentName: meta.studentName,
+      startDate: meta.startDate,
+      endDate: meta.endDate
+    }),
+    legend: firstLegend,
+    title: firstTitle
   };
 }
 
@@ -857,6 +928,10 @@ module.exports = {
   resolveAttendanceTitle,
   resolveTitleMonthYear,
   buildExportFilename,
+  buildStudentAttendanceExcelFilename,
+  sanitizeExcelSheetName,
   fitColumnWidthToContent,
-  buildAttendanceExcelWorkbook
+  appendAttendanceMatrixSheet,
+  buildAttendanceExcelWorkbook,
+  buildStudentAttendanceExcelWorkbook
 };

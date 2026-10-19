@@ -248,6 +248,43 @@ test('generateRotatingWeekdaySessions throughDate mode fills window through incl
   assert.ok(result.sessions.some((row) => row.date === '2026-01-19'));
 });
 
+test('coerceThroughDateRelativeToAnchor bumps January through date past September start', () => {
+  const core = loadSessionCalendarCore();
+  assert.equal(
+    core.coerceThroughDateRelativeToAnchor('2025-09-08', '2025-01-08'),
+    '2026-01-08'
+  );
+  assert.equal(
+    core.coerceThroughDateRelativeToAnchor('2025-09-08', '2026-01-08'),
+    '2026-01-08'
+  );
+});
+
+test('generateRotatingWeekdaySessions throughDate skips blocked holiday weeks without stopping early', () => {
+  const core = loadSessionCalendarCore();
+  const winterBreak = [
+    '2026-12-21', '2026-12-22', '2026-12-23', '2026-12-24',
+    '2026-12-28', '2026-12-29', '2026-12-30', '2026-12-31',
+    '2027-01-01', '2027-01-02', '2027-01-03', '2027-01-04'
+  ];
+  const result = core.generateRotatingWeekdaySessions({
+    anchorDate: '2026-10-01',
+    startTime: '09:00',
+    durationHours: 1,
+    weekdays: [1, 2, 3, 4],
+    limitMode: 'throughDate',
+    enrollmentStart: '2026-10-01',
+    enrollmentEnd: '2027-01-10',
+    blockedDates: winterBreak,
+    existingSessions: [],
+    alreadyStaged: []
+  });
+
+  const last = result.sessions[result.sessions.length - 1]?.date;
+  assert.ok(last >= '2027-01-05', `expected sessions into January, got last ${last}`);
+  assert.ok(result.sessions.every((row) => row.date <= '2027-01-10'));
+});
+
 test('generateRotatingWeekdaySessions throughDate mode can exceed 72 sessions', () => {
   const core = loadSessionCalendarCore();
   const result = core.generateRotatingWeekdaySessions({

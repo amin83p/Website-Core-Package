@@ -64,6 +64,11 @@ router.post('/report/api/export',
   trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT, { keepActive: true }),
   ctrl.exportStudentAttendanceReport);
 
+router.get('/report/api/export-excel.xlsx',
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.READ),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.READ, { keepActive: true }),
+  ctrl.exportStudentAttendanceReportExcel);
+
 router.get('/api/data',
   requireAttendanceOperation(OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL, { keepActive: true }),

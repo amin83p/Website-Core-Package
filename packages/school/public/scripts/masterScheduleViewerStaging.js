@@ -11,6 +11,7 @@
         let scheduleThroughDatePreviewDelegated = false;
         let scheduleStageContext = null;
         let scheduleStageClassContext = null;
+        let scheduleStageClassPickerItems = [];
         let scheduleClassPickerModalInstance = null;
     
         function nearestScheduleStageDurationChip(hours) {
@@ -108,9 +109,14 @@
         function readScheduleStageThroughDate() {
             const modalEl = getScheduleStageModalEl();
             const raw = String(modalEl?.querySelector('#sessionEnrollmentStageThroughDate')?.value || '').trim();
-            return deps.scheduleCalendarCore?.normalizeDateOnly
+            const normalized = deps.scheduleCalendarCore?.normalizeDateOnly
                 ? deps.scheduleCalendarCore.normalizeDateOnly(raw)
                 : raw;
+            const anchor = readScheduleStageStartDate();
+            if (normalized && anchor && deps.scheduleCalendarCore?.coerceThroughDateRelativeToAnchor) {
+                return deps.scheduleCalendarCore.coerceThroughDateRelativeToAnchor(anchor, normalized);
+            }
+            return normalized;
         }
 
         function readScheduleStageStartDate() {
@@ -161,7 +167,13 @@
             const through = deps.scheduleCalendarCore?.normalizeDateOnly
                 ? deps.scheduleCalendarCore.normalizeDateOnly(String(throughInput.value || '').trim())
                 : String(throughInput.value || '').trim();
-            if (through && through < anchorDate) throughInput.value = '';
+            if (through && through < anchorDate) {
+                const coerced = deps.scheduleCalendarCore?.coerceThroughDateRelativeToAnchor
+                    ? deps.scheduleCalendarCore.coerceThroughDateRelativeToAnchor(anchorDate, through)
+                    : '';
+                if (coerced && coerced >= anchorDate) throughInput.value = coerced;
+                else throughInput.value = '';
+            }
         }
 
         function handleScheduleStageStartDateInputChange() {
@@ -215,11 +227,56 @@
 
         let scheduleStagePreviewToken = 0;
 
-        function formatScheduleThroughDatePreviewMessage(sessionCount) {
+        function resolveScheduleStageClassLifecycle(classId = '') {
+            const cid = String(classId || scheduleStageClassContext?.classId || '').trim();
+            const fromContext = scheduleStageClassContext?.lifecycle;
+            if (fromContext && typeof fromContext === 'object') return fromContext;
+            const person = deps.activeSchedulePerson();
+            const events = typeof deps.getScheduleEventsForPerson === 'function'
+                ? deps.getScheduleEventsForPerson(person?.id || '')
+                : [];
+            const match = (Array.isArray(events) ? events : []).find((ev) => {
+                return String(ev?.classId || '').trim() === cid && ev?.classLifecycle;
+            });
+            return match?.classLifecycle || {};
+        }
+
+        function formatScheduleThroughDatePreviewMessage(sessionCount, sessions, throughDate) {
             const count = Math.max(0, Number(sessionCount) || 0);
             if (!count) return 'No sessions in this date range with current settings.';
-            if (count === 1) return '1 session will be staged.';
-            return `${String(count)} sessions will be staged.`;
+            const list = Array.isArray(sessions) ? sessions : [];
+            const lastDate = list.length
+                ? String(list[list.length - 1]?.date || '').trim()
+                : '';
+            const through = String(throughDate || '').trim();
+            let message = count === 1 ? '1 session will be staged.' : `${String(count)} sessions will be staged.`;
+            if (lastDate && deps.scheduleCalendarCore?.formatDayHeaderLong) {
+                message += ` Last: ${deps.scheduleCalendarCore.formatDayHeaderLong(lastDate)}.`;
+            }
+            if (through && lastDate && lastDate < through) {
+                const lifecycle = resolveScheduleStageClassLifecycle();
+                const cycleEnd = deps.scheduleCalendarCore?.normalizeDateOnly
+                    ? deps.scheduleCalendarCore.normalizeDateOnly(
+                        lifecycle.cycleEndDate || scheduleStageClassContext?.cycleEndDate || ''
+                    )
+                    : String(lifecycle.cycleEndDate || scheduleStageClassContext?.cycleEndDate || '').trim();
+                if (cycleEnd && lastDate <= cycleEnd && through > cycleEnd) {
+                    message += ` Class cycle currently ends ${cycleEnd}; saving staged sessions can extend the cycle through your through date.`;
+                } else {
+                    message += ' Some dates could not be filled (teacher schedule conflicts, holidays, or limits).';
+                }
+            } else if (through && lastDate && through > lastDate) {
+                const lifecycle = resolveScheduleStageClassLifecycle();
+                const cycleEnd = deps.scheduleCalendarCore?.normalizeDateOnly
+                    ? deps.scheduleCalendarCore.normalizeDateOnly(
+                        lifecycle.cycleEndDate || scheduleStageClassContext?.cycleEndDate || ''
+                    )
+                    : String(lifecycle.cycleEndDate || scheduleStageClassContext?.cycleEndDate || '').trim();
+                if (cycleEnd && through > cycleEnd) {
+                    message += ` Saving can extend the class cycle beyond ${cycleEnd}.`;
+                }
+            }
+            return message;
         }
 
         function setScheduleThroughDatePreviewMessage(message, visible) {
@@ -308,7 +365,11 @@
                 : { sessions: [] };
             if (token !== scheduleStagePreviewToken) return;
             setScheduleThroughDatePreviewMessage(
-                formatScheduleThroughDatePreviewMessage(result.sessions?.length || 0),
+                formatScheduleThroughDatePreviewMessage(
+                    result.sessions?.length || 0,
+                    result.sessions,
+                    form.throughDate
+                ),
                 true
             );
         }
@@ -353,6 +414,25 @@
             </button>`;
         }
     
+        async function refreshScheduleStageClassMetadata() {
+            const classId = String(scheduleStageClassContext?.classId || '').trim();
+            if (!classId) return;
+            const person = deps.activeSchedulePerson();
+            if (!person?.id) return;
+            try {
+                const items = await fetchInstructorClassesForPerson(person.id);
+                scheduleStageClassPickerItems = items;
+                const match = items.find((row) => String(row?.id || '').trim() === classId);
+                if (!match || !scheduleStageClassContext) return;
+                scheduleStageClassContext.lifecycle = match.lifecycle || {};
+                scheduleStageClassContext.cycleEndDate = String(match.cycleEndDate || match.lifecycle?.cycleEndDate || '').trim();
+                scheduleStageClassContext.cycleStartDate = String(match.cycleStartDate || match.lifecycle?.cycleStartDate || '').trim();
+                scheduleStageClassContext.registrationMode = String(match.registrationMode || match.lifecycle?.registrationMode || '').trim();
+            } catch (_) {
+                // keep existing class context
+            }
+        }
+
         async function fetchInstructorClassesForPerson(personId) {
             const url = `/school/schedules/api/instructor-classes?personId=${encodeURIComponent(personId)}`;
             const res = await fetch(url, { headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' } });
@@ -380,9 +460,15 @@
             listEl.addEventListener('click', (event) => {
                 const item = event.target.closest('.schedule-class-picker-item');
                 if (!item) return;
+                const classId = String(item.getAttribute('data-class-id') || '').trim();
+                const picked = scheduleStageClassPickerItems.find((row) => String(row?.id || '').trim() === classId);
                 scheduleStageClassContext = {
-                    classId: String(item.getAttribute('data-class-id') || '').trim(),
-                    classLabel: String(item.getAttribute('data-class-title') || '').trim()
+                    classId,
+                    classLabel: String(item.getAttribute('data-class-title') || picked?.title || '').trim(),
+                    lifecycle: picked?.lifecycle || {},
+                    cycleEndDate: String(picked?.cycleEndDate || picked?.lifecycle?.cycleEndDate || '').trim(),
+                    cycleStartDate: String(picked?.cycleStartDate || picked?.lifecycle?.cycleStartDate || '').trim(),
+                    registrationMode: String(picked?.registrationMode || picked?.lifecycle?.registrationMode || '').trim()
                 };
                 getScheduleClassPickerModal()?.hide();
                 openScheduleStageModal(scheduleStageContext);
@@ -403,7 +489,11 @@
             if (!match) return null;
             return {
                 classId: filterId,
-                classLabel: String(match.title || match.id || filterId).trim()
+                classLabel: String(match.title || match.id || filterId).trim(),
+                lifecycle: match.lifecycle || {},
+                cycleEndDate: String(match.cycleEndDate || match.lifecycle?.cycleEndDate || '').trim(),
+                cycleStartDate: String(match.cycleStartDate || match.lifecycle?.cycleStartDate || '').trim(),
+                registrationMode: String(match.registrationMode || match.lifecycle?.registrationMode || '').trim()
             };
         }
     
@@ -442,6 +532,7 @@
             }
             try {
                 const items = await fetchInstructorClassesForPerson(person.id);
+                scheduleStageClassPickerItems = items;
                 if (!items.length) {
                     listEl.innerHTML = '';
                     if (emptyEl) emptyEl.classList.remove('d-none');
@@ -987,6 +1078,16 @@
                 };
                 if (limitMode === 'count') genOptions.count = count;
                 const result = deps.scheduleCalendarCore.generateRotatingWeekdaySessions(genOptions);
+                if (limitMode === 'throughDate' && result.sessions.length) {
+                    const lastDate = String(result.sessions[result.sessions.length - 1]?.date || '').trim();
+                    if (lastDate && form.throughDate && lastDate < form.throughDate && typeof deps.uiAlert === 'function') {
+                        await deps.uiAlert(
+                            `Only sessions through ${lastDate} could be staged (through date ${form.throughDate}). Check holidays, conflicts, or the through-date year.`,
+                            'Stage Sessions',
+                            { icon: 'warning' }
+                        );
+                    }
+                }
                 if (!result.sessions.length) {
                     if (typeof deps.uiAlert === 'function') {
                         const hint = limitMode === 'throughDate'
@@ -1055,6 +1156,7 @@
                     classLabel: scheduleStageClassContext.classLabel,
                     startDate,
                     endDate,
+                    cycleEndDate: String(scheduleStageClassContext.cycleEndDate || '').trim(),
                     ...stagedPaddingOptions,
                     sessionsToCreate: sessionsWithAttempt,
                     stagingAttempts,
@@ -1105,10 +1207,12 @@
                 warningEl.classList.add('d-none');
                 warningEl.textContent = '';
             }
-            showScheduleStageModal();
-            if (readScheduleStageLimitMode() === 'throughDate') {
-                updateScheduleStageSessionPreview().catch(() => {});
-            }
+            void refreshScheduleStageClassMetadata().finally(() => {
+                showScheduleStageModal();
+                if (readScheduleStageLimitMode() === 'throughDate') {
+                    updateScheduleStageSessionPreview().catch(() => {});
+                }
+            });
         }
     
         function initScheduleStageModal() {

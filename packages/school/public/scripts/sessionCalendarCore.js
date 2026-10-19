@@ -188,6 +188,27 @@
     return Math.floor((b.getTime() - a.getTime()) / 86400000) + 1;
   }
 
+  /**
+   * When staging across a calendar year (e.g. Sep start, Jan through), date pickers often
+   * keep the anchor year on January — producing a through date before the start. Bump one year
+   * when the month/day is earlier in the year than the anchor month/day.
+   */
+  function coerceThroughDateRelativeToAnchor(anchorDate, throughDate) {
+    const anchor = normalizeDateOnly(anchorDate);
+    const through = normalizeDateOnly(throughDate);
+    if (!anchor || !through || through >= anchor) return through;
+    const anchorYear = Number(anchor.slice(0, 4));
+    const throughYear = Number(through.slice(0, 4));
+    if (!Number.isFinite(anchorYear) || !Number.isFinite(throughYear) || throughYear !== anchorYear) {
+      return through;
+    }
+    const anchorTail = anchor.slice(5);
+    const throughTail = through.slice(5);
+    if (throughTail >= anchorTail) return through;
+    const bumped = normalizeDateOnly(`${anchorYear + 1}-${throughTail}`);
+    return bumped && bumped >= anchor ? bumped : through;
+  }
+
   function endOfMonth(dateStr) {
     const base = new Date(`${dateStr}T00:00:00`);
     if (Number.isNaN(base.getTime())) return dateStr;
@@ -2637,13 +2658,22 @@
           placed = true;
           break;
         }
-        if (!placed) break;
+        if (!placed) {
+          const resumeDate = findFirstPlaceableRotationDate(addDaysIso(lastDate, 1), rotationOrder, rangeEnd, canPlace);
+          if (!resumeDate) break;
+          const placedDate = placeSession(resumeDate, sessions);
+          if (!placedDate) break;
+          lastDate = placedDate;
+          rotationIdx = rotationOrder.indexOf(new Date(`${lastDate}T12:00:00`).getDay());
+          if (rotationIdx < 0) rotationIdx = 0;
+          continue;
+        }
       }
       return sessions;
     }
 
     const COUNT_MODE_CAP = 72;
-    const THROUGH_DATE_MAX = 500;
+    const THROUGH_DATE_MAX = 2000;
     let maxPlace = COUNT_MODE_CAP;
     if (limitMode === 'throughDate') {
       const spanDays = daysBetweenInclusive(rangeStart, rangeEnd);
@@ -3001,6 +3031,8 @@
     buildDayCalendarClasses,
     buildDaySessionBadges,
     addDaysIso,
+    daysBetweenInclusive,
+    coerceThroughDateRelativeToAnchor,
     mondayOfWeek,
     computeViewRange,
     computeCustomViewRange,

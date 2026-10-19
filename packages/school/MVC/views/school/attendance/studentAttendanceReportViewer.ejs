@@ -596,6 +596,8 @@
     const initialEndDate = <%- JSON.stringify(initialEndDate || '') %>;
     const canGenerateReport = <%= (typeof canGenerateReport !== 'undefined' && canGenerateReport) ? 'true' : 'false' %>;
     const canExportReport = <%= (typeof canExportReport !== 'undefined' && canExportReport) ? 'true' : 'false' %>;
+    const canExportAttendanceExcel = <%= (typeof canExportAttendanceExcel !== 'undefined' && canExportAttendanceExcel) ? 'true' : 'false' %>;
+    const canExportStudentMatrixExcel = canExportReport || canExportAttendanceExcel;
     const sarActionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
 
     let selectedStudents = [];
@@ -1573,6 +1575,9 @@
             ? schoolRenderStudentNameHtml(student.name, student.studentRecordId, { className: 'text-decoration-none fw-bold' })
             : escapeHtml(student.name || personId);
         const studentName = String(student?.name || personId).trim();
+        const studentExcelExportBtn = canExportStudentMatrixExcel
+            ? `<button type="button" class="btn btn-filled btn-success btn-sm flex-shrink-0 js-sar-student-excel-export" data-person-id="${escapeHtml(personId)}" title="Export attendance matrix Excel for all classes"><i class="bi bi-cloud-download me-1"></i> Export</button>`
+            : '';
 
         let classRows = '';
         (student.classes || []).forEach((classRow) => {
@@ -1602,29 +1607,32 @@
         return `
             <div class="card border shadow-sm mb-3 student-report-card" data-person-id="${escapeHtml(personId)}" data-student-record-id="${escapeHtml(String(student.studentRecordId || '').trim())}">
                 <div class="card-header bg-white py-2">
-                    <button
-                        class="btn btn-link text-decoration-none text-dark w-100 text-start p-0 sar-collapse-toggle"
-                        type="button"
-                        data-bs-toggle="collapse"
-                        data-bs-target="#${escapeHtml(collapseId)}"
-                        aria-expanded="false"
-                        aria-controls="${escapeHtml(collapseId)}">
-                        <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
-                            <div class="d-flex align-items-center gap-2 fw-bold">
-                                <i class="bi bi-chevron-down sar-collapse-chevron"></i>
-                                <span>${studentNameHtml}</span>
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <button
+                            class="btn btn-link text-decoration-none text-dark text-start p-0 sar-collapse-toggle flex-grow-1 min-w-0"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#${escapeHtml(collapseId)}"
+                            aria-expanded="false"
+                            aria-controls="${escapeHtml(collapseId)}">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2">
+                                <div class="d-flex align-items-center gap-2 fw-bold min-w-0">
+                                    <i class="bi bi-chevron-down sar-collapse-chevron"></i>
+                                    <span class="text-truncate">${studentNameHtml}</span>
+                                </div>
+                                <div class="d-flex flex-wrap gap-2 student-summary-chip">
+                                    <span><span class="text-success fw-semibold">Present</span> ${Number(summary.present || 0)}</span>
+                                    <span><span class="text-warning fw-semibold">Late</span> ${Number(summary.late || 0)}</span>
+                                    <span><span class="text-info fw-semibold">Excused</span> ${Number(summary.excused || 0)}</span>
+                                    <span><span class="text-danger fw-semibold">Absent</span> ${Number(summary.absent || 0)}</span>
+                                    <span><span class="status-acf fw-semibold">ACF</span> ${Number(summary.acf || 0)}</span>
+                                    <span><span class="text-primary fw-semibold">Rollup %</span> ${escapeHtml(rollupPct)}</span>
+                                    <span><span class="text-primary fw-semibold">Notes Exist</span> ${escapeHtml(notesLabel)}</span>
+                                </div>
                             </div>
-                            <div class="d-flex flex-wrap gap-2 student-summary-chip">
-                                <span><span class="text-success fw-semibold">Present</span> ${Number(summary.present || 0)}</span>
-                                <span><span class="text-warning fw-semibold">Late</span> ${Number(summary.late || 0)}</span>
-                                <span><span class="text-info fw-semibold">Excused</span> ${Number(summary.excused || 0)}</span>
-                                <span><span class="text-danger fw-semibold">Absent</span> ${Number(summary.absent || 0)}</span>
-                                <span><span class="status-acf fw-semibold">ACF</span> ${Number(summary.acf || 0)}</span>
-                                <span><span class="text-primary fw-semibold">Rollup %</span> ${escapeHtml(rollupPct)}</span>
-                                <span><span class="text-primary fw-semibold">Notes Exist</span> ${escapeHtml(notesLabel)}</span>
-                            </div>
-                        </div>
-                    </button>
+                        </button>
+                        ${studentExcelExportBtn}
+                    </div>
                 </div>
                 <div id="${escapeHtml(collapseId)}" class="collapse student-report-collapse">
                     <div class="card-body p-0">
@@ -1712,6 +1720,25 @@
         const endDate = String(document.getElementById('filter_endDate').value || '').trim();
         const studentIds = selectedStudents.map((row) => String(row.studentRecordId || row.id || '').trim()).filter(Boolean);
         return { startDate, endDate, studentIds };
+    }
+
+    function exportStudentAttendanceExcel(personId) {
+        const id = String(personId || '').trim();
+        if (!id) return;
+        const { startDate, endDate } = getSarFilterParams();
+        if (!startDate || !endDate) {
+            showReportMessage({
+                icon: 'warning',
+                title: 'Date range required',
+                message: 'Select a start and end date before exporting.'
+            });
+            return;
+        }
+        const params = new URLSearchParams();
+        params.set('personId', id);
+        params.set('startDate', startDate);
+        params.set('endDate', endDate);
+        window.location.href = `/school/attendances/report/api/export-excel.xlsx?${params.toString()}`;
     }
 
     function buildSarShareUrl() {
@@ -2316,6 +2343,13 @@
 
     document.getElementById('studentReportSections').addEventListener('click', (event) => {
         if (event.target.closest('.attendance-cell-history-btn')) return;
+        const studentExcelBtn = event.target.closest('.js-sar-student-excel-export');
+        if (studentExcelBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            exportStudentAttendanceExcel(studentExcelBtn.getAttribute('data-person-id'));
+            return;
+        }
         const cellTrigger = event.target.closest('[data-sar-cell-key]');
         if (cellTrigger) {
             event.preventDefault();

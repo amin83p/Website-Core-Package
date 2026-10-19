@@ -2460,7 +2460,12 @@
   function readStageThroughDate() {
     const el = stageModalEl?.querySelector('#sessionEnrollmentStageThroughDate')
       || qs('sessionEnrollmentStageThroughDate');
-    return core.normalizeDateOnly(String(el?.value || '').trim());
+    const normalized = core.normalizeDateOnly(String(el?.value || '').trim());
+    const anchor = readStageStartDate();
+    if (normalized && anchor && core.coerceThroughDateRelativeToAnchor) {
+      return core.coerceThroughDateRelativeToAnchor(anchor, normalized);
+    }
+    return normalized;
   }
 
   function readStageStartDate() {
@@ -2514,10 +2519,15 @@
     const anchorDate = readStageStartDate();
     if (anchorDate) {
       throughInput.min = anchorDate;
-      const enrollmentEnd = core.normalizeDateOnly(state?.endDate || '');
-      if (enrollmentEnd) throughInput.max = enrollmentEnd;
+      throughInput.removeAttribute('max');
       const through = core.normalizeDateOnly(String(throughInput.value || '').trim());
-      if (through && through < anchorDate) throughInput.value = '';
+      if (through && through < anchorDate) {
+        const coerced = core.coerceThroughDateRelativeToAnchor
+          ? core.coerceThroughDateRelativeToAnchor(anchorDate, through)
+          : '';
+        if (coerced && coerced >= anchorDate) throughInput.value = coerced;
+        else throughInput.value = '';
+      }
     }
   }
 
@@ -2538,10 +2548,7 @@
     if (!anchorDate) return '';
     const count = readStageSessionCount();
     const weeksSpan = Math.max(2, Math.ceil(count / 2) + 1);
-    let projected = core.addDaysIso(anchorDate, weeksSpan * 7 + 14);
-    const enrollmentEnd = core.normalizeDateOnly(state?.endDate || '');
-    if (enrollmentEnd && projected > enrollmentEnd) projected = enrollmentEnd;
-    return projected;
+    return core.addDaysIso(anchorDate, weeksSpan * 7 + 14);
   }
 
   function syncStageLimitModeUi(limitMode) {
@@ -2562,8 +2569,7 @@
       const anchorDate = readStageStartDate();
       if (throughInput && anchorDate) {
         throughInput.min = anchorDate;
-        const enrollmentEnd = core.normalizeDateOnly(state?.endDate || '');
-        if (enrollmentEnd) throughInput.max = enrollmentEnd;
+        throughInput.removeAttribute('max');
         if (!String(throughInput.value || '').trim()) {
           throughInput.value = estimateDefaultStageThroughDate();
         }
@@ -2576,18 +2582,23 @@
     updateStageCapacityWarning().catch(() => {});
   }
 
-  function capStageThroughDateToEnrollment(throughDate) {
+  function resolveStageThroughDateForGeneration(throughDate) {
     const normalized = core.normalizeDateOnly(throughDate || '');
     if (!normalized) return '';
-    const enrollmentEnd = core.normalizeDateOnly(state?.endDate || '');
-    if (enrollmentEnd && normalized > enrollmentEnd) return enrollmentEnd;
-    return normalized;
+    const coerced = core.coerceThroughDateRelativeToAnchor
+      ? core.coerceThroughDateRelativeToAnchor(readStageStartDate(), normalized)
+      : normalized;
+    return coerced || normalized;
+  }
+
+  function readStageClassCycleEndDate() {
+    return core.normalizeDateOnly(state?.cycleEndDate || '');
   }
 
   function resolveStageHolidayRangeEnd() {
     if (readStageLimitMode() === 'throughDate') {
       const through = readStageThroughDate();
-      if (through) return capStageThroughDateToEnrollment(through);
+      if (through) return resolveStageThroughDateForGeneration(through);
       return estimateStageGenerationEndDate();
     }
     return isPartialMode() ? estimateStageGenerationEndDate() : core.normalizeDateOnly(state?.endDate || '');
@@ -2597,10 +2608,7 @@
     const count = readStageSessionCount();
     const anchorDate = readStageStartDate();
     const weeksSpan = Math.max(2, Math.ceil(count / 2) + 1);
-    const projected = core.addDaysIso(anchorDate, weeksSpan * 7 + 14);
-    const enrollmentEnd = core.normalizeDateOnly(state?.endDate || '');
-    if (enrollmentEnd && projected > enrollmentEnd) return enrollmentEnd;
-    return projected;
+    return core.addDaysIso(anchorDate, weeksSpan * 7 + 14);
   }
 
   async function buildStageBlockedDatesForRange(startDate, endDate) {
@@ -2637,7 +2645,7 @@
       : state.startDate;
     let enrollmentEnd;
     if (limitMode === 'throughDate') {
-      enrollmentEnd = capStageThroughDateToEnrollment(readStageThroughDate());
+      enrollmentEnd = resolveStageThroughDateForGeneration(readStageThroughDate());
     } else {
       enrollmentEnd = isPartialMode()
         ? estimateStageGenerationEndDate()
@@ -2700,11 +2708,6 @@
         showStageFormError('Through date must be on or after the slot date.');
         return;
       }
-      const enrollmentEnd = core.normalizeDateOnly(state?.endDate || '');
-      if (enrollmentEnd && throughDate > enrollmentEnd) {
-        showStageFormError(`Through date cannot be after enrollment end (${enrollmentEnd}).`);
-        return;
-      }
     }
     const createBtn = qs('btn_sessionEnrollmentStageCreate');
     if (createBtn) {
@@ -2732,7 +2735,7 @@
           weekdays: readStageWeekdays(),
           limitMode,
           count: limitMode === 'count' ? readStageSessionCount() : undefined,
-          throughDate: limitMode === 'throughDate' ? capStageThroughDateToEnrollment(readStageThroughDate()) : undefined,
+          throughDate: limitMode === 'throughDate' ? resolveStageThroughDateForGeneration(readStageThroughDate()) : undefined,
           skipHolidays: Boolean(qs('sessionEnrollmentStageSkipHolidays')?.checked),
           anchorDate,
           startTime: stageContext.startTime24
@@ -2906,7 +2909,8 @@
       ).catch(() => {});
       return;
     }
-    const preview = core.generateRotatingWeekdaySessions(await buildStageGenerationOptions());
+    const genOptions = await buildStageGenerationOptions();
+    const preview = core.generateRotatingWeekdaySessions(genOptions);
     if (token !== stageCapacityPreviewToken) return;
     if (readStageLimitMode() === 'throughDate') {
       if (warningEl) {
