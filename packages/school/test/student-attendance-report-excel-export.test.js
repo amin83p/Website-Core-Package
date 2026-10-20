@@ -216,6 +216,31 @@ test('buildOfficialStudentAttendanceExcelWorkbook uses class rows and union day 
   assert.equal(String(noClassCell.value), 'X');
 });
 
+test('buildOfficialStudentAttendanceExcelWorkbook omits claim line when unavailable', async () => {
+  const { buffer } = await attendanceExcelExportService.buildOfficialStudentAttendanceExcelWorkbook({
+    student: { name: 'Ada Lovelace' },
+    startDate: '2026-09-01',
+    endDate: '2026-09-30',
+    claimNumbersDisplay: '',
+    enabledAttendanceStatuses: ['present'],
+    unionSessionDates: ['2026-09-08'],
+    classRows: [{
+      className: 'Alpha Class',
+      sessionDateSet: new Set(['2026-09-08']),
+      recordsByDate: new Map([['2026-09-08', { status: 'present' }]])
+    }]
+  }, {
+    studentName: 'Ada Lovelace',
+    startDate: '2026-09-01',
+    endDate: '2026-09-30'
+  });
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  const text = collectWorksheetText(workbook.getWorksheet(1));
+  assert.doesNotMatch(text, /Claim Number/);
+});
+
 test('normalizeStudentExcelExportTemplate recognizes official template', () => {
   assert.equal(
     attendanceExcelExportService.normalizeStudentExcelExportTemplate('officialAttendanceReport'),

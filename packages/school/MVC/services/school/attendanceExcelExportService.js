@@ -1022,12 +1022,12 @@ function writeOfficialStudentAttendanceBlock(sheet, exportModel = {}, options = 
   sheet.getCell(rowAt(2), firstSessionCol).alignment = { vertical: 'middle' };
   mergeHeaderBlock(sheet, rowAt(2), firstSessionCol, mergeEndCol);
 
-  sheet.getCell(rowAt(3), firstSessionCol).value = claimDisplay
-    ? `Claim Number: ${claimDisplay}`
-    : 'Claim Number: —';
-  sheet.getCell(rowAt(3), firstSessionCol).font = { ...OFFICIAL_REPORT_META_FONT };
-  sheet.getCell(rowAt(3), firstSessionCol).alignment = { vertical: 'middle' };
-  mergeHeaderBlock(sheet, rowAt(3), firstSessionCol, mergeEndCol);
+  if (claimDisplay) {
+    sheet.getCell(rowAt(3), firstSessionCol).value = `Claim Number: ${claimDisplay}`;
+    sheet.getCell(rowAt(3), firstSessionCol).font = { ...OFFICIAL_REPORT_META_FONT };
+    sheet.getCell(rowAt(3), firstSessionCol).alignment = { vertical: 'middle' };
+    mergeHeaderBlock(sheet, rowAt(3), firstSessionCol, mergeEndCol);
+  }
 
   legend.forEach((entry, idx) => {
     const row = rowAt(idx + 1);
