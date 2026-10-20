@@ -35,8 +35,10 @@
 
     function resolveActionStateToken() {
         const input = document.querySelector('input[name="actionStateId"]');
-        const token = String(input?.value || '').trim();
-        return token || '';
+        const fromInput = String(input?.value || '').trim();
+        if (fromInput) return fromInput;
+        const ref = document.getElementById('actionStateIdRef');
+        return String(ref?.dataset?.id || ref?.getAttribute('data-id') || '').trim();
     }
 
     function resolveCsrfToken() {

@@ -1008,6 +1008,19 @@ async function postSemiMonthlyPreview(req, res) {
   }
 }
 
+async function postSemiMonthlyAssignmentStatus(req, res) {
+  try {
+    const data = await semiMonthlyReportAssignmentWizardService.summarizeAssignmentAvailability({
+      classIds: req.body?.classIds,
+      reportScope: req.body?.reportScope,
+      reqUser: req.user
+    });
+    return res.json({ status: 'success', data });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message || 'Unable to check report assignments.' });
+  }
+}
+
 async function postSemiMonthlyApply(req, res) {
   try {
     const data = await semiMonthlyReportAssignmentWizardService.applyClassTemplate({
@@ -2722,6 +2735,7 @@ module.exports = {
   postSemiMonthlyProgramCount,
   postSemiMonthlyResolveDates,
   postSemiMonthlyPreview,
+  postSemiMonthlyAssignmentStatus,
   postSemiMonthlyApply,
   saveAssignment,
   deleteAssignment,

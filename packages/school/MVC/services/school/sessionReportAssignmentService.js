@@ -143,6 +143,7 @@ async function createAssignmentForSession({
     sessionEndTime
   });
 
+  const studentScoped = reportScope === 'each_student' || reportScope === 'selected_students';
   if (reportScope === 'selected_students') {
     const rosterIds = collectRosterStudentIds(sessionRoster);
     if (!selectedTargetStudentIds.length) throw new Error('Select at least one student for Specific Students scope.');
@@ -150,8 +151,11 @@ async function createAssignmentForSession({
     if (invalidIds.length) throw new Error('One or more selected students are not in this session roster.');
   }
 
+  const rowStudentIds = studentScoped
+    ? selectedTargetStudentIds.map(clean).filter(Boolean)
+    : [];
   const targetRows = [{
-    rowId: `session:${sessionId}`,
+    rowId: `session:${sessionId}:${reportStartDate}`,
     targetType: 'session',
     sessionId,
     sessionDate,
@@ -166,7 +170,8 @@ async function createAssignmentForSession({
     conductRequiredBeforeFill,
     teacherId,
     status: 'active',
-    notes
+    notes,
+    ...(studentScoped && rowStudentIds.length ? { targetStudentIds: rowStudentIds } : {})
   }];
 
   const {

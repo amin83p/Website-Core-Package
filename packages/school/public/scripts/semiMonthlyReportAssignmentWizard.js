@@ -7,6 +7,9 @@
     verifiedEndDate: '',
     dateMessage: '',
     preview: null,
+    selectedClassIds: new Set(),
+    classSearchQuery: '',
+    classSort: 'title-asc',
     selectedStudents: {},
     result: null
   };
@@ -19,6 +22,28 @@
     return String(value || '').trim();
   }
 
+  function resolveActionStateId() {
+    const fromInput = clean(document.querySelector('input[name="actionStateId"]')?.value);
+    if (fromInput) return fromInput;
+    const ref = document.getElementById('actionStateIdRef');
+    return clean(ref?.dataset?.id || ref?.getAttribute('data-id'));
+  }
+
+  function rememberActionStateId(id) {
+    const token = clean(id);
+    if (!token) return;
+    let input = document.querySelector('input[name="actionStateId"]');
+    if (!input) {
+      input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'actionStateId';
+      document.body.appendChild(input);
+    }
+    input.value = token;
+    const ref = document.getElementById('actionStateIdRef');
+    if (ref) ref.dataset.id = token;
+  }
+
   function escapeHtml(value) {
     return String(value ?? '')
       .replace(/&/g, '&amp;')
@@ -28,17 +53,23 @@
   }
 
   async function postJson(url, body) {
+    const actionStateId = resolveActionStateId();
+    const payload = { ...(body || {}), ...(actionStateId ? { actionStateId } : {}) };
     const res = await fetch(url, {
       method: 'POST',
       credentials: 'same-origin',
       headers: {
         'Content-Type': 'application/json',
         Accept: 'application/json',
-        'X-AJAX-Request': 'true'
+        'X-AJAX-Request': 'true',
+        ...(actionStateId ? { 'X-Action-State-Id': actionStateId } : {})
       },
-      body: JSON.stringify(body || {})
+      body: JSON.stringify(payload)
     });
+    const nextActionStateId = res.headers.get('x-action-state-id');
+    if (nextActionStateId) rememberActionStateId(nextActionStateId);
     const data = await res.json().catch(() => ({}));
+    if (data.actionStateId) rememberActionStateId(data.actionStateId);
     if (!res.ok || data.status !== 'success') {
       throw new Error(data.message || `Request failed (${res.status}).`);
     }
@@ -153,30 +184,144 @@
     };
   }
 
+  function allPreviewClasses() {
+    return Array.isArray(state.preview?.classes) ? state.preview.classes : [];
+  }
+
+  function classMatchesSearch(row, query) {
+    const token = clean(query).toLowerCase();
+    if (!token) return true;
+    const haystack = [
+      row.title,
+      row.classId,
+      row.sessionDate,
+      row.startTime,
+      row.endTime,
+      row.taskStartTime,
+      row.taskEndTime,
+      row.taskWindowMessage
+    ].map((value) => String(value || '').toLowerCase()).join(' ');
+    return haystack.includes(token);
+  }
+
+  function sortPreviewClasses(rows) {
+    const list = [...rows];
+    const sortKey = state.classSort || 'title-asc';
+    list.sort((left, right) => {
+      if (sortKey === 'title-desc') {
+        return String(right.title || '').localeCompare(String(left.title || ''));
+      }
+      if (sortKey === 'session-asc' || sortKey === 'session-desc') {
+        const leftDate = `${left.sessionDate || ''} ${left.startTime || ''}`;
+        const rightDate = `${right.sessionDate || ''} ${right.startTime || ''}`;
+        const cmp = leftDate.localeCompare(rightDate);
+        return sortKey === 'session-desc' ? -cmp : cmp;
+      }
+      if (sortKey === 'status-asc') {
+        const leftOk = left.taskWindowOk === true ? 0 : 1;
+        const rightOk = right.taskWindowOk === true ? 0 : 1;
+        if (leftOk !== rightOk) return leftOk - rightOk;
+      }
+      return String(left.title || '').localeCompare(String(right.title || ''));
+    });
+    return list;
+  }
+
+  function visiblePreviewClasses() {
+    const filtered = allPreviewClasses().filter((row) => classMatchesSearch(row, state.classSearchQuery));
+    return sortPreviewClasses(filtered);
+  }
+
+  function selectedPreviewClasses() {
+    return allPreviewClasses().filter((row) => state.selectedClassIds.has(row.classId));
+  }
+
+  function syncClassSelectionDefaults(preview) {
+    const ids = (preview?.classes || []).map((row) => row.classId).filter(Boolean);
+    state.selectedClassIds = new Set(ids);
+  }
+
+  function updateClassSelectionCount() {
+    const el = qs('smmrClassSelectionCount');
+    if (!el) return;
+    const total = allPreviewClasses().length;
+    const selected = state.selectedClassIds.size;
+    const visible = visiblePreviewClasses().length;
+    const query = clean(state.classSearchQuery);
+    el.textContent = query
+      ? `${selected} of ${total} selected · ${visible} shown`
+      : `${selected} of ${total} selected`;
+  }
+
   function renderTiles(preview) {
     const host = qs('smmrClassTiles');
     const range = qs('smmrTileRange');
+    const emptyFilter = qs('smmrClassEmptyFilter');
     if (range) {
-      range.textContent = `Report period ${preview.startDate} to ${preview.verifiedEndDate}. Assignment date ${preview.verifiedEndDate}.`;
+      range.textContent = `Report period ${preview.startDate} to ${preview.verifiedEndDate}. Assignment date ${preview.verifiedEndDate}. Choose which classes to include.`;
     }
     if (!host) return;
     const studentScope = preview.reportScope !== 'class';
-    host.innerHTML = (preview.classes || []).map((row) => {
+    const rows = visiblePreviewClasses();
+    if (emptyFilter) emptyFilter.classList.toggle('d-none', rows.length > 0);
+    if (!rows.length) {
+      host.innerHTML = '<tr><td colspan="7" class="text-muted small py-3 text-center">No classes match your search.</td></tr>';
+      updateClassSelectionCount();
+      return;
+    }
+    host.innerHTML = rows.map((row) => {
+      const checked = state.selectedClassIds.has(row.classId);
       const time = row.startTime && row.endTime ? `${row.startTime}–${row.endTime}` : 'No session';
-      const task = row.taskWindowOk ? `Task ${row.taskStartTime}–${row.taskEndTime}` : row.taskWindowMessage;
-      const sessionLink = row.href
-        ? `<a href="${escapeHtml(row.href)}" target="_blank" rel="noopener">${escapeHtml(row.sessionDate)} ${escapeHtml(time)}</a>`
-        : escapeHtml(time);
+      const task = row.taskWindowOk
+        ? `${row.taskStartTime}–${row.taskEndTime}`
+        : escapeHtml(row.taskWindowMessage || 'Unavailable');
+      const sessionCell = row.href
+        ? `<a href="${escapeHtml(row.href)}" target="_blank" rel="noopener" class="text-decoration-none">${escapeHtml(row.sessionDate || '—')}<br><span class="text-muted">${escapeHtml(time)}</span></a>`
+        : `<span class="text-muted">${escapeHtml(row.sessionDate || '—')} ${escapeHtml(time)}</span>`;
+      const statusBadge = row.taskWindowOk
+        ? '<span class="badge bg-success-subtle text-success border border-success-subtle">Ready</span>'
+        : '<span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Blocked</span>';
+      const studentCount = studentScope ? (state.selectedStudents[row.classId] || []).length : 0;
       const manage = studentScope
-        ? `<button type="button" class="btn btn-sm btn-outline-primary mt-2" data-smmr-manage-students="${escapeHtml(row.classId)}">Students</button>`
+        ? `<button type="button" class="btn btn-sm btn-outline-primary" data-smmr-manage-students="${escapeHtml(row.classId)}">Students${studentCount ? ` (${studentCount})` : ''}</button>`
         : '';
-      return `<div class="col-md-6 col-xl-4"><div class="border rounded p-3 h-100">
-        <div class="fw-semibold">${escapeHtml(row.title)}</div>
-        <div class="small mt-1">${sessionLink}</div>
-        <div class="small text-muted">${escapeHtml(task)}</div>
-        ${manage}
-      </div></div>`;
+      const assignmentBadge = row.hasReportAssignment
+        ? '<span class="badge bg-primary-subtle text-primary border border-primary-subtle">Available</span>'
+        : '<span class="badge bg-secondary-subtle text-secondary border">Will create</span>';
+      const rowClass = [
+        checked ? 'smmr-class-row-selected' : '',
+        row.taskWindowOk === false ? 'smmr-class-row-blocked' : ''
+      ].filter(Boolean).join(' ');
+      return `<tr class="${rowClass}" data-smmr-class-row="${escapeHtml(row.classId)}">
+        <td><input class="form-check-input" type="checkbox" data-smmr-class-select="${escapeHtml(row.classId)}" ${checked ? 'checked' : ''} aria-label="Include ${escapeHtml(row.title)}"></td>
+        <td><span class="smmr-class-title">${escapeHtml(row.title)}</span></td>
+        <td class="small">${assignmentBadge}</td>
+        <td class="small">${sessionCell}</td>
+        <td class="small">${row.taskWindowOk ? escapeHtml(task) : task}</td>
+        <td>${statusBadge}</td>
+        <td class="text-end">${manage}</td>
+      </tr>`;
     }).join('');
+    updateClassSelectionCount();
+  }
+
+  function setAllClassesSelected(selected) {
+    const ids = selected
+      ? allPreviewClasses().map((row) => row.classId)
+      : [];
+    state.selectedClassIds = new Set(ids.filter(Boolean));
+    if (state.preview) renderTiles(state.preview);
+  }
+
+  function setVisibleClassesSelected(selected) {
+    const visibleIds = visiblePreviewClasses().map((row) => row.classId);
+    const next = new Set(state.selectedClassIds);
+    visibleIds.forEach((id) => {
+      if (selected) next.add(id);
+      else next.delete(id);
+    });
+    state.selectedClassIds = next;
+    if (state.preview) renderTiles(state.preview);
   }
 
   function openStudents(classId) {
@@ -205,6 +350,7 @@
       input.addEventListener('change', () => {
         const ids = [...body.querySelectorAll(`[data-smmr-student="${classId}"]:checked`)].map((el) => el.value);
         state.selectedStudents[classId] = ids;
+        if (state.preview) renderTiles(state.preview);
       });
     });
     window.bootstrap?.Modal?.getOrCreateInstance(qs('smmrStudentModal'))?.show();
@@ -215,33 +361,74 @@
     if (!host || !preview) return;
     const task = taskPayload();
     const programs = state.programs.map((row) => row.title).join(', ');
-    const templateTitles = (preview.templates || []).map((row) => row.title).join(', ');
+    const selected = selectedPreviewClasses();
+    const studentScope = preview.reportScope !== 'class';
+    const studentSummary = studentScope
+      ? selected.map((row) => {
+        const count = (state.selectedStudents[row.classId] || []).length;
+        return `${row.title}: ${count} student(s)`;
+      }).join('; ')
+      : '';
     host.innerHTML = `
       <div class="small">
         <div><strong>Scope:</strong> ${escapeHtml(preview.reportScope)}</div>
         <div><strong>Programs:</strong> ${escapeHtml(programs)}</div>
         <div><strong>Period:</strong> ${escapeHtml(preview.startDate)} to ${escapeHtml(preview.verifiedEndDate)}</div>
         <div><strong>Task:</strong> last ${escapeHtml(String(task.hoursBeforeEnd))} hour(s) of the session</div>
-        <div><strong>Classes:</strong> ${(preview.classes || []).length}</div>
-        <div><strong>Templates:</strong> ${escapeHtml(templateTitles)}</div>
+        <div><strong>Classes selected:</strong> ${selected.length} of ${(preview.classes || []).length}</div>
+        ${studentSummary ? `<div><strong>Students:</strong> ${escapeHtml(studentSummary)}</div>` : ''}
+        <div class="text-muted mt-1">One report target row will be added per selected class (not per template).</div>
       </div>
     `;
   }
 
+  async function renderAssignmentAudit(preview) {
+    const host = qs('smmrAssignmentAudit');
+    if (!host || !preview) return;
+    const classIds = selectedPreviewClasses().map((row) => row.classId);
+    host.innerHTML = '<div class="small text-muted">Checking report assignment items…</div>';
+    try {
+      const audit = await postJson('/school/reports/assignments/semi-monthly-wizard/assignment-status', {
+        classIds,
+        reportScope: preview.reportScope
+      });
+      const withRows = Array.isArray(audit.withAssignment) ? audit.withAssignment : [];
+      const withoutRows = Array.isArray(audit.withoutAssignment) ? audit.withoutAssignment : [];
+      const list = (rows) => (rows.length
+        ? `<ul class="small mb-0 ps-3">${rows.map((row) => `<li>${escapeHtml(row.title)}</li>`).join('')}</ul>`
+        : '<p class="small text-muted mb-0">None</p>');
+      host.innerHTML = `
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="border rounded p-3 h-100 bg-white">
+              <div class="fw-semibold text-primary mb-2">Has report assignment item (${withRows.length})</div>
+              <p class="small text-muted">A target row will be added to the existing assignment.</p>
+              ${list(withRows)}
+            </div>
+          </div>
+          <div class="col-md-6">
+            <div class="border rounded p-3 h-100 bg-white">
+              <div class="fw-semibold text-secondary mb-2">No report assignment item (${withoutRows.length})</div>
+              <p class="small text-muted">The operation will create the assignment, then add a report target row.</p>
+              ${list(withoutRows)}
+            </div>
+          </div>
+        </div>
+      `;
+    } catch (error) {
+      host.innerHTML = `<div class="alert alert-warning py-2 small mb-0">${escapeHtml(error.message || 'Unable to check report assignments.')}</div>`;
+    }
+  }
+
   function studentsReady(preview) {
     if (!preview || preview.reportScope === 'class') return true;
-    return (preview.classes || []).every((row) => (state.selectedStudents[row.classId] || []).length > 0);
+    return selectedPreviewClasses().every((row) => (state.selectedStudents[row.classId] || []).length > 0);
   }
 
   async function runOperation() {
     const preview = state.preview;
     if (!preview) return;
-    const jobs = [];
-    (preview.classes || []).forEach((classRow) => {
-      (preview.templates || []).forEach((template) => {
-        jobs.push({ classRow, template });
-      });
-    });
+    const jobs = selectedPreviewClasses().map((classRow) => ({ classRow }));
     const barWrap = qs('smmrProgressWrap');
     const bar = qs('smmrProgressBar');
     const resultHost = qs('smmrResult');
@@ -259,7 +446,6 @@
       try {
         const result = await postJson('/school/reports/assignments/semi-monthly-wizard/apply', {
           classId: job.classRow.classId,
-          templateId: job.template.id,
           reportScope: preview.reportScope,
           reportStartDate: preview.startDate,
           verifiedEndDate: preview.verifiedEndDate,
@@ -270,10 +456,10 @@
           allocatedHours: task.allocatedHours,
           targetStudentIds: state.selectedStudents[job.classRow.classId] || []
         });
-        created.push(`${job.classRow.title} · ${job.template.title}`);
-        void result;
+        const actionLabel = result.createdAssignment ? 'assignment created' : 'target row added';
+        created.push(`${job.classRow.title} (${actionLabel})`);
       } catch (error) {
-        failed.push(`${job.classRow.title} · ${job.template.title}: ${error.message}`);
+        failed.push(`${job.classRow.title}: ${error.message}`);
       }
     }
     if (bar) {
@@ -343,6 +529,9 @@
             hoursBeforeEnd: taskPayload().hoursBeforeEnd
           });
           state.preview = preview;
+          state.classSearchQuery = clean(qs('smmrClassSearch')?.value);
+          state.classSort = clean(qs('smmrClassSort')?.value) || 'title-asc';
+          syncClassSelectionDefaults(preview);
           (preview.classes || []).forEach((row) => {
             if (preview.reportScope === 'each_student') {
               state.selectedStudents[row.classId] = (row.students || []).map((student) => student.personId);
@@ -359,15 +548,19 @@
         return;
       }
       if (state.step === 'tiles') {
-        if (!studentsReady(state.preview)) {
-          throw new Error('Select at least one student for every class.');
+        if (!state.selectedClassIds.size) {
+          throw new Error('Select at least one class to continue.');
         }
-        const blocked = (state.preview?.classes || []).filter((row) => row.taskWindowOk === false);
+        if (!studentsReady(state.preview)) {
+          throw new Error('Select at least one student for every selected class.');
+        }
+        const blocked = selectedPreviewClasses().filter((row) => row.taskWindowOk === false);
         if (blocked.length) {
-          throw new Error(blocked[0].taskWindowMessage || 'A class session cannot hold the task window.');
+          throw new Error(blocked[0].taskWindowMessage || 'A selected class session cannot hold the task window.');
         }
         renderSummary(state.preview);
         showStep('run');
+        void renderAssignmentAudit(state.preview);
         return;
       }
       if (state.step === 'run' && !state.result) {
@@ -390,9 +583,35 @@
       state.programs = state.programs.filter((row) => row.id !== id);
       renderPrograms();
     });
+    qs('smmrClassSearch')?.addEventListener('input', (event) => {
+      state.classSearchQuery = clean(event.target?.value);
+      if (state.preview) renderTiles(state.preview);
+    });
+    qs('smmrClassSort')?.addEventListener('change', (event) => {
+      state.classSort = clean(event.target?.value) || 'title-asc';
+      if (state.preview) renderTiles(state.preview);
+    });
+    qs('btn_smmrSelectAllClasses')?.addEventListener('click', () => {
+      if (clean(state.classSearchQuery)) setVisibleClassesSelected(true);
+      else setAllClassesSelected(true);
+    });
+    qs('btn_smmrDeselectAllClasses')?.addEventListener('click', () => {
+      if (clean(state.classSearchQuery)) setVisibleClassesSelected(false);
+      else setAllClassesSelected(false);
+    });
+    qs('smmrClassTiles')?.addEventListener('change', (event) => {
+      const checkbox = event.target.closest('[data-smmr-class-select]');
+      if (!checkbox) return;
+      const classId = checkbox.getAttribute('data-smmr-class-select');
+      if (!classId) return;
+      if (checkbox.checked) state.selectedClassIds.add(classId);
+      else state.selectedClassIds.delete(classId);
+      if (state.preview) renderTiles(state.preview);
+    });
     qs('smmrClassTiles')?.addEventListener('click', (event) => {
       const button = event.target.closest('[data-smmr-manage-students]');
       if (!button) return;
+      event.stopPropagation();
       openStudents(button.getAttribute('data-smmr-manage-students'));
     });
     qs('btn_smmrNext')?.addEventListener('click', () => { void goNext(); });

@@ -5,6 +5,8 @@ const semiMonthlyReportPolicyModel = require('../../models/school/semiMonthlyRep
 const sessionReportAssignmentService = require('./sessionReportAssignmentService');
 const reportAssignmentStudentEligibilityService = require('./reportAssignmentStudentEligibilityService');
 const reportViewService = require('./reportViewService');
+const reportIntegrityService = require('./reportIntegrityService');
+const classReferenceSyncService = require('./classReferenceSyncService');
 const reportScopePolicy = require('./reportScopePolicy');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -107,17 +109,99 @@ function matchAssignmentClasses({
 }
 
 function countClassesForProgram({
-  assignments = [],
   classes = [],
-  reportScope = 'class',
   programId = ''
 } = {}) {
-  return matchAssignmentClasses({
-    assignments,
-    classes,
-    reportScope,
-    programIds: [programId]
-  }).length;
+  return (Array.isArray(classes) ? classes : [])
+    .filter((classRow) => classMatchesProgram(classRow, programId))
+    .length;
+}
+
+function classesForPrograms({ classes = [], programIds = [] } = {}) {
+  const programs = (Array.isArray(programIds) ? programIds : []).map((id) => toPublicId(id)).filter(Boolean);
+  return (Array.isArray(classes) ? classes : [])
+    .filter((classRow) => programs.some((programId) => classMatchesProgram(classRow, programId)))
+    .sort((a, b) => String(a.title || a.id).localeCompare(String(b.title || b.id)));
+}
+
+function findReportAssignmentForClass(assignments = [], classId = '', reportScope = 'class') {
+  const scope = reportScopePolicy.normalizeReportScope(reportScope);
+  const classToken = toPublicId(classId);
+  if (!classToken) return null;
+  return (Array.isArray(assignments) ? assignments : []).find((row) => (
+    idsEqual(row?.classId, classToken) && assignmentScope(row) === scope
+  )) || null;
+}
+
+function normalizeSessionForAssignment(session = {}) {
+  const sessionId = toPublicId(session?.sessionId || session?.id);
+  if (!sessionId) return null;
+  return { ...session, sessionId };
+}
+
+function resolveWizardRowStudentIds(reportScope = 'class', targetStudentIds = [], sessionRoster = []) {
+  const scope = reportScopePolicy.normalizeReportScope(reportScope);
+  const selected = (Array.isArray(targetStudentIds) ? targetStudentIds : [])
+    .map((id) => toPublicId(id))
+    .filter(Boolean);
+  if (scope === 'selected_students') return selected;
+  if (scope === 'each_student') {
+    if (selected.length) return selected;
+    return (Array.isArray(sessionRoster) ? sessionRoster : [])
+      .map((row) => toPublicId(row?.personId))
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function buildSemiMonthlyTargetRow({
+  session,
+  reportStartDate,
+  reportDueDate,
+  taskStartTime,
+  taskEndTime,
+  conflictPermitted,
+  timesheetReflection,
+  allocatedHours,
+  conductRequiredBeforeFill,
+  teacherId,
+  reportScope,
+  targetStudentIds,
+  sessionRoster,
+  notes = 'Semi-monthly report assignment wizard.'
+} = {}) {
+  const sessionId = toPublicId(session?.sessionId);
+  const sessionDateValue = normalizeDateOnly(session?.date || session?.sessionDate);
+  const studentScoped = reportScope === 'each_student' || reportScope === 'selected_students';
+  const rowStudentIds = resolveWizardRowStudentIds(reportScope, targetStudentIds, sessionRoster);
+  return {
+    rowId: `session:${sessionId}:${normalizeDateOnly(reportStartDate)}`,
+    targetType: 'session',
+    sessionId,
+    sessionDate: sessionDateValue,
+    dueDate: '',
+    reportStartDate: normalizeDateOnly(reportStartDate),
+    reportDueDate: normalizeDateOnly(reportDueDate),
+    taskStartTime,
+    taskEndTime,
+    conflictPermitted: Boolean(conflictPermitted),
+    timesheetReflection: Boolean(timesheetReflection),
+    allocatedHours: Number(allocatedHours) || 0,
+    conductRequiredBeforeFill: conductRequiredBeforeFill !== false,
+    teacherId: toPublicId(teacherId),
+    status: 'active',
+    notes,
+    ...(studentScoped && rowStudentIds.length ? { targetStudentIds: rowStudentIds } : {})
+  };
+}
+
+function mergeTargetRows(existingRows = [], incomingRow = {}) {
+  const rows = Array.isArray(existingRows) ? [...existingRows] : [];
+  const rowId = String(incomingRow?.rowId || '').trim();
+  const index = rows.findIndex((row) => String(row?.rowId || '').trim() === rowId);
+  if (index >= 0) rows[index] = { ...rows[index], ...incomingRow };
+  else rows.push(incomingRow);
+  return rows;
 }
 
 function sessionsOnDate(sessions = [], date = '') {
@@ -135,6 +219,16 @@ function pickLatestSessionOnDate(sessions = [], date = '') {
     return sessionStart(right).localeCompare(sessionStart(left));
   });
   return rows[0] || null;
+}
+
+function classHasSessionInRange(sessions = [], startDate = '', endDate = '') {
+  const start = normalizeDateOnly(startDate);
+  const end = normalizeDateOnly(endDate);
+  if (!start || !end) return false;
+  return (Array.isArray(sessions) ? sessions : []).some((session) => {
+    const day = sessionDate(session);
+    return isScheduledSession(session) && day && day >= start && day <= end;
+  });
 }
 
 function resolveVerifiedEndDate({
@@ -157,25 +251,50 @@ function resolveVerifiedEndDate({
   if (!classIds.length) {
     return { ok: false, message: 'No matching classes were found.', verifiedEndDate: '' };
   }
+  const classesInRange = classIds.filter((classId) => (
+    classHasSessionInRange(sessionsByClassId[classId], start, end)
+  ));
+  const classesWithoutSessionsInRange = classIds.length - classesInRange.length;
+  if (!classesInRange.length) {
+    return {
+      ok: false,
+      verifiedEndDate: '',
+      classesWithoutSessionsInRange,
+      classesInRangeCount: 0,
+      message: 'None of the program classes have a scheduled session between the period start and end dates.'
+    };
+  }
   let cursor = end;
   while (cursor && cursor >= start) {
-    const everyClassHasSession = classIds.every((classId) => sessionsOnDate(sessionsByClassId[classId], cursor).length > 0);
+    const everyClassHasSession = classesInRange.every((classId) => (
+      sessionsOnDate(sessionsByClassId[classId], cursor).length > 0
+    ));
     if (everyClassHasSession) {
+      const skippedNote = classesWithoutSessionsInRange > 0
+        ? ` ${classesWithoutSessionsInRange} class(es) have no session in this period and are not included in this date check.`
+        : '';
       return {
         ok: true,
         verifiedEndDate: cursor,
         adjusted: cursor !== end,
+        classesWithoutSessionsInRange,
+        classesInRangeCount: classesInRange.length,
         message: cursor === end
-          ? `Reports will be assigned on ${cursor}.`
-          : `No session is scheduled for every class on ${end}. The assignment date is ${cursor}.`
+          ? `Reports will be assigned on ${cursor}.${skippedNote}`
+          : `No session is scheduled for every in-range class on ${end}. The assignment date is ${cursor}.${skippedNote}`
       };
     }
     cursor = addDaysIso(cursor, -1);
   }
+  const skippedSuffix = classesWithoutSessionsInRange > 0
+    ? ` (${classesWithoutSessionsInRange} class(es) have no session in this period.)`
+    : '';
   return {
     ok: false,
     verifiedEndDate: '',
-    message: 'No day in this range has a scheduled session for every selected class.'
+    classesWithoutSessionsInRange,
+    classesInRangeCount: classesInRange.length,
+    message: `No day in this range has a scheduled session for every class that meets during the period.${skippedSuffix}`
   };
 }
 
@@ -232,25 +351,21 @@ async function loadTemplates(reqUser) {
   return templates;
 }
 
-async function countProgramClasses({ reportScope, programId, reqUser } = {}) {
+async function countProgramClasses({ programId, reqUser } = {}) {
   const context = await loadScopeContext(reqUser);
   return {
     programId: toPublicId(programId),
     classCount: countClassesForProgram({
-      assignments: context.assignments,
       classes: context.classes,
-      reportScope,
       programId
     })
   };
 }
 
-async function loadMatchedClasses({ reportScope, programIds, reqUser } = {}) {
+async function loadProgramClasses({ programIds, reqUser } = {}) {
   const context = await loadScopeContext(reqUser);
-  return matchAssignmentClasses({
-    assignments: context.assignments,
+  return classesForPrograms({
     classes: context.classes,
-    reportScope,
     programIds
   });
 }
@@ -262,7 +377,7 @@ async function resolveDates({
   endDate = '',
   reqUser
 } = {}) {
-  const matched = await loadMatchedClasses({ reportScope, programIds, reqUser });
+  const matched = await loadProgramClasses({ programIds, reqUser });
   const sessionsByClassId = {};
   for (const classRow of matched) {
     const classId = toPublicId(classRow.id);
@@ -317,10 +432,12 @@ async function previewTiles({
   if (!templates.length) {
     throw new Error('Choose at least one report template in Semi-Monthly Report settings.');
   }
-  const matched = await loadMatchedClasses({ reportScope: scope, programIds, reqUser });
+  const context = await loadScopeContext(reqUser);
+  const matched = classesForPrograms({ classes: context.classes, programIds });
   const classes = [];
   for (const classRow of matched) {
     const classId = toPublicId(classRow.id);
+    const assignment = findReportAssignmentForClass(context.assignments, classId, scope);
     const sessions = await dependencies.schoolDataService.getClassSessions(classId, reqUser);
     const session = pickLatestSessionOnDate(sessions, verifiedEndDate);
     const window = session ? taskWindowBeforeSessionEnd(session, hoursBeforeEnd) : { ok: false, message: 'No session on the verified date.' };
@@ -336,6 +453,9 @@ async function previewTiles({
     classes.push({
       classId,
       title: String(classRow.title || classId).trim(),
+      hasReportAssignment: Boolean(assignment),
+      assignmentId: toPublicId(assignment?.id),
+      assignmentLabel: assignment ? String(assignment.templateId || assignment.id).trim() : '',
       sessionId: toPublicId(session?.sessionId || session?.id),
       sessionDate: session ? sessionDate(session) : '',
       startTime: session ? sessionStart(session) : '',
@@ -373,21 +493,133 @@ async function applyClassTemplate({
   targetStudentIds = [],
   reqUser
 } = {}) {
+  const scope = reportScopePolicy.normalizeReportScope(reportScope);
   const classData = await dependencies.schoolDataService.getDataById('classes', classId, reqUser);
   if (!classData) throw new Error('Class not found.');
   const sessions = await dependencies.schoolDataService.getClassSessions(classId, reqUser);
-  const session = pickLatestSessionOnDate(sessions, verifiedEndDate);
+  const session = normalizeSessionForAssignment(pickLatestSessionOnDate(sessions, verifiedEndDate));
   if (!session) throw new Error('No scheduled session was found on the verified date.');
   const window = taskWindowBeforeSessionEnd(session, hoursBeforeEnd);
   if (!window.ok) throw new Error(window.message);
+
+  const sessionRoster = Array.isArray(session.roster) ? session.roster : [];
+  const teacherId = dependencies.sessionReportAssignmentService.resolveTeacherId(session, classData);
+  if (!teacherId) throw new Error('The session needs an assigned teacher before assigning a report.');
+
+  const reportDueDate = normalizeDateOnly(session.date || session.sessionDate);
+  const incomingRow = buildSemiMonthlyTargetRow({
+    session,
+    reportStartDate,
+    reportDueDate,
+    taskStartTime: window.taskStartTime,
+    taskEndTime: window.taskEndTime,
+    conflictPermitted,
+    timesheetReflection,
+    allocatedHours: timesheetReflection ? allocatedHours : 0,
+    conductRequiredBeforeFill,
+    teacherId,
+    reportScope: scope,
+    targetStudentIds,
+    sessionRoster
+  });
+
+  const context = await loadScopeContext(reqUser);
+  const existing = findReportAssignmentForClass(context.assignments, classId, scope);
+  const templates = await loadTemplates(reqUser);
+  const resolvedTemplateId = toPublicId(
+    existing?.templateId || templateId || templates[0]?.id
+  );
+  if (!resolvedTemplateId) throw new Error('Choose at least one report template in Semi-Monthly Report settings.');
+
+  if (existing?.id) {
+    const mergedRows = mergeTargetRows(existing.targetRows, incomingRow);
+    const {
+      template,
+      effectiveTargetRows,
+      persistedTargetStudentIds
+    } = await reportIntegrityService.validateAssignmentCrossEntityContext({
+      classId: toPublicId(classId),
+      templateId: resolvedTemplateId,
+      reqUser,
+      reportScope: scope,
+      hasSessionTargets: true,
+      selectedSessionIds: [session.sessionId],
+      teacherIds: [teacherId],
+      requestedTaskStartTime: window.taskStartTime,
+      requestedTaskEndTime: window.taskEndTime,
+      conflictPermitted,
+      requestedReportStartDate: normalizeDateOnly(reportStartDate),
+      requestedReportDueDate: reportDueDate,
+      selectedTargetStudentIds: resolveWizardRowStudentIds(scope, targetStudentIds, sessionRoster),
+      targetRows: mergedRows,
+      excludeAssignmentId: toPublicId(existing.id)
+    });
+
+    const firstActiveRow = effectiveTargetRows.find((row) => String(row?.status || '').toLowerCase() === 'active')
+      || effectiveTargetRows[0];
+    const rowTeacherIds = [...new Set(effectiveTargetRows
+      .map((row) => toPublicId(row?.teacherId))
+      .filter(Boolean))];
+    const now = new Date().toISOString();
+    const basePayload = {
+      orgId: toPublicId(existing.orgId || classData.orgId || reqUser?.activeOrgId),
+      classId: toPublicId(classId),
+      reportScope: scope,
+      targetStudentIds: persistedTargetStudentIds,
+      templateId: template.id,
+      templateVersion: Number(template.version || 1),
+      teacherIds: rowTeacherIds.length ? rowTeacherIds : [teacherId],
+      targetRows: effectiveTargetRows,
+      targetType: firstActiveRow.targetType,
+      sessionId: firstActiveRow.sessionId,
+      sessionDate: firstActiveRow.sessionDate,
+      dueDate: firstActiveRow.dueDate,
+      conflictPermitted: firstActiveRow.conflictPermitted,
+      taskStartTime: firstActiveRow.taskStartTime,
+      taskEndTime: firstActiveRow.taskEndTime,
+      reportStartDate: firstActiveRow.reportStartDate,
+      reportDueDate: firstActiveRow.reportDueDate,
+      status: existing.status || 'active',
+      notes: existing.notes || incomingRow.notes,
+      timesheetReflection: firstActiveRow.timesheetReflection,
+      allocatedHours: firstActiveRow.timesheetReflection ? Number(firstActiveRow.allocatedHours) : 0,
+      conductRequiredBeforeFill: conductRequiredBeforeFill !== false,
+      audit: {
+        createUser: existing?.audit?.createUser || reqUser?.id || '',
+        createDateTime: existing?.audit?.createDateTime || now,
+        lastUpdateUser: reqUser?.id || '',
+        lastUpdateDateTime: now
+      }
+    };
+
+    await dependencies.schoolDataService.updateData('reportAssignments', existing.id, basePayload, reqUser);
+    await classReferenceSyncService.cleanupReportInstancesForRemovedTargetRows({
+      assignmentId: existing.id,
+      previousAssignment: existing,
+      nextAssignment: { ...existing, ...basePayload, id: existing.id },
+      reqUser
+    });
+    await classReferenceSyncService.notifyClassReferencesChanged({
+      classId: toPublicId(classId),
+      reason: `semi_monthly_wizard_target_row:${existing.id}`,
+      reqUser
+    });
+
+    return {
+      assignmentId: toPublicId(existing.id),
+      createdAssignment: false,
+      message: 'Report target row added to the existing report assignment.'
+    };
+  }
+
   const result = await dependencies.sessionReportAssignmentService.createAssignmentForSession({
     classData,
     session,
-    sessionRoster: Array.isArray(session.roster) ? session.roster : [],
+    sessionRoster,
     reqUser,
     input: {
-      templateId,
-      reportScope,
+      templateId: resolvedTemplateId,
+      reportScope: scope,
       reportStartDate,
       taskStartTime: window.taskStartTime,
       taskEndTime: window.taskEndTime,
@@ -395,14 +627,39 @@ async function applyClassTemplate({
       timesheetReflection,
       conductRequiredBeforeFill,
       allocatedHours,
-      targetStudentIds,
-      notes: 'Semi-monthly report assignment wizard.'
+      targetStudentIds: resolveWizardRowStudentIds(scope, targetStudentIds, sessionRoster),
+      notes: incomingRow.notes
     }
   });
   return {
     assignmentId: toPublicId(result?.assignment?.id),
-    message: result?.message || 'Report assigned.'
+    createdAssignment: true,
+    message: result?.message || 'Report assignment created with target row.'
   };
+}
+
+async function summarizeAssignmentAvailability({
+  classIds = [],
+  reportScope = 'class',
+  reqUser
+} = {}) {
+  const scope = reportScopePolicy.normalizeReportScope(reportScope);
+  const context = await loadScopeContext(reqUser);
+  const withAssignment = [];
+  const withoutAssignment = [];
+  (Array.isArray(classIds) ? classIds : []).forEach((classId) => {
+    const classToken = toPublicId(classId);
+    if (!classToken) return;
+    const classRow = context.classes.find((row) => idsEqual(row?.id, classToken));
+    const assignment = findReportAssignmentForClass(context.assignments, classToken, scope);
+    const title = String(classRow?.title || classToken).trim();
+    if (assignment) {
+      withAssignment.push({ classId: classToken, title, assignmentId: toPublicId(assignment.id) });
+    } else {
+      withoutAssignment.push({ classId: classToken, title });
+    }
+  });
+  return { withAssignment, withoutAssignment };
 }
 
 function __setDependenciesForTest(nextDeps = {}) {
@@ -424,13 +681,17 @@ module.exports = {
   classMatchesProgram,
   matchAssignmentClasses,
   countClassesForProgram,
+  classesForPrograms,
+  findReportAssignmentForClass,
   pickLatestSessionOnDate,
+  classHasSessionInRange,
   resolveVerifiedEndDate,
   taskWindowBeforeSessionEnd,
   countProgramClasses,
   resolveDates,
   previewTiles,
   applyClassTemplate,
+  summarizeAssignmentAvailability,
   __setDependenciesForTest,
   __resetDependenciesForTest
 };

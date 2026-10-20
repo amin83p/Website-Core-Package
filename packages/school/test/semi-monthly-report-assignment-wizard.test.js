@@ -16,21 +16,17 @@ const assignments = [
   { id: 'ASG_3', classId: 'CLS_2', orgId: 'ORG', reportScope: 'class' }
 ];
 
-test('program count includes only assignment classes for that program and scope', () => {
+test('program count includes classes linked to the program', () => {
   const count = wizard.countClassesForProgram({
-    assignments,
     classes,
-    reportScope: 'class',
     programId: 'PRG_1'
   });
   assert.equal(count, 1);
-  const otherScope = wizard.countClassesForProgram({
-    assignments,
+  const otherProgram = wizard.countClassesForProgram({
     classes,
-    reportScope: 'each_student',
     programId: 'PRG_2'
   });
-  assert.equal(otherScope, 0);
+  assert.equal(otherProgram, 1);
 });
 
 test('verified end date walks back to a day every class has a session, inside the same month', () => {
@@ -65,6 +61,19 @@ test('verified end date walks back to a day every class has a session, inside th
     sessionsByClassId
   });
   assert.equal(none.ok, false);
+
+  const skipsClassWithNoSessionsInRange = wizard.resolveVerifiedEndDate({
+    startDate: '2026-06-01',
+    endDate: '2026-06-05',
+    sessionsByClassId: {
+      CLS_1: sessionsByClassId.CLS_1,
+      CLS_2: sessionsByClassId.CLS_2,
+      CLS_IDLE: []
+    }
+  });
+  assert.equal(skipsClassWithNoSessionsInRange.ok, true);
+  assert.equal(skipsClassWithNoSessionsInRange.verifiedEndDate, '2026-06-04');
+  assert.equal(skipsClassWithNoSessionsInRange.classesWithoutSessionsInRange, 1);
 });
 
 test('task window is the last requested hours of the session', () => {
@@ -91,13 +100,18 @@ test('apply creates one assignment for the latest session on the verified date',
       getClassSessions: async () => ([
         { sessionId: 'EARLY', date: '2026-06-04', startTime: '09:00', endTime: '10:00', status: 'scheduled', roster: [] },
         { sessionId: 'LATE', date: '2026-06-04', startTime: '13:00', endTime: '15:00', status: 'scheduled', roster: [{ personId: 'PER_1' }] }
-      ])
+      ]),
+      fetchAllData: async () => []
     },
     sessionReportAssignmentService: {
+      resolveTeacherId: () => 'TCH_1',
       createAssignmentForSession: async (args) => {
         created.push(args);
         return { assignment: { id: 'ASG_NEW' }, message: 'assigned' };
       }
+    },
+    semiMonthlyReportPolicyModel: {
+      getPolicyForOrg: async () => ({ reportTemplateIds: ['TPL_1'] })
     }
   });
   t.after(() => wizard.__resetDependenciesForTest());
@@ -133,8 +147,13 @@ test('semi-monthly wizard is linked from report assignments', () => {
   assert.match(page, /smmrReportScope/);
   assert.match(page, /wizard-step-rail/);
   assert.match(page, /smmrWizardProgressBar/);
+  assert.match(page, /smmrClassSearch/);
+  assert.match(page, /btn_smmrSelectAllClasses/);
   assert.match(page, /semiMonthlyReportAssignmentWizard\.js/);
   const script = fs.readFileSync(path.join(__dirname, '../public/scripts/semiMonthlyReportAssignmentWizard.js'), 'utf8');
+  assert.match(script, /actionStateIdRef/);
+  assert.match(script, /X-Action-State-Id/);
+  assert.match(script, /selectedClassIds/);
   assert.match(script, /showLoading/);
   assert.match(script, /Preparing class sessions for the verified date/);
   assert.match(script, /Eligible Sessions/);

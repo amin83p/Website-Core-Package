@@ -648,6 +648,10 @@ router.post('/assignments/semi-monthly-wizard/preview',
   requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE),
   trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE, reportAssignmentBulkActionState),
   ctrl.postSemiMonthlyPreview);
+router.post('/assignments/semi-monthly-wizard/assignment-status',
+  requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE),
+  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE, reportAssignmentBulkActionState),
+  ctrl.postSemiMonthlyAssignmentStatus);
 router.post('/assignments/semi-monthly-wizard/apply',
   requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE),
   trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE, reportAssignmentMutationActionState),
