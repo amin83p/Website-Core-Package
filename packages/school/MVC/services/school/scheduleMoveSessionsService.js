@@ -5,7 +5,6 @@ const schoolDataService = require('./schoolDataService');
 const schoolRepositories = require('../../repositories/school');
 const classSessionCapacityService = require('./classSessionCapacityService');
 const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
-const enrollmentMoveService = require('./enrollmentMoveService');
 const sessionIdService = require('./sessionIdService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -17,9 +16,19 @@ let dependencies = {
   schoolRepositories,
   classSessionCapacityService,
   classEnrollmentSessionApplicabilityService,
-  enrollmentMoveService,
+  enrollmentMoveService: null,
   sessionIdService
 };
+
+function resolveEnrollmentMoveService() {
+  const injected = dependencies.enrollmentMoveService;
+  if (injected && typeof injected.previewMoveEnrollment === 'function') {
+    return injected;
+  }
+  const live = require('./enrollmentMoveService');
+  dependencies.enrollmentMoveService = live;
+  return live;
+}
 
 function normalizeDateOnly(value) {
   const token = String(value || '').trim();
@@ -723,7 +732,9 @@ async function applyEnrollmentRow({
   targetClass,
   reqUser,
   orgId,
-  engineHooks
+  engineHooks,
+  scheduleMoveContext = null,
+  accessContext = null
 } = {}) {
   const targetCapacity = dependencies.classSessionCapacityService.resolveClassMaxCapacity(targetClass);
   if (row.action === 'reassign') {
@@ -761,22 +772,30 @@ async function applyEnrollmentRow({
       notes: period.notes || ''
     }
   };
-  const movePreview = await dependencies.enrollmentMoveService.previewMoveEnrollment({
+  const enrollmentMove = resolveEnrollmentMoveService();
+  const moveOptions = { accessContext };
+  if (scheduleMoveContext?.prefilledSessionTransferPlan) {
+    moveOptions.sessionsTransferredByScheduleMove = true;
+    moveOptions.prefilledSessionTransferPlan = scheduleMoveContext.prefilledSessionTransferPlan;
+  }
+  const movePreview = await enrollmentMove.previewMoveEnrollment({
     sourcePeriodId: period.id,
     payload,
     reqUser,
-    orgId
+    orgId,
+    options: moveOptions
   });
   if (!movePreview.canApply) {
     throw new Error(movePreview.blockers?.[0]?.message || 'Enrollment move is blocked.');
   }
-  return dependencies.enrollmentMoveService.applyMoveEnrollment({
+  return enrollmentMove.applyMoveEnrollment({
     sourcePeriodId: period.id,
     payload,
     previewHash: movePreview.previewHash,
     reqUser,
     orgId,
-    engineHooks
+    engineHooks,
+    options: moveOptions
   });
 }
 
@@ -983,6 +1002,15 @@ async function applyMoveSessions({
   );
 
   const orgId = toPublicId(context.sourceClass.orgId);
+  const scheduleMoveContext = {
+    prefilledSessionTransferPlan: {
+      sourceSessionIds: context.selectedSessions.map((session) => sessionIdentity(session)),
+      plans: [],
+      targetUnmarkSessionIds: resolveTargetUnmarkSessionIdsFromPlans(preview.sessionPlans, targetSessions),
+      createCount: created.length,
+      reuseCount: preview.sessionPlans.filter((plan) => plan.action === 'reuse').length
+    }
+  };
   for (const row of preview.enrollments) {
     const period = context.sourcePeriods.find((item) => idsEqual(item.id, row.periodId));
     if (!period) continue;
@@ -995,7 +1023,9 @@ async function applyMoveSessions({
       targetClass: context.targetClass,
       reqUser,
       orgId,
-      engineHooks: hooks
+      engineHooks: hooks,
+      scheduleMoveContext,
+      accessContext
     });
   }
 
@@ -1034,7 +1064,7 @@ function __resetDependenciesForTest() {
     schoolRepositories,
     classSessionCapacityService,
     classEnrollmentSessionApplicabilityService,
-    enrollmentMoveService,
+    enrollmentMoveService: null,
     sessionIdService
   };
 }
@@ -1056,6 +1086,7 @@ module.exports = {
   buildMovePreviewHash,
   parseSelectedSessionIds,
   buildMovePreview,
+  resolveEnrollmentMoveService,
   applyMoveSessions,
   __setDependenciesForTest,
   __resetDependenciesForTest

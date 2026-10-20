@@ -286,6 +286,17 @@ test('apply creates only missing sessions, keeps matches, moves enrollments, and
   ]);
 });
 
+test('resolveEnrollmentMoveService recovers from circular-require stub', () => {
+  moveService.__setDependenciesForTest({ enrollmentMoveService: {} });
+  try {
+    const resolved = moveService.resolveEnrollmentMoveService();
+    assert.equal(typeof resolved.previewMoveEnrollment, 'function');
+    assert.equal(typeof resolved.applyMoveEnrollment, 'function');
+  } finally {
+    moveService.__resetDependenciesForTest();
+  }
+});
+
 test('move sessions wizard is wired to the schedule rail', () => {
   const view = fs.readFileSync(path.join(__dirname, '../MVC/views/school/schedule/personScheduleAdmin.ejs'), 'utf8');
   const routes = fs.readFileSync(path.join(__dirname, '../MVC/routes/scheduleRoutes.js'), 'utf8');

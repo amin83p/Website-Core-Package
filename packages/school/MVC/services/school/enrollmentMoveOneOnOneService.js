@@ -149,7 +149,19 @@ async function planOneOnOneEnrollmentMove({
   const blockers = [];
   const warnings = [];
   const notices = [];
-  const personId = toPublicId(sourcePeriod?.personId || '');
+  let personId = toPublicId(sourcePeriod?.personId || '');
+  if (!personId && sourcePeriod?.studentId) {
+    try {
+      const student = await dependencies.schoolDataService.getDataById(
+        'students',
+        sourcePeriod.studentId,
+        reqUser
+      );
+      personId = toPublicId(student?.personId || student?.userId || '');
+    } catch (error) {
+      personId = '';
+    }
+  }
   const moveStartDate = normalizeDateOnly(normalized?.target?.startDate || '');
   const targetClassId = toPublicId(targetClass?.id || normalized?.target?.classId || '');
 

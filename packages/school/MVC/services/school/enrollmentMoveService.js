@@ -246,6 +246,16 @@ async function previewTargetEnrollment(normalized, sourcePeriod, sourceClass, ta
   let sessionTransferPlan = normalized.sessionTransferPlan || null;
 
   if (
+    options.sessionsTransferredByScheduleMove
+    && options.prefilledSessionTransferPlan
+  ) {
+    sessionTransferPlan = options.prefilledSessionTransferPlan;
+    normalized.sessionTransferPlan = sessionTransferPlan;
+    warnings.push({
+      code: 'SESSION_TRANSFER_ALREADY_APPLIED',
+      message: 'Sessions were already moved on the master schedule; continuing enrollment on the target class.'
+    });
+  } else if (
     sourceClass
     && targetClass
     && enrollmentMoveOneOnOneService.requiresIntegratedSessionMove({
@@ -574,25 +584,39 @@ async function applyMoveEnrollment({
 
   if (integratedMove) {
     if (!sessionTransferPlan?.plans?.length) {
-      throw new Error('Session transfer plan is missing. Preview the move again before applying.');
+      if (options.sessionsTransferredByScheduleMove) {
+        sessionTransferResult = {
+          targetUnmarkSessionIds: Array.isArray(sessionTransferPlan?.targetUnmarkSessionIds)
+            ? sessionTransferPlan.targetUnmarkSessionIds
+            : [],
+          rollbackTargetSessions: null
+        };
+        normalized.sessionTransferPlan = {
+          ...(sessionTransferPlan || {}),
+          targetUnmarkSessionIds: sessionTransferResult.targetUnmarkSessionIds
+        };
+      } else {
+        throw new Error('Session transfer plan is missing. Preview the move again before applying.');
+      }
+    } else {
+      const [sourceSessions, targetSessions] = await Promise.all([
+        dependencies.schoolDataService.getClassSessions(sourceClass.id, reqUser),
+        dependencies.schoolDataService.getClassSessions(targetClass.id, reqUser)
+      ]);
+      sessionTransferResult = await dependencies.scheduleMoveSessionsService.applySessionTransferPlans({
+        sourceClass,
+        targetClass,
+        sourceSessions,
+        targetSessions,
+        sessionPlans: sessionTransferPlan.plans,
+        reqUser,
+        accessContext
+      });
+      normalized.sessionTransferPlan = {
+        ...sessionTransferPlan,
+        targetUnmarkSessionIds: sessionTransferResult.targetUnmarkSessionIds
+      };
     }
-    const [sourceSessions, targetSessions] = await Promise.all([
-      dependencies.schoolDataService.getClassSessions(sourceClass.id, reqUser),
-      dependencies.schoolDataService.getClassSessions(targetClass.id, reqUser)
-    ]);
-    sessionTransferResult = await dependencies.scheduleMoveSessionsService.applySessionTransferPlans({
-      sourceClass,
-      targetClass,
-      sourceSessions,
-      targetSessions,
-      sessionPlans: sessionTransferPlan.plans,
-      reqUser,
-      accessContext
-    });
-    normalized.sessionTransferPlan = {
-      ...sessionTransferPlan,
-      targetUnmarkSessionIds: sessionTransferResult.targetUnmarkSessionIds
-    };
   }
 
   const engineResult = await dependencies.rollingEnrollmentEngineService.execute({
