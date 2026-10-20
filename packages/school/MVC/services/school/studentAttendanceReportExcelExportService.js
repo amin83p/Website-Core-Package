@@ -5,7 +5,23 @@ async function buildStudentAttendanceReportExcelExport(req, options = {}) {
   const personId = String(options.personId || '').trim();
   const startDate = String(options.startDate || '').trim();
   const endDate = String(options.endDate || '').trim();
+  const exportTemplate = attendanceExcelExportService.normalizeStudentExcelExportTemplate(
+    options.exportTemplate
+  );
   const sheetLayout = attendanceExcelExportService.normalizeStudentExcelSheetLayout(options.sheetLayout);
+
+  if (exportTemplate === attendanceExcelExportService.STUDENT_EXCEL_TEMPLATE_OFFICIAL) {
+    const exportModel = await studentAttendanceReportService.buildOfficialStudentAttendanceExportModel(req, {
+      personId,
+      startDate,
+      endDate
+    });
+    return attendanceExcelExportService.buildOfficialStudentAttendanceExcelWorkbook(exportModel, {
+      studentName: exportModel.student?.name || personId,
+      startDate: exportModel.startDate,
+      endDate: exportModel.endDate
+    });
+  }
 
   const collected = await studentAttendanceReportService.collectStudentClassMatrixPayloadsForExport(req, {
     personId,

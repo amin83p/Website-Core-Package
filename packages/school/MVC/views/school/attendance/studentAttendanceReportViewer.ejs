@@ -410,14 +410,25 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p class="small text-muted mb-3">Choose how class attendance matrices are arranged in the workbook.</p>
+                <p class="small text-muted mb-3">Choose an export template.</p>
                 <div class="form-check mb-2">
-                    <input class="form-check-input" type="radio" name="sarExcelSheetLayout" id="sarExcelSheetLayoutPerClass" value="perClass" checked>
-                    <label class="form-check-label" for="sarExcelSheetLayoutPerClass">Each class on a separate sheet</label>
+                    <input class="form-check-input" type="radio" name="sarExcelExportTemplate" id="sarExcelExportTemplateClassMatrix" value="classMatrix" checked>
+                    <label class="form-check-label" for="sarExcelExportTemplateClassMatrix">Class attendance matrix (per class or stacked)</label>
+                </div>
+                <div id="sarExcelSheetLayoutOptions" class="ms-4 mb-3">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="sarExcelSheetLayout" id="sarExcelSheetLayoutPerClass" value="perClass" checked>
+                        <label class="form-check-label" for="sarExcelSheetLayoutPerClass">Each class on a separate sheet</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="sarExcelSheetLayout" id="sarExcelSheetLayoutSingle" value="singleSheet">
+                        <label class="form-check-label" for="sarExcelSheetLayoutSingle">All classes on one sheet</label>
+                    </div>
                 </div>
                 <div class="form-check">
-                    <input class="form-check-input" type="radio" name="sarExcelSheetLayout" id="sarExcelSheetLayoutSingle" value="singleSheet">
-                    <label class="form-check-label" for="sarExcelSheetLayoutSingle">All classes on one sheet</label>
+                    <input class="form-check-input" type="radio" name="sarExcelExportTemplate" id="sarExcelExportTemplateOfficial" value="officialAttendanceReport">
+                    <label class="form-check-label" for="sarExcelExportTemplateOfficial">Official Attendance Report</label>
+                    <div class="form-text ms-4">One sheet with class rows, shared session days, and WCB claim numbers.</div>
                 </div>
             </div>
             <div class="modal-footer py-2">
@@ -1876,6 +1887,23 @@
         return value === 'singleSheet' ? 'singleSheet' : 'perClass';
     }
 
+    function getSelectedSarExcelExportTemplate() {
+        const checked = document.querySelector('#sarExcelExportModal input[name="sarExcelExportTemplate"]:checked');
+        const value = String(checked?.value || 'classMatrix').trim();
+        return value === 'officialAttendanceReport' ? 'officialAttendanceReport' : 'classMatrix';
+    }
+
+    function syncSarExcelExportModalLayoutOptions() {
+        const template = getSelectedSarExcelExportTemplate();
+        const layoutWrap = document.getElementById('sarExcelSheetLayoutOptions');
+        if (!layoutWrap) return;
+        const disabled = template === 'officialAttendanceReport';
+        layoutWrap.querySelectorAll('input[name="sarExcelSheetLayout"]').forEach((input) => {
+            input.disabled = disabled;
+        });
+        layoutWrap.classList.toggle('opacity-50', disabled);
+    }
+
     function openSarExcelExportModal(personId) {
         const id = String(personId || '').trim();
         if (!id) return;
@@ -1889,8 +1917,11 @@
             return;
         }
         sarExcelExportPendingPersonId = id;
+        const matrixTemplateRadio = document.getElementById('sarExcelExportTemplateClassMatrix');
+        if (matrixTemplateRadio) matrixTemplateRadio.checked = true;
         const perClassRadio = document.getElementById('sarExcelSheetLayoutPerClass');
         if (perClassRadio) perClassRadio.checked = true;
+        syncSarExcelExportModalLayoutOptions();
         const modalEl = document.getElementById('sarExcelExportModal');
         if (modalEl && window.bootstrap?.Modal) {
             window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
@@ -1899,7 +1930,7 @@
         }
     }
 
-    function exportStudentAttendanceExcel(personId, sheetLayout = 'perClass') {
+    function exportStudentAttendanceExcel(personId, sheetLayout = 'perClass', exportTemplate = 'classMatrix') {
         const id = String(personId || '').trim();
         if (!id) return;
         const { startDate, endDate } = getSarFilterParams();
@@ -1911,12 +1942,19 @@
             });
             return;
         }
+        const template = String(exportTemplate || 'classMatrix').trim() === 'officialAttendanceReport'
+            ? 'officialAttendanceReport'
+            : 'classMatrix';
         const layout = String(sheetLayout || 'perClass').trim() === 'singleSheet' ? 'singleSheet' : 'perClass';
         const params = new URLSearchParams();
         params.set('personId', id);
         params.set('startDate', startDate);
         params.set('endDate', endDate);
-        params.set('sheetLayout', layout);
+        if (template === 'officialAttendanceReport') {
+            params.set('exportTemplate', 'officialAttendanceReport');
+        } else {
+            params.set('sheetLayout', layout);
+        }
         window.location.href = `/school/attendances/report/api/export-excel.xlsx?${params.toString()}`;
     }
 
@@ -2613,15 +2651,20 @@
         confirmOpenAttendanceMatrix(sarCurrentMatrixUrl);
     });
 
+    document.querySelectorAll('#sarExcelExportModal input[name="sarExcelExportTemplate"]').forEach((input) => {
+        input.addEventListener('change', syncSarExcelExportModalLayoutOptions);
+    });
+
     document.getElementById('sarExcelExportConfirmBtn')?.addEventListener('click', () => {
         const personId = String(sarExcelExportPendingPersonId || '').trim();
         if (!personId) return;
+        const exportTemplate = getSelectedSarExcelExportTemplate();
         const sheetLayout = getSelectedSarExcelSheetLayout();
         const modalEl = document.getElementById('sarExcelExportModal');
         if (modalEl && window.bootstrap?.Modal) {
             window.bootstrap.Modal.getOrCreateInstance(modalEl).hide();
         }
-        exportStudentAttendanceExcel(personId, sheetLayout);
+        exportStudentAttendanceExcel(personId, sheetLayout, exportTemplate);
         sarExcelExportPendingPersonId = '';
     });
 

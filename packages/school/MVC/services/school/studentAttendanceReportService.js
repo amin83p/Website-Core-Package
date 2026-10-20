@@ -6,6 +6,8 @@ const matrixRollupService = require('./matrixRollupService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const schoolStudentProfileLinkService = require('./schoolStudentProfileLinkService');
 const { buildAttendanceMatrixPayload } = require('../../controllers/school/attendanceController');
+const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
+const studentClaimNumberService = require('./studentClaimNumberService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -516,6 +518,241 @@ async function collectStudentClassMatrixPayloadsForExport(req, options = {}) {
   };
 }
 
+function buildStudentToPersonMap(students = []) {
+  const map = new Map();
+  (Array.isArray(students) ? students : []).forEach((row) => {
+    const studentRecordId = String(row?.studentRecordId || row?.id || '').trim();
+    const personId = String(row?.personId || row?.userId || '').trim();
+    if (studentRecordId && personId) {
+      map.set(studentRecordId, personId);
+    }
+  });
+  return map;
+}
+
+function resolveClaimNumbersForEnrollmentPeriods({
+  periodRows = [],
+  studentToPersonMap,
+  personId = '',
+  studentRecordId = '',
+  windowStart = '',
+  windowEnd = ''
+} = {}) {
+  const targetPersonId = String(personId || '').trim();
+  const targetStudentId = String(studentRecordId || '').trim();
+  const matches = (Array.isArray(periodRows) ? periodRows : []).filter((row) => {
+    const sid = String(row?.studentId || '').trim();
+    if (!sid) return false;
+    if (targetStudentId && sid === targetStudentId) return true;
+    const mappedPerson = String(studentToPersonMap?.get(sid) || '').trim();
+    return (mappedPerson && mappedPerson === targetPersonId) || sid === targetPersonId;
+  });
+  if (!matches.length) return [];
+
+  const ws = normalizeDateOnly(windowStart) || '0000-01-01';
+  const we = normalizeDateOnly(windowEnd) || '9999-12-31';
+  const overlapping = matches.filter((row) => {
+    const start = normalizeDateOnly(row?.startDate);
+    if (!start) return false;
+    const effectiveEnd = classEnrollmentSessionApplicabilityService.periodEffectiveEndDate(row) || '9999-12-31';
+    return start <= we && effectiveEnd >= ws;
+  });
+  const pool = overlapping.length ? overlapping : matches;
+  const numbers = new Set();
+  pool.forEach((row) => {
+    const num = String(row?.claimNumber || row?.claimSelectToken || '').trim();
+    if (num) numbers.add(num);
+  });
+  return Array.from(numbers).sort();
+}
+
+function resolveClaimEntriesForEnrollmentPeriods({
+  periodRows = [],
+  studentToPersonMap,
+  personId = '',
+  studentRecordId = '',
+  windowStart = '',
+  windowEnd = '',
+  student = null
+} = {}) {
+  const targetPersonId = String(personId || '').trim();
+  const targetStudentId = String(studentRecordId || '').trim();
+  const matches = (Array.isArray(periodRows) ? periodRows : []).filter((row) => {
+    const sid = String(row?.studentId || '').trim();
+    if (!sid) return false;
+    if (targetStudentId && sid === targetStudentId) return true;
+    const mappedPerson = String(studentToPersonMap?.get(sid) || '').trim();
+    return (mappedPerson && mappedPerson === targetPersonId) || sid === targetPersonId;
+  });
+  if (!matches.length) return [];
+
+  const ws = normalizeDateOnly(windowStart) || '0000-01-01';
+  const we = normalizeDateOnly(windowEnd) || '9999-12-31';
+  const overlapping = matches.filter((row) => {
+    const start = normalizeDateOnly(row?.startDate);
+    if (!start) return false;
+    const effectiveEnd = classEnrollmentSessionApplicabilityService.periodEffectiveEndDate(row) || '9999-12-31';
+    return start <= we && effectiveEnd >= ws;
+  });
+  const pool = overlapping.length ? overlapping : matches;
+  const entriesByKey = new Map();
+
+  pool.forEach((row) => {
+    const claimNumberId = String(row?.claimNumberId || '').trim();
+    const legacyNumber = String(row?.claimNumber || row?.claimSelectToken || '').trim();
+    let number = legacyNumber;
+    let label = '';
+    if (claimNumberId && student) {
+      const resolved = studentClaimNumberService.resolveClaimFromStudent(student, claimNumberId);
+      if (resolved) {
+        number = String(resolved.number || legacyNumber || '').trim();
+        label = String(resolved.label || '').trim();
+      }
+    } else if (legacyNumber && student) {
+      const matched = studentClaimNumberService.findClaimByNumber(student, legacyNumber);
+      if (matched) {
+        number = String(matched.number || legacyNumber).trim();
+        label = String(matched.label || '').trim();
+      }
+    }
+    if (!number && !claimNumberId) return;
+    const key = claimNumberId || number;
+    if (!key) return;
+    entriesByKey.set(key, { number, label });
+  });
+
+  return Array.from(entriesByKey.values())
+    .filter((entry) => String(entry?.number || '').trim())
+    .sort((a, b) => String(a.number).localeCompare(String(b.number)));
+}
+
+function formatClaimNumberEntryDisplay(entry = {}) {
+  const number = String(entry?.number || entry || '').trim();
+  const label = entry && typeof entry === 'object' ? String(entry.label || '').trim() : '';
+  if (!number) return '';
+  return label ? `${number} ${label}` : number;
+}
+
+function formatClaimNumbersDisplay(claimNumbers = []) {
+  const list = (Array.isArray(claimNumbers) ? claimNumbers : [])
+    .map((item) => formatClaimNumberEntryDisplay(item))
+    .filter(Boolean)
+    .sort();
+  if (!list.length) return '';
+  if (list.length === 1) return list[0];
+  return list.join(', ');
+}
+
+function buildUnionSessionDatesFromExportEntries(entries = []) {
+  const dates = new Set();
+  (Array.isArray(entries) ? entries : []).forEach((entry) => {
+    const sessions = Array.isArray(entry?.payload?.sessions) ? entry.payload.sessions : [];
+    sessions.forEach((session) => {
+      const date = normalizeDateOnly(session?.date);
+      if (date) dates.add(date);
+    });
+  });
+  return Array.from(dates).sort();
+}
+
+function buildClassSessionDateSet(payload = {}) {
+  const set = new Set();
+  const sessions = Array.isArray(payload?.sessions) ? payload.sessions : [];
+  sessions.forEach((session) => {
+    const date = normalizeDateOnly(session?.date);
+    if (date) set.add(date);
+  });
+  return set;
+}
+
+function buildRecordsByDateFromMatrixPayload(payload = {}) {
+  const matrix = Array.isArray(payload?.matrix) ? payload.matrix : [];
+  const studentRow = matrix[0] || {};
+  const records = Array.isArray(studentRow.records) ? studentRow.records : [];
+  const sessions = Array.isArray(payload?.sessions) ? payload.sessions : [];
+  const recordBySessionId = new Map(
+    records.map((record) => [String(record?.sessionId || '').trim(), record])
+  );
+  const map = new Map();
+  sessions.forEach((session, sessionIdx) => {
+    const date = normalizeDateOnly(session?.date);
+    if (!date) return;
+    const record = recordBySessionId.get(String(session?.id || session?.sessionId || '').trim())
+      || records[sessionIdx]
+      || {};
+    map.set(date, record);
+  });
+  return map;
+}
+
+async function buildOfficialStudentAttendanceExportModel(req, options = {}) {
+  const collected = await collectStudentClassMatrixPayloadsForExport(req, options);
+  const entries = Array.isArray(collected.entries) ? collected.entries : [];
+  if (!entries.length) {
+    const error = new Error('No attendance to export for this student in the selected range.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const studentRecordId = String(collected.student?.studentRecordId || '').trim();
+  const resolvedPersonId = String(collected.student?.personId || '').trim();
+  const students = await schoolDataService.fetchAllData('students', {}, req.user);
+  const studentToPersonMap = buildStudentToPersonMap(students);
+  const studentProfile = studentRecordId
+    ? await schoolDataService.getDataById('students', studentRecordId, req.user).catch(() => null)
+    : null;
+  const claimStudent = studentProfile || collected.student || null;
+
+  const unionSessionDates = buildUnionSessionDatesFromExportEntries(entries);
+  const headerClaimEntriesByKey = new Map();
+  const classRows = [];
+
+  for (const entry of entries) {
+    const payload = entry?.payload && typeof entry.payload === 'object' ? entry.payload : {};
+    const matrix = Array.isArray(payload.matrix) ? payload.matrix : [];
+    const studentRow = matrix[0] || {};
+    const periodRows = await schoolDataService.getClassEnrollmentPeriodsByClassId(entry.classId, req.user)
+      .catch(() => []);
+    const claimEntries = resolveClaimEntriesForEnrollmentPeriods({
+      periodRows,
+      studentToPersonMap,
+      personId: resolvedPersonId,
+      studentRecordId,
+      windowStart: collected.startDate,
+      windowEnd: collected.endDate,
+      student: claimStudent
+    });
+    claimEntries.forEach((claimEntry) => {
+      const key = String(claimEntry?.number || '').trim();
+      if (key) headerClaimEntriesByKey.set(key, claimEntry);
+    });
+
+    classRows.push({
+      classId: entry.classId,
+      className: entry.className,
+      teacherName: String(payload.teacherName || '').trim(),
+      claimNumbers: claimEntries.map((row) => row.number),
+      sessionDateSet: buildClassSessionDateSet(payload),
+      recordsByDate: buildRecordsByDateFromMatrixPayload(payload),
+      studentRow
+    });
+  }
+
+  const firstPayload = entries[0]?.payload || {};
+  const enabledAttendanceStatuses = firstPayload.enabledAttendanceStatuses
+    || attendanceMatrixMetricsService.ALL_ATTENDANCE_STATUSES_ORDERED;
+
+  return {
+    student: collected.student,
+    startDate: collected.startDate,
+    endDate: collected.endDate,
+    enabledAttendanceStatuses,
+    unionSessionDates,
+    claimNumbersDisplay: formatClaimNumbersDisplay(Array.from(headerClaimEntriesByKey.values())),
+    classRows
+  };
+}
+
 function formatLocalDateYmd(date) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -564,6 +801,12 @@ module.exports = {
   buildClassDayCells,
   buildStudentAttendanceReportPayload,
   collectStudentClassMatrixPayloadsForExport,
+  buildOfficialStudentAttendanceExportModel,
+  buildUnionSessionDatesFromExportEntries,
+  resolveClaimNumbersForEnrollmentPeriods,
+  resolveClaimEntriesForEnrollmentPeriods,
+  formatClaimNumberEntryDisplay,
+  formatClaimNumbersDisplay,
   resolveSelectedStudents,
   filterReportDaysWithSessionForStudent,
   getWeekStartKeyForDate,

@@ -1640,14 +1640,17 @@ async function exportStudentAttendanceReportExcel(req, res) {
         const startDate = String(req.query?.startDate || '').trim();
         const endDate = String(req.query?.endDate || '').trim();
         const sheetLayoutRaw = String(req.query?.sheetLayout || '').trim();
+        const exportTemplateRaw = String(req.query?.exportTemplate || '').trim();
         const studentAttendanceReportExcelExportService = require('../../services/school/studentAttendanceReportExcelExportService');
         const attendanceExcelExportService = require('../../services/school/attendanceExcelExportService');
         const sheetLayout = attendanceExcelExportService.normalizeStudentExcelSheetLayout(sheetLayoutRaw);
+        const exportTemplate = attendanceExcelExportService.normalizeStudentExcelExportTemplate(exportTemplateRaw);
         const { buffer, filename } = await studentAttendanceReportExcelExportService.buildStudentAttendanceReportExcelExport(req, {
             personId,
             startDate,
             endDate,
-            sheetLayout
+            sheetLayout,
+            exportTemplate
         });
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

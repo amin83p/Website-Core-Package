@@ -34,6 +34,7 @@ const STATUS_FILL_ARGB = Object.freeze({
 });
 
 const NA_DAY_FILL_ARGB = STATUS_FILL_ARGB[ATTENDANCE_STATUS.NOT_APPLICABLE];
+const OFFICIAL_NO_CLASS_FILL_ARGB = 'FFBFBFBF';
 const HEADER_FILL_ARGB = 'FF5B9BD5';
 const WEEKDAY_FILL_ARGB = 'FFFBE5D6';
 const ROW_BAND_FILL_ARGB = 'FFDDEBF7';
@@ -235,6 +236,18 @@ function applyLegendCellStyle(cell, status) {
   cell.font = { size: 11, color: { argb: DARK_TEXT_ARGB }, name: 'Calibri' };
   applyTableCellBorder(cell);
   applyVerticalMiddle(cell);
+}
+
+function applyNoClassCellStyle(cell) {
+  applySolidFill(cell, OFFICIAL_NO_CLASS_FILL_ARGB);
+  cell.font = {
+    bold: false,
+    size: 11,
+    color: { argb: DARK_TEXT_ARGB },
+    name: 'Calibri'
+  };
+  applyTableCellBorder(cell);
+  applyVerticalMiddle(cell, { horizontal: 'center', wrapText: false });
 }
 
 function applyStatusCellStyle(cell, statusOrRecord, { wrapText = false } = {}) {
@@ -855,7 +868,89 @@ function appendAttendanceMatrixSheet(workbook, payload = {}, options = {}) {
 
 const STUDENT_EXCEL_SHEET_LAYOUT_PER_CLASS = 'perClass';
 const STUDENT_EXCEL_SHEET_LAYOUT_SINGLE = 'singleSheet';
+const STUDENT_EXCEL_TEMPLATE_CLASS_MATRIX = 'classMatrix';
+const STUDENT_EXCEL_TEMPLATE_OFFICIAL = 'officialAttendanceReport';
 const STUDENT_EXCEL_BLOCK_GAP_ROWS = 3;
+
+const OFFICIAL_REPORT_META_FONT = Object.freeze({
+  bold: true,
+  size: 12,
+  name: 'Calibri',
+  color: { argb: DARK_TEXT_ARGB }
+});
+
+const OFFICIAL_REPORT_TITLE_FONT = Object.freeze({
+  ...OFFICIAL_REPORT_META_FONT,
+  size: 15
+});
+
+const OFFICIAL_CLASS_NAME_STRIP_TOKENS = Object.freeze(['EAL', 'O/G', 'O/1', 'I/G', 'I/1']);
+const OFFICIAL_BODY_ROW_HEIGHT = 24;
+const OFFICIAL_SESSION_COLUMN_WIDTH = 9;
+const OFFICIAL_LEGEND_CODE_WIDTH = 6;
+const OFFICIAL_LEGEND_LABEL_WIDTH = 14;
+function escapeRegExp(value = '') {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function formatOfficialExportClassName(rawName = '', teacherName = '') {
+  let name = clean(rawName);
+  if (!name) return 'Class';
+
+  const teacherTokens = new Set();
+  const teacher = clean(teacherName);
+  if (teacher) {
+    teacherTokens.add(teacher);
+    const first = teacher.split(/\s+/).filter(Boolean)[0] || '';
+    if (first) {
+      teacherTokens.add(first);
+      teacherTokens.add(first.toUpperCase());
+    }
+  }
+  teacherTokens.forEach((token) => {
+    name = name.replace(new RegExp(escapeRegExp(token), 'gi'), '');
+  });
+
+  OFFICIAL_CLASS_NAME_STRIP_TOKENS.forEach((token) => {
+    name = name.replace(new RegExp(escapeRegExp(token), 'gi'), '');
+  });
+
+  name = name
+    .replace(/[-_/]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return name || clean(rawName) || 'Class';
+}
+
+function measureLongestDisplayLine(value = '') {
+  let maxLen = 0;
+  String(value || '')
+    .split(/\r?\n/)
+    .forEach((line) => {
+      maxLen = Math.max(maxLen, line.length);
+    });
+  return maxLen;
+}
+
+function resolveOfficialClassBufferColumnWidth(classRows = []) {
+  let maxChars = measureLongestDisplayLine('Class');
+  (Array.isArray(classRows) ? classRows : []).forEach((row) => {
+    const displayName = formatOfficialExportClassName(row?.className, row?.teacherName);
+    maxChars = Math.max(maxChars, measureLongestDisplayLine(displayName));
+  });
+  const legendLabelSpan = OFFICIAL_LEGEND_LABEL_WIDTH * 2;
+  const totalWidth = Math.min(48, Math.max(legendLabelSpan + 2, maxChars + 2));
+  const bufferWidth = totalWidth - legendLabelSpan;
+  return Math.max(2, Math.min(48, bufferWidth));
+}
+
+function normalizeStudentExcelExportTemplate(value = '') {
+  const token = clean(value).toLowerCase();
+  if (token === STUDENT_EXCEL_TEMPLATE_OFFICIAL || token === 'officialattendancereport') {
+    return STUDENT_EXCEL_TEMPLATE_OFFICIAL;
+  }
+  return STUDENT_EXCEL_TEMPLATE_CLASS_MATRIX;
+}
 
 function normalizeStudentExcelSheetLayout(value = '') {
   const token = clean(value).toLowerCase();
@@ -887,6 +982,213 @@ async function buildAttendanceExcelWorkbook(payload = {}) {
     }),
     legend: sheetResult.legend,
     title: sheetResult.title
+  };
+}
+
+function writeOfficialStudentAttendanceBlock(sheet, exportModel = {}, options = {}) {
+  const startRow = Math.max(1, Number(options.startRow) || 1);
+  const applyColumnWidths = options.applyColumnWidths !== false;
+  const rowAt = (relativeOneBased) => startRow + relativeOneBased - 1;
+
+  const unionSessionDates = Array.isArray(exportModel.unionSessionDates) ? exportModel.unionSessionDates : [];
+  const classRows = Array.isArray(exportModel.classRows) ? exportModel.classRows : [];
+  const enabledAttendanceStatuses = exportModel.enabledAttendanceStatuses
+    || attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses({});
+  const legend = buildLegendEntries(enabledAttendanceStatuses);
+  const studentName = clean(exportModel.student?.name) || 'Student';
+  const claimDisplay = clean(exportModel.claimNumbersDisplay);
+  const title = resolveAttendanceTitle({
+    startDate: exportModel.startDate,
+    endDate: exportModel.endDate,
+    sessions: unionSessionDates.map((date) => ({ date }))
+  });
+
+  const legendCodeCol = 1;
+  const legendLabelStartCol = 2;
+  const legendLabelEndCol = 3;
+  const numCol = legendCodeCol;
+  const classNameStartCol = legendLabelStartCol;
+  const classNameEndCol = legendLabelEndCol + 1;
+  const firstSessionCol = classNameEndCol + 1;
+  const mergeEndCol = Math.max(firstSessionCol + unionSessionDates.length - 1, firstSessionCol + 2);
+
+  sheet.getCell(rowAt(1), firstSessionCol).value = title;
+  sheet.getCell(rowAt(1), firstSessionCol).font = { ...OFFICIAL_REPORT_TITLE_FONT };
+  sheet.getCell(rowAt(1), firstSessionCol).alignment = { vertical: 'middle' };
+  mergeHeaderBlock(sheet, rowAt(1), firstSessionCol, mergeEndCol);
+
+  sheet.getCell(rowAt(2), firstSessionCol).value = `Student: ${studentName}`;
+  sheet.getCell(rowAt(2), firstSessionCol).font = { ...OFFICIAL_REPORT_META_FONT };
+  sheet.getCell(rowAt(2), firstSessionCol).alignment = { vertical: 'middle' };
+  mergeHeaderBlock(sheet, rowAt(2), firstSessionCol, mergeEndCol);
+
+  sheet.getCell(rowAt(3), firstSessionCol).value = claimDisplay
+    ? `Claim Number: ${claimDisplay}`
+    : 'Claim Number: —';
+  sheet.getCell(rowAt(3), firstSessionCol).font = { ...OFFICIAL_REPORT_META_FONT };
+  sheet.getCell(rowAt(3), firstSessionCol).alignment = { vertical: 'middle' };
+  mergeHeaderBlock(sheet, rowAt(3), firstSessionCol, mergeEndCol);
+
+  legend.forEach((entry, idx) => {
+    const row = rowAt(idx + 1);
+    const codeCell = sheet.getCell(row, legendCodeCol);
+    const labelCell = sheet.getCell(row, legendLabelStartCol);
+    codeCell.value = entry.code;
+    labelCell.value = entry.label;
+    applyLegendCellStyle(codeCell, entry.status);
+    applyLegendCellStyle(labelCell, entry.status);
+    applyLegendCellStyle(sheet.getCell(row, legendLabelEndCol), entry.status);
+    applyVerticalMiddle(codeCell, { horizontal: 'center' });
+    applyVerticalMiddle(labelCell);
+    mergeHeaderBlock(sheet, row, legendLabelStartCol, legendLabelEndCol);
+  });
+
+  const legendBottom = Math.max(legend.length, 3);
+  const headerRowIndex = rowAt(legendBottom + 2);
+  const weekdayRowIndex = headerRowIndex + 1;
+  sheet.getRow(headerRowIndex).height = OFFICIAL_BODY_ROW_HEIGHT;
+  sheet.getRow(weekdayRowIndex).height = OFFICIAL_BODY_ROW_HEIGHT;
+
+  const numHeaderCell = sheet.getCell(headerRowIndex, numCol);
+  numHeaderCell.value = '#';
+  applyHeaderCellStyle(numHeaderCell);
+  applyWeekdayCellStyle(sheet.getCell(weekdayRowIndex, numCol));
+
+  const classHeaderCell = sheet.getCell(headerRowIndex, classNameStartCol);
+  classHeaderCell.value = 'Class';
+  applyHeaderCellStyle(classHeaderCell);
+  applyWeekdayCellStyle(sheet.getCell(weekdayRowIndex, classNameStartCol));
+  mergeHeaderBlock(sheet, headerRowIndex, classNameStartCol, classNameEndCol);
+  mergeHeaderBlock(sheet, weekdayRowIndex, classNameStartCol, classNameEndCol);
+
+  unionSessionDates.forEach((date, idx) => {
+    const col = firstSessionCol + idx;
+    const dayCell = sheet.getCell(headerRowIndex, col);
+    dayCell.value = dayOfMonth(date);
+    applyHeaderCellStyle(dayCell);
+
+    const weekdayCell = sheet.getCell(weekdayRowIndex, col);
+    weekdayCell.value = weekdayShort(date);
+    applyWeekdayCellStyle(weekdayCell);
+  });
+
+  let bodyRow = weekdayRowIndex + 1;
+  const threadedCommentTargets = [];
+
+  classRows.forEach((classRow, idx) => {
+    const banded = idx % 2 === 1;
+    const sessionDateSet = classRow.sessionDateSet instanceof Set
+      ? classRow.sessionDateSet
+      : new Set();
+    const recordsByDate = classRow.recordsByDate instanceof Map
+      ? classRow.recordsByDate
+      : new Map();
+
+    const numCell = sheet.getCell(bodyRow, numCol);
+    const classCell = sheet.getCell(bodyRow, classNameStartCol);
+    const displayClassName = formatOfficialExportClassName(
+      classRow.className,
+      classRow.teacherName
+    );
+
+    numCell.value = idx + 1;
+    classCell.value = displayClassName;
+    mergeHeaderBlock(sheet, bodyRow, classNameStartCol, classNameEndCol);
+
+    applyBodyMetaCellStyle(numCell, { banded, center: true });
+    applyBodyMetaCellStyle(classCell, { banded, wrapText: true });
+    classCell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+    for (let col = classNameStartCol + 1; col <= classNameEndCol; col += 1) {
+      applyBodyMetaCellStyle(sheet.getCell(bodyRow, col), { banded, wrapText: true });
+    }
+    sheet.getRow(bodyRow).height = OFFICIAL_BODY_ROW_HEIGHT;
+
+    unionSessionDates.forEach((date, sessionIdx) => {
+      const cell = sheet.getCell(bodyRow, firstSessionCol + sessionIdx);
+      if (!sessionDateSet.has(date)) {
+        cell.value = 'X';
+        applyNoClassCellStyle(cell);
+        cell.note = {
+          texts: [{ text: 'No Class' }],
+          author: resolveNoteAuthorLabel()
+        };
+        return;
+      }
+      const record = recordsByDate.get(date) || {};
+      cell.value = formatExportCellDisplay(record);
+      applyStatusCellStyle(cell, record, { wrapText: false });
+      const noteText = buildStatusNoteText(record);
+      const threadedMessages = buildThreadedMessagesForRecord(record, {
+        receiverName: studentName,
+        receiverEmail: clean(exportModel.student?.email)
+      });
+      if (noteText) {
+        cell.note = {
+          texts: [{ text: noteText }],
+          author: resolveNoteAuthorLabel()
+        };
+      }
+      if (threadedMessages.length) {
+        threadedCommentTargets.push({
+          ref: cell.address,
+          messages: threadedMessages
+        });
+      }
+    });
+
+    bodyRow += 1;
+  });
+
+  if (applyColumnWidths) {
+    sheet.getColumn(legendCodeCol).width = OFFICIAL_LEGEND_CODE_WIDTH;
+    sheet.getColumn(legendLabelStartCol).width = OFFICIAL_LEGEND_LABEL_WIDTH;
+    sheet.getColumn(legendLabelEndCol).width = OFFICIAL_LEGEND_LABEL_WIDTH;
+    sheet.getColumn(classNameEndCol).width = resolveOfficialClassBufferColumnWidth(classRows);
+    sheet.getColumn(numCol).width = OFFICIAL_LEGEND_CODE_WIDTH;
+    for (let col = firstSessionCol; col < firstSessionCol + unionSessionDates.length; col += 1) {
+      sheet.getColumn(col).width = Math.max(sheet.getColumn(col).width || 0, OFFICIAL_SESSION_COLUMN_WIDTH);
+    }
+  }
+
+  const endRow = bodyRow - 1;
+
+  return {
+    legend,
+    title,
+    threadedCommentTargets,
+    endRow,
+    headerRowIndex,
+    weekdayRowIndex,
+    firstSessionCol
+  };
+}
+
+async function buildOfficialStudentAttendanceExcelWorkbook(exportModel = {}, meta = {}) {
+  const classRows = Array.isArray(exportModel.classRows) ? exportModel.classRows : [];
+  if (!classRows.length) {
+    throw new Error('No attendance sheets to export.');
+  }
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'School Attendance';
+  workbook.created = new Date();
+  const usedSheetNames = new Set();
+  const sheetName = sanitizeExcelSheetName('Official Attendance', usedSheetNames);
+  const sheet = workbook.addWorksheet(sheetName);
+  const blockResult = writeOfficialStudentAttendanceBlock(sheet, exportModel, {
+    startRow: 1,
+    applyColumnWidths: true
+  });
+  const buffer = await writeWorkbookBuffer(workbook, blockResult.threadedCommentTargets);
+  const studentName = clean(meta.studentName) || clean(exportModel.student?.name) || 'Student';
+  return {
+    buffer,
+    filename: buildStudentAttendanceExcelFilename({
+      studentName,
+      startDate: exportModel.startDate || meta.startDate,
+      endDate: exportModel.endDate || meta.endDate
+    }),
+    legend: blockResult.legend,
+    title: blockResult.title
   };
 }
 
@@ -994,8 +1296,15 @@ module.exports = {
   writeAttendanceMatrixBlock,
   appendAttendanceMatrixSheet,
   normalizeStudentExcelSheetLayout,
+  normalizeStudentExcelExportTemplate,
   STUDENT_EXCEL_SHEET_LAYOUT_PER_CLASS,
   STUDENT_EXCEL_SHEET_LAYOUT_SINGLE,
+  STUDENT_EXCEL_TEMPLATE_CLASS_MATRIX,
+  STUDENT_EXCEL_TEMPLATE_OFFICIAL,
+  formatOfficialExportClassName,
+  resolveOfficialClassBufferColumnWidth,
+  writeOfficialStudentAttendanceBlock,
   buildAttendanceExcelWorkbook,
-  buildStudentAttendanceExcelWorkbook
+  buildStudentAttendanceExcelWorkbook,
+  buildOfficialStudentAttendanceExcelWorkbook
 };
