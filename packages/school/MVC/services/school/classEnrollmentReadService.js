@@ -148,6 +148,47 @@ const classEnrollmentReadService = {
     return { source: 'canonical', studentIds: canonicalSet, usedFallback: false };
   },
 
+  async listPersonIdsOverlappingEnrollmentWindow({
+    classId,
+    classItem = null,
+    reqUser,
+    activeOrgId = '',
+    sessionDates = [],
+    startDate = '',
+    endDate = '',
+    canonicalStatuses = null,
+    studentToPersonMap = new Map(),
+    orgToday = ''
+  } = {}) {
+    const snapshot = await classEnrollmentReadService.listActiveStudentIdsForClass({
+      classId,
+      classItem,
+      reqUser,
+      activeOrgId,
+      sessionDates,
+      startDate,
+      endDate,
+      canonicalStatuses,
+      orgToday
+    });
+    const personIds = new Set();
+    const studentIds = snapshot.studentIds instanceof Set ? snapshot.studentIds : new Set();
+    const map = studentToPersonMap instanceof Map ? studentToPersonMap : new Map();
+    studentIds.forEach((id) => {
+      const studentId = String(id || '').trim();
+      if (!studentId) return;
+      const personId = String(map.get(studentId) || studentId).trim();
+      if (personId) personIds.add(personId);
+    });
+    return {
+      source: snapshot.source,
+      personIds,
+      usedFallback: Boolean(snapshot.usedFallback)
+    };
+  },
+
+  periodOverlapsWindow,
+
   async buildClassEnrollmentCountMap({
     classes = [],
     reqUser,

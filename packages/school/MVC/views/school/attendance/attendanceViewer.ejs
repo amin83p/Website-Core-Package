@@ -22,6 +22,8 @@
     .attendance-timing-excuse-right::before { clip-path: inset(0 0 0 50%); }
     .attendance-timing-excuse-full::before { clip-path: none; }
     .attendance-timing-excuse-icon > i { position: relative; z-index: 1; }
+    .cell-modal-section-toggle[aria-expanded="true"] .cell-modal-section-chevron { transform: rotate(180deg); }
+    .cell-modal-section-chevron { transition: transform 0.2s ease; }
     .attendance-legend-icon-btn {
       width: 2.25rem;
       height: 2.25rem;
@@ -560,41 +562,86 @@
                             </div>
                         </div>
                     </div>
-                    <div class="row g-3 mb-3">
-                        <div class="col-12" id="wrap_cellExcuseNotes">
-                            <label class="form-label fw-bold small mb-0">Excuse / reference notes</label>
-                            <div class="row g-2 align-items-start" id="wrap_cellExcuseNotesEditor">
-                                <div class="col-md-8">
-                                    <textarea class="form-control form-control-sm" id="inp_cellExcuseRef" rows="3" placeholder="Add details..."></textarea>
-                                </div>
-                                <div class="col-md-4">
-                                    <input type="file" class="form-control form-control-sm" id="inp_cellExcuseFile">
-                                    <div class="small text-muted mt-1">Attach supporting file if needed.</div>
-                                </div>
-                            </div>
-                            <div class="small mt-2 d-none" id="wrap_cellExcuseNotesReadonly"></div>
-                            <div class="small mt-2" id="inp_cellExcuseAttachmentPreview"></div>
-                        </div>
-                    </div>
-
-                    <div class="mb-0">
-                        <label class="fw-bold small text-secondary" for="inp_rosterStudentNote">Student note (on roster)</label>
-                        <textarea class="form-control form-control-sm" id="inp_rosterStudentNote" rows="2" placeholder="Optional note for this student on this session"></textarea>
-                    </div>
                 </fieldset>
 
-                <div class="mb-3">
-                    <label class="fw-bold text-primary"><i class="bi bi-chat-text me-1"></i> Admin Discussion</label>
-                    <div class="comment-thread mb-3" id="det_commentsThread">
+                <div class="border rounded mb-2 cell-modal-collapsible-section" id="cell_modal_excuse_section">
+                    <button
+                        type="button"
+                        id="cell_modal_excuse_collapse_toggle"
+                        class="btn btn-light w-100 text-start d-flex align-items-center justify-content-between py-2 px-3 border-0 rounded cell-modal-section-toggle"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#cell_modal_excuse_collapse"
+                        aria-expanded="false"
+                        aria-controls="cell_modal_excuse_collapse"
+                        aria-label="Expand excuse notes">
+                        <span class="fw-bold small text-secondary">Excuse / reference notes &amp; files</span>
+                        <i class="bi bi-chevron-down cell-modal-section-chevron" aria-hidden="true"></i>
+                    </button>
+                    <div class="collapse" id="cell_modal_excuse_collapse">
+                        <div class="p-3 border-top">
+                            <div class="col-12" id="wrap_cellExcuseNotes">
+                                <div class="row g-2 align-items-start" id="wrap_cellExcuseNotesEditor">
+                                    <div class="col-md-8">
+                                        <textarea class="form-control form-control-sm" id="inp_cellExcuseRef" rows="3" placeholder="Add details..."></textarea>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <input type="file" class="form-control form-control-sm" id="inp_cellExcuseFile">
+                                        <div class="small text-muted mt-1">Attach supporting file if needed.</div>
+                                    </div>
+                                </div>
+                                <div class="small mt-2 d-none" id="wrap_cellExcuseNotesReadonly"></div>
+                                <div class="small mt-2" id="inp_cellExcuseAttachmentPreview"></div>
+                            </div>
                         </div>
+                    </div>
+                </div>
 
-                    <div class="border rounded p-2 bg-white">
-                        <div class="d-flex flex-wrap gap-1 mb-2" id="pendingMentionsArea"></div>
-                        <textarea class="form-control border-0 bg-transparent p-0 mb-2" id="inp_newComment" rows="2" placeholder="Write a note..."></textarea>
-                        <input type="file" class="form-control form-control-sm mb-2" id="inp_newCommentFile">
-                        <div class="d-flex justify-content-between align-items-center border-top pt-2">
-                            <button class="btn btn-sm btn-outline-secondary" id="btn_mentionUser"><i class="bi bi-at"></i> Tag User</button>
-                            <button class="btn btn-sm btn-primary fw-bold" id="btn_saveComment">Send Note</button>
+                <div class="border rounded mb-2 cell-modal-collapsible-section" id="cell_modal_roster_note_section">
+                    <button
+                        type="button"
+                        id="cell_modal_roster_note_collapse_toggle"
+                        class="btn btn-light w-100 text-start d-flex align-items-center justify-content-between py-2 px-3 border-0 rounded cell-modal-section-toggle"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#cell_modal_roster_note_collapse"
+                        aria-expanded="false"
+                        aria-controls="cell_modal_roster_note_collapse"
+                        aria-label="Expand student note">
+                        <span class="fw-bold small text-secondary">Student note (on roster)</span>
+                        <i class="bi bi-chevron-down cell-modal-section-chevron" aria-hidden="true"></i>
+                    </button>
+                    <div class="collapse" id="cell_modal_roster_note_collapse">
+                        <div class="p-3 border-top">
+                            <label class="visually-hidden" for="inp_rosterStudentNote">Student note (on roster)</label>
+                            <textarea class="form-control form-control-sm" id="inp_rosterStudentNote" rows="2" placeholder="Optional note for this student on this session"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="border rounded mb-3 cell-modal-collapsible-section" id="cell_modal_admin_discussion_section">
+                    <button
+                        type="button"
+                        id="cell_modal_admin_discussion_collapse_toggle"
+                        class="btn btn-light w-100 text-start d-flex align-items-center justify-content-between py-2 px-3 border-0 rounded cell-modal-section-toggle"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#cell_modal_admin_discussion_collapse"
+                        aria-expanded="false"
+                        aria-controls="cell_modal_admin_discussion_collapse"
+                        aria-label="Expand admin discussion">
+                        <span class="fw-bold text-primary"><i class="bi bi-chat-text me-1"></i> Admin Discussion</span>
+                        <i class="bi bi-chevron-down cell-modal-section-chevron" aria-hidden="true"></i>
+                    </button>
+                    <div class="collapse" id="cell_modal_admin_discussion_collapse">
+                        <div class="p-3 border-top">
+                            <div class="comment-thread mb-3" id="det_commentsThread"></div>
+                            <div class="border rounded p-2 bg-white">
+                                <div class="d-flex flex-wrap gap-1 mb-2" id="pendingMentionsArea"></div>
+                                <textarea class="form-control border-0 bg-transparent p-0 mb-2" id="inp_newComment" rows="2" placeholder="Write a note..."></textarea>
+                                <input type="file" class="form-control form-control-sm mb-2" id="inp_newCommentFile">
+                                <div class="d-flex justify-content-between align-items-center border-top pt-2">
+                                    <button class="btn btn-sm btn-outline-secondary" id="btn_mentionUser"><i class="bi bi-at"></i> Tag User</button>
+                                    <button class="btn btn-sm btn-primary fw-bold" id="btn_saveComment">Send Note</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1028,9 +1075,6 @@ function buildAttendanceMatrixReloadUrl(state = {}) {
     const url = new URL(`${window.location.origin}/school/attendances`);
     const next = state && typeof state === 'object' ? state : captureAttendanceMatrixFilterState();
     if (next.classId) url.searchParams.set('classId', next.classId);
-    if (next.className && next.className !== 'Loading Class Data...') {
-        url.searchParams.set('className', next.className);
-    }
     if (next.startDate) url.searchParams.set('startDate', next.startDate);
     if (next.endDate) url.searchParams.set('endDate', next.endDate);
     if (next.range) url.searchParams.set('range', next.range);
@@ -1039,6 +1083,14 @@ function buildAttendanceMatrixReloadUrl(state = {}) {
 
 function navigateAttendanceMatrixReload(state) {
     window.location.assign(buildAttendanceMatrixReloadUrl(state));
+}
+
+function syncAttendanceMatrixUrl(state) {
+    const href = buildAttendanceMatrixReloadUrl(state);
+    const next = href || '/school/attendances';
+    if (window.location.pathname + window.location.search !== next) {
+        window.history.replaceState({}, document.title, next);
+    }
 }
 
 function resolveEffectiveAttendanceRequestMaxAttempts() {
@@ -1453,6 +1505,40 @@ function attendanceCanMarkExcused() {
     return window.CAN_MARK_ATTENDANCE_EXCUSED === true;
 }
 
+function setCellModalCollapseExpanded(collapseId, expanded) {
+    const collapseEl = document.getElementById(collapseId);
+    const toggleBtn = document.querySelector(`[aria-controls="${collapseId}"]`);
+    if (!collapseEl) return;
+    const collapse = window.bootstrap?.Collapse?.getOrCreateInstance(collapseEl, { toggle: false });
+    if (collapse) {
+        if (expanded) collapse.show();
+        else collapse.hide();
+    } else {
+        collapseEl.classList.toggle('show', expanded);
+        if (toggleBtn) toggleBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+    }
+}
+
+function syncCellModalNotesSections(record = {}) {
+    const hasExcuse = Boolean(
+        String(record?.excuseRef || '').trim()
+        || record?.excuseAttachment
+    );
+    const hasRosterNote = Boolean(String(record?.rosterStudentNotes || '').trim());
+    const comments = Array.isArray(record?.comments) ? record.comments : [];
+    const hasAdminDiscussion = comments.length > 0;
+
+    const excuseSection = document.getElementById('cell_modal_excuse_section');
+    const notesWrap = document.getElementById('wrap_cellExcuseNotes');
+    if (excuseSection && notesWrap) {
+        excuseSection.classList.toggle('d-none', notesWrap.classList.contains('d-none'));
+    }
+
+    setCellModalCollapseExpanded('cell_modal_excuse_collapse', hasExcuse);
+    setCellModalCollapseExpanded('cell_modal_roster_note_collapse', hasRosterNote);
+    setCellModalCollapseExpanded('cell_modal_admin_discussion_collapse', hasAdminDiscussion);
+}
+
 function syncExcuseNotesAccess(record = null) {
     const canMark = attendanceCanMarkExcused();
     const editorWrap = document.getElementById('wrap_cellExcuseNotesEditor');
@@ -1628,6 +1714,22 @@ document.addEventListener('DOMContentLoaded', () => {
         buttonId: 'attFilterToggleBtn',
         iconId: 'attFilterToggleIcon'
     });
+    [
+        { collapseId: 'cell_modal_excuse_collapse', openLabel: 'Collapse excuse notes', closeLabel: 'Expand excuse notes' },
+        { collapseId: 'cell_modal_roster_note_collapse', openLabel: 'Collapse student note', closeLabel: 'Expand student note' },
+        { collapseId: 'cell_modal_admin_discussion_collapse', openLabel: 'Collapse admin discussion', closeLabel: 'Expand admin discussion' }
+    ].forEach((section) => {
+        const collapseEl = document.getElementById(section.collapseId);
+        const buttonEl = document.querySelector(`[aria-controls="${section.collapseId}"]`);
+        if (!collapseEl || !buttonEl) return;
+        const setState = (open) => {
+            buttonEl.setAttribute('aria-expanded', open ? 'true' : 'false');
+            buttonEl.setAttribute('aria-label', open ? section.openLabel : section.closeLabel);
+        };
+        setState(collapseEl.classList.contains('show'));
+        collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
+        collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
+    });
 
     const actionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
     setAttendanceActionStateId(actionStateId);
@@ -1746,6 +1848,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (token === 'allTime') {
             setDateRange(null, null);
             setActiveRangeChip('allTime');
+            syncAttendanceMatrixUrl(captureAttendanceMatrixFilterState());
             if (autoLoad && document.getElementById('filter_classId').value) {
                 document.getElementById('btn_loadData').click();
             }
@@ -1755,6 +1858,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!dates) return false;
         setDateRange(dates.start, dates.end);
         setActiveRangeChip(token);
+        syncAttendanceMatrixUrl(captureAttendanceMatrixFilterState());
         if (autoLoad && document.getElementById('filter_classId').value) {
             document.getElementById('btn_loadData').click();
         }
@@ -1822,6 +1926,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.currentMatrixData = null;
         window.attendanceVisiblePersonIds = null;
         setAttendancePrintEnabled(false);
+        syncAttendanceMatrixUrl(captureAttendanceMatrixFilterState());
     });
 
     document.getElementById('btn_reset')?.addEventListener('click', () => {
@@ -1834,6 +1939,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.attendanceVisiblePersonIds = null;
         setAttendancePrintEnabled(false);
         setActiveRangeChip('');
+        syncAttendanceMatrixUrl({});
     });
 
     // --- 2. Pickers ---
@@ -1846,6 +1952,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 onSelect: (item) => {
                     document.getElementById('filter_classId').value = item.id;
                     document.getElementById('filter_className').value = item.title || item.id;
+                    syncAttendanceMatrixUrl(captureAttendanceMatrixFilterState());
                     document.getElementById('btn_loadData').click();
                 }
             }));
@@ -1940,6 +2047,15 @@ document.addEventListener('DOMContentLoaded', () => {
         return parts.join(' - ');
     }
 
+    function attendanceRecordHasNotes(rec) {
+        const comments = Array.isArray(rec?.comments) ? rec.comments : [];
+        return Boolean(
+            comments.length
+            || String(rec?.rosterStudentNotes || '').trim()
+            || String(rec?.excuseRef || '').trim()
+        );
+    }
+
     function buildAttendanceRecordCell(stu, rec) {
         const markAppearance = window.AttendanceMarkAppearance;
         const buildIcon = (key, ringClass) => {
@@ -1972,8 +2088,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     ? 'N/A - approved leave'
                     : (rec.applicability === 'makeup_required' ? 'N/A - make-up session required' : (markAppearance?.getMark('not_applicable')?.label || 'N/A')));
         }
-        const hasComments = (rec.comments && rec.comments.length > 0);
-        const noteBadge = hasComments
+        const noteBadge = attendanceRecordHasNotes(rec)
             ? `<div class="position-absolute top-0 end-0 pe-1 pt-1">${buildIcon('notes', '') || '<i class="bi bi-chat-dots-fill status-notes" style="font-size: 0.65rem;"></i>'}</div>`
             : '';
         const classId = String(window.currentMatrixData?.classId || document.getElementById('filter_classId')?.value || '').trim();
@@ -2603,6 +2718,13 @@ document.addEventListener('DOMContentLoaded', () => {
             applyAttendanceStudentVisibility();
             await refreshAttendanceDisplayRollups();
 
+            syncAttendanceMatrixUrl({
+                classId,
+                startDate,
+                endDate,
+                range: getActiveAttendanceRangeChip()
+            });
+
             const currentUrlParams = new URLSearchParams(window.location.search);
             const targetStudentId = currentUrlParams.get('studentId');
             const targetSessionId = currentUrlParams.get('sessionId');
@@ -2610,11 +2732,12 @@ document.addEventListener('DOMContentLoaded', () => {
             if (targetStudentId && targetSessionId) {
                 setTimeout(() => {
                     openInteractiveModal(targetStudentId, targetSessionId);
-                    const cleanUrl = new URL(`${window.location.origin}/school/attendances`);
-                    cleanUrl.searchParams.set('classId', classId);
-                    if (startDate) cleanUrl.searchParams.set('startDate', startDate);
-                    if (endDate) cleanUrl.searchParams.set('endDate', endDate);
-                    window.history.replaceState({}, document.title, cleanUrl.pathname + cleanUrl.search);
+                    syncAttendanceMatrixUrl({
+                        classId,
+                        startDate,
+                        endDate,
+                        range: getActiveAttendanceRangeChip()
+                    });
                 }, 200);
             }
 
@@ -2653,7 +2776,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    document.getElementById('btn_loadData').addEventListener('click', () => loadAttendanceMatrixData());
+    document.getElementById('btn_loadData').addEventListener('click', () => {
+        syncAttendanceMatrixUrl(captureAttendanceMatrixFilterState());
+        loadAttendanceMatrixData();
+    });
+    ['filter_startDate', 'filter_endDate'].forEach((id) => {
+        document.getElementById(id)?.addEventListener('change', () => {
+            setActiveRangeChip('');
+            syncAttendanceMatrixUrl(captureAttendanceMatrixFilterState());
+        });
+    });
     document.getElementById('btn_attendanceMatrixHistory')?.addEventListener('click', () => {
         setAttendanceHistoryMode(!window.attendanceHistoryModeOn);
     });
@@ -3530,6 +3662,15 @@ document.addEventListener('DOMContentLoaded', () => {
     if (qStart) document.getElementById('filter_startDate').value = qStart;
     if (qEnd) document.getElementById('filter_endDate').value = qEnd;
 
+    if (qClassId || qStart || qEnd || normalizedRange) {
+        syncAttendanceMatrixUrl({
+            classId: qClassId,
+            startDate: qStart,
+            endDate: qEnd,
+            range: normalizedRange
+        });
+    }
+
     if (!qClassId) {
         applyAttendanceRangeSelection('thisWeek');
     } else if (qStart && qEnd) {
@@ -3733,6 +3874,8 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
             if (commentFileInput) commentFileInput.value = '';
             currentMentions = [];
     document.getElementById('pendingMentionsArea').innerHTML = '';
+
+    syncCellModalNotesSections(record);
 
     if (detailsModalInstance) detailsModalInstance.show();
     detailsModalSnapshot = captureAttendanceDetailsModalSnapshot();

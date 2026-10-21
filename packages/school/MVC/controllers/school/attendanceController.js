@@ -777,7 +777,18 @@ async function buildAttendanceMatrixPayload(req, options = {}) {
                 allowedStatuses: classEnrollmentSessionApplicabilityService.ROLLING_ATTENDANCE_WINDOW_STATUSES,
                 forceNotApplicableSessionKeys
             });
-            rollingApplicability.personIds.forEach((personId) => activePersonIds.add(String(personId || '').trim()));
+            const rollingRoster = await classEnrollmentReadService.listPersonIdsOverlappingEnrollmentWindow({
+                classId: classData.id,
+                classItem: classData,
+                reqUser: req.user,
+                activeOrgId,
+                sessionDates,
+                startDate: String(startDate || '').trim(),
+                endDate: String(endDate || '').trim(),
+                canonicalStatuses: Array.from(classEnrollmentSessionApplicabilityService.ROLLING_ATTENDANCE_WINDOW_STATUSES),
+                studentToPersonMap
+            });
+            rollingRoster.personIds.forEach((personId) => activePersonIds.add(String(personId || '').trim()));
         } else {
             const studentIds = enrollmentSnapshot.studentIds instanceof Set
                 ? enrollmentSnapshot.studentIds
