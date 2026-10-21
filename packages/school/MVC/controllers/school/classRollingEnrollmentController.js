@@ -1019,14 +1019,16 @@ function normalizeDateOnlyValue(value) {
 }
 
 function isActivePeriodOnDate(row, referenceDate = '', orgToday = '') {
-    const status = String(row?.status || '').trim().toLowerCase();
-    if (!['active', 'planned'].includes(status)) return false;
     const day = normalizeDateOnlyValue(referenceDate) || normalizeDateOnlyValue(orgToday) || resolveOrgTodayFromContext({ orgToday });
     const start = normalizeDateOnlyValue(row?.startDate);
-    const end = normalizeDateOnlyValue(row?.endDate);
-    // For session/attendance visibility we require period start <= reference day
-    // for both active and planned states.
     if (start && start > day) return false;
+    const effectiveEnd = normalizeDateOnlyValue(classEnrollmentSessionApplicabilityService.periodEffectiveEndDate(row))
+        || normalizeDateOnlyValue(row?.endDate);
+    if (effectiveEnd && effectiveEnd < day) return false;
+    if (classEnrollmentSessionApplicabilityService.isManualCloseBeforeCapTargetSatisfied(row)) return true;
+    const status = String(row?.status || '').trim().toLowerCase();
+    if (!['active', 'planned'].includes(status)) return false;
+    const end = normalizeDateOnlyValue(row?.endDate);
     if (end && end < day) return false;
     return true;
 }
@@ -1526,6 +1528,10 @@ async function showRollingEnrollmentPage(req, res) {
       searchableFields: ROLLING_ENROLLMENT_SEARCHABLE_FIELDS
     });
     periodRows = await attachSessionProgressToEnrollmentPeriodRows(periodRows, classData, req.user, students);
+    periodRows = rollingEnrollmentPeriodFilterService.markValidEnrollmentOnPeriodRows(
+      periodRows,
+      resolveOrgTodayFromRequest(req)
+    );
 
     res.render('school/class/rollingEnrollment', {
       title: `Rolling Enrollment: ${classData?.title || classData?.id || ''}`,
@@ -1618,6 +1624,10 @@ async function buildRollingEnrollmentExportRows(req) {
     searchableFields: ROLLING_ENROLLMENT_SEARCHABLE_FIELDS
   });
   periodRows = await attachSessionProgressToEnrollmentPeriodRows(periodRows, classData, req.user, students);
+  periodRows = rollingEnrollmentPeriodFilterService.markValidEnrollmentOnPeriodRows(
+    periodRows,
+    resolveOrgTodayFromRequest(req)
+  );
 
   return { classData, periodRows, students };
 }

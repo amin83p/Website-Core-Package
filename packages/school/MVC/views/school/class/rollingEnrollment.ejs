@@ -1127,7 +1127,8 @@
   const rollingOptionalBtnsBeforePrint = [
     `<button type="button" id="btn_openAddEnrollmentModal" class="btn btn-filled btn-add btn-md me-2 mb-2"${isRolling && !isClosedForNewEnrollment ? '' : ' disabled'}><i class="bi bi-plus-circle me-1"></i>New Enrollment</button>`,
     `<button type="button" id="btn_openGroupEnrollmentModal" class="btn btn-filled btn-primary btn-md me-2 mb-2"${isRolling && !isClosedForNewEnrollment ? '' : ' disabled'}><i class="bi bi-people-fill me-1"></i>Group Enrollment</button>`,
-    `<button type="button" id="btn_openClassMoveWizard" class="btn btn-outline-primary btn-md me-2 mb-2"${isRolling && (typeof canManageEnrollmentOffice !== 'undefined' && canManageEnrollmentOffice) ? '' : ' disabled'}><i class="bi bi-arrow-left-right me-1"></i>Move Class</button>`
+    `<button type="button" id="btn_openClassMoveWizard" class="btn btn-outline-primary btn-md me-2 mb-2"${isRolling && (typeof canManageEnrollmentOffice !== 'undefined' && canManageEnrollmentOffice) ? '' : ' disabled'}><i class="bi bi-arrow-left-right me-1"></i>Move Class</button>`,
+    `<button type="button" id="btn_toggleValidEnrollment" class="btn btn-outline-primary btn-md me-2 mb-2" aria-pressed="false"${isRolling ? '' : ' disabled'}><i class="bi bi-person-check me-1"></i>Valid Enrollment</button>`
   ];
 %>
 
@@ -3105,6 +3106,25 @@
   const defaultTeacher = <%- defaultTeacherJson %>;
   const studentMap = new Map((Array.isArray(studentOptions) ? studentOptions : []).map((row) => [String(row.id || ''), row]));
   let periodRows = <%- initialRowsJson %>;
+  let showValidEnrollmentOnly = false;
+
+  function periodRowHasValidEnrollment(row) {
+    return row?.hasValidEnrollment === true;
+  }
+
+  function getDisplayPeriodRows() {
+    const all = Array.isArray(periodRows) ? periodRows : [];
+    if (!showValidEnrollmentOnly) return all;
+    return all.filter(periodRowHasValidEnrollment);
+  }
+
+  function syncValidEnrollmentButtonState() {
+    const btn = qs('btn_toggleValidEnrollment');
+    if (!btn) return;
+    btn.classList.toggle('btn-primary', showValidEnrollmentOnly);
+    btn.classList.toggle('btn-outline-primary', !showValidEnrollmentOnly);
+    btn.setAttribute('aria-pressed', showValidEnrollmentOnly ? 'true' : 'false');
+  }
 
   function resolveFunderSelectionFromSelect(selectId) {
     const value = String(qs(selectId)?.value || 'self').trim() || 'self';
@@ -10647,12 +10667,21 @@
 
   function renderRows() {
     closeAllActionMenus();
-    const rows = Array.isArray(periodRows) ? [...periodRows] : [];
+    const allRows = Array.isArray(periodRows) ? periodRows : [];
+    const rows = getDisplayPeriodRows();
     if (periodCount) {
-      periodCount.textContent = `${rows.length} row${rows.length === 1 ? '' : 's'}`;
+      if (showValidEnrollmentOnly) {
+        periodCount.textContent = `${rows.length} of ${allRows.length} row${allRows.length === 1 ? '' : 's'} (valid enrollment)`;
+      } else {
+        periodCount.textContent = `${allRows.length} row${allRows.length === 1 ? '' : 's'}`;
+      }
     }
+    syncValidEnrollmentButtonState();
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="' + String(periodTableColspan) + '" class="text-center py-4 text-muted">No enrollment periods found.</td></tr>';
+      const emptyMessage = showValidEnrollmentOnly
+        ? 'No enrollment periods with valid enrollment.'
+        : 'No enrollment periods found.';
+      tbody.innerHTML = '<tr><td colspan="' + String(periodTableColspan) + '" class="text-center py-4 text-muted">' + emptyMessage + '</td></tr>';
       if (typeof window.reapplyCurrentTableSettings === 'function') {
         window.reapplyCurrentTableSettings(document.getElementById('first-table'));
       }
@@ -13946,6 +13975,10 @@
   });
   qs('btn_openGroupEnrollmentModal')?.addEventListener('click', openGroupEnrollmentModal);
   qs('btn_openClassMoveWizard')?.addEventListener('click', openClassMoveWizard);
+  qs('btn_toggleValidEnrollment')?.addEventListener('click', () => {
+    showValidEnrollmentOnly = !showValidEnrollmentOnly;
+    renderRows();
+  });
   qs('btn_classMoveNext')?.addEventListener('click', () => { classMoveWizardNext().catch((error) => console.error(error)); });
   qs('btn_classMoveBack')?.addEventListener('click', classMoveWizardBack);
   qs('btn_classMovePickTarget')?.addEventListener('click', () => { openClassMoveTargetPicker().catch((error) => console.error(error)); });

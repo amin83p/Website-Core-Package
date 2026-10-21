@@ -1332,14 +1332,17 @@ function normalizeClassSessionsForForm(sessions = []) {
 }
 
 function isActivePeriodOnDate(row, referenceDate = '', orgToday = '') {
-    const status = String(row?.status || '').trim().toLowerCase();
-    if (!['active', 'planned'].includes(status)) return false;
     const day = normalizeDateOnlyValue(referenceDate) || normalizeDateOnlyValue(orgToday) || resolveOrgTodayFromContext({ orgToday });
     const start = normalizeDateOnlyValue(row?.startDate);
-    const end = normalizeDateOnlyValue(row?.endDate);
-    // For session/attendance visibility we require period start <= reference day
-    // for both active and planned states.
     if (start && start > day) return false;
+    const applicabilityService = require('../../services/school/classEnrollmentSessionApplicabilityService');
+    const effectiveEnd = normalizeDateOnlyValue(applicabilityService.periodEffectiveEndDate(row))
+        || normalizeDateOnlyValue(row?.endDate);
+    if (effectiveEnd && effectiveEnd < day) return false;
+    if (applicabilityService.isManualCloseBeforeCapTargetSatisfied(row)) return true;
+    const status = String(row?.status || '').trim().toLowerCase();
+    if (!['active', 'planned'].includes(status)) return false;
+    const end = normalizeDateOnlyValue(row?.endDate);
     if (end && end < day) return false;
     return true;
 }

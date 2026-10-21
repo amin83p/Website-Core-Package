@@ -65,6 +65,37 @@ test('filterEnrollmentPeriodRows applies target type filter', () => {
   assert.deepEqual(dateWindow.map((row) => row.id), ['2']);
 });
 
+test('scheduled close with future end date is valid without session cap while status is completed', () => {
+  const period = {
+    status: 'completed',
+    startDate: '2026-08-01',
+    endDate: '2026-10-29'
+  };
+  const orgToday = '2026-10-21';
+  assert.equal(filterService.isPastPeriod(period, orgToday), false);
+  assert.equal(filterService.isCurrentPeriod(period, orgToday), true);
+  assert.equal(filterService.isValidForSessionsToday(period, orgToday), true);
+});
+
+test('manual close before target stays current and valid for sessions while status is completed', () => {
+  const period = {
+    status: 'completed',
+    startDate: '2026-08-01',
+    endDate: '2026-08-15',
+    targetSessionCount: 46,
+    transactionSummary: {
+      lastCloseSnapshot: {
+        closedEndDate: '2026-08-15',
+        closedAt: '2026-08-10T12:00:00.000Z',
+        closedStatus: 'completed'
+      }
+    }
+  };
+  assert.equal(filterService.isPastPeriod(period, ORG_TODAY), false);
+  assert.equal(filterService.isCurrentPeriod(period, ORG_TODAY), true);
+  assert.equal(filterService.isValidForSessionsToday(period, ORG_TODAY), true);
+});
+
 test('target-session enrollment with open end date can be current and valid when active', () => {
   const period = {
     status: 'active',

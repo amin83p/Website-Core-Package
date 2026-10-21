@@ -51,6 +51,34 @@ test('rolling attendance window supports open-ended and completion-shortened enr
   assert.equal(windowFor('2026-07-11', { completionDate: '2026-07-10' }).withinEnrollmentWindow, false);
 });
 
+test('manual close before session target keeps enrollment window open past close date', () => {
+  const period = {
+    status: 'completed',
+    startDate: '2026-07-01',
+    endDate: '2026-10-15',
+    targetSessionCount: 46,
+    ...manualCloseSnapshot('2026-10-15')
+  };
+  assert.equal(applicabilityService.isManualCloseBeforeCapTargetSatisfied(period), true);
+  assert.equal(applicabilityService.isEnrollmentCapTargetSatisfied(period), false);
+  assert.equal(applicabilityService.periodEffectiveEndDate(period), '9999-12-31');
+  const windowNovember = applicabilityService.resolveRollingEnrollmentWindowForPerson({
+    periodRows: [{
+      id: 'PERIOD_1',
+      orgId: 'ORG_1',
+      studentId: 'STU_1',
+      ...period
+    }],
+    studentToPersonMap,
+    personId: 'PER_1',
+    session: { sessionId: 'SES_NOV', date: '2026-11-05' },
+    activeOrgId: 'ORG_1',
+    allowedStatuses: applicabilityService.ROLLING_ATTENDANCE_WINDOW_STATUSES
+  });
+  assert.equal(windowNovember.withinEnrollmentWindow, true);
+  assert.equal(period.status, 'completed');
+});
+
 test('manual completed close with future end date keeps attendance through enrollment end despite earlier completionDate', () => {
   const period = {
     status: 'completed',

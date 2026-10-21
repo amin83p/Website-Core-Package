@@ -175,7 +175,49 @@ function isManualScheduledCloseForAttendance(period = {}) {
   return isScheduledEnrollmentClose(period);
 }
 
+function isEnrollmentCapTargetSatisfied(period = {}) {
+  if (!hasEnrollmentCap(period)) return false;
+  if (isAutomaticallyCompletedTargetPeriod(period)) return true;
+  if (toPublicId(period.completionSessionId)) return true;
+
+  const summary = period?.cycleAttendanceSummary;
+  if (summary && typeof summary === 'object') {
+    const targetSessions = normalizeTargetSessionCount(period.targetSessionCount);
+    const targetHours = normalizeTargetHours(period.targetHours);
+    if (targetSessions > 0) {
+      const consumed = Number(summary.consumedSessions);
+      const remaining = Number(summary.remainingSessions);
+      if (Number.isFinite(consumed) && consumed >= targetSessions) return true;
+      if (Number.isFinite(remaining) && remaining <= 0 && Number.isFinite(consumed) && consumed > 0) return true;
+    }
+    if (targetHours > 0) {
+      const consumedHours = Number(summary.consumedHours);
+      const remainingHours = Number(summary.remainingHours);
+      if (Number.isFinite(consumedHours) && consumedHours >= targetHours) return true;
+      if (Number.isFinite(remainingHours) && remainingHours <= 0 && Number.isFinite(consumedHours) && consumedHours > 0) {
+        return true;
+      }
+    }
+  }
+
+  const completionDate = normalizeDateOnly(period.completionDate);
+  if (completionDate && isManualScheduledCloseForAttendance(period)) return true;
+  return false;
+}
+
+function isManualCloseBeforeCapTargetSatisfied(period = {}) {
+  return hasEnrollmentCap(period)
+    && isManualScheduledCloseForAttendance(period)
+    && !isEnrollmentCapTargetSatisfied(period);
+}
+
 function periodEffectiveEndDate(period = {}) {
+  if (isManualCloseBeforeCapTargetSatisfied(period)) {
+    const completionDate = normalizeDateOnly(period.completionDate);
+    if (completionDate && isAutomaticallyCompletedTargetPeriod(period)) return completionDate;
+    return '9999-12-31';
+  }
+
   if (isManualScheduledCloseForAttendance(period)) {
     const closingDate = resolveScheduledClosingDate(period);
     if (closingDate) return closingDate;
@@ -719,6 +761,8 @@ module.exports = {
   resolveScheduledClosingDate,
   isScheduledEnrollmentClose,
   isManualScheduledCloseForAttendance,
+  isEnrollmentCapTargetSatisfied,
+  isManualCloseBeforeCapTargetSatisfied,
   resolveRollingEnrollmentWindowForPerson,
   resolveRollingEnrollmentApplicability,
   resolveRollingEnrollmentApplicabilityWithLeaves,

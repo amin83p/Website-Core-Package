@@ -103,12 +103,21 @@ function isFuturePeriod(period = {}, orgToday = '') {
 }
 
 function isPastPeriod(period = {}, orgToday = '') {
-  const status = periodStatus(period);
-  if (ENDED_STATUSES.has(status)) return true;
   const today = normalizeDateOnly(orgToday);
   const end = periodEffectiveEndDate(period);
-  if (!today || !end) return false;
-  return end < today;
+  if (today && end && end < today) return true;
+  if (applicabilityService.isManualCloseBeforeCapTargetSatisfied(period)) return false;
+  if (
+    applicabilityService.isManualScheduledCloseForAttendance(period)
+    && today
+    && end
+    && end >= today
+  ) {
+    return false;
+  }
+  const status = periodStatus(period);
+  if (ENDED_STATUSES.has(status)) return true;
+  return false;
 }
 
 function isCurrentPeriod(period = {}, orgToday = '') {
@@ -122,8 +131,11 @@ function isOpenWorkflowPeriod(period = {}) {
 
 function isValidForSessionsToday(period = {}, orgToday = '') {
   const status = periodStatus(period);
-  if (!VALID_SESSION_STATUSES.has(status)) return false;
-  return isDateWithinPeriodWindow(period, orgToday);
+  const inWindow = isDateWithinPeriodWindow(period, orgToday);
+  if (VALID_SESSION_STATUSES.has(status)) return inWindow;
+  if (applicabilityService.isManualCloseBeforeCapTargetSatisfied(period)) return inWindow;
+  if (applicabilityService.isManualScheduledCloseForAttendance(period)) return inWindow;
+  return false;
 }
 
 function classifyEnrollmentPeriodGroup(period = {}, orgToday = '') {
@@ -258,6 +270,13 @@ function filterEnrollmentPeriodRows(rows, query = {}, options = {}) {
   return filtered;
 }
 
+function markValidEnrollmentOnPeriodRows(rows = [], orgToday = '') {
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    ...row,
+    hasValidEnrollment: isValidForSessionsToday(row, orgToday)
+  }));
+}
+
 module.exports = {
   ENROLLMENT_GROUP_OPTIONS,
   PERIOD_STATUS_OPTIONS,
@@ -271,5 +290,6 @@ module.exports = {
   isFuturePeriod,
   isPastPeriod,
   isOpenWorkflowPeriod,
-  isValidForSessionsToday
+  isValidForSessionsToday,
+  markValidEnrollmentOnPeriodRows
 };
