@@ -1126,7 +1126,9 @@
   ];
   const rollingOptionalBtnsBeforePrint = [
     `<button type="button" id="btn_openAddEnrollmentModal" class="btn btn-filled btn-add btn-md me-2 mb-2"${isRolling && !isClosedForNewEnrollment ? '' : ' disabled'}><i class="bi bi-plus-circle me-1"></i>New Enrollment</button>`,
-    `<button type="button" id="btn_openGroupEnrollmentModal" class="btn btn-filled btn-primary btn-md me-2 mb-2"${isRolling && !isClosedForNewEnrollment ? '' : ' disabled'}><i class="bi bi-people-fill me-1"></i>Group Enrollment</button>`,
+    `<button type="button" id="btn_openGroupEnrollmentModal" class="btn btn-filled btn-primary btn-md me-2 mb-2"${isRolling && !isClosedForNewEnrollment ? '' : ' disabled'}><i class="bi bi-people-fill me-1"></i>Group Enrollment</button>`
+  ];
+  const rollingOptionalToolbarSecondRow = [
     `<button type="button" id="btn_openClassMoveWizard" class="btn btn-outline-primary btn-md me-2 mb-2"${isRolling && (typeof canManageEnrollmentOffice !== 'undefined' && canManageEnrollmentOffice) ? '' : ' disabled'}><i class="bi bi-arrow-left-right me-1"></i>Move Class</button>`,
     `<button type="button" id="btn_toggleValidEnrollment" class="btn btn-outline-primary btn-md me-2 mb-2" aria-pressed="false"${isRolling ? '' : ' disabled'}><i class="bi bi-person-check me-1"></i>Valid Enrollment</button>`
   ];
@@ -1144,7 +1146,8 @@
   headerManageBtns: rollingHeaderManageBtns,
   belowHeadingInclude: 'school/class/rollingEnrollmentBelowHeading',
   manageBtns: rollingManageBtns,
-  optionalBtnsBeforePrint: rollingOptionalBtnsBeforePrint
+  optionalBtnsBeforePrint: rollingOptionalBtnsBeforePrint,
+  optionalToolbarSecondRow: rollingOptionalToolbarSecondRow
 }) %>
 
 <div class="card border-0 shadow-sm mb-3">

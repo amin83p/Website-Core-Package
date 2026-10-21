@@ -64,3 +64,13 @@ test('master schedule bulk edit uses bulk update API instead of per-session post
   const bulkFnSlice = viewerSource.slice(bulkApplyIdx, bulkApplyIdx + 4500);
   assert.doesNotMatch(bulkFnSlice, /applySavedSessionScheduleUpdate\(/);
 });
+
+test('master schedule status changes are not limited to scheduled sessions', () => {
+  const viewerSource = read('public/scripts/masterScheduleViewer.js');
+  assert.match(viewerSource, /function isClassSessionEligibleForStatusChange\(/);
+  const statusFnIdx = viewerSource.indexOf('function canScheduleSessionChangeStatus(event)');
+  const statusFnEnd = viewerSource.indexOf('function isScheduledClassSessionForQuickEdit(event)', statusFnIdx);
+  const statusFnSlice = viewerSource.slice(statusFnIdx, statusFnEnd > statusFnIdx ? statusFnEnd : statusFnIdx + 400);
+  assert.match(statusFnSlice, /isClassSessionEligibleForStatusChange\(event\)/);
+  assert.doesNotMatch(statusFnSlice, /isScheduledClassSessionForQuickEdit\(event\)/);
+});

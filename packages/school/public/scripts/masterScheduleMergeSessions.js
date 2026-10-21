@@ -108,6 +108,16 @@
       if (next) next.textContent = step === 'review' ? 'Merge' : 'Next';
     }
 
+    function mapScheduleEventsToMergeSessions(events) {
+      return (Array.isArray(events) ? events : []).map((ev) => ({
+        classId: clean(ev?.classId),
+        sessionId: clean(ev?.sessionId || ev?.id),
+        date: clean(ev?.date),
+        start: clean(ev?.start),
+        end: clean(ev?.end)
+      })).filter((row) => row.classId && row.sessionId);
+    }
+
     function selectionContext() {
       const savedCount = typeof deps.countActiveScheduleSelectedSessions === 'function'
         ? deps.countActiveScheduleSelectedSessions()
@@ -225,7 +235,11 @@
             previewHash: preview.previewHash
           });
           deps.hideBootstrapModal?.(document.getElementById('scheduleMergeSessionsModal'));
-          deps.refreshScheduleViewWithHolidays?.();
+          if (typeof deps.applyScheduleSessionChangesInView === 'function') {
+            await deps.applyScheduleSessionChangesInView({ reloadAll: true });
+          } else {
+            deps.refreshScheduleViewWithHolidays?.();
+          }
           await deps.uiAlert?.('Sessions were merged.', 'Merge Sessions', { icon: 'success' });
         } finally {
           if (next) next.disabled = false;
@@ -235,21 +249,29 @@
       }
     }
 
-    function openWizard() {
-      const ctx = selectionContext();
-      if (ctx.error === 'mixed') {
-        void deps.uiAlert?.('Clear staged session selections before merging saved sessions.', 'Merge Sessions', { icon: 'info' });
-        return;
+    function openMergeWizard(explicitSessions = null) {
+      let sessions = Array.isArray(explicitSessions) ? explicitSessions : null;
+      if (!sessions) {
+        const ctx = selectionContext();
+        if (ctx.error === 'mixed') {
+          void deps.uiAlert?.('Clear staged session selections before merging saved sessions.', 'Merge Sessions', { icon: 'info' });
+          return;
+        }
+        if (ctx.error === 'staged') {
+          void deps.uiAlert?.('Save staged sessions before merging them.', 'Merge Sessions', { icon: 'info' });
+          return;
+        }
+        if (ctx.error) {
+          void deps.uiAlert?.('Select at least one saved class session.', 'Merge Sessions', { icon: 'info' });
+          return;
+        }
+        sessions = ctx.sessions;
       }
-      if (ctx.error === 'staged') {
-        void deps.uiAlert?.('Save staged sessions before merging them.', 'Merge Sessions', { icon: 'info' });
-        return;
-      }
-      if (ctx.error) {
+      if (!sessions.length) {
         void deps.uiAlert?.('Select at least one saved class session.', 'Merge Sessions', { icon: 'info' });
         return;
       }
-      state.sessions = ctx.sessions;
+      state.sessions = sessions;
       state.teacherId = '';
       state.teacherName = '';
       state.preview = null;
@@ -257,6 +279,20 @@
       setAlert('scheduleMergeReviewBlockers', []);
       showStep('teacher');
       deps.showBootstrapModal?.(document.getElementById('scheduleMergeSessionsModal'));
+    }
+
+    function openWizard() {
+      openMergeWizard(null);
+    }
+
+    function openMergeWizardForScheduleEvents(events) {
+      const sessions = mapScheduleEventsToMergeSessions(events);
+      if (!sessions.length) {
+        void deps.uiAlert?.('This session cannot be merged from Master Schedule.', 'Merge Sessions', { icon: 'warning' });
+        return;
+      }
+      deps.hideScheduleSessionContextMenu?.();
+      openMergeWizard(sessions);
     }
 
     document.getElementById('btn_scheduleMergePickTeacher')?.addEventListener('click', () => openTeacherPicker());
@@ -326,6 +362,7 @@
     });
 
     global.canUndoMergeScheduleEvent = canUndoMergeScheduleEvent;
+    global.openMasterScheduleMergeWizardForSessions = openMergeWizardForScheduleEvents;
   }
 
   global.installMasterScheduleMergeSessions = installMasterScheduleMergeSessions;

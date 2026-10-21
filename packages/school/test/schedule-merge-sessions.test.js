@@ -237,7 +237,8 @@ test('apply rejects a stale merge preview', async () => {
 });
 
 test('merge session takeover is wired to the schedule rail', () => {
-  const view = fs.readFileSync(path.join(__dirname, '../MVC/views/school/schedule/personScheduleAdmin.ejs'), 'utf8');
+  const view = fs.readFileSync(path.join(__dirname, '../MVC/views/school/schedule/partials/personScheduleCalendarShell.ejs'), 'utf8');
+  const adminView = fs.readFileSync(path.join(__dirname, '../MVC/views/school/schedule/personScheduleAdmin.ejs'), 'utf8');
   const routes = fs.readFileSync(path.join(__dirname, '../MVC/routes/scheduleRoutes.js'), 'utf8');
   const viewer = fs.readFileSync(path.join(__dirname, '../public/scripts/masterScheduleViewer.js'), 'utf8');
   const script = fs.readFileSync(path.join(__dirname, '../public/scripts/masterScheduleMergeSessions.js'), 'utf8');
@@ -245,8 +246,9 @@ test('merge session takeover is wired to the schedule rail', () => {
   assert.match(view, /Merge Sessions/);
   assert.match(view, /data-schedule-admin-action="take-over-sessions"/);
   assert.match(view, /Take Over/);
-  assert.match(view, /scheduleMergeSessionsModal/);
-  assert.match(view, /masterScheduleMergeSessions\.js/);
+  assert.match(adminView, /scheduleMergeSessionsModal/);
+  const adminScripts = fs.readFileSync(path.join(__dirname, '../MVC/views/school/schedule/partials/personScheduleScriptsAdmin.ejs'), 'utf8');
+  assert.match(adminScripts, /masterScheduleMergeSessions\.js/);
   assert.match(routes, /\/api\/merge-sessions\/preview/);
   assert.match(routes, /\/api\/merge-sessions\/apply/);
   assert.match(routes, /SCHOOL_SESSIONS, OPERATIONS\.UPDATE/);
@@ -254,4 +256,19 @@ test('merge session takeover is wired to the schedule rail', () => {
   assert.match(viewer, /installMasterScheduleMergeSessions/);
   assert.match(script, /row\.sessions/);
   assert.match(script, /<ul/);
+});
+
+test('master schedule routes merged status picks through merge wizard', () => {
+  const viewer = fs.readFileSync(path.join(__dirname, '../public/scripts/masterScheduleViewer.js'), 'utf8');
+  const mergeScript = fs.readFileSync(path.join(__dirname, '../public/scripts/masterScheduleMergeSessions.js'), 'utf8');
+  assert.match(viewer, /data-merge-session-required="1"/);
+  assert.match(viewer, /openMasterScheduleMergeWizardForSessions/);
+  assert.match(viewer, /requiresManageSession: row\?\.makeUpRequired === true/);
+  assert.doesNotMatch(
+    viewer,
+    /requiresManageSession: row\?\.makeUpRequired === true \|\| row\?\.mergedSessionRequired === true/
+  );
+  assert.match(mergeScript, /openMasterScheduleMergeWizardForSessions/);
+  assert.match(mergeScript, /function openMergeWizard\(/);
+  assert.match(mergeScript, /mapScheduleEventsToMergeSessions/);
 });

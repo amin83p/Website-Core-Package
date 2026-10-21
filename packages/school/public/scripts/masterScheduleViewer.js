@@ -1769,9 +1769,16 @@
         return isScheduledClassSessionForQuickEdit(event) && readSessionManagementPolicy(event).canChangeTime === true;
     }
 
-    function canScheduleSessionChangeStatus(event) {
+    function isClassSessionEligibleForStatusChange(event) {
+        if (!isClassSessionScheduleEvent(event)) return false;
         if (!isScheduleEventMutableUnderClassFocus(event)) return false;
-        return isScheduledClassSessionForQuickEdit(event) && readSessionManagementPolicy(event).canChangeStatus === true;
+        if (event?.locked === true || event?.scheduleDisplayOnly === true) return false;
+        return readSessionManagementPolicy(event).canChangeStatus === true;
+    }
+
+    function canScheduleSessionChangeStatus(event) {
+        if (!isScheduleOnScreenManageEnabled()) return false;
+        return isClassSessionEligibleForStatusChange(event);
     }
 
     function isScheduledClassSessionForQuickEdit(event) {
@@ -1884,7 +1891,7 @@
                 isCurrent: normalizeSessionStatus(row?.code) === currentStatus,
                 makeUpRequired: row?.makeUpRequired === true,
                 mergedSessionRequired: row?.mergedSessionRequired === true,
-                requiresManageSession: row?.makeUpRequired === true || row?.mergedSessionRequired === true
+                requiresManageSession: row?.makeUpRequired === true
             }));
     }
 
@@ -2820,6 +2827,7 @@
         const attrs = [
             `data-schedule-session-status="${escapeHtml(item.code)}"`,
             item.requiresManageSession ? 'data-requires-manage-session="1"' : '',
+            item.mergedSessionRequired ? 'data-merge-session-required="1"' : '',
             item.completionStatus ? `data-work-completion-status="${escapeHtml(item.completionStatus)}"` : '',
             item.assigneeStatus ? `data-work-assignee-status="${escapeHtml(item.assigneeStatus)}"` : ''
         ].filter(Boolean).join(' ');
@@ -3372,6 +3380,15 @@
             clickEvent.preventDefault();
             clickEvent.stopPropagation();
             closeScheduleSessionContextStatusPicker();
+            if (item.getAttribute('data-merge-session-required') === '1') {
+                hideScheduleSessionContextMenu();
+                if (typeof global.openMasterScheduleMergeWizardForSessions === 'function') {
+                    global.openMasterScheduleMergeWizardForSessions([event]);
+                } else if (typeof uiAlert === 'function') {
+                    uiAlert('Merge Sessions is not available on this page.', 'Session status', { icon: 'warning' });
+                }
+                return;
+            }
             if (item.getAttribute('data-requires-manage-session') === '1') {
                 hideScheduleSessionContextMenu();
                 const manageUrl = isWorkSessionScheduleEvent(event)
