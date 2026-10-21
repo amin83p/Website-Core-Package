@@ -685,6 +685,21 @@ function buildRecordsByDateFromMatrixPayload(payload = {}) {
   return map;
 }
 
+function buildSessionsByDateFromMatrixPayload(payload = {}) {
+  const sessions = Array.isArray(payload?.sessions) ? payload.sessions : [];
+  const map = new Map();
+  sessions.forEach((session) => {
+    const date = normalizeDateOnly(session?.date);
+    if (!date) return;
+    map.set(date, {
+      date,
+      startTime: String(session?.startTime || '').trim(),
+      endTime: String(session?.endTime || '').trim()
+    });
+  });
+  return map;
+}
+
 async function buildOfficialStudentAttendanceExportModel(req, options = {}) {
   const collected = await collectStudentClassMatrixPayloadsForExport(req, options);
   const entries = Array.isArray(collected.entries) ? collected.entries : [];
@@ -733,6 +748,7 @@ async function buildOfficialStudentAttendanceExportModel(req, options = {}) {
       teacherName: String(payload.teacherName || '').trim(),
       claimNumbers: claimEntries.map((row) => row.number),
       sessionDateSet: buildClassSessionDateSet(payload),
+      sessionsByDate: buildSessionsByDateFromMatrixPayload(payload),
       recordsByDate: buildRecordsByDateFromMatrixPayload(payload),
       studentRow
     });
@@ -803,6 +819,7 @@ module.exports = {
   collectStudentClassMatrixPayloadsForExport,
   buildOfficialStudentAttendanceExportModel,
   buildUnionSessionDatesFromExportEntries,
+  buildSessionsByDateFromMatrixPayload,
   resolveClaimNumbersForEnrollmentPeriods,
   resolveClaimEntriesForEnrollmentPeriods,
   formatClaimNumberEntryDisplay,

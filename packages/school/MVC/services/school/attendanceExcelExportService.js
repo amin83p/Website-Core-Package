@@ -34,6 +34,12 @@ const STATUS_FILL_ARGB = Object.freeze({
 });
 
 const NA_DAY_FILL_ARGB = STATUS_FILL_ARGB[ATTENDANCE_STATUS.NOT_APPLICABLE];
+const EARLY_LEAVE_FILL_ARGB = 'FFFFC7CE';
+const LATE_AND_EARLY_FILL_ARGB = 'FFFF9966';
+const TIMING_LEGEND_ENTRIES = Object.freeze([
+  Object.freeze({ code: 'LE', label: 'Left early', fillArgb: EARLY_LEAVE_FILL_ARGB }),
+  Object.freeze({ code: 'L/LE', label: 'Late and left early', fillArgb: LATE_AND_EARLY_FILL_ARGB })
+]);
 const OFFICIAL_NO_CLASS_FILL_ARGB = 'FFBFBFBF';
 const HEADER_FILL_ARGB = 'FF5B9BD5';
 const WEEKDAY_FILL_ARGB = 'FFFBE5D6';
@@ -171,6 +177,9 @@ function buildLegendEntries(enabledAttendanceStatuses = []) {
       label: 'Excused absence'
     });
   }
+  TIMING_LEGEND_ENTRIES.forEach((entry) => {
+    entries.push({ ...entry });
+  });
   return entries;
 }
 
@@ -199,9 +208,25 @@ function hasAttendanceTiming(record = {}) {
     || (Number(record.earlyLeaveMinutes) || 0) > 0;
 }
 
+function resolveExportCellPresentation(record = {}) {
+  const late = Number(record.lateMinutes) || 0;
+  const early = Number(record.earlyLeaveMinutes) || 0;
+  if (late > 0 && early > 0) {
+    return { code: 'L/LE', fillArgb: LATE_AND_EARLY_FILL_ARGB };
+  }
+  if (early > 0) {
+    return { code: 'LE', fillArgb: EARLY_LEAVE_FILL_ARGB };
+  }
+  const statusKey = resolveExportStatusKey(record);
+  return {
+    code: statusToExportCode(record),
+    fillArgb: statusFillArgb(statusKey, { forLegend: false })
+  };
+}
+
 /** Status letter only in the cell; timing details belong in Excel notes via buildStatusNoteText. */
 function formatExportCellDisplay(record = {}) {
-  return statusToExportCode(record);
+  return resolveExportCellPresentation(record).code;
 }
 
 function statusFillArgb(status, { forLegend = false } = {}) {
@@ -230,8 +255,17 @@ function applyVerticalMiddle(cell, { horizontal = null, wrapText = false } = {})
   cell.alignment = alignment;
 }
 
-function applyLegendCellStyle(cell, status) {
-  const fillArgb = statusFillArgb(status, { forLegend: true });
+function resolveLegendEntryFillArgb(entryOrStatus) {
+  if (entryOrStatus && typeof entryOrStatus === 'object') {
+    if (entryOrStatus.fillArgb) return entryOrStatus.fillArgb;
+    if (entryOrStatus.status) return statusFillArgb(entryOrStatus.status, { forLegend: true });
+    return '';
+  }
+  return statusFillArgb(entryOrStatus, { forLegend: true });
+}
+
+function applyLegendCellStyle(cell, entryOrStatus) {
+  const fillArgb = resolveLegendEntryFillArgb(entryOrStatus);
   if (fillArgb) applySolidFill(cell, fillArgb);
   cell.font = { size: 11, color: { argb: DARK_TEXT_ARGB }, name: 'Calibri' };
   applyTableCellBorder(cell);
@@ -254,8 +288,7 @@ function applyStatusCellStyle(cell, statusOrRecord, { wrapText = false } = {}) {
   const record = statusOrRecord && typeof statusOrRecord === 'object'
     ? statusOrRecord
     : { status: statusOrRecord };
-  const statusKey = resolveExportStatusKey(record);
-  const fillArgb = statusFillArgb(statusKey, { forLegend: false });
+  const { fillArgb } = resolveExportCellPresentation(record);
   if (fillArgb) applySolidFill(cell, fillArgb);
   cell.font = {
     bold: false,
@@ -426,6 +459,19 @@ function buildStatusNoteText(record = {}) {
   });
 
   return fragments.join('\n\n');
+}
+
+/** Consolidated report appendix: single line breaks between excuse, timing, and roster notes. */
+function buildOfficialAppendixNoteText(record = {}) {
+  const fragments = [];
+  const excuseRef = clean(record.excuseRef);
+  if (excuseRef) fragments.push(`Excuse: ${excuseRef}`);
+  const timingLabel = formatTimingMinutesLabel(record, { includeNotExcused: true });
+  if (timingLabel) fragments.push(`Timing: ${timingLabel}`);
+  collectRosterStatusNotes(record).forEach((note) => {
+    fragments.push(note.startsWith('Note:') ? note : `Note: ${note}`);
+  });
+  return fragments.join('\n');
 }
 
 /**
@@ -708,9 +754,9 @@ function writeAttendanceMatrixBlock(sheet, payload = {}, options = {}) {
     const labelCell = sheet.getCell(row, numCol);
     codeCell.value = entry.code;
     labelCell.value = entry.label;
-    applyLegendCellStyle(codeCell, entry.status);
-    applyLegendCellStyle(labelCell, entry.status);
-    applyLegendCellStyle(sheet.getCell(row, lastNameCol), entry.status);
+    applyLegendCellStyle(codeCell, entry);
+    applyLegendCellStyle(labelCell, entry);
+    applyLegendCellStyle(sheet.getCell(row, lastNameCol), entry);
     applyVerticalMiddle(codeCell, { horizontal: 'center' });
     applyVerticalMiddle(labelCell);
     mergeHeaderBlock(sheet, row, numCol, lastNameCol);
@@ -886,7 +932,14 @@ const OFFICIAL_REPORT_TITLE_FONT = Object.freeze({
 
 const OFFICIAL_CLASS_NAME_STRIP_TOKENS = Object.freeze(['EAL', 'O/G', 'O/1', 'I/G', 'I/1']);
 const OFFICIAL_BODY_ROW_HEIGHT = 24;
+const OFFICIAL_APPENDIX_SECTION_COLOR_ARGB = 'FF495057';
+const OFFICIAL_APPENDIX_CLASS_COLOR_ARGB = 'FF198754';
+const OFFICIAL_APPENDIX_DATETIME_COLOR_ARGB = 'FF0563C1';
+const OFFICIAL_APPENDIX_NOTE_COLOR_ARGB = DARK_TEXT_ARGB;
+const OFFICIAL_APPENDIX_CLASS_DIVIDER_FILL_ARGB = 'FFDEE2E6';
+const OFFICIAL_APPENDIX_CLASS_DIVIDER_ROW_HEIGHT = 5;
 const OFFICIAL_SESSION_COLUMN_WIDTH = 9;
+const OFFICIAL_TEACHER_COLUMN_WIDTH = 12;
 const OFFICIAL_LEGEND_CODE_WIDTH = 6;
 const OFFICIAL_LEGEND_LABEL_WIDTH = 14;
 function escapeRegExp(value = '') {
@@ -932,16 +985,282 @@ function measureLongestDisplayLine(value = '') {
   return maxLen;
 }
 
-function resolveOfficialClassBufferColumnWidth(classRows = []) {
+function formatClockTimeForExport(timeValue = '') {
+  const token = clean(timeValue);
+  if (!token) return '';
+  const match = token.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+  if (match) {
+    const hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    if (!Number.isNaN(hours) && !Number.isNaN(minutes)) {
+      const parsed = new Date(2000, 0, 1, hours, minutes);
+      if (!Number.isNaN(parsed.getTime())) {
+        return parsed.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      }
+    }
+  }
+  return token;
+}
+
+function formatOfficialTeacherShortName(teacherName = '') {
+  const parts = clean(teacherName).split(/\s+/).filter(Boolean);
+  if (!parts.length) return '';
+  if (parts.length === 1) return parts[0];
+  const first = parts[0];
+  const lastInitial = parts[parts.length - 1].charAt(0).toUpperCase();
+  return lastInitial ? `${first} ${lastInitial}.` : first;
+}
+
+function formatOfficialSessionDateHeading(dateValue = '', session = {}, { includeTime = false } = {}) {
+  const date = clean(dateValue || session?.date);
+  const parsed = parseDateOnly(date);
+  const datePart = parsed
+    ? parsed.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    })
+    : date;
+  if (!includeTime) return datePart;
+  const start = formatClockTimeForExport(session?.startTime);
+  const end = formatClockTimeForExport(session?.endTime);
+  let timePart = '';
+  if (start && end) timePart = `${start}–${end}`;
+  else if (start) timePart = start;
+  else if (end) timePart = end;
+  return timePart ? `${datePart} — ${timePart}` : datePart;
+}
+
+function formatOfficialSessionDateTimeHeading(dateValue = '', session = {}) {
+  return formatOfficialSessionDateHeading(dateValue, session, { includeTime: true });
+}
+
+function resolveOfficialSessionTimeKey(session = {}) {
+  return `${clean(session?.startTime)}|${clean(session?.endTime)}`;
+}
+
+function shouldIncludeTimeInOfficialAppendixNotes(sessionsByDate = new Map(), noteDates = []) {
+  const keys = new Set();
+  (Array.isArray(noteDates) ? noteDates : []).forEach((date) => {
+    keys.add(resolveOfficialSessionTimeKey(sessionsByDate.get(date) || {}));
+  });
+  return keys.size > 1;
+}
+
+function formatOfficialSessionTimeRange(session = {}) {
+  const start = formatClockTimeForExport(session?.startTime);
+  const end = formatClockTimeForExport(session?.endTime);
+  if (start && end) return `${start}–${end}`;
+  if (start) return start;
+  if (end) return end;
+  return '';
+}
+
+function buildOfficialAppendixClassHeading(classRow = {}, {
+  noteDates = [],
+  sessionsByDate = new Map(),
+  includeTimeInNoteHeadings = false
+} = {}) {
+  const className = formatOfficialExportClassName(classRow.className, classRow.teacherName);
+  if (includeTimeInNoteHeadings || !noteDates.length) return className;
+  const session = sessionsByDate.get(noteDates[0]) || {};
+  const timeRange = formatOfficialSessionTimeRange(session);
+  return timeRange ? `${className} — ${timeRange}` : className;
+}
+
+function officialClassRowHasExportNotes(classRow = {}, unionSessionDates = []) {
+  const sessionDateSet = classRow.sessionDateSet instanceof Set
+    ? classRow.sessionDateSet
+    : new Set();
+  const recordsByDate = classRow.recordsByDate instanceof Map
+    ? classRow.recordsByDate
+    : new Map();
+  return (Array.isArray(unionSessionDates) ? unionSessionDates : []).some((date) => {
+    if (!sessionDateSet.has(date)) return false;
+    const record = recordsByDate.get(date) || {};
+    return Boolean(buildOfficialAppendixNoteText(record));
+  });
+}
+
+function applyOfficialAppendixTextStyle(cell, {
+  bold = false,
+  wrapText = true,
+  colorArgb = OFFICIAL_APPENDIX_NOTE_COLOR_ARGB,
+  size = 11,
+  vertical = 'middle',
+  horizontal = null
+} = {}) {
+  cell.font = {
+    bold,
+    size,
+    name: 'Calibri',
+    color: { argb: colorArgb }
+  };
+  cell.border = {};
+  const alignment = { vertical, wrapText };
+  if (horizontal) alignment.horizontal = horizontal;
+  cell.alignment = alignment;
+}
+
+function buildOfficialAppendixNoteCellValue(dateHeading = '', noteText = '') {
+  const heading = clean(dateHeading);
+  const body = clean(noteText);
+  return {
+    richText: [
+      {
+        text: `${heading}\n`,
+        font: {
+          name: 'Calibri',
+          size: 11,
+          bold: true,
+          color: { argb: OFFICIAL_APPENDIX_DATETIME_COLOR_ARGB }
+        }
+      },
+      {
+        text: body,
+        font: {
+          name: 'Calibri',
+          size: 11,
+          color: { argb: OFFICIAL_APPENDIX_NOTE_COLOR_ARGB }
+        }
+      }
+    ]
+  };
+}
+
+function applyOfficialAppendixClassDividerRow(sheet, row, startCol, endCol) {
+  mergeHeaderBlock(sheet, row, startCol, endCol);
+  sheet.getRow(row).height = OFFICIAL_APPENDIX_CLASS_DIVIDER_ROW_HEIGHT;
+  for (let col = startCol; col <= endCol; col += 1) {
+    const cell = sheet.getCell(row, col);
+    cell.value = '';
+    cell.border = {};
+    applySolidFill(cell, OFFICIAL_APPENDIX_CLASS_DIVIDER_FILL_ARGB);
+  }
+}
+
+function applyOfficialAppendixNoteEntryCell(cell, dateHeading, noteText) {
+  cell.value = buildOfficialAppendixNoteCellValue(dateHeading, noteText);
+  cell.border = {};
+  cell.alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
+}
+
+function styleOfficialAppendixMergedRow(sheet, row, startCol, endCol, styleOptions = {}) {
+  mergeHeaderBlock(sheet, row, startCol, endCol);
+  for (let col = startCol; col <= endCol; col += 1) {
+    applyOfficialAppendixTextStyle(sheet.getCell(row, col), styleOptions);
+  }
+}
+
+function writeOfficialAttendanceNotesAppendix(
+  sheet,
+  {
+    classRows = [],
+    unionSessionDates = [],
+    numCol,
+    mergeEndCol
+  } = {},
+  startRow = 1
+) {
+  const rows = Array.isArray(classRows) ? classRows : [];
+  const dates = Array.isArray(unionSessionDates) ? unionSessionDates : [];
+  const hasAnyNotes = rows.some((classRow) => officialClassRowHasExportNotes(classRow, dates));
+  if (!hasAnyNotes) return startRow - 1;
+
+  let row = startRow + STUDENT_EXCEL_BLOCK_GAP_ROWS;
+  styleOfficialAppendixMergedRow(sheet, row, numCol, mergeEndCol, {
+    bold: true,
+    wrapText: false,
+    colorArgb: OFFICIAL_APPENDIX_SECTION_COLOR_ARGB,
+    size: 12
+  });
+  sheet.getCell(row, numCol).value = 'Attendance notes';
+  row += 1;
+
+  let classNotesBlockIndex = 0;
+  rows.forEach((classRow) => {
+    if (!officialClassRowHasExportNotes(classRow, dates)) return;
+    if (classNotesBlockIndex > 0) {
+      applyOfficialAppendixClassDividerRow(sheet, row, numCol, mergeEndCol);
+      row += 1;
+    }
+    classNotesBlockIndex += 1;
+
+    const sessionDateSet = classRow.sessionDateSet instanceof Set
+      ? classRow.sessionDateSet
+      : new Set();
+    const recordsByDate = classRow.recordsByDate instanceof Map
+      ? classRow.recordsByDate
+      : new Map();
+    const sessionsByDate = classRow.sessionsByDate instanceof Map
+      ? classRow.sessionsByDate
+      : new Map();
+
+    const noteDates = dates.filter((date) => {
+      if (!sessionDateSet.has(date)) return false;
+      const record = recordsByDate.get(date) || {};
+      return Boolean(buildOfficialAppendixNoteText(record));
+    });
+    const includeTimeInNoteHeadings = shouldIncludeTimeInOfficialAppendixNotes(
+      sessionsByDate,
+      noteDates
+    );
+
+    styleOfficialAppendixMergedRow(sheet, row, numCol, mergeEndCol, {
+      bold: true,
+      wrapText: false,
+      colorArgb: OFFICIAL_APPENDIX_CLASS_COLOR_ARGB,
+      size: 12
+    });
+    sheet.getCell(row, numCol).value = buildOfficialAppendixClassHeading(classRow, {
+      noteDates,
+      sessionsByDate,
+      includeTimeInNoteHeadings
+    });
+    row += 1;
+
+    dates.forEach((date) => {
+      if (!sessionDateSet.has(date)) return;
+      const record = recordsByDate.get(date) || {};
+      const noteText = buildOfficialAppendixNoteText(record);
+      if (!noteText) return;
+
+      const session = sessionsByDate.get(date) || { date };
+      const dateHeading = formatOfficialSessionDateHeading(date, session, {
+        includeTime: includeTimeInNoteHeadings
+      });
+      mergeHeaderBlock(sheet, row, numCol, mergeEndCol);
+      for (let col = numCol; col <= mergeEndCol; col += 1) {
+        if (col === numCol) {
+          applyOfficialAppendixNoteEntryCell(sheet.getCell(row, col), dateHeading, noteText);
+        } else {
+          const spacer = sheet.getCell(row, col);
+          spacer.border = {};
+          spacer.alignment = { vertical: 'top', horizontal: 'left', wrapText: true };
+        }
+      }
+      const lineCount = String(noteText).split(/\r?\n/).length + 1;
+      sheet.getRow(row).height = Math.max(OFFICIAL_BODY_ROW_HEIGHT, lineCount * 16);
+      row += 1;
+    });
+  });
+
+  return row - 1;
+}
+
+function resolveOfficialClassColumnWidth(classRows = []) {
   let maxChars = measureLongestDisplayLine('Class');
   (Array.isArray(classRows) ? classRows : []).forEach((row) => {
     const displayName = formatOfficialExportClassName(row?.className, row?.teacherName);
     maxChars = Math.max(maxChars, measureLongestDisplayLine(displayName));
   });
-  const legendLabelSpan = OFFICIAL_LEGEND_LABEL_WIDTH * 2;
-  const totalWidth = Math.min(48, Math.max(legendLabelSpan + 2, maxChars + 2));
-  const bufferWidth = totalWidth - legendLabelSpan;
-  return Math.max(2, Math.min(48, bufferWidth));
+  return Math.max(14, Math.min(48, maxChars + 2));
+}
+
+/** @deprecated use resolveOfficialClassColumnWidth */
+function resolveOfficialClassBufferColumnWidth(classRows = []) {
+  return resolveOfficialClassColumnWidth(classRows);
 }
 
 function normalizeStudentExcelExportTemplate(value = '') {
@@ -1004,12 +1323,11 @@ function writeOfficialStudentAttendanceBlock(sheet, exportModel = {}, options = 
   });
 
   const legendCodeCol = 1;
-  const legendLabelStartCol = 2;
-  const legendLabelEndCol = 3;
+  const legendLabelCol = 2;
   const numCol = legendCodeCol;
-  const classNameStartCol = legendLabelStartCol;
-  const classNameEndCol = legendLabelEndCol + 1;
-  const firstSessionCol = classNameEndCol + 1;
+  const classNameCol = legendLabelCol;
+  const teacherCol = 3;
+  const firstSessionCol = teacherCol + 1;
   const mergeEndCol = Math.max(firstSessionCol + unionSessionDates.length - 1, firstSessionCol + 2);
 
   sheet.getCell(rowAt(1), firstSessionCol).value = title;
@@ -1032,15 +1350,13 @@ function writeOfficialStudentAttendanceBlock(sheet, exportModel = {}, options = 
   legend.forEach((entry, idx) => {
     const row = rowAt(idx + 1);
     const codeCell = sheet.getCell(row, legendCodeCol);
-    const labelCell = sheet.getCell(row, legendLabelStartCol);
+    const labelCell = sheet.getCell(row, legendLabelCol);
     codeCell.value = entry.code;
     labelCell.value = entry.label;
-    applyLegendCellStyle(codeCell, entry.status);
-    applyLegendCellStyle(labelCell, entry.status);
-    applyLegendCellStyle(sheet.getCell(row, legendLabelEndCol), entry.status);
+    applyLegendCellStyle(codeCell, entry);
+    applyLegendCellStyle(labelCell, entry);
     applyVerticalMiddle(codeCell, { horizontal: 'center' });
     applyVerticalMiddle(labelCell);
-    mergeHeaderBlock(sheet, row, legendLabelStartCol, legendLabelEndCol);
   });
 
   const legendBottom = Math.max(legend.length, 3);
@@ -1054,12 +1370,15 @@ function writeOfficialStudentAttendanceBlock(sheet, exportModel = {}, options = 
   applyHeaderCellStyle(numHeaderCell);
   applyWeekdayCellStyle(sheet.getCell(weekdayRowIndex, numCol));
 
-  const classHeaderCell = sheet.getCell(headerRowIndex, classNameStartCol);
+  const classHeaderCell = sheet.getCell(headerRowIndex, classNameCol);
   classHeaderCell.value = 'Class';
   applyHeaderCellStyle(classHeaderCell);
-  applyWeekdayCellStyle(sheet.getCell(weekdayRowIndex, classNameStartCol));
-  mergeHeaderBlock(sheet, headerRowIndex, classNameStartCol, classNameEndCol);
-  mergeHeaderBlock(sheet, weekdayRowIndex, classNameStartCol, classNameEndCol);
+  applyWeekdayCellStyle(sheet.getCell(weekdayRowIndex, classNameCol));
+
+  const teacherHeaderCell = sheet.getCell(headerRowIndex, teacherCol);
+  teacherHeaderCell.value = 'Teacher';
+  applyHeaderCellStyle(teacherHeaderCell);
+  applyWeekdayCellStyle(sheet.getCell(weekdayRowIndex, teacherCol));
 
   unionSessionDates.forEach((date, idx) => {
     const col = firstSessionCol + idx;
@@ -1085,7 +1404,8 @@ function writeOfficialStudentAttendanceBlock(sheet, exportModel = {}, options = 
       : new Map();
 
     const numCell = sheet.getCell(bodyRow, numCol);
-    const classCell = sheet.getCell(bodyRow, classNameStartCol);
+    const classCell = sheet.getCell(bodyRow, classNameCol);
+    const teacherCell = sheet.getCell(bodyRow, teacherCol);
     const displayClassName = formatOfficialExportClassName(
       classRow.className,
       classRow.teacherName
@@ -1093,14 +1413,13 @@ function writeOfficialStudentAttendanceBlock(sheet, exportModel = {}, options = 
 
     numCell.value = idx + 1;
     classCell.value = displayClassName;
-    mergeHeaderBlock(sheet, bodyRow, classNameStartCol, classNameEndCol);
+    teacherCell.value = formatOfficialTeacherShortName(classRow.teacherName);
 
     applyBodyMetaCellStyle(numCell, { banded, center: true });
     applyBodyMetaCellStyle(classCell, { banded, wrapText: true });
+    applyBodyMetaCellStyle(teacherCell, { banded, wrapText: true });
     classCell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
-    for (let col = classNameStartCol + 1; col <= classNameEndCol; col += 1) {
-      applyBodyMetaCellStyle(sheet.getCell(bodyRow, col), { banded, wrapText: true });
-    }
+    teacherCell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
     sheet.getRow(bodyRow).height = OFFICIAL_BODY_ROW_HEIGHT;
 
     unionSessionDates.forEach((date, sessionIdx) => {
@@ -1141,16 +1460,24 @@ function writeOfficialStudentAttendanceBlock(sheet, exportModel = {}, options = 
 
   if (applyColumnWidths) {
     sheet.getColumn(legendCodeCol).width = OFFICIAL_LEGEND_CODE_WIDTH;
-    sheet.getColumn(legendLabelStartCol).width = OFFICIAL_LEGEND_LABEL_WIDTH;
-    sheet.getColumn(legendLabelEndCol).width = OFFICIAL_LEGEND_LABEL_WIDTH;
-    sheet.getColumn(classNameEndCol).width = resolveOfficialClassBufferColumnWidth(classRows);
+    sheet.getColumn(classNameCol).width = Math.max(
+      OFFICIAL_LEGEND_LABEL_WIDTH,
+      resolveOfficialClassColumnWidth(classRows)
+    );
+    sheet.getColumn(teacherCol).width = OFFICIAL_TEACHER_COLUMN_WIDTH;
     sheet.getColumn(numCol).width = OFFICIAL_LEGEND_CODE_WIDTH;
     for (let col = firstSessionCol; col < firstSessionCol + unionSessionDates.length; col += 1) {
       sheet.getColumn(col).width = Math.max(sheet.getColumn(col).width || 0, OFFICIAL_SESSION_COLUMN_WIDTH);
     }
   }
 
-  const endRow = bodyRow - 1;
+  let endRow = bodyRow - 1;
+  endRow = writeOfficialAttendanceNotesAppendix(sheet, {
+    classRows,
+    unionSessionDates,
+    numCol,
+    mergeEndCol
+  }, bodyRow);
 
   return {
     legend,
@@ -1172,7 +1499,7 @@ async function buildOfficialStudentAttendanceExcelWorkbook(exportModel = {}, met
   workbook.creator = 'School Attendance';
   workbook.created = new Date();
   const usedSheetNames = new Set();
-  const sheetName = sanitizeExcelSheetName('Official Attendance', usedSheetNames);
+  const sheetName = sanitizeExcelSheetName('Consolidated Attendance', usedSheetNames);
   const sheet = workbook.addWorksheet(sheetName);
   const blockResult = writeOfficialStudentAttendanceBlock(sheet, exportModel, {
     startRow: 1,
@@ -1260,11 +1587,15 @@ module.exports = {
   STATUS_EXPORT_META,
   STATUS_FILL_ARGB,
   NA_DAY_FILL_ARGB,
+  EARLY_LEAVE_FILL_ARGB,
+  LATE_AND_EARLY_FILL_ARGB,
+  TIMING_LEGEND_ENTRIES,
   HEADER_FILL_ARGB,
   WEEKDAY_FILL_ARGB,
   ROW_BAND_FILL_ARGB,
   buildLegendEntries,
   statusToExportCode,
+  resolveExportCellPresentation,
   formatExportCellDisplay,
   statusFillArgb,
   buildLateExcusedCommentFragment,
@@ -1301,7 +1632,21 @@ module.exports = {
   STUDENT_EXCEL_SHEET_LAYOUT_SINGLE,
   STUDENT_EXCEL_TEMPLATE_CLASS_MATRIX,
   STUDENT_EXCEL_TEMPLATE_OFFICIAL,
+  OFFICIAL_APPENDIX_SECTION_COLOR_ARGB,
+  OFFICIAL_APPENDIX_CLASS_COLOR_ARGB,
+  OFFICIAL_APPENDIX_DATETIME_COLOR_ARGB,
+  OFFICIAL_APPENDIX_NOTE_COLOR_ARGB,
   formatOfficialExportClassName,
+  formatOfficialTeacherShortName,
+  formatOfficialSessionDateHeading,
+  formatOfficialSessionDateTimeHeading,
+  formatOfficialSessionTimeRange,
+  buildOfficialAppendixClassHeading,
+  shouldIncludeTimeInOfficialAppendixNotes,
+  buildOfficialAppendixNoteText,
+  buildOfficialAppendixNoteCellValue,
+  OFFICIAL_APPENDIX_CLASS_DIVIDER_FILL_ARGB,
+  resolveOfficialClassColumnWidth,
   resolveOfficialClassBufferColumnWidth,
   writeOfficialStudentAttendanceBlock,
   buildAttendanceExcelWorkbook,

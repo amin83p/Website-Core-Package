@@ -63,7 +63,7 @@ test('legend includes only class-enabled statuses and omits disabled optional on
   ]);
   assert.deepEqual(
     mandatoryOnly.map((row) => row.code),
-    ['P', 'A', 'N/A', 'E']
+    ['P', 'A', 'N/A', 'E', 'LE', 'L/LE']
   );
   assert.equal(mandatoryOnly.some((row) => row.code === 'L'), false);
   assert.equal(mandatoryOnly.some((row) => row.code === 'ACF'), false);
@@ -84,7 +84,9 @@ test('legend includes only class-enabled statuses and omits disabled optional on
       'A:Absent',
       'ACF:Absent Camera Off',
       'N/A:Not Applicable',
-      'E:Excused absence'
+      'E:Excused absence',
+      'LE:Left early',
+      'L/LE:Late and left early'
     ]
   );
 });
@@ -207,7 +209,7 @@ test('Late and Excused details enrich day-cell notes with author names', () => {
       status: 'present',
       earlyLeaveMinutes: 60
     }),
-    'P'
+    'LE'
   );
   assert.equal(
     attendanceExcelExportService.formatExportCellDisplay({
@@ -215,7 +217,22 @@ test('Late and Excused details enrich day-cell notes with author names', () => {
       lateMinutes: 10,
       earlyLeaveMinutes: 60
     }),
-    'L'
+    'L/LE'
+  );
+  assert.equal(
+    attendanceExcelExportService.resolveExportCellPresentation({
+      status: 'present',
+      earlyLeaveMinutes: 8
+    }).fillArgb,
+    attendanceExcelExportService.EARLY_LEAVE_FILL_ARGB
+  );
+  assert.equal(
+    attendanceExcelExportService.resolveExportCellPresentation({
+      status: 'late',
+      lateMinutes: 5,
+      earlyLeaveMinutes: 8
+    }).fillArgb,
+    attendanceExcelExportService.LATE_AND_EARLY_FILL_ARGB
   );
 
   const threaded = attendanceExcelExportService.buildThreadedMessagesForRecord({
@@ -466,8 +483,19 @@ test('workbook layout: Att %, banding, title/class/teacher, Fatima fills, notes,
         email: 'jose@example.com',
         summary: { performancePercent: 0 },
         records: [
-          { sessionId: 's1', date: '2026-07-20', status: 'absent' },
-          { sessionId: 's2', date: '2026-07-21', status: 'absent' }
+          {
+            sessionId: 's1',
+            date: '2026-07-20',
+            status: 'present',
+            earlyLeaveMinutes: 20
+          },
+          {
+            sessionId: 's2',
+            date: '2026-07-21',
+            status: 'late',
+            lateMinutes: 10,
+            earlyLeaveMinutes: 5
+          }
         ]
       }
     ]
@@ -475,7 +503,7 @@ test('workbook layout: Att %, banding, title/class/teacher, Fatima fills, notes,
 
   assert.match(filename, /Attendance_EAL_Morning_2026-07-01_to_2026-07-31\.xlsx/);
   assert.equal(title, 'Attendance July 2026 (1–31)');
-  assert.deepEqual(legend.map((row) => row.code), ['P', 'L', 'A', 'N/A', 'E']);
+  assert.deepEqual(legend.map((row) => row.code), ['P', 'L', 'A', 'N/A', 'E', 'LE', 'L/LE']);
   assert.equal(legend.some((row) => row.code === 'ACF'), false);
 
   const workbook = new ExcelJS.Workbook();
@@ -495,6 +523,12 @@ test('workbook layout: Att %, banding, title/class/teacher, Fatima fills, notes,
   assert.equal(sheet.getCell(5, 1).fill?.fgColor?.argb, 'FF0DCAF0');
   assert.equal(sheet.getCell(5, 2).fill?.fgColor?.argb, 'FF0DCAF0');
   assert.equal(sheet.getCell(5, 3).fill?.fgColor?.argb, 'FF0DCAF0');
+  assert.equal(sheet.getCell(6, 1).value, 'LE');
+  assert.equal(sheet.getCell(6, 2).value, 'Left early');
+  assert.equal(sheet.getCell(6, 1).fill?.fgColor?.argb, 'FFFFC7CE');
+  assert.equal(sheet.getCell(7, 1).value, 'L/LE');
+  assert.equal(sheet.getCell(7, 2).value, 'Late and left early');
+  assert.equal(sheet.getCell(7, 1).fill?.fgColor?.argb, 'FFFF9966');
   // Legend labels span # + Last Name (cols 2–3)
   const mergeKeys = [
     ...Object.keys(sheet._merges || {}),
@@ -506,38 +540,38 @@ test('workbook layout: Att %, banding, title/class/teacher, Fatima fills, notes,
   assert.equal(String(sheet.getCell(2, 5).value), 'Class: EAL Morning');
   assert.equal(String(sheet.getCell(3, 5).value), 'Teacher: Fatima Majoka');
 
-  // legend (5) + blank => header at row 7
-  assert.equal(sheet.getCell(7, 1).value, 'Funder');
-  assert.equal(sheet.getCell(7, 1).fill?.fgColor?.argb, 'FF5B9BD5');
-  assert.equal(sheet.getCell(7, 2).value, '#');
-  assert.equal(sheet.getCell(7, 3).value, 'Last Name');
-  assert.equal(sheet.getCell(7, 4).value, 'First Name');
-  assert.equal(sheet.getCell(7, 5).value, 20);
-  assert.equal(sheet.getCell(7, 6).value, 21);
-  assert.equal(sheet.getCell(7, 7).value, 'Comment');
-  assert.equal(sheet.getCell(7, 8).value, 'Start/End Date');
-  assert.equal(sheet.getCell(7, 9).value, 'CLBs');
-  assert.equal(sheet.getCell(7, 10).value, 'Att %');
-  assert.ok(sheet.getCell(7, 1).border?.top);
-  assert.ok(sheet.getCell(7, 10).border?.left);
-  assert.equal(sheet.getCell(8, 5).value, 'Mon');
-  assert.equal(sheet.getCell(8, 5).fill?.fgColor?.argb, 'FFFBE5D6');
-  assert.equal(sheet.getCell(8, 6).value, 'Tue');
-
+  // legend (7) + blank => header at row 9
   assert.equal(sheet.getCell(9, 1).value, 'Funder');
-  assert.equal(sheet.getCell(9, 2).value, 1);
-  assert.equal(sheet.getCell(9, 3).value, 'Haidari');
-  assert.equal(sheet.getCell(9, 4).value, 'Foroozan');
-  assert.equal(sheet.getCell(9, 5).value, 'L');
-  assert.equal(sheet.getCell(9, 6).value, 'E');
-  assert.equal(sheet.getCell(9, 3).fill?.fgColor?.argb || null, null);
-  assert.equal(sheet.getCell(9, 3).alignment?.vertical, 'middle');
-  assert.notEqual(sheet.getCell(9, 3).alignment?.horizontal, 'center');
-  assert.ok(sheet.getCell(9, 3).border?.bottom);
-  assert.ok(sheet.getCell(9, 5).border?.top);
+  assert.equal(sheet.getCell(9, 1).fill?.fgColor?.argb, 'FF5B9BD5');
+  assert.equal(sheet.getCell(9, 2).value, '#');
+  assert.equal(sheet.getCell(9, 3).value, 'Last Name');
+  assert.equal(sheet.getCell(9, 4).value, 'First Name');
+  assert.equal(sheet.getCell(9, 5).value, 20);
+  assert.equal(sheet.getCell(9, 6).value, 21);
+  assert.equal(sheet.getCell(9, 7).value, 'Comment');
+  assert.equal(sheet.getCell(9, 8).value, 'Start/End Date');
+  assert.equal(sheet.getCell(9, 9).value, 'CLBs');
+  assert.equal(sheet.getCell(9, 10).value, 'Att %');
+  assert.ok(sheet.getCell(9, 1).border?.top);
+  assert.ok(sheet.getCell(9, 10).border?.left);
+  assert.equal(sheet.getCell(10, 5).value, 'Mon');
+  assert.equal(sheet.getCell(10, 5).fill?.fgColor?.argb, 'FFFBE5D6');
+  assert.equal(sheet.getCell(10, 6).value, 'Tue');
 
-  const lateCell = sheet.getCell(9, 5);
-  const excusedCell = sheet.getCell(9, 6);
+  assert.equal(sheet.getCell(11, 1).value, 'Funder');
+  assert.equal(sheet.getCell(11, 2).value, 1);
+  assert.equal(sheet.getCell(11, 3).value, 'Haidari');
+  assert.equal(sheet.getCell(11, 4).value, 'Foroozan');
+  assert.equal(sheet.getCell(11, 5).value, 'L');
+  assert.equal(sheet.getCell(11, 6).value, 'E');
+  assert.equal(sheet.getCell(11, 3).fill?.fgColor?.argb || null, null);
+  assert.equal(sheet.getCell(11, 3).alignment?.vertical, 'middle');
+  assert.notEqual(sheet.getCell(11, 3).alignment?.horizontal, 'center');
+  assert.ok(sheet.getCell(11, 3).border?.bottom);
+  assert.ok(sheet.getCell(11, 5).border?.top);
+
+  const lateCell = sheet.getCell(11, 5);
+  const excusedCell = sheet.getCell(11, 6);
   assert.equal(lateCell.fill?.fgColor?.argb, 'FFFFC000');
   assert.equal(excusedCell.fill?.fgColor?.argb, 'FF0DCAF0');
 
@@ -559,7 +593,7 @@ test('workbook layout: Att %, banding, title/class/teacher, Fatima fills, notes,
   assert.doesNotMatch(noteText(excusedCell), /Please follow up/);
   assert.match(personXml, /displayName="Jane Admin"/);
   assert.match(personXml, /userId="jane@school\.org"/);
-  assert.match(threadedXml, /ref="E9"/);
+  assert.match(threadedXml, /ref="E11"/);
   assert.doesNotMatch(threadedXml, /From: Jane Admin/);
   assert.match(threadedXml, /To: Bob Teacher &lt;bob@school\.org&gt;/);
   assert.match(threadedXml, /Please follow up/);
@@ -572,8 +606,8 @@ test('workbook layout: Att %, banding, title/class/teacher, Fatima fills, notes,
   assert.doesNotMatch(commentsXml, /tc=\{/);
   assert.doesNotMatch(commentsXml, /\[Threaded comment\]/);
   assert.doesNotMatch(commentsXml, /Please follow up/);
-  // E9 => col 4 (0-based), row 8 (0-based) — ExcelJS note VML preserved after inject
-  assert.match(vmlXml, /<x:Row>8<\/x:Row><x:Column>4<\/x:Column>/);
+  // E11 => col 4 (0-based), row 10 (0-based) — ExcelJS note VML preserved after inject
+  assert.match(vmlXml, /<x:Row>10<\/x:Row><x:Column>4<\/x:Column>/);
   assert.doesNotMatch(vmlXml, /<x:Anchor>4, 8, 8, 8/);
   assert.match(vmlXml, /, 14, /);
 
@@ -590,29 +624,33 @@ test('workbook layout: Att %, banding, title/class/teacher, Fatima fills, notes,
   const sheetXml = await zip.file('xl/worksheets/sheet1.xml').async('string');
   assert.match(sheetXml, /<legacyDrawing r:id="rId\d+"\/>/);
 
-  assert.equal(String(sheet.getCell(9, 7).value || ''), '');
+  assert.equal(String(sheet.getCell(11, 7).value || ''), '');
 
-  const startEnd = String(sheet.getCell(9, 8).value || '');
+  const startEnd = String(sheet.getCell(11, 8).value || '');
   assert.match(startEnd, /Start:/);
   assert.match(startEnd, /End:/);
-  assert.equal(String(sheet.getCell(9, 9).value), 'C: L4 S4 R4 W4\nG: L5 S5 R5 W5');
-  assert.equal(sheet.getCell(9, 9).alignment?.wrapText, true);
-  assert.match(String(sheet.getCell(9, 8).value || ''), /Start:.*\nEnd:/);
-  assert.equal(sheet.getCell(9, 8).alignment?.wrapText, true);
-  assert.notEqual(sheet.getCell(9, 5).font?.bold, true);
-  assert.equal(String(sheet.getCell(9, 10).value), '50%\nP(0)/L(1)/E(1)/A(0)/ACF(0)/N(0)');
-  assert.equal(sheet.getCell(9, 10).alignment?.vertical, 'middle');
-  assert.notEqual(sheet.getCell(9, 10).alignment?.horizontal, 'center');
-  assert.equal(sheet.getCell(9, 10).alignment?.wrapText, true);
+  assert.equal(String(sheet.getCell(11, 9).value), 'C: L4 S4 R4 W4\nG: L5 S5 R5 W5');
+  assert.equal(sheet.getCell(11, 9).alignment?.wrapText, true);
+  assert.match(String(sheet.getCell(11, 8).value || ''), /Start:.*\nEnd:/);
+  assert.equal(sheet.getCell(11, 8).alignment?.wrapText, true);
+  assert.notEqual(sheet.getCell(11, 5).font?.bold, true);
+  assert.equal(String(sheet.getCell(11, 10).value), '50%\nP(0)/L(1)/E(1)/A(0)/ACF(0)/N(0)');
+  assert.equal(sheet.getCell(11, 10).alignment?.vertical, 'middle');
+  assert.notEqual(sheet.getCell(11, 10).alignment?.horizontal, 'center');
+  assert.equal(sheet.getCell(11, 10).alignment?.wrapText, true);
 
   // second student row is banded
-  assert.equal(sheet.getCell(10, 1).value, 'Self Fund');
-  assert.equal(sheet.getCell(10, 2).value, 2);
-  assert.equal(sheet.getCell(10, 3).value, 'Alvarenga');
-  assert.equal(sheet.getCell(10, 3).fill?.fgColor?.argb, 'FFDDEBF7');
-  assert.equal(String(sheet.getCell(10, 10).value), '0%\nP(0)/L(0)/E(0)/A(2)/ACF(0)/N(0)');
-  assert.equal(sheet.getCell(10, 10).fill?.fgColor?.argb, 'FFDDEBF7');
-  assert.ok(sheet.getCell(10, 10).border?.right);
+  assert.equal(sheet.getCell(12, 1).value, 'Self Fund');
+  assert.equal(sheet.getCell(12, 2).value, 2);
+  assert.equal(sheet.getCell(12, 3).value, 'Alvarenga');
+  assert.equal(sheet.getCell(12, 5).value, 'LE');
+  assert.equal(sheet.getCell(12, 5).fill?.fgColor?.argb, 'FFFFC7CE');
+  assert.equal(sheet.getCell(12, 6).value, 'L/LE');
+  assert.equal(sheet.getCell(12, 6).fill?.fgColor?.argb, 'FFFF9966');
+  assert.equal(sheet.getCell(12, 3).fill?.fgColor?.argb, 'FFDDEBF7');
+  assert.equal(String(sheet.getCell(12, 10).value), '0%\nP(1)/L(1)/E(0)/A(0)/ACF(0)/N(0)');
+  assert.equal(sheet.getCell(12, 10).fill?.fgColor?.argb, 'FFDDEBF7');
+  assert.ok(sheet.getCell(12, 10).border?.right);
   assert.equal(attendanceExcelExportService.ROW_BAND_FILL_ARGB, 'FFDDEBF7');
   // CLBs column width fits content (not a fixed oversized default)
   assert.ok(sheet.getColumn(9).width >= 12);

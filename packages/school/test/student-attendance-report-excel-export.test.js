@@ -56,11 +56,20 @@ test('buildStudentAttendanceExcelWorkbook creates one sheet per class', async ()
   assert.equal(workbook.getWorksheet(2).name, 'Beta Class');
 });
 
+function cellValueAsText(cell) {
+  if (cell?.value == null || cell.value === '') return '';
+  if (Array.isArray(cell.value?.richText)) {
+    return cell.value.richText.map((part) => part.text).join('');
+  }
+  return String(cell.value);
+}
+
 function collectWorksheetText(worksheet) {
   const parts = [];
   worksheet.eachRow({ includeEmpty: false }, (row) => {
     row.eachCell({ includeEmpty: false }, (cell) => {
-      if (cell.value != null && cell.value !== '') parts.push(String(cell.value));
+      const text = cellValueAsText(cell);
+      if (text) parts.push(text);
     });
   });
   return parts.join('\n');
@@ -154,6 +163,67 @@ test('formatOfficialExportClassName strips template tokens and teacher name', ()
   );
 });
 
+test('buildSessionsByDateFromMatrixPayload maps session times by date', () => {
+  const map = studentAttendanceReportService.buildSessionsByDateFromMatrixPayload({
+    sessions: [
+      { id: 's1', date: '2026-09-08', startTime: '09:00', endTime: '12:00' },
+      { id: 's2', date: '2026-09-09', startTime: '13:30', endTime: '15:00' }
+    ]
+  });
+  assert.equal(map.get('2026-09-08')?.startTime, '09:00');
+  assert.equal(map.get('2026-09-09')?.endTime, '15:00');
+});
+
+test('formatOfficialTeacherShortName uses first name and surname initial', () => {
+  assert.equal(
+    attendanceExcelExportService.formatOfficialTeacherShortName('Fatima Majoka'),
+    'Fatima M.'
+  );
+  assert.equal(attendanceExcelExportService.formatOfficialTeacherShortName('Sam'), 'Sam');
+});
+
+test('formatOfficialSessionDateHeading omits time unless requested', () => {
+  const dateOnly = attendanceExcelExportService.formatOfficialSessionDateHeading('2026-09-08', {
+    date: '2026-09-08',
+    startTime: '09:00',
+    endTime: '12:00'
+  });
+  assert.match(dateOnly, /Sep/);
+  assert.doesNotMatch(dateOnly, /9:00/);
+  assert.equal(
+    attendanceExcelExportService.shouldIncludeTimeInOfficialAppendixNotes(
+      new Map([
+        ['2026-09-08', { startTime: '09:00', endTime: '12:00' }],
+        ['2026-09-09', { startTime: '09:00', endTime: '12:00' }]
+      ]),
+      ['2026-09-08', '2026-09-09']
+    ),
+    false
+  );
+  assert.equal(
+    attendanceExcelExportService.shouldIncludeTimeInOfficialAppendixNotes(
+      new Map([
+        ['2026-09-08', { startTime: '09:00', endTime: '12:00' }],
+        ['2026-09-09', { startTime: '13:00', endTime: '15:00' }]
+      ]),
+      ['2026-09-08', '2026-09-09']
+    ),
+    true
+  );
+});
+
+test('formatOfficialSessionDateTimeHeading includes date and session times', () => {
+  const heading = attendanceExcelExportService.formatOfficialSessionDateTimeHeading('2026-09-08', {
+    date: '2026-09-08',
+    startTime: '09:00',
+    endTime: '12:00'
+  });
+  assert.match(heading, /Sep/);
+  assert.match(heading, /2026/);
+  assert.match(heading, /9:00/);
+  assert.match(heading, /12:00/);
+});
+
 test('buildOfficialStudentAttendanceExcelWorkbook uses class rows and union day columns', async () => {
   const exportModel = {
     student: { name: 'Ada Lovelace', email: 'ada@example.com' },
@@ -165,19 +235,38 @@ test('buildOfficialStudentAttendanceExcelWorkbook uses class rows and union day 
     classRows: [
       {
         className: 'Alpha Class',
+        teacherName: 'Fatima Majoka',
         studentRow: { funderType: 'wcb' },
         sessionDateSet: new Set(['2026-09-08', '2026-09-09']),
+        sessionsByDate: new Map([
+          ['2026-09-08', { date: '2026-09-08', startTime: '09:00', endTime: '12:00' }],
+          ['2026-09-09', { date: '2026-09-09', startTime: '09:00', endTime: '12:00' }]
+        ]),
         recordsByDate: new Map([
           ['2026-09-08', { status: 'present', sessionId: 's1' }],
-          ['2026-09-09', { status: 'absent', sessionId: 's2' }]
+          ['2026-09-09', {
+            status: 'late',
+            sessionId: 's2',
+            excuseRef: 'medical appointment',
+            lateMinutes: 12,
+            rosterStudentNotes: 'arrived after intake'
+          }]
         ])
       },
       {
         className: 'Beta Class',
+        teacherName: 'Bob Teacher',
         studentRow: { funderType: 'ircc' },
         sessionDateSet: new Set(['2026-09-08']),
+        sessionsByDate: new Map([
+          ['2026-09-08', { date: '2026-09-08', startTime: '14:00', endTime: '16:00' }]
+        ]),
         recordsByDate: new Map([
-          ['2026-09-08', { status: 'present', sessionId: 's3' }]
+          ['2026-09-08', {
+            status: 'excused',
+            sessionId: 's3',
+            excuseRef: 'family matter'
+          }]
         ])
       }
     ]
@@ -193,26 +282,98 @@ test('buildOfficialStudentAttendanceExcelWorkbook uses class rows and union day 
   await workbook.xlsx.load(buffer);
   assert.equal(workbook.worksheets.length, 1);
   const sheet = workbook.getWorksheet(1);
+  assert.equal(sheet.name, 'Consolidated Attendance');
   const text = collectWorksheetText(sheet);
   assert.match(text, /Student: Ada Lovelace/);
   assert.match(text, /Claim Number: 791 8022 WCB/);
   assert.match(text, /Alpha Class/);
   assert.match(text, /Beta Class/);
+  assert.match(text, /Attendance notes/);
+  assert.match(text, /medical appointment/);
+  assert.match(text, /family matter/);
+  assert.match(text, /Fatima M\./);
+  assert.match(text, /Bob T\./);
+  assert.match(text, /Alpha Class — .*9:00.*12:00/);
+
+  let alphaClassNotesRow = null;
+  let betaClassNotesRow = null;
+  let combinedNoteCell = null;
+  sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    row.eachCell({ includeEmpty: false }, (cell) => {
+      const value = String(cell.value || '');
+      const richFlat = Array.isArray(cell.value?.richText)
+        ? cell.value.richText.map((part) => part.text).join('')
+        : value;
+      if (value === 'Alpha Class' || value.startsWith('Alpha Class —')) alphaClassNotesRow = rowNumber;
+      if (value === 'Beta Class' || value.startsWith('Beta Class —')) betaClassNotesRow = rowNumber;
+      if (richFlat.includes('medical appointment')) combinedNoteCell = cell;
+    });
+  });
+  assert.ok(alphaClassNotesRow);
+  assert.ok(betaClassNotesRow);
+  assert.ok(betaClassNotesRow > alphaClassNotesRow);
+  assert.equal(betaClassNotesRow - alphaClassNotesRow >= 2, true);
+  assert.equal(
+    sheet.getCell(alphaClassNotesRow, 1).font?.color?.argb,
+    attendanceExcelExportService.OFFICIAL_APPENDIX_CLASS_COLOR_ARGB
+  );
+  assert.ok(combinedNoteCell);
+  assert.ok(Array.isArray(combinedNoteCell.value?.richText));
+  const combinedNoteFlat = combinedNoteCell.value.richText.map((part) => part.text).join('');
+  assert.match(combinedNoteFlat, /Sep.*2026/);
+  assert.doesNotMatch(combinedNoteFlat, /9:00/);
+  assert.match(combinedNoteFlat, /medical appointment/);
+  assert.doesNotMatch(combinedNoteFlat, /─{3}/);
+  assert.doesNotMatch(combinedNoteFlat, /\n\n/);
+  assert.match(combinedNoteFlat, /Excuse: medical appointment\nTiming: Late 12m/);
+  assert.match(combinedNoteFlat, /arrived after intake/);
+  assert.equal(combinedNoteCell.value.richText.length, 2);
+  assert.equal(
+    combinedNoteCell.value.richText[0].font?.color?.argb,
+    attendanceExcelExportService.OFFICIAL_APPENDIX_DATETIME_COLOR_ARGB
+  );
+  assert.equal(combinedNoteCell.value.richText[0].font?.bold, true);
+  assert.equal(
+    combinedNoteCell.value.richText[1].font?.color?.argb,
+    attendanceExcelExportService.OFFICIAL_APPENDIX_NOTE_COLOR_ARGB
+  );
+  assert.ok(betaClassNotesRow > alphaClassNotesRow + 2);
+  let classDividerRow = null;
+  sheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
+    if (rowNumber <= alphaClassNotesRow || rowNumber >= betaClassNotesRow) return;
+    const fill = sheet.getCell(rowNumber, 1).fill?.fgColor?.argb;
+    if (fill === attendanceExcelExportService.OFFICIAL_APPENDIX_CLASS_DIVIDER_FILL_ARGB) {
+      classDividerRow = rowNumber;
+    }
+  });
+  assert.ok(classDividerRow);
+  assert.equal(sheet.getRow(classDividerRow).height, 5);
+  assert.equal(combinedNoteCell.alignment?.vertical, 'top');
+  assert.equal(combinedNoteCell.alignment?.horizontal, 'left');
+  assert.equal(combinedNoteCell.border?.top, undefined);
   assert.doesNotMatch(text, /Comment/);
   assert.doesNotMatch(text, /CLBs/);
   assert.doesNotMatch(text, /Att %/);
   assert.doesNotMatch(text, /Funder/);
   assert.doesNotMatch(text, /Last Name/);
 
-  let betaRowNumber = null;
+  let betaGridRowNumber = null;
   sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-    row.eachCell({ includeEmpty: false }, (cell) => {
-      if (String(cell.value) === 'Beta Class') betaRowNumber = rowNumber;
-    });
+    if (sheet.getCell(rowNumber, 1).value === 2) betaGridRowNumber = rowNumber;
   });
-  assert.ok(betaRowNumber);
-  const sep09Col = 6;
-  const noClassCell = sheet.getCell(betaRowNumber, sep09Col);
+  assert.ok(betaGridRowNumber);
+  let gridHeaderRow = null;
+  sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    if (sheet.getCell(rowNumber, 1).value === '#') gridHeaderRow = rowNumber;
+  });
+  assert.ok(gridHeaderRow);
+  assert.equal(String(sheet.getCell(gridHeaderRow, 3).value), 'Teacher');
+  assert.equal(String(sheet.getCell(gridHeaderRow + 2, 3).value), 'Fatima M.');
+  assert.equal(sheet.getCell(1, 1).fill?.fgColor?.argb, 'FFA9CE91');
+  assert.equal(sheet.getCell(1, 2).fill?.fgColor?.argb, 'FFA9CE91');
+  assert.notEqual(sheet.getCell(1, 3).fill?.fgColor?.argb, 'FFA9CE91');
+  const sep09Col = 5;
+  const noClassCell = sheet.getCell(betaGridRowNumber, sep09Col);
   assert.equal(String(noClassCell.value), 'X');
 });
 
@@ -286,8 +447,11 @@ test('student attendance report viewer wires per-student matrix Excel export', (
   assert.match(viewer, /sheetLayout/);
   assert.match(viewer, /exportTemplate/);
   assert.match(viewer, /officialAttendanceReport/);
+  assert.match(viewer, /Consolidated Attendance Report/);
   assert.match(viewer, /sarExcelExportTemplateOfficial/);
   assert.match(viewer, /\/school\/attendances\/report\/api\/export-excel\.xlsx/);
+  assert.match(viewer, /showSarExcelExportWaiting/);
+  assert.match(viewer, /fetch\(`\/school\/attendances\/report\/api\/export-excel\.xlsx/);
   assert.match(viewer, /canExportStudentMatrixExcel/);
   assert.match(controller, /sheetLayout/);
   assert.match(controller, /exportTemplate/);
