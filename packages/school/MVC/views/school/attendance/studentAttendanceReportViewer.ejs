@@ -425,10 +425,20 @@
                         <label class="form-check-label" for="sarExcelSheetLayoutSingle">All classes on one sheet</label>
                     </div>
                 </div>
-                <div class="form-check">
+                <div class="form-check mb-2">
                     <input class="form-check-input" type="radio" name="sarExcelExportTemplate" id="sarExcelExportTemplateOfficial" value="officialAttendanceReport">
                     <label class="form-check-label" for="sarExcelExportTemplateOfficial">Consolidated Attendance Report</label>
                     <div class="form-text ms-4">One sheet: all classes in rows, shared session days, claim numbers, and attendance notes below the grid.</div>
+                </div>
+                <div id="sarExcelOfficialTeacherOptions" class="ms-4 mb-3 d-none">
+                    <div class="form-check mb-2">
+                        <input class="form-check-input" type="radio" name="sarExcelOfficialTeacher" id="sarExcelOfficialTeacherWith" value="with" checked>
+                        <label class="form-check-label" for="sarExcelOfficialTeacherWith">With Teacher's Name</label>
+                    </div>
+                    <div class="form-check">
+                        <input class="form-check-input" type="radio" name="sarExcelOfficialTeacher" id="sarExcelOfficialTeacherWithout" value="without">
+                        <label class="form-check-label" for="sarExcelOfficialTeacherWithout">Without Teacher's Name</label>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer py-2">
@@ -1893,15 +1903,30 @@
         return value === 'officialAttendanceReport' ? 'officialAttendanceReport' : 'classMatrix';
     }
 
+    function getSelectedSarExcelOfficialIncludeTeacher() {
+        const checked = document.querySelector('#sarExcelExportModal input[name="sarExcelOfficialTeacher"]:checked');
+        const value = String(checked?.value || 'with').trim();
+        return value !== 'without';
+    }
+
     function syncSarExcelExportModalLayoutOptions() {
         const template = getSelectedSarExcelExportTemplate();
         const layoutWrap = document.getElementById('sarExcelSheetLayoutOptions');
-        if (!layoutWrap) return;
-        const disabled = template === 'officialAttendanceReport';
-        layoutWrap.querySelectorAll('input[name="sarExcelSheetLayout"]').forEach((input) => {
-            input.disabled = disabled;
-        });
-        layoutWrap.classList.toggle('opacity-50', disabled);
+        const teacherWrap = document.getElementById('sarExcelOfficialTeacherOptions');
+        const consolidated = template === 'officialAttendanceReport';
+        if (layoutWrap) {
+            layoutWrap.querySelectorAll('input[name="sarExcelSheetLayout"]').forEach((input) => {
+                input.disabled = consolidated;
+            });
+            layoutWrap.classList.toggle('opacity-50', consolidated);
+        }
+        if (teacherWrap) {
+            teacherWrap.classList.toggle('d-none', !consolidated);
+            teacherWrap.querySelectorAll('input[name="sarExcelOfficialTeacher"]').forEach((input) => {
+                input.disabled = !consolidated;
+            });
+            teacherWrap.classList.toggle('opacity-50', !consolidated);
+        }
     }
 
     function openSarExcelExportModal(personId) {
@@ -1921,6 +1946,8 @@
         if (matrixTemplateRadio) matrixTemplateRadio.checked = true;
         const perClassRadio = document.getElementById('sarExcelSheetLayoutPerClass');
         if (perClassRadio) perClassRadio.checked = true;
+        const teacherWithRadio = document.getElementById('sarExcelOfficialTeacherWith');
+        if (teacherWithRadio) teacherWithRadio.checked = true;
         syncSarExcelExportModalLayoutOptions();
         const modalEl = document.getElementById('sarExcelExportModal');
         if (modalEl && window.bootstrap?.Modal) {
@@ -1970,6 +1997,7 @@
         params.set('endDate', endDate);
         if (template === 'officialAttendanceReport') {
             params.set('exportTemplate', 'officialAttendanceReport');
+            params.set('includeTeacherName', getSelectedSarExcelOfficialIncludeTeacher() ? 'true' : 'false');
         } else {
             params.set('sheetLayout', layout);
         }

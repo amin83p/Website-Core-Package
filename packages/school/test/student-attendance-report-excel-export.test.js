@@ -103,6 +103,47 @@ test('buildUnionSessionDatesFromExportEntries dedupes and sorts session dates', 
   assert.deepEqual(dates, ['2026-09-08', '2026-09-09']);
 });
 
+test('buildOfficialAppendixNoteText appends (Excused) for excused absent with attendance field', () => {
+  const text = attendanceExcelExportService.buildOfficialAppendixNoteText({
+    attendance: 'absent',
+    absenceExcused: true,
+    excuseRef: "Informed me yesterday that she had a doctor's appointment"
+  });
+  assert.match(text, /Excuse:/);
+  assert.match(text, /\nExcused$/);
+});
+
+test('buildOfficialAppendixNoteText appends Excused for excused absence without excuse text', () => {
+  const text = attendanceExcelExportService.buildOfficialAppendixNoteText({
+    status: 'absent',
+    absenceExcused: true
+  });
+  assert.equal(text, 'Excused');
+});
+
+test('buildOfficialAppendixNoteText appends (not excused) for unexcused absence', () => {
+  const text = attendanceExcelExportService.buildOfficialAppendixNoteText({
+    status: 'absent',
+    absenceExcused: false,
+    excuseRef: 'no call'
+  });
+  assert.match(text, /\(not excused\)$/);
+});
+
+test('formatOfficialClaimHeaderLine puts funder label before Claim Number', () => {
+  assert.equal(
+    studentAttendanceReportService.formatOfficialClaimHeaderLine([{ number: '791 8022', label: 'WCB' }]),
+    'WCB Claim Number: 791 8022'
+  );
+  assert.equal(
+    studentAttendanceReportService.formatOfficialClaimHeaderLine([
+      { number: 'WCB-2', label: '' },
+      { number: 'WCB-1', label: 'Primary' }
+    ]),
+    'Claim Number: WCB-2; Primary Claim Number: WCB-1'
+  );
+});
+
 test('formatClaimNumbersDisplay joins number and label', () => {
   assert.equal(
     studentAttendanceReportService.formatClaimNumbersDisplay([{ number: '791 8022', label: 'WCB' }]),
@@ -141,15 +182,22 @@ test('resolveClaimNumbersForEnrollmentPeriods collects distinct overlapping clai
   assert.deepEqual(numbers, ['WCB-100', 'WCB-200']);
 });
 
-test('resolveOfficialClassBufferColumnWidth sizes column D from class names only', () => {
-  const shortWidth = attendanceExcelExportService.resolveOfficialClassBufferColumnWidth([
+test('resolveOfficialLegendLabelColumnWidth fits longest legend label', () => {
+  const legend = attendanceExcelExportService.buildLegendEntries(['present', 'late', 'absent']);
+  const width = attendanceExcelExportService.resolveOfficialLegendLabelColumnWidth(legend);
+  assert.ok(width >= 16);
+  assert.ok(width >= 'Late and left early'.length);
+});
+
+test('resolveOfficialClassColumnCWidth sizes column C from class names with fixed A and B', () => {
+  const shortWidth = attendanceExcelExportService.resolveOfficialClassColumnCWidth([
     { className: 'AM PM', teacherName: '' }
   ]);
-  const longWidth = attendanceExcelExportService.resolveOfficialClassBufferColumnWidth([
+  const longWidth = attendanceExcelExportService.resolveOfficialClassColumnCWidth([
     { className: 'AM Low Intermediate Conversation Class', teacherName: '' }
   ]);
   assert.ok(longWidth > shortWidth);
-  assert.ok(shortWidth >= 2);
+  assert.ok(shortWidth >= 5);
 });
 
 test('formatOfficialExportClassName strips template tokens and teacher name', () => {
@@ -230,6 +278,7 @@ test('buildOfficialStudentAttendanceExcelWorkbook uses class rows and union day 
     startDate: '2026-09-01',
     endDate: '2026-09-30',
     claimNumbersDisplay: '791 8022 WCB',
+    claimHeaderDisplay: 'WCB Claim Number: 791 8022',
     enabledAttendanceStatuses: ['present', 'absent', 'not_applicable'],
     unionSessionDates: ['2026-09-08', '2026-09-09'],
     classRows: [
@@ -249,6 +298,7 @@ test('buildOfficialStudentAttendanceExcelWorkbook uses class rows and union day 
             sessionId: 's2',
             excuseRef: 'medical appointment',
             lateMinutes: 12,
+            lateExcused: true,
             rosterStudentNotes: 'arrived after intake'
           }]
         ])
@@ -263,7 +313,8 @@ test('buildOfficialStudentAttendanceExcelWorkbook uses class rows and union day 
         ]),
         recordsByDate: new Map([
           ['2026-09-08', {
-            status: 'excused',
+            status: 'absent',
+            absenceExcused: true,
             sessionId: 's3',
             excuseRef: 'family matter'
           }]
@@ -285,12 +336,15 @@ test('buildOfficialStudentAttendanceExcelWorkbook uses class rows and union day 
   assert.equal(sheet.name, 'Consolidated Attendance');
   const text = collectWorksheetText(sheet);
   assert.match(text, /Student: Ada Lovelace/);
-  assert.match(text, /Claim Number: 791 8022 WCB/);
+  assert.match(text, /WCB Claim Number: 791 8022/);
+  assert.match(text, /Attendance Report - September 01, 2026 - September 30, 2026/);
   assert.match(text, /Alpha Class/);
   assert.match(text, /Beta Class/);
   assert.match(text, /Attendance notes/);
   assert.match(text, /medical appointment/);
   assert.match(text, /family matter/);
+  assert.match(text, /Excuse: family matter[\s\S]*\nExcused/);
+  assert.doesNotMatch(text, /\nE\n/);
   assert.match(text, /Fatima M\./);
   assert.match(text, /Bob T\./);
   assert.match(text, /Alpha Class — .*9:00.*12:00/);
@@ -325,18 +379,17 @@ test('buildOfficialStudentAttendanceExcelWorkbook uses class rows and union day 
   assert.match(combinedNoteFlat, /medical appointment/);
   assert.doesNotMatch(combinedNoteFlat, /─{3}/);
   assert.doesNotMatch(combinedNoteFlat, /\n\n/);
-  assert.match(combinedNoteFlat, /Excuse: medical appointment\nTiming: Late 12m/);
+  assert.match(combinedNoteFlat, /Excuse: medical appointment\nTiming: Late 12m Excused/);
+  assert.equal(combinedNoteCell.value.richText.some((part) => part.font?.bold === true), true);
   assert.match(combinedNoteFlat, /arrived after intake/);
-  assert.equal(combinedNoteCell.value.richText.length, 2);
+  assert.ok(combinedNoteCell.value.richText.length >= 2);
   assert.equal(
     combinedNoteCell.value.richText[0].font?.color?.argb,
     attendanceExcelExportService.OFFICIAL_APPENDIX_DATETIME_COLOR_ARGB
   );
   assert.equal(combinedNoteCell.value.richText[0].font?.bold, true);
-  assert.equal(
-    combinedNoteCell.value.richText[1].font?.color?.argb,
-    attendanceExcelExportService.OFFICIAL_APPENDIX_NOTE_COLOR_ARGB
-  );
+  const noteBodyParts = combinedNoteCell.value.richText.slice(1);
+  assert.ok(noteBodyParts.some((part) => part.font?.color?.argb === attendanceExcelExportService.OFFICIAL_APPENDIX_NOTE_COLOR_ARGB));
   assert.ok(betaClassNotesRow > alphaClassNotesRow + 2);
   let classDividerRow = null;
   sheet.eachRow({ includeEmpty: true }, (row, rowNumber) => {
@@ -359,22 +412,63 @@ test('buildOfficialStudentAttendanceExcelWorkbook uses class rows and union day 
 
   let betaGridRowNumber = null;
   sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-    if (sheet.getCell(rowNumber, 1).value === 2) betaGridRowNumber = rowNumber;
+    if (String(sheet.getCell(rowNumber, 1).value || '') === 'Beta Class') {
+      betaGridRowNumber = rowNumber;
+    }
   });
   assert.ok(betaGridRowNumber);
   let gridHeaderRow = null;
   sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
-    if (sheet.getCell(rowNumber, 1).value === '#') gridHeaderRow = rowNumber;
+    if (sheet.getCell(rowNumber, 1).value === 'Class') gridHeaderRow = rowNumber;
   });
   assert.ok(gridHeaderRow);
-  assert.equal(String(sheet.getCell(gridHeaderRow, 3).value), 'Teacher');
-  assert.equal(String(sheet.getCell(gridHeaderRow + 2, 3).value), 'Fatima M.');
+  assert.equal(String(sheet.getCell(gridHeaderRow, 4).value), 'Teacher');
+  assert.equal(String(sheet.getCell(gridHeaderRow + 2, 4).value), 'Fatima M.');
   assert.equal(sheet.getCell(1, 1).fill?.fgColor?.argb, 'FFA9CE91');
   assert.equal(sheet.getCell(1, 2).fill?.fgColor?.argb, 'FFA9CE91');
   assert.notEqual(sheet.getCell(1, 3).fill?.fgColor?.argb, 'FFA9CE91');
-  const sep09Col = 5;
+  const sep09Col = 6;
   const noClassCell = sheet.getCell(betaGridRowNumber, sep09Col);
   assert.equal(String(noClassCell.value), 'X');
+});
+
+test('buildOfficialStudentAttendanceExcelWorkbook omits teacher column when disabled', async () => {
+  const exportModel = {
+    student: { name: 'Ada Lovelace' },
+    startDate: '2026-09-01',
+    endDate: '2026-09-30',
+    enabledAttendanceStatuses: ['present'],
+    unionSessionDates: ['2026-09-08', '2026-09-09'],
+    classRows: [{
+      className: 'Alpha Class',
+      teacherName: 'Fatima Majoka',
+      sessionDateSet: new Set(['2026-09-08']),
+      recordsByDate: new Map([['2026-09-08', { status: 'present' }]])
+    }]
+  };
+
+  const { buffer } = await attendanceExcelExportService.buildOfficialStudentAttendanceExcelWorkbook(exportModel, {
+    studentName: 'Ada Lovelace',
+    startDate: '2026-09-01',
+    endDate: '2026-09-30',
+    includeTeacherName: false
+  });
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  const sheet = workbook.getWorksheet(1);
+  let gridHeaderRow = null;
+  sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    if (sheet.getCell(rowNumber, 1).value === 'Class') gridHeaderRow = rowNumber;
+  });
+  assert.ok(gridHeaderRow);
+  assert.equal(String(sheet.getCell(gridHeaderRow, 1).value), 'Class');
+  assert.equal(String(sheet.getCell(gridHeaderRow, 4).value), '8');
+  assert.equal(String(sheet.getCell(gridHeaderRow, 5).value), '9');
+  assert.doesNotMatch(collectWorksheetText(sheet), /Fatima M\./);
+  assert.ok(sheet.getColumn(2).width >= 14);
+  assert.equal(sheet.getColumn(1).width, 6);
+  assert.ok(sheet.getColumn(3).width >= 5);
 });
 
 test('buildOfficialStudentAttendanceExcelWorkbook omits claim line when unavailable', async () => {
@@ -449,6 +543,9 @@ test('student attendance report viewer wires per-student matrix Excel export', (
   assert.match(viewer, /officialAttendanceReport/);
   assert.match(viewer, /Consolidated Attendance Report/);
   assert.match(viewer, /sarExcelExportTemplateOfficial/);
+  assert.match(viewer, /sarExcelOfficialTeacherOptions/);
+  assert.match(viewer, /includeTeacherName/);
+  assert.match(controller, /includeTeacherName/);
   assert.match(viewer, /\/school\/attendances\/report\/api\/export-excel\.xlsx/);
   assert.match(viewer, /showSarExcelExportWaiting/);
   assert.match(viewer, /fetch\(`\/school\/attendances\/report\/api\/export-excel\.xlsx/);

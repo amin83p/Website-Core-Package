@@ -19,7 +19,10 @@ async function buildStudentAttendanceReportExcelExport(req, options = {}) {
     return attendanceExcelExportService.buildOfficialStudentAttendanceExcelWorkbook(exportModel, {
       studentName: exportModel.student?.name || personId,
       startDate: exportModel.startDate,
-      endDate: exportModel.endDate
+      endDate: exportModel.endDate,
+      includeTeacherName: attendanceExcelExportService.normalizeOfficialIncludeTeacherName(
+        options.includeTeacherName
+      )
     });
   }
 

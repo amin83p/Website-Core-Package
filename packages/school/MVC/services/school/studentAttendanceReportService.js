@@ -643,6 +643,29 @@ function formatClaimNumbersDisplay(claimNumbers = []) {
   return list.join(', ');
 }
 
+function formatOfficialClaimHeaderLine(claimNumbers = []) {
+  const entries = (Array.isArray(claimNumbers) ? claimNumbers : [])
+    .map((item) => ({
+      number: String(item?.number || item || '').trim(),
+      label: item && typeof item === 'object' ? String(item.label || '').trim() : ''
+    }))
+    .filter((entry) => entry.number);
+  if (!entries.length) return '';
+  const numbersByLabel = new Map();
+  entries.forEach((entry) => {
+    const labelKey = entry.label || '';
+    if (!numbersByLabel.has(labelKey)) numbersByLabel.set(labelKey, new Set());
+    numbersByLabel.get(labelKey).add(entry.number);
+  });
+  const parts = [];
+  numbersByLabel.forEach((numbers, label) => {
+    const nums = Array.from(numbers).sort((a, b) => a.localeCompare(b)).join(', ');
+    if (label) parts.push(`${label} Claim Number: ${nums}`);
+    else parts.push(`Claim Number: ${nums}`);
+  });
+  return parts.sort((a, b) => a.localeCompare(b)).join('; ');
+}
+
 function buildUnionSessionDatesFromExportEntries(entries = []) {
   const dates = new Set();
   (Array.isArray(entries) ? entries : []).forEach((entry) => {
@@ -668,7 +691,9 @@ function buildClassSessionDateSet(payload = {}) {
 function buildRecordsByDateFromMatrixPayload(payload = {}) {
   const matrix = Array.isArray(payload?.matrix) ? payload.matrix : [];
   const studentRow = matrix[0] || {};
-  const records = Array.isArray(studentRow.records) ? studentRow.records : [];
+  const records = Array.isArray(studentRow._rollupRecords) && studentRow._rollupRecords.length
+    ? studentRow._rollupRecords
+    : (Array.isArray(studentRow.records) ? studentRow.records : []);
   const sessions = Array.isArray(payload?.sessions) ? payload.sessions : [];
   const recordBySessionId = new Map(
     records.map((record) => [String(record?.sessionId || '').trim(), record])
@@ -765,6 +790,7 @@ async function buildOfficialStudentAttendanceExportModel(req, options = {}) {
     enabledAttendanceStatuses,
     unionSessionDates,
     claimNumbersDisplay: formatClaimNumbersDisplay(Array.from(headerClaimEntriesByKey.values())),
+    claimHeaderDisplay: formatOfficialClaimHeaderLine(Array.from(headerClaimEntriesByKey.values())),
     classRows
   };
 }
@@ -824,6 +850,7 @@ module.exports = {
   resolveClaimEntriesForEnrollmentPeriods,
   formatClaimNumberEntryDisplay,
   formatClaimNumbersDisplay,
+  formatOfficialClaimHeaderLine,
   resolveSelectedStudents,
   filterReportDaysWithSessionForStudent,
   getWeekStartKeyForDate,

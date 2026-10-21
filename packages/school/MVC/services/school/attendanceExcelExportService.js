@@ -46,6 +46,8 @@ const WEEKDAY_FILL_ARGB = 'FFFBE5D6';
 const ROW_BAND_FILL_ARGB = 'FFDDEBF7';
 const DARK_TEXT_ARGB = 'FF000000';
 const WHITE_TEXT_ARGB = 'FFFFFFFF';
+const OFFICIAL_GRID_EXCUSED_ABSENCE_CODE_GREEN_ARGB = 'FF008000';
+const OFFICIAL_APPENDIX_EXCUSED_LABEL = 'Excused';
 
 const THIN_BLACK_BORDER = Object.freeze({
   top: { style: 'thin', color: { argb: 'FF000000' } },
@@ -90,6 +92,24 @@ function formatCrossMonthDate(dateValue) {
   const d = parseDateOnly(dateValue);
   if (!d) return clean(dateValue);
   return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+/** Consolidated report title line, e.g. October 01, 2026 - October 25, 2026 */
+function formatOfficialReportLongDate(dateValue) {
+  const d = parseDateOnly(dateValue);
+  if (!d) return clean(dateValue);
+  return d.toLocaleDateString('en-US', { month: 'long', day: '2-digit', year: 'numeric' });
+}
+
+function resolveOfficialAttendanceDateRangeTitle({ startDate, endDate, sessions = [] } = {}) {
+  const range = resolveExportRangeDates({ startDate, endDate, sessions });
+  const startLabel = formatOfficialReportLongDate(range.startDate);
+  const endLabel = formatOfficialReportLongDate(range.endDate);
+  if (!startLabel && !endLabel) return 'Attendance Report';
+  const dateRange = startLabel && endLabel
+    ? `${startLabel} - ${endLabel}`
+    : (startLabel || endLabel);
+  return `Attendance Report - ${dateRange}`;
 }
 
 function weekdayShort(dateValue) {
@@ -183,12 +203,48 @@ function buildLegendEntries(enabledAttendanceStatuses = []) {
   return entries;
 }
 
+function buildOfficialLegendEntries(enabledAttendanceStatuses = []) {
+  const entries = buildLegendEntries(enabledAttendanceStatuses);
+  const withoutE = entries.filter((entry) => entry.code !== 'E');
+  const hasExcusedAbsenceLegend = withoutE.some(
+    (entry) => entry.label === 'Excused absence' || entry.status === ATTENDANCE_STATUS.EXCUSED
+  );
+  if (!hasExcusedAbsenceLegend) {
+    withoutE.push({
+      status: ATTENDANCE_STATUS.EXCUSED,
+      code: 'A',
+      label: 'Excused absence'
+    });
+  }
+  return withoutE.map((entry) => {
+    if (entry.status === ATTENDANCE_STATUS.EXCUSED || entry.label === 'Excused absence') {
+      return { ...entry, code: 'A', label: 'Excused absence' };
+    }
+    return entry;
+  });
+}
+
+function resolveExportRecordAttendanceStatus(record = {}) {
+  const legacy = normalizeLegacyAbsenceExcusedRecord(record);
+  return normalizeAttendanceStatusForSave(
+    legacy.attendance || legacy.status || record.attendance || record.status,
+    ''
+  );
+}
+
+function recordHasExcusedAbsenceFlag(record = {}, attendanceStatus = '') {
+  const legacy = normalizeLegacyAbsenceExcusedRecord(record);
+  if (isAbsenceExcused(legacy)) return true;
+  if (!isAbsentLikeStatus(attendanceStatus)) return false;
+  return normalizeAttendanceTimingExcuseFlag(record?.absenceExcused);
+}
+
 function resolveExportStatusKey(record = {}) {
   const legacy = normalizeLegacyAbsenceExcusedRecord(record);
-  const normalized = normalizeAttendanceStatusForSave(legacy.status || record.status, '');
+  const normalized = resolveExportRecordAttendanceStatus(record);
   if (!normalized) return '';
   if (normalized === ATTENDANCE_STATUS.EXCUSED) return ATTENDANCE_STATUS.EXCUSED;
-  if (isAbsenceExcused(legacy) && isAbsentLikeStatus(normalized)) {
+  if (isAbsentLikeStatus(normalized) && recordHasExcusedAbsenceFlag(record, normalized)) {
     return ATTENDANCE_STATUS.EXCUSED;
   }
   return normalized;
@@ -278,6 +334,69 @@ function applyNoClassCellStyle(cell) {
     bold: false,
     size: 11,
     color: { argb: DARK_TEXT_ARGB },
+    name: 'Calibri'
+  };
+  applyTableCellBorder(cell);
+  applyVerticalMiddle(cell, { horizontal: 'center', wrapText: false });
+}
+
+function isOfficialExcusedAbsence(record = {}) {
+  const attendance = resolveExportRecordAttendanceStatus(record);
+  if (!isAbsentLikeStatus(attendance)) {
+    return resolveExportStatusKey(record) === ATTENDANCE_STATUS.EXCUSED;
+  }
+  return recordHasExcusedAbsenceFlag(record, attendance)
+    || resolveExportStatusKey(record) === ATTENDANCE_STATUS.EXCUSED;
+}
+
+function isOfficialUnexcusedAbsence(record = {}) {
+  const attendance = resolveExportRecordAttendanceStatus(record);
+  if (!isAbsentLikeStatus(attendance)) return false;
+  return !isOfficialExcusedAbsence(record);
+}
+
+function officialAppendixNoteHasExcusedLabel(text = '') {
+  const body = clean(text);
+  if (!body) return false;
+  if (body === OFFICIAL_APPENDIX_EXCUSED_LABEL) return true;
+  return new RegExp(`(^|\\n)${OFFICIAL_APPENDIX_EXCUSED_LABEL}$`).test(body)
+    || body.includes(` ${OFFICIAL_APPENDIX_EXCUSED_LABEL}`);
+}
+
+function appendOfficialAppendixAbsenceQualifier(text, record = {}) {
+  const attendance = resolveExportRecordAttendanceStatus(record);
+  if (!isAbsentLikeStatus(attendance)) return text;
+  if (isOfficialExcusedAbsence(record)) {
+    if (officialAppendixNoteHasExcusedLabel(text)) return text;
+    const body = clean(text);
+    return body ? `${body}\n${OFFICIAL_APPENDIX_EXCUSED_LABEL}` : OFFICIAL_APPENDIX_EXCUSED_LABEL;
+  }
+  const suffix = '(not excused)';
+  if (String(text || '').includes(suffix)) return text;
+  const body = clean(text);
+  return body ? `${body}\n${suffix}` : suffix;
+}
+
+function resolveOfficialConsolidatedCellPresentation(record = {}) {
+  const base = resolveExportCellPresentation(record);
+  if (base.code === 'LE' || base.code === 'L/LE') return base;
+  if (isOfficialExcusedAbsence(record)) {
+    return {
+      code: 'A',
+      fillArgb: STATUS_FILL_ARGB[ATTENDANCE_STATUS.ABSENT]
+    };
+  }
+  return base;
+}
+
+function applyOfficialConsolidatedAttendanceCellStyle(cell, record = {}) {
+  const { code, fillArgb } = resolveOfficialConsolidatedCellPresentation(record);
+  if (fillArgb) applySolidFill(cell, fillArgb);
+  const excusedAbsence = code === 'A' && isOfficialExcusedAbsence(record);
+  cell.font = {
+    bold: excusedAbsence,
+    size: 11,
+    color: { argb: excusedAbsence ? OFFICIAL_GRID_EXCUSED_ABSENCE_CODE_GREEN_ARGB : DARK_TEXT_ARGB },
     name: 'Calibri'
   };
   applyTableCellBorder(cell);
@@ -389,6 +508,24 @@ function formatTimingMinutesLabel(record = {}, { includeNotExcused = false } = {
   return fragments.join(' / ');
 }
 
+function formatOfficialTimingExcuseSuffix(value, { includeNotExcused = false } = {}) {
+  if (normalizeAttendanceTimingExcuseFlag(value)) return ` ${OFFICIAL_APPENDIX_EXCUSED_LABEL}`;
+  return includeNotExcused ? ' (not excused)' : '';
+}
+
+function formatOfficialTimingMinutesLabel(record = {}, { includeNotExcused = false } = {}) {
+  const late = Number(record.lateMinutes) || 0;
+  const early = Number(record.earlyLeaveMinutes) || 0;
+  const fragments = [];
+  if (late > 0) {
+    fragments.push(`Late ${late}m${formatOfficialTimingExcuseSuffix(record.lateExcused, { includeNotExcused })}`);
+  }
+  if (early > 0) {
+    fragments.push(`Left Early ${early}m${formatOfficialTimingExcuseSuffix(record.earlyLeaveExcused, { includeNotExcused })}`);
+  }
+  return fragments.join(' / ');
+}
+
 function formatTimingMinutesFragment(record = {}) {
   return formatTimingMinutesLabel(record);
 }
@@ -466,12 +603,12 @@ function buildOfficialAppendixNoteText(record = {}) {
   const fragments = [];
   const excuseRef = clean(record.excuseRef);
   if (excuseRef) fragments.push(`Excuse: ${excuseRef}`);
-  const timingLabel = formatTimingMinutesLabel(record, { includeNotExcused: true });
+  const timingLabel = formatOfficialTimingMinutesLabel(record, { includeNotExcused: true });
   if (timingLabel) fragments.push(`Timing: ${timingLabel}`);
   collectRosterStatusNotes(record).forEach((note) => {
     fragments.push(note.startsWith('Note:') ? note : `Note: ${note}`);
   });
-  return fragments.join('\n');
+  return appendOfficialAppendixAbsenceQualifier(fragments.join('\n'), record);
 }
 
 /**
@@ -942,6 +1079,9 @@ const OFFICIAL_SESSION_COLUMN_WIDTH = 9;
 const OFFICIAL_TEACHER_COLUMN_WIDTH = 12;
 const OFFICIAL_LEGEND_CODE_WIDTH = 6;
 const OFFICIAL_LEGEND_LABEL_WIDTH = 14;
+const OFFICIAL_LEGEND_SPACER_WIDTH = 5;
+const OFFICIAL_CLASS_START_COL = 1;
+const OFFICIAL_CLASS_END_COL = 3;
 function escapeRegExp(value = '') {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -1105,27 +1245,18 @@ function applyOfficialAppendixTextStyle(cell, {
 
 function buildOfficialAppendixNoteCellValue(dateHeading = '', noteText = '') {
   const heading = clean(dateHeading);
-  const body = clean(noteText);
+  const headingPart = {
+    text: `${heading}\n`,
+    font: {
+      name: 'Calibri',
+      size: 11,
+      bold: true,
+      color: { argb: OFFICIAL_APPENDIX_DATETIME_COLOR_ARGB }
+    }
+  };
+  const bodyParts = buildOfficialAppendixNoteBodyRichText(noteText);
   return {
-    richText: [
-      {
-        text: `${heading}\n`,
-        font: {
-          name: 'Calibri',
-          size: 11,
-          bold: true,
-          color: { argb: OFFICIAL_APPENDIX_DATETIME_COLOR_ARGB }
-        }
-      },
-      {
-        text: body,
-        font: {
-          name: 'Calibri',
-          size: 11,
-          color: { argb: OFFICIAL_APPENDIX_NOTE_COLOR_ARGB }
-        }
-      }
-    ]
+    richText: [headingPart, ...bodyParts]
   };
 }
 
@@ -1258,6 +1389,76 @@ function resolveOfficialClassColumnWidth(classRows = []) {
   return Math.max(14, Math.min(48, maxChars + 2));
 }
 
+function resolveOfficialLegendLabelColumnWidth(legend = []) {
+  let maxChars = measureLongestDisplayLine('Present');
+  (Array.isArray(legend) ? legend : []).forEach((entry) => {
+    maxChars = Math.max(maxChars, measureLongestDisplayLine(entry?.label));
+  });
+  return Math.max(OFFICIAL_LEGEND_LABEL_WIDTH, Math.min(36, maxChars + 2));
+}
+
+/** Column C width for merged class block; columns A and B stay at fixed legend widths. */
+function resolveOfficialClassColumnCWidth(classRows = []) {
+  return resolveOfficialClassColumnWidth(classRows);
+}
+
+function officialRecordHasExcusedTiming(record = {}) {
+  const late = Number(record.lateMinutes) || 0;
+  const early = Number(record.earlyLeaveMinutes) || 0;
+  return (late > 0 && normalizeAttendanceTimingExcuseFlag(record.lateExcused))
+    || (early > 0 && normalizeAttendanceTimingExcuseFlag(record.earlyLeaveExcused));
+}
+
+function appendOfficialAppendixInlineRichText(richText, textSlice, baseFont, boldFont) {
+  const pattern = /( Excused|\(not excused\))/g;
+  let lastIndex = 0;
+  let match = pattern.exec(textSlice);
+  while (match) {
+    if (match.index > lastIndex) {
+      richText.push({ text: textSlice.slice(lastIndex, match.index), font: baseFont });
+    }
+    richText.push({ text: match[0], font: boldFont });
+    lastIndex = match.index + match[0].length;
+    match = pattern.exec(textSlice);
+  }
+  if (lastIndex < textSlice.length) {
+    richText.push({ text: textSlice.slice(lastIndex), font: baseFont });
+  }
+}
+
+function buildOfficialAppendixNoteBodyRichText(noteText = '') {
+  const baseFont = {
+    name: 'Calibri',
+    size: 11,
+    color: { argb: OFFICIAL_APPENDIX_NOTE_COLOR_ARGB }
+  };
+  const boldFont = { ...baseFont, bold: true };
+  const text = clean(noteText);
+  if (!text) return [];
+  const richText = [];
+  const lines = text.split('\n');
+  lines.forEach((line, lineIndex) => {
+    if (lineIndex > 0) richText.push({ text: '\n', font: baseFont });
+    if (line === OFFICIAL_APPENDIX_EXCUSED_LABEL || line === '(not excused)') {
+      richText.push({ text: line, font: boldFont });
+      return;
+    }
+    appendOfficialAppendixInlineRichText(richText, line, baseFont, boldFont);
+  });
+  if (!richText.length) richText.push({ text, font: baseFont });
+  return richText;
+}
+
+function mergeOfficialClassColumns(sheet, row, classStartCol = OFFICIAL_CLASS_START_COL, classEndCol = OFFICIAL_CLASS_END_COL) {
+  mergeHeaderBlock(sheet, row, classStartCol, classEndCol);
+}
+
+function applyStyleAcrossMergedColumns(sheet, row, startCol, endCol, applyStyle) {
+  for (let col = startCol; col <= endCol; col += 1) {
+    applyStyle(sheet.getCell(row, col));
+  }
+}
+
 /** @deprecated use resolveOfficialClassColumnWidth */
 function resolveOfficialClassBufferColumnWidth(classRows = []) {
   return resolveOfficialClassColumnWidth(classRows);
@@ -1277,6 +1478,14 @@ function normalizeStudentExcelSheetLayout(value = '') {
     return STUDENT_EXCEL_SHEET_LAYOUT_SINGLE;
   }
   return STUDENT_EXCEL_SHEET_LAYOUT_PER_CLASS;
+}
+
+function normalizeOfficialIncludeTeacherName(value) {
+  const token = clean(value).toLowerCase();
+  if (token === 'false' || token === '0' || token === 'no' || token === 'without') {
+    return false;
+  }
+  return true;
 }
 
 async function writeWorkbookBuffer(workbook, threadedCommentTargets = []) {
@@ -1307,27 +1516,34 @@ async function buildAttendanceExcelWorkbook(payload = {}) {
 function writeOfficialStudentAttendanceBlock(sheet, exportModel = {}, options = {}) {
   const startRow = Math.max(1, Number(options.startRow) || 1);
   const applyColumnWidths = options.applyColumnWidths !== false;
+  const includeTeacherName = options.includeTeacherName !== false;
   const rowAt = (relativeOneBased) => startRow + relativeOneBased - 1;
 
   const unionSessionDates = Array.isArray(exportModel.unionSessionDates) ? exportModel.unionSessionDates : [];
   const classRows = Array.isArray(exportModel.classRows) ? exportModel.classRows : [];
   const enabledAttendanceStatuses = exportModel.enabledAttendanceStatuses
     || attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses({});
-  const legend = buildLegendEntries(enabledAttendanceStatuses);
   const studentName = clean(exportModel.student?.name) || 'Student';
-  const claimDisplay = clean(exportModel.claimNumbersDisplay);
-  const title = resolveAttendanceTitle({
+  const claimLine = clean(exportModel.claimHeaderDisplay)
+    || (clean(exportModel.claimNumbersDisplay)
+      ? `Claim Number: ${clean(exportModel.claimNumbersDisplay)}`
+      : '');
+  const title = resolveOfficialAttendanceDateRangeTitle({
     startDate: exportModel.startDate,
     endDate: exportModel.endDate,
     sessions: unionSessionDates.map((date) => ({ date }))
   });
 
-  const legendCodeCol = 1;
+  const legend = buildOfficialLegendEntries(enabledAttendanceStatuses);
+
+  const legendCodeCol = OFFICIAL_CLASS_START_COL;
   const legendLabelCol = 2;
-  const numCol = legendCodeCol;
-  const classNameCol = legendLabelCol;
-  const teacherCol = 3;
-  const firstSessionCol = teacherCol + 1;
+  const legendSpacerCol = OFFICIAL_CLASS_END_COL;
+  const classStartCol = OFFICIAL_CLASS_START_COL;
+  const classEndCol = OFFICIAL_CLASS_END_COL;
+  const teacherCol = classEndCol + 1;
+  const firstSessionCol = includeTeacherName ? teacherCol + 1 : classEndCol + 1;
+  const appendixStartCol = classStartCol;
   const mergeEndCol = Math.max(firstSessionCol + unionSessionDates.length - 1, firstSessionCol + 2);
 
   sheet.getCell(rowAt(1), firstSessionCol).value = title;
@@ -1340,8 +1556,8 @@ function writeOfficialStudentAttendanceBlock(sheet, exportModel = {}, options = 
   sheet.getCell(rowAt(2), firstSessionCol).alignment = { vertical: 'middle' };
   mergeHeaderBlock(sheet, rowAt(2), firstSessionCol, mergeEndCol);
 
-  if (claimDisplay) {
-    sheet.getCell(rowAt(3), firstSessionCol).value = `Claim Number: ${claimDisplay}`;
+  if (claimLine) {
+    sheet.getCell(rowAt(3), firstSessionCol).value = claimLine;
     sheet.getCell(rowAt(3), firstSessionCol).font = { ...OFFICIAL_REPORT_META_FONT };
     sheet.getCell(rowAt(3), firstSessionCol).alignment = { vertical: 'middle' };
     mergeHeaderBlock(sheet, rowAt(3), firstSessionCol, mergeEndCol);
@@ -1351,12 +1567,15 @@ function writeOfficialStudentAttendanceBlock(sheet, exportModel = {}, options = 
     const row = rowAt(idx + 1);
     const codeCell = sheet.getCell(row, legendCodeCol);
     const labelCell = sheet.getCell(row, legendLabelCol);
+    const spacerCell = sheet.getCell(row, legendSpacerCol);
     codeCell.value = entry.code;
     labelCell.value = entry.label;
+    spacerCell.value = '';
     applyLegendCellStyle(codeCell, entry);
     applyLegendCellStyle(labelCell, entry);
     applyVerticalMiddle(codeCell, { horizontal: 'center' });
     applyVerticalMiddle(labelCell);
+    applyVerticalMiddle(spacerCell);
   });
 
   const legendBottom = Math.max(legend.length, 3);
@@ -1365,20 +1584,20 @@ function writeOfficialStudentAttendanceBlock(sheet, exportModel = {}, options = 
   sheet.getRow(headerRowIndex).height = OFFICIAL_BODY_ROW_HEIGHT;
   sheet.getRow(weekdayRowIndex).height = OFFICIAL_BODY_ROW_HEIGHT;
 
-  const numHeaderCell = sheet.getCell(headerRowIndex, numCol);
-  numHeaderCell.value = '#';
-  applyHeaderCellStyle(numHeaderCell);
-  applyWeekdayCellStyle(sheet.getCell(weekdayRowIndex, numCol));
-
-  const classHeaderCell = sheet.getCell(headerRowIndex, classNameCol);
+  mergeOfficialClassColumns(sheet, headerRowIndex, classStartCol, classEndCol);
+  const classHeaderCell = sheet.getCell(headerRowIndex, classStartCol);
   classHeaderCell.value = 'Class';
-  applyHeaderCellStyle(classHeaderCell);
-  applyWeekdayCellStyle(sheet.getCell(weekdayRowIndex, classNameCol));
+  applyStyleAcrossMergedColumns(sheet, headerRowIndex, classStartCol, classEndCol, applyHeaderCellStyle);
 
-  const teacherHeaderCell = sheet.getCell(headerRowIndex, teacherCol);
-  teacherHeaderCell.value = 'Teacher';
-  applyHeaderCellStyle(teacherHeaderCell);
-  applyWeekdayCellStyle(sheet.getCell(weekdayRowIndex, teacherCol));
+  mergeOfficialClassColumns(sheet, weekdayRowIndex, classStartCol, classEndCol);
+  applyStyleAcrossMergedColumns(sheet, weekdayRowIndex, classStartCol, classEndCol, applyWeekdayCellStyle);
+
+  if (includeTeacherName) {
+    const teacherHeaderCell = sheet.getCell(headerRowIndex, teacherCol);
+    teacherHeaderCell.value = 'Teacher';
+    applyHeaderCellStyle(teacherHeaderCell);
+    applyWeekdayCellStyle(sheet.getCell(weekdayRowIndex, teacherCol));
+  }
 
   unionSessionDates.forEach((date, idx) => {
     const col = firstSessionCol + idx;
@@ -1403,23 +1622,24 @@ function writeOfficialStudentAttendanceBlock(sheet, exportModel = {}, options = 
       ? classRow.recordsByDate
       : new Map();
 
-    const numCell = sheet.getCell(bodyRow, numCol);
-    const classCell = sheet.getCell(bodyRow, classNameCol);
-    const teacherCell = sheet.getCell(bodyRow, teacherCol);
     const displayClassName = formatOfficialExportClassName(
       classRow.className,
       classRow.teacherName
     );
 
-    numCell.value = idx + 1;
+    mergeOfficialClassColumns(sheet, bodyRow, classStartCol, classEndCol);
+    const classCell = sheet.getCell(bodyRow, classStartCol);
     classCell.value = displayClassName;
-    teacherCell.value = formatOfficialTeacherShortName(classRow.teacherName);
-
-    applyBodyMetaCellStyle(numCell, { banded, center: true });
-    applyBodyMetaCellStyle(classCell, { banded, wrapText: true });
-    applyBodyMetaCellStyle(teacherCell, { banded, wrapText: true });
-    classCell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
-    teacherCell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+    applyStyleAcrossMergedColumns(sheet, bodyRow, classStartCol, classEndCol, (cell) => {
+      applyBodyMetaCellStyle(cell, { banded, wrapText: true });
+      cell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+    });
+    if (includeTeacherName) {
+      const teacherCell = sheet.getCell(bodyRow, teacherCol);
+      teacherCell.value = formatOfficialTeacherShortName(classRow.teacherName);
+      applyBodyMetaCellStyle(teacherCell, { banded, wrapText: true });
+      teacherCell.alignment = { vertical: 'middle', horizontal: 'left', wrapText: true };
+    }
     sheet.getRow(bodyRow).height = OFFICIAL_BODY_ROW_HEIGHT;
 
     unionSessionDates.forEach((date, sessionIdx) => {
@@ -1434,8 +1654,8 @@ function writeOfficialStudentAttendanceBlock(sheet, exportModel = {}, options = 
         return;
       }
       const record = recordsByDate.get(date) || {};
-      cell.value = formatExportCellDisplay(record);
-      applyStatusCellStyle(cell, record, { wrapText: false });
+      cell.value = resolveOfficialConsolidatedCellPresentation(record).code;
+      applyOfficialConsolidatedAttendanceCellStyle(cell, record);
       const noteText = buildStatusNoteText(record);
       const threadedMessages = buildThreadedMessagesForRecord(record, {
         receiverName: studentName,
@@ -1459,13 +1679,13 @@ function writeOfficialStudentAttendanceBlock(sheet, exportModel = {}, options = 
   });
 
   if (applyColumnWidths) {
+    const legendLabelWidth = resolveOfficialLegendLabelColumnWidth(legend);
     sheet.getColumn(legendCodeCol).width = OFFICIAL_LEGEND_CODE_WIDTH;
-    sheet.getColumn(classNameCol).width = Math.max(
-      OFFICIAL_LEGEND_LABEL_WIDTH,
-      resolveOfficialClassColumnWidth(classRows)
-    );
-    sheet.getColumn(teacherCol).width = OFFICIAL_TEACHER_COLUMN_WIDTH;
-    sheet.getColumn(numCol).width = OFFICIAL_LEGEND_CODE_WIDTH;
+    sheet.getColumn(legendLabelCol).width = legendLabelWidth;
+    sheet.getColumn(legendSpacerCol).width = resolveOfficialClassColumnCWidth(classRows);
+    if (includeTeacherName) {
+      sheet.getColumn(teacherCol).width = OFFICIAL_TEACHER_COLUMN_WIDTH;
+    }
     for (let col = firstSessionCol; col < firstSessionCol + unionSessionDates.length; col += 1) {
       sheet.getColumn(col).width = Math.max(sheet.getColumn(col).width || 0, OFFICIAL_SESSION_COLUMN_WIDTH);
     }
@@ -1475,7 +1695,7 @@ function writeOfficialStudentAttendanceBlock(sheet, exportModel = {}, options = 
   endRow = writeOfficialAttendanceNotesAppendix(sheet, {
     classRows,
     unionSessionDates,
-    numCol,
+    numCol: appendixStartCol,
     mergeEndCol
   }, bodyRow);
 
@@ -1503,7 +1723,8 @@ async function buildOfficialStudentAttendanceExcelWorkbook(exportModel = {}, met
   const sheet = workbook.addWorksheet(sheetName);
   const blockResult = writeOfficialStudentAttendanceBlock(sheet, exportModel, {
     startRow: 1,
-    applyColumnWidths: true
+    applyColumnWidths: true,
+    includeTeacherName: normalizeOfficialIncludeTeacherName(meta.includeTeacherName)
   });
   const buffer = await writeWorkbookBuffer(workbook, blockResult.threadedCommentTargets);
   const studentName = clean(meta.studentName) || clean(exportModel.student?.name) || 'Student';
@@ -1597,6 +1818,12 @@ module.exports = {
   statusToExportCode,
   resolveExportCellPresentation,
   formatExportCellDisplay,
+  isOfficialExcusedAbsence,
+  applyOfficialConsolidatedAttendanceCellStyle,
+  resolveOfficialConsolidatedCellPresentation,
+  buildOfficialLegendEntries,
+  OFFICIAL_APPENDIX_EXCUSED_LABEL,
+  OFFICIAL_GRID_EXCUSED_ABSENCE_CODE_GREEN_ARGB,
   statusFillArgb,
   buildLateExcusedCommentFragment,
   formatTimingMinutesFragment,
@@ -1628,6 +1855,9 @@ module.exports = {
   appendAttendanceMatrixSheet,
   normalizeStudentExcelSheetLayout,
   normalizeStudentExcelExportTemplate,
+  normalizeOfficialIncludeTeacherName,
+  formatOfficialReportLongDate,
+  resolveOfficialAttendanceDateRangeTitle,
   STUDENT_EXCEL_SHEET_LAYOUT_PER_CLASS,
   STUDENT_EXCEL_SHEET_LAYOUT_SINGLE,
   STUDENT_EXCEL_TEMPLATE_CLASS_MATRIX,
@@ -1647,6 +1877,10 @@ module.exports = {
   buildOfficialAppendixNoteCellValue,
   OFFICIAL_APPENDIX_CLASS_DIVIDER_FILL_ARGB,
   resolveOfficialClassColumnWidth,
+  resolveOfficialClassColumnCWidth,
+  resolveOfficialLegendLabelColumnWidth,
+  buildOfficialAppendixNoteBodyRichText,
+  officialRecordHasExcusedTiming,
   resolveOfficialClassBufferColumnWidth,
   writeOfficialStudentAttendanceBlock,
   buildAttendanceExcelWorkbook,
