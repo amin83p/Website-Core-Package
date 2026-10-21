@@ -150,7 +150,6 @@ async function applySessionMarks(periodId, changes = [], requestingUser = null, 
     }
     if (action !== 'mark_na') return;
     const note = String(change.note || '').trim();
-    if (!note) throw new Error('A note is required when marking a session as N/A.');
     marksMap.set(sessionId, {
       sessionId,
       status: 'not_applicable',

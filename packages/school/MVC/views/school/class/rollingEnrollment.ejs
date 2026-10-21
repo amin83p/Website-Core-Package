@@ -13595,7 +13595,7 @@
           <td>${marked ? '<span class="badge bg-secondary">N/A (locked)</span>' : '<span class="text-muted">Expected</span>'}</td>
           <td class="small">${htmlEscape(note)}</td>
           <td class="text-end">
-            ${action === 'mark_na' ? `<input type="text" class="form-control form-control-sm enrollment-session-mark-note mb-1" placeholder="Required note">` : ''}
+            ${action === 'mark_na' ? `<input type="text" class="form-control form-control-sm enrollment-session-mark-note mb-1" placeholder="Optional note">` : ''}
             <button type="button" class="btn btn-outline-primary btn-sm js-enrollment-session-mark" data-period-id="${htmlEscape(String(periodId))}" data-session-id="${htmlEscape(String(row.sessionId || ''))}" data-action="${action}">${actionLabel}</button>
           </td>
         </tr>`;
@@ -13662,10 +13662,6 @@
     const action = String(btn.getAttribute('data-action') || '').trim();
     const row = btn.closest('tr');
     const note = String(row?.querySelector('.enrollment-session-mark-note')?.value || '').trim();
-    if (action === 'mark_na' && !note) {
-      await showMsg('Note required', 'warning', 'Enter a note explaining why this session is N/A.');
-      return;
-    }
     let result;
     try {
       result = await requestJson(

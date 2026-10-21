@@ -13,6 +13,7 @@ const VIEW_PRESETS = Object.freeze([
   'day',
   'week',
   'twoWeeks',
+  'fourWeeks',
   'thirtyDays',
   'month',
   'twoMonths',
@@ -140,6 +141,10 @@ function computeViewRange(preset = 'week', anchorDate = '', options = {}) {
   if (key === 'twoWeeks') {
     const start = addDaysIso(anchor, -((new Date(`${anchor}T00:00:00`).getDay() + 6) % 7));
     return { startDate: start, endDate: addDaysIso(start, 13), preset: key, anchorDate: anchor };
+  }
+  if (key === 'fourWeeks') {
+    const start = addDaysIso(anchor, -((new Date(`${anchor}T00:00:00`).getDay() + 6) % 7));
+    return { startDate: start, endDate: addDaysIso(start, 27), preset: key, anchorDate: anchor };
   }
   if (key === 'thirtyDays') {
     return { startDate: anchor, endDate: addDaysIso(anchor, 30), preset: key, anchorDate: anchor };

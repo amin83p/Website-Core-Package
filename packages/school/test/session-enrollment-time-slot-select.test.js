@@ -120,6 +120,8 @@ test('calendar modal chrome and context menu work in picker mode', () => {
   assert.doesNotMatch(modalSource, /function handleHostContextMenu\(event\) \{\s*if \(!isManageMode\(\)\) return;/);
   assert.doesNotMatch(modalSource, /function showContextMenu\(event, sessionId\) \{\s*if \(!isManageMode\(\)\) return;/);
   assert.match(modalSource, /Exclude session/);
+  assert.match(contextMenuPartialSource, /btn_sessionEnrollmentContextMarkNaReason/);
+  assert.match(modalSource, /stageManageSessionMarkFromContext/);
   assert.match(modalSource, /stageTimeSlotPickerChanges/);
 });
 
@@ -127,6 +129,75 @@ test('calendar modal includes time-slot select overlay and context menu partials
   assert.match(calendarPartialSource, /sessionEnrollmentTimeSlotSelectModal/);
   assert.match(calendarPartialSource, /sessionEnrollmentContextMenu/);
   assert.match(contextMenuPartialSource, /dropdown-menu session-enrollment-context-menu/);
+});
+
+test('context menu exposes weekday bulk actions for manage and picker', () => {
+  assert.match(contextMenuPartialSource, /id="sessionEnrollmentContextMenuWeekdayBulk"/);
+  assert.match(contextMenuPartialSource, /data-context-weekday-bulk="mark_na_forward"/);
+  assert.match(contextMenuPartialSource, /data-context-weekday-bulk="mark_na_backward"/);
+  assert.match(contextMenuPartialSource, /data-context-weekday-bulk="unmark_forward"/);
+  assert.match(contextMenuPartialSource, /data-context-weekday-bulk="unmark_backward"/);
+  assert.match(modalSource, /function applyWeekdayBulkPending/);
+  assert.match(modalSource, /function collectWeekdayBulkSessions/);
+  assert.match(modalSource, /resolveContextMenuCalendarDate/);
+  assert.match(modalSource, /contextMenuWeekdayAnchorDate/);
+  assert.match(modalSource, /function supportsWeekdayBulkContextMenu/);
+  assert.match(modalSource, /function applyWeekdayBulkSelection/);
+  assert.match(modalSource, /Include all \$\{weekdayPlural\} forward/);
+  assert.match(modalSource, /resolveWeekdayBulkActionForMode/);
+  assert.match(modalSource, /collectBulkWeekdaySelectionSessions/);
+});
+
+test('collectBulkWeekdaySelectionSessions filters selectable weekdays in range', () => {
+  const pickerEvents = [
+    { sessionId: 'S1', date: '2026-01-05', start: '09:00', end: '10:30', selectable: true },
+    { sessionId: 'S2', date: '2026-01-12', start: '09:00', end: '10:30', selectable: true, savedMarked: true },
+    { sessionId: 'S3', date: '2026-01-19', start: '13:00', end: '14:30', selectable: true },
+    { sessionId: 'S4', date: '2026-01-26', start: '09:00', end: '10:30', selectable: false }
+  ];
+  const selectedSet = new Set(['S2']);
+
+  const forwardSelect = core.collectBulkWeekdaySelectionSessions(
+    pickerEvents,
+    selectedSet,
+    '2026-01-12',
+    '2026-01-26',
+    'select',
+    [1]
+  );
+  assert.deepEqual(forwardSelect.map((row) => row.sessionId), ['S3']);
+
+  const backwardDeselect = core.collectBulkWeekdaySelectionSessions(
+    pickerEvents,
+    selectedSet,
+    '2026-01-05',
+    '2026-01-12',
+    'deselect',
+    [1]
+  );
+  assert.deepEqual(backwardDeselect.map((row) => row.sessionId), ['S2']);
+});
+
+test('collectBulkNaSessions filters weekdays within forward enrollment range', () => {
+  const forward = core.collectBulkNaSessions(
+    sampleEvents,
+    null,
+    '2026-01-12',
+    '2026-01-26',
+    'mark_na',
+    [1]
+  );
+  assert.deepEqual(forward.map((row) => row.sessionId), ['S3', 'S4']);
+
+  const backwardUnmark = core.collectBulkNaSessions(
+    sampleEvents,
+    null,
+    '2026-01-05',
+    '2026-01-12',
+    'unmark',
+    [1]
+  );
+  assert.deepEqual(backwardUnmark.map((row) => row.sessionId), ['S2']);
 });
 
 test('session enrollment calendar modal wires context menu and time-slot select flow', () => {
@@ -141,6 +212,21 @@ test('session enrollment calendar modal wires context menu and time-slot select 
 test('rolling enrollment passes cycle end date into manage sessions modal', () => {
   assert.match(rollingSource, /mode: 'manageEnrollmentSessions'/);
   assert.match(rollingSource, /cycleEndDate:\s*String\(cycleWindow\?\.endDate/);
+});
+
+test('enrollment calendar modal uses unified quad scroll layout', () => {
+  assert.match(modalSource, /mode === 'manageEnrollmentSessions' \|\| mode === 'enrollmentOnHoldPreview'\)\s*\n\s*\? 'wholeCycle'/);
+  assert.match(modalSource, /options\.viewPreset \|\| 'wholeCycle'/);
+  assert.match(modalSource, /function isQuadScrollCalendarView/);
+  assert.match(modalSource, /function isStagingCalendarMode/);
+  assert.match(modalSource, /session-cal-four-week-quad/);
+  assert.match(modalSource, /function ensureQuadScrollViewRange/);
+  assert.match(modalSource, /scrollEnrollmentCalendarByPage/);
+  assert.match(modalSource, /scrollEnrollmentCalendarToToday/);
+  assert.match(modalSource, /isQuadScrollCalendarView\(\)\)/);
+  assert.match(modalSource, /hideTimeGutter: quadView \|\| isStagingCalendarMode\(\)/);
+  assert.match(modalSource, /enableTimeHover: isStagingCalendarMode\(\)/);
+  assert.match(modalSource, /presetGroup\?\.classList\.toggle\('d-none', quadScroll\)/);
 });
 
 test('rolling enrollment passes cycle end date into picker calendar modal', () => {

@@ -354,9 +354,42 @@
     return { startDate, endDate, preset: 'custom', anchorDate: dates[0] };
   }
 
+  function normalizeFourWeekWindow(startDate, endDate, bounds = {}) {
+    const min = normalizeDateOnly(bounds.minDate);
+    const max = normalizeDateOnly(bounds.maxDate);
+    let end = normalizeDateOnly(endDate);
+    let start = normalizeDateOnly(startDate);
+    if (!start || !end) return null;
+    const targetSpan = 28;
+    if (viewRangeDayCount({ startDate: start, endDate: end }) >= targetSpan) {
+      return { startDate: start, endDate: end };
+    }
+    if (max) {
+      const tailStart = addDaysIso(max, -(targetSpan - 1));
+      if (!min || tailStart >= min) {
+        if (!min || end >= tailStart) {
+          return { startDate: tailStart, endDate: max };
+        }
+      }
+    }
+    start = addDaysIso(end, -(targetSpan - 1));
+    if (min && start < min) {
+      start = min;
+      end = addDaysIso(start, targetSpan - 1);
+    }
+    if (max && end > max) {
+      end = max;
+      start = addDaysIso(end, -(targetSpan - 1));
+      if (min && start < min) start = min;
+    }
+    if (end < start) end = start;
+    return { startDate: start, endDate: end };
+  }
+
   function clampViewRangeToBounds(viewRange = {}, { minDate = '', maxDate = '' } = {}) {
     const min = normalizeDateOnly(minDate);
     const max = normalizeDateOnly(maxDate);
+    const preset = String(viewRange?.preset || '').trim();
     let start = normalizeDateOnly(viewRange?.startDate);
     let end = normalizeDateOnly(viewRange?.endDate);
     if (!start || !end) return viewRange;
@@ -365,11 +398,20 @@
     if (min && end < min) end = min;
     if (max && start > max) start = max;
     if (end < start) end = start;
+    if (preset === 'fourWeeks') {
+      const normalized = normalizeFourWeekWindow(start, end, { minDate: min, maxDate: max });
+      if (normalized) {
+        start = normalized.startDate;
+        end = normalized.endDate;
+      }
+    }
+    const anchor = normalizeDateOnly(viewRange?.anchorDate) || start;
     return {
       ...viewRange,
+      preset: preset || viewRange?.preset || 'week',
       startDate: start,
       endDate: end,
-      anchorDate: normalizeDateOnly(viewRange?.anchorDate) || start
+      anchorDate: anchor
     };
   }
 
@@ -406,6 +448,10 @@
       const start = mondayOfWeek(anchor);
       return { startDate: start, endDate: addDaysIso(start, 13), preset: key, anchorDate: anchor };
     }
+    if (key === 'fourWeeks') {
+      const start = mondayOfWeek(anchor);
+      return { startDate: start, endDate: addDaysIso(start, 27), preset: key, anchorDate: anchor };
+    }
     if (key === 'thirtyDays') {
       return { startDate: anchor, endDate: addDaysIso(anchor, 30), preset: key, anchorDate: anchor };
     }
@@ -433,8 +479,13 @@
 
   function shiftViewRange(viewRange = {}, direction = 1, options = {}) {
     const preset = String(viewRange?.preset || 'week').trim();
-    const anchor = parseAnchorDate(viewRange?.anchorDate);
+    const anchor = parseAnchorDate(viewRange?.anchorDate || viewRange?.startDate);
     const dir = Number(direction) >= 0 ? 1 : -1;
+    if (preset === 'fourWeeks') {
+      const windowStart = normalizeDateOnly(viewRange?.startDate) || mondayOfWeek(anchor);
+      const shiftedStart = addDaysIso(windowStart, dir * 28);
+      return clampViewRangeToBounds(computeViewRange(preset, shiftedStart), options);
+    }
     if (preset === 'custom' || preset === 'wholeCycle') {
       const dayCount = viewRangeDayCount(viewRange);
       const shiftedStart = addDaysIso(normalizeDateOnly(viewRange?.startDate) || anchor, dir * dayCount);
@@ -446,7 +497,10 @@
     }
     if (preset === 'day') return computeViewRange(preset, addDaysIso(anchor, dir));
     if (preset === 'week') return computeViewRange(preset, addDaysIso(anchor, dir * 7));
-    if (preset === 'twoWeeks') return computeViewRange(preset, addDaysIso(anchor, dir * 14));
+    if (preset === 'twoWeeks') {
+      const windowStart = normalizeDateOnly(viewRange?.startDate) || mondayOfWeek(anchor);
+      return clampViewRangeToBounds(computeViewRange(preset, addDaysIso(windowStart, dir * 14)), options);
+    }
     if (preset === 'thirtyDays') return computeViewRange(preset, addDaysIso(anchor, dir * 31));
     if (preset === 'month') return computeViewRange(preset, addMonthsIso(startOfMonth(anchor), dir));
     if (preset === 'twoMonths') return computeViewRange(preset, addMonthsIso(startOfMonth(anchor), dir * 2));
@@ -1765,6 +1819,12 @@
     if (label) {
       label.style.top = `${pct}%`;
       label.textContent = formatSnappedTimelineLabel(snappedOffset, bounds);
+      const host = row.closest('.session-enrollment-calendar-host');
+      if (host?.classList?.contains('session-cal-no-time-gutter')) {
+        label.style.width = 'max-content';
+        label.style.minWidth = 'max-content';
+        label.style.maxWidth = 'none';
+      }
     }
     row.classList.add('is-time-hover');
   }
@@ -1952,11 +2012,15 @@
 
     const dayWidth = Number(options.dayWidth || 140);
     const hourHeight = Math.max(20, Number(options.hourHeight || 28));
+    const hideTimeGutter = options.hideTimeGutter === true;
     const holidayDates = options.holidayDates || null;
     const filterEmptyDays = options.filterEmptyDays === true;
     const cellOptions = { ...options, selectedSet };
     container.style.setProperty('--session-day-width', `${dayWidth}px`);
-    container.style.setProperty('--session-time-gutter-width', '76px');
+    container.style.setProperty('--session-time-gutter-width', hideTimeGutter ? '0px' : '76px');
+    if (container.classList) {
+      container.classList.toggle('session-cal-no-time-gutter', hideTimeGutter);
+    }
     container.style.setProperty('--session-hour-height', `${hourHeight}px`);
     let renderedWeekCount = 0;
     let visibleDayCount = 0;
@@ -1987,7 +2051,7 @@
           ${buildWeekLabelRowHtml(week.weekStart, week.weekEnd, labelExtra, weekBounds)}
           <div class="session-cal-week-grid-vertical">
             <div class="session-cal-day-header-row">
-              <div class="session-cal-time-gutter-spacer" aria-hidden="true"></div>
+              ${hideTimeGutter ? '' : '<div class="session-cal-time-gutter-spacer" aria-hidden="true"></div>'}
       `;
       days.forEach((day) => {
         const dayEvents = eventsByDate[day.date] || [];
@@ -2010,7 +2074,7 @@
       html += `
             </div>
             <div class="session-cal-week-body-row session-cal-time-track">
-              ${buildVerticalTimeGutterHtml(weekBounds)}
+              ${hideTimeGutter ? '' : buildVerticalTimeGutterHtml(weekBounds)}
               <div class="session-cal-days-row">
       `;
       days.forEach((day) => {
@@ -2251,6 +2315,9 @@
       viewRange,
       anchorDate: options.anchorDate,
       dayWidth: options.dayWidth,
+      hourHeight: options.hourHeight,
+      hideTimeGutter: options.hideTimeGutter,
+      enableTimeHover: options.enableTimeHover,
       holidayDates: options.holidayDates || null,
       enrollmentStartDate: options.enrollmentStartDate || '',
       buildPositionedBlockHtml: options.buildPositionedBlockHtml,
@@ -2859,6 +2926,28 @@
     });
   }
 
+  function collectBulkWeekdaySelectionSessions(events, selectedSet, startDate, endDate, action, weekdays) {
+    const normalizedAction = String(action || '').trim().toLowerCase();
+    const allowedWeekdays = resolveBulkNaWeekdayFilter(weekdays);
+    const isSelected = (sessionId) => {
+      if (selectedSet && typeof selectedSet.has === 'function') return selectedSet.has(sessionId);
+      if (Array.isArray(selectedSet)) return selectedSet.includes(sessionId);
+      return false;
+    };
+    return (Array.isArray(events) ? events : []).filter((ev) => {
+      const sessionId = String(ev?.sessionId || '').trim();
+      const date = normalizeDateOnly(ev?.date);
+      if (!sessionId || !date) return false;
+      if (!isDateWithinInclusiveRange(date, startDate, endDate)) return false;
+      if (!allowedWeekdays.length) return false;
+      const dow = sessionWeekdayIndex(date);
+      if (dow === null || !allowedWeekdays.includes(dow)) return false;
+      if (normalizedAction === 'select') return ev?.selectable === true && !isSelected(sessionId);
+      if (normalizedAction === 'deselect') return isSelected(sessionId);
+      return false;
+    });
+  }
+
   function clonePendingMap(pendingMap) {
     const next = new Map();
     if (!pendingMap) return next;
@@ -3107,6 +3196,7 @@
     resolveEnrollmentNaStateForCap,
     isDateWithinInclusiveRange,
     collectBulkNaSessions,
+    collectBulkWeekdaySelectionSessions,
     clonePendingMap,
     applyBulkPendingChanges,
     getEffectiveNaSessionIdsFromPending,

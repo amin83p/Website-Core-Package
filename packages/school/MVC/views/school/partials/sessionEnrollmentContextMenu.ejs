@@ -1,4 +1,17 @@
 <div id="sessionEnrollmentContextMenu" class="dropdown-menu session-enrollment-context-menu shadow d-none" role="menu" aria-hidden="true">
-  <button type="button" class="dropdown-item" id="btn_sessionEnrollmentContextMark" role="menuitem">Mark N/A</button>
-  <button type="button" class="dropdown-item" id="btn_sessionEnrollmentContextSelect" role="menuitem">Select sessions…</button>
+  <div id="sessionEnrollmentContextMenuSession">
+    <button type="button" class="dropdown-item d-none" id="btn_sessionEnrollmentContextMarkNa" role="menuitem">Mark N/A</button>
+    <button type="button" class="dropdown-item d-none" id="btn_sessionEnrollmentContextMarkNaReason" role="menuitem">Mark N/A with Reason</button>
+    <button type="button" class="dropdown-item d-none" id="btn_sessionEnrollmentContextUnmarkNa" role="menuitem">Unmark N/A</button>
+    <button type="button" class="dropdown-item d-none" id="btn_sessionEnrollmentContextPickerToggle" role="menuitem">Include session</button>
+    <button type="button" class="dropdown-item" id="btn_sessionEnrollmentContextSelect" role="menuitem">Select sessions…</button>
+  </div>
+  <div id="sessionEnrollmentContextMenuWeekdayBulk" class="d-none">
+    <hr class="dropdown-divider my-1" />
+    <div class="dropdown-header py-1 px-3 small" id="sessionEnrollmentContextWeekdayBulkLabel">This weekday</div>
+    <button type="button" class="dropdown-item" data-context-weekday-bulk="mark_na_forward" role="menuitem">Mark N/A forward</button>
+    <button type="button" class="dropdown-item" data-context-weekday-bulk="mark_na_backward" role="menuitem">Mark N/A backward</button>
+    <button type="button" class="dropdown-item" data-context-weekday-bulk="unmark_forward" role="menuitem">Unmark N/A forward</button>
+    <button type="button" class="dropdown-item" data-context-weekday-bulk="unmark_backward" role="menuitem">Unmark N/A backward</button>
+  </div>
 </div>

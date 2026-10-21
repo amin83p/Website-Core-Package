@@ -13,6 +13,7 @@
     day: 'Day',
     week: 'Week',
     twoWeeks: '2 Weeks',
+    fourWeeks: '4 Weeks',
     thirtyDays: '30 Days',
     month: 'Month',
     twoMonths: '2 Months',
@@ -56,6 +57,20 @@
 
   function isPartialMode() {
     return String(state?.mode || '').trim() === 'partial';
+  }
+
+  function isPickerMode() {
+    return String(state?.mode || 'picker').trim() === 'picker';
+  }
+
+  function isQuadScrollCalendarView() {
+    if (!state) return false;
+    if (String(state.viewMode || '').trim() !== 'vertical') return false;
+    return isPickerMode() || isPartialMode() || isManageMode() || isOnHoldPreviewMode();
+  }
+
+  function isStagingCalendarMode() {
+    return isPickerMode() || isPartialMode();
   }
 
   function partialModePaddingOptions(source = {}) {
@@ -311,11 +326,25 @@
   function applyViewRange(nextRange = {}) {
     if (!state) return;
     const bounds = resolveEnrollmentWindowBounds();
-    const range = core.clampViewRangeToBounds(nextRange, bounds);
+    const preset = String(nextRange?.preset || state.viewPreset || 'week').trim();
+    const range = core.clampViewRangeToBounds({ ...nextRange, preset }, bounds);
     state.viewRange = range;
-    state.viewPreset = String(range.preset || state.viewPreset || 'week').trim();
+    state.viewPreset = String(range.preset || preset || 'week').trim();
     state.anchorDate = range.anchorDate || range.startDate;
     syncPresetButtons();
+  }
+
+  function viewRangeForShift() {
+    const preset = String(state?.viewPreset || state?.viewRange?.preset || 'week').trim();
+    return { ...(state?.viewRange || {}), preset };
+  }
+
+  function renderManageCalendarView() {
+    syncModalChromeForMode();
+    syncViewModeButtons();
+    renderCalendar();
+    if (isOnHoldPreviewMode()) updateOnHoldPreviewSummary();
+    else if (isManageMode()) updateManageSummary();
   }
 
   function computePresetViewRange(preset) {
@@ -352,7 +381,20 @@
     }, bounds);
   }
 
-  const initManageModeViewRange = initDefaultViewRange;
+  function initManageModeViewRange() {
+    if (!state) return;
+    const bounds = resolveEnrollmentWindowBounds();
+    const rangeStart = bounds.minDate || core.parseAnchorDate('');
+    state.viewPreset = 'wholeCycle';
+    state.anchorDate = rangeStart;
+    state.viewRange = core.clampViewRangeToBounds(
+      core.computeWholeCycleViewRange({
+        startDate: rangeStart,
+        endDate: bounds.maxDate || state.endDate || rangeStart
+      }),
+      bounds
+    );
+  }
 
   function initOnHoldPreviewViewRange() {
     if (!state) return;
@@ -426,9 +468,16 @@
     saveBtn?.classList.toggle('d-none', manage || onHoldPreview);
     doneBtn?.classList.toggle('d-none', !manage);
     bulkNaBtn?.classList.toggle('d-none', !manage);
-    presetGroup?.classList.toggle('d-none', partial);
+    const quadScroll = isQuadScrollCalendarView();
+    presetGroup?.classList.toggle('d-none', quadScroll);
+    const viewModeGroup = document.querySelector('#sessionEnrollmentCalendarModal .session-enrollment-viewmode-group');
+    viewModeGroup?.classList.toggle('d-none', quadScroll);
     if (dialogEl) {
       dialogEl.classList.toggle('session-enrollment-calendar-dialog--manage', manage || onHoldPreview);
+      dialogEl.classList.toggle(
+        'session-enrollment-calendar-dialog--quad',
+        quadScroll
+      );
       dialogEl.classList.toggle('session-enrollment-calendar-dialog--partial', partial);
     }
     syncDoneButtonLabel();
@@ -957,42 +1006,59 @@
     showMarkModalLayer();
   }
 
-  function applyPendingSessionMark(action, note = '') {
-    if (!markContext || !state) return;
-    const sessionId = String(markContext.sessionId || '').trim();
-    if (!sessionId) return;
+  function commitManageSessionMarkChange(sessionId, action, note = '', onError) {
+    const id = String(sessionId || '').trim();
+    if (!id || !state) return false;
     if (!state.pendingMarkChanges) state.pendingMarkChanges = new Map();
-    const ev = allEvents.find((row) => String(row?.sessionId || '').trim() === sessionId);
+    const ev = allEvents.find((row) => String(row?.sessionId || '').trim() === id);
     if (action === 'unmark') {
-      const preview = getManageCapBalance('unmark', sessionId);
+      const preview = getManageCapBalance('unmark', id);
       if (preview.enforcedSessions && preview.expectedCount > preview.targetSessions) {
-        showMarkFormError(preview.message || 'Unmarking would exceed the enrollment session target.');
-        return;
+        onError?.(preview.message || 'Unmarking would exceed the enrollment session target.');
+        return false;
       }
       if (preview.enforcedHours && preview.expectedHours > preview.targetHours) {
-        showMarkFormError(preview.message || 'Unmarking would exceed the enrollment hour target.');
-        return;
+        onError?.(preview.message || 'Unmarking would exceed the enrollment hour target.');
+        return false;
       }
       if (ev?.savedMarked || ev?.savedRosterNa) {
-        state.pendingMarkChanges.set(sessionId, { action: 'unmark', note: '' });
+        state.pendingMarkChanges.set(id, { action: 'unmark', note: '' });
       } else {
-        state.pendingMarkChanges.delete(sessionId);
+        state.pendingMarkChanges.delete(id);
       }
     } else {
       const normalizedNote = String(note || '').trim();
-      if (!normalizedNote) {
-        showMarkFormError('Enter a note explaining why this session is N/A.');
-        return;
-      }
-      state.pendingMarkChanges.set(sessionId, { action: 'mark_na', note: normalizedNote });
+      state.pendingMarkChanges.set(id, { action: 'mark_na', note: normalizedNote });
     }
-    syncEventNaFromPending(sessionId);
-    hideMarkModalLayer();
+    syncEventNaFromPending(id);
+    return true;
+  }
+
+  function refreshCalendarAfterManageMarkChange() {
     const scrollSnapshot = captureScrollPositions();
     renderCalendar();
     restoreScrollPositions(scrollSnapshot);
     updateManageSummary();
     syncDoneButtonLabel();
+  }
+
+  function applyPendingSessionMark(action, note = '') {
+    if (!markContext || !state) return;
+    const sessionId = String(markContext.sessionId || '').trim();
+    if (!sessionId) return;
+    const ok = commitManageSessionMarkChange(sessionId, action, note, (message) => showMarkFormError(message));
+    if (!ok) return;
+    hideMarkModalLayer();
+    refreshCalendarAfterManageMarkChange();
+  }
+
+  function stageManageSessionMarkFromContext(ev, action, note = '') {
+    if (!ev || !isManageMode()) return;
+    const sessionId = String(ev.sessionId || '').trim();
+    if (!sessionId) return;
+    const ok = commitManageSessionMarkChange(sessionId, action, note, (message) => flashManageCalendarMessage(message));
+    if (!ok) return;
+    refreshCalendarAfterManageMarkChange();
   }
 
   function formatManageSaveError(message = '') {
@@ -1036,10 +1102,6 @@
       if (event.target.closest('#btn_sessionEnrollmentMarkApply')) {
         event.preventDefault();
         const note = String(qs('sessionEnrollmentMarkNote')?.value || '').trim();
-        if (!note) {
-          showMarkFormError('Enter a note explaining why this session is N/A.');
-          return;
-        }
         applyPendingSessionMark('mark_na', note);
         return;
       }
@@ -1258,10 +1320,6 @@
       return;
     }
     const note = String(qs('sessionEnrollmentBulkNaNote')?.value || '').trim();
-    if (action === 'mark_na' && !note) {
-      showBulkNaFormError('Enter a note explaining why these sessions are N/A.');
-      return;
-    }
     const previewMap = buildBulkPendingPreview(sessions, action, note);
     const preview = getManageCapBalance(null, '', previewMap);
     if (action === 'unmark') {
@@ -1588,10 +1646,6 @@
       return;
     }
     const note = String(qs('sessionEnrollmentTimeSlotNote')?.value || '').trim();
-    if (action === 'mark_na' && !note) {
-      showTimeSlotFormError('Enter a note explaining why these sessions are N/A.');
-      return;
-    }
     const previewMap = core.applyBulkPendingChanges(state.pendingMarkChanges, sessions, action, note);
     const preview = getManageCapBalance(null, '', previewMap);
     if (action === 'unmark') {
@@ -1694,26 +1748,127 @@
     contextMenuEl.classList.remove('show');
     contextMenuEl.setAttribute('aria-hidden', 'true');
     contextMenuSessionId = '';
+    contextMenuWeekdayAnchorDate = '';
   }
 
-  function showContextMenu(event, sessionId) {
+  function resolveContextMenuWeekdayIndex(dateStr) {
+    const date = core.normalizeDateOnly(dateStr);
+    if (!date) return null;
+    const dow = new Date(`${date}T12:00:00`).getDay();
+    return Number.isInteger(dow) ? dow : null;
+  }
+
+  function formatWeekdayPluralLabel(dateStr) {
+    const date = core.normalizeDateOnly(dateStr);
+    if (!date) return 'weekdays';
+    const long = new Date(`${date}T12:00:00`).toLocaleDateString('en-US', { weekday: 'long' });
+    return long ? `${long}s` : 'weekdays';
+  }
+
+  function formatWeekdayBulkContextMenuLabel(dateStr) {
+    const weekdayPlural = formatWeekdayPluralLabel(dateStr);
+    const date = core.normalizeDateOnly(dateStr);
+    if (!date) return weekdayPlural;
+    const long = core.formatDayHeaderLong ? core.formatDayHeaderLong(date) : date;
+    return `${weekdayPlural} · ${long}`;
+  }
+
+  function supportsWeekdayBulkContextMenu() {
+    return isManageMode() || isPickerMode() || isPartialMode();
+  }
+
+  function syncWeekdayBulkMenuButtonLabels(anchorDate) {
+    const weekdayPlural = formatWeekdayPluralLabel(anchorDate);
+    const templates = isManageMode()
+      ? {
+        mark_na_forward: `Mark N/A all ${weekdayPlural} forward`,
+        mark_na_backward: `Mark N/A all ${weekdayPlural} backward`,
+        unmark_forward: `Unmark N/A all ${weekdayPlural} forward`,
+        unmark_backward: `Unmark N/A all ${weekdayPlural} backward`
+      }
+      : {
+        mark_na_forward: `Include all ${weekdayPlural} forward`,
+        mark_na_backward: `Include all ${weekdayPlural} backward`,
+        unmark_forward: `Exclude all ${weekdayPlural} forward`,
+        unmark_backward: `Exclude all ${weekdayPlural} backward`
+      };
+    contextMenuEl?.querySelectorAll('[data-context-weekday-bulk]').forEach((btn) => {
+      const key = String(btn.getAttribute('data-context-weekday-bulk') || '').trim();
+      if (templates[key]) btn.textContent = templates[key];
+    });
+  }
+
+  function resolveContextMenuCalendarDate(event, sessionId = '') {
+    const calTarget = event?.target?.closest?.('[data-cal-date]');
+    const fromDom = core.normalizeDateOnly(calTarget?.getAttribute?.('data-cal-date') || '');
+    if (fromDom) return fromDom;
+    const id = String(sessionId || '').trim();
+    if (!id) return '';
+    const eventRow = allEvents.find((row) => String(row?.sessionId || '').trim() === id);
+    return core.normalizeDateOnly(eventRow?.date || '');
+  }
+
+  function showContextMenu(event, options = {}) {
+    const sessionId = String(options?.sessionId || options || '').trim();
+    const weekdayAnchorDate = core.normalizeDateOnly(options?.weekdayAnchorDate || options?.mondayAnchorDate || '');
+    const hasSession = Boolean(sessionId);
+    const weekdayIndex = resolveContextMenuWeekdayIndex(weekdayAnchorDate);
+    const showWeekdayBulk = supportsWeekdayBulkContextMenu() && weekdayAnchorDate && weekdayIndex !== null;
+    if (!hasSession && !showWeekdayBulk) return;
+
     contextMenuEl = resolveContextMenuEl();
     if (!contextMenuEl) return;
-    const eventRow = allEvents.find((row) => String(row?.sessionId || '').trim() === String(sessionId || '').trim());
-    if (!eventRow) return;
-    contextMenuSessionId = String(sessionId || '').trim();
-    const markBtn = qs('btn_sessionEnrollmentContextMark');
-    if (markBtn) {
-      if (isManageMode()) {
-        const naState = resolveManageNaState(eventRow);
-        markBtn.textContent = naState !== 'normal' ? 'Unmark N/A' : 'Mark N/A';
-      } else {
-        const isSelected = state?.selectedSet?.has(contextMenuSessionId);
-        markBtn.textContent = isSelected ? 'Exclude session' : 'Include session';
+
+    contextMenuSessionId = hasSession ? sessionId : '';
+    contextMenuWeekdayAnchorDate = showWeekdayBulk ? weekdayAnchorDate : '';
+
+    const sessionSection = contextMenuEl.querySelector('#sessionEnrollmentContextMenuSession');
+    const weekdaySection = contextMenuEl.querySelector('#sessionEnrollmentContextMenuWeekdayBulk');
+    sessionSection?.classList.toggle('d-none', !hasSession);
+    weekdaySection?.classList.toggle('d-none', !showWeekdayBulk);
+
+    if (hasSession) {
+      const eventRow = allEvents.find((row) => String(row?.sessionId || '').trim() === sessionId);
+      if (!eventRow && !showWeekdayBulk) return;
+      const markNaBtn = qs('btn_sessionEnrollmentContextMarkNa');
+      const markNaReasonBtn = qs('btn_sessionEnrollmentContextMarkNaReason');
+      const unmarkNaBtn = qs('btn_sessionEnrollmentContextUnmarkNa');
+      const pickerToggleBtn = qs('btn_sessionEnrollmentContextPickerToggle');
+      const selectBtn = qs('btn_sessionEnrollmentContextSelect');
+      if (eventRow) {
+        if (isManageMode()) {
+          const naState = resolveManageNaState(eventRow);
+          const isOpen = naState === 'normal';
+          markNaBtn?.classList.toggle('d-none', !isOpen);
+          markNaReasonBtn?.classList.toggle('d-none', !isOpen);
+          unmarkNaBtn?.classList.toggle('d-none', isOpen);
+          pickerToggleBtn?.classList.add('d-none');
+        } else {
+          markNaBtn?.classList.add('d-none');
+          markNaReasonBtn?.classList.add('d-none');
+          unmarkNaBtn?.classList.add('d-none');
+          pickerToggleBtn?.classList.remove('d-none');
+          const isSelected = state?.selectedSet?.has(sessionId);
+          if (pickerToggleBtn) {
+            pickerToggleBtn.textContent = isSelected ? 'Exclude session' : 'Include session';
+          }
+        }
+      }
+      if (eventRow && selectBtn) {
+        selectBtn.classList.toggle('d-none', isManageMode() && eventRow.selectable !== true);
       }
     }
-    const menuWidth = 200;
-    const menuHeight = 80;
+
+    const weekdayLabel = contextMenuEl.querySelector('#sessionEnrollmentContextWeekdayBulkLabel');
+    if (weekdayLabel && showWeekdayBulk) {
+      weekdayLabel.textContent = formatWeekdayBulkContextMenuLabel(weekdayAnchorDate);
+    }
+    if (showWeekdayBulk) syncWeekdayBulkMenuButtonLabels(weekdayAnchorDate);
+
+    const menuWidth = 280;
+    let menuHeight = 80;
+    if (hasSession) menuHeight += isManageMode() ? 88 : 8;
+    if (showWeekdayBulk) menuHeight += 168;
     const left = Math.min(event.clientX, window.innerWidth - menuWidth - 8);
     const top = Math.min(event.clientY, window.innerHeight - menuHeight - 8);
     const appliedLeft = Math.max(8, left);
@@ -1730,18 +1885,166 @@
     contextMenuEl.setAttribute('aria-hidden', 'false');
   }
 
+  function collectWeekdayBulkRangeBounds(anchorDate, direction) {
+    const bounds = resolveEnrollmentWindowBounds();
+    const anchor = core.normalizeDateOnly(anchorDate);
+    const min = core.normalizeDateOnly(bounds.minDate);
+    const max = core.normalizeDateOnly(bounds.maxDate);
+    if (!anchor || !min || !max || anchor < min || anchor > max) return null;
+    const start = direction === 'forward' ? anchor : min;
+    const end = direction === 'forward' ? max : anchor;
+    if (!start || !end || start > end) return null;
+    const weekdayIndex = resolveContextMenuWeekdayIndex(anchorDate);
+    if (weekdayIndex === null) return null;
+    return { start, end, weekdayIndex };
+  }
+
+  function collectWeekdayBulkSessions(anchorDate, direction, action) {
+    const range = collectWeekdayBulkRangeBounds(anchorDate, direction);
+    if (!range) return [];
+    return core.collectBulkNaSessions(
+      allEvents,
+      state?.pendingMarkChanges,
+      range.start,
+      range.end,
+      action,
+      [range.weekdayIndex]
+    );
+  }
+
+  function collectWeekdayBulkSelectionSessions(anchorDate, direction, action) {
+    const range = collectWeekdayBulkRangeBounds(anchorDate, direction);
+    if (!range) return [];
+    return core.collectBulkWeekdaySelectionSessions(
+      allEvents,
+      state?.selectedSet,
+      range.start,
+      range.end,
+      action,
+      [range.weekdayIndex]
+    );
+  }
+
+  function flashManageCalendarMessage(message) {
+    summaryEl = qs('sessionEnrollmentCalendarSummary');
+    if (!summaryEl) return;
+    const text = String(message || '').trim();
+    if (!text) return;
+    summaryEl.classList.add('is-plain', 'text-danger');
+    summaryEl.textContent = text;
+    window.setTimeout(() => {
+      summaryEl.classList.remove('text-danger');
+      if (isManageMode()) updateManageSummary();
+      else updateSummary();
+    }, 4000);
+  }
+
+  function parseWeekdayBulkMenuAction(raw = '') {
+    const key = String(raw || '').trim().toLowerCase();
+    if (key === 'mark_na_forward') return { direction: 'forward', menuKey: key };
+    if (key === 'mark_na_backward') return { direction: 'backward', menuKey: key };
+    if (key === 'unmark_forward') return { direction: 'forward', menuKey: key };
+    if (key === 'unmark_backward') return { direction: 'backward', menuKey: key };
+    return null;
+  }
+
+  function resolveWeekdayBulkActionForMode(menuKey = '') {
+    const key = String(menuKey || '').trim().toLowerCase();
+    if (isManageMode()) {
+      if (key === 'mark_na_forward' || key === 'mark_na_backward') return 'mark_na';
+      if (key === 'unmark_forward' || key === 'unmark_backward') return 'unmark';
+      return '';
+    }
+    if (key === 'mark_na_forward' || key === 'mark_na_backward') return 'select';
+    if (key === 'unmark_forward' || key === 'unmark_backward') return 'deselect';
+    return '';
+  }
+
+  function applyWeekdayBulkPending(anchorDate, direction, action) {
+    if (!state || !isManageMode()) return;
+    const sessions = collectWeekdayBulkSessions(anchorDate, direction, action);
+    if (!sessions.length) {
+      flashManageCalendarMessage('No sessions match this weekday bulk action.');
+      return;
+    }
+    const previewMap = buildBulkPendingPreview(sessions, action, '');
+    const preview = getManageCapBalance(null, '', previewMap);
+    if (action === 'unmark') {
+      if (preview.enforcedSessions && preview.expectedCount > preview.targetSessions) {
+        flashManageCalendarMessage(preview.message || 'Unmarking would exceed the enrollment session target.');
+        return;
+      }
+      if (preview.enforcedHours && preview.expectedHours > preview.targetHours) {
+        flashManageCalendarMessage(preview.message || 'Unmarking would exceed the enrollment hour target.');
+        return;
+      }
+    }
+    if (!state.pendingMarkChanges) state.pendingMarkChanges = new Map();
+    state.pendingMarkChanges = previewMap;
+    allEvents.forEach((ev) => {
+      const sessionId = String(ev?.sessionId || '').trim();
+      if (sessionId) syncEventNaFromPending(sessionId);
+    });
+    const scrollSnapshot = captureScrollPositions();
+    renderCalendar();
+    restoreScrollPositions(scrollSnapshot);
+    updateManageSummary();
+    syncDoneButtonLabel();
+  }
+
+  function applyWeekdayBulkSelection(anchorDate, direction, action) {
+    if (!state || (!isPickerMode() && !isPartialMode())) return;
+    const sessions = collectWeekdayBulkSelectionSessions(anchorDate, direction, action);
+    if (!sessions.length) {
+      flashManageCalendarMessage('No sessions match this weekday bulk action.');
+      return;
+    }
+    sessions.forEach((row) => {
+      const sessionId = String(row?.sessionId || '').trim();
+      if (!sessionId) return;
+      if (action === 'deselect') state.selectedSet.delete(sessionId);
+      else state.selectedSet.add(sessionId);
+    });
+    const scrollSnapshot = captureScrollPositions();
+    renderCalendar();
+    restoreScrollPositions(scrollSnapshot);
+    updateSummary();
+  }
+
   function bindContextMenuEvents() {
+    if (contextMenuEventsBound) return;
+    contextMenuEventsBound = true;
     contextMenuEl = resolveContextMenuEl();
-    qs('btn_sessionEnrollmentContextMark')?.addEventListener('click', (event) => {
+    qs('btn_sessionEnrollmentContextMarkNa')?.addEventListener('click', (event) => {
       event.preventDefault();
       const sessionId = String(contextMenuSessionId || '').trim();
       hideContextMenu();
       const eventRow = allEvents.find((row) => String(row?.sessionId || '').trim() === sessionId);
-      if (!eventRow) return;
-      if (isManageMode()) {
-        openMarkModalForEvent(eventRow);
-        return;
-      }
+      if (!eventRow || !isManageMode()) return;
+      stageManageSessionMarkFromContext(eventRow, 'mark_na', '');
+    });
+    qs('btn_sessionEnrollmentContextMarkNaReason')?.addEventListener('click', (event) => {
+      event.preventDefault();
+      const sessionId = String(contextMenuSessionId || '').trim();
+      hideContextMenu();
+      const eventRow = allEvents.find((row) => String(row?.sessionId || '').trim() === sessionId);
+      if (!eventRow || !isManageMode()) return;
+      openMarkModalForEvent(eventRow);
+    });
+    qs('btn_sessionEnrollmentContextUnmarkNa')?.addEventListener('click', (event) => {
+      event.preventDefault();
+      const sessionId = String(contextMenuSessionId || '').trim();
+      hideContextMenu();
+      const eventRow = allEvents.find((row) => String(row?.sessionId || '').trim() === sessionId);
+      if (!eventRow || !isManageMode()) return;
+      stageManageSessionMarkFromContext(eventRow, 'unmark', '');
+    });
+    qs('btn_sessionEnrollmentContextPickerToggle')?.addEventListener('click', (event) => {
+      event.preventDefault();
+      const sessionId = String(contextMenuSessionId || '').trim();
+      hideContextMenu();
+      const eventRow = allEvents.find((row) => String(row?.sessionId || '').trim() === sessionId);
+      if (!eventRow || isManageMode()) return;
       if (eventRow.selectable !== true) return;
       toggleSession(sessionId);
     });
@@ -1751,6 +2054,24 @@
       hideContextMenu();
       const eventRow = allEvents.find((row) => String(row?.sessionId || '').trim() === sessionId);
       if (eventRow) openTimeSlotSelectModal(eventRow);
+    });
+    contextMenuEl?.addEventListener('click', (event) => {
+      const bulkBtn = event.target.closest('[data-context-weekday-bulk]');
+      if (!bulkBtn) return;
+      event.preventDefault();
+      const parsed = parseWeekdayBulkMenuAction(bulkBtn.getAttribute('data-context-weekday-bulk'));
+      const anchor = String(contextMenuWeekdayAnchorDate || '').trim();
+      hideContextMenu();
+      if (!parsed || !anchor) return;
+      const bulkAction = resolveWeekdayBulkActionForMode(parsed.menuKey);
+      if (!bulkAction) return;
+      if (isManageMode()) {
+        applyWeekdayBulkPending(anchor, parsed.direction, bulkAction);
+        return;
+      }
+      if (isPickerMode() || isPartialMode()) {
+        applyWeekdayBulkSelection(anchor, parsed.direction, bulkAction);
+      }
     });
     document.addEventListener('click', (event) => {
       if (!contextMenuEl || contextMenuEl.classList.contains('d-none')) return;
@@ -1783,12 +2104,14 @@
 
   function handleHostContextMenu(event) {
     const block = event.target.closest('[data-session-id]');
-    if (!block) return;
-    event.preventDefault();
-    event.stopPropagation();
-    const sessionId = String(block.getAttribute('data-session-id') || '').trim();
-    const eventRow = allEvents.find((row) => String(row?.sessionId || '').trim() === sessionId);
+    const sessionId = block ? String(block.getAttribute('data-session-id') || '').trim() : '';
+    const eventRow = sessionId
+      ? allEvents.find((row) => String(row?.sessionId || '').trim() === sessionId)
+      : null;
+
     if (isPartialMode() && eventRow?.isStaged === true && global.ScheduleDraftSessionMenu?.show) {
+      event.preventDefault();
+      event.stopPropagation();
       global.ScheduleDraftSessionMenu.show({
         sessionId,
         classId: state?.classId || eventRow.classId,
@@ -1803,7 +2126,17 @@
       }, event, 'partialModal');
       return;
     }
-    showContextMenu(event, sessionId);
+
+    const calendarDate = resolveContextMenuCalendarDate(event, sessionId);
+    const weekdayAnchorDate = core.normalizeDateOnly(calendarDate);
+    const showWeekdayBulkMenu = supportsWeekdayBulkContextMenu()
+      && weekdayAnchorDate
+      && resolveContextMenuWeekdayIndex(weekdayAnchorDate) !== null;
+    if (!sessionId && !showWeekdayBulkMenu) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+    showContextMenu(event, { sessionId, weekdayAnchorDate });
   }
 
   function handleHostDblClick(event) {
@@ -2227,6 +2560,8 @@
   let timeSlotCountTouched = false;
   let contextMenuEl = null;
   let contextMenuSessionId = '';
+  let contextMenuWeekdayAnchorDate = '';
+  let contextMenuEventsBound = false;
   let manageSummaryMeta = null;
   const STAGE_COUNT_MIN = 1;
   const STAGE_COUNT_MAX = 72;
@@ -3141,6 +3476,9 @@
 
   function shouldAutoFitDayColumns() {
     if (!state) return false;
+    if (isManageMode()) {
+      return !state.dayWidthUserAdjusted && state.viewMode === 'vertical';
+    }
     return !state.dayWidthUserAdjusted
       && state.viewMode === 'vertical'
       && core.isWeekRowPreset(state.viewPreset);
@@ -3156,7 +3494,8 @@
     if (!state || !hostEl) return;
     if (!shouldAutoFitDayColumns()) return;
     const dayCount = Number(options.dayCount || getVisibleDayCountForState() || 7);
-    const auto = core.computeAutoDayWidth(hostEl, { gutterWidth: 64, dayCount, min: 72, max: 280, fallback: 140 });
+    const gutterWidth = hostEl.classList.contains('session-cal-four-week-quad') ? 0 : 64;
+    const auto = core.computeAutoDayWidth(hostEl, { gutterWidth, dayCount, min: 72, max: 280, fallback: 140 });
     state.dayWidth = auto;
     const dayWidthInput = qs('sessionEnrollmentDayWidth');
     if (dayWidthInput) dayWidthInput.value = String(auto);
@@ -3175,7 +3514,7 @@
   function syncDayWidthControlVisibility() {
     const wrap = qs('sessionEnrollmentDayWidthWrap');
     if (!wrap || !state) return;
-    const show = state.viewMode === 'vertical' && core.isWeekRowPreset(state.viewPreset);
+    const show = state.viewMode === 'vertical' && (isManageMode() || core.isWeekRowPreset(state.viewPreset));
     wrap.classList.toggle('d-none', !show);
   }
 
@@ -3235,11 +3574,32 @@
   async function refreshPickerViewLocally() {
     await ensureHolidaysLoaded();
     const scrollSnapshot = captureScrollPositions();
-    state.viewRange = core.computeViewRange(
-      state.viewPreset,
-      core.clampAnchorDate(state.anchorDate || state.viewRange?.anchorDate || state.startDate, state.startDate)
-    );
-    state.anchorDate = core.clampAnchorDate(state.viewRange.anchorDate, state.startDate);
+    if (isManageLikeMode()) {
+      const bounds = resolveEnrollmentWindowBounds();
+      if (state.viewRange?.startDate && state.viewRange?.endDate) {
+        state.viewRange = core.clampViewRangeToBounds(state.viewRange, bounds);
+        state.viewPreset = String(state.viewRange.preset || state.viewPreset || 'fourWeeks').trim();
+        state.anchorDate = core.clampAnchorDate(
+          state.viewRange.anchorDate || state.viewRange.startDate || state.anchorDate,
+          bounds.minDate
+        );
+      } else {
+        state.viewRange = core.clampViewRangeToBounds(
+          core.computeViewRange(
+            state.viewPreset,
+            core.clampAnchorDate(state.anchorDate || bounds.minDate || state.startDate, bounds.minDate)
+          ),
+          bounds
+        );
+        state.anchorDate = core.clampAnchorDate(state.viewRange.anchorDate || state.viewRange.startDate, bounds.minDate);
+      }
+    } else {
+      state.viewRange = core.computeViewRange(
+        state.viewPreset,
+        core.clampAnchorDate(state.anchorDate || state.viewRange?.anchorDate || state.startDate, state.startDate)
+      );
+      state.anchorDate = core.clampAnchorDate(state.viewRange.anchorDate, state.startDate);
+    }
     syncPresetButtons();
     renderCalendar();
     restoreScrollPositions(scrollSnapshot);
@@ -3528,9 +3888,64 @@
     return true;
   }
 
+  function ensureQuadScrollViewRange() {
+    if (!state || !isQuadScrollCalendarView()) return;
+    state.viewMode = 'vertical';
+    const bounds = resolveEnrollmentWindowBounds();
+    const rangeStart = bounds.minDate || core.parseAnchorDate(state.startDate || '');
+    const rangeEnd = bounds.maxDate || core.parseAnchorDate(state.endDate || '') || rangeStart;
+    const targetRange = core.clampViewRangeToBounds(
+      core.computeWholeCycleViewRange({ startDate: rangeStart, endDate: rangeEnd }),
+      bounds
+    );
+    const preset = String(state.viewRange?.preset || '').trim();
+    const sameRange = preset === 'wholeCycle'
+      && state.viewRange?.startDate === targetRange.startDate
+      && state.viewRange?.endDate === targetRange.endDate;
+    if (!sameRange) {
+      state.viewPreset = 'wholeCycle';
+      state.viewRange = targetRange;
+      const anchor = core.normalizeDateOnly(state.anchorDate);
+      if (!anchor || anchor < targetRange.startDate || anchor > targetRange.endDate) {
+        state.anchorDate = targetRange.startDate;
+      }
+    }
+  }
+
+  function scrollEnrollmentCalendarByPage(direction = 1) {
+    hostEl = qs('sessionEnrollmentCalendarHost');
+    const scrollEl = hostEl?.querySelector('.session-cal-vertical-scroll');
+    if (!scrollEl) return;
+    const step = Math.max(220, Math.round(scrollEl.clientHeight * 0.82));
+    scrollEl.scrollBy({ top: Number(direction) * step, behavior: 'smooth' });
+  }
+
+  function scrollEnrollmentCalendarToToday() {
+    const bounds = resolveEnrollmentWindowBounds();
+    let target = core.parseAnchorDate('');
+    const min = core.normalizeDateOnly(bounds.minDate);
+    const max = core.normalizeDateOnly(bounds.maxDate);
+    if (min && target < min) target = min;
+    if (max && target > max) target = max;
+    requestAnimationFrame(() => {
+      if (!scrollHostToStagedDate(target, { align: 'start' })) {
+        hostEl = qs('sessionEnrollmentCalendarHost');
+        const scrollEl = hostEl?.querySelector('.session-cal-vertical-scroll');
+        scrollEl?.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+    });
+  }
+
   function renderCalendar() {
     hostEl = qs('sessionEnrollmentCalendarHost');
     if (!hostEl || !state) return;
+    if (isQuadScrollCalendarView()) {
+      ensureQuadScrollViewRange();
+    }
+    const quadView = isQuadScrollCalendarView();
+    hostEl.classList.toggle('session-cal-four-week-quad', quadView);
+    const dialogEl = qs('sessionEnrollmentCalendarModal')?.querySelector('.modal-dialog');
+    dialogEl?.classList.toggle('session-enrollment-calendar-dialog--quad', quadView);
     syncAutoDayWidthMode();
     applyAutoDayWidthIfNeeded({ dayCount: getVisibleDayCountForState() });
     syncDayWidthControlVisibility();
@@ -3542,7 +3957,10 @@
       selectedSet: state.selectedSet,
       dayWidth: state.dayWidth || 140,
       holidayDates: state.holidayDates || null,
-      enrollmentStartDate: state.startDate || ''
+      enrollmentStartDate: state.startDate || '',
+      hourHeight: quadView ? 20 : undefined,
+      hideTimeGutter: quadView || isStagingCalendarMode(),
+      enableTimeHover: isStagingCalendarMode()
     };
     if (isManageLikeMode()) {
       calendarOptions.buildPositionedBlockHtml = (ev) => buildManageEnrollmentBlockHtml(ev);
@@ -3552,6 +3970,19 @@
       calendarOptions.buildListDayCardHtml = (ev) => buildPartialListDayCardHtml(ev);
     }
     core.renderEnrollmentCalendar(hostEl, getVisibleEvents(), calendarOptions);
+    if (quadView) {
+      const weekStack = hostEl.querySelector('.session-cal-week-stack');
+      if (weekStack) {
+        weekStack.style.display = 'grid';
+        weekStack.style.gridTemplateColumns = '1fr 1fr';
+        weekStack.style.gridTemplateRows = '';
+        weekStack.style.gridAutoRows = 'minmax(210px, auto)';
+        weekStack.style.gap = '8px';
+        weekStack.style.flexDirection = 'unset';
+        weekStack.style.height = 'auto';
+        weekStack.style.minHeight = '100%';
+      }
+    }
     syncAutoDayWidthMode();
     if (shouldAutoFitDayColumns()) {
       scheduleCalendarAutoFit();
@@ -3715,6 +4146,7 @@
       btn.addEventListener('click', () => {
         const preset = String(btn.getAttribute('data-session-picker-preset') || '').trim();
         if (!preset || !state) return;
+        if (isManageMode()) return;
         state.viewPreset = preset;
         state.viewMode = core.suggestViewModeForPreset(preset);
         if (preset !== 'day' && state.viewMode === 'singleDay') {
@@ -3722,8 +4154,12 @@
         }
         state.dayWidthUserAdjusted = false;
         applyViewRange(computePresetViewRange(preset));
-        syncViewModeButtons();
-        fetchPickerData({ remote: false }).catch((err) => console.error(err));
+        if (isManageLikeMode()) {
+          renderManageCalendarView();
+        } else {
+          syncViewModeButtons();
+          fetchPickerData({ remote: false }).catch((err) => console.error(err));
+        }
       });
     });
 
@@ -3731,6 +4167,7 @@
       btn.addEventListener('click', () => {
         const mode = String(btn.getAttribute('data-session-picker-view') || '').trim();
         if (!mode || !state) return;
+        if (isManageMode()) return;
         const scrollSnapshot = captureScrollPositions();
         if (mode === 'vertical') {
           state.dayWidthUserAdjusted = false;
@@ -3745,40 +4182,58 @@
     qs('btn_sessionEnrollmentCalendarPrev')?.addEventListener('click', () => {
       if (!state) return;
       state.dayWidthUserAdjusted = false;
-      const bounds = resolveEnrollmentWindowBounds();
-      const shifted = core.shiftViewRange(state.viewRange, -1, bounds);
-      if (isManageLikeMode()) {
-        applyViewRange(shifted);
-      } else {
-        state.viewRange = core.clampViewRangeToEnrollmentStart(shifted, state.startDate);
-        state.anchorDate = state.viewRange.anchorDate;
+      if (isQuadScrollCalendarView()) {
+        scrollEnrollmentCalendarByPage(-1);
+        return;
       }
+      const bounds = resolveEnrollmentWindowBounds();
+      const shifted = core.shiftViewRange(viewRangeForShift(), -1, bounds);
+      if (isOnHoldPreviewMode()) {
+        applyViewRange(shifted);
+        renderManageCalendarView();
+        return;
+      }
+      state.viewRange = core.clampViewRangeToEnrollmentStart(shifted, state.startDate);
+      state.anchorDate = state.viewRange.anchorDate;
       fetchPickerData({ remote: false }).catch((err) => console.error(err));
     });
 
     qs('btn_sessionEnrollmentCalendarNext')?.addEventListener('click', () => {
       if (!state) return;
       state.dayWidthUserAdjusted = false;
-      const bounds = resolveEnrollmentWindowBounds();
-      const shifted = core.shiftViewRange(state.viewRange, 1, bounds);
-      if (isManageLikeMode()) {
-        applyViewRange(shifted);
-      } else {
-        state.viewRange = shifted;
-        state.anchorDate = state.viewRange.anchorDate;
+      if (isQuadScrollCalendarView()) {
+        scrollEnrollmentCalendarByPage(1);
+        return;
       }
+      const bounds = resolveEnrollmentWindowBounds();
+      const shifted = core.shiftViewRange(viewRangeForShift(), 1, bounds);
+      if (isOnHoldPreviewMode()) {
+        applyViewRange(shifted);
+        renderManageCalendarView();
+        return;
+      }
+      state.viewRange = shifted;
+      state.anchorDate = state.viewRange.anchorDate;
       fetchPickerData({ remote: false }).catch((err) => console.error(err));
     });
 
     qs('btn_sessionEnrollmentCalendarToday')?.addEventListener('click', () => {
       if (!state) return;
       state.dayWidthUserAdjusted = false;
-      state.anchorDate = core.clampAnchorDate(core.parseAnchorDate(''), state.startDate);
-      if (isManageLikeMode()) {
-        applyViewRange(computePresetViewRange(state.viewPreset));
-      } else {
-        state.viewRange = core.computeViewRange(state.viewPreset, state.anchorDate);
+      const bounds = resolveEnrollmentWindowBounds();
+      if (isQuadScrollCalendarView()) {
+        scrollEnrollmentCalendarToToday();
+        return;
       }
+      if (isOnHoldPreviewMode()) {
+        const anchor = core.clampAnchorDate(core.parseAnchorDate(''), bounds.minDate || state.startDate);
+        state.anchorDate = anchor;
+        applyViewRange(computePresetViewRange(state.viewPreset));
+        renderManageCalendarView();
+        return;
+      }
+      state.anchorDate = core.clampAnchorDate(core.parseAnchorDate(''), state.startDate);
+      state.viewRange = core.computeViewRange(state.viewPreset, state.anchorDate);
       fetchPickerData({ remote: false }).catch((err) => console.error(err));
     });
 
@@ -4021,10 +4476,10 @@
     });
 
     const viewPreset = (mode === 'manageEnrollmentSessions' || mode === 'enrollmentOnHoldPreview')
-      ? 'thirtyDays'
+      ? 'wholeCycle'
       : (mode === 'partial'
         ? 'custom'
-        : String(options.viewPreset || 'thirtyDays').trim());
+        : String(options.viewPreset || 'wholeCycle').trim());
     const anchorDate = mode === 'manageEnrollmentSessions'
       ? core.parseAnchorDate('')
       : core.clampAnchorDate(

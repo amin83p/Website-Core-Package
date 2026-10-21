@@ -60,6 +60,47 @@ test('formatWeekLabelHtml includes month week, ISO week, and date range', () => 
   assert.match(html, /session-cal-week-label-dates/);
 });
 
+test('computeViewRange fourWeeks spans 28 days from Monday', () => {
+  const core = loadSessionCalendarCore();
+  const range = core.computeViewRange('fourWeeks', '2026-01-15');
+  assert.equal(range.preset, 'fourWeeks');
+  assert.equal(range.startDate, '2026-01-12');
+  assert.equal(range.endDate, '2026-02-08');
+  const blocks = core.buildWeekBlocks(range);
+  assert.equal(blocks.length, 4);
+});
+
+test('shiftViewRange fourWeeks moves anchor by 28 days', () => {
+  const core = loadSessionCalendarCore();
+  const base = core.computeViewRange('fourWeeks', '2026-01-15');
+  const next = core.shiftViewRange(base, 1);
+  assert.equal(next.startDate, '2026-02-09');
+  assert.equal(next.endDate, '2026-03-08');
+});
+
+test('shiftViewRange fourWeeks keeps preset when preset only on state', () => {
+  const core = loadSessionCalendarCore();
+  const base = core.computeViewRange('fourWeeks', '2026-08-24');
+  const shifted = core.shiftViewRange({ startDate: base.startDate, endDate: base.endDate, preset: 'fourWeeks' }, 1);
+  assert.equal(shifted.preset, 'fourWeeks');
+  assert.equal(core.viewRangeDayCount(shifted), 28);
+});
+
+test('clampViewRangeToBounds expands collapsed fourWeeks window at enrollment end', () => {
+  const core = loadSessionCalendarCore();
+  const squashed = {
+    preset: 'fourWeeks',
+    startDate: '2026-12-15',
+    endDate: '2026-12-15',
+    anchorDate: '2026-12-15'
+  };
+  const clamped = core.clampViewRangeToBounds(squashed, { minDate: '2026-08-24', maxDate: '2026-12-17' });
+  assert.equal(clamped.preset, 'fourWeeks');
+  assert.equal(clamped.endDate, '2026-12-17');
+  assert.equal(clamped.startDate, '2026-11-20');
+  assert.equal(core.viewRangeDayCount(clamped), 28);
+});
+
 test('formatClockTimeRange uses compact same-period range labels', () => {
   const core = loadSessionCalendarCore();
   assert.equal(core.formatClockTimeRange('09:00', '10:30'), '9 – 10:30 AM');

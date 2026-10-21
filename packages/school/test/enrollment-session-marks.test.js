@@ -88,7 +88,7 @@ test('findLockedEnrollmentNaMark ignores unlocked or missing marks', () => {
   assert.equal(marksService.findLockedEnrollmentNaMark(periods, classId, 'S1', personId), null);
 });
 
-test('applySessionMarks requires note when marking N/A', async () => {
+test('applySessionMarks allows empty note when marking N/A', async () => {
   const mocks = buildMocks({
     sessions: [{
       id: 'S1',
@@ -100,10 +100,13 @@ test('applySessionMarks requires note when marking N/A', async () => {
   });
   marksService.__setDependenciesForTest({ repositories: mocks.repositories });
   try {
-    await assert.rejects(
-      () => marksService.applySessionMarks(periodId, [{ sessionId: 'S1', action: 'mark_na', note: '' }], { id: 'USR_1' }),
-      /note is required/i
+    const updated = await marksService.applySessionMarks(
+      periodId,
+      [{ sessionId: 'S1', action: 'mark_na', note: '' }],
+      { id: 'USR_1' }
     );
+    assert.equal(updated.enrollmentSessionMarks.length, 1);
+    assert.equal(updated.enrollmentSessionMarks[0].note, '');
   } finally {
     marksService.__resetDependenciesForTest();
   }
