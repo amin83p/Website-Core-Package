@@ -2810,10 +2810,78 @@
     let scheduleSessionEnrollmentUseCurrentDate = false;
 
     function closeScheduleSessionContextStatusPicker() {
-        document.getElementById('scheduleSessionContextStatusPicker')?.classList.add('d-none');
+        const picker = document.getElementById('scheduleSessionContextStatusPicker');
+        if (picker) {
+            picker.classList.add('d-none');
+            picker.classList.remove('is-drop-up', 'is-fixed-placement');
+            picker.style.maxHeight = '';
+            picker.style.visibility = '';
+            picker.style.top = '';
+            picker.style.left = '';
+            picker.style.width = '';
+            picker.style.maxWidth = '';
+            picker.style.minWidth = '';
+            picker.style.position = '';
+        }
         document.getElementById('scheduleSessionContextMenu')?.classList.remove('is-status-picker-open');
         const chipBtn = document.getElementById('scheduleSessionContextStatusChip');
-        if (chipBtn) chipBtn.setAttribute('aria-expanded', 'false');
+        if (chipBtn) {
+            chipBtn.setAttribute('aria-expanded', 'false');
+            chipBtn.classList.remove('is-picker-open', 'is-drop-up');
+        }
+    }
+
+    function syncScheduleSessionContextStatusPickerPlacement(picker, anchorEl) {
+        if (!picker || !anchorEl) return;
+        const viewportMargin = 8;
+        const gapPx = 6;
+        picker.classList.remove('is-drop-up', 'is-fixed-placement');
+        anchorEl.classList.remove('is-drop-up');
+        picker.style.top = '';
+        picker.style.left = '';
+        picker.style.width = '';
+        picker.style.maxWidth = '';
+        picker.style.minWidth = '';
+        picker.style.position = '';
+        picker.style.maxHeight = '';
+        picker.classList.add('is-fixed-placement');
+        picker.style.position = 'fixed';
+        picker.style.minWidth = '0';
+        picker.style.maxWidth = '320px';
+        picker.style.width = 'max-content';
+        picker.style.visibility = 'hidden';
+        picker.classList.remove('d-none');
+        const anchorRect = anchorEl.getBoundingClientRect();
+        const menuEl = document.getElementById('scheduleSessionContextMenu');
+        const menuWidth = menuEl?.getBoundingClientRect().width || 280;
+        const naturalHeight = picker.scrollHeight;
+        const spaceBelow = window.innerHeight - anchorRect.bottom - viewportMargin;
+        const spaceAbove = anchorRect.top - viewportMargin;
+        const fitsBelow = spaceBelow >= naturalHeight + gapPx;
+        const fitsAbove = spaceAbove >= naturalHeight + gapPx;
+        let dropUp = false;
+        if (!fitsBelow && fitsAbove) {
+            dropUp = true;
+        } else if (!fitsBelow && !fitsAbove) {
+            dropUp = spaceAbove > spaceBelow;
+        }
+        const maxHeight = Math.max(96, Math.floor((dropUp ? spaceAbove : spaceBelow) - gapPx));
+        const contentWidth = Math.ceil(picker.scrollWidth);
+        const pickerWidth = Math.min(320, Math.max(anchorRect.width, menuWidth, contentWidth));
+        const left = Math.max(viewportMargin, Math.min(anchorRect.left, window.innerWidth - pickerWidth - viewportMargin));
+        picker.style.left = `${left}px`;
+        picker.style.width = `${pickerWidth}px`;
+        picker.style.maxWidth = '320px';
+        picker.style.maxHeight = `${maxHeight}px`;
+        if (dropUp) {
+            picker.classList.add('is-drop-up');
+            anchorEl.classList.add('is-drop-up');
+            const heightUsed = Math.min(naturalHeight, maxHeight);
+            picker.style.top = `${Math.max(viewportMargin, anchorRect.top - gapPx - heightUsed)}px`;
+        } else {
+            picker.style.top = `${anchorRect.bottom + gapPx}px`;
+        }
+        picker.style.visibility = '';
     }
 
     function isScheduleSessionContextStatusItemActionable(event, item) {
@@ -3366,8 +3434,9 @@
                 closeScheduleSessionContextStatusPicker();
                 if (willOpen) {
                     document.getElementById('scheduleSessionContextMenu')?.classList.add('is-status-picker-open');
-                    picker.classList.remove('d-none');
+                    chipBtn.classList.add('is-picker-open');
                     chipBtn.setAttribute('aria-expanded', 'true');
+                    syncScheduleSessionContextStatusPickerPlacement(picker, chipBtn);
                     scheduleSessionContextMenuSuppressDismissUntil = Date.now() + 250;
                 }
                 return;

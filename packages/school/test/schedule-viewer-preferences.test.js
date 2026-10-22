@@ -525,7 +525,10 @@ test('Master Schedule Viewer session context menu shows status chip with picker'
   assert.match(source, /closeScheduleSessionContextStatusPicker/);
   assert.match(source, /isScheduleSessionContextStatusItemActionable/);
   assert.match(source, /schedule-session-context-status-chip-toggle/);
+  assert.match(source, /syncScheduleSessionContextStatusPickerPlacement/);
   const css = read('public/styles/session-calendar.css');
   assert.match(css, /\.schedule-session-context-status-chip-toggle/);
+  assert.match(css, /\.schedule-session-context-status-picker\.is-drop-up/);
+  assert.match(css, /\.schedule-session-context-status-picker\.is-fixed-placement/);
   assert.match(css, /flex-direction: row/);
 });
