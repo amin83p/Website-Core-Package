@@ -247,14 +247,12 @@ function resolveRosterStudentNoteForSave({
     existing = {}
 }) {
     const existingNote = String(existing.notes || '').trim();
+    if (!canOverride && !canEditStudentRosterNote) {
+        return existingNote;
+    }
     if (incoming.notes === undefined) return existingNote;
     const nextNote = String(incoming.notes || '').trim();
     if (nextNote === existingNote) return existingNote;
-    if (!canOverride && !canEditStudentRosterNote) {
-        const error = new Error('You do not have permission to edit student roster notes.');
-        error.statusCode = 403;
-        throw error;
-    }
     return nextNote;
 }
 
