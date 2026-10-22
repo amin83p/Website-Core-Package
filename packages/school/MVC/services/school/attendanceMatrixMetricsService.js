@@ -89,6 +89,16 @@ function isUnmarkedAttendanceStatus(status) {
   return !normalizeStatus(status);
 }
 
+function listRosterRowsWithUnmarkedAttendance(roster) {
+  const rows = Array.isArray(roster) ? roster : [];
+  return rows.map((row) => {
+    const personId = String(row?.personId || '').trim();
+    if (!personId || !isUnmarkedAttendanceStatus(row?.attendance)) return null;
+    const name = String(row?.name || '').trim();
+    return name ? { personId, name } : { personId };
+  }).filter(Boolean);
+}
+
 function isAbsentLikeStatus(status) {
   const st = normalizeStatus(status);
   return st === ATTENDANCE_STATUS.ABSENT || st === ATTENDANCE_STATUS.ACF;
@@ -956,6 +966,7 @@ module.exports = {
   normalizeStatus,
   isNotApplicableStatus,
   isUnmarkedAttendanceStatus,
+  listRosterRowsWithUnmarkedAttendance,
   isAbsentLikeStatus,
   isEligibleAttendanceStatus,
   normalizeAttendanceStatusForSave,

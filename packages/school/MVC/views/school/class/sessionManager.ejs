@@ -1941,6 +1941,7 @@
                     <i class="bi bi-chevron-down session-info-expand-chevron" aria-hidden="true"></i>
                 </span>
                 <div id="sessionPendingReportsHint" class="session-pending-reports-hint d-none" role="status"></div>
+                <div id="sessionPendingAttendanceHint" class="session-pending-reports-hint d-none" role="status"></div>
             </div>
             <div class="session-info-status-slot">
                 <div class="session-info-status-slot-label">
@@ -6728,6 +6729,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!rows.length) {
             body.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-muted">No report instances for this session, or none visible for your account.</td></tr>';
             syncPendingReportsHint();
+            syncPendingAttendanceHint();
             return;
         }
         const groups = new Map();
@@ -6769,6 +6771,7 @@ document.addEventListener('DOMContentLoaded', () => {
             return groupHeader + instanceRows;
         }).join('');
         syncPendingReportsHint();
+        syncPendingAttendanceHint();
         renderSessionRosterReconciliation();
     }
 
@@ -7896,6 +7899,34 @@ document.addEventListener('DOMContentLoaded', () => {
         return (Array.isArray(sessionReportInstancesState) ? sessionReportInstancesState : [])
             .filter((row) => !isReportRowSubmitted(row));
     }
+    function getUnmarkedRosterAttendanceRows() {
+        return Array.from(document.querySelectorAll('.roster-row')).filter((row) => {
+            const attendance = String(row.querySelector('.att-radio:checked')?.value || '').trim();
+            return !attendance;
+        }).map((row) => ({
+            personId: String(row.getAttribute('data-personid') || '').trim(),
+            name: String(row.getAttribute('data-student-name') || '').trim() || 'Student'
+        })).filter((row) => row.personId);
+    }
+    function buildUnmarkedAttendanceMessageHtml(rows) {
+        const list = Array.isArray(rows) ? rows : [];
+        if (!list.length) return '';
+        const items = list.map((row) => {
+            const name = attendanceAttachmentEscape(row.name || row.personId || 'Student');
+            return `<li>${name}</li>`;
+        }).join('');
+        return `<div class="mt-3"><strong>Students without attendance:</strong><ul class="mt-2 mb-0 text-start">${items}</ul></div><div class="mt-3">Open the <strong>Attendance</strong> panel and set a status for each student before marking this session completed.</div>`;
+    }
+    async function showUnmarkedAttendanceBlockModal(rows) {
+        const message = '<p class="mb-2">This session cannot be marked completed until attendance is recorded for every student on the roster.</p>'
+            + buildUnmarkedAttendanceMessageHtml(rows);
+        await sessionMessageBox({
+            title: 'Attendance Not Complete',
+            icon: 'warning',
+            message,
+            html: true
+        });
+    }
     function wouldBlockCompletionStatus(statusCode) {
         if (!isSessionCompletionStatus(statusCode)) return false;
         const target = normalizeStatusCode(statusCode);
@@ -7977,6 +8008,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         hint.classList.remove('d-none');
         hint.innerHTML = `<i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i><span>${pending.length} assigned report(s) must be submitted before this session can be marked completed.</span>`;
+    }
+    function syncPendingAttendanceHint() {
+        const hint = document.getElementById('sessionPendingAttendanceHint');
+        if (!hint) return;
+        const unmarked = getUnmarkedRosterAttendanceRows();
+        const completionSelected = isSessionCompletionStatus(getSelectedSessionStatus());
+        const notYetSavedCompleted = !isSessionCompletionStatus(sessionInitialStatusCode);
+        if (!unmarked.length || !completionSelected || !notYetSavedCompleted) {
+            hint.classList.add('d-none');
+            hint.textContent = '';
+            return;
+        }
+        hint.classList.remove('d-none');
+        hint.innerHTML = `<i class="bi bi-exclamation-triangle-fill" aria-hidden="true"></i><span>${unmarked.length} student(s) need attendance marked before this session can be saved as completed.</span>`;
     }
     function initSessionManagerTooltips() {
         if (typeof bootstrap === 'undefined' || !bootstrap?.Tooltip) return;
@@ -8418,21 +8463,25 @@ document.addEventListener('DOMContentLoaded', () => {
                 statusSelect.value = code;
                 styleSessionStatusSelect();
                 markSessionAutosaveCoreDirty();
+                syncPendingAttendanceHint();
                 if (sessionStatusModalInstance) sessionStatusModalInstance.hide();
             });
             grid.appendChild(btn);
         });
         syncPendingReportsHint();
+        syncPendingAttendanceHint();
     }
     if (statusSelect) {
         statusSelect.addEventListener('change', () => {
             styleSessionStatusSelect();
             markSessionAutosaveCoreDirty();
+            syncPendingAttendanceHint();
         });
         styleSessionStatusSelect();
     }
     initSessionManagerTooltips();
     syncSessionInfoSummary();
+    syncPendingAttendanceHint();
     syncSessionNotesNavBadge();
     document.getElementById('sessionNotes')?.addEventListener('input', () => {
         syncSessionNotesNavBadge();
@@ -11196,6 +11245,7 @@ document.addEventListener('DOMContentLoaded', () => {
             refreshAttendanceStatusSummary();
             gbOnAttendanceChanged();
             markSessionAutosaveRosterDirty();
+            syncPendingAttendanceHint();
         });
     }
 
@@ -11501,6 +11551,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     await showPendingReportsBlockModal(clientPending);
                     return { ok: false, skipped: true, reason: 'pending-reports' };
                 }
+                const clientUnmarked = getUnmarkedRosterAttendanceRows();
+                if (clientUnmarked.length) {
+                    if (isAutosave) {
+                        return { ok: false, skipped: true, reason: 'unmarked-attendance', message: 'Completion blocked by unmarked attendance.' };
+                    }
+                    await showUnmarkedAttendanceBlockModal(clientUnmarked);
+                    return { ok: false, skipped: true, reason: 'unmarked-attendance' };
+                }
             }
 
             let { result } = await submitSessionSave(payload);
@@ -11516,6 +11574,15 @@ document.addEventListener('DOMContentLoaded', () => {
                 const pendingRows = Array.isArray(result?.data?.pendingReports) ? result.data.pendingReports : [];
                 await showPendingReportsBlockModal(pendingRows.length ? pendingRows : getUnsubmittedSessionReports());
                 return { ok: false, skipped: true, reason: 'pending-reports' };
+            }
+
+            if (result.code === 'UNMARKED_ATTENDANCE_BLOCK_COMPLETION') {
+                if (isAutosave) {
+                    return { ok: false, skipped: true, reason: 'unmarked-attendance', message: result.message || 'Completion blocked by unmarked attendance.' };
+                }
+                const unmarkedRows = Array.isArray(result?.data?.unmarkedStudents) ? result.data.unmarkedStudents : [];
+                await showUnmarkedAttendanceBlockModal(unmarkedRows.length ? unmarkedRows : getUnmarkedRosterAttendanceRows());
+                return { ok: false, skipped: true, reason: 'unmarked-attendance' };
             }
 
             if (result.status === 'warning' && result.code === 'MAKEUP_SESSIONS_EXIST') {

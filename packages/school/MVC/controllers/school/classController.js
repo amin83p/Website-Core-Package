@@ -6251,6 +6251,7 @@ async function saveSession(req, res) {
         }
         const shouldSkipInstructionalPayload = currentMakeupInactive || nextMakeupInactive;
         let pendingAttendanceChangeLog = null;
+        let rosterForCompletionAttendanceCheck = null;
 
         const orgIdForPolicies = classData?.orgId || getActiveOrgIdOrThrow(req.user);
         const orgTimeZoneForPolicies = req.orgTimeZone || req.user?.activeOrgTimeZone || '';
@@ -6616,6 +6617,7 @@ async function saveSession(req, res) {
                 }
                 preservedConductRosterRows.push({ ...existRec });
             });
+            rosterForCompletionAttendanceCheck = mergedSessionRoster;
             originalSession.roster = mergedSessionRoster.concat(preservedConductRosterRows);
             pendingAttendanceChangeLog = {
                 beforeRoster: existingRoster,
@@ -6623,6 +6625,24 @@ async function saveSession(req, res) {
                 sessionId,
                 sessionDate: String(originalSession?.date || '').trim()
             };
+        }
+
+        if (!wasCompletion && willBeCompletion && !shouldSkipInstructionalPayload) {
+            const rosterToCheck = rosterForCompletionAttendanceCheck
+                ?? (Array.isArray(originalSession.roster) ? originalSession.roster : []);
+            const unmarkedStudents = attendanceMatrixMetricsService.listRosterRowsWithUnmarkedAttendance(rosterToCheck);
+            if (unmarkedStudents.length) {
+                const blockMessage = 'This session cannot be marked completed until attendance is recorded for every student on the roster.';
+                if (req.headers['x-ajax-request']) {
+                    return res.status(400).json({
+                        status: 'error',
+                        code: 'UNMARKED_ATTENDANCE_BLOCK_COMPLETION',
+                        message: blockMessage,
+                        data: { unmarkedStudents }
+                    });
+                }
+                throw new Error(blockMessage);
+            }
         }
 
         if (!shouldSkipInstructionalPayload && req.body?.gradebooks !== undefined) {
