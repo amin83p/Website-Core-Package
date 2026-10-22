@@ -78,20 +78,32 @@ test('attendance matrix excuse marking follows access flags in controller and vi
   const matrixAccess = read('packages/school/MVC/services/school/attendanceMatrixAccessService.js');
   const controller = read('packages/school/MVC/controllers/school/attendanceController.js');
   const viewer = read('packages/school/MVC/views/school/attendance/attendanceViewer.ejs');
+  const classController = read('packages/school/MVC/controllers/school/classController.js');
 
   assert.match(matrixAccess, /userCanMarkAttendanceExcused/);
   assert.match(matrixAccess, /canMarkExcused/);
 
   assert.match(controller, /canMarkAttendanceExcused/);
+  assert.match(controller, /canEditExcuseReference/);
+  assert.match(controller, /canEditStudentRosterNote/);
   assert.match(controller, /resolveAttendanceAccessForRequest/);
   assert.match(controller, /savedExcuseState/);
   assert.match(controller, /if \(canMarkAttendanceExcused\) \{[\s\S]*rosterRecord\.lateExcused/);
   assert.match(controller, /else \{[\s\S]*rosterRecord\.lateExcused = savedExcuseState\.lateExcused/);
+  assert.match(controller, /canEditExcuseText/);
+  assert.match(controller, /canEditStudentRosterNote/);
+
+  assert.match(classController, /resolveRosterStudentNoteForSave/);
+  assert.match(classController, /resolveRosterExcuseRefForSave/);
 
   assert.match(viewer, /CAN_MARK_ATTENDANCE_EXCUSED/);
+  assert.match(viewer, /CAN_EDIT_STUDENT_ROSTER_NOTE/);
+  assert.match(viewer, /CAN_EDIT_EXCUSE_REFERENCE/);
   assert.match(viewer, /attendanceCanMarkExcused/);
+  assert.match(viewer, /attendanceCanEditExcuseNotes/);
   assert.match(viewer, /syncExcuseNotesAccess/);
   assert.match(viewer, /if \(attendanceCanMarkExcused\(\)\) \{[\s\S]*payload\.lateExcused/);
+  assert.match(viewer, /if \(attendanceCanEditExcuseNotes\(\)\) \{[\s\S]*payload\.excuseRef/);
   assert.match(viewer, /if \(!attendanceCanMarkExcused\(\)\) \{[\s\S]*wrapper\.classList\.add\('d-none'\)/);
 });
 

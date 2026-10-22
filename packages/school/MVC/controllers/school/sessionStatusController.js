@@ -84,7 +84,8 @@ function buildPayload(reqBody, { activeOrgId, userId }) {
     excludeFromAttendance: toBoolean(reqBody.excludeFromAttendance, false),
     excludeFromTeacherIndex: toBoolean(reqBody.excludeFromTeacherIndex, false),
     excludeFromStudentIndex: toBoolean(reqBody.excludeFromStudentIndex, false),
-    active: toBoolean(reqBody.active, true),
+    // Unchecked HTML checkboxes are omitted from POST bodies; default inactive when absent.
+    active: toBoolean(reqBody.active, false),
     sortOrder: Number(reqBody.sortOrder || 0),
     accessType: String(reqBody.accessType || 'users').trim(),
     classCapacity: String(reqBody.classCapacity || 'both').trim(),

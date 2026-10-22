@@ -237,6 +237,13 @@ test('session status form exposes mergedSessionRequired control', () => {
   assert.match(form, /Merged Session Required/);
 });
 
+test('session status save treats unchecked Active switch as inactive', () => {
+  const controller = readPackage('MVC/controllers/school/sessionStatusController.js');
+  const form = readPackage('MVC/views/school/sessionStatus/sessionStatusForm.ejs');
+  assert.match(controller, /active: toBoolean\(reqBody\.active, false\)/);
+  assert.match(form, /if \(!params\.has\('active'\)\) params\.set\('active', 'false'\)/);
+});
+
 test('session manager includes merge modal and status hook markers', () => {
   const sessionManager = readPackage('MVC/views/school/class/sessionManager.ejs');
   assert.match(sessionManager, /ensureMergedSessionModal/);

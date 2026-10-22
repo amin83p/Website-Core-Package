@@ -95,7 +95,7 @@ See [admin-access-types-reference-2026-09-05.md](admin-access-types-reference-20
 | Operation | Scope | What user can do and see |
 | --- | --- | --- |
 | READ_ALL | USER | No Access. |
-| READ_ALL | OWNER | **Matrix:** student names, statuses, late/early mins, student note. Date window: 3 months from today. **Manage Session:** same fields (view). |
+| READ_ALL | OWNER | **Matrix:** student names, statuses, late/early mins, excuse/reference note. Date window: 3 months from today. **Manage Session:** same fields (view). |
 | READ_ALL | DEPARTMENT / DIVISION | **Matrix:** `+` excuse/reference notes, student notes, attached files, admin discussion, excuse marks, rollups. Date window: 1 year. **Manage Session:** `+` excuse notes, files, admin discussion. |
 | READ_ALL | ORGANIZATION | **Matrix:** `+` change history. |
 | READ_ALL | ADMIN | No additional READ_ALL extras beyond ORGANIZATION. Locked sessions remain visible to all users who can open the matrix; only cell **updates** on locked sessions are blocked (unless UPDATE + ADMIN or bypass A1). Admin viewer tools and full field visibility are bypass-only — see overrides A4 and A12. |
@@ -113,8 +113,8 @@ See [admin-access-types-reference-2026-09-05.md](admin-access-types-reference-20
 | --- | --- | --- |
 | UPDATE | USER | No Access. |
 | UPDATE | OWNER | **Matrix:** statuses, late/early mins, student note. Window: 3 months. **Manage Session:** statuses, late/early mins. |
-| UPDATE | DEPARTMENT / DIVISION | **Matrix:** `+` excuse notes, student note, files, admin discussion. **Manage Session:** same. |
-| UPDATE | ORGANIZATION | **Matrix:** `+` excuse flags (Late/Early, Absent, ACF); edit after completed-session deadline. **Manage Session:** same. |
+| UPDATE | DEPARTMENT / DIVISION | **Matrix:** `+` excuse notes, files, admin discussion. **Manage Session:** same. |
+| UPDATE | ORGANIZATION | **Matrix:** `+` student note, excuse flags (Late/Early, Absent, ACF); edit after completed-session deadline. **Manage Session:** same. |
 | UPDATE | ADMIN | **Matrix + Manage Session:** `+` edit attendance on locked session; `+` change attendance **away from N/A** when rolling enrollment placed the student on-hold or exempted the session (office session mark). |
 
 **Notes:**

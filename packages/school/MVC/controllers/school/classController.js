@@ -225,8 +225,8 @@ function resolveExcuseAttachmentForRosterMerge(incRec = {}, existRec = {}, canDe
     return incomingAttachment;
 }
 
-function resolveAttendanceExcuseFieldsForSave({ canOverride, incoming = {}, existing = {} }) {
-    if (canOverride) {
+function resolveAttendanceExcuseFieldsForSave({ canOverride, canMarkExcused = false, incoming = {}, existing = {} }) {
+    if (canOverride || canMarkExcused) {
         return {
             lateExcused: incoming.lateExcused === undefined ? existing.lateExcused : incoming.lateExcused,
             earlyLeaveExcused: incoming.earlyLeaveExcused === undefined ? existing.earlyLeaveExcused : incoming.earlyLeaveExcused,
@@ -238,6 +238,43 @@ function resolveAttendanceExcuseFieldsForSave({ canOverride, incoming = {}, exis
         earlyLeaveExcused: existing.earlyLeaveExcused,
         absenceExcused: existing.absenceExcused
     };
+}
+
+function resolveRosterStudentNoteForSave({
+    canOverride = false,
+    canEditStudentRosterNote = false,
+    incoming = {},
+    existing = {}
+}) {
+    const existingNote = String(existing.notes || '').trim();
+    if (incoming.notes === undefined) return existingNote;
+    const nextNote = String(incoming.notes || '').trim();
+    if (nextNote === existingNote) return existingNote;
+    if (!canOverride && !canEditStudentRosterNote) {
+        const error = new Error('You do not have permission to edit student roster notes.');
+        error.statusCode = 403;
+        throw error;
+    }
+    return nextNote;
+}
+
+function resolveRosterExcuseRefForSave({
+    canOverride = false,
+    canMarkExcused = false,
+    canEditExcuseReference = false,
+    incoming = {},
+    existing = {}
+}) {
+    const existingRef = String(existing.excuseRef || '').trim();
+    if (incoming.excuseRef === undefined) return existingRef;
+    const nextRef = String(incoming.excuseRef || '').trim();
+    if (nextRef === existingRef) return existingRef;
+    if (!canOverride && !canMarkExcused && !canEditExcuseReference) {
+        const error = new Error('You do not have permission to edit excuse reference notes.');
+        error.statusCode = 403;
+        throw error;
+    }
+    return nextRef;
 }
 
 function normalizeSessionRatingPercent(value, fallback = null) {
@@ -4169,6 +4206,15 @@ async function saveSession1(req, res) {
             const matrixPolicySave1 = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayerSave1);
             const attendanceAccessSave1 = await attendanceAccessService.buildAttendanceAccess(req.user, req.ip);
             const canDeleteAttendanceFilesSave1 = Boolean(attendanceAccessSave1.canDeleteFiles);
+            const canOverrideSave1 = await adminAuthorityService.isAdminForRequestAsync(
+                req.user,
+                SECTIONS.SCHOOL_ATTENDANCES,
+                OPERATIONS.UPDATE,
+                { section: { id: SECTIONS.SCHOOL_ATTENDANCES } }
+            );
+            const canMarkExcusedSave1 = Boolean(attendanceAccessSave1.canMarkExcused);
+            const canEditExcuseReferenceSave1 = Boolean(attendanceAccessSave1.canEditExcuseReference);
+            const canEditStudentRosterNoteSave1 = Boolean(attendanceAccessSave1.canEditStudentRosterNote);
             await cleanupRemovedExcuseAttachments(existingRoster, incomingRoster, {
                 canDeleteFiles: canDeleteAttendanceFilesSave1
             });
@@ -4191,7 +4237,8 @@ async function saveSession1(req, res) {
                 const existingRespectsTeachers = normalizeSessionRatingPercent(existRec.respectsTeachersPercent, null);
                 const existingRespectsStudents = normalizeSessionRatingPercent(existRec.respectsStudentsPercent, null);
                 const excuseFields = resolveAttendanceExcuseFieldsForSave({
-                    canOverride,
+                    canOverride: canOverrideSave1,
+                    canMarkExcused: canMarkExcusedSave1,
                     incoming: incRec,
                     existing: existRec
                 });
@@ -4208,7 +4255,13 @@ async function saveSession1(req, res) {
                     lateExcused: excuseFields.lateExcused,
                     earlyLeaveExcused: excuseFields.earlyLeaveExcused,
                     absenceExcused: excuseFields.absenceExcused,
-                    excuseRef: incRec.excuseRef,
+                    excuseRef: resolveRosterExcuseRefForSave({
+                        canOverride: canOverrideSave1,
+                        canMarkExcused: canMarkExcusedSave1,
+                        canEditExcuseReference: canEditExcuseReferenceSave1,
+                        incoming: incRec,
+                        existing: existRec
+                    }),
                     excuseAttachment: resolveExcuseAttachmentForRosterMerge(
                         incRec,
                         existRec,
@@ -4227,7 +4280,12 @@ async function saveSession1(req, res) {
                         ? existingRespectsStudents
                         : normalizeSessionRatingPercent(incRec.respectsStudentsPercent, null),
                     conductSavedAt: resolveConductSavedAtForRosterMerge(incRec, existRec),
-                    notes: existRec.notes || '',       // Preserve existing student-specific notes if any
+                    notes: resolveRosterStudentNoteForSave({
+                        canOverride: canOverrideSave1,
+                        canEditStudentRosterNote: canEditStudentRosterNoteSave1,
+                        incoming: incRec,
+                        existing: existRec
+                    }),
                     comments: existRec.comments || []  // PRESERVE the interactive admin comments!
                 };
                 const ruled = attendanceMatrixMetricsService.applyAttendanceMatrixRosterRules(
@@ -6512,6 +6570,9 @@ async function saveSession(req, res) {
             const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
             const attendanceAccessSave = await attendanceAccessService.buildAttendanceAccess(req.user, req.ip);
             const canDeleteAttendanceFilesSave = Boolean(attendanceAccessSave.canDeleteFiles);
+            const canMarkExcusedSave = Boolean(attendanceAccessSave.canMarkExcused);
+            const canEditExcuseReferenceSave = Boolean(attendanceAccessSave.canEditExcuseReference);
+            const canEditStudentRosterNoteSave = Boolean(attendanceAccessSave.canEditStudentRosterNote);
 
             await cleanupRemovedExcuseAttachments(existingRoster, incomingRoster, {
                 canDeleteFiles: canDeleteAttendanceFilesSave
@@ -6537,6 +6598,7 @@ async function saveSession(req, res) {
                 const existingRespectsStudents = normalizeSessionRatingPercent(existRec.respectsStudentsPercent, null);
                 const excuseFields = resolveAttendanceExcuseFieldsForSave({
                     canOverride,
+                    canMarkExcused: canMarkExcusedSave,
                     incoming: incRec,
                     existing: existRec
                 });
@@ -6553,7 +6615,13 @@ async function saveSession(req, res) {
                     lateExcused: excuseFields.lateExcused,
                     earlyLeaveExcused: excuseFields.earlyLeaveExcused,
                     absenceExcused: excuseFields.absenceExcused,
-                    excuseRef: incRec.excuseRef,
+                    excuseRef: resolveRosterExcuseRefForSave({
+                        canOverride,
+                        canMarkExcused: canMarkExcusedSave,
+                        canEditExcuseReference: canEditExcuseReferenceSave,
+                        incoming: incRec,
+                        existing: existRec
+                    }),
                     excuseAttachment: resolveExcuseAttachmentForRosterMerge(
                         incRec,
                         existRec,
@@ -6588,7 +6656,12 @@ async function saveSession(req, res) {
                             ? existingRespectsStudents
                             : normalizeSessionRatingPercent(incRec.respectsStudentsPercent, null)),
                     conductSavedAt: resolveConductSavedAtForRosterMerge(incRec, existRec),
-                    notes: existRec.notes || '',
+                    notes: resolveRosterStudentNoteForSave({
+                        canOverride,
+                        canEditStudentRosterNote: canEditStudentRosterNoteSave,
+                        incoming: incRec,
+                        existing: existRec
+                    }),
                     comments: existRec.comments || []
                 };
                 const ruled = attendanceMatrixMetricsService.applyAttendanceMatrixRosterRules(

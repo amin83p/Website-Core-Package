@@ -467,6 +467,7 @@
                     <h5 class="fw-bold mb-1" id="det_studentName">Student Name</h5>
                     <div class="text-muted small" id="det_date">Date</div>
                     <p class="text-warning small mb-0 mt-2 d-none" id="cell_modal_lock_notice">This session is locked. Attendance cannot be changed unless an administrator unlocks it or overrides the lock.</p>
+                    <p class="text-warning small mb-0 mt-2 d-none" id="cell_modal_attendance_edit_window_notice">Attendance edits are no longer allowed for this completed session. Contact an administrator if you need an override.</p>
                     <p class="text-warning small mb-0 mt-2 d-none" id="cell_modal_makeup_notice">This session requires a make-up session. Attendance and roster notes cannot be changed here. Create or open the make-up session instead.</p>
                     <p class="text-secondary small mb-0 mt-2 d-none" id="cell_modal_enrollment_notice">This student was not enrolled for this session date. Attendance and roster details are read-only.</p>
                     <p class="text-warning small mb-0 mt-2 d-none" id="cell_modal_enrollment_na_lock_notice">This attendance is N/A due to enrollment on-hold or an enrollment office session exemption. Status and late/early timing are locked unless you have attendance administrator access. Student notes and admin discussion may still be edited.</p>
@@ -478,7 +479,7 @@
                         <input type="radio" class="btn-check modal-att-option" name="modal_cell_attendance" id="modal_att_present" value="present" data-status="present">
                         <label class="btn btn-outline-success" for="modal_att_present" title="Present" data-status-label="present"><i class="bi bi-check-circle"></i>Present</label>
                         <input type="radio" class="btn-check modal-att-option" name="modal_cell_attendance" id="modal_att_late" value="late" data-status="late">
-                        <label class="btn btn-outline-warning text-dark" for="modal_att_late" title="Late" data-status-label="late"><i class="bi bi-clock-history"></i>Late</label>
+                        <label class="btn btn-outline-warning text-dark" for="modal_att_late" title="Late/Leave Early" data-status-label="late"><i class="bi bi-clock-history"></i>Late/Leave Early</label>
                         <input type="radio" class="btn-check modal-att-option" name="modal_cell_attendance" id="modal_att_absent" value="absent" data-status="absent">
                         <label class="btn btn-outline-danger" for="modal_att_absent" title="Absent" data-status-label="absent"><i class="bi bi-x-circle"></i>Absent</label>
                         <input type="radio" class="btn-check modal-att-option" name="modal_cell_attendance" id="modal_att_acf" value="acf" data-status="acf">
@@ -495,6 +496,7 @@
 
                     <input type="hidden" id="inp_cellLateMins" value="">
                     <input type="hidden" id="inp_cellLeaveMins" value="">
+                    <div class="collapse" id="cell_modal_timing_collapse">
                     <div class="attendance-timing-panel border rounded bg-light-subtle p-3 mb-3">
                         <div class="small text-muted mb-3" id="cell_modalSessionWindow">Session: —</div>
                         <div id="cell_modalAttendanceTimingError" class="small text-danger mb-2 d-none" role="alert"></div>
@@ -561,6 +563,7 @@
                                 </div>
                             </div>
                         </div>
+                    </div>
                     </div>
                 </fieldset>
 
@@ -1505,6 +1508,18 @@ function attendanceCanMarkExcused() {
     return window.CAN_MARK_ATTENDANCE_EXCUSED === true;
 }
 
+function attendanceCanEditExcuseReference() {
+    return window.CAN_EDIT_EXCUSE_REFERENCE === true;
+}
+
+function attendanceCanEditStudentRosterNote() {
+    return window.CAN_EDIT_STUDENT_ROSTER_NOTE === true;
+}
+
+function attendanceCanEditExcuseNotes() {
+    return attendanceCanMarkExcused() || attendanceCanEditExcuseReference();
+}
+
 function setCellModalCollapseExpanded(collapseId, expanded) {
     const collapseEl = document.getElementById(collapseId);
     const toggleBtn = document.querySelector(`[aria-controls="${collapseId}"]`);
@@ -1540,12 +1555,12 @@ function syncCellModalNotesSections(record = {}) {
 }
 
 function syncExcuseNotesAccess(record = null) {
-    const canMark = attendanceCanMarkExcused();
+    const canEditExcuse = attendanceCanEditExcuseNotes();
     const editorWrap = document.getElementById('wrap_cellExcuseNotesEditor');
     const readonlyWrap = document.getElementById('wrap_cellExcuseNotesReadonly');
     const notesWrap = document.getElementById('wrap_cellExcuseNotes');
     if (!notesWrap) return;
-    if (canMark) {
+    if (canEditExcuse) {
         notesWrap.classList.remove('d-none');
         if (editorWrap) editorWrap.classList.remove('d-none');
         if (readonlyWrap) readonlyWrap.classList.add('d-none');
@@ -1645,24 +1660,69 @@ function syncAbsenceExcuseControl() {
     return checkbox.checked === true;
 }
 
+function applyCellModalTimingFieldAccess() {
+    const fieldset = document.getElementById('fieldset_cell_attendance');
+    const allowEditBase = fieldset?.dataset.allowEditBase === 'true';
+    const enrollmentNaLocked = fieldset?.dataset.enrollmentNaLocked === 'true';
+    const canOverride = window.CAN_OVERRIDE_SESSION_LOCK === true;
+    const isLate = document.querySelector('input[name="modal_cell_attendance"]:checked')?.value === 'late';
+    const allowTimingEdit = allowEditBase && isLate && (!enrollmentNaLocked || canOverride);
+    [
+        'cell_modalArrivalTime',
+        'cell_modalBreakLateMins',
+        'cell_modalLeaveTime',
+        'cell_modalBreakEarlyMins'
+    ].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = !allowTimingEdit;
+    });
+    ['btn_cellLateExcused', 'btn_cellEarlyLeaveExcused'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = !allowTimingEdit;
+    });
+    const attendance = document.querySelector('input[name="modal_cell_attendance"]:checked')?.value || '';
+    const allowAbsenceExcuseEdit = allowEditBase
+        && isAbsentLikeAttendanceStatus(attendance)
+        && (!enrollmentNaLocked || canOverride);
+    ['btn_cellAbsenceExcused', 'inp_cellAbsenceExcused'].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = !allowAbsenceExcuseEdit;
+    });
+    return allowTimingEdit;
+}
+
+function syncCellModalTimingSectionVisibility() {
+    const attendance = document.querySelector('input[name="modal_cell_attendance"]:checked')?.value || '';
+    const isLate = attendance === 'late';
+    setCellModalCollapseExpanded('cell_modal_timing_collapse', isLate);
+    applyCellModalTimingFieldAccess();
+    if (!isLate) {
+        setCellAttendanceTimingError('');
+    }
+}
+
 function syncTimingExcuseControls() {
-    recalculateCellAttendanceTimingTotals();
-    syncTimingExcuseControl({
-        minutesInputId: 'inp_cellLateMins',
-        checkboxId: 'inp_cellLateExcused',
-        wrapperId: 'wrap_cellLateExcused',
-        buttonId: 'btn_cellLateExcused',
-        inactiveText: 'Mark late excused',
-        activeText: 'Late excused'
-    });
-    syncTimingExcuseControl({
-        minutesInputId: 'inp_cellLeaveMins',
-        checkboxId: 'inp_cellEarlyLeaveExcused',
-        wrapperId: 'wrap_cellEarlyLeaveExcused',
-        buttonId: 'btn_cellEarlyLeaveExcused',
-        inactiveText: 'Mark early leave excused',
-        activeText: 'Early leave excused'
-    });
+    syncCellModalTimingSectionVisibility();
+    const isLate = document.querySelector('input[name="modal_cell_attendance"]:checked')?.value === 'late';
+    if (isLate) {
+        recalculateCellAttendanceTimingTotals();
+        syncTimingExcuseControl({
+            minutesInputId: 'inp_cellLateMins',
+            checkboxId: 'inp_cellLateExcused',
+            wrapperId: 'wrap_cellLateExcused',
+            buttonId: 'btn_cellLateExcused',
+            inactiveText: 'Mark late excused',
+            activeText: 'Late excused'
+        });
+        syncTimingExcuseControl({
+            minutesInputId: 'inp_cellLeaveMins',
+            checkboxId: 'inp_cellEarlyLeaveExcused',
+            wrapperId: 'wrap_cellEarlyLeaveExcused',
+            buttonId: 'btn_cellEarlyLeaveExcused',
+            inactiveText: 'Mark early leave excused',
+            activeText: 'Early leave excused'
+        });
+    }
     syncAbsenceExcuseControl();
     syncExcuseNotesAccess();
 }
@@ -1737,6 +1797,8 @@ document.addEventListener('DOMContentLoaded', () => {
     syncAttendanceRequestBudgetFromUsage();
     window.CAN_EDIT_ATTENDANCE_ROSTER = <%= (typeof canEditAttendanceRoster !== 'undefined' && canEditAttendanceRoster) ? 'true' : 'false' %>;
     window.CAN_MARK_ATTENDANCE_EXCUSED = <%= (typeof canMarkAttendanceExcused !== 'undefined' && canMarkAttendanceExcused) ? 'true' : 'false' %>;
+    window.CAN_EDIT_STUDENT_ROSTER_NOTE = <%= (typeof canEditStudentRosterNote !== 'undefined' && canEditStudentRosterNote) ? 'true' : 'false' %>;
+    window.CAN_EDIT_EXCUSE_REFERENCE = <%= (typeof canEditExcuseReference !== 'undefined' && canEditExcuseReference) ? 'true' : 'false' %>;
     window.CAN_OVERRIDE_SESSION_LOCK = <%= (typeof canOverrideSessionLock !== 'undefined' && canOverrideSessionLock) ? 'true' : 'false' %>;
     window.CAN_UPLOAD_ATTENDANCE_FILES = <%= (typeof canUploadFiles !== 'undefined' && canUploadFiles) ? 'true' : 'false' %>;
     window.CAN_EXPORT_ATTENDANCE = <%= (typeof canExportExcel !== 'undefined' && canExportExcel) ? 'true' : 'false' %>;
@@ -3543,11 +3605,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const attendance = document.querySelector('input[name="modal_cell_attendance"]:checked')?.value;
             if (!attendance) {
                 if (typeof showMessageModal === 'function') {
-                    showMessageModal({ title: 'Attendance', icon: 'warning', message: 'Select a status (Present, Late, Absent, ACF, or N/A).', buttons: [{ text: 'OK', class: 'btn-primary' }] });
+                    showMessageModal({ title: 'Attendance', icon: 'warning', message: 'Select a status (Present, Late/Leave Early, Absent, ACF, or N/A).', buttons: [{ text: 'OK', class: 'btn-primary' }] });
                 } else { alert('Select an attendance status.'); }
                 return;
             }
-            if (hasCellAttendanceTimingValidationError()) {
+            if (attendance === 'late' && hasCellAttendanceTimingValidationError()) {
                 if (typeof showMessageModal === 'function') {
                     showMessageModal({ title: 'Attendance timing', icon: 'warning', message: document.getElementById('cell_modalAttendanceTimingError')?.textContent || 'Fix timing fields before saving.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
                 } else { alert('Fix timing fields before saving.'); }
@@ -3584,8 +3646,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     payload.lateExcused = parseAttendanceMinutesInputValue('inp_cellLateMins') > 0 && document.getElementById('inp_cellLateExcused')?.checked === true;
                     payload.earlyLeaveExcused = parseAttendanceMinutesInputValue('inp_cellLeaveMins') > 0 && document.getElementById('inp_cellEarlyLeaveExcused')?.checked === true;
                     payload.absenceExcused = isAbsentLikeAttendanceStatus(attendance) && document.getElementById('inp_cellAbsenceExcused')?.checked === true;
+                }
+                if (attendanceCanEditExcuseNotes()) {
                     payload.excuseRef = document.getElementById('inp_cellExcuseRef').value;
-                    payload.excuseAttachment = await uploadAttendanceFile(document.getElementById('inp_cellExcuseFile'), 'excuse', classId, sessionId, personId) || window.currentAttendanceExcuseAttachment || null;
+                    if (window.CAN_UPLOAD_ATTENDANCE_FILES === true) {
+                        payload.excuseAttachment = await uploadAttendanceFile(document.getElementById('inp_cellExcuseFile'), 'excuse', classId, sessionId, personId) || window.currentAttendanceExcuseAttachment || null;
+                    }
+                }
+                if (!attendanceCanEditStudentRosterNote()) {
+                    delete payload.notes;
                 }
                 const res = await fetch('/school/attendances/api/update-roster-cell', {
                     method: 'POST',
@@ -3760,14 +3829,13 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
         absenceExcusedInput.checked = isAbsentLikeAttendanceStatus(effStatus)
             && (attendanceAbsenceIsExcused(record) || record.status === 'excused');
     }
-    syncTimingExcuseControls();
     document.getElementById('inp_cellExcuseRef').value = record.excuseRef || '';
     window.currentAttendanceExcuseAttachment = record.excuseAttachment || null;
     const excuseFileInput = document.getElementById('inp_cellExcuseFile');
     if (excuseFileInput) excuseFileInput.value = '';
     const excusePreview = document.getElementById('inp_cellExcuseAttachmentPreview');
     if (excusePreview) {
-        excusePreview.innerHTML = attendanceCanMarkExcused()
+        excusePreview.innerHTML = attendanceCanEditExcuseNotes()
             ? renderAttendanceAttachmentLink(record.excuseAttachment, '<span class="text-muted">No file attached.</span>')
             : '';
     }
@@ -3775,6 +3843,7 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
     document.getElementById('inp_rosterStudentNote').value = record.rosterStudentNotes != null ? record.rosterStudentNotes : '';
 
     const locked = record.sessionLocked === true;
+    const attendanceEditLocked = record.attendanceEditLocked === true;
     const makeupRequired = record.applicability === 'makeup_required';
     const outsideEnrollmentWindow = record.withinEnrollmentWindow === false;
     const enrollmentNaLocked = record.enrollmentNaLock === true
@@ -3782,15 +3851,26 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
     const canEdit = window.CAN_EDIT_ATTENDANCE_ROSTER === true;
     const canUploadFiles = window.CAN_UPLOAD_ATTENDANCE_FILES === true;
     const canOverride = window.CAN_OVERRIDE_SESSION_LOCK === true;
-    const allowEditBase = canEdit && !outsideEnrollmentWindow && !makeupRequired && (!locked || canOverride);
+    const allowEditBase = canEdit
+        && !outsideEnrollmentWindow
+        && !makeupRequired
+        && !attendanceEditLocked
+        && (!locked || canOverride);
     const allowStatusEdit = allowEditBase && (!enrollmentNaLocked || canOverride);
-    const allowTimingEdit = allowEditBase && (!enrollmentNaLocked || canOverride);
-    const allowNotesEdit = allowEditBase;
-    const allowSaveAttendance = allowStatusEdit || (enrollmentNaLocked && allowNotesEdit);
-    const allowUpload = canUploadFiles && !outsideEnrollmentWindow && !makeupRequired && (!locked || canOverride);
     const fs = document.getElementById('fieldset_cell_attendance');
-    if (!allowEditBase) {
-        if (fs) fs.disabled = true;
+    if (fs) {
+        fs.dataset.allowEditBase = allowEditBase ? 'true' : 'false';
+        fs.dataset.enrollmentNaLocked = enrollmentNaLocked ? 'true' : 'false';
+    }
+    syncTimingExcuseControls();
+    const allowStudentRosterNoteEdit = allowEditBase && attendanceCanEditStudentRosterNote();
+    const allowExcuseNotesEdit = allowEditBase && attendanceCanEditExcuseNotes();
+    const allowSaveAttendance = allowStatusEdit
+        || (enrollmentNaLocked && (allowStudentRosterNoteEdit || allowExcuseNotesEdit));
+    const allowUpload = canUploadFiles && !outsideEnrollmentWindow && !makeupRequired && (!locked || canOverride);
+    if (fs) {
+        // Fieldset disabled must be cleared when editing is allowed; otherwise status radios stay dead after a read-only open.
+        fs.disabled = !allowEditBase;
     }
     document.querySelectorAll('.modal-att-option').forEach((el) => {
         el.disabled = !allowStatusEdit;
@@ -3799,22 +3879,12 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
         if (allowStatusEdit) el.classList.remove('disabled');
         else el.classList.add('disabled');
     });
-    [
-        'cell_modalArrivalTime',
-        'cell_modalBreakLateMins',
-        'cell_modalLeaveTime',
-        'cell_modalBreakEarlyMins'
-    ].forEach((id) => {
-        const el = document.getElementById(id);
-        if (el) el.disabled = !allowTimingEdit;
-    });
-    ['btn_cellLateExcused', 'btn_cellEarlyLeaveExcused', 'btn_cellAbsenceExcused', 'inp_cellAbsenceExcused'].forEach((id) => {
-        const el = document.getElementById(id);
-        if (el) el.disabled = !allowTimingEdit;
-    });
     const rosterStudentNoteEl = document.getElementById('inp_rosterStudentNote');
-    if (rosterStudentNoteEl) rosterStudentNoteEl.disabled = !allowNotesEdit;
+    if (rosterStudentNoteEl) rosterStudentNoteEl.disabled = !allowStudentRosterNoteEdit;
+    const excuseRefEl = document.getElementById('inp_cellExcuseRef');
+    if (excuseRefEl) excuseRefEl.disabled = !allowExcuseNotesEdit;
     const lockNotice = document.getElementById('cell_modal_lock_notice');
+    const attendanceEditWindowNotice = document.getElementById('cell_modal_attendance_edit_window_notice');
     const makeupNotice = document.getElementById('cell_modal_makeup_notice');
     const enrollmentNotice = document.getElementById('cell_modal_enrollment_notice');
     const enrollmentNaLockNotice = document.getElementById('cell_modal_enrollment_na_lock_notice');
@@ -3833,19 +3903,34 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
         if (makeupRequired && canEdit) makeupNotice.classList.remove('d-none');
         else makeupNotice.classList.add('d-none');
     }
+    if (attendanceEditWindowNotice) {
+        const deadlineKey = String(record.attendanceEditDeadlineDateKey || '').trim();
+        if (attendanceEditLocked && canEdit && !makeupRequired && !outsideEnrollmentWindow) {
+            attendanceEditWindowNotice.textContent = deadlineKey
+                ? `Attendance edits are no longer allowed for this completed session (deadline: ${deadlineKey}). Contact an administrator if you need an override.`
+                : 'Attendance edits are no longer allowed for this completed session. Contact an administrator if you need an override.';
+            attendanceEditWindowNotice.classList.remove('d-none');
+        } else {
+            attendanceEditWindowNotice.classList.add('d-none');
+        }
+    }
     if (locked && !canOverride && canEdit && !makeupRequired) lockNotice.classList.remove('d-none');
     else lockNotice.classList.add('d-none');
     const saveAttBtn = document.getElementById('btn_saveAttendance');
     if (saveAttBtn) {
         saveAttBtn.disabled = !allowSaveAttendance;
     }
+    const allowAdminDiscussionEdit = allowEditBase;
     ['inp_newComment', 'btn_saveComment', 'btn_mentionUser'].forEach((id) => {
         const el = document.getElementById(id);
-        if (el) el.disabled = !allowNotesEdit;
+        if (el) el.disabled = !allowAdminDiscussionEdit;
     });
+    const allowExcuseFileUpload = allowUpload && allowExcuseNotesEdit;
     ['inp_cellExcuseFile', 'inp_newCommentFile'].forEach((id) => {
         const el = document.getElementById(id);
-        if (el) el.disabled = !allowUpload;
+        if (!el) return;
+        if (id === 'inp_cellExcuseFile') el.disabled = !allowExcuseFileUpload;
+        else el.disabled = !allowUpload;
     });
 
     const thread = document.getElementById('det_commentsThread');

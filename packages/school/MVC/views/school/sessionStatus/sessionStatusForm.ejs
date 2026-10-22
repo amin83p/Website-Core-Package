@@ -447,10 +447,12 @@ document.addEventListener('DOMContentLoaded', () => {
     submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
 
     try {
+      const params = new URLSearchParams(new FormData(form));
+      if (!params.has('active')) params.set('active', 'false');
       const response = await fetch(form.action, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded', 'X-AJAX-Request': 'true' },
-        body: new URLSearchParams(new FormData(form)).toString()
+        body: params.toString()
       });
       const result = await response.json();
       const guarded = typeof window.applyGuardedApiResult === 'function'

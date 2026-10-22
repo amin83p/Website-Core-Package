@@ -89,12 +89,19 @@ test('attendance controller uses shared session edit guard with makeup policy ch
 
 test('attendance matrix view blocks makeup-required sessions in allowEdit and comment controls', () => {
   const source = read('packages/school/MVC/views/school/attendance/attendanceViewer.ejs');
+  const controller = read('packages/school/MVC/controllers/school/attendanceController.js');
   assert.match(source, /const makeupRequired = record\.applicability === 'makeup_required'/);
-  assert.match(source, /const allowEditBase = canEdit && !outsideEnrollmentWindow && !makeupRequired && \(!locked \|\| canOverride\)/);
+  assert.match(source, /attendanceEditLocked/);
+  assert.match(source, /cell_modal_attendance_edit_window_notice/);
+  assert.match(source, /!attendanceEditLocked/);
+  assert.match(controller, /attendanceEditLocked/);
+  assert.match(controller, /buildSessionAttendanceEditAccessBySessionId/);
+  assert.match(controller, /resolveMatrixAttendanceEditLocked/);
+  assert.match(controller, /resolveSessionSectionEditAccess/);
   assert.match(source, /allowTimingEdit/);
   assert.match(source, /cell_modal_makeup_notice/);
   assert.match(source, /\['inp_newComment', 'btn_saveComment', 'btn_mentionUser'\]/);
-  assert.match(source, /if \(el\) el\.disabled = !allowNotesEdit/);
+  assert.match(source, /if \(el\) el\.disabled = !allowAdminDiscussionEdit/);
   assert.match(source, /make-up session required/);
 });
 

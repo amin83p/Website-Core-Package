@@ -30,6 +30,10 @@ const CHANGE_HISTORY_READ_ALL_SCOPES = Object.freeze(['organization', 'admin', '
 const EXPORT_PRINT_SCOPES = Object.freeze(['department', 'division', 'organization', 'admin', 'global']);
 const UPLOAD_SCOPES = Object.freeze(['department', 'division', 'organization', 'admin', 'global']);
 const EXCUSE_UPDATE_SCOPES = Object.freeze(['organization', 'admin', 'global']);
+const EXCUSE_REFERENCE_EDIT_SCOPES = Object.freeze(['department', 'division', 'organization', 'admin', 'global']);
+const STUDENT_ROSTER_NOTE_EDIT_SCOPES = Object.freeze(['owner', 'organization', 'admin', 'global']);
+const STUDENT_NOTE_READ_ALL_SCOPES = Object.freeze(['department', 'division', 'organization', 'admin', 'global']);
+const EXCUSE_REF_READ_ALL_SCOPES = Object.freeze(['owner', 'department', 'division', 'organization', 'admin', 'global']);
 
 const OWNER_DATE_WINDOW_MONTHS = 3;
 const DEPT_DATE_WINDOW_MONTHS = 12;
@@ -45,6 +49,8 @@ const EMPTY_ACCESS_FLAGS = Object.freeze({
   canViewChangeHistory: false,
   canDeleteFiles: false,
   canMarkExcused: false,
+  canEditStudentRosterNote: false,
+  canEditExcuseReference: false,
   canOverrideSessionLock: false,
   isAttendanceAdminViewer: false,
   readScopeId: null,
@@ -179,6 +185,14 @@ function canMarkExcusedAtScope(scopeId) {
   return scopeInList(scopeId, EXCUSE_UPDATE_SCOPES);
 }
 
+function canEditExcuseReferenceAtScope(scopeId) {
+  return scopeInList(scopeId, EXCUSE_REFERENCE_EDIT_SCOPES);
+}
+
+function canEditStudentRosterNoteAtScope(scopeId) {
+  return scopeInList(scopeId, STUDENT_ROSTER_NOTE_EDIT_SCOPES);
+}
+
 function addMonthsToDate(anchorDate, months) {
   const base = anchorDate instanceof Date ? new Date(anchorDate.getTime()) : new Date(String(anchorDate || ''));
   if (Number.isNaN(base.getTime())) return null;
@@ -257,13 +271,15 @@ function resolveFieldVisibility({ readAllScopeId, updateScopeId, adminBypass = f
   const readAllMode = normalizeScopeMode(readAllScopeId);
   const updateMode = normalizeScopeMode(updateScopeId);
   const effectiveMode = readAllMode || updateMode;
+  const showStudentNote = scopeInList(readAllScopeId, STUDENT_NOTE_READ_ALL_SCOPES)
+    || canEditStudentRosterNoteAtScope(updateScopeId);
 
   return {
     showStudentNames: Boolean(effectiveMode && effectiveMode !== 'user'),
     showStatuses: Boolean(effectiveMode && effectiveMode !== 'user'),
     showLateEarly: Boolean(effectiveMode && effectiveMode !== 'user'),
-    showStudentNote: Boolean(effectiveMode && effectiveMode !== 'user'),
-    showExcuseRef: scopeInList(readAllScopeId, ['department', 'division', 'organization', 'admin', 'global']),
+    showStudentNote,
+    showExcuseRef: scopeInList(readAllScopeId, EXCUSE_REF_READ_ALL_SCOPES),
     showExcuseAttachment: scopeInList(readAllScopeId, ['department', 'division', 'organization', 'admin', 'global']),
     showAdminDiscussion: scopeInList(readAllScopeId, ['department', 'division', 'organization', 'admin', 'global']),
     showAttachedFiles: scopeInList(readAllScopeId, ['department', 'division', 'organization', 'admin', 'global']),
@@ -343,6 +359,14 @@ function deriveAccessFlags(evaluations = {}, adminFlags = {}) {
     adminFlags.update
     || (updateAllowed && canMarkExcusedAtScope(update.scopeId))
   );
+  const canEditStudentRosterNote = Boolean(
+    adminFlags.update
+    || (updateAllowed && canEditStudentRosterNoteAtScope(update.scopeId))
+  );
+  const canEditExcuseReference = Boolean(
+    adminFlags.update
+    || (updateAllowed && canEditExcuseReferenceAtScope(update.scopeId))
+  );
   const canOverrideSessionLock = Boolean(
     adminFlags.update
     || (updateAllowed && normalizeScopeMode(update.scopeId) === 'admin')
@@ -362,6 +386,8 @@ function deriveAccessFlags(evaluations = {}, adminFlags = {}) {
     canViewChangeHistory,
     canDeleteFiles,
     canMarkExcused,
+    canEditStudentRosterNote,
+    canEditExcuseReference,
     canOverrideSessionLock,
     isAttendanceAdminViewer,
     readScopeId: read.scopeId || null,
@@ -385,6 +411,8 @@ module.exports = {
   canExportOrPrintAtScope,
   canUploadAtScope,
   canMarkExcusedAtScope,
+  canEditExcuseReferenceAtScope,
+  canEditStudentRosterNoteAtScope,
   resolveAttendanceDateWindow,
   clampDateWindow,
   resolveFieldVisibility,

@@ -149,6 +149,80 @@ test('applyOperationPolicy rejects USER scope even when central access allows', 
   }
 });
 
+test('resolveFieldVisibility shows excuse ref at OWNER READ_ALL but not student note', () => {
+  delete require.cache[POLICY_PATH];
+  const policy = require(POLICY_PATH);
+  const ownerRead = policy.resolveFieldVisibility({
+    readAllScopeId: 'SCP_OWNER',
+    updateScopeId: null
+  });
+  assert.equal(ownerRead.showExcuseRef, true);
+  assert.equal(ownerRead.showStudentNote, false);
+
+  const ownerUpdate = policy.resolveFieldVisibility({
+    readAllScopeId: 'SCP_OWNER',
+    updateScopeId: 'SCP_OWNER'
+  });
+  assert.equal(ownerUpdate.showExcuseRef, true);
+  assert.equal(ownerUpdate.showStudentNote, true);
+});
+
+test('resolveFieldVisibility shows student note at DEPT READ_ALL but not via OWNER-only read', () => {
+  delete require.cache[POLICY_PATH];
+  const policy = require(POLICY_PATH);
+  const deptRead = policy.resolveFieldVisibility({
+    readAllScopeId: 'SCP_DEPT',
+    updateScopeId: null
+  });
+  assert.equal(deptRead.showStudentNote, true);
+  assert.equal(deptRead.showExcuseRef, true);
+});
+
+test('edit-scope helpers split student roster notes and excuse reference text', () => {
+  delete require.cache[POLICY_PATH];
+  const policy = require(POLICY_PATH);
+  assert.equal(policy.canEditStudentRosterNoteAtScope('SCP_OWNER'), true);
+  assert.equal(policy.canEditStudentRosterNoteAtScope('SCP_DEPT'), false);
+  assert.equal(policy.canEditStudentRosterNoteAtScope('SCP_ORG'), true);
+
+  assert.equal(policy.canEditExcuseReferenceAtScope('SCP_DEPT'), true);
+  assert.equal(policy.canEditExcuseReferenceAtScope('SCP_OWNER'), false);
+  assert.equal(policy.canEditExcuseReferenceAtScope('SCP_ORG'), true);
+});
+
+test('deriveAccessFlags sets note and excuse-reference edit flags by UPDATE scope', () => {
+  delete require.cache[POLICY_PATH];
+  const policy = require(POLICY_PATH);
+
+  const deptUpdate = policy.deriveAccessFlags({
+    read: { allowed: true, scopeId: 'SCP_DEPT' },
+    readAll: { allowed: true, scopeId: 'SCP_DEPT' },
+    update: { allowed: true, scopeId: 'SCP_DEPT' },
+    del: { allowed: false, scopeId: null },
+    upload: { allowed: false, scopeId: null },
+    export: { allowed: false, scopeId: null },
+    print: { allowed: false, scopeId: null }
+  }, {});
+
+  assert.equal(deptUpdate.canEditExcuseReference, true);
+  assert.equal(deptUpdate.canEditStudentRosterNote, false);
+  assert.equal(deptUpdate.canMarkExcused, false);
+
+  const orgUpdate = policy.deriveAccessFlags({
+    read: { allowed: true, scopeId: 'SCP_ORG' },
+    readAll: { allowed: true, scopeId: 'SCP_ORG' },
+    update: { allowed: true, scopeId: 'SCP_ORG' },
+    del: { allowed: false, scopeId: null },
+    upload: { allowed: false, scopeId: null },
+    export: { allowed: false, scopeId: null },
+    print: { allowed: false, scopeId: null }
+  }, {});
+
+  assert.equal(orgUpdate.canEditStudentRosterNote, true);
+  assert.equal(orgUpdate.canEditExcuseReference, true);
+  assert.equal(orgUpdate.canMarkExcused, true);
+});
+
 test('resolveAttendanceDateWindow uses 3 months for OWNER and 12 for DEPT', () => {
   delete require.cache[POLICY_PATH];
   const policy = require(POLICY_PATH);

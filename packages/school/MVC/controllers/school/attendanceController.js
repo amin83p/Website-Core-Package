@@ -8,6 +8,7 @@ const chatRepository = requireCoreModule('MVC/repositories/chatRepository');
 const socketService = requireCoreModule('MVC/services/socketService'); // IMPORT SOCKET SERVICE
 const sessionStatusPolicyService = require('../../services/school/sessionStatusPolicyService');
 const sessionAttendanceEditAccessService = require('../../services/school/sessionAttendanceEditAccessService');
+const sessionAccessPolicyModel = require('../../models/school/sessionAccessPolicyModel');
 const sessionNavigationService = require('../../services/school/sessionNavigationService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
 const classEnrollmentSessionApplicabilityService = require('../../services/school/classEnrollmentSessionApplicabilityService');
@@ -436,6 +437,8 @@ async function showAttendancePage(req, res) {
             canViewRollups,
             canViewChangeHistory,
             canMarkExcused: canMarkAttendanceExcused,
+            canEditStudentRosterNote,
+            canEditExcuseReference,
             canOverrideSessionLock,
             isAttendanceAdminViewer,
             canViewRosterFields
@@ -484,6 +487,8 @@ async function showAttendancePage(req, res) {
             canEditAttendanceRoster,
             isAttendanceAdminViewer,
             canMarkAttendanceExcused,
+            canEditStudentRosterNote,
+            canEditExcuseReference,
             canOverrideSessionLock,
             canUploadFiles,
             canExportExcel,
@@ -545,6 +550,53 @@ async function listActiveAttendanceClasses(req, res) {
     }
 }
 
+async function buildSessionAttendanceEditAccessBySessionId(sessions = [], {
+    orgId = '',
+    orgTimeZone = 'UTC',
+    statusMap = null
+} = {}) {
+    const orgKey = String(orgId || '').trim();
+    const policy = await sessionAccessPolicyModel.getPolicyForOrg(orgKey);
+    const periodByDate = new Map();
+    const accessBySessionId = new Map();
+    const uniqueSessions = [];
+    const seenSessionIds = new Set();
+    (Array.isArray(sessions) ? sessions : []).forEach((session) => {
+        const sessionId = String(session?.sessionId || session?.id || '').trim();
+        if (!sessionId || seenSessionIds.has(sessionId)) return;
+        seenSessionIds.add(sessionId);
+        uniqueSessions.push(session);
+    });
+
+    await Promise.all(uniqueSessions.map(async (session) => {
+        const sessionId = String(session?.sessionId || session?.id || '').trim();
+        const dateKey = String(session?.date || '').trim();
+        let timesheetPeriod = periodByDate.get(dateKey);
+        if (timesheetPeriod === undefined) {
+            timesheetPeriod = await sessionAttendanceEditAccessService.findTimesheetPeriodForSessionDate(orgKey, dateKey);
+            periodByDate.set(dateKey, timesheetPeriod);
+        }
+        const access = await sessionAttendanceEditAccessService.resolveSessionSectionEditAccess({
+            orgId: orgKey,
+            session,
+            policy,
+            orgTimeZone,
+            timesheetPeriod,
+            statusMap,
+            target: 'attendance'
+        });
+        accessBySessionId.set(sessionId, access);
+    }));
+
+    return accessBySessionId;
+}
+
+function resolveMatrixAttendanceEditLocked(editAccess, { canEditRoster = false, canOverrideAttendanceEdit = false } = {}) {
+    if (!canEditRoster) return true;
+    if (!editAccess || editAccess.editable) return false;
+    return !canOverrideAttendanceEdit;
+}
+
 function buildAttendanceMatrixRecordForSession(stu, ses, context = {}) {
     const {
         rosterMaps,
@@ -566,6 +618,12 @@ function buildAttendanceMatrixRecordForSession(stu, ses, context = {}) {
         ? attendanceMatrixMetricsService.normalizeLegacyAbsenceExcusedRecord(rosterRecordRaw)
         : null;
     const sessionLocked = ses.locked === true || String(ses.locked) === 'true';
+    const sessionKey = String(ses?.sessionId || ses?.id || '').trim();
+    const attendanceEditAccess = context.sessionAttendanceEditBySessionId?.get(sessionKey) || null;
+    const attendanceEditLocked = resolveMatrixAttendanceEditLocked(attendanceEditAccess, {
+        canEditRoster: Boolean(context.canEditRoster),
+        canOverrideAttendanceEdit: Boolean(context.canOverrideAttendanceEdit)
+    });
     const applicabilityState = getApplicabilityForSession(stu, ses);
     const enrollmentWindow = getEnrollmentWindowForSession(stu, ses);
     const withinEnrollmentWindow = enrollmentWindow.withinEnrollmentWindow === true;
@@ -631,6 +689,8 @@ function buildAttendanceMatrixRecordForSession(stu, ses, context = {}) {
         rosterStudentNotes: rosterRecord?.notes || '',
         sessionLevelNote: ses.notes || '',
         sessionLocked,
+        attendanceEditLocked,
+        attendanceEditDeadlineDateKey: attendanceEditAccess?.deadlineDateKey || '',
         comments: enrichAttendanceComments(rosterRecord?.comments || [], userContactById),
         scheduledMinutes
     };
@@ -916,6 +976,24 @@ async function buildAttendanceMatrixPayload(req, options = {}) {
         const buildSessions = matrixSessions.slice(buildPlan.sessionStart, buildPlan.sessionEnd);
         const windowRosterMaps = matrixWindowService.buildRosterLookupMaps(buildSessions);
         const fullRosterMaps = matrixWindowService.buildRosterLookupMaps(matrixSessions);
+        const orgIdForPolicies = String(classData?.orgId || activeOrgId).trim();
+        const orgTimeZoneForPolicies = req.orgTimeZone || req.user?.activeOrgTimeZone || '';
+        const [canOverrideClassAdmin, sessionAttendanceEditBySessionId] = await Promise.all([
+            adminAuthorityService.isAdminForRequestAsync(
+                req.user,
+                SECTIONS.SCHOOL_CLASSES,
+                OPERATIONS.UPDATE,
+                { section: { id: SECTIONS.SCHOOL_CLASSES } }
+            ),
+            buildSessionAttendanceEditAccessBySessionId(matrixSessions, {
+                orgId: orgIdForPolicies,
+                orgTimeZone: orgTimeZoneForPolicies,
+                statusMap
+            })
+        ]);
+        const canOverrideAttendanceEdit = Boolean(
+            canOverrideClassAdmin || attendanceAccess.canOverrideSessionLock
+        );
         const recordBuildContext = {
             classData,
             orgPolicyCatalog,
@@ -927,7 +1005,10 @@ async function buildAttendanceMatrixPayload(req, options = {}) {
             userContactById,
             rollingPeriodRows,
             classId: classData.id,
-            registrationMode
+            registrationMode,
+            sessionAttendanceEditBySessionId,
+            canEditRoster: Boolean(attendanceAccess.canEditRoster),
+            canOverrideAttendanceEdit
         };
 
         const matrix = buildStudentList.map((stu) => {
@@ -1328,6 +1409,9 @@ async function updateAttendanceRosterCell(req, res) {
                 : null
         };
         const canMarkAttendanceExcused = Boolean(attendanceAccess.canMarkExcused);
+        const canEditExcuseReference = Boolean(attendanceAccess.canEditExcuseReference);
+        const canEditStudentRosterNote = Boolean(attendanceAccess.canEditStudentRosterNote);
+        const canEditExcuseText = canMarkAttendanceExcused || canEditExcuseReference;
         const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
         const normalizedAttendance = attendanceMatrixMetricsService.assertAttendanceStatusAllowedForSave({
             status: req.body?.attendance,
@@ -1393,6 +1477,12 @@ async function updateAttendanceRosterCell(req, res) {
             if (req.body?.absenceExcused !== undefined) {
                 rosterRecord.absenceExcused = attendanceMatrixMetricsService.normalizeAttendanceTimingExcuseFlag(req.body?.absenceExcused);
             }
+        } else {
+            rosterRecord.lateExcused = savedExcuseState.lateExcused;
+            rosterRecord.earlyLeaveExcused = savedExcuseState.earlyLeaveExcused;
+            rosterRecord.absenceExcused = savedExcuseState.absenceExcused;
+        }
+        if (canEditExcuseText) {
             if (req.body?.excuseRef !== undefined) {
                 rosterRecord.excuseRef = String(req.body.excuseRef || '').trim();
             }
@@ -1410,14 +1500,43 @@ async function updateAttendanceRosterCell(req, res) {
                 rosterRecord.excuseAttachment = incomingAttachment;
             }
         } else {
-            rosterRecord.lateExcused = savedExcuseState.lateExcused;
-            rosterRecord.earlyLeaveExcused = savedExcuseState.earlyLeaveExcused;
-            rosterRecord.absenceExcused = savedExcuseState.absenceExcused;
+            if (req.body?.excuseRef !== undefined) {
+                const nextExcuseRef = String(req.body.excuseRef || '').trim();
+                if (nextExcuseRef !== savedExcuseState.excuseRef) {
+                    assertAttendanceAccess(
+                        attendanceAccess,
+                        'canEditExcuseReference',
+                        'You do not have permission to edit excuse reference notes.'
+                    );
+                }
+            }
+            if (req.body?.excuseAttachment !== undefined) {
+                const incomingAttachment = req.body.excuseAttachment && typeof req.body.excuseAttachment === 'object'
+                    ? req.body.excuseAttachment
+                    : null;
+                const hadAttachment = Boolean(savedExcuseState.excuseAttachment);
+                if (incomingAttachment !== savedExcuseState.excuseAttachment && (incomingAttachment || hadAttachment)) {
+                    assertAttendanceAccess(
+                        attendanceAccess,
+                        'canEditExcuseReference',
+                        'You do not have permission to edit excuse reference files.'
+                    );
+                }
+            }
             rosterRecord.excuseRef = savedExcuseState.excuseRef;
             rosterRecord.excuseAttachment = savedExcuseState.excuseAttachment;
         }
         if (req.body?.notes !== undefined) {
-            rosterRecord.notes = String(req.body.notes || '').trim();
+            const nextNotes = String(req.body.notes || '').trim();
+            const prevNotes = String(existingRosterRecord?.notes || '').trim();
+            if (nextNotes !== prevNotes) {
+                assertAttendanceAccess(
+                    attendanceAccess,
+                    'canEditStudentRosterNote',
+                    'You do not have permission to edit student roster notes.'
+                );
+            }
+            rosterRecord.notes = canEditStudentRosterNote ? nextNotes : prevNotes;
         }
         if (!rosterRecord.comments) rosterRecord.comments = [];
 
