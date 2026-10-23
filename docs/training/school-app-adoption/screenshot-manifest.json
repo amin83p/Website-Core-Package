@@ -1,0 +1,140 @@
+{
+  "schoolName": "Your School Name",
+  "completedStatusLabel": "Completed",
+  "supportContact": "Contact your school office or IT support.",
+  "shots": [
+    {
+      "file": "01-dashboard-open-my-schedule.png",
+      "slide": 13,
+      "title": "School dashboard",
+      "hint": "My Schedule Overview card and Open My Schedule button",
+      "route": "/dashboard/section-nav/SCHOOL (School section dashboard)",
+      "state": "Card visible with Open My Schedule"
+    },
+    {
+      "file": "02-schedule-overview-full.png",
+      "slide": 14,
+      "title": "Schedule Overview",
+      "hint": "Full page: heading, summary, Session Details table",
+      "route": "/school/schedules/my",
+      "state": "After Load — at least one session row visible"
+    },
+    {
+      "file": "03-filters-anchor-period-load.png",
+      "slide": 14,
+      "title": "Filters",
+      "hint": "Anchor Date, period chip (e.g. Daily or Weekly), Load button",
+      "route": "/school/schedules/my",
+      "state": "Filter bar in focus before or after Load"
+    },
+    {
+      "file": "04-session-details-table.png",
+      "slide": 15,
+      "title": "Session Details",
+      "hint": "Rows with Status and Role; highlight a session you teach",
+      "route": "/school/schedules/my",
+      "state": "Teacher role on at least one row"
+    },
+    {
+      "file": "05-open-manage-session.png",
+      "slide": 16,
+      "title": "Open session",
+      "hint": "Row click and Manage Session page header",
+      "route": "/school/classes/{classId}/sessions/{sessionId}",
+      "state": "Just opened from Schedule Overview"
+    },
+    {
+      "file": "06-manage-session-map.png",
+      "slide": 16,
+      "title": "Manage Session layout",
+      "hint": "Left sidebar nav, Session status, Save session",
+      "route": "/school/classes/{classId}/sessions/{sessionId}",
+      "state": "Attendance panel or any default panel"
+    },
+    {
+      "file": "07-attendance-panel.png",
+      "slide": 17,
+      "title": "Attendance",
+      "hint": "Roster with attendance marks — blur student names",
+      "route": "/school/classes/{classId}/sessions/{sessionId}",
+      "state": "Attendance panel active; some marks set"
+    },
+    {
+      "file": "08-session-notes.png",
+      "slide": 18,
+      "title": "Session & notes",
+      "hint": "Notes area with sample instructional text",
+      "route": "/school/classes/{classId}/sessions/{sessionId}",
+      "state": "Session & notes panel active"
+    },
+    {
+      "file": "09-reports-panel.png",
+      "slide": 19,
+      "title": "Reports",
+      "hint": "At least one report assignment visible (pending or complete)",
+      "route": "/school/classes/{classId}/sessions/{sessionId}",
+      "state": "Reports panel; badge or list shows assigned work",
+      "needsUserCapture": true
+    },
+    {
+      "file": "10-book-coverage.png",
+      "slide": 20,
+      "title": "Book coverage",
+      "hint": "Book report / coverage for materials used in session",
+      "route": "/school/classes/{classId}/sessions/{sessionId}",
+      "state": "Book coverage panel with entry or list",
+      "needsUserCapture": true
+    },
+    {
+      "file": "11-student-cases.png",
+      "slide": 21,
+      "title": "Student Cases",
+      "hint": "Case list or create flow — blur identifying details",
+      "route": "/school/classes/{classId}/sessions/{sessionId}",
+      "state": "Student Cases panel",
+      "needsUserCapture": true
+    },
+    {
+      "file": "12-class-conduct.png",
+      "slide": 21,
+      "title": "Class Conduct",
+      "hint": "Class-wide conduct entry if your school uses it",
+      "route": "/school/classes/{classId}/sessions/{sessionId}",
+      "state": "Class Conduct panel",
+      "needsUserCapture": true
+    },
+    {
+      "file": "13-gradebook-activities.png",
+      "slide": 22,
+      "title": "Grade book",
+      "hint": "Scored and/or unscored activities example",
+      "route": "/school/classes/{classId}/sessions/{sessionId}",
+      "state": "Grade book panel with activities",
+      "needsUserCapture": true
+    },
+    {
+      "file": "14-session-status-picker.png",
+      "slide": 23,
+      "title": "Session status",
+      "hint": "Status picker with Completed selected",
+      "route": "/school/classes/{classId}/sessions/{sessionId}",
+      "state": "Session status control open or showing Completed"
+    },
+    {
+      "file": "15-save-session.png",
+      "slide": 24,
+      "title": "Save session",
+      "hint": "Save session button and/or success indicator",
+      "route": "/school/classes/{classId}/sessions/{sessionId}",
+      "state": "After save — completed check by title if shown"
+    },
+    {
+      "file": "16-verify-schedule-overview.png",
+      "slide": 24,
+      "title": "Verify on schedule",
+      "hint": "Same session row showing Completed status",
+      "route": "/school/schedules/my",
+      "state": "Reloaded Schedule Overview after save"
+    }
+  ]
+}

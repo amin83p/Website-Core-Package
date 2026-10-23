@@ -1777,7 +1777,6 @@
     }
 
     function canScheduleSessionChangeStatus(event) {
-        if (!isScheduleOnScreenManageEnabled()) return false;
         return isClassSessionEligibleForStatusChange(event);
     }
 
@@ -2667,7 +2666,7 @@
     }
 
     async function applyClassSessionStatusUpdate(event, status) {
-        if (!isScheduleOnScreenManageEnabled() || !event || !status) return false;
+        if (!event || !status) return false;
         if (!canScheduleSessionChangeStatus(event)) {
             if (typeof uiAlert === 'function') {
                 uiAlert(formatSessionManagementBlockerMessage(event, 'This session status cannot be changed from Master Schedule.'), 'Session status', { icon: 'warning' });
@@ -2715,7 +2714,7 @@
     }
 
     async function applyWorkSessionStatusUpdate(event, item) {
-        if (!isScheduleOnScreenManageEnabled() || !event || !item) return false;
+        if (!event || !item) return false;
         const person = activeSchedulePerson();
         if (!person?.id) return false;
         const previousKey = scheduleSessionSelectionKey(event);
@@ -2886,8 +2885,8 @@
 
     function isScheduleSessionContextStatusItemActionable(event, item) {
         if (!item || item.isCurrent) return false;
-        if (!isScheduleOnScreenManageEnabled() || !isScheduleEventMutableUnderClassFocus(event)) return false;
-        if (isWorkSessionScheduleEvent(event)) return true;
+        if (!isScheduleEventMutableUnderClassFocus(event)) return false;
+        if (isWorkSessionScheduleEvent(event)) return canDragCreateSessions === true;
         return canScheduleSessionChangeStatus(event);
     }
 
@@ -3441,7 +3440,6 @@
                 }
                 return;
             }
-            if (!canDragCreateSessions) return;
             const item = clickEvent.target.closest('[data-schedule-session-status]');
             if (!item) return;
             const event = scheduleSessionContextEvent;

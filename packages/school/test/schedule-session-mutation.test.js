@@ -73,4 +73,17 @@ test('master schedule status changes are not limited to scheduled sessions', () 
   const statusFnSlice = viewerSource.slice(statusFnIdx, statusFnEnd > statusFnIdx ? statusFnEnd : statusFnIdx + 400);
   assert.match(statusFnSlice, /isClassSessionEligibleForStatusChange\(event\)/);
   assert.doesNotMatch(statusFnSlice, /isScheduledClassSessionForQuickEdit\(event\)/);
+  assert.doesNotMatch(statusFnSlice, /isScheduleOnScreenManageEnabled/);
+});
+
+test('master schedule context status picker does not require on-screen manage mode', () => {
+  const viewerSource = read('public/scripts/masterScheduleViewer.js');
+  const actionableIdx = viewerSource.indexOf('function isScheduleSessionContextStatusItemActionable(event, item)');
+  const actionableEnd = viewerSource.indexOf('function buildScheduleSessionContextStatusPickerItemHtml', actionableIdx);
+  const actionableSlice = viewerSource.slice(actionableIdx, actionableEnd > actionableIdx ? actionableEnd : actionableIdx + 500);
+  assert.doesNotMatch(actionableSlice, /isScheduleOnScreenManageEnabled/);
+  const classApplyIdx = viewerSource.indexOf('async function applyClassSessionStatusUpdate');
+  const classApplyEnd = viewerSource.indexOf('async function applyWorkSessionStatusUpdate', classApplyIdx);
+  const classApplySlice = viewerSource.slice(classApplyIdx, classApplyEnd > classApplyIdx ? classApplyEnd : classApplyIdx + 400);
+  assert.doesNotMatch(classApplySlice, /isScheduleOnScreenManageEnabled/);
 });
