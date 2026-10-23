@@ -13,6 +13,10 @@ const {
   validateNavigationPreferences,
   extractModuleOrderFromSettings,
   extractNavigationPreferences,
+  buildPinKey,
+  validatePinnedModuleRefs,
+  validatePinnedModulesAgainstNative,
+  mergeNativeAndPinnedModules,
   MAX_MODULE_ORDER_LENGTH
 } = require('../MVC/utils/dashboardModuleOrder');
 
@@ -76,9 +80,49 @@ test('validateNavigationPreferences accepts moduleOrder and hiddenModuleKeys', (
 test('extractNavigationPreferences reads moduleOrder and hiddenModuleKeys', () => {
   assert.deepEqual(
     extractNavigationPreferences({ moduleOrder: ['a'], hiddenModuleKeys: ['b'] }),
-    { moduleOrder: ['a'], hiddenModuleKeys: ['b'] }
+    { moduleOrder: ['a'], hiddenModuleKeys: ['b'], pinnedModules: [] }
   );
-  assert.deepEqual(extractNavigationPreferences({}), { moduleOrder: null, hiddenModuleKeys: [] });
+  assert.deepEqual(extractNavigationPreferences({}), { moduleOrder: null, hiddenModuleKeys: [], pinnedModules: [] });
+});
+
+test('validatePinnedModuleRefs enforces pin key format and unique section ids', () => {
+  const ok = validatePinnedModuleRefs([
+    { pinKey: buildPinKey('SEC_A'), sectionId: 'SEC_A' }
+  ]);
+  assert.equal(ok.ok, true);
+  assert.deepEqual(ok.pinnedModules, [{ pinKey: 'pin:SEC_A', sectionId: 'SEC_A' }]);
+  assert.equal(validatePinnedModuleRefs([{ pinKey: 'bad', sectionId: 'SEC_A' }]).ok, false);
+});
+
+test('validatePinnedModulesAgainstNative rejects native dashboard duplicates', () => {
+  const blocked = validatePinnedModulesAgainstNative(
+    [{ pinKey: buildPinKey('NATIVE_1'), sectionId: 'NATIVE_1' }],
+    ['NATIVE_1']
+  );
+  assert.equal(blocked.ok, false);
+  const allowed = validatePinnedModulesAgainstNative(
+    [{ pinKey: buildPinKey('OTHER'), sectionId: 'OTHER' }],
+    ['NATIVE_1']
+  );
+  assert.equal(allowed.ok, true);
+});
+
+test('buildNextSettings stores pinnedModules and reset clears them', () => {
+  const withPins = buildNextSettings({}, 'section-1', {
+    pinnedModules: [{ pinKey: buildPinKey('X'), sectionId: 'X' }]
+  });
+  assert.deepEqual(readDashboardEntry(withPins, 'section-1').pinnedModules, [
+    { pinKey: 'pin:X', sectionId: 'X' }
+  ]);
+  assert.equal(hasSavedPreferences(readDashboardEntry(withPins, 'section-1')), true);
+});
+
+test('mergeNativeAndPinnedModules appends pinned tiles after native modules', () => {
+  const merged = mergeNativeAndPinnedModules(
+    [{ id: 'a' }],
+    [{ id: 'pin:b', isPinned: true }]
+  );
+  assert.deepEqual(merged.map((m) => m.id), ['a', 'pin:b']);
 });
 
 test('buildNextSettings stores and clears dashboard navigation preferences', () => {

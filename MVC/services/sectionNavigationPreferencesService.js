@@ -28,13 +28,18 @@ function normalizeUserId(userId) {
 function emptyPreferences() {
   return {
     moduleOrder: null,
-    hiddenModuleKeys: []
+    hiddenModuleKeys: [],
+    pinnedModules: []
   };
 }
 
 function hasSavedPreferences(entry = {}) {
   const prefs = extractNavigationPreferences(entry);
-  return Boolean(prefs.moduleOrder?.length || prefs.hiddenModuleKeys.length);
+  return Boolean(
+    prefs.moduleOrder?.length
+    || prefs.hiddenModuleKeys.length
+    || prefs.pinnedModules.length
+  );
 }
 
 function readDashboardEntry(settings = {}, dashboardKey = '') {
@@ -49,14 +54,16 @@ function buildNextSettings(currentSettings = {}, dashboardKey = '', dashboardPre
   const prefs = extractNavigationPreferences(dashboardPrefs);
   const hasOrder = Boolean(prefs.moduleOrder?.length);
   const hasHidden = Boolean(prefs.hiddenModuleKeys.length);
-  if (!hasOrder && !hasHidden) {
+  const hasPins = Boolean(prefs.pinnedModules.length);
+  if (!hasOrder && !hasHidden && !hasPins) {
     delete next[SETTINGS_ROOT][dashboardKey];
     if (!Object.keys(next[SETTINGS_ROOT]).length) delete next[SETTINGS_ROOT];
     return next;
   }
   next[SETTINGS_ROOT][dashboardKey] = {
     ...(hasOrder ? { moduleOrder: prefs.moduleOrder } : {}),
-    ...(hasHidden ? { hiddenModuleKeys: prefs.hiddenModuleKeys } : {})
+    ...(hasHidden ? { hiddenModuleKeys: prefs.hiddenModuleKeys } : {}),
+    ...(hasPins ? { pinnedModules: prefs.pinnedModules } : {})
   };
   return next;
 }
@@ -143,7 +150,10 @@ function createService(deps = {}) {
         : (currentPrefs.moduleOrder || null),
       hiddenModuleKeys: Object.prototype.hasOwnProperty.call(payload, 'hiddenModuleKeys')
         ? incomingPrefs.hiddenModuleKeys
-        : currentPrefs.hiddenModuleKeys
+        : currentPrefs.hiddenModuleKeys,
+      pinnedModules: Object.prototype.hasOwnProperty.call(payload, 'pinnedModules')
+        ? incomingPrefs.pinnedModules
+        : currentPrefs.pinnedModules
     };
 
     const nextSettings = buildNextSettings(currentSettings, dashboardKey, nextDashboardPrefs);

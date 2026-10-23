@@ -2,7 +2,35 @@
   'use strict';
 
   const SECTION_NAV_DASHBOARD_KEY_RE = /^section-[A-Za-z0-9_-]+$/;
+  const PIN_KEY_PREFIX = 'pin:';
   const SAVE_DEBOUNCE_MS = 1500;
+
+  function buildPinKey(sectionId) {
+    const id = String(sectionId || '').trim();
+    if (!id) return '';
+    return `${PIN_KEY_PREFIX}${id}`;
+  }
+
+  function mergeNativeAndPinnedModules(nativeModules, pinnedModules) {
+    const native = Array.isArray(nativeModules) ? nativeModules.slice() : [];
+    const pins = Array.isArray(pinnedModules) ? pinnedModules.slice() : [];
+    return native.concat(pins);
+  }
+
+  function serializePinnedModuleRefs(modules) {
+    const list = Array.isArray(modules) ? modules : [];
+    const refs = [];
+    const seen = new Set();
+    list.forEach((module) => {
+      if (!module || module.isPinned !== true) return;
+      const sectionId = String(module.sectionId || '').trim();
+      const pinKey = String(module.id || buildPinKey(sectionId)).trim();
+      if (!sectionId || !pinKey || seen.has(sectionId)) return;
+      seen.add(sectionId);
+      refs.push({ pinKey, sectionId });
+    });
+    return refs;
+  }
 
   function getModuleKey(module) {
     if (!module || typeof module !== 'object') return '';
@@ -74,7 +102,10 @@
     if (data.status !== 'success') throw new Error(data.message || 'Failed to load module layout.');
     return {
       moduleOrder: Array.isArray(data.moduleOrder) ? data.moduleOrder : null,
-      hiddenModuleKeys: normalizeKeyList(data.hiddenModuleKeys)
+      hiddenModuleKeys: normalizeKeyList(data.hiddenModuleKeys),
+      pinnedModules: Array.isArray(data.pinnedModules) ? data.pinnedModules : [],
+      pinnedModuleRefs: Array.isArray(data.pinnedModuleRefs) ? data.pinnedModuleRefs : [],
+      nativeSectionIds: normalizeKeyList(data.nativeSectionIds)
     };
   }
 
@@ -87,6 +118,7 @@
     const payload = {};
     if (Array.isArray(layout.moduleOrder)) payload.moduleOrder = layout.moduleOrder;
     if (Array.isArray(layout.hiddenModuleKeys)) payload.hiddenModuleKeys = layout.hiddenModuleKeys;
+    if (Array.isArray(layout.pinnedModules)) payload.pinnedModules = layout.pinnedModules;
     const response = await fetch(`/dashboard/api/module-order/${encodeURIComponent(dashboardKey)}`, {
       method: 'PUT',
       headers: {
@@ -266,9 +298,13 @@
 
   global.UnifiedDashboardModuleOrder = {
     SAVE_DEBOUNCE_MS,
+    PIN_KEY_PREFIX,
     getModuleKey,
+    buildPinKey,
     applyModuleOrder,
     applyHiddenModules,
+    mergeNativeAndPinnedModules,
+    serializePinnedModuleRefs,
     isSectionNavDashboardKey,
     fetchModuleLayout,
     fetchModuleOrder,

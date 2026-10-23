@@ -9,11 +9,15 @@ const { resolveSectionDisplayTitle } = require('../utils/sectionDisplay');
 const {
   applyModuleOrder,
   applyHiddenModules,
+  getModuleKey,
   validateDashboardKey,
   validateNavigationPreferences,
+  validatePinnedModulesAgainstNative,
+  validateModuleOrderKeys,
   extractNavigationPreferences
 } = require('../utils/dashboardModuleOrder');
 const sectionNavigationPreferencesService = require('../services/sectionNavigationPreferencesService');
+const dashboardPinnedModuleService = require('../services/dashboardPinnedModuleService');
 const sectionsOperationsCatalogCacheService = require('../services/cache/sectionsOperationsCatalogCacheService');
 const {
   buildDashboardAllSectionsCacheKey,
@@ -665,6 +669,30 @@ const DISPLAY_ACRONYMS = new Set([
   'XML'
 ]);
 
+function buildSectionDashboardModule(s, index = 0) {
+  const home = String(s.homeURL || '').trim();
+  const hasSubs = Array.isArray(s.subsections) && s.subsections.length > 0;
+  const navKey = encodeURIComponent(s.name || s.id);
+  const href = home || (hasSubs ? `/dashboard/section-nav/${navKey}` : '/sections');
+  const colors = ['primary', 'secondary', 'success', 'info', 'warning', 'danger'];
+  const color = colors[index % colors.length];
+  const sectionId = String(s.id || s.name || '').trim();
+  return {
+    id: sectionId,
+    sectionId,
+    title: resolveSectionDisplayTitle(s, formatDashboardLabel),
+    description: s.description || '',
+    href,
+    icon: 'bi-grid-fill',
+    buttonLabel: 'Open',
+    buttonClass: `btn btn-${color}`,
+    subtleClass: `bg-${color}-subtle text-${color}`,
+    customIcon: s.customIcon || null,
+    priority: s.minimumAccessRequirement ?? index,
+    isPinned: false
+  };
+}
+
 function formatDashboardLabel(name) {
   const raw = String(name || '').trim();
   if (!raw) return 'Unknown';
@@ -728,29 +756,8 @@ async function renderSubDashboardForParent(req, res, parentSection, allSections,
 
   const parentWithIcon = (mapSymbolsToSections([{ ...parentSection }], contextSymbols, req.user))[0];
 
-  function sectionToModule(s, index) {
-    const home = String(s.homeURL || '').trim();
-    const hasSubs = Array.isArray(s.subsections) && s.subsections.length > 0;
-    const navKey = encodeURIComponent(s.name || s.id);
-    let href = home || (hasSubs ? `/dashboard/section-nav/${navKey}` : '/sections');
-    const colors = ['primary', 'secondary', 'success', 'info', 'warning', 'danger'];
-    const color = colors[index % colors.length];
-    return {
-      id: String(s.id || s.name || '').trim(),
-      title: resolveSectionDisplayTitle(s, formatDashboardLabel),
-      description: s.description || '',
-      href,
-      icon: 'bi-grid-fill',
-      buttonLabel: 'Open',
-      buttonClass: `btn btn-${color}`,
-      subtleClass: `bg-${color}-subtle text-${color}`,
-      customIcon: s.customIcon || null,
-      priority: s.minimumAccessRequirement ?? index
-    };
-  }
-
   // Keep icon/tile order exactly as configured in parentSection.subsections.
-  const dashboardSections = subsections.map((s, i) => sectionToModule(s, i));
+  const dashboardSections = subsections.map((s, i) => buildSectionDashboardModule(s, i));
 
   const displayName = resolveSectionDisplayTitle(parentSection, formatDashboardLabel);
   const title = `${displayName} - Subsections`;
@@ -1004,10 +1011,22 @@ async function getModuleOrder(req, res) {
       { reqUser: req.user }
     );
 
+    const { nativeSectionIds } = await dashboardPinnedModuleService.getNativeSubDashboardModules(
+      req.user,
+      ctx.dashboardKey
+    );
+    const pinnedModules = await dashboardPinnedModuleService.resolvePinnedModuleDtos(
+      req.user,
+      preferences.pinnedModules
+    );
+
     return res.json({
       status: 'success',
       moduleOrder: preferences.moduleOrder,
-      hiddenModuleKeys: preferences.hiddenModuleKeys
+      hiddenModuleKeys: preferences.hiddenModuleKeys,
+      pinnedModules,
+      pinnedModuleRefs: preferences.pinnedModules,
+      nativeSectionIds
     });
   } catch (error) {
     console.error('getModuleOrder Error:', error);
@@ -1027,22 +1046,69 @@ async function saveModuleOrder(req, res) {
       return res.status(400).json({ status: 'error', message: prefsCheck.message });
     }
 
+    const { nativeSectionIds, nativeModules } = await dashboardPinnedModuleService.getNativeSubDashboardModules(
+      req.user,
+      ctx.dashboardKey
+    );
+    const pinnedToSave = Object.prototype.hasOwnProperty.call(req.body || {}, 'pinnedModules')
+      ? prefsCheck.pinnedModules
+      : null;
+
+    let pinNativeCheck = { ok: true, pinnedModules: [] };
+    if (pinnedToSave) {
+      pinNativeCheck = validatePinnedModulesAgainstNative(pinnedToSave, nativeSectionIds);
+      if (!pinNativeCheck.ok) {
+        return res.status(400).json({ status: 'error', message: pinNativeCheck.message });
+      }
+    }
+
+    const resolvedPins = await dashboardPinnedModuleService.resolvePinnedModuleDtos(
+      req.user,
+      pinnedToSave || (await sectionNavigationPreferencesService.getPreferences(
+        ctx.userId,
+        ctx.dashboardKey,
+        { reqUser: req.user }
+      )).pinnedModules
+    );
+    const allowedKeys = [
+      ...nativeModules.map((m) => getModuleKey(m)),
+      ...resolvedPins.map((m) => getModuleKey(m))
+    ].filter(Boolean);
+
+    if (prefsCheck.moduleOrder) {
+      const orderKeysCheck = validateModuleOrderKeys(prefsCheck.moduleOrder, allowedKeys);
+      if (!orderKeysCheck.ok) {
+        return res.status(400).json({ status: 'error', message: orderKeysCheck.message });
+      }
+    }
+
     const saved = await sectionNavigationPreferencesService.savePreferences(
       ctx.userId,
       ctx.dashboardKey,
       {
         ...(prefsCheck.moduleOrder ? { moduleOrder: prefsCheck.moduleOrder } : {}),
-        hiddenModuleKeys: prefsCheck.hiddenModuleKeys
+        hiddenModuleKeys: prefsCheck.hiddenModuleKeys,
+        ...(Object.prototype.hasOwnProperty.call(req.body || {}, 'pinnedModules')
+          ? { pinnedModules: pinNativeCheck.pinnedModules }
+          : {})
       },
       req.user,
       { reqUser: req.user }
+    );
+
+    const pinnedModules = await dashboardPinnedModuleService.resolvePinnedModuleDtos(
+      req.user,
+      saved.pinnedModules
     );
 
     return res.json({
       status: 'success',
       message: 'Module layout saved.',
       moduleOrder: saved.moduleOrder,
-      hiddenModuleKeys: saved.hiddenModuleKeys
+      hiddenModuleKeys: saved.hiddenModuleKeys,
+      pinnedModules,
+      pinnedModuleRefs: saved.pinnedModules,
+      nativeSectionIds
     });
   } catch (error) {
     console.error('saveModuleOrder Error:', error);
@@ -1083,9 +1149,13 @@ module.exports = {
   saveModuleOrder,
   resetModuleOrder,
   getDashboardSection,
+  findSectionByKey,
+  hasSectionAccess,
+  filterAccessibleSubsections,
   mapSymbolsToSections,
   filterMainDashboardSections,
   buildSectionOpenUrl,
+  buildSectionDashboardModule,
   resolveSingleMainDashboardRedirect,
   applyModuleOrder,
   applyHiddenModules,
