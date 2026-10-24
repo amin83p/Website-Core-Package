@@ -173,6 +173,10 @@ router.post('/app',
           requireAccess(SECTIONS.SYSTEM_SETTINGS, OPERATIONS.UPDATE), 
           trackActionState(SECTIONS.SYSTEM_SETTINGS, OPERATIONS.UPDATE), 
           ctrl.updateAppSettings);
+router.get('/app/integration-variables/validate',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_SETTINGS, OPERATIONS.UPDATE),
+          ctrl.validateIntegrationVariableKey);
 
 router.get('/public-pages/media/library',
           requireAuth,

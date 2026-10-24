@@ -100,6 +100,27 @@ test('normalizeRedirectUri strips trailing slash from path', () => {
   );
 });
 
+test('getMicrosoftAuthConfig reads from explicit env object (integration snapshot)', () => {
+  const config = getMicrosoftAuthConfig({
+    MICROSOFT_AUTH_ENABLED: 'true',
+    MICROSOFT_CLIENT_ID: 'client-id',
+    MICROSOFT_CLIENT_SECRET: 'secret',
+    MICROSOFT_REDIRECT_URIS: 'https://equportal.app/auth/microsoft/callback',
+    MICROSOFT_ALLOWED_DOMAIN: 'example.com'
+  });
+  assert.equal(config.clientId, 'client-id');
+  assert.ok(config.redirectUris.includes('https://equportal.app/auth/microsoft/callback'));
+});
+
+test('parseRedirectUrisFromEnv adds callback from PUBLIC_APP_URL when not listed explicitly', () => {
+  const uris = parseRedirectUrisFromEnv({
+    MICROSOFT_REDIRECT_URI: 'https://equalizer.up.railway.app/auth/microsoft/callback',
+    PUBLIC_APP_URL: 'https://equportal.app'
+  });
+  assert.ok(uris.includes('https://equalizer.up.railway.app/auth/microsoft/callback'));
+  assert.ok(uris.includes('https://equportal.app/auth/microsoft/callback'));
+});
+
 test('resolveRedirectUriForRequest matches allowlisted https when request builds http callback', () => {
   const config = {
     redirectUris: [

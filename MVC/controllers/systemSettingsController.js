@@ -21,6 +21,7 @@ const actionStateRetentionService = require('../services/actionStateRetentionSer
 const jsonToMongoMigrationService = require('../services/migration/jsonToMongoMigrationService');
 const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
 const integrationVariableModel = require('../models/integrationVariableModel');
+const integrationVariableService = require('../services/integrationVariableService');
 const publicPageContentSettingsDataService = require('../services/publicPageContentSettingsDataService');
 const coreFilesService = require('../services/coreFilesService');
 const localPackageSyncService = require('../services/localPackageSyncService');
@@ -253,6 +254,22 @@ exports.showAppSettings = async (req, res) => {
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+};
+
+exports.validateIntegrationVariableKey = async (req, res) => {
+  try {
+    const key = String(req.query?.key || req.body?.key || '').trim();
+    if (!key) {
+      return res.status(400).json({ status: 'error', message: 'Integration variable key is required.' });
+    }
+    const result = integrationVariableService.validateIntegrationVariable(key);
+    if (result.status === 'error') {
+      return res.status(400).json(result);
+    }
+    return res.json(result);
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message || 'Unable to validate integration variable.' });
   }
 };
 

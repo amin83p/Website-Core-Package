@@ -126,8 +126,10 @@ MONGODB_URI or MONGO_URI              -> target MongoDB URI
 MONGODB_DB or MONGO_DB                -> target database name, if separate
 PUBLIC_APP_URL / WEBSITE_BASE_URL     -> TARGET_DOMAIN
 APP_URL / BASE_URL                    -> TARGET_DOMAIN
-MICROSOFT_REDIRECT_URIS               -> comma-separated callback URLs, one per public domain
+MICROSOFT_REDIRECT_URIS               -> comma-separated callback URLs, one per public domain (Railway **web service** vars and/or Application Defaults → Integration Variables)
 MICROSOFT_REDIRECT_URI                -> optional single-URI fallback if MICROSOFT_REDIRECT_URIS is unset
+PUBLIC_APP_URL / WEBSITE_BASE_URL     -> if set, app also registers `{origin}/auth/microsoft/callback` automatically
+Microsoft OAuth keys (`MICROSOFT_AUTH_ENABLED`, `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`, redirect URIs, `MICROSOFT_ALLOWED_DOMAIN`, etc.) can be stored in **System Settings → Application Defaults → Integration Variables**; changes apply after **Save Defaults** without redeploy. Use **Validate** on each row to confirm the key is linked in code. Railway env remains fallback when no stored value exists.
 RAILWAY_GATEWAY_BASE_URL              -> target internal/public app URL if railway_proxy is used
 ```
 

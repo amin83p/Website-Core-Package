@@ -280,6 +280,16 @@
         "key": "FIRST_REQUEST",
         "isSecret": false,
         "value": "curl -H 'X-API-Key: nb_live_XtmPJxyp48oMYH0R3VyK7b9e5uExRsn1L08bXKZF' \\   'https://api.builddata.ca/permit?municipality=toronto&limit=5'"
+      },
+      {
+        "key": "MICROSOFT_REDIRECT_URIS",
+        "isSecret": false,
+        "value": "https://equalizer.up.railway.app/auth/microsoft/callback,https://equportal.app/auth/microsoft/callback"
+      },
+      {
+        "key": "MICROSOFT_REDIRECT_URI",
+        "isSecret": false,
+        "value": "https://equalizer.up.railway.app/auth/microsoft/callback"
       }
     ],
     "schoolCanonicalEnrollmentRead": false,
@@ -292,6 +302,6 @@
   },
   "audit": {
     "lastUpdateUser": "ROOT_001",
-    "lastUpdateDateTime": "2026-09-20T21:13:38.491Z"
+    "lastUpdateDateTime": "2026-10-24T03:54:32.608Z"
   }
 }

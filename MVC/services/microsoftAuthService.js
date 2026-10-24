@@ -5,6 +5,7 @@ const {
   validateMicrosoftAuthConfig,
   normalizeRedirectUri
 } = require('../../config/microsoftAuth');
+const integrationVariableService = require('./integrationVariableService');
 const { resolveRequestOrigin } = require('./appPublicUrlService');
 
 const MICROSOFT_CALLBACK_PATH = '/auth/microsoft/callback';
@@ -52,8 +53,17 @@ function requireSession(req) {
   }
 }
 
+function resolveMicrosoftAuthConfig() {
+  return getMicrosoftAuthConfig(integrationVariableService.buildMicrosoftAuthEffectiveEnv());
+}
+
+function clearClientCache() {
+  cachedClient = null;
+  cachedClientKey = '';
+}
+
 function requireConfig() {
-  const config = getMicrosoftAuthConfig();
+  const config = resolveMicrosoftAuthConfig();
   const validation = validateMicrosoftAuthConfig(config);
   if (!validation.ok) {
     const message = validation.reason === 'disabled'
@@ -323,7 +333,7 @@ async function handleCallback(req) {
 }
 
 function isEnabled() {
-  const config = getMicrosoftAuthConfig();
+  const config = resolveMicrosoftAuthConfig();
   return Boolean(config.enabled && validateMicrosoftAuthConfig(config).ok);
 }
 
@@ -332,7 +342,9 @@ module.exports = {
   createAuthorizationUrl,
   handleCallback,
   isEnabled,
-  getConfig: getMicrosoftAuthConfig,
+  resolveMicrosoftAuthConfig,
+  clearClientCache,
+  getConfig: resolveMicrosoftAuthConfig,
   buildCallbackUriFromRequest,
   resolveRedirectUriForRequest,
   pickAllowlistedRedirectUri,

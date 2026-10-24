@@ -39,11 +39,49 @@ function normalizeRedirectUri(value = '') {
   }
 }
 
+const MICROSOFT_CALLBACK_SUFFIX = '/auth/microsoft/callback';
+
+const PUBLIC_SITE_ENV_KEYS = [
+  'MICROSOFT_REDIRECT_URIS',
+  'MICROSOFT_REDIRECT_URI',
+  'PUBLIC_APP_URL',
+  'WEBSITE_BASE_URL',
+  'APP_URL',
+  'BASE_URL'
+];
+
+function parsePublicSiteOrigin(entry = '') {
+  const token = clean(entry);
+  if (!token) return '';
+  try {
+    const parsed = new URL(token.includes('://') ? token : `https://${token}`);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return '';
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch (_) {
+    return '';
+  }
+}
+
+function collectImplicitRedirectUrisFromPublicSiteEnv(env = process.env) {
+  const implicit = [];
+  PUBLIC_SITE_ENV_KEYS.slice(2).forEach((key) => {
+    const raw = clean(env[key]);
+    if (!raw) return;
+    raw.split(/[\n,]+/).forEach((entry) => {
+      const origin = parsePublicSiteOrigin(entry);
+      if (!origin) return;
+      implicit.push(`${origin}${MICROSOFT_CALLBACK_SUFFIX}`);
+    });
+  });
+  return implicit;
+}
+
 function parseRedirectUrisFromEnv(env = process.env) {
   const pluralRaw = clean(env.MICROSOFT_REDIRECT_URIS);
   const sources = pluralRaw
     ? pluralRaw.split(/[\n,]+/)
     : [clean(env.MICROSOFT_REDIRECT_URI)];
+  sources.push(...collectImplicitRedirectUrisFromPublicSiteEnv(env));
   const seen = new Set();
   const redirectUris = [];
   sources.forEach((entry) => {
@@ -55,16 +93,17 @@ function parseRedirectUrisFromEnv(env = process.env) {
   return redirectUris;
 }
 
-function getMicrosoftAuthConfig() {
-  const tenantId = clean(process.env.MICROSOFT_TENANT_ID);
-  const authorityTenant = normalizeAuthorityTenant(process.env.MICROSOFT_AUTHORITY_TENANT || tenantId || 'organizations');
-  const clientId = clean(process.env.MICROSOFT_CLIENT_ID);
-  const clientSecret = clean(process.env.MICROSOFT_CLIENT_SECRET);
-  const redirectUris = parseRedirectUrisFromEnv(process.env);
+function getMicrosoftAuthConfig(env = process.env) {
+  const source = env && typeof env === 'object' ? env : process.env;
+  const tenantId = clean(source.MICROSOFT_TENANT_ID);
+  const authorityTenant = normalizeAuthorityTenant(source.MICROSOFT_AUTHORITY_TENANT || tenantId || 'organizations');
+  const clientId = clean(source.MICROSOFT_CLIENT_ID);
+  const clientSecret = clean(source.MICROSOFT_CLIENT_SECRET);
+  const redirectUris = parseRedirectUrisFromEnv(source);
   const redirectUri = redirectUris[0] || '';
-  const allowedDomain = normalizeDomain(process.env.MICROSOFT_ALLOWED_DOMAIN || 'equilibrium.ab.ca');
-  const enabled = enabledFromEnv(process.env.MICROSOFT_AUTH_ENABLED);
-  const enforceTenant = enabledFromEnv(process.env.MICROSOFT_ENFORCE_TENANT) && Boolean(tenantId);
+  const allowedDomain = normalizeDomain(source.MICROSOFT_ALLOWED_DOMAIN || 'equilibrium.ab.ca');
+  const enabled = enabledFromEnv(source.MICROSOFT_AUTH_ENABLED);
+  const enforceTenant = enabledFromEnv(source.MICROSOFT_ENFORCE_TENANT) && Boolean(tenantId);
 
   return {
     enabled,
@@ -104,5 +143,7 @@ module.exports = {
   getMicrosoftAuthConfig,
   validateMicrosoftAuthConfig,
   parseRedirectUrisFromEnv,
-  normalizeRedirectUri
+  normalizeRedirectUri,
+  collectImplicitRedirectUrisFromPublicSiteEnv,
+  MICROSOFT_CALLBACK_SUFFIX
 };

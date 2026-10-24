@@ -702,15 +702,17 @@
           <div class="alert alert-light border small mb-3">
             Get your key from <a href="https://www.canadapost-postescanada.ca/ac/" target="_blank" rel="noopener">Canada Post AddressComplete</a> (not Google Places).
             Suggested keys: <code>CANADA_POST_ADDRESS_API_KEY</code> (secret), <code>CANADA_POST_ADDRESS_COUNTRY</code> (<code>CAN</code>), <code>CANADA_POST_ADDRESS_MAX_SUGGESTIONS</code> (<code>7</code>).
+            Microsoft OAuth: <code>MICROSOFT_AUTH_ENABLED</code>, <code>MICROSOFT_CLIENT_ID</code>, <code>MICROSOFT_CLIENT_SECRET</code> (secret), <code>MICROSOFT_REDIRECT_URIS</code> (comma-separated callbacks), <code>MICROSOFT_ALLOWED_DOMAIN</code>.
+            Values saved here apply live after <strong>Save Defaults</strong> (no redeploy). Railway <code>process.env</code> is used only when no stored value exists. Use <strong>Validate</strong> to see whether a key is linked to app code.
             Secret values are encrypted at rest. Leave a secret value blank to keep the current stored value.
           </div>
           <div data-integration-var-list>
             <% integrationVarFormRows.forEach((row, rowIndex) => { %>
-            <div class="integration-var-row row g-2 align-items-center mb-2">
-              <div class="col-md-4">
+            <div class="integration-var-row row g-2 align-items-start mb-2">
+              <div class="col-md-3">
                 <input type="text" name="integrationVarKey" class="form-control font-monospace" value="<%= String(row.key || '') %>" placeholder="CANADA_POST_ADDRESS_API_KEY">
               </div>
-              <div class="col-md-5">
+              <div class="col-md-4">
                 <input type="<%= row.isSecret ? 'password' : 'text' %>" name="integrationVarValue" class="form-control font-monospace" value="<%= row.isSecret ? '' : String(row.value || '') %>" placeholder="<%= row.isSecret && row.valueHint ? ('Stored: ' + row.valueHint) : 'Value' %>">
               </div>
               <div class="col-md-2">
@@ -720,8 +722,14 @@
                   <label class="form-check-label small" for="integrationVarSecret_<%= rowIndex %>">Secret</label>
                 </div>
               </div>
+              <div class="col-md-2 d-grid">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-integration-var-validate title="Check if the app reads this key">Validate</button>
+              </div>
               <div class="col-md-1 d-grid">
                 <button type="button" class="btn btn-outline-danger" data-remove-integration-var-row title="Remove variable"><i class="bi bi-trash"></i></button>
+              </div>
+              <div class="col-12">
+                <div class="integration-var-status small" data-integration-var-status></div>
               </div>
             </div>
             <% }); %>
@@ -835,10 +843,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const row = document.createElement('div');
     row.className = 'integration-var-row row g-2 align-items-center mb-2';
     row.innerHTML = `
-      <div class="col-md-4">
+      <div class="col-md-3">
         <input type="text" name="integrationVarKey" class="form-control font-monospace" placeholder="CANADA_POST_ADDRESS_API_KEY">
       </div>
-      <div class="col-md-5">
+      <div class="col-md-4">
         <input type="text" name="integrationVarValue" class="form-control font-monospace" placeholder="Value">
       </div>
       <div class="col-md-2">
@@ -848,8 +856,14 @@ document.addEventListener('DOMContentLoaded', () => {
           <label class="form-check-label small">Secret</label>
         </div>
       </div>
+      <div class="col-md-2 d-grid">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-integration-var-validate title="Check if the app reads this key">Validate</button>
+      </div>
       <div class="col-md-1 d-grid">
         <button type="button" class="btn btn-outline-danger" data-remove-integration-var-row title="Remove variable"><i class="bi bi-trash"></i></button>
+      </div>
+      <div class="col-12">
+        <div class="integration-var-status small" data-integration-var-status></div>
       </div>
     `;
     return row;
@@ -887,6 +901,67 @@ document.addEventListener('DOMContentLoaded', () => {
     const removeBtn = event.target.closest('[data-remove-integration-var-row]');
     if (!removeBtn) return;
     removeBtn.closest('.integration-var-row')?.remove();
+  });
+
+  function renderIntegrationVarStatus(statusEl, payload) {
+    if (!statusEl) return;
+    statusEl.innerHTML = '';
+    if (!payload || payload.status === 'error') {
+      statusEl.innerHTML = `<span class="text-danger">${String(payload?.message || 'Validation failed.')}</span>`;
+      return;
+    }
+    if (!payload.linked) {
+      statusEl.innerHTML = '<span class="badge text-bg-warning">Not linked</span> <span class="text-muted">No registered consumer — this key is not read by the app.</span>';
+      return;
+    }
+    const groups = [...new Set((payload.entries || []).map((entry) => entry.group).filter(Boolean))];
+    const groupLabel = groups.join(', ') || 'Application';
+    const valueLabel = payload.hasEffectiveValue ? 'set' : 'missing';
+    const sourceLabel = payload.valueSource === 'integration'
+      ? 'from Integration Variables'
+      : payload.valueSource === 'env'
+        ? 'from server environment only'
+        : payload.valueSource === 'integration_and_env'
+          ? 'stored value overrides environment'
+          : 'not set';
+    let html = `<span class="badge text-bg-success">Linked</span> <span class="text-muted">${groupLabel} — value ${valueLabel} (${sourceLabel}).</span>`;
+    if (payload.configHint?.message) {
+      const hintClass = payload.configHint.ok ? 'text-success' : 'text-warning';
+      html += ` <span class="${hintClass}">${payload.configHint.message}</span>`;
+    }
+    statusEl.innerHTML = html;
+  }
+
+  document.addEventListener('click', async (event) => {
+    const validateBtn = event.target.closest('[data-integration-var-validate]');
+    if (!validateBtn) return;
+    const row = validateBtn.closest('.integration-var-row');
+    const keyInput = row?.querySelector('input[name="integrationVarKey"]');
+    const statusEl = row?.querySelector('[data-integration-var-status]');
+    const key = String(keyInput?.value || '').trim();
+    if (!key) {
+      renderIntegrationVarStatus(statusEl, { status: 'error', message: 'Enter a key before validating.' });
+      return;
+    }
+    validateBtn.disabled = true;
+    renderIntegrationVarStatus(statusEl, { status: 'error', message: 'Checking…' });
+    try {
+      const response = await fetch(`/systemSettings/app/integration-variables/validate?key=${encodeURIComponent(key)}`, {
+        method: 'GET',
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' }
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        renderIntegrationVarStatus(statusEl, { status: 'error', message: payload.message || `Validation failed (${response.status}).` });
+        return;
+      }
+      renderIntegrationVarStatus(statusEl, payload);
+    } catch (error) {
+      renderIntegrationVarStatus(statusEl, { status: 'error', message: error.message || 'Validation failed.' });
+    } finally {
+      validateBtn.disabled = false;
+    }
   });
 
   const contactPageRowTemplates = {

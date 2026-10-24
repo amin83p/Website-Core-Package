@@ -33,6 +33,14 @@ const settingService = {
     } catch (_) {
       // ignore school cache refresh errors
     }
+    try {
+      const microsoftAuthService = require('./microsoftAuthService');
+      if (typeof microsoftAuthService.clearClientCache === 'function') {
+        microsoftAuthService.clearClientCache();
+      }
+    } catch (_) {
+      // ignore Microsoft auth cache refresh errors
+    }
     startupLogger.info('SETTINGS', 'CACHE', 'System settings cache refreshed.');
   },
 
