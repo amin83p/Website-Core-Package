@@ -577,7 +577,26 @@ function buildTemplatePreviewHtml(text = '') {
 }
 
 function looksLikeHtmlTemplate(value = '') {
-  return /<\/?[a-z][\s\S]*>/i.test(String(value || ''));
+  const source = String(value || '');
+  if (!source.trim()) return false;
+  if (/<\/?[a-z][\s\S]*?>/i.test(source)) return true;
+  if (/<!DOCTYPE\b/i.test(source)) return true;
+  return /<[a-z!/][\s\S]*?>/i.test(source);
+}
+
+function looksLikeEntityEncodedHtml(value = '') {
+  return /&lt;\s*\/?\s*[a-z!/]/i.test(String(value || ''));
+}
+
+function normalizeHtmlTemplateBody(value = '') {
+  const source = cleanString(value, { max: 60000, allowEmpty: true });
+  if (!source) return '';
+  if (looksLikeHtmlTemplate(source)) return source;
+  if (looksLikeEntityEncodedHtml(source)) {
+    const decoded = decodeCommonHtmlEntities(source);
+    if (looksLikeHtmlTemplate(decoded)) return decoded;
+  }
+  return source;
 }
 
 function decodeCommonHtmlEntities(value = '') {
@@ -611,10 +630,11 @@ function htmlToPlainText(html = '') {
 }
 
 function buildRuntimeBodyOutputs(value = '') {
-  const raw = cleanString(value, { max: 60000, allowEmpty: true });
+  const raw = normalizeHtmlTemplateBody(value);
   if (!raw) return { text: '', html: '' };
 
-  if (looksLikeHtmlTemplate(raw)) {
+  const isHtml = looksLikeHtmlTemplate(raw);
+  if (isHtml) {
     return {
       text: htmlToPlainText(raw),
       html: raw
@@ -1283,6 +1303,9 @@ const emailManagementService = {
     normalizeInjectedValues,
     applyPlaceholderValues,
     buildRuntimeBodyOutputs,
+    normalizeHtmlTemplateBody,
+    looksLikeHtmlTemplate,
+    looksLikeEntityEncodedHtml,
     extractPlaceholders,
     buildDefinitionFromEvent,
     buildDefinitionFromStored,

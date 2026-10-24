@@ -62,7 +62,7 @@ function normalizeScheduledTaskDefinition(record = {}, existing = null, { strict
     runAtTime: cleanText(input.runAtTime || base.runAtTime, { max: 8, allowEmpty: true }).slice(0, 5),
     timezone: cleanText(input.timezone || base.timezone, { max: 80, allowEmpty: true }),
     enabled: input.enabled !== undefined ? input.enabled === true : base.enabled !== false,
-    paused: input.paused === true || base.paused === true,
+    paused: input.paused !== undefined ? input.paused === true : base.paused === true,
     source: cleanText(input.source || base.source, { max: 120, allowEmpty: true }),
     sourceRef: cleanText(input.sourceRef || base.sourceRef, { max: 120, allowEmpty: true }),
     input: input.input !== undefined ? input.input : (base.input || {}),

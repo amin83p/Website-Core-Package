@@ -41,7 +41,6 @@ const emailOutboxService = requireCoreModule('MVC/services/emailOutboxService');
 
 const {
   formatInstantInTimezone,
-  formatMsToDateTimeLocalInput,
   getTodayDateKeyInTimezone,
   resolveActiveOrgTimezoneFromUser,
   resolveDefaultTimezone
@@ -583,10 +582,12 @@ async function showRun(req, res) {
         baseUrl: notificationCenterComposeService.resolveRequestBaseUrl(req)
       })
       : null;
-    const defaultManagerSendAtLocal = formatMsToDateTimeLocalInput(
-      Date.now() + 3600000,
-      await notificationCenterComposeService.resolveOrgTimeZone(orgId)
-    );
+    const managerTimeZone = await notificationCenterComposeService.resolveOrgTimeZone(orgId);
+    const defaultManagerSendAtLocal = notificationCenterComposeService.resolveDefaultSendAtLocal({
+      rule,
+      timeZone: managerTimeZone,
+      cycleDate: run.asOfDate
+    });
 
     return res.render('school/notificationCenter/runDetail', await baseView(req, res, {
 
@@ -604,7 +605,9 @@ async function showRun(req, res) {
 
       managerSummaryPreview,
 
-      defaultManagerSendAtLocal
+      defaultManagerSendAtLocal,
+
+      managerTimeZone
 
     }));
 
@@ -666,7 +669,11 @@ async function showComposeEmail(req, res) {
 
     const timeZone = await notificationCenterComposeService.resolveOrgTimeZone(orgId);
 
-    const defaultSendAtLocal = formatMsToDateTimeLocalInput(Date.now() + 3600000, timeZone);
+    const defaultSendAtLocal = notificationCenterComposeService.resolveDefaultSendAtLocal({
+      rule,
+      timeZone,
+      cycleDate: run.asOfDate
+    });
 
     const composePayload = {
 
@@ -756,6 +763,8 @@ async function scheduleEmail(req, res) {
 
       baseUrl: notificationCenterComposeService.resolveRequestBaseUrl(req),
 
+      sendNow: body.sendNow,
+
       req
 
     });
@@ -794,22 +803,38 @@ async function scheduleManagerSummary(req, res) {
     }
     const body = req.body && typeof req.body === 'object' ? req.body : {};
     const timeZone = await notificationCenterComposeService.resolveOrgTimeZone(orgId);
-    const sendAtIso = body.sendAtLocal
-      ? notificationCenterComposeService.parseSendAtLocalInput(body.sendAtLocal, timeZone)
-      : '';
+    let sendAtIso = '';
+    if (notificationCenterComposeService.isTruthySendNow(body.sendNow)) {
+      sendAtIso = notificationCenterComposeService.buildImmediateSendAtIso();
+    } else if (body.sendAtLocal) {
+      sendAtIso = notificationCenterComposeService.parseSendAtLocalInput(body.sendAtLocal, timeZone);
+    }
     const result = await notificationCenterManagerSummaryService.queueManagerSummaryForRun({
       orgId,
       rule,
       run,
       user: req.user,
       sendAtIso,
+      sendNow: body.sendNow,
       baseUrl: notificationCenterComposeService.resolveRequestBaseUrl(req)
     });
     if (!result.queued) {
       throw new Error('Manager summary was not queued (disabled, already sent, or managers missing email).');
     }
-    if (wantsJson(req)) return res.json({ status: 'ok', result });
-    return res.redirect(`/school/notification-center/outbox?scheduled=1`);
+    const sendAtLabel = sendAtIso
+      ? notificationCenterComposeService.formatScheduledSendAtLabel(sendAtIso, timeZone)
+      : '';
+    const enrichedResult = {
+      ...result,
+      sendAt: sendAtIso,
+      sendAtLabel,
+      sendNow: notificationCenterComposeService.isTruthySendNow(body.sendNow)
+    };
+    if (wantsJson(req)) return res.json({ status: 'ok', result: enrichedResult });
+    const outboxQuery = result.outboxId
+      ? `scheduled=1&outboxId=${encodeURIComponent(result.outboxId)}`
+      : 'scheduled=1';
+    return res.redirect(`/school/notification-center/outbox?${outboxQuery}`);
   } catch (error) {
     if (wantsJson(req)) return res.status(400).json({ status: 'error', message: error.message });
     return res.status(400).render('error', { title: 'Error', message: error.message, error, user: req.user });

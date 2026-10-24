@@ -297,7 +297,8 @@
         managerPreviewSubject,
         managerPreviewPlain,
         managerRecipientCount,
-        defaultManagerSendAtLocal: typeof defaultManagerSendAtLocal !== 'undefined' ? defaultManagerSendAtLocal : ''
+        defaultManagerSendAtLocal: typeof defaultManagerSendAtLocal !== 'undefined' ? defaultManagerSendAtLocal : '',
+        managerTimeZone: typeof managerTimeZone !== 'undefined' ? managerTimeZone : ''
       }) %>
     <% } %>
   <% } %>
@@ -533,6 +534,7 @@
   <%- include('partials/composeEmailModal') %>
 <% } %>
 
+<script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/notificationCenterScheduleSendTime.js') : '/scripts/notificationCenterScheduleSendTime.js' %>"></script>
 
 <script>
 
@@ -554,7 +556,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const composeSubmit = document.getElementById('ncScheduleEmailSubmit');
 
+  const composeSendNowFooter = document.getElementById('ncScheduleEmailSendNowFooter');
+
   const previewFrame = document.getElementById('ncComposePreviewFrame');
+
+  let composeScheduleBinder = null;
+
+  const orgTimeZone = <%- JSON.stringify(typeof managerTimeZone !== 'undefined' ? managerTimeZone : '') %>;
 
   function setComposePreviewHtml(html) {
 
@@ -576,8 +584,34 @@ document.addEventListener('DOMContentLoaded', () => {
 
     composeSubmit.disabled = true;
 
+    if (composeSendNowFooter) composeSendNowFooter.disabled = true;
+
+    composeScheduleBinder?.clearSendNow?.();
+
     setComposePreviewHtml('');
 
+  }
+
+  function bindComposeSchedulePanel(timeZone) {
+    if (!window.NotificationCenterScheduleSendTime) return;
+    composeScheduleBinder = window.NotificationCenterScheduleSendTime.bind({
+      inputEl: document.getElementById('ncComposeSendAt'),
+      summaryEl: document.getElementById('ncComposeScheduleSummary'),
+      sendNowInputEl: document.getElementById('ncComposeSendNow'),
+      timeZone: timeZone || orgTimeZone || 'UTC',
+      timeZoneHintEl: document.getElementById('ncComposeTimeZoneHint'),
+      sendNowBtn: document.getElementById('ncComposeSendNowBtn'),
+      schedulePanelEl: document.getElementById('ncComposeSchedulePanel')
+    });
+  }
+
+  function buildScheduleSuccessMessage(result, fallbackHtml) {
+    const label = result?.sendAtLabel || '';
+    const immediate = result?.sendNow === true;
+    const whenText = immediate
+      ? 'It will be sent as soon as possible (next outbox dispatch).'
+      : (label ? `It is scheduled for <strong>${label}</strong>.` : 'It was added to the scheduled outbox.');
+    return `${whenText} <a href="/school/notification-center/outbox?scheduled=1">View scheduled emails</a>.`;
   }
 
   async function openScheduleEmailModal(teacherId, selectionKeys) {
@@ -646,21 +680,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
       document.getElementById('ncComposeSendAt').value = payload.defaultSendAtLocal || '';
 
-      document.getElementById('ncComposeTimeZoneHint').textContent = payload.timeZone
+      const tz = payload.timeZone || orgTimeZone || 'UTC';
 
-        ? `Organization timezone: ${payload.timeZone}`
-
-        : '';
+      document.getElementById('ncComposeTimeZoneHint').textContent = tz ? `Organization timezone: ${tz}` : '';
 
       document.getElementById('ncComposeMeta').innerHTML = `<i class="bi bi-person-lines-fill me-1 text-primary"></i>To: <strong>${preview.recipientName || payload.recipientPersonId || teacherId}</strong> <span class="text-muted mx-1">·</span> <i class="bi bi-list-check me-1"></i>${(payload.selectionKeys || selectionKeys).length} session(s) selected`;
 
       setComposePreviewHtml(preview.htmlBody || '');
+
+      bindComposeSchedulePanel(tz);
+
+      composeScheduleBinder?.refresh?.();
 
       composeLoading?.classList.add('d-none');
 
       composeForm?.classList.remove('d-none');
 
       composeSubmit.disabled = false;
+
+      if (composeSendNowFooter) composeSendNowFooter.disabled = false;
 
     } catch (error) {
 
@@ -674,11 +712,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   }
 
-  composeSubmit?.addEventListener('click', async () => {
+  async function submitComposeSchedule() {
 
     if (!composeForm || composeSubmit.disabled) return;
 
     composeSubmit.disabled = true;
+
+    if (composeSendNowFooter) composeSendNowFooter.disabled = true;
 
     composeError?.classList.add('d-none');
 
@@ -726,11 +766,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
       window.showMessageModal?.({
 
-        title: 'Email scheduled',
+        title: payload.result?.sendNow ? 'Email queued' : 'Email scheduled',
 
         icon: 'success',
 
-        message: 'The message was added to the scheduled outbox. <a href="/school/notification-center/outbox?scheduled=1">View scheduled emails</a>.',
+        message: buildScheduleSuccessMessage(payload.result || {}),
 
         buttons: [{ text: 'OK', class: 'btn-primary' }]
 
@@ -744,7 +784,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
       composeSubmit.disabled = false;
 
+      if (composeSendNowFooter) composeSendNowFooter.disabled = false;
+
     }
+
+  }
+
+  composeSubmit?.addEventListener('click', () => { void submitComposeSchedule(); });
+
+  composeSendNowFooter?.addEventListener('click', (event) => {
+
+    event.preventDefault();
+
+    composeScheduleBinder?.activateSendNow?.();
+
+    void submitComposeSchedule();
 
   });
 
@@ -869,8 +923,9 @@ document.addEventListener('DOMContentLoaded', () => {
   const managerOpenBtn = document.getElementById('ncOpenManagerSummaryModalBtn');
   const managerSummarySubmit = document.getElementById('ncScheduleManagerSummarySubmit');
   const managerSummaryError = document.getElementById('ncManagerSummaryError');
-  const managerSummarySendAt = document.getElementById('ncManagerSummarySendAt');
   const managerSummaryPreviewFrame = document.getElementById('ncManagerSummaryPreviewFrame');
+  const managerSendNowFooter = document.getElementById('ncManagerSummarySendNowFooter');
+  let managerScheduleBinder = null;
   const managerPreviewHtml = <%- JSON.stringify((rule?.managerSummary?.enabled && (managerSummaryRows || []).length) ? (managerSummaryPreview?.htmlBody || '') : '') %>;
 
   function setManagerSummaryPreviewHtml(html) {
@@ -883,6 +938,20 @@ document.addEventListener('DOMContentLoaded', () => {
     managerSummaryError?.classList.add('d-none');
     managerSummaryError.textContent = '';
     setManagerSummaryPreviewHtml(managerPreviewHtml);
+    if (!managerScheduleBinder && window.NotificationCenterScheduleSendTime) {
+      managerScheduleBinder = window.NotificationCenterScheduleSendTime.bind({
+        inputEl: document.getElementById('ncManagerSendAt'),
+        summaryEl: document.getElementById('ncManagerScheduleSummary'),
+        sendNowInputEl: document.getElementById('ncManagerSendNow'),
+        timeZone: orgTimeZone || 'UTC',
+        timeZoneHintEl: document.getElementById('ncManagerTimeZoneHint'),
+        sendNowBtn: document.getElementById('ncManagerSendNowBtn'),
+        schedulePanelEl: document.getElementById('ncManagerSchedulePanel')
+      });
+    } else {
+      managerScheduleBinder?.clearSendNow?.();
+      managerScheduleBinder?.refresh?.();
+    }
     managerModal.show();
   }
 
@@ -898,7 +967,10 @@ document.addEventListener('DOMContentLoaded', () => {
     managerSummaryError?.classList.add('d-none');
     const params = new URLSearchParams();
     if (actionStateId) params.set('actionStateId', actionStateId);
-    if (managerSummarySendAt?.value) params.set('sendAtLocal', managerSummarySendAt.value);
+    const managerSendAtEl = document.getElementById('ncManagerSendAt');
+    const managerSendNowEl = document.getElementById('ncManagerSendNow');
+    if (managerSendNowEl?.value === '1') params.set('sendNow', '1');
+    else if (managerSendAtEl?.value) params.set('sendAtLocal', managerSendAtEl.value);
     try {
       const response = await fetch(`/school/notification-center/runs/${encodeURIComponent(runId)}/schedule-manager-summary`, {
         method: 'POST',
@@ -915,9 +987,15 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       managerModal?.hide();
       window.showMessageModal?.({
-        title: 'Manager summary scheduled',
+        title: payload.result?.sendNow ? 'Manager summary queued' : 'Manager summary scheduled',
         icon: 'success',
-        message: 'Manager summary email(s) were added to the scheduled outbox. <a href="/school/notification-center/outbox?scheduled=1">View scheduled emails</a>.',
+        message: (() => {
+          const r = payload.result || {};
+          const when = r.sendNow
+            ? 'They will be sent as soon as possible (next outbox dispatch).'
+            : (r.sendAtLabel ? `Scheduled for <strong>${r.sendAtLabel}</strong>.` : '');
+          return `Manager summary email(s) were added to the outbox. ${when} <a href="/school/notification-center/outbox?scheduled=1">View scheduled emails</a>.`;
+        })(),
         buttons: [{ text: 'OK', class: 'btn-primary' }]
       });
     } catch (error) {
@@ -931,6 +1009,12 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   managerSummarySubmit?.addEventListener('click', scheduleManagerSummary);
+
+  managerSendNowFooter?.addEventListener('click', (event) => {
+    event.preventDefault();
+    managerScheduleBinder?.activateSendNow?.();
+    void scheduleManagerSummary();
+  });
 
   updateCount();
 

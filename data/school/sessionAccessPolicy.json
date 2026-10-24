@@ -1,3 +1,80 @@
 {
-  "byOrgId": {}
+  "byOrgId": {
+    "900000": {
+      "uncompletedSessionNotification": {
+        "enabled": false,
+        "channels": {
+          "email": {
+            "enabled": false,
+            "sendWhen": "daily_all",
+            "sendAtTime": "18:00",
+            "prepareAtTime": "17:00",
+            "sessionDateRange": {
+              "type": "this_week",
+              "daysBeforeToday": null
+            },
+            "emailTemplateId": "",
+            "fromEmail": "",
+            "subjectTemplate": "Reminder: {{sessionCount}} uncompleted session(s) need attention",
+            "bodyTemplate": "<div style=\"font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#212529;\"><p style=\"margin:0 0 16px;\">Hi {{teacherName}},</p><p style=\"margin:0 0 16px;\">You have <strong>{{sessionCount}}</strong> uncompleted session(s) that still need your attention. Please review each session below and complete attendance when you are ready.</p>{{sessionListHtml}}<p style=\"margin:24px 0 0;font-size:13px;color:#6c757d;\">Thank you,<br>{{orgName}}</p></div>",
+            "wrapperPlaceholderMappings": []
+          },
+          "sms": {
+            "enabled": false,
+            "sendWhen": "same_day",
+            "sendAtTime": "18:00",
+            "prepareAtTime": "17:00",
+            "sessionDateRange": {
+              "type": "this_week",
+              "daysBeforeToday": null
+            },
+            "bodyTemplate": "{{orgName}}: {{sessionCount}} uncompleted session(s) need attention."
+          }
+        }
+      },
+      "completedSessionAttendanceEdit": {
+        "enabled": true,
+        "windowType": "timesheet_period",
+        "daysAfterSession": null
+      },
+      "completedSessionNotesEdit": {
+        "enabled": true,
+        "windowType": "timesheet_period",
+        "daysAfterSession": null
+      },
+      "completedSessionGradebookEdit": {
+        "enabled": true,
+        "windowType": "timesheet_period",
+        "daysAfterSession": null
+      },
+      "completedSessionConductEdit": {
+        "enabled": true,
+        "windowType": "timesheet_period",
+        "daysAfterSession": null
+      },
+      "completedSessionCurriculumEdit": {
+        "enabled": true,
+        "windowType": "timesheet_period",
+        "daysAfterSession": null
+      },
+      "completedSessionStudentCasesEdit": {
+        "enabled": true,
+        "windowType": "timesheet_period",
+        "daysAfterSession": null
+      },
+      "naAttendanceVisibility": {
+        "teacherNa": true,
+        "onHoldNa": true,
+        "enrollmentExcludedNa": false,
+        "approvedLeaveNa": true,
+        "makeupRequiredNa": false,
+        "capReachedNa": false
+      },
+      "sessionNotificationMigratedToNcAt": "2026-10-24T00:47:26.050Z",
+      "audit": {
+        "lastUpdateUser": "session-notification-migration",
+        "lastUpdateDateTime": "2026-10-24T00:47:26.050Z"
+      }
+    }
+  }
 }

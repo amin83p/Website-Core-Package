@@ -182,6 +182,7 @@ async function queueManagerSummaryForRun({
   run,
   user = null,
   sendAtIso = '',
+  sendNow = false,
   baseUrl = '',
   logger = null
 } = {}) {
@@ -199,7 +200,12 @@ async function queueManagerSummaryForRun({
   const timeZone = await resolveOrgTimeZone(orgKey);
   const cycleDate = getTodayDateKeyInTimezone(timeZone);
   const emailSendTime = cleanText(rule?.channels?.email?.sendAtTime) || '18:00';
-  const resolvedSendAt = cleanText(sendAtIso) || buildSendAtIso(cycleDate, emailSendTime, timeZone);
+  let resolvedSendAt = cleanText(sendAtIso);
+  if (notificationCenterComposeService.isTruthySendNow(sendNow)) {
+    resolvedSendAt = notificationCenterComposeService.buildImmediateSendAtIso();
+  } else if (!resolvedSendAt) {
+    resolvedSendAt = buildSendAtIso(cycleDate, emailSendTime, timeZone);
+  }
   const cycleKey = resolvedSendAt.slice(0, 10);
 
   let queued = 0;

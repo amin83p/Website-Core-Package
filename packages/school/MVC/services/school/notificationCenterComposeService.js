@@ -11,7 +11,10 @@ const appPublicUrlService = requireCoreModule('MVC/services/appPublicUrlService'
 const {
   resolveDefaultTimezone,
   resolveOrganizationTimezoneFromRow,
-  zonedWallClockToIso
+  zonedWallClockToIso,
+  getTodayDateKeyInTimezone,
+  formatMsToDateTimeLocalInput,
+  formatInstantInTimezone
 } = requireCoreModule('MVC/utils/timezoneUtils');
 
 const NC_META_SOURCE = 'school.notificationCenter';
@@ -45,6 +48,33 @@ async function resolveOrgTimeZone(orgId) {
   return resolveDefaultTimezone();
 }
 
+function parseRuleEmailSendAtTime(rule) {
+  const raw = cleanText(rule?.channels?.email?.sendAtTime).slice(0, 8);
+  const match = raw.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return '18:00';
+  const hour = String(Math.min(23, Math.max(0, Number(match[1])))).padStart(2, '0');
+  const minute = String(Math.min(59, Math.max(0, Number(match[2])))).padStart(2, '0');
+  return `${hour}:${minute}`;
+}
+
+function nextDateKey(dateKey = '') {
+  const token = cleanText(dateKey);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(token)) return token;
+  const anchor = new Date(`${token}T12:00:00.000Z`);
+  if (Number.isNaN(anchor.getTime())) return token;
+  anchor.setUTCDate(anchor.getUTCDate() + 1);
+  return anchor.toISOString().slice(0, 10);
+}
+
+function isTruthySendNow(value) {
+  const token = String(value ?? '').trim().toLowerCase();
+  return token === '1' || token === 'true' || token === 'yes' || token === 'on';
+}
+
+function buildImmediateSendAtIso() {
+  return new Date(Date.now() + 60_000).toISOString();
+}
+
 function parseSendAtLocalInput(sendAtLocal, timeZone) {
   const raw = cleanText(sendAtLocal);
   if (!raw) throw new Error('Send date and time are required.');
@@ -58,6 +88,50 @@ function parseSendAtLocalInput(sendAtLocal, timeZone) {
     throw new Error('Send time must be in the future.');
   }
   return iso;
+}
+
+function resolveSendAtForSchedule({ sendAtLocal, sendNow, timeZone } = {}) {
+  const tz = cleanText(timeZone) || resolveDefaultTimezone();
+  if (isTruthySendNow(sendNow)) return buildImmediateSendAtIso();
+  return parseSendAtLocalInput(sendAtLocal, tz);
+}
+
+function resolveDefaultSendAtIso({ rule, timeZone, cycleDate } = {}) {
+  const tz = cleanText(timeZone) || resolveDefaultTimezone();
+  const baseDate = /^\d{4}-\d{2}-\d{2}$/.test(cleanText(cycleDate))
+    ? cleanText(cycleDate)
+    : getTodayDateKeyInTimezone(tz);
+  const sendAtTime = parseRuleEmailSendAtTime(rule);
+  let iso = zonedWallClockToIso(baseDate, sendAtTime, tz);
+  if (!iso) {
+    return new Date(Date.now() + 3600000).toISOString();
+  }
+  if (new Date(iso).getTime() < Date.now() + 60_000) {
+    const rolled = zonedWallClockToIso(nextDateKey(baseDate), sendAtTime, tz);
+    if (rolled) iso = rolled;
+  }
+  return iso;
+}
+
+function resolveDefaultSendAtLocal({ rule, timeZone, cycleDate } = {}) {
+  const tz = cleanText(timeZone) || resolveDefaultTimezone();
+  const iso = resolveDefaultSendAtIso({ rule, timeZone: tz, cycleDate });
+  return formatMsToDateTimeLocalInput(new Date(iso).getTime(), tz);
+}
+
+function formatScheduledSendAtLabel(sendAtIso, timeZone) {
+  const tz = cleanText(timeZone) || resolveDefaultTimezone();
+  const iso = cleanText(sendAtIso);
+  if (!iso) return '';
+  return formatInstantInTimezone(iso, tz, {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
 }
 
 async function buildPreviewFromSelection({
@@ -119,12 +193,13 @@ async function scheduleEmail({
   bodyText,
   bodyHtml,
   sendAtLocal,
+  sendNow = false,
   baseUrl = '',
   req = null
 }) {
   const orgKey = cleanText(orgId);
   const timeZone = await resolveOrgTimeZone(orgKey);
-  const sendAtIso = parseSendAtLocalInput(sendAtLocal, timeZone);
+  const sendAtIso = resolveSendAtForSchedule({ sendAtLocal, sendNow, timeZone });
   const resolvedBaseUrl = cleanText(baseUrl) || appPublicUrlService.resolvePublicSiteUrl({ req });
   const { preview, items, recipientPersonId: teacherId } = await buildPreviewFromSelection({
     run,
@@ -210,7 +285,14 @@ async function scheduleEmail({
     message: `${items.length} session(s)`
   });
 
-  return { outboxId: created.id, sendAt: sendAtIso, to, subject: finalSubject };
+  return {
+    outboxId: created.id,
+    sendAt: sendAtIso,
+    sendAtLabel: formatScheduledSendAtLabel(sendAtIso, timeZone),
+    sendNow: isTruthySendNow(sendNow),
+    to,
+    subject: finalSubject
+  };
 }
 
 module.exports = {
@@ -219,5 +301,11 @@ module.exports = {
   scheduleEmail,
   resolveOrgTimeZone,
   parseSendAtLocalInput,
+  resolveSendAtForSchedule,
+  resolveDefaultSendAtLocal,
+  resolveDefaultSendAtIso,
+  formatScheduledSendAtLabel,
+  isTruthySendNow,
+  buildImmediateSendAtIso,
   resolveRequestBaseUrl
 };

@@ -1,1 +1,35 @@
-[]
+[
+  {
+    "id": "STDEF2026102414693",
+    "orgId": "900000",
+    "packageName": "SCHOOL",
+    "taskKey": "school.notificationCenter.prepare",
+    "label": "Notification centre: Uncompleted sessions",
+    "description": "Runs a scheduled notification rule evaluation and stores preview results for review.",
+    "scheduleType": "weekly",
+    "runAtTime": "17:00",
+    "timezone": "UTC",
+    "enabled": false,
+    "paused": false,
+    "source": "school.notificationCenter",
+    "sourceRef": "rule:SNCR-1789585117342-4997",
+    "input": {
+      "ruleId": "SNCR-1789585117342-4997",
+      "daysOfWeek": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6
+      ]
+    },
+    "nextRunAt": "2026-10-24T17:00:00.000Z",
+    "lastRunAt": "",
+    "createdByUserId": "SYSTEM",
+    "createdByDisplayName": "System",
+    "createdAt": "2026-10-24T00:47:26.047Z",
+    "updatedAt": "2026-10-24T00:47:26.047Z"
+  }
+]

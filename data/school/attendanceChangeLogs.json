@@ -52,5 +52,32 @@
     "toEarlyLeaveExcused": false,
     "fromAbsenceExcused": false,
     "toAbsenceExcused": false
+  },
+  {
+    "id": "ACL-1792636055002-2717",
+    "orgId": "ORG-1",
+    "classId": "CLS-1",
+    "sessionId": "SES-1",
+    "sessionDate": "2026-06-01",
+    "studentPersonId": "PER-1",
+    "source": "matrix_cell",
+    "changedAt": "2026-10-22T02:27:35.000Z",
+    "changedBy": {
+      "userId": "USR-1",
+      "username": "",
+      "displayName": "Test User"
+    },
+    "fromStatus": "",
+    "toStatus": "present",
+    "fromLateMinutes": 0,
+    "toLateMinutes": 0,
+    "fromEarlyLeaveMinutes": 0,
+    "toEarlyLeaveMinutes": 0,
+    "fromLateExcused": false,
+    "toLateExcused": false,
+    "fromEarlyLeaveExcused": false,
+    "toEarlyLeaveExcused": false,
+    "fromAbsenceExcused": false,
+    "toAbsenceExcused": false
   }
 ]

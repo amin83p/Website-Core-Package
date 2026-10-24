@@ -9,6 +9,23 @@ function readRoot(relativePath) {
   return fs.readFileSync(path.join(ROOT_DIR, relativePath), 'utf8');
 }
 
+test('scheduled task definition model can resume after pause', () => {
+  const model = require('../MVC/models/scheduledTaskDefinitionModel');
+  const paused = model.normalizeScheduledTaskDefinition(
+    { paused: true },
+    { id: 'STDEF1', taskKey: 'core.emailOutbox.dispatch', label: 'Dispatch', runAtTime: '09:00', paused: false },
+    { strict: false }
+  );
+  assert.equal(paused.paused, true);
+
+  const resumed = model.normalizeScheduledTaskDefinition(
+    { paused: false },
+    paused,
+    { strict: false }
+  );
+  assert.equal(resumed.paused, false);
+});
+
 test('scheduled task definition model preserves createdBy fields', () => {
   const model = require('../MVC/models/scheduledTaskDefinitionModel');
   const normalized = model.normalizeScheduledTaskDefinition({

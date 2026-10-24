@@ -1,5 +1,6 @@
 <%
   const fmt = typeof formatNotificationTokenLabel === 'function' ? formatNotificationTokenLabel : (v) => String(v || '');
+  const tzHint = timeZone ? ('Organization timezone: ' + timeZone) : 'Organization timezone applies when scheduling.';
 %>
 
 <div class="sections-page">
@@ -12,7 +13,7 @@
   </div>
 
   <div class="form-container wide" style="max-width: 900px;">
-    <form method="post" action="/school/notification-center/runs/<%= run.id %>/schedule-email">
+    <form method="post" action="/school/notification-center/runs/<%= run.id %>/schedule-email" id="ncComposePageForm">
       <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
       <input type="hidden" name="recipientPersonId" value="<%= recipientPersonId %>">
       <% (selectionKeys || []).forEach((key) => { %>
@@ -21,6 +22,11 @@
 
       <div class="card border-0 shadow-sm mb-4">
         <div class="card-body p-4">
+          <%- include('partials/scheduleSendTimePanel', {
+            schedulePanelPrefix: 'ncPage',
+            scheduleSendAtValue: defaultSendAtLocal || '',
+            scheduleTimeZoneHint: tzHint
+          }) %>
           <div class="row g-3">
             <div class="col-12">
               <label class="form-label fw-bold" for="ncSubject">Subject</label>
@@ -32,19 +38,37 @@
               <textarea class="d-none" name="bodyHtml" id="ncBodyHtml" aria-hidden="true"><%- preview.htmlBody || '' %></textarea>
               <div class="form-text small">Plain-text version shown for editing; HTML with clickable session links is sent when you schedule.</div>
             </div>
-            <div class="col-md-6">
-              <label class="form-label fw-bold" for="ncSendAtLocal">Send at</label>
-              <input class="form-control size-md" type="datetime-local" id="ncSendAtLocal" name="sendAtLocal" value="<%= defaultSendAtLocal || '' %>" required>
-              <div class="form-text small">Organization timezone: <%= timeZone || 'UTC' %></div>
-            </div>
           </div>
         </div>
       </div>
 
-      <div class="button-row pt-3 border-top">
+      <div class="button-row pt-3 border-top d-flex flex-wrap gap-2">
         <button type="submit" class="btn btn-filled btn-primary btn-md"><i class="bi bi-calendar-check me-1"></i> Add to scheduled outbox</button>
+        <button type="button" class="btn btn-outline-primary btn-md" id="ncPageSendNowFooter"><i class="bi bi-send me-1"></i> Send now</button>
         <a href="/school/notification-center/runs/<%= run.id %>" class="btn btn-filled btn-secondary btn-md">Cancel</a>
       </div>
     </form>
   </div>
 </div>
+
+<script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/notificationCenterScheduleSendTime.js') : '/scripts/notificationCenterScheduleSendTime.js' %>"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const form = document.getElementById('ncComposePageForm');
+  const sendNowFooter = document.getElementById('ncPageSendNowFooter');
+  const binder = window.NotificationCenterScheduleSendTime?.bind({
+    inputEl: document.getElementById('ncPageSendAt'),
+    summaryEl: document.getElementById('ncPageScheduleSummary'),
+    sendNowInputEl: document.getElementById('ncPageSendNow'),
+    timeZone: <%- JSON.stringify(timeZone || 'UTC') %>,
+    timeZoneHintEl: document.getElementById('ncPageTimeZoneHint'),
+    sendNowBtn: document.getElementById('ncPageSendNowBtn'),
+    schedulePanelEl: document.getElementById('ncPageSchedulePanel')
+  });
+  sendNowFooter?.addEventListener('click', function (event) {
+    event.preventDefault();
+    binder?.activateSendNow();
+    form?.requestSubmit();
+  });
+});
+</script>

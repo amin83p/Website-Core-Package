@@ -144,6 +144,12 @@
 
           <div class="nc-compose-meta-bar small" id="ncComposeMeta"></div>
 
+          <%- include('scheduleSendTimePanel', {
+            schedulePanelPrefix: 'ncCompose',
+            scheduleSendAtValue: '',
+            scheduleTimeZoneHint: ''
+          }) %>
+
           <ul class="nav nav-pills nc-compose-tabs mb-3 flex-shrink-0" role="tablist">
             <li class="nav-item" role="presentation">
               <button class="nav-link active" id="ncComposeEditTab" data-bs-toggle="tab" data-bs-target="#ncComposeEditPane" type="button" role="tab">
@@ -183,6 +189,9 @@
                 <iframe id="ncComposePreviewFrame" title="Email HTML preview"></iframe>
               </div>
             </div>
+        <button type="button" class="btn btn-outline-primary" id="ncScheduleEmailSendNowFooter" disabled>
+          <i class="bi bi-send me-1"></i>Send now
+        </button>
           </div>
         </form>
       </div>
