@@ -133,7 +133,17 @@ function pickAllowlistedRedirectUri(candidate = '', allowlist = []) {
         return false;
       }
     });
-    return match || '';
+    if (match) return match;
+    const hostPathMatch = list.find((entry) => {
+      try {
+        const allowed = new URL(entry);
+        return allowed.hostname === candidateUrl.hostname
+          && allowed.pathname === candidateUrl.pathname;
+      } catch (_) {
+        return false;
+      }
+    });
+    return hostPathMatch ? normalizeRedirectUri(hostPathMatch) : '';
   } catch (_) {
     return '';
   }

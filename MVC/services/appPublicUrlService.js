@@ -35,10 +35,14 @@ function getConfiguredPublicSiteUrl() {
   return url;
 }
 
+function firstForwardedToken(value = '') {
+  return cleanText(String(value || '').split(',')[0]);
+}
+
 function resolveRequestOrigin(req) {
   if (!req || typeof req !== 'object') return '';
-  const proto = cleanText(req.get?.('x-forwarded-proto') || req.protocol || 'http');
-  const host = cleanText(req.get?.('x-forwarded-host') || req.get?.('host') || '');
+  const proto = firstForwardedToken(req.get?.('x-forwarded-proto') || req.protocol || 'http');
+  const host = firstForwardedToken(req.get?.('x-forwarded-host') || req.get?.('host') || '');
   if (!host) return '';
   return `${proto}://${host}`.replace(/\/$/, '');
 }

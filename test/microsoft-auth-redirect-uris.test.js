@@ -99,3 +99,16 @@ test('normalizeRedirectUri strips trailing slash from path', () => {
     'https://app.example/auth/microsoft/callback'
   );
 });
+
+test('resolveRedirectUriForRequest matches allowlisted https when request builds http callback', () => {
+  const config = {
+    redirectUris: [
+      'https://equalizer.up.railway.app/auth/microsoft/callback',
+      'https://equportal.app/auth/microsoft/callback'
+    ]
+  };
+  const req = mockReq({ host: 'equportal.app', proto: '' });
+  req.protocol = 'http';
+  const uri = microsoftAuthService.resolveRedirectUriForRequest(req, config);
+  assert.equal(uri, 'https://equportal.app/auth/microsoft/callback');
+});
