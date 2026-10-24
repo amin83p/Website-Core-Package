@@ -41,6 +41,38 @@ function sessionHasCases({ classData, session, caseCountIndex }) {
   return key && (caseCountIndex.get(key) || 0) > 0;
 }
 
+function slimClassDataForFinding(classData = {}) {
+  return {
+    id: cleanText(classData?.id),
+    orgId: cleanText(classData?.orgId),
+    title: cleanText(classData?.title || classData?.name),
+    name: cleanText(classData?.name || classData?.title)
+  };
+}
+
+function slimSessionForFinding(session = {}) {
+  return {
+    sessionId: cleanText(session?.sessionId || session?.id),
+    id: cleanText(session?.id || session?.sessionId),
+    date: cleanText(session?.date),
+    startTime: cleanText(session?.startTime),
+    endTime: cleanText(session?.endTime),
+    room: cleanText(session?.room),
+    status: session?.status,
+    sessionStatus: session?.sessionStatus,
+    notes: session?.notes,
+    statusNotes: session?.statusNotes,
+    locked: session?.locked === true
+  };
+}
+
+function slimSessionFindingPayload({ classData, session, ...rest } = {}) {
+  const out = { ...rest };
+  if (classData) out.classData = slimClassDataForFinding(classData);
+  if (session) out.session = slimSessionForFinding(session);
+  return out;
+}
+
 function buildFinding({ classData, session, extraPayload = {} }) {
   return {
     id: cleanText(session?.sessionId || session?.id),
@@ -49,7 +81,7 @@ function buildFinding({ classData, session, extraPayload = {} }) {
     classTitle: cleanText(classData?.title || classData?.name),
     sessionDate: cleanText(session?.date),
     href: sessionUncompletedNotificationService.buildSessionManagerPath(classData, session),
-    payload: { classData, session, ...extraPayload }
+    payload: slimSessionFindingPayload({ classData, session, ...extraPayload })
   };
 }
 
@@ -146,6 +178,9 @@ function evaluateSessionWithActivities(context) {
 }
 
 module.exports = {
+  slimClassDataForFinding,
+  slimSessionForFinding,
+  slimSessionFindingPayload,
   sessionHasInstructionalActivities,
   sessionNotesEmpty,
   sessionHasCases,

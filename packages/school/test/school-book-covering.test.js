@@ -168,6 +168,15 @@ test('book covering period service resolves daily and weekly windows', () => {
   assert.equal(weekly.periodEndDate, '2026-08-16');
 });
 
+test('session book coverage upsert submits draft after saving an entry', () => {
+  const serviceSource = fs.readFileSync(
+    path.join(ROOT, 'packages/school/MVC/services/school/bookCoveringReportService.js'),
+    'utf8'
+  );
+  const upsertBlock = serviceSource.split('async function upsertSessionReportEntry')[1]?.split('async function removeSessionReportEntry')[0] || '';
+  assert.match(upsertBlock, /patch\.status\s*=\s*REPORT_STATUSES\.SUBMITTED/);
+});
+
 test('book covering report service allows submitted edits until session is locked', () => {
   const serviceSource = fs.readFileSync(
     path.join(ROOT, 'packages/school/MVC/services/school/bookCoveringReportService.js'),

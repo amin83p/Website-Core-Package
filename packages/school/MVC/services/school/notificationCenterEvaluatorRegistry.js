@@ -5,6 +5,7 @@ const notificationCenterEmailComposeService = require('./notificationCenterEmail
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const schoolDataService = require('./schoolDataService');
 const notificationCenterSessionRuleScanService = require('./notificationCenterSessionRuleScanService');
+const { slimSessionFindingPayload } = notificationCenterSessionRuleScanService;
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -40,7 +41,10 @@ async function evaluateSessionNotFinal({ orgId, rule, asOfDate, reqUser }) {
     classTitle: cleanText(entry?.classData?.title || entry?.classData?.name),
     sessionDate: cleanText(entry?.session?.date),
     href: sessionUncompletedNotificationService.buildSessionManagerPath(entry?.classData, entry?.session),
-    payload: entry
+    payload: slimSessionFindingPayload({
+      classData: entry?.classData,
+      session: entry?.session
+    })
   }));
   return { findings, metadata: { fromDate, throughDate: resolvedThrough } };
 }
@@ -91,7 +95,11 @@ async function evaluateSessionAttendanceIncomplete({ orgId, rule, asOfDate, reqU
         sessionDate,
         unmarkedCount: unmarked.length,
         href: sessionUncompletedNotificationService.buildSessionManagerPath(classData, session),
-        payload: { classData, session, unmarkedCount: unmarked.length }
+        payload: slimSessionFindingPayload({
+          classData,
+          session,
+          unmarkedCount: unmarked.length
+        })
       });
     }
   }

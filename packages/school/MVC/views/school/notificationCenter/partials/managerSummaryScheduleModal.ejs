@@ -75,21 +75,54 @@
   .nc-manager-summary-modal .tab-content > .tab-pane.active.show {
     display: flex;
   }
+  .nc-manager-summary-modal .nc-preview-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+  }
+  .nc-manager-summary-modal .nc-preview-toolbar .btn.active {
+    background: var(--bs-primary);
+    color: #fff;
+    border-color: var(--bs-primary);
+  }
+  .nc-manager-summary-modal .nc-compose-preview-outer {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    justify-content: center;
+    background: #e9ecef;
+    border-radius: 8px;
+    padding: 12px;
+    overflow: auto;
+  }
   .nc-manager-summary-modal .nc-compose-preview-shell {
     border: 1px solid var(--bs-border-color);
     border-radius: 8px;
     overflow: hidden;
     background: #f8f9fa;
-    flex: 1 1 auto;
-    min-height: 0;
+    width: 100%;
+    max-width: 100%;
+    min-height: 200px;
     display: flex;
     flex-direction: column;
+    transition: max-width 0.2s ease;
+  }
+  .nc-manager-summary-modal .nc-compose-preview-shell.nc-preview--mobile {
+    max-width: 375px;
+  }
+  .nc-manager-summary-modal .nc-compose-preview-shell.nc-preview--tablet {
+    max-width: 768px;
+  }
+  .nc-manager-summary-modal .nc-compose-preview-shell.nc-preview--desktop {
+    max-width: 100%;
   }
   .nc-manager-summary-modal #ncManagerSummaryPreviewFrame {
     display: block;
     width: 100%;
     flex: 1 1 auto;
-    min-height: 0;
+    min-height: 280px;
     border: 0;
     background: #fff;
   }
@@ -120,7 +153,7 @@
           <h5 class="modal-title mb-1" id="ncManagerScheduleModalLabel">
             <i class="bi bi-people me-2 text-primary"></i>Schedule manager summary
           </h5>
-          <p class="small text-muted mb-0">Review the compact summary email, choose send time, then add to the outbox.</p>
+          <p class="small text-muted mb-0">Review the summary email, then send now or pick a send time.</p>
         </div>
         <button type="button" class="btn-close ms-3" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
@@ -140,7 +173,7 @@
             </div>
           </div>
 
-          <%- include('scheduleSendTimePanel', {
+          <%- include('scheduleSendTimeFields', {
             schedulePanelPrefix: 'ncManager',
             scheduleSendAtValue: defaultManagerSendAtLocal || '',
             scheduleTimeZoneHint: managerTimeZone ? ('Organization timezone: ' + managerTimeZone) : 'Organization timezone applies when scheduling.'
@@ -161,8 +194,16 @@
 
           <div class="tab-content flex-grow-1 min-h-0">
             <div class="tab-pane fade show active" id="ncManagerPreviewHtmlPane" role="tabpanel">
-              <div class="nc-compose-preview-shell">
-                <iframe id="ncManagerSummaryPreviewFrame" title="Manager summary email preview"></iframe>
+              <div class="nc-preview-toolbar flex-shrink-0" role="group" aria-label="Preview device width">
+                <span class="small text-muted me-1">Preview as:</span>
+                <button type="button" class="btn btn-sm btn-outline-secondary nc-preview-device-mobile" aria-pressed="false">Mobile</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary nc-preview-device-tablet" aria-pressed="false">Tablet</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary nc-preview-device-desktop" aria-pressed="true">Desktop</button>
+              </div>
+              <div class="nc-compose-preview-outer flex-grow-1 min-h-0">
+                <div class="nc-compose-preview-shell nc-preview--desktop" id="ncManagerPreviewShell">
+                  <iframe id="ncManagerSummaryPreviewFrame" title="Manager summary email preview"></iframe>
+                </div>
               </div>
             </div>
             <div class="tab-pane fade" id="ncManagerPreviewPlainPane" role="tabpanel">
@@ -176,8 +217,8 @@
         <button type="button" class="btn btn-outline-primary" id="ncManagerSummarySendNowFooter">
           <i class="bi bi-send me-1"></i>Send now
         </button>
-        <button type="button" class="btn btn-primary px-4" id="ncScheduleManagerSummarySubmit">
-          <i class="bi bi-calendar-check me-1"></i>Add to scheduled outbox
+        <button type="button" class="btn btn-outline-primary px-4" id="ncManagerSummaryScheduleBtn">
+          <i class="bi bi-calendar-event me-1"></i>Schedule
         </button>
       </div>
     </div>

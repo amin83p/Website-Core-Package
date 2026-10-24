@@ -85,6 +85,30 @@ const emailOutboxService = {
         if (Array.isArray(existing) && existing.length) {
           const row = existing[0];
           const status = cleanText(row?.status);
+          if (['queued', 'sending'].includes(status) && options.replaceActiveQueued === true) {
+            // eslint-disable-next-line no-await-in-loop
+            const updated = await emailOutboxRepository.update(row.id, {
+              orgId: entry.orgId,
+              to: entry.to,
+              subject: entry.subject,
+              html: entry.html,
+              text: entry.text,
+              from: entry.from,
+              replyTo: entry.replyTo,
+              providerProfileId: entry.providerProfileId,
+              templateId: entry.templateId,
+              injectedValues: entry.injectedValues,
+              sendAt: entry.sendAt,
+              dedupeKey: entry.dedupeKey,
+              taskRunId: entry.taskRunId || '',
+              meta: entry.meta,
+              status: 'queued',
+              lastError: '',
+              preparedAt: new Date().toISOString()
+            }, options);
+            created.push(updated);
+            continue;
+          }
           if (['queued', 'sending', 'sent'].includes(status)) {
             continue;
           }

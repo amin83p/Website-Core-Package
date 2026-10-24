@@ -75,7 +75,7 @@ test('buildTeacherReviewEmailContent asks teacher to review and complete', async
   assert.match(content.htmlBody, /role="presentation"/);
   assert.match(content.htmlBody, /Session completion reminder/);
   assert.match(content.htmlBody, /Demo School/);
-  assert.match(content.htmlBody, /linear-gradient\(135deg,#087f8c 0%,#1d5fb8 100%\)/);
+  assert.match(content.htmlBody, /bgcolor="#1d5fb8"|background-color:#1d5fb8/i);
   assert.match(content.htmlBody, /uploads\/GLOBAL\/logo|<img[^>]+alt="/i);
   assert.match(content.htmlBody, /This notification was sent by <strong[^>]*>.*<\/strong>/);
 });

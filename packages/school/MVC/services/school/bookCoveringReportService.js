@@ -656,9 +656,15 @@ async function upsertSessionReportEntry({
   if (existingIndex >= 0) entries[existingIndex] = sanitizedEntry;
   else entries.push(sanitizedEntry);
 
+  const patch = { entries };
+  const currentStatus = clean(report.status || REPORT_STATUSES.DRAFT).toLowerCase();
+  if (entries.length > 0 && currentStatus !== REPORT_STATUSES.SUBMITTED) {
+    patch.status = REPORT_STATUSES.SUBMITTED;
+  }
+
   const updated = await updateReport(
     report.id,
-    { entries },
+    patch,
     reqUser,
     accessContext
   );

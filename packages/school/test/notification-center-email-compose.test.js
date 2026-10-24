@@ -16,6 +16,7 @@ const notificationRuleModel = require('../MVC/models/school/notificationRuleMode
 const personDisplayNameService = require('../MVC/services/school/personDisplayNameService');
 const composeService = require('../MVC/services/school/notificationCenterEmailComposeService');
 const registry = require('../MVC/services/school/notificationCenterEvaluatorRegistry');
+const { NC_EMAIL_CLASSES } = require('../../../MVC/utils/brandedEmailLayout');
 
 const sampleSessionItem = {
   title: 'Period 1',
@@ -55,6 +56,10 @@ test('session_without_book_report default mentions book coverage not session com
   assert.match(preview.plainText, /Add Book Report/i);
   assert.doesNotMatch(preview.plainText, /require review and completion/i);
   assert.match(preview.htmlBody, /Book coverage reminder/);
+  assert.match(preview.htmlBody, /@media screen and \(max-width:600px\)/);
+  assert.ok(preview.htmlBody.includes(NC_EMAIL_CLASSES.sessionCard));
+  assert.match(preview.htmlBody, /Open session/);
+  assert.ok(preview.htmlBody.includes(NC_EMAIL_CLASSES.prose));
 });
 
 test('session_not_final default uses uncompleted session completion copy', async () => {
@@ -67,6 +72,9 @@ test('session_not_final default uses uncompleted session completion copy', async
   });
   assert.match(preview.plainText, /require review and completion/i);
   assert.match(preview.htmlBody, /Session completion reminder/);
+  assert.match(preview.htmlBody, /max-width:680px/);
+  assert.ok(preview.htmlBody.includes(NC_EMAIL_CLASSES.sessionCard));
+  assert.ok(preview.htmlBody.includes(NC_EMAIL_CLASSES.container));
 });
 
 test('custom bodyTextTemplate renders teacher and session list placeholders', async () => {

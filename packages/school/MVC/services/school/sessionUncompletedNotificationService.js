@@ -11,6 +11,8 @@ const { requireCoreModule } = require('./schoolCoreContracts');
 
 const {
   buildBrandedEmailLayout,
+  buildEmailButton,
+  NC_EMAIL_CLASSES,
   NEWS_BLUE,
   NEWS_TEAL,
   NEWS_INK,
@@ -321,6 +323,9 @@ function buildSessionListText(entries = [], { baseUrl = '', sessionTimingByKey =
 function buildSessionListHtml(entries = [], { baseUrl = '', sessionTimingByKey = null, formal = false } = {}) {
   const timingMap = sessionTimingByKey instanceof Map ? sessionTimingByKey : null;
   const groups = groupEntriesByClassTitle(entries);
+  const sessionCardClass = NC_EMAIL_CLASSES.sessionCard;
+  const sessionRowClass = NC_EMAIL_CLASSES.sessionRow;
+  const sessionLinkClass = NC_EMAIL_CLASSES.sessionLink;
   if (!groups.length) {
     return `<p style="margin:0;color:${NEWS_MUTED};">No sessions listed.</p>`;
   }
@@ -332,28 +337,32 @@ function buildSessionListHtml(entries = [], { baseUrl = '', sessionTimingByKey =
       const sessionUrl = resolveAbsoluteSessionUrl(entry?.classData || {}, session, baseUrl);
       const timing = escapeHtml(timingMap?.get(sessionKey)?.timingLabel || '');
       const linkCell = sessionUrl
-        ? `<a href="${escapeHtml(sessionUrl)}" style="color:${NEWS_BLUE};text-decoration:none;font-weight:700;border-bottom:1px solid rgba(29,95,184,0.35);">${formal ? label : `${buildEmailIcon('link')}${label}`}</a>`
-        : `${formal ? label : `${buildEmailIcon('session')}${label}`}`;
+        ? `<a href="${escapeHtml(sessionUrl)}" class="${sessionLinkClass}" style="color:${NEWS_BLUE};text-decoration:none;font-weight:700;border-bottom:1px solid rgba(29,95,184,0.35);word-break:break-word;">${formal ? label : `${buildEmailIcon('link')}${label}`}</a>`
+        : `<span class="${sessionLinkClass}" style="word-break:break-word;">${formal ? label : `${buildEmailIcon('session')}${label}`}</span>`;
+      const ctaBlock = sessionUrl ? buildEmailButton(sessionUrl, 'Open session') : '';
       return [
-        '<tr>',
-        `<td style="padding:12px 16px;border-bottom:1px solid ${NEWS_LINE};vertical-align:top;width:20px;color:${NEWS_TEAL};font-weight:700;">&#8226;</td>`,
-        `<td style="padding:12px 16px;border-bottom:1px solid ${NEWS_LINE};vertical-align:top;">`,
+        `<tr class="${sessionRowClass}">`,
+        `<td style="padding:14px 16px 6px;border-bottom:1px solid ${NEWS_LINE};vertical-align:top;width:20px;color:${NEWS_TEAL};font-weight:700;">&#8226;</td>`,
+        `<td style="padding:14px 16px;border-bottom:1px solid ${NEWS_LINE};vertical-align:top;">`,
         `<div style="font-size:14px;line-height:1.55;color:${NEWS_INK};">${linkCell}</div>`,
         timing ? `<div style="font-size:13px;line-height:1.45;color:${NEWS_MUTED};margin-top:6px;">${formal ? timing : `${buildEmailIcon('clock')}${timing}`}</div>` : '',
+        ctaBlock,
         '</td>',
         '</tr>'
       ].join('');
     }).join('');
     return [
-      `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin:0 0 18px;border:1px solid ${NEWS_LINE};background:#ffffff;border-radius:16px;overflow:hidden;">`,
+      `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" class="${sessionCardClass}"`,
+      ` style="margin:0 0 20px;border:1px solid ${NEWS_LINE};background:#ffffff;border-radius:16px;overflow:hidden;`,
+      'box-shadow:0 6px 20px rgba(19,34,44,0.06);">',
       '<tr>',
-      `<td style="padding:12px 16px;background:rgba(8,127,140,0.12);border-bottom:1px solid ${NEWS_LINE};">`,
-      `<p style="margin:0;font-size:14px;font-weight:800;color:${NEWS_TEAL};letter-spacing:0.02em;">${formal ? escapeHtml(className) : `${buildEmailIcon('class')}${escapeHtml(className)}`}</p>`,
+      `<td bgcolor="#e8f2f8" style="padding:14px 18px;background-color:#e8f2f8;border-bottom:1px solid ${NEWS_LINE};">`,
+      `<p style="margin:0;font-size:15px;font-weight:800;color:${NEWS_TEAL};letter-spacing:0.02em;">${formal ? escapeHtml(className) : `${buildEmailIcon('class')}${escapeHtml(className)}`}</p>`,
       '</td>',
       '</tr>',
       '<tr>',
       '<td style="padding:0;">',
-      `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;">${rows}</table>`,
+      `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border-collapse:collapse;width:100%;">${rows}</table>`,
       '</td>',
       '</tr>',
       '</table>'
@@ -396,17 +405,19 @@ async function buildTeacherReviewEmailContent({
     '',
     appName
   ].join('\n');
+  const proseClass = NC_EMAIL_CLASSES.prose;
   const bodyInner = [
-    `<p style="margin:0 0 16px;">Hi ${escapeHtml(name)},</p>`,
-    `<p style="margin:0 0 14px;color:${NEWS_MUTED};">You have <strong style="color:${NEWS_INK};">${sessionCount}</strong> session(s) that need review and completion. Open each session below, verify the details, and mark it complete when you are ready.</p>`,
+    `<p class="${proseClass}" style="margin:0 0 18px;font-size:16px;color:${NEWS_INK};">Hi ${escapeHtml(name)},</p>`,
+    `<p class="${proseClass}" style="margin:0 0 20px;color:${NEWS_MUTED};">You have <strong style="color:${NEWS_INK};">${sessionCount}</strong> session(s) that need review and completion. Open each session below, verify the details, and mark it complete when you are ready.</p>`,
     listHtml,
-    `<p style="margin:22px 0 0;">Thank you for your attention.</p>`,
-    `<p style="margin:16px 0 0;color:${NEWS_MUTED};">— <strong style="color:${NEWS_INK};">${escapeHtml(org)}</strong></p>`
+    `<p class="${proseClass}" style="margin:24px 0 0;color:${NEWS_INK};">Thank you for your attention.</p>`,
+    `<p class="${proseClass}" style="margin:14px 0 0;color:${NEWS_MUTED};">— <strong style="color:${NEWS_INK};">${escapeHtml(org)}</strong></p>`
   ].join('');
   const htmlBody = buildBrandedEmailLayout({
     baseUrl,
     eyebrow: 'School notification',
     title: 'Session completion reminder',
+    preheader: `${sessionCount} session(s) need your review`,
     bodyHtml: bodyInner
   });
   return { plainText, htmlBody, sessionCount, listText, listHtml };

@@ -10,6 +10,7 @@ const { requireCoreModule } = require('./schoolCoreContracts');
 const {
   buildBrandedEmailLayout,
   escapeHtml,
+  NC_EMAIL_CLASSES,
   NEWS_INK,
   NEWS_MUTED,
   NEWS_LINE
@@ -35,10 +36,10 @@ const DEFAULT_BODY_TEXT = [
 ].join('\n');
 
 const DEFAULT_BODY_HTML = [
-  '<p style="margin:0 0 14px;">Hi {{MANAGER_NAME}},</p>',
-  `<p style="margin:0 0 16px;color:${NEWS_MUTED};">Summary for <strong style="color:${NEWS_INK};">{{RULE_LABEL}}</strong> as of {{RUN_DATE}}:</p>`,
+  `<p class="${NC_EMAIL_CLASSES.prose}" style="margin:0 0 18px;font-size:16px;color:${NEWS_INK};">Hi {{MANAGER_NAME}},</p>`,
+  `<p class="${NC_EMAIL_CLASSES.prose}" style="margin:0 0 20px;color:${NEWS_MUTED};">Summary for <strong style="color:${NEWS_INK};">{{RULE_LABEL}}</strong> as of {{RUN_DATE}}:</p>`,
   '{{TEACHER_SUMMARY_LIST_HTML}}',
-  `<p style="margin:20px 0 0;color:${NEWS_MUTED};">Thank you,<br><strong style="color:${NEWS_INK};">{{ORG_NAME}}</strong></p>`
+  `<p class="${NC_EMAIL_CLASSES.prose}" style="margin:24px 0 0;color:${NEWS_MUTED};">Thank you,<br><strong style="color:${NEWS_INK};">{{ORG_NAME}}</strong></p>`
 ].join('');
 
 function cleanText(value) {
@@ -97,16 +98,18 @@ function buildTeacherSummaryListHtml(rows = []) {
   if (!rows.length) {
     return `<p style="margin:0;color:${NEWS_MUTED};">No teachers in this run.</p>`;
   }
+  const tableClass = NC_EMAIL_CLASSES.summaryTable;
   const bodyRows = rows.map((row) => (
-    `<tr>`
-    + `<td style="padding:8px 12px;border-bottom:1px solid ${NEWS_LINE};color:${NEWS_INK};">${escapeHtml(row.name)}</td>`
-    + `<td style="padding:8px 12px;border-bottom:1px solid ${NEWS_LINE};text-align:right;color:${NEWS_INK};">${escapeHtml(String(row.itemCount))}</td>`
-    + `</tr>`
+    '<tr>'
+    + `<td class="nc-summary-teacher" style="padding:10px 14px;border-bottom:1px solid ${NEWS_LINE};color:${NEWS_INK};">${escapeHtml(row.name)}</td>`
+    + `<td class="nc-summary-items" style="padding:10px 14px;border-bottom:1px solid ${NEWS_LINE};text-align:right;color:${NEWS_INK};">${escapeHtml(String(row.itemCount))}</td>`
+    + '</tr>'
   )).join('');
-  return `<table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;border:1px solid ${NEWS_LINE};border-radius:8px;overflow:hidden;">`
-    + `<thead><tr style="background:#f8f9fa;">`
-    + `<th style="padding:8px 12px;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:${NEWS_MUTED};">Teacher</th>`
-    + `<th style="padding:8px 12px;text-align:right;font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:${NEWS_MUTED};">Items</th>`
+  return `<table role="presentation" cellpadding="0" cellspacing="0" class="${tableClass}" width="100%"`
+    + ` style="width:100%;border-collapse:collapse;border:1px solid ${NEWS_LINE};border-radius:12px;overflow:hidden;background:#ffffff;">`
+    + '<thead><tr style="background:#f4f8fc;">'
+    + `<th style="padding:10px 14px;text-align:left;font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:${NEWS_MUTED};">Teacher</th>`
+    + `<th style="padding:10px 14px;text-align:right;font-size:12px;text-transform:uppercase;letter-spacing:0.04em;color:${NEWS_MUTED};">Items</th>`
     + `</tr></thead><tbody>${bodyRows}</tbody></table>`;
 }
 
@@ -164,6 +167,7 @@ async function buildManagerSummaryPreview({
     baseUrl: cleanText(baseUrl),
     eyebrow: 'Manager summary',
     title: context.RULE_LABEL,
+    preheader: `Manager summary — ${context.TEACHER_COUNT} teachers, ${context.TOTAL_ITEM_COUNT} items`,
     bodyHtml: bodyInner
   });
   return {

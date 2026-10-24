@@ -1,5 +1,6 @@
 'use strict';
 
+const crypto = require('crypto');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
 const notificationCenterEvaluatorRegistry = require('./notificationCenterEvaluatorRegistry');
 const notificationCenterRunPresentationService = require('./notificationCenterRunPresentationService');
@@ -169,16 +170,20 @@ async function buildPreviewFromSelection({
   return { preview, items, recipientPersonId: teacherId, timeZone, orgName: resolvedOrgName };
 }
 
-function buildDedupeKey({ orgId, ruleId, runId, recipientPersonId, selectionKeys, sendAtIso }) {
-  const sorted = [...selectionKeys].sort().join('|');
+function hashSelectionKeys(selectionKeys = []) {
+  const sorted = [...selectionKeys].map((key) => cleanText(key)).filter(Boolean).sort();
+  return crypto.createHash('sha256').update(sorted.join('|'), 'utf8').digest('hex').slice(0, 32);
+}
+
+/** Stable outbox key per org/rule/run/recipient/selection (send time is not part of the key). */
+function buildDedupeKey({ orgId, ruleId, runId, recipientPersonId, selectionKeys }) {
   return [
     'nc-email',
     cleanText(orgId),
     cleanText(ruleId),
     cleanText(runId),
     cleanText(recipientPersonId),
-    sorted,
-    cleanText(sendAtIso)
+    hashSelectionKeys(selectionKeys)
   ].join('::');
 }
 
@@ -243,13 +248,14 @@ async function scheduleEmail({
   const finalHtml = cleanText(preview.htmlBody) || cleanText(bodyHtml);
   if (!finalText && !finalHtml) throw new Error('Email body is required.');
 
+  const resolvedSelectionKeys = notificationCenterRunPresentationService
+    .resolveSelectedItems(run, selectionKeys).selectionKeys;
   const dedupeKey = buildDedupeKey({
     orgId: orgKey,
     ruleId: rule.id,
     runId: run.id,
     recipientPersonId: teacherId,
-    selectionKeys: notificationCenterRunPresentationService.resolveSelectedItems(run, selectionKeys).selectionKeys,
-    sendAtIso
+    selectionKeys: resolvedSelectionKeys
   });
 
   const cycleDate = sendAtIso.slice(0, 10);
@@ -268,7 +274,7 @@ async function scheduleEmail({
       recipientPersonId: teacherId,
       findingIds: items.map((item) => cleanText(item.id)).filter(Boolean)
     }
-  });
+  }, { replaceActiveQueued: true });
   if (!created) throw new Error('Email was not queued (duplicate or blocked).');
 
   await notificationSendLedgerModel.appendEntry({
@@ -307,5 +313,7 @@ module.exports = {
   formatScheduledSendAtLabel,
   isTruthySendNow,
   buildImmediateSendAtIso,
-  resolveRequestBaseUrl
+  resolveRequestBaseUrl,
+  buildDedupeKey,
+  hashSelectionKeys
 };

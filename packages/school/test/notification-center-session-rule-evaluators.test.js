@@ -55,6 +55,25 @@ test('session scan predicates detect notes, activities, and cases', () => {
   );
 });
 
+test('slim session finding payload omits embedded class sessions', () => {
+  const heavyClass = {
+    id: 'C1',
+    orgId: 'ORG1',
+    title: 'Heavy class',
+    sessions: Array.from({ length: 200 }, (_, index) => ({
+      sessionId: `S${index}`,
+      roster: Array.from({ length: 40 }, () => ({ attendanceStatus: 'present' }))
+    }))
+  };
+  const session = { sessionId: 'S1', date: '2026-09-15', startTime: '09:00' };
+  const bloated = { classData: heavyClass, session };
+  const slim = scanService.slimSessionFindingPayload(bloated);
+  assert.ok(Buffer.byteLength(JSON.stringify(bloated), 'utf8') > 50000);
+  assert.ok(Buffer.byteLength(JSON.stringify(slim), 'utf8') < 500);
+  assert.equal(Array.isArray(slim.classData?.sessions), false);
+  assert.equal(slim.session?.sessionId, 'S1');
+});
+
 test('submitted book report predicate ignores draft-only reports', () => {
   const classData = { id: 'C1', orgId: 'ORG1' };
   const session = { sessionId: 'S1', date: '2026-09-15' };

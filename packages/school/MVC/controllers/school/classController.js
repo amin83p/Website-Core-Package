@@ -5182,9 +5182,10 @@ async function upsertSessionBookCoveringEntry(req, res) {
             accessContext
         });
         const summary = await bookCoveringReportService.buildReportSummary(report, req.user, accessContext);
+        const submitted = String(report?.status || '').toLowerCase() === 'submitted';
         return res.json({
             status: 'success',
-            message: 'Book coverage saved.',
+            message: submitted ? 'Book coverage submitted.' : 'Book coverage saved.',
             summary,
             actionStateId: req.actionStateId
         });

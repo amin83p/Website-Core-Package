@@ -1,0 +1,6 @@
+<%
+  const panelPrefix = typeof schedulePanelPrefix !== 'undefined' ? schedulePanelPrefix : 'ncCompose';
+  const sendAtValue = typeof scheduleSendAtValue !== 'undefined' ? scheduleSendAtValue : '';
+%>
+<input type="hidden" name="sendNow" id="<%= panelPrefix %>SendNow" value="">
+<input type="hidden" name="sendAtLocal" id="<%= panelPrefix %>SendAt" value="<%= sendAtValue %>">

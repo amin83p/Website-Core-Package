@@ -22,29 +22,31 @@
 
       <div class="card border-0 shadow-sm mb-4">
         <div class="card-body p-4">
-          <%- include('partials/scheduleSendTimePanel', {
+          <div class="mb-3">
+            <label class="form-label fw-bold" for="ncSubject">Subject</label>
+            <input class="form-control size-md" id="ncSubject" name="subject" value="<%= preview.subject || '' %>" required>
+          </div>
+
+          <%- include('partials/scheduleSendTimeFields', {
             schedulePanelPrefix: 'ncPage',
             scheduleSendAtValue: defaultSendAtLocal || '',
             scheduleTimeZoneHint: tzHint
           }) %>
+
           <div class="row g-3">
             <div class="col-12">
-              <label class="form-label fw-bold" for="ncSubject">Subject</label>
-              <input class="form-control size-md" id="ncSubject" name="subject" value="<%= preview.subject || '' %>" required>
-            </div>
-            <div class="col-12">
-              <label class="form-label fw-bold" for="ncBodyText">Email body</label>
+              <label class="form-label fw-bold" for="ncBodyText">Email body (plain text)</label>
               <textarea class="form-control size-md font-monospace" id="ncBodyText" name="bodyText" rows="14" required><%= preview.plainText || '' %></textarea>
               <textarea class="d-none" name="bodyHtml" id="ncBodyHtml" aria-hidden="true"><%- preview.htmlBody || '' %></textarea>
-              <div class="form-text small">Plain-text version shown for editing; HTML with clickable session links is sent when you schedule.</div>
+              <div class="form-text small">Plain-text version for editing; HTML with clickable session links is sent to recipients.</div>
             </div>
           </div>
         </div>
       </div>
 
       <div class="button-row pt-3 border-top d-flex flex-wrap gap-2">
-        <button type="submit" class="btn btn-filled btn-primary btn-md"><i class="bi bi-calendar-check me-1"></i> Add to scheduled outbox</button>
         <button type="button" class="btn btn-outline-primary btn-md" id="ncPageSendNowFooter"><i class="bi bi-send me-1"></i> Send now</button>
+        <button type="button" class="btn btn-outline-primary btn-md" id="ncPageScheduleBtn"><i class="bi bi-calendar-event me-1"></i> Schedule</button>
         <a href="/school/notification-center/runs/<%= run.id %>" class="btn btn-filled btn-secondary btn-md">Cancel</a>
       </div>
     </form>
@@ -56,19 +58,22 @@
 document.addEventListener('DOMContentLoaded', function () {
   const form = document.getElementById('ncComposePageForm');
   const sendNowFooter = document.getElementById('ncPageSendNowFooter');
-  const binder = window.NotificationCenterScheduleSendTime?.bind({
-    inputEl: document.getElementById('ncPageSendAt'),
-    summaryEl: document.getElementById('ncPageScheduleSummary'),
-    sendNowInputEl: document.getElementById('ncPageSendNow'),
+  const scheduleBtn = document.getElementById('ncPageScheduleBtn');
+  const controller = window.NotificationCenterScheduleSendTime?.createScheduleController({
+    sendAtInput: document.getElementById('ncPageSendAt'),
+    sendNowInput: document.getElementById('ncPageSendNow'),
+    scheduleBtn: scheduleBtn,
     timeZone: <%- JSON.stringify(timeZone || 'UTC') %>,
-    timeZoneHintEl: document.getElementById('ncPageTimeZoneHint'),
-    sendNowBtn: document.getElementById('ncPageSendNowBtn'),
-    schedulePanelEl: document.getElementById('ncPageSchedulePanel')
+    defaultSendAtLocal: <%- JSON.stringify(defaultSendAtLocal || '') %>,
+    onSubmit: () => form?.requestSubmit()
   });
   sendNowFooter?.addEventListener('click', function (event) {
     event.preventDefault();
-    binder?.activateSendNow();
-    form?.requestSubmit();
+    controller?.submitSendNow();
+  });
+  scheduleBtn?.addEventListener('click', function (event) {
+    event.preventDefault();
+    void controller?.submitSchedule?.();
   });
 });
 </script>

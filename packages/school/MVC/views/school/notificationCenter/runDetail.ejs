@@ -535,6 +535,7 @@
 <% } %>
 
 <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/notificationCenterScheduleSendTime.js') : '/scripts/notificationCenterScheduleSendTime.js' %>"></script>
+<script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/notificationCenterEmailPreviewDevices.js') : '/scripts/notificationCenterEmailPreviewDevices.js' %>"></script>
 
 <script>
 
@@ -554,13 +555,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const composeError = document.getElementById('ncComposeError');
 
-  const composeSubmit = document.getElementById('ncScheduleEmailSubmit');
+  const composeScheduleBtn = document.getElementById('ncScheduleEmailScheduleBtn');
 
   const composeSendNowFooter = document.getElementById('ncScheduleEmailSendNowFooter');
 
   const previewFrame = document.getElementById('ncComposePreviewFrame');
 
-  let composeScheduleBinder = null;
+  const previewShell = document.getElementById('ncComposePreviewShell');
+
+  let composeScheduleController = null;
+
+  let composeDevicePreview = null;
 
   const orgTimeZone = <%- JSON.stringify(typeof managerTimeZone !== 'undefined' ? managerTimeZone : '') %>;
 
@@ -582,26 +587,39 @@ document.addEventListener('DOMContentLoaded', () => {
 
     composeLoading?.classList.remove('d-none');
 
-    composeSubmit.disabled = true;
+    if (composeScheduleBtn) composeScheduleBtn.disabled = true;
 
     if (composeSendNowFooter) composeSendNowFooter.disabled = true;
 
-    composeScheduleBinder?.clearSendNow?.();
+    composeScheduleController?.reset?.();
 
     setComposePreviewHtml('');
 
   }
 
-  function bindComposeSchedulePanel(timeZone) {
+  function bindComposeScheduleController(timeZone, defaultSendAtLocal) {
     if (!window.NotificationCenterScheduleSendTime) return;
-    composeScheduleBinder = window.NotificationCenterScheduleSendTime.bind({
-      inputEl: document.getElementById('ncComposeSendAt'),
-      summaryEl: document.getElementById('ncComposeScheduleSummary'),
-      sendNowInputEl: document.getElementById('ncComposeSendNow'),
+    composeScheduleController = window.NotificationCenterScheduleSendTime.createScheduleController({
+      sendAtInput: document.getElementById('ncComposeSendAt'),
+      sendNowInput: document.getElementById('ncComposeSendNow'),
+      scheduleBtn: composeScheduleBtn,
       timeZone: timeZone || orgTimeZone || 'UTC',
-      timeZoneHintEl: document.getElementById('ncComposeTimeZoneHint'),
-      sendNowBtn: document.getElementById('ncComposeSendNowBtn'),
-      schedulePanelEl: document.getElementById('ncComposeSchedulePanel')
+      defaultSendAtLocal: defaultSendAtLocal || '',
+      onSubmit: () => { void submitComposeSchedule(); }
+    });
+  }
+
+  function bindComposeDevicePreview() {
+    if (!window.NotificationCenterEmailPreviewDevices || !previewShell) return;
+    const pane = document.getElementById('ncComposePreviewPane');
+    if (!pane) return;
+    composeDevicePreview = window.NotificationCenterEmailPreviewDevices.bindDevicePreview({
+      shellEl: previewShell,
+      buttons: {
+        mobile: pane.querySelector('.nc-preview-device-mobile'),
+        tablet: pane.querySelector('.nc-preview-device-tablet'),
+        desktop: pane.querySelector('.nc-preview-device-desktop')
+      }
     });
   }
 
@@ -678,25 +696,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
       document.getElementById('ncComposeBodyHtml').value = preview.htmlBody || '';
 
-      document.getElementById('ncComposeSendAt').value = payload.defaultSendAtLocal || '';
-
       const tz = payload.timeZone || orgTimeZone || 'UTC';
 
-      document.getElementById('ncComposeTimeZoneHint').textContent = tz ? `Organization timezone: ${tz}` : '';
+      const defaultSendAt = payload.defaultSendAtLocal || '';
 
       document.getElementById('ncComposeMeta').innerHTML = `<i class="bi bi-person-lines-fill me-1 text-primary"></i>To: <strong>${preview.recipientName || payload.recipientPersonId || teacherId}</strong> <span class="text-muted mx-1">·</span> <i class="bi bi-list-check me-1"></i>${(payload.selectionKeys || selectionKeys).length} session(s) selected`;
 
       setComposePreviewHtml(preview.htmlBody || '');
 
-      bindComposeSchedulePanel(tz);
+      bindComposeScheduleController(tz, defaultSendAt);
 
-      composeScheduleBinder?.refresh?.();
+      composeScheduleController?.setDefaultSendAtLocal?.(defaultSendAt);
+
+      bindComposeDevicePreview();
 
       composeLoading?.classList.add('d-none');
 
       composeForm?.classList.remove('d-none');
 
-      composeSubmit.disabled = false;
+      if (composeScheduleBtn) composeScheduleBtn.disabled = false;
 
       if (composeSendNowFooter) composeSendNowFooter.disabled = false;
 
@@ -714,9 +732,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   async function submitComposeSchedule() {
 
-    if (!composeForm || composeSubmit.disabled) return;
+    if (!composeForm || composeScheduleBtn?.disabled) return;
 
-    composeSubmit.disabled = true;
+    if (composeScheduleBtn) composeScheduleBtn.disabled = true;
 
     if (composeSendNowFooter) composeSendNowFooter.disabled = true;
 
@@ -782,7 +800,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       composeError.classList.remove('d-none');
 
-      composeSubmit.disabled = false;
+      if (composeScheduleBtn) composeScheduleBtn.disabled = false;
 
       if (composeSendNowFooter) composeSendNowFooter.disabled = false;
 
@@ -790,15 +808,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
   }
 
-  composeSubmit?.addEventListener('click', () => { void submitComposeSchedule(); });
-
   composeSendNowFooter?.addEventListener('click', (event) => {
 
     event.preventDefault();
 
-    composeScheduleBinder?.activateSendNow?.();
+    composeScheduleController?.submitSendNow?.();
 
-    void submitComposeSchedule();
+  });
+
+  composeScheduleBtn?.addEventListener('click', (event) => {
+
+    event.preventDefault();
+
+    void composeScheduleController?.submitSchedule?.();
 
   });
 
@@ -921,11 +943,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const managerModalEl = document.getElementById('ncManagerScheduleModal');
   const managerModal = managerModalEl && window.bootstrap?.Modal ? window.bootstrap.Modal.getOrCreateInstance(managerModalEl) : null;
   const managerOpenBtn = document.getElementById('ncOpenManagerSummaryModalBtn');
-  const managerSummarySubmit = document.getElementById('ncScheduleManagerSummarySubmit');
+  const managerSummaryScheduleBtn = document.getElementById('ncManagerSummaryScheduleBtn');
   const managerSummaryError = document.getElementById('ncManagerSummaryError');
   const managerSummaryPreviewFrame = document.getElementById('ncManagerSummaryPreviewFrame');
+  const managerPreviewShell = document.getElementById('ncManagerPreviewShell');
   const managerSendNowFooter = document.getElementById('ncManagerSummarySendNowFooter');
-  let managerScheduleBinder = null;
+  let managerScheduleController = null;
+  let managerDevicePreview = null;
+  const defaultManagerSendAtLocal = <%- JSON.stringify(typeof defaultManagerSendAtLocal !== 'undefined' ? defaultManagerSendAtLocal : '') %>;
   const managerPreviewHtml = <%- JSON.stringify((rule?.managerSummary?.enabled && (managerSummaryRows || []).length) ? (managerSummaryPreview?.htmlBody || '') : '') %>;
 
   function setManagerSummaryPreviewHtml(html) {
@@ -938,19 +963,29 @@ document.addEventListener('DOMContentLoaded', () => {
     managerSummaryError?.classList.add('d-none');
     managerSummaryError.textContent = '';
     setManagerSummaryPreviewHtml(managerPreviewHtml);
-    if (!managerScheduleBinder && window.NotificationCenterScheduleSendTime) {
-      managerScheduleBinder = window.NotificationCenterScheduleSendTime.bind({
-        inputEl: document.getElementById('ncManagerSendAt'),
-        summaryEl: document.getElementById('ncManagerScheduleSummary'),
-        sendNowInputEl: document.getElementById('ncManagerSendNow'),
+    if (!managerScheduleController && window.NotificationCenterScheduleSendTime) {
+      managerScheduleController = window.NotificationCenterScheduleSendTime.createScheduleController({
+        sendAtInput: document.getElementById('ncManagerSendAt'),
+        sendNowInput: document.getElementById('ncManagerSendNow'),
+        scheduleBtn: managerSummaryScheduleBtn,
         timeZone: orgTimeZone || 'UTC',
-        timeZoneHintEl: document.getElementById('ncManagerTimeZoneHint'),
-        sendNowBtn: document.getElementById('ncManagerSendNowBtn'),
-        schedulePanelEl: document.getElementById('ncManagerSchedulePanel')
+        defaultSendAtLocal: defaultManagerSendAtLocal,
+        onSubmit: () => { void scheduleManagerSummary(); }
       });
     } else {
-      managerScheduleBinder?.clearSendNow?.();
-      managerScheduleBinder?.refresh?.();
+      managerScheduleController?.reset?.();
+      managerScheduleController?.setDefaultSendAtLocal?.(defaultManagerSendAtLocal);
+    }
+    if (!managerDevicePreview && window.NotificationCenterEmailPreviewDevices && managerPreviewShell) {
+      const pane = document.getElementById('ncManagerPreviewHtmlPane');
+      managerDevicePreview = window.NotificationCenterEmailPreviewDevices.bindDevicePreview({
+        shellEl: managerPreviewShell,
+        buttons: {
+          mobile: pane?.querySelector('.nc-preview-device-mobile'),
+          tablet: pane?.querySelector('.nc-preview-device-tablet'),
+          desktop: pane?.querySelector('.nc-preview-device-desktop')
+        }
+      });
     }
     managerModal.show();
   }
@@ -962,8 +997,9 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   async function scheduleManagerSummary() {
-    if (!managerSummarySubmit) return;
-    managerSummarySubmit.disabled = true;
+    if (!managerSummaryScheduleBtn) return;
+    managerSummaryScheduleBtn.disabled = true;
+    if (managerSendNowFooter) managerSendNowFooter.disabled = true;
     managerSummaryError?.classList.add('d-none');
     const params = new URLSearchParams();
     if (actionStateId) params.set('actionStateId', actionStateId);
@@ -1004,16 +1040,19 @@ document.addEventListener('DOMContentLoaded', () => {
         managerSummaryError.classList.remove('d-none');
       }
     } finally {
-      managerSummarySubmit.disabled = false;
+      managerSummaryScheduleBtn.disabled = false;
+      if (managerSendNowFooter) managerSendNowFooter.disabled = false;
     }
   }
 
-  managerSummarySubmit?.addEventListener('click', scheduleManagerSummary);
+  managerSummaryScheduleBtn?.addEventListener('click', (event) => {
+    event.preventDefault();
+    void managerScheduleController?.submitSchedule?.();
+  });
 
   managerSendNowFooter?.addEventListener('click', (event) => {
     event.preventDefault();
-    managerScheduleBinder?.activateSendNow?.();
-    void scheduleManagerSummary();
+    managerScheduleController?.submitSendNow?.();
   });
 
   updateCount();

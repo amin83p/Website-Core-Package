@@ -103,6 +103,7 @@ test('notification centre routes and views wire manager summary', () => {
   const managerModal = readText('packages/school/MVC/views/school/notificationCenter/partials/managerSummaryScheduleModal.ejs');
   assert.match(managerModal, /ncManagerScheduleModal/);
   assert.match(managerModal, /ncManagerSummaryPreviewFrame/);
-  assert.match(managerModal, /ncScheduleManagerSummarySubmit/);
+  assert.match(managerModal, /ncManagerSummaryScheduleBtn/);
+  assert.match(managerModal, /nc-preview-device-mobile/);
   assert.match(delivery, /queueManagerSummaryForRun/);
 });

@@ -7,10 +7,21 @@ const { requireCoreModule } = require('./schoolCoreContracts');
 const {
   buildBrandedEmailLayout,
   escapeHtml,
+  NC_EMAIL_CLASSES,
   NEWS_INK,
   NEWS_MUTED,
   NEWS_LINE
 } = requireCoreModule('MVC/utils/brandedEmailLayout');
+
+function buildSessionRuleBodyHtml(introHtml = '') {
+  const prose = NC_EMAIL_CLASSES.prose;
+  return [
+    `<p class="${prose}" style="margin:0 0 18px;font-size:16px;color:${NEWS_INK};">Hi {{TEACHER_NAME}},</p>`,
+    `<p class="${prose}" style="margin:0 0 20px;color:${NEWS_MUTED};">${introHtml}</p>`,
+    '{{SESSION_LIST_HTML}}',
+    `<p class="${prose}" style="margin:24px 0 0;color:${NEWS_MUTED};">Thank you,<br><strong style="color:${NEWS_INK};">{{ORG_NAME}}</strong></p>`
+  ].join('');
+}
 
 const PLACEHOLDER_TOKEN_REGEX = /\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g;
 
@@ -85,12 +96,9 @@ function buildDefaultTemplates(ruleType = '') {
         'Thank you,',
         '{{ORG_NAME}}'
       ].join('\n'),
-      bodyHtml: [
-        '<p style="margin:0 0 14px;">Hi {{TEACHER_NAME}},</p>',
-        `<p style="margin:0 0 16px;color:${NEWS_MUTED};">The following session(s) still need attendance finalized. Open each session below and complete attendance when you are ready.</p>`,
-        '{{SESSION_LIST_HTML}}',
-        `<p style="margin:20px 0 0;color:${NEWS_MUTED};">Thank you,<br><strong style="color:${NEWS_INK};">{{ORG_NAME}}</strong></p>`
-      ].join(''),
+      bodyHtml: buildSessionRuleBodyHtml(
+        'The following session(s) still need attendance finalized. Open each session below and complete attendance when you are ready.'
+      ),
       emailTitle: 'Attendance reminder',
       eyebrow: 'School notification',
       smsText: sms,
@@ -108,12 +116,9 @@ function buildDefaultTemplates(ruleType = '') {
         'Thank you,',
         '{{ORG_NAME}}'
       ].join('\n'),
-      bodyHtml: [
-        '<p style="margin:0 0 14px;">Hi {{TEACHER_NAME}},</p>',
-        `<p style="margin:0 0 16px;color:${NEWS_MUTED};">The following session(s) are missing a submitted book coverage report. Open each session, go to the <strong>Book coverage</strong> tab, and use <strong>Add Book Report</strong> to record coverage for the class book.</p>`,
-        '{{SESSION_LIST_HTML}}',
-        `<p style="margin:20px 0 0;color:${NEWS_MUTED};">Thank you,<br><strong style="color:${NEWS_INK};">{{ORG_NAME}}</strong></p>`
-      ].join(''),
+      bodyHtml: buildSessionRuleBodyHtml(
+        `The following session(s) are missing a submitted book coverage report. Open each session, go to the <strong>Book coverage</strong> tab, and use <strong>Add Book Report</strong> to record coverage for the class book.`
+      ),
       emailTitle: 'Book coverage reminder',
       eyebrow: 'School notification',
       smsText: sms,
@@ -131,12 +136,9 @@ function buildDefaultTemplates(ruleType = '') {
         'Thank you,',
         '{{ORG_NAME}}'
       ].join('\n'),
-      bodyHtml: [
-        '<p style="margin:0 0 14px;">Hi {{TEACHER_NAME}},</p>',
-        `<p style="margin:0 0 16px;color:${NEWS_MUTED};">The following session(s) are missing session notes. Open each session below and add notes on the Manage Session page when you are ready.</p>`,
-        '{{SESSION_LIST_HTML}}',
-        `<p style="margin:20px 0 0;color:${NEWS_MUTED};">Thank you,<br><strong style="color:${NEWS_INK};">{{ORG_NAME}}</strong></p>`
-      ].join(''),
+      bodyHtml: buildSessionRuleBodyHtml(
+        'The following session(s) are missing session notes. Open each session below and add notes on the Manage Session page when you are ready.'
+      ),
       emailTitle: 'Session notes reminder',
       eyebrow: 'School notification',
       smsText: sms,
@@ -154,12 +156,9 @@ function buildDefaultTemplates(ruleType = '') {
         'Thank you,',
         '{{ORG_NAME}}'
       ].join('\n'),
-      bodyHtml: [
-        '<p style="margin:0 0 14px;">Hi {{TEACHER_NAME}},</p>',
-        `<p style="margin:0 0 16px;color:${NEWS_MUTED};">The following session(s) have student cases that need your attention. Review each session below and follow up on the open cases.</p>`,
-        '{{SESSION_LIST_HTML}}',
-        `<p style="margin:20px 0 0;color:${NEWS_MUTED};">Thank you,<br><strong style="color:${NEWS_INK};">{{ORG_NAME}}</strong></p>`
-      ].join(''),
+      bodyHtml: buildSessionRuleBodyHtml(
+        'The following session(s) have student cases that need your attention. Review each session below and follow up on the open cases.'
+      ),
       emailTitle: 'Student cases reminder',
       eyebrow: 'School notification',
       smsText: sms,
@@ -177,12 +176,9 @@ function buildDefaultTemplates(ruleType = '') {
         'Thank you,',
         '{{ORG_NAME}}'
       ].join('\n'),
-      bodyHtml: [
-        '<p style="margin:0 0 14px;">Hi {{TEACHER_NAME}},</p>',
-        `<p style="margin:0 0 16px;color:${NEWS_MUTED};">The following session(s) have instructional activities that may need your review. Open each session below when you are ready.</p>`,
-        '{{SESSION_LIST_HTML}}',
-        `<p style="margin:20px 0 0;color:${NEWS_MUTED};">Thank you,<br><strong style="color:${NEWS_INK};">{{ORG_NAME}}</strong></p>`
-      ].join(''),
+      bodyHtml: buildSessionRuleBodyHtml(
+        'The following session(s) have instructional activities that may need your review. Open each session below when you are ready.'
+      ),
       emailTitle: 'Session activities reminder',
       eyebrow: 'School notification',
       smsText: sms,
@@ -201,11 +197,11 @@ function buildDefaultTemplates(ruleType = '') {
         '{{ORG_NAME}}'
       ].join('\n'),
       bodyHtml: [
-        '<p style="margin:0 0 14px;">Hi {{TEACHER_NAME}},</p>',
-        `<p style="margin:0 0 16px;color:${NEWS_MUTED};">The following timesheet period(s) still need to be submitted:</p>`,
-        '<div style="padding:14px 16px;border:1px solid {{NEWS_LINE}};">{{ITEM_LIST_HTML}}</div>',
-        `<p style="margin:20px 0 0;color:${NEWS_MUTED};">Thank you,<br><strong style="color:${NEWS_INK};">{{ORG_NAME}}</strong></p>`
-      ].join('').replace(/\{\{NEWS_LINE\}\}/g, NEWS_LINE),
+        `<p class="${NC_EMAIL_CLASSES.prose}" style="margin:0 0 18px;font-size:16px;color:${NEWS_INK};">Hi {{TEACHER_NAME}},</p>`,
+        `<p class="${NC_EMAIL_CLASSES.prose}" style="margin:0 0 20px;color:${NEWS_MUTED};">The following timesheet period(s) still need to be submitted:</p>`,
+        `<div style="padding:14px 16px;border:1px solid ${NEWS_LINE};border-radius:12px;background:#f8fbfd;">{{ITEM_LIST_HTML}}</div>`,
+        `<p class="${NC_EMAIL_CLASSES.prose}" style="margin:24px 0 0;color:${NEWS_MUTED};">Thank you,<br><strong style="color:${NEWS_INK};">{{ORG_NAME}}</strong></p>`
+      ].join(''),
       emailTitle: 'Timesheet reminder',
       eyebrow: 'School notification',
       smsText: sms,
@@ -336,6 +332,7 @@ async function buildEmailPreview({
     baseUrl,
     eyebrow: defaults.eyebrow,
     title: defaults.emailTitle || ruleLabel,
+    preheader: `${ruleLabel} — ${items.length} item(s)`,
     bodyHtml: bodyInner
   });
 
