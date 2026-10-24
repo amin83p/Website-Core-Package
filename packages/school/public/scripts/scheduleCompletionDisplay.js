@@ -114,6 +114,28 @@
     if (String(event?.eventType || '') === 'school_activity') {
       const scan = event?.completionScan && typeof event.completionScan === 'object' ? event.completionScan : null;
       const isComplete = scan?.isComplete === true;
+      const evaluationType = normalizeStatusCode(event?.evaluationType);
+      const attendanceStatus = normalizeStatusCode(event?.status);
+      const attendancePalettes = {
+        attended: DEFAULT_COMPLETE,
+        absent: { bg: '#f8d7da', text: '#842029', border: '#f1aeb5' },
+        excused: { bg: '#cff4fc', text: '#055160', border: '#9eeaf9' }
+      };
+      const attendanceIcons = {
+        attended: 'bi-check-circle-fill text-success',
+        absent: 'bi-x-circle-fill text-danger',
+        excused: 'bi-envelope-paper-fill text-info'
+      };
+      if (evaluationType !== 'completion' && attendancePalettes[attendanceStatus]) {
+        const scanLabel = scan?.scanLabel || event?.statusLabel || attendanceStatus.charAt(0).toUpperCase() + attendanceStatus.slice(1);
+        return buildScanResult({
+          state: 'completed',
+          isComplete: true,
+          scanLabel,
+          colors: attendancePalettes[attendanceStatus],
+          iconClass: attendanceIcons[attendanceStatus]
+        });
+      }
       return buildScanResult({
         state: isComplete ? 'completed' : 'pending',
         isComplete,

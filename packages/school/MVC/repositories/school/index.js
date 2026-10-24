@@ -164,6 +164,20 @@ function isRecordAccessibleByAssignment(record = {}, scope = {}, options = {}) {
     return allowed.some((id) => idsEqual(id, personId));
   }
 
+  if (kind === 'activityEntryAssignees') {
+    const entries = Array.isArray(record?.entries) ? record.entries : [];
+    for (const entry of entries) {
+      const entryAssignees = Array.isArray(entry?.assignees) ? entry.assignees : [];
+      if (entryAssignees.some((row) => idsEqual(row?.personId, personId))) return true;
+      const entryAllowed = Array.isArray(entry?.allowedPersonIds) ? entry.allowedPersonIds : [];
+      if (entryAllowed.some((id) => idsEqual(id, personId))) return true;
+    }
+    const assignees = Array.isArray(record?.assignees) ? record.assignees : [];
+    if (assignees.some((row) => idsEqual(row?.personId, personId))) return true;
+    const allowed = Array.isArray(record?.allowedPersonIds) ? record.allowedPersonIds : [];
+    return allowed.some((id) => idsEqual(id, personId));
+  }
+
   if (kind === 'teacherId') {
     return idsEqual(record?.teacherId, personId);
   }
@@ -268,6 +282,16 @@ function buildAssignmentScopeFilter(scope = {}, options = {}) {
   if (kind === 'assignees') {
     return {
       $or: [
+        { 'assignees.personId': personId },
+        { allowedPersonIds: personId }
+      ]
+    };
+  }
+  if (kind === 'activityEntryAssignees') {
+    return {
+      $or: [
+        { 'entries.assignees.personId': personId },
+        { 'entries.allowedPersonIds': personId },
         { 'assignees.personId': personId },
         { allowedPersonIds: personId }
       ]
@@ -1257,7 +1281,7 @@ const schoolRepositories = {
     update: activityModel.updateActivity,
     remove: activityModel.deleteActivity,
     defaultSearchFields: ['id', 'orgId', 'title', 'categoryId', 'departmentId', 'status', 'location'],
-    assignmentScopeKind: 'assignees'
+    assignmentScopeKind: 'activityEntryAssignees'
   }),
   teachers: createSchoolRepository({
     entityName: 'teachers',

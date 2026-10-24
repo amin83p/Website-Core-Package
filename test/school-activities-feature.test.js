@@ -607,6 +607,7 @@ test('Schedule completion display script is wired into schedule views', () => {
   assert.match(masterHub, /scheduleCompletionDisplay\.js/);
   assert.match(masterHub, /hubScheduleEventScanBadge/);
   assert.match(helper, /resolveScheduleCompletionScan/);
+  assert.match(helper, /attendancePalettes/);
   assert.match(helper, /summarizeDayCompletion/);
   assert.match(helper, /buildCalendarDayBadges/);
 });

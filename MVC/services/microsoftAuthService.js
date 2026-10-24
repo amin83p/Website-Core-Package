@@ -1,6 +1,13 @@
 const crypto = require('crypto');
 const msal = require('@azure/msal-node');
-const { getMicrosoftAuthConfig, validateMicrosoftAuthConfig } = require('../../config/microsoftAuth');
+const {
+  getMicrosoftAuthConfig,
+  validateMicrosoftAuthConfig,
+  normalizeRedirectUri
+} = require('../../config/microsoftAuth');
+const { resolveRequestOrigin } = require('./appPublicUrlService');
+
+const MICROSOFT_CALLBACK_PATH = '/auth/microsoft/callback';
 
 const STATE_TTL_MS = 10 * 60 * 1000;
 
@@ -104,10 +111,83 @@ async function saveSession(req) {
   });
 }
 
+function buildCallbackUriFromRequest(req) {
+  const origin = resolveRequestOrigin(req);
+  if (!origin) return '';
+  return normalizeRedirectUri(`${origin}${MICROSOFT_CALLBACK_PATH}`);
+}
+
+function pickAllowlistedRedirectUri(candidate = '', allowlist = []) {
+  const normalizedCandidate = normalizeRedirectUri(candidate);
+  if (!normalizedCandidate) return '';
+  const list = Array.isArray(allowlist) ? allowlist : [];
+  if (list.includes(normalizedCandidate)) return normalizedCandidate;
+  try {
+    const candidateUrl = new URL(normalizedCandidate);
+    const match = list.find((entry) => {
+      try {
+        const allowed = new URL(entry);
+        return allowed.origin === candidateUrl.origin
+          && allowed.pathname === candidateUrl.pathname;
+      } catch (_) {
+        return false;
+      }
+    });
+    return match || '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function resolveRedirectUriForRequest(req, config = requireConfig()) {
+  const allowlist = Array.isArray(config.redirectUris) ? config.redirectUris : [];
+  if (!allowlist.length) {
+    throw new MicrosoftAuthError('Microsoft login is not configured. Missing: MICROSOFT_REDIRECT_URIS or MICROSOFT_REDIRECT_URI', {
+      statusCode: 500,
+      code: 'MICROSOFT_AUTH_NOT_CONFIGURED'
+    });
+  }
+  const fromRequest = buildCallbackUriFromRequest(req);
+  const redirectUri = pickAllowlistedRedirectUri(fromRequest, allowlist);
+  if (!redirectUri) {
+    const host = cleanHostFromRequest(req);
+    throw new MicrosoftAuthError(
+      host
+        ? `Microsoft login is not configured for ${host}. Add its callback URL to MICROSOFT_REDIRECT_URIS.`
+        : 'Microsoft login could not determine the callback URL for this request.',
+      { statusCode: 400, code: 'REDIRECT_URI_NOT_ALLOWED' }
+    );
+  }
+  return redirectUri;
+}
+
+function cleanHostFromRequest(req) {
+  return String(req?.get?.('x-forwarded-host') || req?.get?.('host') || '').trim();
+}
+
+function assertCallbackMatchesStoredRedirect(req, storedRedirectUri = '') {
+  const stored = normalizeRedirectUri(storedRedirectUri);
+  if (!stored) {
+    throw new MicrosoftAuthError('Microsoft login validation failed. Please try again.', {
+      statusCode: 400,
+      code: 'REDIRECT_URI_MISSING'
+    });
+  }
+  const fromRequest = buildCallbackUriFromRequest(req);
+  const requestMatch = pickAllowlistedRedirectUri(fromRequest, [stored]);
+  if (!requestMatch) {
+    throw new MicrosoftAuthError('Microsoft login returned on an unexpected domain. Start sign-in again from the same site.', {
+      statusCode: 400,
+      code: 'REDIRECT_URI_MISMATCH'
+    });
+  }
+}
+
 async function createAuthorizationUrl(req) {
   requireSession(req);
   const config = requireConfig();
   const client = getClient(config);
+  const redirectUri = resolveRedirectUriForRequest(req, config);
 
   const codeVerifier = randomToken(64);
   const state = randomToken(32);
@@ -117,13 +197,14 @@ async function createAuthorizationUrl(req) {
     state,
     nonce,
     codeVerifier,
+    redirectUri,
     createdAt: Date.now()
   };
   await saveSession(req);
 
   return client.getAuthCodeUrl({
     scopes: config.scopes,
-    redirectUri: config.redirectUri,
+    redirectUri,
     state,
     nonce,
     prompt: 'select_account',
@@ -170,11 +251,20 @@ async function handleCallback(req) {
     });
   }
 
+  const redirectUri = normalizeRedirectUri(stored.redirectUri) || normalizeRedirectUri(config.redirectUri);
+  if (!redirectUri) {
+    throw new MicrosoftAuthError('Microsoft login validation failed. Please try again.', {
+      statusCode: 400,
+      code: 'REDIRECT_URI_MISSING'
+    });
+  }
+  assertCallbackMatchesStoredRedirect(req, redirectUri);
+
   const client = getClient(config);
   const result = await client.acquireTokenByCode({
     code,
     scopes: config.scopes,
-    redirectUri: config.redirectUri,
+    redirectUri,
     codeVerifier: stored.codeVerifier
   });
 
@@ -232,5 +322,9 @@ module.exports = {
   createAuthorizationUrl,
   handleCallback,
   isEnabled,
-  getConfig: getMicrosoftAuthConfig
+  getConfig: getMicrosoftAuthConfig,
+  buildCallbackUriFromRequest,
+  resolveRedirectUriForRequest,
+  pickAllowlistedRedirectUri,
+  MICROSOFT_CALLBACK_PATH
 };

@@ -229,6 +229,11 @@ test('Activity service timesheet eligibility differs by evaluation type', () => 
   assert.equal(activityService.isAssigneeEligibleForTimesheet(attendanceActivity, attendedAssignee), true);
   assert.equal(activityService.isAssigneeEligibleForTimesheet(completionActivity, attendedAssignee), false);
   assert.equal(activityService.isAssigneeEligibleForTimesheet(completionActivity, completedAssignee), true);
+
+  const excusedAssignee = { personId: 'P1', status: 'excused', paid: false, paidHours: 3 };
+  const absentAssignee = { personId: 'P1', status: 'absent', paid: false, paidHours: 0 };
+  assert.equal(activityService.isAssigneeEligibleForTimesheet(attendanceActivity, excusedAssignee), true);
+  assert.equal(activityService.isAssigneeEligibleForTimesheet(attendanceActivity, absentAssignee), false);
 });
 
 test('Complete assignee is rejected for attendance-type activities', async () => {

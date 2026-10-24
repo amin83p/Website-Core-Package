@@ -71,6 +71,7 @@ MICROSOFT_AUTHORITY_TENANT
 MICROSOFT_CLIENT_ID
 MICROSOFT_CLIENT_SECRET
 MICROSOFT_REDIRECT_URI
+MICROSOFT_REDIRECT_URIS
 MICROSOFT_ALLOWED_DOMAIN
 MICROSOFT_ENFORCE_TENANT
 SESSION_SECRET
@@ -125,7 +126,8 @@ MONGODB_URI or MONGO_URI              -> target MongoDB URI
 MONGODB_DB or MONGO_DB                -> target database name, if separate
 PUBLIC_APP_URL / WEBSITE_BASE_URL     -> TARGET_DOMAIN
 APP_URL / BASE_URL                    -> TARGET_DOMAIN
-MICROSOFT_REDIRECT_URI                -> TARGET_DOMAIN/auth/microsoft/callback
+MICROSOFT_REDIRECT_URIS               -> comma-separated callback URLs, one per public domain
+MICROSOFT_REDIRECT_URI                -> optional single-URI fallback if MICROSOFT_REDIRECT_URIS is unset
 RAILWAY_GATEWAY_BASE_URL              -> target internal/public app URL if railway_proxy is used
 ```
 
@@ -295,10 +297,12 @@ PUBLIC_APP_URL=TARGET_DOMAIN
 WEBSITE_BASE_URL=TARGET_DOMAIN
 APP_URL=TARGET_DOMAIN
 BASE_URL=TARGET_DOMAIN
-MICROSOFT_REDIRECT_URI=TARGET_DOMAIN/auth/microsoft/callback
+MICROSOFT_REDIRECT_URIS=https://primary-domain.example/auth/microsoft/callback,https://secondary-domain.example/auth/microsoft/callback
 ```
 
-Use full URLs with protocol, for example:
+Use full callback URLs with protocol. For a single domain you can still set `MICROSOFT_REDIRECT_URI` instead of the plural variable.
+
+Use full URLs with protocol for site base vars, for example:
 
 ```text
 https://new-domain.com
@@ -309,20 +313,23 @@ https://new-domain.com
 In Microsoft Entra app registration:
 
 1. Go to Authentication.
-2. Add a Web redirect URI:
+2. Add a Web redirect URI for **each** public domain that serves this app:
 
 ```text
 https://new-domain.com/auth/microsoft/callback
+https://other-domain.example/auth/microsoft/callback
 ```
 
-3. Keep the old redirect URI if the source project remains live.
-4. Confirm Railway target variable:
+3. Keep older redirect URIs if those domains remain live.
+4. Confirm Railway target variable lists every callback URL the app should accept:
 
 ```text
-MICROSOFT_REDIRECT_URI=https://new-domain.com/auth/microsoft/callback
+MICROSOFT_REDIRECT_URIS=https://new-domain.com/auth/microsoft/callback,https://other-domain.example/auth/microsoft/callback
 ```
 
-5. Test Microsoft login with an existing local user whose email matches the Microsoft account.
+The app picks the callback URL from this allowlist based on the domain where the user started Microsoft sign-in, and stores it in the login session for the token exchange.
+
+5. Test Microsoft login from each domain with an existing local user whose email matches the Microsoft account.
 
 ## 10. Configure Email Provider Profiles
 

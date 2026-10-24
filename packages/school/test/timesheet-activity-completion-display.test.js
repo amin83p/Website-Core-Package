@@ -68,6 +68,42 @@ test('buildActivityTimesheetRowStatus uses completed label for completion evalua
   assert.equal(row.evaluationType, 'completion');
 });
 
+test('getTimesheetEntriesForPerson includes excused assignees and excludes absent', async () => {
+  const activity = {
+    ...baseActivity,
+    entries: [{
+      ...baseActivity.entries[0],
+      assignees: [
+        { personId: 'TEACHER_1', status: 'excused', paid: true, paidHours: 7 },
+        { personId: 'TEACHER_2', status: 'absent', paid: false, paidHours: 0 }
+      ]
+    }]
+  };
+  const restore = mockActivityFetch([activity]);
+  try {
+    const rows = await activityService.getTimesheetEntriesForPerson({
+      orgId: 'ORG_1',
+      personId: 'TEACHER_1',
+      periodStartDate: '2026-03-01',
+      periodEndDate: '2026-03-31',
+      reqUser: { activeOrgId: 'ORG_1' }
+    });
+    assert.equal(rows.length, 1);
+    assert.equal(rows[0].status, 'excused');
+
+    const absentRows = await activityService.getTimesheetEntriesForPerson({
+      orgId: 'ORG_1',
+      personId: 'TEACHER_2',
+      periodStartDate: '2026-03-01',
+      periodEndDate: '2026-03-31',
+      reqUser: { activeOrgId: 'ORG_1' }
+    });
+    assert.equal(absentRows.length, 0);
+  } finally {
+    restore();
+  }
+});
+
 test('getTimesheetEntriesForPerson enriches activity row status fields', async () => {
   const restore = mockActivityFetch([baseActivity]);
   try {

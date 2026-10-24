@@ -224,7 +224,8 @@ function buildAssigneeCompletionLabel(activity, assignee) {
   if (evaluationType === 'completion') {
     return String(assignee.completionStatus || '').toLowerCase() === 'completed' ? 'Completed' : 'Pending';
   }
-  return normalizeStatus(assignee.status) ? 'Attendance recorded' : 'Pending attendance';
+  const status = normalizeStatus(assignee.status, '');
+  return activityService.isRecordedAttendanceStatus(status) ? 'Attendance recorded' : 'Pending attendance';
 }
 
 function enrichAssigneeRow(activity, assignee, {
@@ -685,6 +686,12 @@ async function saveWorkSessionMetadata({
     }
     return assignee;
   });
+  nextAssignees.forEach((assignee) => {
+    const prior = priorAssigneeByPerson.get(normalizeId(assignee.personId)) || {};
+    if (normalizeStatus(assignee.status) === 'excused' && normalizeStatus(prior.status) !== 'excused') {
+      workSessionAccessService.assertCanMarkAssigneeExcused(capabilities, { isSelf: false });
+    }
+  });
   workSessionAccessService.assertAssigneeRosterChanges({
     priorEntryAssignees: priorEntry.assignees,
     nextAssigneePersonIds: nextAssignees.map((row) => row.personId),
@@ -810,7 +817,7 @@ async function saveAssigneeRow({
   });
   const durationHours = Number(context.entry.durationHours || 0);
   const evaluationType = context.evaluationType;
-  const paid = input.paid === undefined
+  let paid = input.paid === undefined
     ? assignee.paid !== false
     : (input.paid === true || input.paid === 'true' || input.paid === 'on');
   const paidHours = input.paidHours === undefined || input.paidHours === ''
@@ -823,12 +830,17 @@ async function saveAssigneeRow({
     if (!['attended', 'absent', 'excused'].includes(status)) {
       throw new Error('Invalid attendance status.');
     }
+    if (status === 'absent') {
+      paid = false;
+    }
   } else if (input.status !== undefined && normalizeStatus(input.status) !== normalizeStatus(assignee.status)) {
     throw new Error('Attendance cannot be changed on completion-type activities. Use Mark complete instead.');
   }
-  const safePaidHours = Number.isFinite(paidHours)
-    ? Number(paidHours.toFixed(2))
-    : Number(assignee.paidHours || durationHours || 0);
+  let safePaidHours = paid
+    ? (Number.isFinite(paidHours)
+      ? Number(paidHours.toFixed(2))
+      : Number(assignee.paidHours || durationHours || 0))
+    : 0;
   const canEditTiming = capabilities.canEditAnyAssigneeRow
     || (isSelf && capabilities.canEditOwnAssigneeTiming);
   workSessionAccessService.assertAssigneeFieldChanges({
@@ -863,6 +875,16 @@ async function saveAssigneeRow({
       endTime: inputEndTime,
       paidHours: paid ? safePaidHours : 0
     });
+    if (paid && status === 'attended') {
+      const resolvedTiming = activityAssigneeTimingService.resolveAssigneeTiming({ assignee: timed, entry: sessionEntry });
+      const spanHours = activityAssigneeTimingService.hoursBetweenClockTimes(
+        resolvedTiming.startTime,
+        resolvedTiming.endTime
+      );
+      if (spanHours > 0 && Number(timed.paidHours || 0) > spanHours) {
+        timed.paidHours = spanHours;
+      }
+    }
     activityAssigneeTimingService.assertAssigneeTimingRules({ assignee: timed, entry: sessionEntry });
     return timed;
   }, reqUser);

@@ -62,3 +62,29 @@ test('buildReadCapabilitiesForScope denies USER scope page open', () => {
   assert.equal(workSessionAccessService.buildReadCapabilitiesForScope('USER').canOpenPage, false);
   assert.equal(workSessionAccessService.buildReadCapabilitiesForScope('OWNER').canOpenPage, true);
 });
+
+test('only org and admin scopes can mark assignee excused on self-edit', () => {
+  assert.equal(workSessionAccessService.buildCapabilitiesForScope('ORGANIZATION').canMarkAssigneeExcused, true);
+  assert.equal(workSessionAccessService.buildCapabilitiesForScope('ADMIN').canMarkAssigneeExcused, true);
+  assert.equal(workSessionAccessService.buildCapabilitiesForScope('DEPARTMENT').canMarkAssigneeExcused, false);
+  assert.equal(workSessionAccessService.buildCapabilitiesForScope('DIVISION').canMarkAssigneeExcused, false);
+  assert.equal(workSessionAccessService.buildCapabilitiesForScope('OWNER').canMarkAssigneeExcused, false);
+
+  const departmentSelf = workSessionAccessService.buildAssigneeFieldCapabilities(
+    workSessionAccessService.buildCapabilitiesForScope('DEPARTMENT'),
+    { isSelf: true, locked: false }
+  );
+  assert.equal(departmentSelf.canMarkExcused, false);
+
+  assert.throws(
+    () => workSessionAccessService.assertAssigneeFieldChanges({
+      capabilities: workSessionAccessService.buildCapabilitiesForScope('DEPARTMENT'),
+      assignee: { status: 'attended' },
+      prior: { status: 'attended' },
+      isSelf: true,
+      input: { status: 'excused' },
+      evaluationType: 'attendance'
+    }),
+    /cannot mark attendance as excused/i
+  );
+});

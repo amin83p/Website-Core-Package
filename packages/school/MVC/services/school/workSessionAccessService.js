@@ -87,7 +87,8 @@ function buildBypassCapabilities(scopeName = 'ADMIN') {
     canEditOwnAssigneeTiming: true,
     canEditOwnAssigneeNotes: true,
     canEditOwnAssigneePayable: true,
-    canEditOwnAssigneePaidHours: true
+    canEditOwnAssigneePaidHours: true,
+    canMarkAssigneeExcused: true
   });
 }
 
@@ -107,7 +108,8 @@ function buildDeniedCapabilities(scopeName = 'USER') {
     canEditOwnAssigneeTiming: false,
     canEditOwnAssigneeNotes: false,
     canEditOwnAssigneePayable: false,
-    canEditOwnAssigneePaidHours: false
+    canEditOwnAssigneePaidHours: false,
+    canMarkAssigneeExcused: false
   });
 }
 
@@ -128,7 +130,8 @@ function buildOrgWideCapabilities(scopeName = 'ORGANIZATION', { hasLockedAssigne
     canEditOwnAssigneeTiming: true,
     canEditOwnAssigneeNotes: true,
     canEditOwnAssigneePayable: true,
-    canEditOwnAssigneePaidHours: true
+    canEditOwnAssigneePaidHours: true,
+    canMarkAssigneeExcused: true
   });
 }
 
@@ -154,7 +157,8 @@ function buildCapabilitiesForScope(scopeName = '', options = {}) {
       canEditOwnAssigneeTiming: false,
       canEditOwnAssigneeNotes: false,
       canEditOwnAssigneePayable: false,
-      canEditOwnAssigneePaidHours: false
+      canEditOwnAssigneePaidHours: false,
+      canMarkAssigneeExcused: false
     });
   }
   if (normalized === 'DIVISION') {
@@ -173,7 +177,8 @@ function buildCapabilitiesForScope(scopeName = '', options = {}) {
       canEditOwnAssigneeTiming: true,
       canEditOwnAssigneeNotes: true,
       canEditOwnAssigneePayable: false,
-      canEditOwnAssigneePaidHours: false
+      canEditOwnAssigneePaidHours: false,
+      canMarkAssigneeExcused: false
     });
   }
   if (normalized === 'DEPARTMENT') {
@@ -192,10 +197,23 @@ function buildCapabilitiesForScope(scopeName = '', options = {}) {
       canEditOwnAssigneeTiming: true,
       canEditOwnAssigneeNotes: true,
       canEditOwnAssigneePayable: true,
-      canEditOwnAssigneePaidHours: true
+      canEditOwnAssigneePaidHours: true,
+      canMarkAssigneeExcused: false
     });
   }
   return buildOrgWideCapabilities('ORGANIZATION', options);
+}
+
+function canMarkAssigneeExcused(capabilities = {}, { isSelf = false } = {}) {
+  if (!capabilities?.canUpdate) return false;
+  if (capabilities.isBypassAdmin || capabilities.canEditAnyAssigneeRow) return true;
+  return Boolean(capabilities.canMarkAssigneeExcused);
+}
+
+function assertCanMarkAssigneeExcused(capabilities = {}, { isSelf = false } = {}) {
+  if (!canMarkAssigneeExcused(capabilities, { isSelf })) {
+    throw createDeniedError('You cannot mark attendance as excused.');
+  }
 }
 
 async function evaluateSectionUpdate(user, sectionId, orgId) {
@@ -542,6 +560,12 @@ function assertAssigneeFieldChanges({
   if (evaluationType === 'attendance' && input.status !== undefined && fieldChanged(prior.status, input.status) && !can('canEditOwnAssigneeStatus')) {
     throw createDeniedError('You cannot change assignee attendance status.');
   }
+  if (evaluationType === 'attendance' && input.status !== undefined && fieldChanged(prior.status, input.status)) {
+    const nextStatus = normalizeStatus(input.status, '');
+    if (nextStatus === 'excused') {
+      assertCanMarkAssigneeExcused(capabilities, { isSelf });
+    }
+  }
   if (input.completionStatus !== undefined && fieldChanged(prior.completionStatus, input.completionStatus) && !can('canEditOwnAssigneeStatus')) {
     throw createDeniedError('You cannot change assignee completion status.');
   }
@@ -604,7 +628,8 @@ function buildAssigneeFieldCapabilities(capabilities = {}, { isSelf = false, loc
       canEditTiming: false,
       canEditNotes: false,
       canEditPayable: false,
-      canEditPaidHours: false
+      canEditPaidHours: false,
+      canMarkExcused: false
     };
   }
   if (capabilities.canEditAnyAssigneeRow) {
@@ -614,7 +639,8 @@ function buildAssigneeFieldCapabilities(capabilities = {}, { isSelf = false, loc
       canEditTiming: true,
       canEditNotes: true,
       canEditPayable: true,
-      canEditPaidHours: true
+      canEditPaidHours: true,
+      canMarkExcused: true
     };
   }
   if (!isSelf) {
@@ -624,7 +650,8 @@ function buildAssigneeFieldCapabilities(capabilities = {}, { isSelf = false, loc
       canEditTiming: false,
       canEditNotes: false,
       canEditPayable: false,
-      canEditPaidHours: false
+      canEditPaidHours: false,
+      canMarkExcused: false
     };
   }
   return {
@@ -633,7 +660,8 @@ function buildAssigneeFieldCapabilities(capabilities = {}, { isSelf = false, loc
     canEditTiming: Boolean(capabilities.canEditOwnAssigneeTiming),
     canEditNotes: Boolean(capabilities.canEditOwnAssigneeNotes),
     canEditPayable: Boolean(capabilities.canEditOwnAssigneePayable),
-    canEditPaidHours: Boolean(capabilities.canEditOwnAssigneePaidHours)
+    canEditPaidHours: Boolean(capabilities.canEditOwnAssigneePaidHours),
+    canMarkExcused: Boolean(capabilities.canMarkAssigneeExcused)
   };
 }
 
@@ -664,6 +692,8 @@ module.exports = {
   assertAssigneeFieldChanges,
   assertSessionMetadataChanges,
   buildAssigneeFieldCapabilities,
+  canMarkAssigneeExcused,
+  assertCanMarkAssigneeExcused,
   canEditAssigneeRow,
   requiresAssigneeVisibilityForScope,
   isAssigneeOnActivityEntry,

@@ -115,14 +115,23 @@ function resolveActivityTimesheetEntryHours(activity = {}, assignee = {}, entry 
   return Number(assignee?.paidHours || entry?.durationHours || 0);
 }
 
+function isAssigneeTimesheetCountableStatus(status) {
+  const normalized = normalizeStatus(status, 'attended');
+  return normalized === 'attended' || normalized === 'excused';
+}
+
 function isAssigneeEligibleForTimesheet(activity = {}, assignee = {}) {
-  if (assignee.paid !== false && normalizeStatus(assignee.status, 'attended') !== 'attended') return false;
+  const status = normalizeStatus(assignee.status, 'attended');
   const type = normalizeEvaluationType(activity.evaluationType);
   if (type === 'completion') {
     return normalizeCompletionStatus(assignee) === 'completed';
   }
-  if (activity.paid === true) return normalizeStatus(assignee.status, 'attended') === 'attended';
-  return Boolean(normalizeStatus(assignee.status));
+  if (!isAssigneeTimesheetCountableStatus(status)) return false;
+  if (activity.paid === true) {
+    if (status === 'excused') return true;
+    return status === 'attended' && assignee.paid !== false;
+  }
+  return isAssigneeTimesheetCountableStatus(status);
 }
 
 function normalizeId(value) {
@@ -139,6 +148,10 @@ function belongsToOrg(row = {}, orgId = '') {
 
 function normalizeStatus(value, fallback = '') {
   return String(value || fallback || '').trim().toLowerCase();
+}
+
+function isRecordedAttendanceStatus(status) {
+  return ['attended', 'absent', 'excused'].includes(normalizeStatus(status, ''));
 }
 
 function normalizeActivityVisibilityScope(value) {
@@ -1016,13 +1029,13 @@ async function getScheduleEventsForPerson({ orgId, personId, startDate, endDate,
       const evaluationType = normalizeEvaluationType(activity.evaluationType);
       return assignees
         .filter((attendee) => idsEqual(attendee.personId, targetPersonId))
-        .filter((attendee) => normalizeStatus(attendee.status, 'attended') === 'attended')
         .map((attendee) => {
+          const attendeeStatus = normalizeStatus(attendee.status, 'attended');
           const completionScan = buildActivityScheduleCompletionScan(activity, attendee);
           const statusLabel = buildIncompleteActivityStatusLabel(activity, attendee);
           const status = evaluationType === 'completion'
             ? (completionScan.isComplete ? 'completed' : 'pending_completion')
-            : 'attended';
+            : (isRecordedAttendanceStatus(attendeeStatus) ? attendeeStatus : 'pending_attendance');
           const timing = activityAssigneeTimingService.resolveAssigneeTiming({ assignee: attendee, entry });
           return {
             id: `ACT-${activity.id}-${entry.entryId}-${targetPersonId}`,
@@ -1069,7 +1082,7 @@ function buildActivityScheduleCompletionScan(activity = {}, assignee = {}) {
       scanLabel: statusLabel
     };
   }
-  const isComplete = normalizeStatus(assignee.status, 'attended') === 'attended';
+  const isComplete = isRecordedAttendanceStatus(assignee.status);
   return {
     state: isComplete ? 'completed' : 'pending',
     isComplete,
@@ -1098,12 +1111,14 @@ function buildActivityTimesheetRowStatus(activity = {}, assignee = {}) {
       isFinalStatus: isComplete
     };
   }
-  const isAttended = normalizeStatus(assignee.status, 'attended') === 'attended';
+  const attendeeStatus = normalizeStatus(assignee.status, 'attended');
+  const isRecorded = isRecordedAttendanceStatus(attendeeStatus);
+  const isAttended = attendeeStatus === 'attended';
   return {
-    statusCode: isAttended ? 'attended' : 'pending',
-    statusLabel: isAttended ? 'Attended activity' : 'Not attended',
+    statusCode: isRecorded ? attendeeStatus : 'pending',
+    statusLabel: isAttended ? 'Attended activity' : (isRecorded ? buildIncompleteActivityStatusLabel(activity, assignee) : 'Not attended'),
     evaluationType,
-    isFinalStatus: isAttended
+    isFinalStatus: isRecorded
   };
 }
 
@@ -1602,6 +1617,8 @@ module.exports = {
   parseJsonArray,
   normalizeEvaluationType,
   normalizeCompletionStatus,
+  isRecordedAttendanceStatus,
+  isAssigneeTimesheetCountableStatus,
   ENTRY_TIMESHEET_EDITABLE_FIELDS,
   ENTRY_TIMESHEET_CORE_LOCKED_FIELDS,
   isAssigneeTimesheetLocked,

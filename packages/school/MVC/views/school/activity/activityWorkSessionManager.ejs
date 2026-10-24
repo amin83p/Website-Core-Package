@@ -27,6 +27,11 @@
     ? Boolean(canRemoveAssignees)
     : rosterAdminFlag;
   const canManageAll = rosterAdminFlag && canEditWorkSessionMetadata;
+  const canMarkAssigneeExcusedFlag = Boolean(
+    updateCapabilities.canMarkAssigneeExcused
+    || updateCapabilities.canEditAnyAssigneeRow
+    || rosterAdminFlag
+  );
   const dashboardHref = (typeof schoolSectionDashboardHref !== 'undefined' && schoolSectionDashboardHref)
     ? schoolSectionDashboardHref
     : '/school/activities';
@@ -38,14 +43,19 @@
   const completionDoneCount = visibleRows.filter((row) => String(row.completionStatus || '').toLowerCase() === 'completed').length;
   const completionPendingCount = visibleRows.filter((row) => String(row.completionStatus || '').toLowerCase() !== 'completed').length;
   const attendanceAttendedCount = visibleRows.filter((row) => String(row.status || '').toLowerCase() === 'attended').length;
+  const attendanceRecordedCount = visibleRows.filter((row) => {
+    const s = String(row.status || '').toLowerCase();
+    return s === 'attended' || s === 'absent' || s === 'excused';
+  }).length;
   const allAssigneesCompleted = isCompletion && visibleRows.length > 0 && completionPendingCount === 0;
-  const allAttendanceRecorded = !isCompletion && visibleRows.length > 0 && attendanceAttendedCount === visibleRows.length;
+  const allAttendanceRecorded = !isCompletion && visibleRows.length > 0 && attendanceRecordedCount === visibleRows.length;
   const workSessionStatusLabel = isCompletion
     ? (allAssigneesCompleted ? 'Completed' : 'Pending completion')
     : (allAttendanceRecorded ? 'Attendance recorded' : 'Pending attendance');
   const workSessionStatusActionRequired = isCompletion ? !allAssigneesCompleted : !allAttendanceRecorded;
   const workSessionLocationLabel = String(entryRow.location || activityRow.location || '').trim();
   const editableAssigneeRows = visibleRows.filter((row) => row.editable && !row.locked);
+  const showBulkAttendanceActions = !isCompletion && visibleRows.length > 1;
   const pendingCompletionRows = editableAssigneeRows.filter((row) => String(row.completionStatus || '').toLowerCase() !== 'completed');
   const currentSessionIndex = sessionSwitcher.findIndex((row) => row && row.isCurrent === true);
   const prevSession = currentSessionIndex > 0 ? sessionSwitcher[currentSessionIndex - 1] : null;
@@ -416,13 +426,36 @@
     width: 7.5rem;
   }
   .activity-work-session-page #workSessionAssigneeTable .ws-status-col {
-    min-width: 7.75rem;
-    width: 7.75rem;
+    min-width: 280px;
   }
-  .activity-work-session-page #workSessionAssigneeTable .ws-notes-col {
-    min-width: 160px;
-    padding-left: 0.35rem !important;
-    padding-right: 0.5rem !important;
+  .activity-work-session-page #workSessionAssigneeTable .ws-att-label {
+    background-color: transparent;
+    border: 1px solid transparent;
+    color: #adb5bd;
+    transition: all 0.2s ease-in-out;
+  }
+  .activity-work-session-page #workSessionAssigneeTable .ws-att-label:hover {
+    background-color: #f8f9fa;
+    color: #495057;
+  }
+  .activity-work-session-page #workSessionAssigneeTable .btn-check[value="attended"]:checked + .ws-att-label {
+    background-color: #198754;
+    color: #fff;
+    font-weight: bold;
+  }
+  .activity-work-session-page #workSessionAssigneeTable .btn-check[value="excused"]:checked + .ws-att-label {
+    background-color: #0dcaf0;
+    color: #000;
+    font-weight: bold;
+  }
+  .activity-work-session-page #workSessionAssigneeTable .btn-check[value="absent"]:checked + .ws-att-label {
+    background-color: #dc3545;
+    color: #fff;
+    font-weight: bold;
+  }
+  .activity-work-session-page #workSessionAssigneeTable .btn-details {
+    flex: 0 0 auto;
+    min-width: 2.25rem;
   }
   .activity-work-session-page #workSessionAssigneeTable .ws-payable-col {
     width: 3.25rem;
@@ -434,12 +467,6 @@
   .activity-work-session-page #workSessionAssigneeTable tbody tr.roster-row.is-locked {
     background-color: #f1f5f9;
   }
-  .activity-work-session-page #workSessionAssigneeTable .ws-notes-input {
-    min-height: 2.4rem;
-    resize: vertical;
-    font-size: 0.85rem;
-  }
-
   .activity-work-session-page .session-manager-info-card {
     background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
     border: 1px solid #dbe3ef !important;
@@ -1076,9 +1103,11 @@
               <div class="small text-muted mt-1"><%= isCompletion ? 'Set completion status per assignee when editable, then save.' : 'Set attendance per assignee, then use Save session.' %></div>
             </div>
             <% if (!isCompletion && editableAssigneeRows.length) { %>
-              <div class="btn-group btn-group-sm" role="group" aria-label="Bulk attendance">
+              <div class="btn-group btn-group-sm<%= showBulkAttendanceActions ? '' : ' d-none' %>" id="workSessionBulkAttendanceActions" role="group" aria-label="Bulk attendance">
                 <button type="button" class="btn btn-outline-success" id="btnWsAllAttended">All Attended</button>
+                <% if (canMarkAssigneeExcusedFlag) { %>
                 <button type="button" class="btn btn-outline-info" id="btnWsAllExcused">All Excused</button>
+                <% } %>
                 <button type="button" class="btn btn-outline-danger" id="btnWsAllAbsent">All Absent</button>
                 <button type="button" class="btn btn-outline-dark" id="btnWsResetAttendance" title="Reset attendance to attended">Reset</button>
               </div>
@@ -1094,12 +1123,11 @@
                     <th class="ws-role-col">Role</th>
                     <% if (rosterAdminFlag && activityRow.paid) { %><th class="ws-payable-col">Payable</th><% } %>
                     <th class="text-end">Paid hours</th>
-                    <th class="ws-status-col">Status</th>
-                    <th class="ws-notes-col">Notes</th>
+                    <th class="ws-status-col">Attendance status</th>
                   </tr>
                 </thead>
                 <tbody id="workSessionAssigneeTableBody">
-                  <% const assigneeTableCols = (rosterAdminFlag && activityRow.paid) ? 7 : 6;
+                  <% const assigneeTableCols = (rosterAdminFlag && activityRow.paid) ? 6 : 5;
                   const assigneeTimingColSpan = assigneeTableCols - 1; %>
                   <% let visibleAssigneeIndex = 0;
                   assigneeRows.forEach((assignee, idx) => {
@@ -1198,15 +1226,41 @@
                           <span class="fw-semibold ws-paid-hours-display" data-person-id="<%= assignee.personId %>"><%= assignee.paid === false ? '—' : (assigneePaidHours.toFixed(2) + ' h') %></span>
                         <% } %>
                       </td>
-                      <td class="ws-status-col align-middle pe-2">
+                      <td class="ws-status-col align-middle pe-3 py-2">
+                        <% const assigneeNotesText = String(assignee.notes || '').trim();
+                        const assigneeHasNotes = Boolean(assigneeNotesText);
+                        const canEditAssigneeNotes = (rosterAdminFlag || assignee.canEditNotes) && rowEditable && !assignee.locked;
+                        const canEditAssigneeTimingRow = rowEditable && !assignee.locked && (rosterAdminFlag || assignee.canEditTiming);
+                        const showAssigneeDetailsBtn = canEditAssigneeNotes || assigneeHasNotes || canEditAssigneeTimingRow || Boolean(assigneeStartTime || assigneeEndTime);
+                        const assigneeDetailsReadOnly = !canEditAssigneeNotes;
+                        const assigneeDetailsCanEditTiming = canEditAssigneeTimingRow;
+                        const assigneeDetailsCanEditNotes = canEditAssigneeNotes; %>
                         <% if (!isCompletion && (rosterAdminFlag || assignee.canEditStatus) && rowEditable && !assignee.locked) { %>
-                          <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Attendance status for <%= assignee.personName || assignee.personId %>">
-                            <input type="radio" class="btn-check ws-att-radio" data-person-id="<%= assignee.personId %>" name="att_<%= rowKey %>" id="attended_<%= rowKey %>" value="attended" <%= String(assignee.status || 'attended') === 'attended' ? 'checked' : '' %>>
-                            <label class="btn btn-outline-success btn-sm" for="attended_<%= rowKey %>" title="Attended"><i class="bi bi-check-lg me-1"></i>Attended</label>
-                            <input type="radio" class="btn-check ws-att-radio" data-person-id="<%= assignee.personId %>" name="att_<%= rowKey %>" id="excused_<%= rowKey %>" value="excused" <%= String(assignee.status || '') === 'excused' ? 'checked' : '' %>>
-                            <label class="btn btn-outline-info btn-sm" for="excused_<%= rowKey %>" title="Excused"><i class="bi bi-envelope-paper me-1"></i>Excused</label>
-                            <input type="radio" class="btn-check ws-att-radio" data-person-id="<%= assignee.personId %>" name="att_<%= rowKey %>" id="absent_<%= rowKey %>" value="absent" <%= String(assignee.status || '') === 'absent' ? 'checked' : '' %>>
-                            <label class="btn btn-outline-danger btn-sm" for="absent_<%= rowKey %>" title="Absent"><i class="bi bi-x-lg me-1"></i>Absent</label>
+                          <div class="d-flex gap-2 align-items-center flex-wrap">
+                            <div class="btn-group btn-group-sm flex-grow-1" role="group" aria-label="Attendance status for <%= assignee.personName || assignee.personId %>">
+                              <input type="radio" class="btn-check ws-att-radio" data-person-id="<%= assignee.personId %>" name="att_<%= rowKey %>" id="attended_<%= rowKey %>" value="attended" <%= String(assignee.status || 'attended') === 'attended' ? 'checked' : '' %>>
+                              <label class="btn btn-sm ws-att-label" for="attended_<%= rowKey %>" title="Attended"><i class="bi bi-check-lg me-1"></i>Attended</label>
+                              <% if (rosterAdminFlag || assignee.canMarkExcused) { %>
+                              <input type="radio" class="btn-check ws-att-radio" data-person-id="<%= assignee.personId %>" name="att_<%= rowKey %>" id="excused_<%= rowKey %>" value="excused" <%= String(assignee.status || '') === 'excused' ? 'checked' : '' %>>
+                              <label class="btn btn-sm ws-att-label" for="excused_<%= rowKey %>" title="Excused"><i class="bi bi-envelope-paper me-1"></i>Excused</label>
+                              <% } %>
+                              <input type="radio" class="btn-check ws-att-radio" data-person-id="<%= assignee.personId %>" name="att_<%= rowKey %>" id="absent_<%= rowKey %>" value="absent" <%= String(assignee.status || '') === 'absent' ? 'checked' : '' %>>
+                              <label class="btn btn-sm ws-att-label" for="absent_<%= rowKey %>" title="Absent"><i class="bi bi-x-lg me-1"></i>Absent</label>
+                            </div>
+                            <% if (showAssigneeDetailsBtn) { %>
+                              <button type="button"
+                                class="btn btn-sm btn-details js-ws-assignee-details-btn <%= assigneeHasNotes ? 'btn-warning text-dark' : 'btn-outline-secondary' %>"
+                                data-person-id="<%= assignee.personId %>"
+                                data-person-name="<%= assignee.personName || assignee.personId %>"
+                                data-read-only="<%= assigneeDetailsReadOnly ? 'true' : 'false' %>"
+                                data-can-edit-timing="<%= assigneeDetailsCanEditTiming ? 'true' : 'false' %>"
+                                data-can-edit-notes="<%= assigneeDetailsCanEditNotes ? 'true' : 'false' %>"
+                                title="Assignee details"
+                                aria-label="Assignee details for <%= assignee.personName || assignee.personId %>">
+                                <i class="bi <%= assigneeHasNotes ? 'bi-sticky-fill' : 'bi-three-dots' %>"></i>
+                              </button>
+                            <% } %>
+                            <textarea class="d-none ws-notes-input" id="notes_<%= rowKey %>" data-person-id="<%= assignee.personId %>" maxlength="500" aria-hidden="true"><%= assignee.notes || '' %></textarea>
                           </div>
                         <% } else if (isCompletion && (rosterAdminFlag || assignee.canEditStatus) && rowEditable && !assignee.locked) { %>
                           <div class="btn-group-vertical btn-group-sm ws-completion-radio-group" role="group" aria-label="Completion status for <%= assignee.personName || assignee.personId %>">
@@ -1217,18 +1271,27 @@
                           </div>
                         <% } else { %>
                           <% const readOnlyStatus = isCompletion ? (isAssigneeCompleted ? 'completed' : 'pending') : (assignee.status || 'pending'); %>
-                          <span class="badge <%= assigneeStatusBadgeClass(readOnlyStatus, isCompletion) %>"><%= readOnlyStatus %></span>
-                        <% } %>
-                      </td>
-                      <td class="ws-notes-col align-middle">
-                        <% if ((rosterAdminFlag || assignee.canEditNotes) && rowEditable && !assignee.locked) { %>
-                          <textarea class="form-control form-control-sm ws-notes-input" id="notes_<%= rowKey %>" data-person-id="<%= assignee.personId %>" rows="2" maxlength="500" placeholder="Notes"><%= assignee.notes || '' %></textarea>
-                        <% } else { %>
-                          <span class="small text-muted"><%= assignee.notes || '—' %></span>
+                          <div class="d-flex gap-2 align-items-center flex-wrap">
+                            <span class="badge <%= assigneeStatusBadgeClass(readOnlyStatus, isCompletion) %>"><%= readOnlyStatus %></span>
+                            <% if (showAssigneeDetailsBtn) { %>
+                              <button type="button"
+                                class="btn btn-sm btn-details <%= assigneeHasNotes ? 'btn-warning text-dark' : 'btn-outline-secondary' %> js-ws-assignee-details-btn"
+                                data-person-id="<%= assignee.personId %>"
+                                data-person-name="<%= assignee.personName || assignee.personId %>"
+                                data-read-only="true"
+                                data-can-edit-timing="false"
+                                data-can-edit-notes="false"
+                                title="Assignee details"
+                                aria-label="Assignee details for <%= assignee.personName || assignee.personId %>">
+                                <i class="bi <%= assigneeHasNotes ? 'bi-sticky-fill' : 'bi-three-dots' %>"></i>
+                              </button>
+                            <% } %>
+                            <textarea class="d-none ws-notes-input" id="notes_<%= rowKey %>" data-person-id="<%= assignee.personId %>" maxlength="500" aria-hidden="true"><%= assignee.notes || '' %></textarea>
+                          </div>
                         <% } %>
                       </td>
                     </tr>
-                    <tr class="ws-assignee-timing-row" data-person-id="<%= assignee.personId %>">
+                    <tr class="ws-assignee-timing-row d-none" data-person-id="<%= assignee.personId %>" aria-hidden="true">
                       <td class="ws-timing-spacer"></td>
                       <td colspan="<%= assigneeTimingColSpan %>">
                         <div class="ws-timing-bar">
@@ -1299,6 +1362,43 @@
   <% } %>
 </div>
 
+<div class="modal fade" id="workSessionAssigneeNotesModal" tabindex="-1" aria-labelledby="workSessionAssigneeNotesModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="workSessionAssigneeNotesModalLabel">Assignee details</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-3" id="workSessionAssigneeNotesPersonLabel"></p>
+        <div class="mb-3" id="workSessionAssigneeDetailsTimingSection">
+          <div class="fw-semibold small text-primary mb-2"><i class="bi bi-clock me-1" aria-hidden="true"></i>Your time on this session</div>
+          <div class="row g-2">
+            <div class="col-6">
+              <label class="form-label small" for="workSessionAssigneeDetailsStart">Start</label>
+              <input type="time" class="form-control" id="workSessionAssigneeDetailsStart" aria-describedby="workSessionAssigneeDetailsWindowHint">
+            </div>
+            <div class="col-6">
+              <label class="form-label small" for="workSessionAssigneeDetailsEnd">End</label>
+              <input type="time" class="form-control" id="workSessionAssigneeDetailsEnd" aria-describedby="workSessionAssigneeDetailsWindowHint">
+            </div>
+          </div>
+          <div class="form-text" id="workSessionAssigneeDetailsWindowHint"></div>
+          <div class="form-text text-danger d-none" id="workSessionAssigneeDetailsTimingError"></div>
+        </div>
+        <div id="workSessionAssigneeDetailsNotesSection">
+          <label class="form-label small fw-semibold" for="workSessionAssigneeNotesInput">Notes</label>
+          <textarea class="form-control" id="workSessionAssigneeNotesInput" rows="4" maxlength="500" placeholder="Notes for this assignee"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary" id="workSessionAssigneeNotesSaveBtn">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <%- include('partials/modal') %>
 <%- include('partials/modal_GenericPicker') %>
 
@@ -1319,6 +1419,7 @@
     const isCompletionMode = <%= isCompletion ? 'true' : 'false' %>;
     const canManageAllWorkSession = <%= canEditWorkSessionMetadata ? 'true' : 'false' %>;
     const rosterAdminFlagClient = <%= rosterAdminFlag ? 'true' : 'false' %>;
+    const canMarkAssigneeExcusedClient = <%= canMarkAssigneeExcusedFlag ? 'true' : 'false' %>;
     const canEditAssigneeTiming = <%= (typeof canEditAssigneeTiming !== 'undefined' && canEditAssigneeTiming) ? 'true' : 'false' %>;
     const activityPaid = <%= activityRow.paid ? 'true' : 'false' %>;
     let dynamicAssigneeIndex = 0;
@@ -1568,6 +1669,14 @@
         if (num) num.textContent = String(index + 1);
       });
       refreshAssigneeRowInfoIcons();
+      refreshBulkAttendanceVisibility();
+    }
+
+    function refreshBulkAttendanceVisibility() {
+      const bulk = document.getElementById('workSessionBulkAttendanceActions');
+      if (!bulk || isCompletionMode) return;
+      const count = document.querySelectorAll('#workSessionAssigneeTableBody tr.roster-row').length;
+      bulk.classList.toggle('d-none', count <= 1);
     }
 
     function clearAssigneeEmptyState() {
@@ -1581,7 +1690,7 @@
       const tbody = document.getElementById('workSessionAssigneeTableBody');
       if (!tbody) return;
       if (tbody.querySelectorAll('tr.roster-row').length) return;
-      const colSpan = (rosterAdminFlagClient && activityPaid) ? 7 : 6;
+      const colSpan = (rosterAdminFlagClient && activityPaid) ? 6 : 5;
       tbody.innerHTML = '<tr><td colspan="' + colSpan + '" class="text-center py-4 text-muted">No assignees on this work session.</td></tr>';
     }
 
@@ -1732,10 +1841,43 @@
       return window.confirm((opts && opts.message) ? opts.message : 'Are you sure?');
     }
 
+    function capRowPaidHoursToAssigneeSpan(row) {
+      if (!row) return;
+      const status = String(row.getAttribute('data-status') || 'attended').toLowerCase();
+      if (status === 'absent') return;
+      const isPaid = String(row.getAttribute('data-paid') || 'true').toLowerCase() !== 'false';
+      if (!isPaid) return;
+      const start = getRowAssigneeStart(row);
+      const end = getRowAssigneeEnd(row);
+      if (!start || !end) return;
+      const span = calculateDurationHours(start, end);
+      if (span <= 0) return;
+      const current = resolveRowPaidHours(row);
+      const next = Math.min(current, span);
+      if (Math.abs(next - current) < 0.001) return;
+      row.setAttribute('data-paid-hours', next.toFixed(2));
+      const personId = row.getAttribute('data-person-id');
+      if (!personId) return;
+      const safePersonId = escapeSelectorValue(personId);
+      document.querySelectorAll('input[name="paidHours"][data-person-id="' + safePersonId + '"]').forEach((input) => {
+        input.value = next.toFixed(2);
+      });
+      document.querySelectorAll('form.ws-assignee-save-form[data-person-id="' + safePersonId + '"] input[name="paidHours"]').forEach((input) => {
+        input.value = next.toFixed(2);
+      });
+      const paidHoursInput = document.querySelector('.ws-paid-hours-input[data-person-id="' + safePersonId + '"]');
+      if (paidHoursInput) paidHoursInput.value = next.toFixed(2);
+      const paidEditInput = row.querySelector('.ws-paid-hours-edit');
+      if (paidEditInput) paidEditInput.value = next.toFixed(2);
+      const hoursNode = row.querySelector('.ws-paid-hours-display');
+      if (hoursNode) hoursNode.textContent = next.toFixed(2) + ' h';
+    }
+
     function syncRowFields(personId) {
       const safePersonId = escapeSelectorValue(personId);
       const personSelector = '[data-person-id="' + safePersonId + '"]';
       const row = document.querySelector('#workSessionAssigneeTableBody tr.roster-row' + personSelector);
+      capRowPaidHoursToAssigneeSpan(row);
       const status = document.querySelector('input.ws-att-radio' + personSelector + ':checked');
       const paidHours = document.querySelector('.ws-paid-hours-input' + personSelector);
       const resolvedPaidHours = row ? resolveRowPaidHours(row) : Number(paidHours?.value || 0);
@@ -1794,6 +1936,12 @@
         }
       }
       return { valid: true, message: '' };
+    }
+
+    function prepareVisibleAssigneeRowsForSave() {
+      document.querySelectorAll('#workSessionAssigneeTableBody tr.roster-row').forEach((row) => {
+        capRowPaidHoursToAssigneeSpan(row);
+      });
     }
 
     function validateVisibleAssigneeRowsClient() {
@@ -1861,7 +2009,7 @@
       const safePersonId = escapeHtml(personId);
       const safeStart = escapeHtml(startTime);
       const safeEnd = escapeHtml(endTime);
-      const timingColSpan = (rosterAdminFlagClient && activityPaid) ? 6 : 5;
+      const timingColSpan = (rosterAdminFlagClient && activityPaid) ? 5 : 4;
       const timingEditable = Boolean(editable && (rosterAdminFlagClient || canEditAssigneeTiming));
       const fields = timingEditable
         ? [
@@ -1869,7 +2017,7 @@
           '<div class="ws-timing-field"><span class="ws-timing-field-label">End</span><input type="time" class="form-control form-control-sm ws-assignee-end-input" data-person-id="' + safePersonId + '" value="' + safeEnd + '" aria-label="End time for ' + safePersonId + '"></div>'
         ].join('')
         : '<span class="ws-timing-readonly"><i class="bi bi-clock me-1 text-primary" aria-hidden="true"></i>' + safeStart + ' – ' + safeEnd + '</span>';
-      return '<tr class="ws-assignee-timing-row" data-person-id="' + safePersonId + '"><td class="ws-timing-spacer"></td><td colspan="' + timingColSpan + '"><div class="ws-timing-bar">' + fields + '</div></td></tr>';
+      return '<tr class="ws-assignee-timing-row d-none" data-person-id="' + safePersonId + '" aria-hidden="true"><td class="ws-timing-spacer"></td><td colspan="' + timingColSpan + '"><div class="ws-timing-bar">' + fields + '</div></td></tr>';
     }
 
     function buildAdminAssigneeRow(person) {
@@ -1887,13 +2035,21 @@
       const statusControls = isCompletionMode
         ? '<div class="btn-group-vertical btn-group-sm ws-completion-radio-group" role="group">' + buildCompletionRadios(rowKey, person.personId, 'pending') + '</div>'
         : [
-          '<div class="btn-group btn-group-sm flex-wrap" role="group">',
+          '<div class="d-flex gap-2 align-items-center flex-wrap">',
+          '<div class="btn-group btn-group-sm flex-grow-1" role="group">',
           '<input type="radio" class="btn-check ws-att-radio" data-person-id="' + safePersonId + '" name="att_' + rowKey + '" id="attended_' + rowKey + '" value="attended" checked>',
-          '<label class="btn btn-outline-success btn-sm" for="attended_' + rowKey + '"><i class="bi bi-check-lg me-1"></i>Attended</label>',
-          '<input type="radio" class="btn-check ws-att-radio" data-person-id="' + safePersonId + '" name="att_' + rowKey + '" id="excused_' + rowKey + '" value="excused">',
-          '<label class="btn btn-outline-info btn-sm" for="excused_' + rowKey + '"><i class="bi bi-envelope-paper me-1"></i>Excused</label>',
+          '<label class="btn btn-sm ws-att-label" for="attended_' + rowKey + '"><i class="bi bi-check-lg me-1"></i>Attended</label>',
+          (canMarkAssigneeExcusedClient
+            ? [
+              '<input type="radio" class="btn-check ws-att-radio" data-person-id="' + safePersonId + '" name="att_' + rowKey + '" id="excused_' + rowKey + '" value="excused">',
+              '<label class="btn btn-sm ws-att-label" for="excused_' + rowKey + '"><i class="bi bi-envelope-paper me-1"></i>Excused</label>'
+            ].join('')
+            : ''),
           '<input type="radio" class="btn-check ws-att-radio" data-person-id="' + safePersonId + '" name="att_' + rowKey + '" id="absent_' + rowKey + '" value="absent">',
-          '<label class="btn btn-outline-danger btn-sm" for="absent_' + rowKey + '"><i class="bi bi-x-lg me-1"></i>Absent</label>',
+          '<label class="btn btn-sm ws-att-label" for="absent_' + rowKey + '"><i class="bi bi-x-lg me-1"></i>Absent</label>',
+          '</div>',
+          '<button type="button" class="btn btn-sm btn-details btn-outline-secondary js-ws-assignee-details-btn" data-person-id="' + safePersonId + '" data-person-name="' + safePersonName + '" data-read-only="false" data-can-edit-timing="true" data-can-edit-notes="true" title="Assignee details" aria-label="Assignee details for ' + safePersonName + '"><i class="bi bi-three-dots"></i></button>',
+          '<textarea class="d-none ws-notes-input" id="notes_' + rowKey + '" data-person-id="' + safePersonId + '" maxlength="500" aria-hidden="true"></textarea>',
           '</div>'
         ].join('');
       const payableCell = (rosterAdminFlagClient && activityPaid)
@@ -1922,8 +2078,7 @@
         '<td class="ws-role-col align-middle"><div class="btn-group-vertical btn-group-sm ws-role-radio-group" role="group" data-roles="' + safeRoleList + '">' + roleRadios + '</div></td>',
         payableCell,
         paidHoursCell || '<td class="text-end align-middle ws-paid-hours-cell"><span class="fw-semibold ws-paid-hours-display" data-person-id="' + safePersonId + '">' + hours + ' h</span></td>',
-        '<td class="ws-status-col align-middle pe-2">' + statusControls + '</td>',
-        '<td class="ws-notes-col align-middle"><textarea class="form-control form-control-sm ws-notes-input" id="notes_' + rowKey + '" data-person-id="' + safePersonId + '" rows="2" maxlength="500" placeholder="Notes"></textarea></td>',
+        '<td class="ws-status-col align-middle pe-3 py-2">' + statusControls + '</td>',
         '</tr>',
         buildAssigneeTimingRowHtml(person.personId, sessionStart, defaultEnd, true)
       ].join('');
@@ -1966,6 +2121,8 @@
             if (!confirmed) return;
           }
           const assigneesInput = document.getElementById('workSessionMetadataAssignees');
+          if (assigneesInput) assigneesInput.value = JSON.stringify(collectAdminAssignees());
+          prepareVisibleAssigneeRowsForSave();
           if (assigneesInput) assigneesInput.value = JSON.stringify(collectAdminAssignees());
           const assigneeValidation = validateVisibleAssigneeRowsClient();
           if (!assigneeValidation.valid) {
@@ -2031,6 +2188,11 @@
         const saveForms = Array.from(document.querySelectorAll('.ws-assignee-save-form[data-person-id]'))
           .filter((form) => String(form.getAttribute('data-person-id') || '').trim());
         if (!saveForms.length) return;
+        prepareVisibleAssigneeRowsForSave();
+        saveForms.forEach((form) => {
+          const personId = form.getAttribute('data-person-id');
+          if (personId) syncRowFields(personId);
+        });
         const assigneeValidation = validateVisibleAssigneeRowsClient();
         if (!assigneeValidation.valid) {
           await showUiMessage({
@@ -2076,6 +2238,192 @@
     });
     refreshDerivedHours();
     initAllRowPayableStates();
+    refreshBulkAttendanceVisibility();
+
+    let notesModalPersonId = '';
+    let notesModalReadOnly = false;
+    let notesModalCanEditTiming = false;
+    let notesModalCanEditNotes = false;
+    const notesModalEl = document.getElementById('workSessionAssigneeNotesModal');
+    const notesModalInput = document.getElementById('workSessionAssigneeNotesInput');
+    const notesModalPersonLabel = document.getElementById('workSessionAssigneeNotesPersonLabel');
+    const notesModalSaveBtn = document.getElementById('workSessionAssigneeNotesSaveBtn');
+    const detailsStartInput = document.getElementById('workSessionAssigneeDetailsStart');
+    const detailsEndInput = document.getElementById('workSessionAssigneeDetailsEnd');
+    const detailsTimingSection = document.getElementById('workSessionAssigneeDetailsTimingSection');
+    const detailsNotesSection = document.getElementById('workSessionAssigneeDetailsNotesSection');
+    const detailsWindowHint = document.getElementById('workSessionAssigneeDetailsWindowHint');
+    const detailsTimingError = document.getElementById('workSessionAssigneeDetailsTimingError');
+    let notesModalInstance = null;
+    let detailsModalBackdrop = null;
+
+    function getAssigneeDetailsModalInstance() {
+      if (!notesModalEl) return null;
+      if (window.bootstrap?.Modal) {
+        notesModalInstance = window.bootstrap.Modal.getOrCreateInstance(notesModalEl);
+        return notesModalInstance;
+      }
+      return null;
+    }
+
+    function hideAssigneeDetailsModalFallback() {
+      if (!notesModalEl) return;
+      notesModalEl.classList.remove('show');
+      notesModalEl.style.display = 'none';
+      notesModalEl.setAttribute('aria-hidden', 'true');
+      document.body.classList.remove('modal-open');
+      detailsModalBackdrop?.remove();
+      detailsModalBackdrop = null;
+    }
+
+    function showAssigneeDetailsModal() {
+      if (!notesModalEl) return;
+      const instance = getAssigneeDetailsModalInstance();
+      if (instance) {
+        instance.show();
+        return;
+      }
+      notesModalEl.classList.add('show');
+      notesModalEl.style.display = 'block';
+      notesModalEl.removeAttribute('aria-hidden');
+      document.body.classList.add('modal-open');
+      if (!detailsModalBackdrop) {
+        detailsModalBackdrop = document.createElement('div');
+        detailsModalBackdrop.className = 'modal-backdrop fade show';
+        document.body.appendChild(detailsModalBackdrop);
+      }
+    }
+
+    function hideAssigneeDetailsModal() {
+      const instance = getAssigneeDetailsModalInstance();
+      if (instance) {
+        instance.hide();
+        return;
+      }
+      hideAssigneeDetailsModalFallback();
+    }
+
+    notesModalEl?.querySelectorAll('[data-bs-dismiss="modal"]').forEach((btn) => {
+      btn.addEventListener('click', hideAssigneeDetailsModal);
+    });
+
+    function updateAssigneeDetailsButton(row) {
+      if (!row) return;
+      const personId = row.getAttribute('data-person-id');
+      const notesInput = row.querySelector('.ws-notes-input' + (personId ? '[data-person-id="' + escapeSelectorValue(personId) + '"]' : ''));
+      const notes = String(notesInput?.value || row.getAttribute('data-notes') || '').trim();
+      row.setAttribute('data-notes', notes);
+      const btn = row.querySelector('.js-ws-assignee-details-btn');
+      if (!btn) return;
+      const hasNotes = Boolean(notes);
+      btn.classList.toggle('btn-warning', hasNotes);
+      btn.classList.toggle('text-dark', hasNotes);
+      btn.classList.toggle('btn-outline-secondary', !hasNotes);
+      const icon = btn.querySelector('i');
+      if (icon) {
+        icon.classList.toggle('bi-sticky-fill', hasNotes);
+        icon.classList.toggle('bi-three-dots', !hasNotes);
+      }
+    }
+
+    function syncAssigneeDetailsTimingFromRow(row) {
+      if (!row || !detailsStartInput || !detailsEndInput) return;
+      detailsStartInput.value = getRowAssigneeStart(row) || '';
+      detailsEndInput.value = getRowAssigneeEnd(row) || '';
+    }
+
+    function applyAssigneeDetailsTimingToRow(row, personId) {
+      if (!row || !detailsStartInput || !detailsEndInput) return { valid: true, message: '' };
+      const start = String(detailsStartInput.value || '').trim();
+      const end = String(detailsEndInput.value || '').trim();
+      row.setAttribute('data-assignee-start-time', start);
+      row.setAttribute('data-assignee-end-time', end);
+      const timingRow = personId ? getAssigneeTimingRow(personId) : null;
+      const startInput = timingRow?.querySelector('.ws-assignee-start-input');
+      const endInput = timingRow?.querySelector('.ws-assignee-end-input');
+      if (startInput) startInput.value = start;
+      if (endInput) endInput.value = end;
+      capRowPaidHoursToAssigneeSpan(row);
+      return validateAssigneeRowClient(row);
+    }
+
+    function refreshAssigneeDetailsWindowHint() {
+      if (!detailsWindowHint) return;
+      const { sessionStart, sessionEnd } = getCurrentSessionWindow();
+      if (sessionStart && sessionEnd) {
+        detailsWindowHint.textContent = 'Must stay within the work session window (' + sessionStart + ' – ' + sessionEnd + ').';
+      } else {
+        detailsWindowHint.textContent = 'Times must fall within the work session window.';
+      }
+    }
+
+    function openAssigneeDetailsModal(triggerButton) {
+      if (!notesModalEl) return;
+      const personId = triggerButton?.getAttribute('data-person-id') || '';
+      const personName = triggerButton?.getAttribute('data-person-name') || '';
+      const safePersonId = escapeSelectorValue(personId);
+      const row = document.querySelector('.work-session-assignee-form[data-person-id="' + safePersonId + '"]');
+      const notesInput = row?.querySelector('.ws-notes-input[data-person-id="' + safePersonId + '"]');
+      notesModalPersonId = personId;
+      notesModalReadOnly = triggerButton?.getAttribute('data-read-only') === 'true';
+      notesModalCanEditTiming = triggerButton?.getAttribute('data-can-edit-timing') === 'true';
+      notesModalCanEditNotes = triggerButton?.getAttribute('data-can-edit-notes') === 'true';
+      const canSave = notesModalCanEditTiming || notesModalCanEditNotes;
+      if (notesModalPersonLabel) {
+        notesModalPersonLabel.textContent = personName ? personName : 'Assignee';
+      }
+      if (notesModalInput) {
+        notesModalInput.value = notesInput ? notesInput.value : (row?.getAttribute('data-notes') || '');
+        notesModalInput.readOnly = !notesModalCanEditNotes;
+      }
+      if (detailsTimingSection) {
+        detailsTimingSection.classList.toggle('d-none', !notesModalCanEditTiming && !getRowAssigneeStart(row) && !getRowAssigneeEnd(row));
+      }
+      if (detailsStartInput && detailsEndInput) {
+        syncAssigneeDetailsTimingFromRow(row);
+        detailsStartInput.readOnly = !notesModalCanEditTiming;
+        detailsEndInput.readOnly = !notesModalCanEditTiming;
+      }
+      if (detailsNotesSection) {
+        detailsNotesSection.classList.toggle('d-none', !notesModalCanEditNotes && !String(notesModalInput?.value || '').trim());
+      }
+      if (detailsTimingError) {
+        detailsTimingError.classList.add('d-none');
+        detailsTimingError.textContent = '';
+      }
+      refreshAssigneeDetailsWindowHint();
+      if (notesModalSaveBtn) notesModalSaveBtn.classList.toggle('d-none', !canSave);
+      showAssigneeDetailsModal();
+    }
+
+    notesModalSaveBtn?.addEventListener('click', function () {
+      if (!notesModalPersonId) return;
+      const safePersonId = escapeSelectorValue(notesModalPersonId);
+      const row = document.querySelector('.work-session-assignee-form[data-person-id="' + safePersonId + '"]');
+      if (notesModalCanEditTiming && row) {
+        const timingResult = applyAssigneeDetailsTimingToRow(row, notesModalPersonId);
+        if (!timingResult.valid) {
+          if (detailsTimingError) {
+            detailsTimingError.textContent = timingResult.message || 'Invalid assignee times.';
+            detailsTimingError.classList.remove('d-none');
+          }
+          return;
+        }
+      }
+      if (notesModalCanEditNotes) {
+        const notesInput = row?.querySelector('.ws-notes-input[data-person-id="' + safePersonId + '"]');
+        const nextNotes = String(notesModalInput?.value || '');
+        if (notesInput) notesInput.value = nextNotes;
+        if (row) {
+          row.setAttribute('data-notes', nextNotes);
+          updateAssigneeDetailsButton(row);
+        }
+      }
+      if (row && (notesModalCanEditTiming || notesModalCanEditNotes)) {
+        syncRowFields(notesModalPersonId);
+      }
+      hideAssigneeDetailsModal();
+    });
 
     document.getElementById('btnWsAllAttended')?.addEventListener('click', () => applyBulkWsAttendance('attended'));
     document.getElementById('btnWsAllExcused')?.addEventListener('click', () => applyBulkWsAttendance('excused'));
@@ -2100,6 +2448,16 @@
       const personId = target.getAttribute('data-person-id') || row.getAttribute('data-person-id');
       if (target.classList.contains('ws-att-radio') && target.checked) {
         row.setAttribute('data-status', target.value);
+        if (target.value === 'absent') {
+          row.setAttribute('data-paid', 'false');
+          syncRowPayableState(row);
+        } else if (target.value === 'attended' || target.value === 'excused') {
+          const storedPaid = row.getAttribute('data-paid-hours-stored');
+          if (storedPaid) {
+            row.setAttribute('data-paid', 'true');
+            syncRowPayableState(row);
+          }
+        }
         if (personId) syncRowFields(personId);
       }
       if (target.classList.contains('ws-completion-radio') && target.checked) {
@@ -2110,6 +2468,7 @@
       }
       if (target.classList.contains('ws-notes-input') && personId) {
         row.setAttribute('data-notes', target.value || '');
+        updateAssigneeDetailsButton(row);
         syncRowFields(personId);
       }
       if (target.classList.contains('ws-paid-input')) {
@@ -2135,6 +2494,13 @@
     });
 
     document.addEventListener('click', async function (event) {
+      const detailsButton = event.target.closest('.js-ws-assignee-details-btn');
+      if (detailsButton) {
+        event.preventDefault();
+        event.stopPropagation();
+        openAssigneeDetailsModal(detailsButton);
+        return;
+      }
       const removeButton = event.target.closest('.js-remove-work-assignee');
       if (!removeButton) return;
       event.preventDefault();

@@ -423,20 +423,45 @@
         if (roleText.includes('teacher')) return 'role-teacher';
         return 'role-student';
     }
+    function isSchoolActivityScheduleEvent(event) {
+        return String(event?.eventType || '').trim() === 'school_activity';
+    }
+
+    function resolveSchoolActivityAttendanceChip(event) {
+        if (!isSchoolActivityScheduleEvent(event)) return null;
+        if (String(event?.evaluationType || '').trim().toLowerCase() === 'completion') return null;
+        const status = String(event?.status || '').trim().toLowerCase();
+        const map = {
+            attended: { shortLabel: 'Attended', statusClass: 'status-attendance-attended', icon: 'bi-check-circle-fill' },
+            absent: { shortLabel: 'Absent', statusClass: 'status-attendance-absent', icon: 'bi-x-circle-fill' },
+            excused: { shortLabel: 'Excused', statusClass: 'status-attendance-excused', icon: 'bi-envelope-paper-fill' }
+        };
+        if (!map[status]) return null;
+        const label = event?.statusLabel || map[status].shortLabel;
+        return { ...map[status], label };
+    }
+
     function scheduleStatusChip(event, statusMap, scan) {
         const resolvedScan = scan || (window.ScheduleCompletionDisplay ? window.ScheduleCompletionDisplay.resolveScheduleCompletionScan(event, statusMap) : null);
         const leaveEvent = isLeaveEvent(event);
-        const label = resolvedScan?.scanLabel || formatStatusLabel(event?.status);
+        const activityAttendance = !event?.hasOverlap ? resolveSchoolActivityAttendanceChip(event) : null;
+        const label = activityAttendance?.label || resolvedScan?.scanLabel || formatStatusLabel(event?.status);
         const normalizedLabel = String(label || '').trim().toLowerCase();
         const shortLabel = event?.hasOverlap
             ? 'Overlap'
-            : (leaveEvent ? 'Leave' : (resolvedScan?.isComplete ? 'Done' : (normalizedLabel.includes('cancel') ? 'Cancel' : 'Pending')));
+            : (activityAttendance
+                ? activityAttendance.shortLabel
+                : (leaveEvent ? 'Leave' : (resolvedScan?.isComplete ? 'Done' : (normalizedLabel.includes('cancel') ? 'Cancel' : 'Pending'))));
         const statusClass = event?.hasOverlap
             ? 'status-overlap'
-            : (leaveEvent ? 'status-leave' : (resolvedScan?.isComplete ? 'status-complete' : 'status-pending'));
+            : (activityAttendance
+                ? activityAttendance.statusClass
+                : (leaveEvent ? 'status-leave' : (resolvedScan?.isComplete ? 'status-complete' : 'status-pending')));
         const icon = event?.hasOverlap
             ? 'bi-exclamation-triangle-fill'
-            : (leaveEvent ? 'bi-airplane-fill' : (resolvedScan?.isComplete ? 'bi-check-circle-fill' : 'bi-clock-history'));
+            : (activityAttendance
+                ? activityAttendance.icon
+                : (leaveEvent ? 'bi-airplane-fill' : (resolvedScan?.isComplete ? 'bi-check-circle-fill' : 'bi-clock-history')));
         return `<span class="schedule-status-chip ${statusClass}" aria-label="${escapeHtml(label)}"><i class="bi ${escapeHtml(icon)}" aria-hidden="true"></i><span class="schedule-status-chip-label">${escapeHtml(shortLabel)}</span></span>`;
     }
     function normalizeScheduleTooltipValue(value) {
