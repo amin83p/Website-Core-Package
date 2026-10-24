@@ -28,6 +28,33 @@ const REGISTRY_ENTRIES = [
     secretRecommended: false
   },
   {
+    key: 'SAR_EXPORT_CONCURRENCY',
+    group: 'Student Attendance Report export',
+    description: 'Parallel report jobs per bulk DOCX/PDF export (1–8, default 4).',
+    consumers: [
+      'packages/school/MVC/services/school/studentAttendanceReportGenerationService.js',
+      'packages/school/MVC/services/school/overallReportGenerationEngineService.js'
+    ],
+    secretRecommended: false,
+    optional: true
+  },
+  {
+    key: 'SAR_EXPORT_TIMING',
+    group: 'Student Attendance Report export',
+    description: 'Log export phase timings when true/yes/1/on (non-production defaults on if unset).',
+    consumers: ['packages/school/MVC/services/school/sarExportTimingService.js'],
+    secretRecommended: false,
+    optional: true
+  },
+  {
+    key: 'SAR_EXPORT_ASYNC_MIN_TARGETS',
+    group: 'Student Attendance Report export',
+    description: 'Use background export when selected report count is at least this value (default 12, max 100).',
+    consumers: ['packages/school/MVC/services/school/sarExportConfigService.js'],
+    secretRecommended: false,
+    optional: true
+  },
+  {
     key: 'MICROSOFT_AUTH_ENABLED',
     group: 'Microsoft OAuth',
     description: 'Enable Microsoft sign-in (true/yes/1/on).',

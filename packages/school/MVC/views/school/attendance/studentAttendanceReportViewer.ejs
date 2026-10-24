@@ -2603,6 +2603,56 @@
         return message;
     }
 
+    async function downloadSarExportBlob(blob, fileName) {
+        if (!blob || blob.size === 0) {
+            throw new Error('Export returned an empty file.');
+        }
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        URL.revokeObjectURL(url);
+    }
+
+    async function pollSarExportJob(jobId, filters) {
+        const maxAttempts = 450;
+        for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+            const statusResponse = await fetch(`/school/attendances/report/api/export-jobs/${encodeURIComponent(jobId)}`, {
+                credentials: 'same-origin',
+                headers: { 'X-AJAX-Request': 'true', Accept: 'application/json' }
+            });
+            const statusPayload = await statusResponse.json().catch(() => null);
+            if (!statusResponse.ok || statusPayload?.status !== 'success') {
+                throw new Error(statusPayload?.message || `Could not check export status (${statusResponse.status}).`);
+            }
+            const job = statusPayload.job || {};
+            if (job.status === 'failed') {
+                throw new Error(job.error || 'Background export failed.');
+            }
+            if (job.status === 'complete') {
+                const downloadUrl = statusPayload.downloadUrl
+                    || `/school/attendances/report/api/export-jobs/${encodeURIComponent(jobId)}/download`;
+                const downloadResponse = await fetch(downloadUrl, {
+                    credentials: 'same-origin',
+                    headers: { 'X-AJAX-Request': 'true', Accept: 'application/octet-stream' }
+                });
+                if (!downloadResponse.ok) {
+                    const errPayload = await downloadResponse.json().catch(() => null);
+                    throw new Error(errPayload?.message || `Download failed (${downloadResponse.status}).`);
+                }
+                const blob = await downloadResponse.blob();
+                const fileName = job.fileName || `student_attendance_export_${filters.startDate}_${filters.endDate}`;
+                await downloadSarExportBlob(blob, fileName);
+                return;
+            }
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+        }
+        throw new Error('Export is taking longer than expected. Try again with fewer reports or check server logs.');
+    }
+
     async function runSarExport(format, targets = [], exportOptions = {}) {
         const filters = validateSarFilters();
         if (!filters) return;
@@ -2634,26 +2684,27 @@
                 body: new URLSearchParams(params).toString()
             });
 
+            if (response.status === 202) {
+                const accepted = await response.json().catch(() => null);
+                const jobId = accepted?.job?.jobId || accepted?.jobId;
+                if (!jobId) {
+                    throw new Error('Server accepted a background export but did not return a job id.');
+                }
+                await pollSarExportJob(jobId, filters);
+                showReportMessage({ icon: 'success', message: 'Export downloaded successfully.' });
+                return;
+            }
+
             if (!response.ok) {
                 const payload = await response.json().catch(() => null);
                 throw new Error(payload?.message || `Export failed (${response.status}).`);
             }
 
             const blob = await response.blob();
-            if (!blob || blob.size === 0) {
-                throw new Error('Export returned an empty file.');
-            }
             const disposition = response.headers.get('Content-Disposition') || '';
             const fileNameMatch = disposition.match(/filename="([^"]+)"/i);
             const fileName = fileNameMatch?.[1] || `student_attendance_export_${filters.startDate}_${filters.endDate}`;
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = fileName;
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            URL.revokeObjectURL(url);
+            await downloadSarExportBlob(blob, fileName);
             showReportMessage({ icon: 'success', message: 'Export downloaded successfully.' });
         } catch (error) {
             showReportMessage({ icon: 'error', message: formatSarFetchError(error) });

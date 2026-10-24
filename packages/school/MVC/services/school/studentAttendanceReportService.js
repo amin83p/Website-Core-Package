@@ -10,6 +10,8 @@ const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSes
 const studentClaimNumberService = require('./studentClaimNumberService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { runWithConcurrency } = require('../../utils/asyncPool');
+const sarExportConfigService = require('./sarExportConfigService');
 
 function normalizeDateOnly(value = '') {
   const token = String(value || '').trim();
@@ -54,6 +56,17 @@ function classBelongsToActiveOrg(row = {}, activeOrgId = '') {
   const rowOrgId = String(row?.orgId || row?.organizationId || row?.schoolOrgId || '').trim();
   if (!rowOrgId) return true;
   return idsEqual(rowOrgId, scopedOrgId);
+}
+
+function resolveAttendanceClassDisplayName(classRow = {}, classId = '') {
+  const id = String(classId || classRow?.id || '').trim();
+  return String(
+    classRow?.title
+    || classRow?.name
+    || classRow?.className
+    || classRow?.classLabel
+    || id
+  ).trim() || id;
 }
 
 function recordHasNotes(record = {}) {
@@ -335,45 +348,52 @@ async function buildStudentAttendanceReportPayload(req, options = {}) {
   const orgPolicyCatalog = await attendanceMatrixPolicyModel.getPolicyCatalogForOrg(activeOrgId);
   const canonicalStatuses = classEnrollmentReadService.HISTORICAL_ROLLING_ROSTER_STATUSES;
 
-  for (const classRow of activeClasses) {
-    const classId = String(classRow?.id || '').trim();
-    if (!classId) continue;
+  const { matchesByClassId } = await classEnrollmentReadService.listClassStudentMatchesForReportWindow({
+    reqUser: req.user,
+    activeOrgId,
+    startDate,
+    endDate,
+    selectedStudentRecordIds: [...selectedStudentIdSet],
+    canonicalStatuses
+  });
 
-    const enrollmentSnapshot = await classEnrollmentReadService.listActiveStudentIdsForClass({
-      classId,
-      classItem: classRow,
-      reqUser: req.user,
-      activeOrgId,
-      startDate,
-      endDate,
-      canonicalStatuses
-    });
-    const enrolledStudentIds = enrollmentSnapshot.studentIds instanceof Set
-      ? enrollmentSnapshot.studentIds
-      : new Set();
-    const matchedStudentIds = [...selectedStudentIdSet].filter((studentId) => enrolledStudentIds.has(studentId));
-    if (!matchedStudentIds.length) continue;
+  const classRowById = new Map(
+    activeClasses.map((classRow) => [String(classRow?.id || '').trim(), classRow])
+  );
 
+  const matrixJobs = [];
+  matchesByClassId.forEach((matchedStudentIdSet, classId) => {
+    const classRow = classRowById.get(classId);
+    if (!classRow) return;
+    const matchedStudentIds = [...matchedStudentIdSet].filter((studentId) => selectedStudentIdSet.has(studentId));
+    if (!matchedStudentIds.length) return;
     const matchedPersonIds = selectedStudents
       .filter((row) => matchedStudentIds.includes(String(row.studentRecordId || '').trim()))
       .map((row) => row.personId)
       .filter((personId) => selectedPersonIdSet.has(personId));
-    if (!matchedPersonIds.length) continue;
+    if (!matchedPersonIds.length) return;
+    matrixJobs.push({ classRow, classId, matchedPersonIds });
+  });
 
+  const matrixConcurrency = sarExportConfigService.getExportConcurrency();
+  const matrixResults = await runWithConcurrency(matrixJobs, matrixConcurrency, async (job) => {
     const matrixReq = {
       user: req.user,
       query: {
-        classId,
+        classId: job.classId,
         startDate,
         endDate
       }
     };
     const payload = await buildAttendanceMatrixPayload(matrixReq, {
       applyWindow: false,
-      filterPersonIds: matchedPersonIds.join(',')
+      filterPersonIds: job.matchedPersonIds.join(',')
     });
-    const matrixRows = Array.isArray(payload?.matrix) ? payload.matrix : [];
+    return { ...job, payload };
+  });
 
+  matrixResults.forEach(({ classRow, payload }) => {
+    const matrixRows = Array.isArray(payload?.matrix) ? payload.matrix : [];
     matrixRows.forEach((matrixRow) => {
       const personId = String(matrixRow?.personId || '').trim();
       if (!personId || !studentMap.has(personId)) return;
@@ -394,7 +414,7 @@ async function buildStudentAttendanceReportPayload(req, options = {}) {
         days: buildClassDayCells(days, rollupRecords)
       });
     });
-  }
+  });
 
   const students = [...studentMap.values()].map((row) => finalizeStudentSummary(row, orgPolicyCatalog));
   const rankByStudentId = new Map();
@@ -503,7 +523,7 @@ async function collectStudentClassMatrixPayloadsForExport(req, options = {}) {
 
     entries.push({
       classId,
-      className: String(filteredPayload.className || classRow?.name || classId).trim(),
+      className: String(filteredPayload.className || resolveAttendanceClassDisplayName(classRow, classId)).trim(),
       payload: filteredPayload
     });
   }
@@ -838,10 +858,169 @@ function filterReportDaysWithSessionForStudent(student = {}, allDays = [], optio
   return days.filter((day) => sessionDates.has(normalizeDateOnly(day)));
 }
 
+function normalizeTargetClassIdSet(raw) {
+  if (raw instanceof Set) {
+    return new Set([...raw].map((id) => String(id || '').trim()).filter(Boolean));
+  }
+  return new Set(parseIdList(raw));
+}
+
+async function buildStudentAttendanceReportExportContextPayload(req, options = {}) {
+  const query = req?.query && typeof req.query === 'object' ? req.query : {};
+  const startDate = normalizeDateOnly(query.startDate || options.startDate);
+  const endDate = normalizeDateOnly(query.endDate || options.endDate);
+  const studentIds = parseIdList(query.studentIds || query.personIds || options.studentIds);
+  const targetClassIds = normalizeTargetClassIdSet(options.targetClassIds);
+
+  if (!startDate || !endDate) {
+    throw new Error('Start date and end date are required.');
+  }
+  if (endDate < startDate) {
+    throw new Error('End date must be on or after start date.');
+  }
+  if (!studentIds.length) {
+    throw new Error('Select at least one student.');
+  }
+
+  const days = buildDateRangeDays(startDate, endDate);
+  const activeOrgId = String(req.user?.activeOrgId || '').trim();
+  const routeAccessContext = schoolDataService.buildRouteAccessContext(req);
+  const selectedStudents = await resolveSelectedStudents(req, studentIds);
+  if (!selectedStudents.length) {
+    throw new Error('No matching students were found for the current selection.');
+  }
+
+  const selectedStudentIdSet = new Set(
+    selectedStudents.map((row) => String(row.studentRecordId || '').trim()).filter(Boolean)
+  );
+  const studentMap = new Map(
+    selectedStudents.map((row) => [row.personId, initStudentRow(row)])
+  );
+
+  const classes = await schoolDataService.fetchAllData('classes', {}, req.user, routeAccessContext);
+  const activeClasses = (Array.isArray(classes) ? classes : [])
+    .filter((row) => classBelongsToActiveOrg(row, activeOrgId))
+    .filter(isActiveAttendanceClass);
+
+  const orgPolicyCatalog = await attendanceMatrixPolicyModel.getPolicyCatalogForOrg(activeOrgId);
+  const canonicalStatuses = classEnrollmentReadService.HISTORICAL_ROLLING_ROSTER_STATUSES;
+  const emptyDayCells = buildClassDayCells(days, []);
+
+  const useEnrollmentClassIndex = options.useEnrollmentClassIndex !== false;
+  let classMatches = [];
+
+  if (useEnrollmentClassIndex) {
+    const { matchesByClassId } = await classEnrollmentReadService.listClassStudentMatchesForReportWindow({
+      reqUser: req.user,
+      activeOrgId,
+      startDate,
+      endDate,
+      selectedStudentRecordIds: [...selectedStudentIdSet],
+      canonicalStatuses
+    });
+    const classRowById = new Map(
+      activeClasses.map((classRow) => [String(classRow?.id || '').trim(), classRow])
+    );
+    matchesByClassId.forEach((matchedStudentIds, classId) => {
+      if (targetClassIds.size && !targetClassIds.has(classId)) return;
+      const classRow = classRowById.get(classId);
+      if (!classRow) return;
+      classMatches.push({
+        classRow,
+        classId,
+        matchedStudentIds: [...matchedStudentIds]
+      });
+    });
+  } else {
+    const classesToScan = activeClasses.filter((classRow) => {
+      const classId = String(classRow?.id || '').trim();
+      if (!classId) return false;
+      if (targetClassIds.size && !targetClassIds.has(classId)) return false;
+      return true;
+    });
+
+    await runWithConcurrency(classesToScan, 6, async (classRow) => {
+      const classId = String(classRow?.id || '').trim();
+      const enrollmentSnapshot = await classEnrollmentReadService.listActiveStudentIdsForClass({
+        classId,
+        classItem: classRow,
+        reqUser: req.user,
+        activeOrgId,
+        startDate,
+        endDate,
+        canonicalStatuses
+      });
+      const enrolledStudentIds = enrollmentSnapshot.studentIds instanceof Set
+        ? enrollmentSnapshot.studentIds
+        : new Set();
+      const matchedStudentIds = [...selectedStudentIdSet].filter((studentId) => enrolledStudentIds.has(studentId));
+      if (!matchedStudentIds.length) return;
+      classMatches.push({ classRow, classId, matchedStudentIds });
+    });
+  }
+
+  classMatches.forEach(({ classRow, classId, matchedStudentIds }) => {
+    matchedStudentIds.forEach((studentRecordId) => {
+      const personId = selectedStudents
+        .find((row) => String(row.studentRecordId || '').trim() === studentRecordId)?.personId;
+      if (!personId || !studentMap.has(personId)) return;
+      const studentRow = studentMap.get(personId);
+      const teacherId = String(classRow?.instructors?.[0]?.personId || classRow?.instructors?.[0]?.id || '').trim();
+      studentRow.classes.push({
+        classId,
+        className: resolveAttendanceClassDisplayName(classRow, classId),
+        teacherName: String(classRow?.teacherName || '').trim(),
+        teacherId,
+        summary: {
+          present: 0,
+          late: 0,
+          excused: 0,
+          absent: 0,
+          acf: 0,
+          notApplicable: 0,
+          rollupPercent: null,
+          notesExist: false
+        },
+        days: emptyDayCells
+      });
+    });
+  });
+
+  const students = [...studentMap.values()].map((row) => finalizeStudentSummary(row, orgPolicyCatalog));
+  const rankByStudentId = new Map();
+  studentIds.forEach((studentId, index) => {
+    const key = String(studentId || '').trim();
+    if (key) rankByStudentId.set(key, index);
+  });
+  students.sort((a, b) => {
+    const aKey = String(a.studentRecordId || '').trim();
+    const bKey = String(b.studentRecordId || '').trim();
+    const aRank = rankByStudentId.has(aKey)
+      ? rankByStudentId.get(aKey)
+      : rankByStudentId.get(String(a.personId || '').trim());
+    const bRank = rankByStudentId.has(bKey)
+      ? rankByStudentId.get(bKey)
+      : rankByStudentId.get(String(b.personId || '').trim());
+    const aIndex = Number.isFinite(Number(aRank)) ? Number(aRank) : 9999;
+    const bIndex = Number.isFinite(Number(bRank)) ? Number(bRank) : 9999;
+    if (aIndex !== bIndex) return aIndex - bIndex;
+    return String(a.name || '').localeCompare(String(b.name || ''));
+  });
+
+  return {
+    startDate,
+    endDate,
+    days,
+    students,
+    enabledAttendanceStatuses: attendanceMatrixMetricsService.ALL_ATTENDANCE_STATUSES_ORDERED
+  };
+}
+
 module.exports = {
   buildDateRangeDays,
   buildClassDayCells,
   buildStudentAttendanceReportPayload,
+  buildStudentAttendanceReportExportContextPayload,
   collectStudentClassMatrixPayloadsForExport,
   buildOfficialStudentAttendanceExportModel,
   buildUnionSessionDatesFromExportEntries,

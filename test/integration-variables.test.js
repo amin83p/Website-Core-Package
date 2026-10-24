@@ -94,6 +94,12 @@ test('registry links Canada Post and Microsoft keys', () => {
   assert.ok(listAllRegisteredKeys().includes('MICROSOFT_CLIENT_ID'));
 });
 
+test('registry links SAR export tuning keys', () => {
+  assert.ok(findRegistryEntriesByKey('SAR_EXPORT_CONCURRENCY').length);
+  assert.ok(findRegistryEntriesByKey('SAR_EXPORT_TIMING').length);
+  assert.ok(findRegistryEntriesByKey('SAR_EXPORT_ASYNC_MIN_TARGETS').length);
+});
+
 test('validateIntegrationVariable reports unlinked custom keys', () => {
   const result = integrationVariableService.validateIntegrationVariable('UNLINKED_TEST_KEY_XYZ');
   assert.equal(result.status, 'success');

@@ -7,6 +7,8 @@ const reportScopePolicy = require('./reportScopePolicy');
 const reportRosterService = require('./reportRosterService');
 const reportDocxRenderService = require('./reportDocxRenderService');
 const reportPdfRenderService = require('./reportPdfRenderService');
+const reportExportBatchCacheService = require('./reportExportBatchCacheService');
+const sarExportTimingService = require('./sarExportTimingService');
 const reportFunderDocxService = require('./reportFunderDocxService');
 const reportFunderPdfService = require('./reportFunderPdfService');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
@@ -406,10 +408,15 @@ async function resolveGenerationContext(request = {}, reqUser) {
   }
 
   const { template, assignment } = await buildEphemeralAssignmentContext(request, reqUser);
-  const [classData, sessions] = await Promise.all([
-    schoolDataService.getDataById('classes', assignment.classId, reqUser),
-    schoolDataService.getClassSessions(assignment.classId, reqUser)
-  ]);
+  const dataCache = request?.exportBatchCache || null;
+  const resolvedTemplate = dataCache
+    ? await reportExportBatchCacheService.getOrLoadTemplate(dataCache, template?.id || request.templateId, reqUser)
+    : template;
+  const { classData, sessions } = await reportExportBatchCacheService.getOrLoadClassBundle(
+    dataCache,
+    assignment.classId,
+    reqUser
+  );
   if (!classData) throw new Error('Class not found for ad-hoc generation.');
 
   const targetStudentIds = await resolveTargetStudentIds({
@@ -425,7 +432,7 @@ async function resolveGenerationContext(request = {}, reqUser) {
 
   return {
     source: 'adhoc',
-    template,
+    template: resolvedTemplate || template,
     assignment,
     teacherId,
     targetStudentIds,
@@ -439,14 +446,16 @@ async function buildSyntheticInstance({
   assignment,
   teacherId,
   studentId = '',
-  reqUser
+  reqUser,
+  dataCache = null
 } = {}) {
   const prefillSnapshot = await reportService.buildPrefillSnapshot({
     assignment,
     teacherId,
     studentId,
     reqUser,
-    requiredKeys: reportService.resolveTemplateFillKeys(template)
+    requiredKeys: reportService.resolveTemplateFillKeys(template),
+    dataCache
   });
   const instance = {
     id: `engine-${studentId || 'class'}`,
@@ -594,7 +603,8 @@ async function buildStudentPayload({
     template,
     instance,
     assignment,
-    reqUser
+    reqUser,
+    dataCache: options.dataCache || null
   });
   const warnings = assessGenerationWarnings(template, assignment, instance, mergedAnswers, mergeOptions);
   const collectionDiagnostics = Object.fromEntries(
@@ -720,7 +730,12 @@ async function generateReportOutput(request = {}, options = {}, reqUser) {
     throw new Error('Invalid export format. Use json, docx, or pdf.');
   }
 
+  const dataCache = request?.exportBatchCache || options?.exportBatchCache || null;
+  const engineTimer = sarExportTimingService.createTimer('report.generateReportOutput');
+  engineTimer.mark('start', { format, classId: String(request?.classId || '') });
+
   const context = await resolveGenerationContext(request, reqUser);
+  engineTimer.mark('resolveGenerationContext');
   const {
     template,
     assignment,
@@ -736,14 +751,15 @@ async function generateReportOutput(request = {}, options = {}, reqUser) {
       assignment,
       teacherId,
       studentId,
-      reqUser
+      reqUser,
+      dataCache
     });
     const payload = await buildStudentPayload({
       template,
       assignment,
       instance,
       reqUser,
-      options: { format }
+      options: { format, dataCache }
     });
     rows.push({
       studentId,
@@ -778,8 +794,11 @@ async function generateReportOutput(request = {}, options = {}, reqUser) {
         ...row.payload
       }))
     };
+    engineTimer.mark('json_complete', { rowCount: rows.length });
+    engineTimer.log({ format, rowCount: rows.length });
     return result;
   }
+  engineTimer.mark('payload_rows', { rowCount: rows.length });
 
   const selectionByStudent = new Map(
     (Array.isArray(request?.selections) ? request.selections : [])
@@ -828,12 +847,16 @@ async function generateReportOutput(request = {}, options = {}, reqUser) {
     if (rendered.length === 1) {
       result.file = rendered[0];
       result.contentType = 'application/pdf';
+      engineTimer.mark('pdf_complete');
+      engineTimer.log({ format: 'pdf', rowCount: rows.length });
       return result;
     }
     const zipBuffer = await reportPdfRenderService.zipReportInstancePdfFiles(rendered);
     result.buffer = zipBuffer;
     result.contentType = 'application/zip';
     result.fileName = `report-engine-${assignment?.id || 'adhoc'}-pdf.zip`;
+    engineTimer.mark('pdf_zip_complete');
+    engineTimer.log({ format: 'pdf', rowCount: rows.length });
     return result;
   }
 
@@ -892,6 +915,8 @@ async function generateReportOutput(request = {}, options = {}, reqUser) {
   if (rendered.length === 1 || docxMode === 'single') {
     result.file = rendered[0];
     result.contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    engineTimer.mark('docx_complete');
+    engineTimer.log({ format: 'docx', rowCount: rows.length });
     return result;
   }
 
@@ -899,6 +924,8 @@ async function generateReportOutput(request = {}, options = {}, reqUser) {
   result.buffer = buffer;
   result.contentType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
   result.fileName = `report-engine-${assignment?.id || 'adhoc'}.docx`;
+  engineTimer.mark('docx_merge_complete');
+  engineTimer.log({ format: 'docx', rowCount: rows.length });
   return result;
 }
 

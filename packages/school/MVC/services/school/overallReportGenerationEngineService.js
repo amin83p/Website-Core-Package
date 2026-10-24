@@ -7,6 +7,8 @@ const reportDocxRenderService = require('./reportDocxRenderService');
 const reportPdfRenderService = require('./reportPdfRenderService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const { runWithConcurrency } = require('../../utils/asyncPool');
+const sarExportConfigService = require('./sarExportConfigService');
 
 const DATA_FIELD_EXCLUSIONS = new Set(['section', 'subheader', 'row_break']);
 
@@ -305,10 +307,11 @@ async function generateSourceBatch(request = {}, reqUser) {
   if (!sourceRuns.length) throw new Error('Add at least one source run.');
 
   const globalStudentIds = Array.isArray(request?.studentIds) ? request.studentIds : undefined;
+  const exportBatchCache = request?.exportBatchCache || null;
+  const concurrency = sarExportConfigService.getExportConcurrency();
   const warnings = [];
-  const results = [];
 
-  for (const run of sourceRuns) {
+  const results = await runWithConcurrency(sourceRuns, concurrency, async (run) => {
     const engineResult = await reportGenerationEngineService.generateReportOutput({
       templateId: run.templateId,
       classId: run.classId,
@@ -329,12 +332,13 @@ async function generateSourceBatch(request = {}, reqUser) {
       format: run.format || 'json',
       docxMode: run.docxMode,
       docxKey: run.docxKey,
-      pdfKey: run.pdfKey
+      pdfKey: run.pdfKey,
+      exportBatchCache
     }, {}, reqUser);
 
     (engineResult.warnings || []).forEach((warning) => warnings.push(warning));
 
-    results.push({
+    return {
       slotKey: clean(run.slotKey).toUpperCase(),
       templateId: run.templateId,
       classId: run.classId,
@@ -343,8 +347,8 @@ async function generateSourceBatch(request = {}, reqUser) {
       reportDueDate: run.reportDueDate,
       format: engineResult.format,
       engineResult
-    });
-  }
+    };
+  });
 
   const batch = {
     filterStartDate: clean(request?.filterStartDate),
@@ -671,7 +675,8 @@ async function generateOverallPipeline(request = {}, reqUser) {
     filterStartDate: request?.filterStartDate,
     filterEndDate: request?.filterEndDate,
     studentIds: request?.studentIds,
-    sourceRuns: request?.sourceRuns
+    sourceRuns: request?.sourceRuns,
+    exportBatchCache: request?.exportBatchCache || null
   }, reqUser);
 
   const overall = await generateOverallFromSourceBatch({

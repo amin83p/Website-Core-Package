@@ -15,6 +15,7 @@ const gradebookSkillCatalogService = require('./gradebookSkillCatalogService');
 const gradebookWeightService = require('./gradebookWeightService');
 const reportFunderDocxService = require('./reportFunderDocxService');
 const sessionGradebookMakeupService = require('./sessionGradebookMakeupService');
+const reportExportBatchCacheService = require('./reportExportBatchCacheService');
 
 const STUDENT_PHONE_TYPES = Object.freeze(['mobile', 'home', 'work', 'other']);
 const STUDENT_PHONE_TYPE_LABELS = Object.freeze({
@@ -1893,6 +1894,55 @@ function buildSessionCollectionRow(session, index, statusMap = null, options = {
   };
 }
 
+function isScopedSelectedStudentReport(assignment = {}, instance = {}) {
+  const scope = String(assignment?.reportScope || '').toLowerCase();
+  if (scope !== 'selected_students') return false;
+  if (toPublicId(instance?.studentId)) return true;
+  const ids = Array.isArray(assignment?.targetStudentIds) ? assignment.targetStudentIds : [];
+  return ids.length > 0 && ids.length <= 32;
+}
+
+async function loadReportStudentsAndPersons({ assignment, instance, reqUser, dataCache = null }) {
+  if (dataCache || isScopedSelectedStudentReport(assignment, instance)) {
+    const { students, persons } = await reportExportBatchCacheService.ensureStudentsAndPersons(dataCache, reqUser);
+    if (!isScopedSelectedStudentReport(assignment, instance)) {
+      return { students, persons };
+    }
+    const targetPersonIds = new Set();
+    const instancePersonId = toPublicId(instance?.studentId);
+    if (instancePersonId) targetPersonIds.add(instancePersonId);
+    (Array.isArray(assignment?.targetStudentIds) ? assignment.targetStudentIds : []).forEach((id) => {
+      const personId = toPublicId(id);
+      if (personId) targetPersonIds.add(personId);
+    });
+    const studentMaps = buildStudentRecordMaps(students);
+    const filteredStudents = students.filter((row) => targetPersonIds.has(toPublicId(row?.personId)));
+    const filteredPersons = persons.filter((row) => targetPersonIds.has(toPublicId(row?.id)));
+    targetPersonIds.forEach((personId) => {
+      if (filteredPersons.some((row) => toPublicId(row?.id) === personId)) return;
+      const studentRecord = studentMaps.byPersonId.get(personId);
+      if (studentRecord) filteredStudents.push(studentRecord);
+    });
+    return {
+      students: filteredStudents.length ? filteredStudents : students,
+      persons: filteredPersons.length ? filteredPersons : persons
+    };
+  }
+
+  const [students, personsPayload] = await Promise.all([
+    schoolDataService.fetchAllData('students', {}, reqUser),
+    schoolIdentityLookupService.listSchoolPersonRecords({
+      reqUser,
+      requireSchoolRole: false,
+      query: { limit: 5000 }
+    })
+  ]);
+  return {
+    students: Array.isArray(students) ? students : [],
+    persons: personsPayload?.allRows || personsPayload?.rows || []
+  };
+}
+
 async function resolveReportCollectionStudentIds({ assignment, instance, classData, periodSessions, students, reqUser, reportPeriod }) {
   const instanceStudentId = toPublicId(instance?.studentId);
   if (instanceStudentId) return [instanceStudentId];
@@ -1935,18 +1985,21 @@ async function resolveReportCollectionStudentIds({ assignment, instance, classDa
   return [...new Set(fromRoster)];
 }
 
-async function buildReportDocxCollections({ instance, assignment, reqUser }) {
+async function buildReportDocxCollections({ instance, assignment, reqUser, dataCache = null }) {
   const classId = toPublicId(assignment?.classId || instance?.classId);
-  const [classData, allSessionsRaw, students, persons] = await Promise.all([
-    classId ? schoolDataService.getDataById('classes', classId, reqUser) : Promise.resolve(null),
-    classId ? schoolDataService.getClassSessions(classId, reqUser) : Promise.resolve([]),
-    schoolDataService.fetchAllData('students', {}, reqUser),
-    schoolIdentityLookupService.listSchoolPersonRecords({
-      reqUser,
-      requireSchoolRole: false,
-      query: { limit: 5000 }
-    }).then((payload) => payload.allRows || payload.rows || [])
-  ]);
+  let classData = null;
+  let allSessionsRaw = [];
+  if (classId) {
+    const bundle = await reportExportBatchCacheService.getOrLoadClassBundle(dataCache, classId, reqUser);
+    classData = bundle.classData;
+    allSessionsRaw = bundle.sessions;
+  }
+  const { students, persons } = await loadReportStudentsAndPersons({
+    assignment,
+    instance,
+    reqUser,
+    dataCache
+  });
 
   const allSessions = Array.isArray(allSessionsRaw) ? allSessionsRaw : [];
   const selectedSession = allSessions.find((row) => idsEqual(row?.sessionId, assignment?.sessionId || instance?.sessionId)) ||
@@ -2296,7 +2349,8 @@ async function buildPrefillSnapshot({
   teacherId = '',
   studentId = '',
   reqUser,
-  requiredKeys = null
+  requiredKeys = null,
+  dataCache = null
 }) {
   const requiredKeySet = normalizeRequiredKeySet(requiredKeys);
   const bundles = resolvePrefillBundlesForKeys(requiredKeySet);
@@ -2315,19 +2369,26 @@ async function buildPrefillSnapshot({
     || wants(PREFILL_COMPUTE_BUNDLE.OVERALL_ATTENDANCE_DAYS);
 
   const classIdForQuery = toPublicId(assignment.classId);
-  const [classData, sessions, persons, organizations] = await Promise.all([
-    schoolDataService.getDataById('classes', assignment.classId, reqUser),
-    schoolDataService.getClassSessions(assignment.classId, reqUser),
-    schoolIdentityLookupService.listSchoolPersonRecords({
-      reqUser,
-      requireSchoolRole: false,
-      query: { limit: 1000 }
-    }).then((payload) => payload.allRows || payload.rows || []),
+  const classBundle = classIdForQuery
+    ? await reportExportBatchCacheService.getOrLoadClassBundle(dataCache, classIdForQuery, reqUser)
+    : { classData: null, sessions: [] };
+  const classData = classBundle.classData;
+  const sessions = classBundle.sessions;
+  const [rosterData, organizations] = await Promise.all([
+    needsStudentsTable || needsAttendanceWork
+      ? loadReportStudentsAndPersons({
+        assignment,
+        instance: { studentId },
+        reqUser,
+        dataCache
+      })
+      : Promise.resolve({ students: [], persons: [] }),
     dataServiceGlobal.fetchData('organizations', {}, reqUser)
   ]);
+  const persons = rosterData.persons || [];
   const [students, examAssignmentsForClass, enrollmentPeriodRows] = await Promise.all([
     needsStudentsTable
-      ? schoolDataService.fetchAllData('students', {}, reqUser)
+      ? Promise.resolve(rosterData.students || [])
       : Promise.resolve([]),
     wants(PREFILL_COMPUTE_BUNDLE.EXAM_PERIOD) && classIdForQuery
       ? schoolDataService.fetchData('examAssignments', { classId__eq: classIdForQuery }, reqUser)

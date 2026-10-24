@@ -12,6 +12,10 @@ const reportFunderDocxService = require('./reportFunderDocxService');
 const reportFunderPdfService = require('./reportFunderPdfService');
 const overallReportService = require('./overallReportService');
 const studentAttendanceReportExportFormatService = require('./studentAttendanceReportExportFormatService');
+const reportExportBatchCacheService = require('./reportExportBatchCacheService');
+const sarExportTimingService = require('./sarExportTimingService');
+const sarExportConfigService = require('./sarExportConfigService');
+const { runWithConcurrency } = require('../../utils/asyncPool');
 
 function clean(value = '') {
   return String(value ?? '').trim();
@@ -166,6 +170,29 @@ function buildSourceRunsForStudent({
   return { sourceRuns, warnings };
 }
 
+function parseExportConcurrency() {
+  return sarExportConfigService.getExportConcurrency();
+}
+
+function collectTargetClassIds(targets = []) {
+  const set = new Set();
+  (Array.isArray(targets) ? targets : []).forEach((target) => {
+    const type = clean(target?.type).toLowerCase();
+    if (type === 'class') {
+      const classId = clean(target?.classId);
+      if (classId) set.add(classId);
+      return;
+    }
+    if (type === 'overall' && Array.isArray(target?.classIds)) {
+      target.classIds.forEach((id) => {
+        const classId = clean(id);
+        if (classId) set.add(classId);
+      });
+    }
+  });
+  return set;
+}
+
 async function loadGenerationContext(req, options = {}) {
   const activeOrgId = clean(req.user?.activeOrgId);
   if (!activeOrgId) {
@@ -173,6 +200,9 @@ async function loadGenerationContext(req, options = {}) {
     error.statusCode = 400;
     throw error;
   }
+
+  const policyAccessCache = options.policyAccessCache
+    || studentAttendanceReportPolicyService.createPolicyAccessCache();
 
   const policy = studentAttendanceReportPolicyService.resolvePolicy(
     await studentAttendanceReportPolicyModel.getPolicyForOrg(activeOrgId)
@@ -183,13 +213,21 @@ async function loadGenerationContext(req, options = {}) {
     throw error;
   }
 
-  await studentAttendanceReportPolicyService.assertReportTemplateAccessible(policy.reportTemplateId, req.user);
+  await studentAttendanceReportPolicyService.assertReportTemplateAccessible(policy.reportTemplateId, req.user, {
+    accessCache: policyAccessCache
+  });
 
-  const overallTemplates = await studentAttendanceReportPolicyService.assertOverallTemplatesAccessible(policy.overallReportTemplateIds, req.user);
+  const overallTemplates = await studentAttendanceReportPolicyService.assertOverallTemplatesAccessible(
+    policy.overallReportTemplateIds,
+    req.user,
+    { accessCache: policyAccessCache }
+  );
   const overallTemplate = overallTemplates[0] || null;
   const overallTemplateMap = new Map(overallTemplates.map((template) => [clean(template.id), template]));
 
-  const payload = await studentAttendanceReportService.buildStudentAttendanceReportPayload(req, options);
+  const payload = options.skipAttendanceMatrix
+    ? await studentAttendanceReportService.buildStudentAttendanceReportExportContextPayload(req, options)
+    : await studentAttendanceReportService.buildStudentAttendanceReportPayload(req, options);
   const students = Array.isArray(payload.students) ? payload.students : [];
   if (!students.length) {
     const error = new Error('No students matched the current filters.');
@@ -209,11 +247,15 @@ async function loadGenerationContext(req, options = {}) {
   };
 }
 
-async function loadTemplateMetaMap(templateIds = [], reqUser, policy = {}) {
+async function loadTemplateMetaMap(templateIds = [], reqUser, policy = {}, accessCache = null) {
   const map = new Map();
   const uniqueIds = [...new Set(templateIds.map((id) => clean(id)).filter(Boolean))];
   for (const templateId of uniqueIds) {
-    const template = await schoolDataService.getDataById('reportTemplates', templateId, reqUser);
+    let template = accessCache?.reportTemplates?.get(templateId) || null;
+    if (!template) {
+      // eslint-disable-next-line no-await-in-loop
+      template = await schoolDataService.getDataById('reportTemplates', templateId, reqUser);
+    }
     if (!template) continue;
     const rawMeta = {
       templateTitle: studentAttendanceReportPolicyService.formatTemplateLabel(template, templateId),
@@ -382,10 +424,19 @@ async function enrichOverallExportOptionsForStudent({
   policy = {},
   startDate = '',
   endDate = '',
-  reqUser
+  reqUser,
+  periodRowsByClassId = null
 } = {}) {
   const classIds = classRows.map((row) => clean(row.classId)).filter(Boolean);
-  const periodRows = await loadEnrollmentPeriodRowsForClassIds(classIds, reqUser);
+  let periodRows = [];
+  if (periodRowsByClassId instanceof Map) {
+    classIds.forEach((classId) => {
+      const rows = periodRowsByClassId.get(classId);
+      if (Array.isArray(rows)) periodRows.push(...rows);
+    });
+  } else {
+    periodRows = await loadEnrollmentPeriodRowsForClassIds(classIds, reqUser);
+  }
   const funder = reportFunderDocxService.resolveStudentFunderForReportPeriod({
     periodRows,
     personId: clean(student.personId),
@@ -404,11 +455,29 @@ async function enrichOverallExportOptionsForStudent({
 }
 
 async function buildStudentAttendanceReportExportPlan(req, options = {}) {
-  const ctx = await loadGenerationContext(req, options);
+  const policyAccessCache = studentAttendanceReportPolicyService.createPolicyAccessCache();
+  const ctx = await loadGenerationContext(req, {
+    ...options,
+    skipAttendanceMatrix: true,
+    policyAccessCache
+  });
   const { policy, overallTemplates, students, startDate, endDate } = ctx;
 
   const templateIds = [policy.reportTemplateId];
-  const templateMetaMap = await loadTemplateMetaMap(templateIds, req.user, policy);
+  const templateMetaMap = await loadTemplateMetaMap(templateIds, req.user, policy, policyAccessCache);
+
+  const allClassIds = new Set();
+  students.forEach((student) => {
+    buildClassExportRowsForStudent(student, policy, null, templateMetaMap).forEach((row) => {
+      const classId = clean(row?.classId);
+      if (classId) allClassIds.add(classId);
+    });
+  });
+  const periodRowsByClassId = new Map();
+  await runWithConcurrency([...allClassIds], 6, async (classId) => {
+    const rows = await schoolDataService.getClassEnrollmentPeriodsByClassId(classId, req.user).catch(() => []);
+    periodRowsByClassId.set(classId, Array.isArray(rows) ? rows : []);
+  });
 
   const planStudents = [];
   for (const student of students) {
@@ -423,7 +492,8 @@ async function buildStudentAttendanceReportExportPlan(req, options = {}) {
       policy,
       startDate,
       endDate,
-      reqUser: req.user
+      reqUser: req.user,
+      periodRowsByClassId
     });
     const overall = overallOptions.find((option) => option.eligible) || overallOptions[0] || null;
     planStudents.push({
@@ -548,7 +618,7 @@ function resolveClassTemplateId(policy) {
   return clean(policy.reportTemplateId);
 }
 
-async function exportClassTarget(student, classId, format, ctx, reqUser) {
+async function exportClassTarget(student, classId, format, ctx, reqUser, exportBatchCache = null) {
   const { policy, startDate, endDate } = ctx;
   const classes = sortClasses(student.classes);
   const classRow = classes.find((row) => clean(row.classId) === clean(classId));
@@ -581,7 +651,8 @@ async function exportClassTarget(student, classId, format, ctx, reqUser) {
     reportScope: 'selected_students',
     targetStudentIds: [clean(student.personId)],
     format,
-    docxMode: 'single'
+    docxMode: 'single',
+    exportBatchCache: exportBatchCache || ctx?.exportBatchCache || null
   }, {}, reqUser);
 
   const fileStem = `${student.name || student.personId}_${classRow.className || classId}`;
@@ -685,7 +756,8 @@ async function exportOverallTarget(
     format: format === 'json' ? 'json' : (format === 'pdf' ? 'pdf' : 'docx'),
     docxMode: 'single',
     selectedDocxKey: variantKey,
-    selectedPdfKey: variantKey
+    selectedPdfKey: variantKey,
+    exportBatchCache: ctx?.exportBatchCache || null
   }, reqUser);
 
   const overall = pipeline.overall || {};
@@ -861,11 +933,21 @@ async function exportStudentAttendanceReportSelections(req, options = {}) {
     throw error;
   }
 
-  const ctx = await loadGenerationContext(req, options);
-  const studentMap = new Map(ctx.students.map((row) => [clean(row.personId), row]));
-  const files = [];
+  const exportTimer = sarExportTimingService.createTimer('sar.exportStudentAttendanceReportSelections');
+  const exportBatchCache = reportExportBatchCacheService.createExportBatchCache();
+  const ctx = await loadGenerationContext(req, {
+    ...options,
+    skipAttendanceMatrix: options.skipAttendanceMatrix !== false,
+    targetClassIds: collectTargetClassIds(targets)
+  });
+  exportTimer.mark('loadGenerationContext', { targetCount: targets.length });
+  ctx.exportBatchCache = exportBatchCache;
+  await reportExportBatchCacheService.getOrLoadTemplate(exportBatchCache, clean(ctx.policy.reportTemplateId), req.user);
 
-  for (const target of targets) {
+  const studentMap = new Map(ctx.students.map((row) => [clean(row.personId), row]));
+  const concurrency = parseExportConcurrency();
+
+  const files = await runWithConcurrency(targets, concurrency, async (target) => {
     const type = clean(target?.type).toLowerCase();
     const studentId = clean(target?.studentId);
     const student = studentMap.get(studentId);
@@ -882,15 +964,14 @@ async function exportStudentAttendanceReportSelections(req, options = {}) {
         error.statusCode = 400;
         throw error;
       }
-      files.push(await exportClassTarget(student, classId, format, ctx, req.user));
-      continue;
+      return exportClassTarget(student, classId, format, ctx, req.user, exportBatchCache);
     }
 
     if (type === 'overall') {
       const classIds = Array.isArray(target?.classIds)
         ? target.classIds.map((id) => clean(id)).filter(Boolean)
         : [];
-      files.push(await exportOverallTarget(
+      return exportOverallTarget(
         student,
         classIds,
         clean(target?.overallTemplateId),
@@ -898,18 +979,26 @@ async function exportStudentAttendanceReportSelections(req, options = {}) {
         ctx,
         req.user,
         clean(target?.templateVariantKey)
-      ));
-      continue;
+      );
     }
 
     const error = new Error(`Unsupported export target type: ${type || '(empty)'}.`);
     error.statusCode = 400;
     throw error;
-  }
+  });
+  exportTimer.mark('targets_complete', { fileCount: files.length });
 
   const bundleMode = clean(body.bundleMode).toLowerCase();
   const mergeDocuments = bundleMode === 'merge' && (format === 'docx' || format === 'pdf');
-  return bundleExportFiles(files, format, ctx.startDate, ctx.endDate, { mergeDocuments });
+  const bundled = await bundleExportFiles(files, format, ctx.startDate, ctx.endDate, { mergeDocuments });
+  exportTimer.mark('bundle_complete');
+  exportTimer.log({
+    format,
+    targetCount: targets.length,
+    fileCount: files.length,
+    concurrency
+  });
+  return bundled;
 }
 
 async function generateDocxForStudentWithoutOverall(student, policy, startDate, endDate, reqUser) {
@@ -1075,6 +1164,7 @@ async function generateStudentAttendanceReports(req, options = {}) {
 
 module.exports = {
   sortClasses,
+  parseTargets,
   buildSourceRunsForStudent,
   buildClassExportRowsForStudent,
   buildOverallExportBlock,

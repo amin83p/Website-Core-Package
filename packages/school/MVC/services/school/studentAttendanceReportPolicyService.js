@@ -10,6 +10,13 @@ function cleanId(value = '') {
   return String(value ?? '').trim();
 }
 
+function createPolicyAccessCache() {
+  return {
+    reportTemplates: new Map(),
+    overallTemplates: new Map()
+  };
+}
+
 const DEFAULT_POLICY = Object.freeze({
   reportTemplateId: '',
   overallReportTemplateId: '',
@@ -87,7 +94,7 @@ function resolvePolicy(input = {}) {
   return normalizePolicyFromStored(input);
 }
 
-async function assertReportTemplateAccessible(templateId, reqUser, { required = false } = {}) {
+async function assertReportTemplateAccessible(templateId, reqUser, { required = false, accessCache = null } = {}) {
   const id = cleanId(templateId);
   if (!id) {
     if (required) {
@@ -96,6 +103,9 @@ async function assertReportTemplateAccessible(templateId, reqUser, { required = 
       throw error;
     }
     return null;
+  }
+  if (accessCache?.reportTemplates?.has(id)) {
+    return accessCache.reportTemplates.get(id);
   }
   const template = await schoolDataService.getDataById('reportTemplates', id, reqUser);
   if (!template) {
@@ -114,12 +124,18 @@ async function assertReportTemplateAccessible(templateId, reqUser, { required = 
     error.statusCode = 400;
     throw error;
   }
+  if (accessCache?.reportTemplates) {
+    accessCache.reportTemplates.set(id, template);
+  }
   return template;
 }
 
-async function assertOverallTemplateAccessible(templateId, reqUser) {
+async function assertOverallTemplateAccessible(templateId, reqUser, { accessCache = null } = {}) {
   const id = cleanId(templateId);
   if (!id) return null;
+  if (accessCache?.overallTemplates?.has(id)) {
+    return accessCache.overallTemplates.get(id);
+  }
   const template = await schoolDataService.getDataById('overallReportTemplates', id, reqUser);
   if (!template) {
     const error = new Error('The selected overall report template was not found.');
@@ -138,17 +154,18 @@ async function assertOverallTemplateAccessible(templateId, reqUser) {
     throw error;
   }
   await overallReportService.validateTemplateReferences(template, reqUser);
+  if (accessCache?.overallTemplates) {
+    accessCache.overallTemplates.set(id, template);
+  }
   return template;
 }
 
-async function assertOverallTemplatesAccessible(templateIds = [], reqUser) {
-  const templates = [];
-  for (const templateId of normalizeIdList(templateIds)) {
-    // eslint-disable-next-line no-await-in-loop
-    const template = await assertOverallTemplateAccessible(templateId, reqUser);
-    if (template) templates.push(template);
-  }
-  return templates;
+async function assertOverallTemplatesAccessible(templateIds = [], reqUser, { accessCache = null } = {}) {
+  const ids = normalizeIdList(templateIds);
+  const templates = await Promise.all(
+    ids.map((templateId) => assertOverallTemplateAccessible(templateId, reqUser, { accessCache }))
+  );
+  return templates.filter(Boolean);
 }
 
 async function validatePolicyInput(input = {}, reqUser) {
@@ -169,6 +186,7 @@ function formatTemplateLabel(template = {}, fallbackId = '') {
 
 module.exports = {
   DEFAULT_POLICY,
+  createPolicyAccessCache,
   normalizePolicyFromStored,
   normalizePolicyFromForm,
   resolvePolicy,

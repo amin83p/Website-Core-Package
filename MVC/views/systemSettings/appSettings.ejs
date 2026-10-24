@@ -703,6 +703,7 @@
             Get your key from <a href="https://www.canadapost-postescanada.ca/ac/" target="_blank" rel="noopener">Canada Post AddressComplete</a> (not Google Places).
             Suggested keys: <code>CANADA_POST_ADDRESS_API_KEY</code> (secret), <code>CANADA_POST_ADDRESS_COUNTRY</code> (<code>CAN</code>), <code>CANADA_POST_ADDRESS_MAX_SUGGESTIONS</code> (<code>7</code>).
             Microsoft OAuth: <code>MICROSOFT_AUTH_ENABLED</code>, <code>MICROSOFT_CLIENT_ID</code>, <code>MICROSOFT_CLIENT_SECRET</code> (secret), <code>MICROSOFT_REDIRECT_URIS</code> (comma-separated callbacks), <code>MICROSOFT_ALLOWED_DOMAIN</code>.
+            Student Attendance Report export: <code>SAR_EXPORT_CONCURRENCY</code> (<code>4</code>), <code>SAR_EXPORT_TIMING</code> (<code>true</code> to log phase timings), <code>SAR_EXPORT_ASYNC_MIN_TARGETS</code> (<code>12</code> for background bulk export).
             Values saved here apply live after <strong>Save Defaults</strong> (no redeploy). Railway <code>process.env</code> is used only when no stored value exists. Use <strong>Validate</strong> to see whether a key is linked to app code.
             Secret values are encrypted at rest. Leave a secret value blank to keep the current stored value.
           </div>

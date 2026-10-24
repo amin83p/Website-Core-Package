@@ -64,6 +64,16 @@ router.post('/report/api/export',
   trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT, { keepActive: true }),
   ctrl.exportStudentAttendanceReport);
 
+router.get('/report/api/export-jobs/:jobId',
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT, { keepActive: true }),
+  ctrl.getStudentAttendanceReportExportJob);
+
+router.get('/report/api/export-jobs/:jobId/download',
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT, { keepActive: true }),
+  ctrl.downloadStudentAttendanceReportExportJob);
+
 router.get('/report/api/export-excel.xlsx',
   requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.READ),
   trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.READ, { keepActive: true }),

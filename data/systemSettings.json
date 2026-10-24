@@ -290,6 +290,21 @@
         "key": "MICROSOFT_REDIRECT_URI",
         "isSecret": false,
         "value": "https://equalizer.up.railway.app/auth/microsoft/callback"
+      },
+      {
+        "key": "SAR_EXPORT_TIMING",
+        "isSecret": false,
+        "value": "true"
+      },
+      {
+        "key": "SAR_EXPORT_CONCURRENCY",
+        "isSecret": false,
+        "value": "4"
+      },
+      {
+        "key": "SAR_EXPORT_ASYNC_MIN_TARGETS",
+        "isSecret": false,
+        "value": "12"
       }
     ],
     "schoolCanonicalEnrollmentRead": false,
@@ -302,6 +317,6 @@
   },
   "audit": {
     "lastUpdateUser": "ROOT_001",
-    "lastUpdateDateTime": "2026-10-24T03:54:32.608Z"
+    "lastUpdateDateTime": "2026-10-24T05:53:29.125Z"
   }
 }

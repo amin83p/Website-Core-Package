@@ -203,6 +203,49 @@ const classEnrollmentReadService = {
     };
   },
 
+  async listClassStudentMatchesForReportWindow({
+    reqUser,
+    activeOrgId = '',
+    startDate = '',
+    endDate = '',
+    selectedStudentRecordIds = [],
+    canonicalStatuses = HISTORICAL_ROLLING_ROSTER_STATUSES
+  } = {}) {
+    const studentIdSet = new Set(
+      (Array.isArray(selectedStudentRecordIds) ? selectedStudentRecordIds : [])
+        .map((id) => toPublicId(id))
+        .filter(Boolean)
+    );
+    const matchesByClassId = new Map();
+    if (!studentIdSet.size) {
+      return { source: 'none', matchesByClassId };
+    }
+
+    const canonicalRows = await loadCanonicalOrgPeriods({ reqUser, activeOrgId });
+    const normalizedStatusSet = Array.isArray(canonicalStatuses) && canonicalStatuses.length
+      ? new Set(canonicalStatuses.map((value) => normalizeStatus(value)).filter(Boolean))
+      : OPEN_PERIOD_STATUSES;
+    const windowStart = normalizeDateOnly(startDate);
+    const windowEnd = normalizeDateOnly(endDate);
+    if (!windowStart || !windowEnd) {
+      return { source: 'canonical', matchesByClassId };
+    }
+
+    canonicalRows.forEach((row) => {
+      const studentId = toPublicId(row?.studentId);
+      if (!studentId || !studentIdSet.has(studentId)) return;
+      if (!periodOverlapsWindow(row, windowStart, windowEnd, normalizedStatusSet)) return;
+      const classId = toPublicId(row?.classId);
+      if (!classId) return;
+      if (!matchesByClassId.has(classId)) {
+        matchesByClassId.set(classId, new Set());
+      }
+      matchesByClassId.get(classId).add(studentId);
+    });
+
+    return { source: 'canonical', matchesByClassId };
+  },
+
   async getActiveClassIdsForStudent({
     studentId,
     classes = [],

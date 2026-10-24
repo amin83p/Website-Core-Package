@@ -1798,6 +1798,27 @@ async function exportStudentAttendanceReportExcel(req, res) {
     }
 }
 
+function buildStudentAttendanceReportExportFauxReq(req) {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    return {
+        user: req.user,
+        body,
+        query: {
+            startDate: body.startDate || req.query?.startDate,
+            endDate: body.endDate || req.query?.endDate,
+            studentIds: body.studentIds || req.query?.studentIds
+        }
+    };
+}
+
+function shouldRunSarExportAsync(body = {}, targetCount = 0) {
+    const sarExportConfigService = require('../../services/school/sarExportConfigService');
+    const asyncFlag = String(body.async || body.asyncExport || '').trim().toLowerCase();
+    if (['1', 'true', 'yes', 'on'].includes(asyncFlag)) return true;
+    if (['0', 'false', 'no', 'off'].includes(asyncFlag)) return false;
+    return targetCount >= sarExportConfigService.getAsyncExportMinTargets();
+}
+
 async function exportStudentAttendanceReport(req, res) {
     try {
         const reportAccess = await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip);
@@ -1808,16 +1829,27 @@ async function exportStudentAttendanceReport(req, res) {
             });
         }
         const studentAttendanceReportGenerationService = require('../../services/school/studentAttendanceReportGenerationService');
+        const sarExportJobService = require('../../services/school/sarExportJobService');
         const body = req.body && typeof req.body === 'object' ? req.body : {};
-        const fauxReq = {
-            user: req.user,
-            body,
-            query: {
-                startDate: body.startDate || req.query?.startDate,
-                endDate: body.endDate || req.query?.endDate,
-                studentIds: body.studentIds || req.query?.studentIds
-            }
-        };
+        const fauxReq = buildStudentAttendanceReportExportFauxReq(req);
+        const targets = studentAttendanceReportGenerationService.parseTargets(body.targets);
+
+        if (shouldRunSarExportAsync(body, targets.length)) {
+            const job = sarExportJobService.createJob({
+                userId: req.user?.id || req.user?.userId,
+                activeOrgId: req.user?.activeOrgId
+            });
+            sarExportJobService.startJob(job.id, () =>
+                studentAttendanceReportGenerationService.exportStudentAttendanceReportSelections(fauxReq)
+            );
+            return res.status(202).json({
+                status: 'accepted',
+                async: true,
+                job: sarExportJobService.toPublicJob(job),
+                pollUrl: `/school/attendances/report/api/export-jobs/${job.id}`
+            });
+        }
+
         const result = await studentAttendanceReportGenerationService.exportStudentAttendanceReportSelections(fauxReq);
         const buffer = Buffer.isBuffer(result.buffer)
             ? result.buffer
@@ -1833,6 +1865,58 @@ async function exportStudentAttendanceReport(req, res) {
         return res.status(Number(error?.statusCode) || 400).json({
             status: 'error',
             message: error.message || 'Could not export student attendance reports.'
+        });
+    }
+}
+
+async function getStudentAttendanceReportExportJob(req, res) {
+    try {
+        const reportAccess = await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip);
+        if (!reportAccess.canExportReport) {
+            return res.status(403).json({
+                status: 'error',
+                message: 'You do not have permission to export student attendance reports.'
+            });
+        }
+        const sarExportJobService = require('../../services/school/sarExportJobService');
+        const jobId = String(req.params?.jobId || '').trim();
+        const job = sarExportJobService.getJobForUser(jobId, req.user);
+        return res.json({
+            status: 'success',
+            job: sarExportJobService.toPublicJob(job),
+            downloadUrl: job.status === 'complete'
+                ? `/school/attendances/report/api/export-jobs/${job.id}/download`
+                : ''
+        });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            message: error.message || 'Could not load export job status.'
+        });
+    }
+}
+
+async function downloadStudentAttendanceReportExportJob(req, res) {
+    try {
+        const reportAccess = await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip);
+        if (!reportAccess.canExportReport) {
+            return res.status(403).json({
+                status: 'error',
+                message: 'You do not have permission to export student attendance reports.'
+            });
+        }
+        const sarExportJobService = require('../../services/school/sarExportJobService');
+        const jobId = String(req.params?.jobId || '').trim();
+        const job = sarExportJobService.getJobForUser(jobId, req.user);
+        const buffer = sarExportJobService.readJobFile(job);
+        res.setHeader('Content-Type', job.contentType || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `attachment; filename="${String(job.fileName || 'student_attendance_export').replace(/"/g, '')}"`);
+        res.setHeader('Content-Length', String(buffer.length));
+        return res.send(buffer);
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            message: error.message || 'Could not download export job.'
         });
     }
 }
@@ -1912,6 +1996,8 @@ module.exports = {
     generateStudentAttendanceReport,
     getStudentAttendanceReportExportPlan,
     exportStudentAttendanceReport,
+    getStudentAttendanceReportExportJob,
+    downloadStudentAttendanceReportExportJob,
     exportStudentAttendanceReportExcel,
     listActiveAttendanceClasses,
     buildAttendanceMatrixPayload,
