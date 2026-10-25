@@ -9,6 +9,11 @@ const uploadMiddleware = require('../middleware/upload');
 const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
 const settingService = require('../services/settingService');
 const paginate = require('../utils/paginationHelper');
+const {
+    ensureRootRelativeWebPath,
+    normalizeNewsHtmlAssetUrls,
+    extractImgSrcList
+} = require('../utils/newsHtmlAssetUrls');
 
 const MAX_ARTICLE_VISIT_PAGE_LIMIT = 100;
 
@@ -122,9 +127,9 @@ function normalizeNewsItem(item = {}) {
         },
         content: {
             ...content,
-            featuredImage: content.featuredImage || source.featuredImage || '',
+            featuredImage: ensureRootRelativeWebPath(content.featuredImage || source.featuredImage || ''),
             summary: content.summary || source.summary || '',
-            body: content.body || source.body || source.htmlContent || ''
+            body: normalizeNewsHtmlAssetUrls(content.body || source.body || source.htmlContent || '')
         }
     };
 }
@@ -171,10 +176,11 @@ function buildNewsScopeUploadPrefix(scopeKey = '') {
 function encodeNewsUploadUrl(uploadPath = '') {
     const normalized = String(uploadPath || '').replace(/\\/g, '/').replace(/\/+/g, '/').trim();
     if (!normalized) return '';
-    return normalized
+    const encoded = normalized
         .split('/')
         .map((part, index) => (index === 0 ? part : encodeURIComponent(part)))
         .join('/');
+    return ensureRootRelativeWebPath(encoded);
 }
 
 function buildNewsMediaLibraryRow(entry = {}, scopeKey = '', currentFolder = '') {
@@ -363,9 +369,11 @@ function buildNewsObject(body, files, user, existing = null) {
         },
 
         content: {
-            featuredImage: body.featuredImage || (finalAttachments.find(a=>a.type==='image')?.url) || null,
+            featuredImage: ensureRootRelativeWebPath(
+                body.featuredImage || (finalAttachments.find(a => a.type === 'image')?.url) || ''
+            ) || null,
             summary: body.summary,
-            body: body.htmlContent
+            body: normalizeNewsHtmlAssetUrls(body.htmlContent || '')
         },
 
         attachments: finalAttachments,

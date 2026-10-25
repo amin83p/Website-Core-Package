@@ -77,6 +77,7 @@ const scheduledTaskSchedulerService = require('./MVC/services/scheduledTaskSched
 const { runWithRequestContext } = require('./MVC/utils/requestContextStore');
 const uploadPathUtils = require('./MVC/utils/uploadPathUtils');
 const { isRailwayProxyMode, getGatewayBaseUrl } = require('./MVC/utils/uploadModeUtils');
+const { streamUploadFromGateway } = require('./MVC/services/uploadGatewayStreamService');
 const buildVersionResolver = require('./MVC/utils/buildVersionResolver');
 const { buildStaticAssetUrl } = require('./MVC/utils/staticAssetUrl');
 const staticAssetMiddleware = require('./MVC/middleware/staticAssetMiddleware');
@@ -357,7 +358,7 @@ const uploadsStaticContext = {
   root: '',
   middleware: null
 };
-app.use('/uploads', (req, res, next) => {
+app.use('/uploads', async (req, res, next) => {
   if (chatAttachmentAccessService.isProtectedChatUploadPath(req.path || req.url || '')) {
     return res.status(404).send('Not found');
   }
@@ -373,22 +374,11 @@ app.use('/uploads', (req, res, next) => {
 
   if (isRailwayProxyMode()) {
     const gatewayBaseUrl = getGatewayBaseUrl();
-    if (gatewayBaseUrl) {
-      let isSameHost = false;
-      try {
-        const gatewayHost = new URL(gatewayBaseUrl).host.toLowerCase();
-        const requestHost = String(req.get('host') || '').toLowerCase();
-        isSameHost = gatewayHost === requestHost;
-      } catch (_) {
-        isSameHost = false;
-      }
-      // In local/dev flows we may have build artifacts on local disk while proxy mode is still enabled.
-      // Prefer serving local files when they exist; otherwise keep gateway redirect behavior.
-      if (!isSameHost && !hasLocalArtifact) {
-        const suffix = String(req.originalUrl || '').replace(/^\/uploads/, '');
-        const targetUrl = `${gatewayBaseUrl}/uploads${suffix}`;
-        return res.redirect(307, targetUrl);
-      }
+    // Prefer local disk when the artifact exists. Otherwise stream from the file gateway on the
+    // server so browsers never follow redirects to localhost/private Railway hosts (PNA prompts).
+    if (gatewayBaseUrl && !hasLocalArtifact) {
+      await streamUploadFromGateway(req, res);
+      return;
     }
   }
 

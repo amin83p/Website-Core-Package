@@ -1,5 +1,46 @@
 [
   {
+    "id": "NEWS_20261024_001",
+    "active": true,
+    "analytics": [],
+    "attachments": [
+      {
+        "url": "/images/news/equportal-app-domain-announcement.jpg",
+        "type": "image",
+        "name": "equportal-app-domain-announcement.jpg"
+      }
+    ],
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-10-24T06:30:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-10-24T06:30:00.000Z"
+    },
+    "content": {
+      "featuredImage": "/images/news/equportal-app-domain-announcement.jpg",
+      "summary": "EQUportal.app is our shorter, official home on the web. Older links will keep working for now—please bookmark the new address and move over at your own pace.",
+      "body": "<p><img src=\"/images/news/equportal-app-domain-announcement.jpg\" alt=\"EQUportal.app — our new home domain\"></p><p>We are pleased to introduce <strong><a href=\"https://EQUportal.app\" rel=\"noopener noreferrer\">EQUportal.app</a></strong> as the primary address for this portal. It is shorter, easier to share, and it is <strong>our home domain</strong>—the place we want students, families, and staff to land first.</p><h3>What is changing?</h3><ul><li><strong>New canonical URL:</strong> <a href=\"https://EQUportal.app\" rel=\"noopener noreferrer\">https://EQUportal.app</a></li><li><strong>Same sign-in, same data:</strong> your account, classes, and settings are unchanged.</li><li><strong>Existing bookmarks:</strong> older URLs should continue to work during the transition.</li></ul><h3>Please migrate slowly—and on purpose</h3><p>There is no rush to change everything overnight. We ask you to <strong>migrate gradually</strong>:</p><ol><li>Bookmark <strong>EQUportal.app</strong> in your browser.</li><li>Update saved links in notes, handouts, and classroom materials when you next revise them.</li><li>Share the new address with colleagues and families so everyone learns one consistent URL.</li></ol><p>Over time we will phase in EQUportal.app across printed materials, email signatures, and integrations. If you run into a link that still points elsewhere, let your administrator know—we will keep redirects in place while people move over.</p><p>Thank you for helping us settle into our new home on the web.</p>"
+    },
+    "meta": {
+      "title": "EQUportal.app is our new home—please migrate at your own pace",
+      "slug": "equportal-app-is-our-new-home-please-migrate-at-your-own-pace",
+      "category": "Announcements",
+      "tags": ["domain", "EQUportal", "announcement"],
+      "author": {
+        "userId": "SYS_ROOT_001",
+        "displayName": "Platform Team"
+      },
+      "publishDate": "2026-10-24T06:30"
+    },
+    "metrics": {
+      "views": 0
+    },
+    "status": "published",
+    "targetOrgId": null,
+    "targetOrgIds": [],
+    "visibility": "public"
+  },
+  {
     "title": "Smoke News 1774557078536-297",
     "slug": "smoke-news-1774557078536-297",
     "status": "published",

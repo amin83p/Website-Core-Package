@@ -10,6 +10,7 @@
 %>
 
 <link href="https://cdn.jsdelivr.net/npm/quill@1.3.6/dist/quill.snow.css" rel="stylesheet">
+<%- include('partials/newsArticleBodyStyles') %>
 
 <div class="sections-page">
   <div class="d-flex align-items-center justify-content-between mb-4">
@@ -50,12 +51,22 @@
                               placeholder="Brief description for list views (optional)"><%= item ? item.content.summary : '' %></textarea>
                 </div>
 
-                <div class="d-flex justify-content-between align-items-end mb-2">
+                <div class="d-flex justify-content-between align-items-end mb-2 flex-wrap gap-2">
                     <label class="form-label fw-bold mb-0">Article Body</label>
-                    
-                    <button type="button" class="btn btn-sm btn-primary btn-filled" id="btnOpenMediaForEditor">
-                        <i class="bi bi-images me-1"></i> Manage & Insert Media
-                    </button>
+                    <div class="d-flex flex-wrap gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnPasteHtmlSource" title="Paste raw HTML from a code block">
+                            <i class="bi bi-code-slash me-1"></i> Paste HTML
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="btnInsertInlineImage" title="Small inline image from library">
+                            <i class="bi bi-image me-1"></i> Inline image
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-primary" id="btnInsertFigureImage" title="Sized figure with layout options">
+                            <i class="bi bi-card-image me-1"></i> Figure
+                        </button>
+                        <button type="button" class="btn btn-sm btn-primary btn-filled" id="btnOpenMediaForEditor">
+                            <i class="bi bi-images me-1"></i> Media library
+                        </button>
+                    </div>
                 </div>
 
                 <div id="editor-wrapper" class="border rounded">
@@ -178,10 +189,67 @@
   </form>
 </div>
 
+<div class="modal fade" id="pasteHtmlModal" tabindex="-1" aria-labelledby="pasteHtmlModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="pasteHtmlModalLabel">Paste HTML source</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-2">Paste raw HTML (for example from a chat code block). This replaces the current article body with rendered content.</p>
+                <textarea id="pasteHtmlSourceInput" class="form-control font-monospace" rows="14" placeholder="<p>Hello</p>"></textarea>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="btnApplyPasteHtml">Apply to body</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="newsFigureModal" tabindex="-1" aria-labelledby="newsFigureModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="newsFigureModalLabel">Figure image options</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">Choose layout and width, then pick an uploaded image from the media library.</p>
+                <div class="mb-3">
+                    <label class="form-label fw-semibold" for="newsFigureLayoutSelect">Layout</label>
+                    <select id="newsFigureLayoutSelect" class="form-select">
+                        <option value="center">Centered (text above/below)</option>
+                        <option value="float-left">Float left (text wraps right)</option>
+                        <option value="float-right">Float right (text wraps left)</option>
+                        <option value="block">Full width block (no side text)</option>
+                    </select>
+                </div>
+                <div class="mb-2 d-flex justify-content-between align-items-center">
+                    <label class="form-label fw-semibold mb-0" for="newsFigureWidthSlider">Width</label>
+                    <span class="badge bg-light text-dark border" id="newsFigureWidthLabel">72%</span>
+                </div>
+                <input type="range" class="form-range" id="newsFigureWidthSlider" min="25" max="100" step="1" value="72">
+                <div class="d-flex flex-wrap gap-2 mt-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary news-figure-width-preset" data-width="50">50%</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary news-figure-width-preset" data-width="72">72%</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary news-figure-width-preset" data-width="100">100%</button>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" id="btnNewsFigureContinue">Choose image…</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <%- include('../partials/modal_GenericPicker') %>
 <%- include('../partials/modal_MediaManager') %>
 
 <script src="https://cdn.jsdelivr.net/npm/quill@1.3.6/dist/quill.js"></script>
+<script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/news/quillNewsFigure.js') : '/scripts/news/quillNewsFigure.js' %>"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     if (typeof window.Quill !== 'function') {
@@ -222,6 +290,151 @@ document.addEventListener('DOMContentLoaded', () => {
         ]}
     });
 
+    const figureEditor = window.NewsFigureEditor || null;
+    const toolbarModule = quill.getModule('toolbar');
+    if (toolbarModule) {
+        toolbarModule.addHandler('image', () => {
+            openNewsMediaPicker('inline').catch((error) => {
+                showNewsMessage('Media Error', error.message || 'Unable to open media library.');
+            });
+        });
+    }
+
+    let pendingFigureOptions = { layout: 'center', widthPct: 72 };
+    let editingFigureIndex = null;
+    const newsFigureModalEl = document.getElementById('newsFigureModal');
+    const newsFigureModal = (window.bootstrap && window.bootstrap.Modal && newsFigureModalEl)
+        ? window.bootstrap.Modal.getOrCreateInstance(newsFigureModalEl)
+        : null;
+    const newsFigureLayoutSelect = document.getElementById('newsFigureLayoutSelect');
+    const newsFigureWidthSlider = document.getElementById('newsFigureWidthSlider');
+    const newsFigureWidthLabel = document.getElementById('newsFigureWidthLabel');
+
+    function syncFigureWidthLabel() {
+        if (!newsFigureWidthSlider || !newsFigureWidthLabel) return;
+        newsFigureWidthLabel.textContent = `${newsFigureWidthSlider.value}%`;
+    }
+
+    function readFigureOptionsFromModal() {
+        const layout = newsFigureLayoutSelect ? newsFigureLayoutSelect.value : 'center';
+        const widthPct = newsFigureWidthSlider ? Number(newsFigureWidthSlider.value) : 72;
+        return {
+            layout: figureEditor?.normalizeLayoutToken ? figureEditor.normalizeLayoutToken(layout) : layout,
+            widthPct: figureEditor?.clampWidthPct ? figureEditor.clampWidthPct(widthPct, 72) : widthPct
+        };
+    }
+
+    const btnNewsFigureContinue = document.getElementById('btnNewsFigureContinue');
+
+    function openFigureOptionsModal({ layout = 'center', widthPct = 72, editIndex = null } = {}) {
+        editingFigureIndex = Number.isFinite(editIndex) ? editIndex : null;
+        if (newsFigureLayoutSelect) newsFigureLayoutSelect.value = layout;
+        if (newsFigureWidthSlider) newsFigureWidthSlider.value = String(widthPct);
+        syncFigureWidthLabel();
+        if (btnNewsFigureContinue) {
+            btnNewsFigureContinue.textContent = Number.isFinite(editingFigureIndex) ? 'Apply changes' : 'Choose image…';
+        }
+        if (newsFigureModal) newsFigureModal.show();
+    }
+
+    if (newsFigureWidthSlider) {
+        newsFigureWidthSlider.addEventListener('input', syncFigureWidthLabel);
+    }
+    document.querySelectorAll('.news-figure-width-preset').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const width = btn.getAttribute('data-width');
+            if (newsFigureWidthSlider && width) {
+                newsFigureWidthSlider.value = width;
+                syncFigureWidthLabel();
+            }
+        });
+    });
+
+    quill.root.addEventListener('click', (event) => {
+        const target = event.target;
+        const figure = target && target.closest ? target.closest('figure.news-figure') : null;
+        if (!figure || !figureEditor) return;
+        const blot = Quill.find(figure);
+        if (!blot) return;
+        const value = figureEditor.NewsFigureDom.readFromNode(figure);
+        openFigureOptionsModal({
+            layout: value.layout,
+            widthPct: value.widthPct,
+            editIndex: quill.getIndex(blot)
+        });
+    });
+
+    function looksLikeHtmlMarkup(text) {
+        const token = String(text || '').trim();
+        if (token.length < 4) return false;
+        return /<(?:p|h[1-6]|ul|ol|li|img|a|div|br|strong|em)\b/i.test(token)
+            || /<[a-z][a-z0-9]*\b[^>]*>[\s\S]*<\/[a-z][a-z0-9]*>/i.test(token);
+    }
+
+    function normalizeHtmlAssetUrls(html) {
+        return String(html || '').replace(
+            /\s(src|href)\s*=\s*(["'])(?!\/|https?:|data:|blob:|mailto:|tel:|#)([^"']+)\2/gi,
+            (match, attr, quote, path) => ` ${attr}=${quote}/${String(path).replace(/^\/+/, '')}${quote}`
+        );
+    }
+
+    function applyHtmlToQuillEditor(html, { replaceAll = false } = {}) {
+        const source = normalizeHtmlAssetUrls(String(html || '').trim());
+        if (!source) return false;
+        if (replaceAll) {
+            quill.setText('');
+        }
+        const range = quill.getSelection(true);
+        const index = replaceAll ? 0 : (range ? range.index : quill.getLength());
+        if (range && range.length && !replaceAll) {
+            quill.deleteText(range.index, range.length, 'user');
+        }
+        quill.clipboard.dangerouslyPasteHTML(index, source, 'user');
+        return true;
+    }
+
+    quill.root.addEventListener('paste', (event) => {
+        const html = event.clipboardData && typeof event.clipboardData.getData === 'function'
+            ? String(event.clipboardData.getData('text/html') || '')
+            : '';
+        const plain = event.clipboardData && typeof event.clipboardData.getData === 'function'
+            ? String(event.clipboardData.getData('text/plain') || '')
+            : '';
+        if (figureEditor?.clipboardHasEmbeddedImage?.(html, plain)) {
+            event.preventDefault();
+            showNewsMessage(
+                'Embedded image blocked',
+                'Paste text only, or insert images from Inline image / Figure using the media library.'
+            );
+            return;
+        }
+        if (!html.trim() && looksLikeHtmlMarkup(plain)) {
+            event.preventDefault();
+            applyHtmlToQuillEditor(plain, { replaceAll: false });
+        }
+    });
+
+    const pasteHtmlModalEl = document.getElementById('pasteHtmlModal');
+    const pasteHtmlModal = (window.bootstrap && window.bootstrap.Modal && pasteHtmlModalEl)
+        ? window.bootstrap.Modal.getOrCreateInstance(pasteHtmlModalEl)
+        : null;
+    const pasteHtmlSourceInput = document.getElementById('pasteHtmlSourceInput');
+    document.getElementById('btnPasteHtmlSource')?.addEventListener('click', () => {
+        if (pasteHtmlSourceInput) pasteHtmlSourceInput.value = '';
+        if (pasteHtmlModal) pasteHtmlModal.show();
+        else if (pasteHtmlSourceInput) pasteHtmlSourceInput.focus();
+    });
+    document.getElementById('btnApplyPasteHtml')?.addEventListener('click', () => {
+        const raw = pasteHtmlSourceInput ? pasteHtmlSourceInput.value : '';
+        if (!looksLikeHtmlMarkup(raw)) {
+            showNewsMessage('Invalid HTML', 'Paste markup that includes HTML tags (for example &lt;p&gt;...&lt;/p&gt;).');
+            return;
+        }
+        applyHtmlToQuillEditor(raw, { replaceAll: true });
+        if (pasteHtmlModal) pasteHtmlModal.hide();
+        showNewsMessage('HTML applied', 'The article body was updated from your HTML source.', 'success');
+    });
+
     function syncAttachmentRegistry() {
         attachmentRegistryInput.value = JSON.stringify(articleAttachments);
     }
@@ -243,10 +456,12 @@ document.addEventListener('DOMContentLoaded', () => {
     function resolveMediaRowUrl(row = {}) {
         const url = String(row.url || row.path || '').trim();
         if (!url) return '';
-        if (/^\/uploads\//i.test(url)) return url;
-        const match = url.match(/\/uploads\/(.+)$/i);
+        if (/^(?:https?:|data:|blob:)/i.test(url)) return url;
+        if (url.startsWith('/')) return url;
+        if (/^uploads\//i.test(url)) return `/${url.replace(/^\/+/, '')}`;
+        const match = url.match(/(?:^|\/)uploads\/(.+)$/i);
         if (match && match[1]) return `/uploads/${match[1].replace(/^\/+/, '')}`;
-        return url;
+        return `/${url.replace(/^\/+/, '')}`;
     }
 
     function inferMediaTypeFromRow(row = {}) {
@@ -337,21 +552,65 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('btnRemoveFeaturedImage').classList.remove('d-none');
     }
 
-    function insertMediaIntoEditor(row = {}) {
+    function registerAttachment(row = {}, type = 'document') {
         const url = resolveMediaRowUrl(row);
-        if (!url) throw new Error('Selected media has no URL.');
+        if (!url) return '';
         const name = String(row.name || row.originalName || row.filename || 'Media').trim() || 'Media';
-        const type = inferMediaTypeFromRow(row);
         if (!articleAttachments.some((entry) => entry.url === url)) {
             articleAttachments.push({ url, type, name });
             syncAttachmentRegistry();
         }
-        const range = quill.getSelection(true);
-        if (type === 'image') {
-            quill.insertEmbed(range.index, 'image', url);
-        } else {
-            quill.insertText(range.index, ` ${name} `, 'link', url);
+        return url;
+    }
+
+    function insertInlineImageIntoEditor(row = {}) {
+        const url = registerAttachment(row, 'image');
+        if (!url) throw new Error('Selected media has no URL.');
+        if (figureEditor?.isEmbeddedImageUrl?.(url)) {
+            throw new Error('Only library upload URLs can be inserted.');
         }
+        const range = quill.getSelection(true);
+        const index = range ? range.index : quill.getLength();
+        quill.insertEmbed(index, 'image', url, 'user');
+        quill.setSelection(index + 1, 0, 'silent');
+    }
+
+    function insertFigureIntoEditor(row = {}, options = {}) {
+        const url = registerAttachment(row, 'image');
+        if (!url) throw new Error('Selected media has no URL.');
+        if (!figureEditor?.insertNewsFigure) {
+            throw new Error('Figure editor is not available. Refresh the page and try again.');
+        }
+        const payload = {
+            src: url,
+            layout: options.layout || 'center',
+            widthPct: options.widthPct || 72,
+            alt: String(row.name || row.originalName || '').trim()
+        };
+        if (Number.isFinite(editingFigureIndex)) {
+            figureEditor.updateNewsFigureAt(quill, editingFigureIndex, payload);
+            editingFigureIndex = null;
+            return;
+        }
+        figureEditor.insertNewsFigure(quill, payload);
+    }
+
+    function insertMediaIntoEditor(row = {}, mode = 'inline') {
+        const url = resolveMediaRowUrl(row);
+        if (!url) throw new Error('Selected media has no URL.');
+        const type = inferMediaTypeFromRow(row);
+        if (type === 'image') {
+            if (mode === 'figure') {
+                insertFigureIntoEditor(row, pendingFigureOptions);
+            } else {
+                insertInlineImageIntoEditor(row);
+            }
+            return;
+        }
+        registerAttachment(row, type);
+        const range = quill.getSelection(true);
+        const name = String(row.name || row.originalName || row.filename || 'Media').trim() || 'Media';
+        quill.insertText(range ? range.index : quill.getLength(), ` ${name} `, 'link', url);
     }
 
     async function openNewsMediaPicker(mode) {
@@ -361,6 +620,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const isFeatured = mode === 'featured';
+        const isFigure = mode === 'figure';
+        const isInline = mode === 'inline';
         if (typeof mediaManagerModalApi.setModalCompat === 'function' && mediaManagerModalEl && mediaManagerModal) {
             mediaManagerModalApi.setModalCompat({
                 modalEl: mediaManagerModalEl,
@@ -377,9 +638,9 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         await mediaManagerModalApi.open({
-            title: isFeatured ? 'Select Featured Image' : 'Select Article Media',
+            title: isFeatured ? 'Select Featured Image' : (isFigure ? 'Select Figure Image' : 'Select Article Media'),
             mode: 'assign',
-            mediaKind: isFeatured ? 'image' : 'any',
+            mediaKind: (isFeatured || isInline || isFigure) ? 'image' : 'any',
             maxSelection: 1,
             defaultView: 'tile',
             defaultFolder: NEWS_MEDIA_DEFAULT_FOLDER,
@@ -396,10 +657,67 @@ document.addEventListener('DOMContentLoaded', () => {
                     applyFeaturedImage(resolveMediaRowUrl(rows[0]));
                     return;
                 }
-                insertMediaIntoEditor(rows[0]);
+                const row = rows[0];
+                const type = inferMediaTypeFromRow(row);
+                if (type === 'image' && mode === 'editor') {
+                    if (typeof showMessageModal === 'function') {
+                        const choice = await showMessageModal({
+                            title: 'Insert image',
+                            icon: 'info',
+                            message: 'How should this image appear in the article body?',
+                            buttons: [
+                                { text: 'Inline (small)', class: 'btn-outline-primary', value: 'inline' },
+                                { text: 'Figure (layout)', class: 'btn-primary', value: 'figure' },
+                                { text: 'Cancel', class: 'btn-outline-secondary', value: 'cancel' }
+                            ]
+                        });
+                        if (choice === 'cancel') return;
+                        if (choice === 'figure') {
+                            pendingFigureOptions = readFigureOptionsFromModal();
+                            insertMediaIntoEditor(row, 'figure');
+                            return;
+                        }
+                    }
+                }
+                insertMediaIntoEditor(row, isFigure ? 'figure' : (isInline ? 'inline' : 'inline'));
             }
         });
     }
+
+    document.getElementById('btnInsertInlineImage')?.addEventListener('click', () => {
+        openNewsMediaPicker('inline').catch((error) => {
+            showNewsMessage('Media Error', error.message || 'Unable to open media library.');
+        });
+    });
+
+    document.getElementById('btnInsertFigureImage')?.addEventListener('click', () => {
+        editingFigureIndex = null;
+        openFigureOptionsModal({ layout: 'center', widthPct: 72 });
+    });
+
+    btnNewsFigureContinue?.addEventListener('click', () => {
+        pendingFigureOptions = readFigureOptionsFromModal();
+        if (Number.isFinite(editingFigureIndex) && figureEditor) {
+            const leaf = quill.getLeaf(editingFigureIndex);
+            const embed = Array.isArray(leaf) ? leaf[0] : null;
+            const domNode = embed?.domNode;
+            if (domNode && domNode.matches?.('figure.news-figure')) {
+                const current = figureEditor.NewsFigureDom.readFromNode(domNode);
+                figureEditor.updateNewsFigureAt(quill, editingFigureIndex, {
+                    ...current,
+                    layout: pendingFigureOptions.layout,
+                    widthPct: pendingFigureOptions.widthPct
+                });
+            }
+            editingFigureIndex = null;
+            if (newsFigureModal) newsFigureModal.hide();
+            return;
+        }
+        if (newsFigureModal) newsFigureModal.hide();
+        openNewsMediaPicker('figure').catch((error) => {
+            showNewsMessage('Media Error', error.message || 'Unable to open media library.');
+        });
+    });
 
     document.getElementById('btnOpenMediaForEditor').addEventListener('click', () => {
         openNewsMediaPicker('editor').catch((error) => {
@@ -423,7 +741,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const newsForm = document.getElementById('newsForm');
     newsForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        document.getElementById('hiddenHtmlContent').value = document.querySelector('.ql-editor').innerHTML;
+        let editorHtml = document.querySelector('.ql-editor').innerHTML;
+        if (figureEditor?.stripEmbeddedImagesFromHtml) {
+            editorHtml = figureEditor.stripEmbeddedImagesFromHtml(editorHtml);
+        }
+        document.getElementById('hiddenHtmlContent').value = normalizeHtmlAssetUrls(editorHtml);
 
         const submitBtn = newsForm.querySelector('button[type="submit"]');
         const originalHtml = submitBtn ? submitBtn.innerHTML : '';
