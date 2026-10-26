@@ -1,6 +1,8 @@
 const schoolRepositories = require('../../repositories/school');
 const enrollmentCycleSummaryService = require('./enrollmentCycleSummaryService');
 const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
+const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
+const schoolDataService = require('./schoolDataService');
 const classEnrollmentPeriodModel = require('../../models/school/classEnrollmentPeriodModel');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -139,10 +141,36 @@ async function getClassSessions(classId, options = {}) {
   return Array.isArray(classRow?.sessions) ? classRow.sessions : [];
 }
 
-function resolvePersonId(period = {}) {
+async function resolvePersonIdForPeriod(period = {}, options = {}) {
   const direct = toPublicId(period?.personId);
   if (direct) return direct;
+  const studentId = toPublicId(period?.studentId);
+  if (!studentId) return '';
+
+  const reqUser = options?.reqUser || null;
+  const studentRepo = dependencies.repositories?.students;
+  let student = null;
+  if (studentRepo && typeof studentRepo.getById === 'function') {
+    student = await studentRepo.getById(studentId, options).catch(() => null);
+  }
+  if (!student && reqUser) {
+    student = await schoolDataService.getDataById('students', studentId, reqUser).catch(() => null);
+  }
+  const studentToPersonMap = new Map();
+  if (student) {
+    const sid = toPublicId(student?.id || student?.studentId);
+    const pid = toPublicId(student?.personId);
+    if (sid && pid) studentToPersonMap.set(sid, pid);
+  }
+  const resolved = classEnrollmentSessionApplicabilityService.resolveStudentPersonId(period, studentToPersonMap);
+  if (resolved) return resolved;
+
   return '';
+}
+
+function mergeHoldServiceOptions(requestingUser = null, options = {}) {
+  const reqUser = options?.reqUser || requestingUser || null;
+  return reqUser ? { ...options, reqUser } : { ...options };
 }
 
 function formatAttendanceLabelForHoldBlocker(attendance = '') {
@@ -158,12 +186,12 @@ function formatAttendanceLabelForHoldBlocker(attendance = '') {
   return labels[key] || String(attendance || '').trim() || 'Recorded';
 }
 
-function buildHoldBlockerMessage(row = {}) {
+function buildHoldAttendanceOverrideMessage(row = {}) {
   const date = String(row.date || '').trim();
   const attendanceLabel = formatAttendanceLabelForHoldBlocker(row.attendance);
   let message = date
-    ? `Session on ${date} already has attendance recorded (${attendanceLabel}).`
-    : `This session already has attendance recorded (${attendanceLabel}).`;
+    ? `Session on ${date} has attendance (${attendanceLabel}); on-hold will set it to N/A.`
+    : `This session has attendance (${attendanceLabel}); on-hold will set it to N/A.`;
   const note = String(row.notes || '').trim();
   if (note) {
     message += ` Note: ${note}`;
@@ -171,18 +199,18 @@ function buildHoldBlockerMessage(row = {}) {
   return message;
 }
 
-function buildPreviewResult(period, sessions, startDate, endDate) {
-  const personId = resolvePersonId(period);
+async function buildPreviewResult(period, sessions, startDate, endDate, options = {}) {
+  const personId = await resolvePersonIdForPeriod(period, options);
   if (!personId) throw new Error('Enrollment period is missing a student person reference.');
   const holdSessions = listSessionsForHold(period, sessions, startDate, endDate);
   const rows = buildSessionPreviewRows(holdSessions, personId);
-  const blockers = rows
+  const attendanceOverrides = rows
     .filter((row) => row.hasNonNaAttendance)
     .map((row) => ({
       sessionId: row.sessionId,
       date: row.date,
       attendance: row.attendance,
-      message: buildHoldBlockerMessage(row)
+      message: buildHoldAttendanceOverrideMessage(row)
     }));
   return {
     periodId: period.id,
@@ -195,8 +223,9 @@ function buildPreviewResult(period, sessions, startDate, endDate) {
     enrollmentEndDate: normalizeDateOnly(period.endDate) || '',
     existingHolds: classEnrollmentPeriodModel.sanitizeEnrollmentHoldPeriods(period.enrollmentHoldPeriods),
     sessions: rows,
-    blockers,
-    canApply: blockers.length === 0 && rows.length > 0
+    blockers: attendanceOverrides,
+    attendanceOverrides,
+    canApply: rows.length > 0
   };
 }
 
@@ -208,7 +237,7 @@ async function previewHoldPeriod(periodId, input = {}, options = {}) {
   resolveHoldDateBounds(period, input?.startDate, input?.endDate);
   assertNoOverlappingAppliedHolds(period, input?.startDate, input?.endDate, excludeHoldId);
   const sessions = await getClassSessions(period.classId, options);
-  const preview = buildPreviewResult(period, sessions, input.startDate, input.endDate);
+  const preview = await buildPreviewResult(period, sessions, input.startDate, input.endDate, options);
   return { ...preview, reason, excludeHoldId };
 }
 
@@ -244,10 +273,6 @@ function applyRosterHoldForSessions({
       return { ...session, roster };
     }
     const row = roster[index];
-    const attendance = attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(row.attendance, '');
-    if (attendance && attendance !== attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) {
-      throw new Error(`Session on ${getSessionDate(session)} already has attendance recorded (${attendance}).`);
-    }
     roster[index] = {
       ...row,
       attendance: attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE,
@@ -304,20 +329,18 @@ function generateHoldId(existing = []) {
 }
 
 async function applyHoldPeriod(periodId, input = {}, requestingUser = null, options = {}) {
+  const serviceOptions = mergeHoldServiceOptions(requestingUser, options);
   const reason = String(input?.reason || '').trim();
   if (!reason) throw new Error('A reason is required for the on-hold period.');
-  const period = await getPeriodOrThrow(periodId, options);
-  const preview = await previewHoldPeriod(periodId, input, options);
+  const period = await getPeriodOrThrow(periodId, serviceOptions);
+  const preview = await previewHoldPeriod(periodId, input, serviceOptions);
   if (!preview.canApply) {
-    const message = preview.blockers.length
-      ? preview.blockers[0].message
-      : 'No sessions are available for this on-hold period.';
-    throw new Error(message);
+    throw new Error('No sessions are available for this on-hold period.');
   }
 
-  const personId = resolvePersonId(period);
+  const personId = preview.personId || await resolvePersonIdForPeriod(period, serviceOptions);
   const classId = toPublicId(period.classId);
-  const classRow = await dependencies.repositories.classes.getById(classId, options);
+  const classRow = await dependencies.repositories.classes.getById(classId, serviceOptions);
   if (!classRow) throw new Error('Class not found.');
   const sessions = Array.isArray(classRow.sessions) ? classRow.sessions : [];
   const sessionIds = preview.sessions.map((row) => row.sessionId).filter(Boolean);
@@ -332,7 +355,7 @@ async function applyHoldPeriod(periodId, input = {}, requestingUser = null, opti
   await dependencies.repositories.classes.update(classId, {
     sessions: nextSessions,
     updatedBy: resolveActor(requestingUser)
-  }, options);
+  }, serviceOptions);
 
   const existingHolds = classEnrollmentPeriodModel.sanitizeEnrollmentHoldPeriods(period.enrollmentHoldPeriods);
   const holdRecord = {
@@ -345,10 +368,14 @@ async function applyHoldPeriod(periodId, input = {}, requestingUser = null, opti
     createdBy: resolveActor(requestingUser),
     status: 'applied'
   };
-  const updated = await dependencies.repositories.classEnrollmentPeriods.update(period.id, {
+  const periodPatch = {
     enrollmentHoldPeriods: [...existingHolds, holdRecord],
     updatedBy: resolveActor(requestingUser)
-  }, options);
+  };
+  if (!toPublicId(period.personId) && personId) {
+    periodPatch.personId = personId;
+  }
+  const updated = await dependencies.repositories.classEnrollmentPeriods.update(period.id, periodPatch, serviceOptions);
 
   return {
     hold: holdRecord,
@@ -359,13 +386,15 @@ async function applyHoldPeriod(periodId, input = {}, requestingUser = null, opti
 }
 
 async function revokeHoldPeriod(periodId, holdId, requestingUser = null, options = {}) {
-  const period = await getPeriodOrThrow(periodId, options);
+  const serviceOptions = mergeHoldServiceOptions(requestingUser, options);
+  const period = await getPeriodOrThrow(periodId, serviceOptions);
   const hold = findAppliedHold(period, holdId);
   if (!hold) throw new Error('On-hold period not found.');
 
-  const personId = resolvePersonId(period);
+  const personId = await resolvePersonIdForPeriod(period, serviceOptions);
+  if (!personId) throw new Error('Enrollment period is missing a student person reference.');
   const classId = toPublicId(period.classId);
-  const classRow = await dependencies.repositories.classes.getById(classId, options);
+  const classRow = await dependencies.repositories.classes.getById(classId, serviceOptions);
   if (!classRow) throw new Error('Class not found.');
   const sessions = Array.isArray(classRow.sessions) ? classRow.sessions : [];
   const { nextSessions, revertedCount } = revertRosterHoldForSessions({
@@ -378,7 +407,7 @@ async function revokeHoldPeriod(periodId, holdId, requestingUser = null, options
   await dependencies.repositories.classes.update(classId, {
     sessions: nextSessions,
     updatedBy: resolveActor(requestingUser)
-  }, options);
+  }, serviceOptions);
 
   const existingHolds = classEnrollmentPeriodModel.sanitizeEnrollmentHoldPeriods(period.enrollmentHoldPeriods);
   const nextHolds = existingHolds.map((row) => {
@@ -393,7 +422,7 @@ async function revokeHoldPeriod(periodId, holdId, requestingUser = null, options
   const updated = await dependencies.repositories.classEnrollmentPeriods.update(period.id, {
     enrollmentHoldPeriods: nextHolds,
     updatedBy: resolveActor(requestingUser)
-  }, options);
+  }, serviceOptions);
 
   return {
     hold: nextHolds.find((row) => idsEqual(row.id, hold.id)) || null,
@@ -403,9 +432,10 @@ async function revokeHoldPeriod(periodId, holdId, requestingUser = null, options
 }
 
 async function updateHoldPeriod(periodId, holdId, input = {}, requestingUser = null, options = {}) {
+  const serviceOptions = mergeHoldServiceOptions(requestingUser, options);
   const reason = String(input?.reason || '').trim();
   if (!reason) throw new Error('A reason is required for the on-hold period.');
-  const period = await getPeriodOrThrow(periodId, options);
+  const period = await getPeriodOrThrow(periodId, serviceOptions);
   const hold = findAppliedHold(period, holdId);
   if (!hold) throw new Error('On-hold period not found.');
 
@@ -414,17 +444,14 @@ async function updateHoldPeriod(periodId, holdId, input = {}, requestingUser = n
     endDate: input?.endDate,
     reason,
     excludeHoldId: hold.id
-  }, options);
+  }, serviceOptions);
   if (!preview.canApply) {
-    const message = preview.blockers.length
-      ? preview.blockers[0].message
-      : 'No sessions are available for this on-hold period.';
-    throw new Error(message);
+    throw new Error('No sessions are available for this on-hold period.');
   }
 
-  const personId = resolvePersonId(period);
+  const personId = preview.personId || await resolvePersonIdForPeriod(period, serviceOptions);
   const classId = toPublicId(period.classId);
-  const classRow = await dependencies.repositories.classes.getById(classId, options);
+  const classRow = await dependencies.repositories.classes.getById(classId, serviceOptions);
   if (!classRow) throw new Error('Class not found.');
   const sessions = Array.isArray(classRow.sessions) ? classRow.sessions : [];
   const { nextSessions: revertedSessions, revertedCount } = revertRosterHoldForSessions({
@@ -445,7 +472,7 @@ async function updateHoldPeriod(periodId, holdId, input = {}, requestingUser = n
   await dependencies.repositories.classes.update(classId, {
     sessions: nextSessions,
     updatedBy: resolveActor(requestingUser)
-  }, options);
+  }, serviceOptions);
 
   const existingHolds = classEnrollmentPeriodModel.sanitizeEnrollmentHoldPeriods(period.enrollmentHoldPeriods);
   const nextHolds = existingHolds.map((row) => {
@@ -461,10 +488,14 @@ async function updateHoldPeriod(periodId, holdId, input = {}, requestingUser = n
       status: 'applied'
     };
   });
-  const updated = await dependencies.repositories.classEnrollmentPeriods.update(period.id, {
+  const periodPatch = {
     enrollmentHoldPeriods: nextHolds,
     updatedBy: resolveActor(requestingUser)
-  }, options);
+  };
+  if (!toPublicId(period.personId) && personId) {
+    periodPatch.personId = personId;
+  }
+  const updated = await dependencies.repositories.classEnrollmentPeriods.update(period.id, periodPatch, serviceOptions);
 
   return {
     hold: nextHolds.find((row) => idsEqual(row.id, hold.id)) || null,

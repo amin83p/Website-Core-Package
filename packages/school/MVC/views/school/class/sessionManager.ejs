@@ -11713,14 +11713,16 @@ document.addEventListener('DOMContentLoaded', () => {
             if (isAutosave) {
                 return { ok: false, message: 'A network error occurred during autosave.' };
             }
+            const saveFailureMessage = String(error?.message || '').trim()
+                || 'A network error occurred while trying to save the session.';
             await sessionMessageBox({
-                title: 'Network Error',
+                title: saveFailureMessage.includes('network') ? 'Network Error' : 'Error',
                 icon: 'error',
-                message: 'A network error occurred while trying to save the session.',
+                message: saveFailureMessage,
                 okText: 'Close',
                 okClass: 'btn-secondary'
             });
-            return { ok: false, message: error?.message || 'Network error.' };
+            return { ok: false, message: saveFailureMessage };
         } finally {
             if (btn && !isAutosave) {
                 btn.disabled = false;

@@ -100,6 +100,41 @@ test('sanitizeEnrollmentHoldPeriods keeps valid applied holds', () => {
   assert.deepEqual(holds[0].sessionIds, ['S1', 'S2']);
 });
 
+test('previewHoldPeriod resolves personId from student when period.personId is empty', async () => {
+  const mocks = buildMocks({
+    period: {
+      id: periodId,
+      classId,
+      personId: '',
+      studentId: 'STU_001',
+      status: 'active',
+      startDate: '2026-01-01',
+      endDate: '2026-03-31',
+      enrollmentHoldPeriods: [],
+      enrollmentSessionMarks: [],
+      plannedNotApplicableSessionIds: []
+    },
+    sessions: [session('S2', '2026-01-15')]
+  });
+  mocks.repositories.students = {
+    async getById(id) {
+      return id === 'STU_001' ? { id: 'STU_001', personId } : null;
+    }
+  };
+  holdService.__setDependenciesForTest({ repositories: mocks.repositories });
+  try {
+    const preview = await holdService.previewHoldPeriod(periodId, {
+      startDate: '2026-01-10',
+      endDate: '2026-01-20',
+      reason: 'Family travel'
+    });
+    assert.equal(preview.personId, personId);
+    assert.equal(preview.canApply, true);
+  } finally {
+    holdService.__resetDependenciesForTest();
+  }
+});
+
 test('previewHoldPeriod returns only sessions in hold date range', async () => {
   const mocks = buildMocks({
     sessions: [
@@ -161,26 +196,30 @@ test('previewHoldPeriod blocker message uses friendly attendance label and roste
     assert.equal(preview.blockers.length, 1);
     assert.match(preview.blockers[0].message, /Present/);
     assert.match(preview.blockers[0].message, /Doctor appointment/);
-    assert.equal(preview.canApply, false);
+    assert.match(preview.blockers[0].message, /set it to N\/A/i);
+    assert.equal(preview.canApply, true);
+    assert.equal(preview.attendanceOverrides.length, 1);
   } finally {
     holdService.__resetDependenciesForTest();
   }
 });
 
-test('applyHoldPeriod blocks when session already has non-N/A attendance', async () => {
+test('applyHoldPeriod overwrites non-N/A attendance with not_applicable', async () => {
   const mocks = buildMocks({
     sessions: [session('S1', '2026-01-15', attendanceMatrixMetricsService.ATTENDANCE_STATUS.PRESENT)]
   });
   holdService.__setDependenciesForTest({ repositories: mocks.repositories });
   try {
-    await assert.rejects(
-      () => holdService.applyHoldPeriod(periodId, {
-        startDate: '2026-01-10',
-        endDate: '2026-01-20',
-        reason: 'Should fail'
-      }, { id: 'USR_1' }),
-      /already has attendance recorded/i
-    );
+    const result = await holdService.applyHoldPeriod(periodId, {
+      startDate: '2026-01-10',
+      endDate: '2026-01-20',
+      reason: 'Medical leave'
+    }, { id: 'USR_1' });
+    const rosterRow = mocks.classRow.sessions[0].roster.find((row) => row.personId === personId);
+    assert.ok(rosterRow);
+    assert.equal(rosterRow.attendance, attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE);
+    assert.equal(rosterRow.notes, 'Medical leave');
+    assert.equal(result.updatedSessionCount, 1);
   } finally {
     holdService.__resetDependenciesForTest();
   }

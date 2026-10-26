@@ -303,6 +303,92 @@
     margin-top: 0.35rem;
   }
 
+  .school-master-hub .hub-student-progress-student {
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 0.75rem;
+    margin-bottom: 1rem;
+    overflow: hidden;
+    background: #fff;
+  }
+
+  .school-master-hub .hub-student-progress-student-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 0;
+    background: rgba(2, 132, 199, 0.06);
+    font-weight: 700;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .school-master-hub .hub-student-progress-class-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    width: 100%;
+    margin: 0;
+    padding: 0.55rem 0.15rem;
+    border: 0;
+    background: transparent;
+    font-size: 1rem;
+    font-weight: 600;
+    text-align: start;
+    cursor: pointer;
+  }
+
+  .school-master-hub .hub-student-progress-class {
+    padding: 0.35rem 1rem 0.85rem;
+  }
+
+  .school-master-hub .hub-student-progress-chevron {
+    flex: 0 0 auto;
+    color: #64748b;
+  }
+
+  .school-master-hub .hub-student-progress-week-row {
+    cursor: pointer;
+  }
+
+  .school-master-hub .hub-student-progress-chart-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem 1rem;
+    align-items: start;
+  }
+
+  .school-master-hub .hub-student-progress-chart-card {
+    min-width: 0;
+    margin-bottom: 0;
+  }
+
+  .school-master-hub .hub-student-progress-chart-frame {
+    position: relative;
+    height: 150px;
+  }
+
+  .school-master-hub .hub-student-progress-week-legend {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem 0.85rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    font-size: 0.72rem;
+    color: #64748b;
+  }
+
+  @media (max-width: 767.98px) {
+    .school-master-hub .hub-student-progress-chart-grid {
+      grid-template-columns: 1fr;
+    }
+  }
+
   .school-master-hub .hub-weekly-reports-board {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
@@ -3097,6 +3183,9 @@
       <button type="button" class="hub-section-segment" data-hub-workspace-section="weekly-reports">
         <span><i class="bi bi-calendar-week me-1"></i> Weekly Reports</span>
       </button>
+      <button type="button" class="hub-section-segment" data-hub-workspace-section="student-progress">
+        <span><i class="bi bi-graph-up me-1"></i> Student Progress</span>
+      </button>
     </div>
   </div>
 
@@ -3119,6 +3208,7 @@
 <script src="/scripts/visibilityInterval.js"></script>
 <script src="/scripts/timesheetDepartmentHoursView.js"></script>
 <script src="/scripts/weeklyReportsHubShareUrl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 (function () {
   function formatHubDateKey(dateValue, options = {}) {
@@ -3433,6 +3523,12 @@
       endpoint: '/school/report-hub/api/workspace/weekly-reports',
       sourceUrl: '/school/report-hub',
       icon: 'bi bi-calendar-week'
+    },
+    'student-progress': {
+      label: 'Student Progress',
+      endpoint: '/school/report-hub/api/workspace/student-progress',
+      sourceUrl: '/school/report-hub',
+      icon: 'bi bi-graph-up'
     }
   };
 
@@ -12513,6 +12609,719 @@
     ].join('');
   }
 
+  let hubStudentProgressSelections = [];
+  let hubStudentProgressLoading = false;
+  let hubStudentProgressViewMode = 'table';
+  let hubStudentProgressPayload = null;
+  let hubStudentProgressCharts = [];
+
+  function studentProgressResultsEl() {
+    const live = document.getElementById('hubStudentProgressResults');
+    if (live) return live;
+    const bucket = hubWorkspaceNodeCache.get('student-progress');
+    return bucket ? bucket.querySelector('#hubStudentProgressResults') : null;
+  }
+
+  function setHubStudentProgressRange(range) {
+    const startEl = document.getElementById('hubStudentProgressStartDate');
+    const endEl = document.getElementById('hubStudentProgressEndDate');
+    if (!startEl || !endEl) return;
+
+    const today = hubTodayDate();
+    const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    let start;
+    let end = hubSnapToWeekEnd(startOfDay);
+
+    if (range === 'thisWeek') {
+      start = hubSnapToWeekStart(startOfDay);
+    } else if (range === 'lastFourWeeks') {
+      start = hubSnapToWeekStart(startOfDay);
+      start.setDate(start.getDate() - 21);
+    } else if (range === 'lastThreeMonths') {
+      const anchor = new Date(startOfDay);
+      anchor.setMonth(anchor.getMonth() - 3);
+      start = hubSnapToWeekStart(anchor);
+    } else if (range === 'wholeYear') {
+      const year = parseInt(hubOrgYear(), 10) || startOfDay.getFullYear();
+      start = hubSnapToWeekStart(new Date(year, 0, 1));
+      end = hubSnapToWeekEnd(new Date(year, 11, 31));
+    } else {
+      return;
+    }
+
+    startEl.value = hubDateToIso(start);
+    endEl.value = hubDateToIso(end);
+  }
+
+  function snapHubStudentProgressDateInputs() {
+    const startEl = document.getElementById('hubStudentProgressStartDate');
+    const endEl = document.getElementById('hubStudentProgressEndDate');
+    if (!startEl || !endEl) return;
+
+    if (startEl.value) {
+      const startDate = hubParseDateInputValue(startEl.value);
+      if (startDate) startEl.value = hubDateToIso(hubSnapToWeekStart(startDate));
+    }
+    if (endEl.value) {
+      const endDate = hubParseDateInputValue(endEl.value);
+      if (endDate) endEl.value = hubDateToIso(hubSnapToWeekEnd(endDate));
+    }
+    if (startEl.value && endEl.value && endEl.value < startEl.value) {
+      const startDate = hubParseDateInputValue(startEl.value);
+      if (startDate) endEl.value = hubDateToIso(hubSnapToWeekEnd(startDate));
+    }
+  }
+
+  function renderStudentProgressStudentChips() {
+    const container = document.getElementById('hubStudentProgressStudentChips');
+    if (!container) return;
+    if (!hubStudentProgressSelections.length) {
+      container.innerHTML = '';
+      return;
+    }
+    container.innerHTML = hubStudentProgressSelections.map(function (item) {
+      return [
+        '<span class="badge rounded-pill text-bg-light border d-inline-flex align-items-center gap-1 px-2 py-1 me-1 mb-1">',
+        '<span>' + escapeHtml(item.name || item.id) + '</span>',
+        '<button type="button" class="btn-close btn-close-sm ms-1" style="font-size:0.62rem;" aria-label="Remove student" data-hub-student-progress-remove-student="' + escapeHtml(item.id) + '"></button>',
+        '</span>'
+      ].join('');
+    }).join('');
+  }
+
+  function syncStudentProgressStudentInputs() {
+    const studentIdEl = document.getElementById('hubStudentProgressStudentId');
+    const studentNameEl = document.getElementById('hubStudentProgressStudentName');
+    if (studentIdEl) {
+      studentIdEl.value = hubStudentProgressSelections.map(function (item) { return item.id; }).filter(Boolean).join(',');
+    }
+    if (studentNameEl) {
+      studentNameEl.value = hubStudentProgressSelections.map(function (item) { return item.name || item.id; }).join(', ');
+    }
+    renderStudentProgressStudentChips();
+  }
+
+  function openHubStudentProgressStudentPicker() {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      showHubMessage({ title: 'Student Picker', icon: 'warning', message: 'Student picker is not available yet.' });
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.student({
+      title: 'Select Students',
+      placeholder: 'Search students, select one or more...',
+      multiselect: true,
+      selectedItems: hubStudentProgressSelections.map(function (row) {
+        return { id: row.id, studentId: row.id, name: row.name, firstName: row.name };
+      }),
+      context: window.GenericPickerContexts
+        ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+        : undefined,
+      onSelect: function (items) {
+        const next = [];
+        (Array.isArray(items) ? items : [items]).forEach(function (item) {
+          const id = resolveHubStudentRecordId(item);
+          const name = formatHubStudentRecordName(item, id);
+          if (id && !next.some(function (row) { return row.id === id; })) {
+            next.push({ id: id, name: name });
+          }
+        });
+        hubStudentProgressSelections = next;
+        syncStudentProgressStudentInputs();
+      }
+    }));
+  }
+
+  function formatStudentProgressWeekLabel(startDate, endDate) {
+    const formatOne = function (value) {
+      return formatHubDateKey(value, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+    };
+    if (startDate && endDate) return formatOne(startDate) + ' – ' + formatOne(endDate);
+    return formatOne(startDate || endDate || '');
+  }
+
+  function studentProgressDisplayName(student) {
+    const id = String(student && student.studentId || '');
+    const picked = hubStudentProgressSelections.find(function (row) { return row.id === id; });
+    return String((student && student.name) || (picked && picked.name) || id || 'Student');
+  }
+
+  function renderStudentProgressWaitingState() {
+    return [
+      '<div class="hub-empty">',
+      '<div><i class="bi bi-graph-up display-6 d-block mb-3"></i>',
+      '<div class="fw-semibold">Waiting for a progress report.</div>',
+      '<div class="text-muted small mt-1">Select one or more students, choose a start and end date, then click Generate.</div>',
+      '</div></div>'
+    ].join('');
+  }
+
+  function renderStudentProgressWeekRows(studentIndex, classIndex, classBlock) {
+    const weeks = Array.isArray(classBlock && classBlock.weeks) ? classBlock.weeks : [];
+    const showAcfColumn = !!(classBlock && classBlock.showAcfColumn);
+    const columnCount = showAcfColumn ? 9 : 8;
+    return weeks.map(function (week, weekIndex) {
+      const att = readWeeklyReportsStudentAttendance(week);
+      const key = String(studentIndex) + '-' + String(classIndex) + '-' + String(weekIndex);
+      const acfCell = showAcfColumn
+        ? '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsAttendanceCountCell(att.acfCount, {
+          excusedCount: att.acfExcusedCount,
+          showMinutes: false,
+          tone: 'danger'
+        }) + '</td>'
+        : '';
+      return [
+        '<tr class="hub-student-progress-week-row" data-hub-student-progress-week="' + escapeHtml(key) + '" aria-expanded="false">',
+        '<td class="ps-3 fw-semibold">' + escapeHtml(formatStudentProgressWeekLabel(week.startDate, week.endDate)) + '</td>',
+        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsStudentEngagementRing(week.engagement) + '</td>',
+        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsMetricStack(String(att.sessionCount), '', { tone: 'info' }) + '</td>',
+        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsAttendanceCountCell(att.presentCount, { tone: 'success' }) + '</td>',
+        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsAttendanceCountCell(att.lateCount, {
+          excusedCount: att.lateExcusedCount,
+          excusedMinutes: att.lateExcusedMinutes,
+          tone: 'warning'
+        }) + '</td>',
+        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsAttendanceCountCell(att.earlyCount, {
+          excusedCount: att.earlyExcusedCount,
+          excusedMinutes: att.earlyExcusedMinutes,
+          tone: 'early'
+        }) + '</td>',
+        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsAttendanceCountCell(att.absenceCount, {
+          excusedCount: att.absenceExcusedCount,
+          showMinutes: false,
+          tone: 'danger'
+        }) + '</td>',
+        acfCell,
+        '<td class="text-center pe-3 hub-weekly-reports-metric-cell">' + renderWeeklyReportsMetricStack(String(Number(week.caseCount || 0)), '') + '</td>',
+        '</tr>',
+        '<tr class="d-none" data-hub-student-progress-detail="' + escapeHtml(key) + '">',
+        '<td class="p-3 bg-light" colspan="' + String(columnCount) + '">',
+        '<div class="small text-uppercase fw-bold text-muted mb-2">Sessions this week</div>',
+        renderWeeklyReportsStudentSessionTable({ sessions: week.sessions }),
+        '</td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+  }
+
+  function studentProgressEmptyClassMessage(payload) {
+    if (payload && payload.noStartedWeeks) return 'No weeks have started in this range.';
+    return 'No scheduled sessions in this range.';
+  }
+
+  function renderStudentProgressViewToggle() {
+    const tableActive = hubStudentProgressViewMode !== 'analytics';
+    return [
+      '<div class="btn-group btn-group-sm" role="group" aria-label="Student progress view mode">',
+      '<button type="button" class="btn ' + (tableActive ? 'btn-primary' : 'btn-outline-secondary') + '" data-hub-student-progress-view="table"><i class="bi bi-table me-1"></i>Table</button>',
+      '<button type="button" class="btn ' + (!tableActive ? 'btn-primary' : 'btn-outline-secondary') + '" data-hub-student-progress-view="analytics"><i class="bi bi-bar-chart me-1"></i>Analytics</button>',
+      '</div>'
+    ].join('');
+  }
+
+  function formatStudentProgressChartAxisLabel(index) {
+    return 'W' + String(index + 1);
+  }
+
+  function renderStudentProgressWeekLegend(weeks) {
+    const items = (Array.isArray(weeks) ? weeks : []).map(function (week, index) {
+      return '<li><span class="fw-semibold text-dark">' + escapeHtml(formatStudentProgressChartAxisLabel(index)) + '</span> ' + escapeHtml(formatStudentProgressWeekLabel(week.startDate, week.endDate)) + '</li>';
+    }).join('');
+    if (!items) return '';
+    return '<ul class="hub-student-progress-week-legend">' + items + '</ul>';
+  }
+
+  function renderStudentProgressClassAnalytics(studentIndex, classIndex, classBlock) {
+    const chartCard = function (metric, title) {
+      return [
+        '<div class="hub-student-progress-chart-card">',
+        '<div class="small fw-semibold text-muted mb-1">' + escapeHtml(title) + '</div>',
+        '<div class="hub-student-progress-chart-frame">',
+        '<canvas data-hub-student-progress-chart="' + escapeHtml(metric) + '" data-student-index="' + escapeHtml(String(studentIndex)) + '" data-class-index="' + escapeHtml(String(classIndex)) + '"></canvas>',
+        '</div>',
+        '</div>'
+      ].join('');
+    };
+    const weeks = Array.isArray(classBlock && classBlock.weeks) ? classBlock.weeks : [];
+    return [
+      '<div class="hub-student-progress-chart-grid">',
+      chartCard('engagement', 'Engagement'),
+      chartCard('timing', 'Late and early'),
+      chartCard('activity', 'Activity average'),
+      renderStudentProgressWeekLegend(weeks),
+      '</div>'
+    ].join('');
+  }
+
+  function renderStudentProgressClassSection(classBlock, bodyHtml) {
+    const title = classBlock.className || classBlock.classId || 'Class';
+    return [
+      '<div class="hub-student-progress-class">',
+      '<button type="button" class="hub-student-progress-class-toggle" data-hub-student-progress-toggle="class" aria-expanded="true">',
+      '<span>' + escapeHtml(title) + '</span>',
+      '<i class="bi bi-chevron-up hub-student-progress-chevron" aria-hidden="true"></i>',
+      '</button>',
+      '<div class="hub-student-progress-class-body" data-hub-student-progress-panel="class">',
+      bodyHtml,
+      '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderStudentProgressClassTable(studentIndex, classIndex, classBlock) {
+    const showAcfColumn = !!(classBlock && classBlock.showAcfColumn);
+    const acfHeader = showAcfColumn
+      ? '<th class="text-center">ACF</th>'
+      : '';
+    return [
+      '<div class="hub-table-wrap">',
+      '<table class="table table-hover align-middle hub-workspace-table hub-weekly-reports-data-table mb-0">',
+      '<thead><tr>',
+      '<th class="ps-3">Week</th>',
+      '<th class="text-center">Engagement</th>',
+      '<th class="text-center">Sessions</th>',
+      '<th class="text-center">Present</th>',
+      '<th class="text-center">Late</th>',
+      '<th class="text-center">Early</th>',
+      '<th class="text-center">Absent</th>',
+      acfHeader,
+      '<th class="text-center pe-3">Cases</th>',
+      '</tr></thead>',
+      '<tbody>',
+      renderStudentProgressWeekRows(studentIndex, classIndex, classBlock),
+      '</tbody>',
+      '</table>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderStudentProgressResults(payload) {
+    const students = Array.isArray(payload && payload.students) ? payload.students : [];
+    if (!students.length) {
+      return renderStudentProgressWaitingState();
+    }
+    const range = payload.range || {};
+    const rangeLabel = formatStudentProgressWeekLabel(range.startDate, range.endDate);
+    const analytics = hubStudentProgressViewMode === 'analytics';
+    const chartsMissing = analytics && !window.Chart;
+    const emptyMessage = studentProgressEmptyClassMessage(payload);
+    const body = students.map(function (student, studentIndex) {
+      const classes = Array.isArray(student.classes) ? student.classes : [];
+      const classHtml = classes.length
+        ? classes.map(function (classBlock, classIndex) {
+          let bodyHtml = '';
+          if (analytics && window.Chart) {
+            bodyHtml = renderStudentProgressClassAnalytics(studentIndex, classIndex, classBlock);
+          } else if (analytics) {
+            bodyHtml = '<div class="text-muted small">Charts are not available on this page yet.</div>';
+          } else {
+            bodyHtml = renderStudentProgressClassTable(studentIndex, classIndex, classBlock);
+          }
+          return renderStudentProgressClassSection(classBlock, bodyHtml);
+        }).join('')
+        : '<div class="p-3 text-muted small">' + escapeHtml(emptyMessage) + '</div>';
+      return [
+        '<section class="hub-student-progress-student">',
+        '<div class="hub-student-progress-student-title" data-hub-student-progress-toggle="student" role="button" tabindex="0" aria-expanded="true">',
+        '<span>' + hubStudentNameHtml(studentProgressDisplayName(student), student.studentId) + '</span>',
+        '<i class="bi bi-chevron-up hub-student-progress-chevron" aria-hidden="true"></i>',
+        '</div>',
+        '<div class="hub-student-progress-student-body" data-hub-student-progress-panel="student">',
+        classHtml,
+        '</div>',
+        '</section>'
+      ].join('');
+    }).join('');
+    return [
+      '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">',
+      '<div class="small text-muted">',
+      '<span class="fw-semibold text-dark">' + escapeHtml(String(students.length)) + '</span> student(s)',
+      ' <span class="mx-1">|</span> ',
+      escapeHtml(rangeLabel),
+      '</div>',
+      renderStudentProgressViewToggle(),
+      '</div>',
+      chartsMissing
+        ? '<div class="alert alert-warning py-2 small">Charts are not available on this page yet.</div>'
+        : '',
+      body
+    ].join('');
+  }
+
+  function destroyStudentProgressCharts() {
+    hubStudentProgressCharts.forEach(function (chart) {
+      if (chart && typeof chart.destroy === 'function') chart.destroy();
+    });
+    hubStudentProgressCharts = [];
+  }
+
+  function studentProgressChartOptions(percentScale, fullLabels) {
+    const tickFont = { size: 10 };
+    const yScale = {
+      beginAtZero: true,
+      ticks: { font: tickFont }
+    };
+    if (percentScale) {
+      yScale.max = 100;
+      yScale.ticks.callback = function (value) { return String(value) + '%'; };
+    }
+    const labels = Array.isArray(fullLabels) ? fullLabels : [];
+    return {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'bottom',
+          labels: {
+            boxWidth: 8,
+            boxHeight: 8,
+            padding: 6,
+            font: { size: 10 }
+          }
+        },
+        tooltip: {
+          callbacks: {
+            title: function (items) {
+              const index = items && items[0] ? items[0].dataIndex : -1;
+              return labels[index] || '';
+            }
+          }
+        }
+      },
+      scales: {
+        y: yScale,
+        x: {
+          ticks: {
+            font: tickFont,
+            maxRotation: 0,
+            minRotation: 0,
+            autoSkip: false
+          }
+        }
+      }
+    };
+  }
+
+  function mountStudentProgressCharts() {
+    destroyStudentProgressCharts();
+    if (hubStudentProgressViewMode !== 'analytics' || !window.Chart || !hubStudentProgressPayload) return;
+    const results = studentProgressResultsEl();
+    if (!results) return;
+    const students = Array.isArray(hubStudentProgressPayload.students) ? hubStudentProgressPayload.students : [];
+    results.querySelectorAll('[data-hub-student-progress-chart]').forEach(function (canvas) {
+      const studentIndex = Number(canvas.getAttribute('data-student-index'));
+      const classIndex = Number(canvas.getAttribute('data-class-index'));
+      const metric = canvas.getAttribute('data-hub-student-progress-chart') || '';
+      const student = students[studentIndex];
+      const classBlock = student && Array.isArray(student.classes) ? student.classes[classIndex] : null;
+      const weeks = classBlock && Array.isArray(classBlock.weeks) ? classBlock.weeks : [];
+      if (!weeks.length) return;
+      const labels = weeks.map(function (week, index) {
+        return formatStudentProgressChartAxisLabel(index);
+      });
+      const fullLabels = weeks.map(function (week) {
+        return formatStudentProgressWeekLabel(week.startDate, week.endDate);
+      });
+      let datasets = [];
+      let percentScale = false;
+      if (metric === 'engagement') {
+        percentScale = true;
+        datasets = [{
+          label: 'Engagement',
+          data: weeks.map(function (week) {
+            const percent = week.engagement && week.engagement.percent;
+            return percent == null ? null : Number(percent);
+          }),
+          backgroundColor: '#0284c7'
+        }];
+      } else if (metric === 'timing') {
+        datasets = [
+          {
+            label: 'Late',
+            data: weeks.map(function (week) {
+              const attendance = week.attendance || {};
+              return Number(attendance.lateCount || 0);
+            }),
+            backgroundColor: '#d97706'
+          },
+          {
+            label: 'Early',
+            data: weeks.map(function (week) {
+              const attendance = week.attendance || {};
+              return Number(attendance.earlyCount || 0);
+            }),
+            backgroundColor: '#7c3aed'
+          }
+        ];
+      } else if (metric === 'activity') {
+        percentScale = true;
+        datasets = [{
+          label: 'Activity average',
+          data: weeks.map(function (week) {
+            return week.activityAveragePercent == null ? null : Number(week.activityAveragePercent);
+          }),
+          backgroundColor: '#16a34a'
+        }];
+      } else {
+        return;
+      }
+      hubStudentProgressCharts.push(new window.Chart(canvas, {
+        type: 'bar',
+        data: { labels: labels, datasets: datasets },
+        options: studentProgressChartOptions(percentScale, fullLabels)
+      }));
+    });
+  }
+
+  function resizeStudentProgressCharts(panel) {
+    hubStudentProgressCharts.forEach(function (chart) {
+      const canvas = chart && chart.canvas;
+      if (!canvas || (panel && !panel.contains(canvas))) return;
+      if (typeof chart.resize === 'function') chart.resize();
+    });
+  }
+
+  function toggleStudentProgressSection(toggle) {
+    if (!toggle) return;
+    const panel = toggle.nextElementSibling;
+    if (!panel || !panel.hasAttribute('data-hub-student-progress-panel')) return;
+    const collapsed = panel.classList.toggle('d-none');
+    toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    const icon = toggle.querySelector('.hub-student-progress-chevron');
+    if (icon) {
+      icon.classList.toggle('bi-chevron-up', !collapsed);
+      icon.classList.toggle('bi-chevron-down', collapsed);
+    }
+    if (!collapsed) {
+      window.requestAnimationFrame(function () {
+        resizeStudentProgressCharts(panel);
+      });
+    }
+  }
+
+  function paintStudentProgressResults(payload) {
+    const target = studentProgressResultsEl();
+    if (!target) return;
+    destroyStudentProgressCharts();
+    target.innerHTML = renderStudentProgressResults(payload);
+    mountStudentProgressCharts();
+  }
+
+  function renderStudentProgressMessage(message) {
+    return [
+      '<div class="hub-empty text-danger">',
+      '<div><i class="bi bi-exclamation-triangle display-6 d-block mb-3"></i>',
+      '<div class="fw-semibold">' + escapeHtml(message || 'Unable to build this progress report.') + '</div>',
+      '</div></div>'
+    ].join('');
+  }
+
+  async function loadStudentProgressReport() {
+    if (hubStudentProgressLoading) return;
+    snapHubStudentProgressDateInputs();
+    syncStudentProgressStudentInputs();
+    const studentIds = hubInputValue('hubStudentProgressStudentId');
+    const startDate = hubInputValue('hubStudentProgressStartDate');
+    const endDate = hubInputValue('hubStudentProgressEndDate');
+    if (!studentIds) {
+      showHubMessage({ title: 'Student Progress', icon: 'warning', message: 'Select at least one student.' });
+      return;
+    }
+    if (!startDate || !endDate) {
+      showHubMessage({ title: 'Student Progress', icon: 'warning', message: 'Choose a start date and an end date.' });
+      return;
+    }
+
+    const resultsEl = studentProgressResultsEl();
+    hubStudentProgressLoading = true;
+    if (typeof window.showLoading === 'function') {
+      window.showLoading('Building student progress...');
+    }
+    try {
+      const requestQuery = new URLSearchParams();
+      requestQuery.set('studentIds', studentIds);
+      requestQuery.set('startDate', startDate);
+      requestQuery.set('endDate', endDate);
+      const response = await fetch('/school/report-hub/api/workspace/student-progress?' + requestQuery.toString(), {
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin'
+      });
+      const payload = await response.json().catch(function () {
+        return { status: 'error', message: 'Unable to build this progress report.' };
+      });
+      if (!response.ok || payload.status !== 'success') {
+        throw new Error(payload.message || 'Unable to build this progress report.');
+      }
+      hubStudentProgressPayload = payload;
+      paintStudentProgressResults(payload);
+    } catch (error) {
+      hubStudentProgressPayload = null;
+      destroyStudentProgressCharts();
+      const target = studentProgressResultsEl() || resultsEl;
+      if (target) target.innerHTML = renderStudentProgressMessage(error.message);
+    } finally {
+      hubStudentProgressLoading = false;
+      if (typeof window.hideLoading === 'function') {
+        window.hideLoading({ force: true });
+      }
+    }
+  }
+
+  function bindStudentProgressControls() {
+    const openPicker = document.getElementById('hubStudentProgressOpenStudentPicker');
+    const clearStudents = document.getElementById('hubStudentProgressClearStudent');
+    const generate = document.getElementById('hubStudentProgressGenerate');
+    const reset = document.getElementById('hubStudentProgressReset');
+    const startEl = document.getElementById('hubStudentProgressStartDate');
+    const endEl = document.getElementById('hubStudentProgressEndDate');
+    const chips = document.getElementById('hubStudentProgressStudentChips');
+    const results = document.getElementById('hubStudentProgressResults');
+    const rootEl = document.getElementById('hubStudentProgressWorkspace');
+
+    if (openPicker) {
+      openPicker.addEventListener('click', function () {
+        openHubStudentProgressStudentPicker();
+      });
+    }
+    if (clearStudents) {
+      clearStudents.addEventListener('click', function () {
+        hubStudentProgressSelections = [];
+        syncStudentProgressStudentInputs();
+      });
+    }
+    if (generate) {
+      generate.addEventListener('click', function () {
+        loadStudentProgressReport();
+      });
+    }
+    if (reset) {
+      reset.addEventListener('click', function () {
+        hubStudentProgressSelections = [];
+        hubStudentProgressPayload = null;
+        hubStudentProgressViewMode = 'table';
+        syncStudentProgressStudentInputs();
+        setHubStudentProgressRange('thisWeek');
+        destroyStudentProgressCharts();
+        const target = studentProgressResultsEl();
+        if (target) target.innerHTML = renderStudentProgressWaitingState();
+      });
+    }
+    if (startEl) startEl.addEventListener('change', snapHubStudentProgressDateInputs);
+    if (endEl) endEl.addEventListener('change', snapHubStudentProgressDateInputs);
+    if (chips) {
+      chips.addEventListener('click', function (event) {
+        const button = event.target.closest('[data-hub-student-progress-remove-student]');
+        if (!button) return;
+        const id = button.getAttribute('data-hub-student-progress-remove-student') || '';
+        hubStudentProgressSelections = hubStudentProgressSelections.filter(function (row) { return row.id !== id; });
+        syncStudentProgressStudentInputs();
+      });
+    }
+    if (rootEl) {
+      rootEl.addEventListener('click', function (event) {
+        const preset = event.target.closest('[data-hub-student-progress-range]');
+        if (preset && rootEl.contains(preset)) {
+          setHubStudentProgressRange(preset.getAttribute('data-hub-student-progress-range') || '');
+        }
+      });
+    }
+    if (results) {
+      results.addEventListener('click', function (event) {
+        const viewButton = event.target.closest('[data-hub-student-progress-view]');
+        if (viewButton && results.contains(viewButton) && hubStudentProgressPayload) {
+          const nextMode = viewButton.getAttribute('data-hub-student-progress-view') === 'analytics' ? 'analytics' : 'table';
+          if (nextMode !== hubStudentProgressViewMode) {
+            hubStudentProgressViewMode = nextMode;
+            paintStudentProgressResults(hubStudentProgressPayload);
+          }
+          return;
+        }
+        const sectionToggle = event.target.closest('[data-hub-student-progress-toggle]');
+        if (sectionToggle && results.contains(sectionToggle)) {
+          if (event.target.closest('a')) return;
+          event.preventDefault();
+          toggleStudentProgressSection(sectionToggle);
+          return;
+        }
+        const row = event.target.closest('[data-hub-student-progress-week]');
+        if (!row || !results.contains(row)) return;
+        const key = row.getAttribute('data-hub-student-progress-week') || '';
+        const detail = results.querySelector('[data-hub-student-progress-detail="' + key + '"]');
+        if (!detail) return;
+        const collapsed = detail.classList.toggle('d-none');
+        row.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      });
+      results.addEventListener('keydown', function (event) {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        const sectionToggle = event.target.closest('[data-hub-student-progress-toggle="student"]');
+        if (!sectionToggle || !results.contains(sectionToggle) || event.target.closest('a')) return;
+        event.preventDefault();
+        toggleStudentProgressSection(sectionToggle);
+      });
+    }
+  }
+
+  function renderStudentProgressWorkspace(payload) {
+    const section = payload && payload.section ? payload.section : {
+      key: 'student-progress',
+      label: 'Student Progress',
+      icon: 'bi bi-graph-up',
+      sourceUrl: '/school/report-hub'
+    };
+    els.workspace.innerHTML = [
+      '<section class="hub-workspace" id="hubStudentProgressWorkspace">',
+      '<div class="hub-workspace-card">',
+      '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
+      '<div>',
+      '<div class="text-uppercase text-muted small fw-bold">Report Hub Section</div>',
+      '<h2 class="h5 mb-0"><i class="' + escapeHtml(section.icon || 'bi bi-graph-up') + ' me-2"></i>' + escapeHtml(section.label || 'Student Progress') + '</h2>',
+      '</div>',
+      '</div>',
+      '<div class="p-3 border-bottom bg-white">',
+      '<div class="hub-weekly-reports-filter-grid mb-3">',
+      '<div class="hub-weekly-reports-filter-field" style="grid-column: span 2;">',
+      '<label class="form-label fw-bold small">Students</label>',
+      '<div class="input-group input-group-sm">',
+      '<input type="hidden" id="hubStudentProgressStudentId">',
+      '<input type="text" id="hubStudentProgressStudentName" class="form-control bg-white" placeholder="Select students..." readonly>',
+      '<button type="button" class="btn btn-outline-danger" id="hubStudentProgressClearStudent" title="Clear Students"><i class="bi bi-x"></i></button>',
+      '<button type="button" class="btn btn-outline-primary" id="hubStudentProgressOpenStudentPicker" title="Select Students"><i class="bi bi-mortarboard"></i></button>',
+      '</div>',
+      '<div id="hubStudentProgressStudentChips" class="hub-weekly-reports-filter-chips"></div>',
+      '</div>',
+      '<div class="hub-weekly-reports-filter-field">',
+      '<label class="form-label fw-bold small" for="hubStudentProgressStartDate">Start Date</label>',
+      '<input type="date" id="hubStudentProgressStartDate" class="form-control form-control-sm">',
+      '<div class="form-text">Snaps to Monday</div>',
+      '</div>',
+      '<div class="hub-weekly-reports-filter-field">',
+      '<label class="form-label fw-bold small" for="hubStudentProgressEndDate">End Date</label>',
+      '<input type="date" id="hubStudentProgressEndDate" class="form-control form-control-sm">',
+      '<div class="form-text">Snaps to Sunday</div>',
+      '</div>',
+      '</div>',
+      '<div class="d-flex gap-2 justify-content-md-end mb-3">',
+      '<button type="button" id="hubStudentProgressGenerate" class="btn btn-primary btn-sm fw-bold"><i class="bi bi-funnel-fill me-1"></i> Generate</button>',
+      '<button type="button" id="hubStudentProgressReset" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i> Reset</button>',
+      '</div>',
+      '<div class="d-flex flex-wrap gap-2 pt-3 border-top">',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-student-progress-range="thisWeek">This Week</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-student-progress-range="lastFourWeeks">Last Four Weeks</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-student-progress-range="lastThreeMonths">Last Three Months</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-student-progress-range="wholeYear">Whole Year</button>',
+      '</div>',
+      '</div>',
+      '<div class="p-3" id="hubStudentProgressResults">',
+      renderStudentProgressWaitingState(),
+      '</div>',
+      '</div>',
+      '</section>'
+    ].join('');
+
+    setHubStudentProgressRange('thisWeek');
+    syncStudentProgressStudentInputs();
+    bindStudentProgressControls();
+  }
+
   const hubWorkspaceNodeCache = new Map();
 
   function preserveCurrentHubWorkspace(nextKey) {
@@ -12701,6 +13510,19 @@
           key: 'weekly-reports',
           label: 'Weekly Reports',
           icon: 'bi bi-calendar-week',
+          sourceUrl: '/school/report-hub'
+        }
+      });
+      return;
+    }
+
+    if (key === 'student-progress') {
+      renderStudentProgressWorkspace({
+        status: 'success',
+        section: {
+          key: 'student-progress',
+          label: 'Student Progress',
+          icon: 'bi bi-graph-up',
           sourceUrl: '/school/report-hub'
         }
       });

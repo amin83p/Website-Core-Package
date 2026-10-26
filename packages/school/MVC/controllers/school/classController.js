@@ -5221,9 +5221,12 @@ async function deleteSessionBookCoveringEntry(req, res) {
 async function listSessionReportInstances(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
-        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
-        const sessions = await schoolDataService.getClassSessions(classId, req.user);
-        const { index: sessionIndex, session } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
+        const sessionDate = resolveSessionDateFromRequest(req);
+        const { classData, sessions } = await loadSessionManageScope(classId, req, {
+            sessionId,
+            sessionDate
+        });
+        const { session } = findSessionInList(sessions, sessionId, sessionDate);
         if (!session) throw new Error('Session not found.');
 
         assertSessionScopeForRequest(req, classData, session);

@@ -5,6 +5,7 @@ const leaveRequestService = require('./leaveRequestService');
 const activityService = require('./activityService');
 const reportViewService = require('./reportViewService');
 const weeklyReportsHubService = require('./weeklyReportsHubService');
+const studentProgressReportService = require('./studentProgressReportService');
 const personDisplayNameService = require('./personDisplayNameService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const classSessionCapacityService = require('./classSessionCapacityService');
@@ -1226,6 +1227,37 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       teacherOptions,
       refreshedAt: board.refreshedAt,
       preparedInMs: Number(board.preparedInMs) || workspacePreparedInMs
+    };
+  }
+
+  if (key === 'student-progress') {
+    const access = await evaluateModuleAccess(req, {
+      label: 'Student Progress',
+      sectionId: SECTIONS.SCHOOL_CLASSES
+    });
+    if (!access.allowed) {
+      const error = new Error('You do not have access to Student Progress.');
+      error.statusCode = 403;
+      throw error;
+    }
+    const report = await studentProgressReportService.buildStudentProgressReport({
+      reqUser: req.user,
+      orgToday: req?.orgToday || req?.user?.orgToday || '',
+      studentIds: queryInput?.studentIds || queryInput?.studentId || '',
+      startDate: queryInput?.startDate || '',
+      endDate: queryInput?.endDate || ''
+    });
+    return {
+      section: {
+        key: 'student-progress',
+        label: 'Student Progress',
+        icon: 'bi bi-graph-up',
+        sourceUrl: '/school/report-hub'
+      },
+      students: report.students,
+      range: report.range,
+      noStartedWeeks: report.noStartedWeeks === true,
+      refreshedAt: report.refreshedAt
     };
   }
 

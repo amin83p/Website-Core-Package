@@ -13431,14 +13431,18 @@
       if (preview.canApply) {
         approvedOnHoldPayload = { ...payload };
         if (qs('btn_applyOnHoldPeriod')) qs('btn_applyOnHoldPeriod').disabled = false;
-        setOnHoldApplyHint(`${sessions.length} session(s) ready to mark N/A on attendance.`, 'success');
+        if (blockers.length) {
+          const overrideSummary = blockers.length === 1
+            ? blockers[0].message
+            : `${blockers.length} session(s) already have attendance; saving will set them to N/A.`;
+          setOnHoldApplyHint(`${sessions.length} session(s) in range. ${overrideSummary}`, 'warning');
+        } else {
+          setOnHoldApplyHint(`${sessions.length} session(s) ready to mark N/A on attendance.`, 'success');
+        }
       } else {
         approvedOnHoldPayload = null;
         if (qs('btn_applyOnHoldPeriod')) qs('btn_applyOnHoldPeriod').disabled = true;
-        const blockerText = blockers.length
-          ? blockers.map((row) => String(row?.message || '')).filter(Boolean).join(' ')
-          : 'No sessions fall within this on-hold date range.';
-        setOnHoldApplyHint(blockerText, 'warning');
+        setOnHoldApplyHint('No sessions fall within this on-hold date range.', 'warning');
       }
     } catch (error) {
       approvedOnHoldPayload = null;

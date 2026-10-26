@@ -5458,14 +5458,19 @@ async function previewEnrollmentHoldPeriod(req, res) {
       endDate: req.body?.endDate,
       reason: req.body?.reason,
       excludeHoldId: req.body?.excludeHoldId
-    });
-    return res.json({
-      status: preview.canApply ? 'success' : 'blocked',
-      message: preview.canApply
-        ? 'On-hold preview is ready.'
-        : 'Resolve the listed attendance conflicts before applying the on-hold period.',
-      preview
-    });
+    }, { reqUser: req.user });
+    const overrideCount = Array.isArray(preview.attendanceOverrides)
+      ? preview.attendanceOverrides.length
+      : (Array.isArray(preview.blockers) ? preview.blockers.length : 0);
+    let message = 'No sessions fall within this on-hold date range.';
+    let status = 'blocked';
+    if (preview.canApply) {
+      status = overrideCount > 0 ? 'warning' : 'success';
+      message = overrideCount > 0
+        ? `${preview.sessions.length} session(s) will be set to N/A; ${overrideCount} already have attendance that will be overwritten.`
+        : 'On-hold preview is ready.';
+    }
+    return res.json({ status, message, preview });
   } catch (error) {
     return res.status(400).json({ status: 'error', message: error.message, preview: error.preview || null });
   }

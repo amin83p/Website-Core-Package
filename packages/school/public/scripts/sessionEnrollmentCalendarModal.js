@@ -90,7 +90,7 @@
   function isEventNaMarked(ev = {}) {
     if (isOnHoldPreviewMode()) {
       const previewState = resolveOnHoldPreviewNaState(ev);
-      return previewState !== 'normal' && previewState !== 'blocked';
+      return previewState !== 'normal';
     }
     if (isManageMode()) {
       return resolveManageNaState(ev) !== 'normal';
@@ -102,10 +102,10 @@
   function resolveOnHoldPreviewNaState(ev = {}) {
     const sessionId = String(ev?.sessionId || '').trim();
     if (!sessionId || !state) return 'normal';
-    const blockerSet = state.holdBlockerSessionIds || new Set();
     const previewSet = state.holdPreviewSessionIds || new Set();
-    if (blockerSet.has(sessionId)) return 'blocked';
     if (!previewSet.has(sessionId)) return 'normal';
+    const blockerSet = state.holdBlockerSessionIds || new Set();
+    if (blockerSet.has(sessionId)) return 'override';
     return state.holdPreviewKind === 'applied' ? 'saved' : 'projected';
   }
 
@@ -120,9 +120,9 @@
     if (detail?.message) return String(detail.message).trim();
     const attendance = formatManageAttendanceLabel(ev?.attendance || detail?.attendance);
     if (attendance) {
-      return `Already marked (${attendance}). Clear attendance on Manage Session before applying on-hold.`;
+      return `Marked ${attendance}; on-hold will set attendance to N/A.`;
     }
-    return 'Attendance already recorded. Clear it on Manage Session before applying on-hold.';
+    return 'Attendance already recorded; on-hold will set it to N/A.';
   }
 
   function annotateOnHoldPreviewEvents() {
@@ -535,7 +535,7 @@
       + '<div class="session-enrollment-legend-items">'
       +   '<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch is-open" aria-hidden="true"></span><span>Other enrollment session</span></div>'
       +   `<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch ${kind === 'applied' ? 'is-na-saved' : 'is-na-projected'}" aria-hidden="true"></span><span>${projectedLabel}</span></div>`
-      +   '<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch is-blocked" aria-hidden="true"></span><span>Attendance conflict (marked — see session for reason)</span></div>'
+      +   '<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch is-blocked" aria-hidden="true"></span><span>Has attendance — will be set to N/A on save</span></div>'
       + '</div>';
   }
 
@@ -721,7 +721,7 @@
       return;
     }
     const parts = [`${count} on-hold session(s)`];
-    if (blockerCount) parts.push(`${blockerCount} conflict(s)`);
+    if (blockerCount) parts.push(`${blockerCount} attendance override(s)`);
     summaryEl.textContent = parts.join(' · ');
   }
 
@@ -770,7 +770,7 @@
   }
 
   function buildManageSessionMetaLine(ev = {}, naState = 'normal') {
-    if (naState === 'blocked') {
+    if (naState === 'blocked' || naState === 'override') {
       const sessionId = String(ev?.sessionId || '').trim();
       return resolveHoldBlockerMessage(sessionId, ev);
     }
@@ -784,6 +784,9 @@
   function buildManageNaHeadHtml(naState) {
     if (naState === 'blocked') {
       return '<div class="session-manage-na-head is-blocked">Conflict</div>';
+    }
+    if (naState === 'override') {
+      return '<div class="session-manage-na-head is-projected" style="color:#664d03;font-weight:800;font-size:0.68rem;line-height:1.1;">N/A · replaces attendance</div>';
     }
     if (naState === 'projected') {
       return '<div class="session-manage-na-head is-projected" style="color:#664d03;font-weight:800;font-size:0.68rem;line-height:1.1;">N/A · projected</div>';
@@ -802,6 +805,9 @@
     const base = 'box-sizing:border-box;border-radius:4px;';
     if (naState === 'blocked') {
       return `${base}border:2px solid #f1aeb5;background-color:#fff3cd;`;
+    }
+    if (naState === 'override') {
+      return `${base}border:2px dashed #ffda6a;background-color:#fff8e1;`;
     }
     if (naState === 'projected') {
       return `${base}border:2px dashed #ced4da;background-color:#f8f9fa;`;
@@ -835,6 +841,7 @@
       naState === 'saved' ? 'is-na-saved' : '',
       naState === 'pending' ? 'is-na-pending' : '',
       naState === 'projected' ? 'is-na-projected' : '',
+      naState === 'override' ? 'is-na-override' : '',
       naState === 'blocked' ? 'is-blocked' : '',
       hasAttendance ? 'has-attendance' : '',
       isOpenSession ? 'is-scheduled-open' : ''
@@ -842,8 +849,12 @@
     const inlineStyle = buildManageBlockInlineStyle(naState, attendance);
     const timeLabel = buildManageSessionTimeLabel(ev);
     const metaLabel = buildManageSessionMetaLine(ev, naState);
-    const metaClass = naState === 'blocked' ? 'session-block-meta is-hold-blocker-reason' : 'session-block-meta';
-    const blockerTitle = naState === 'blocked' ? resolveHoldBlockerMessage(sessionId, ev) : '';
+    const metaClass = (naState === 'blocked' || naState === 'override')
+      ? 'session-block-meta is-hold-blocker-reason'
+      : 'session-block-meta';
+    const blockerTitle = (naState === 'blocked' || naState === 'override')
+      ? resolveHoldBlockerMessage(sessionId, ev)
+      : '';
     const titleAttr = blockerTitle ? ` title="${core.escapeHtml(blockerTitle)}"` : '';
     const selectableAttr = isOnHoldPreviewMode() ? '0' : '1';
     return `
@@ -870,6 +881,11 @@
       const shortLabel = formatManageAttendanceLabel(attendance) || 'marked';
       return `<span class="session-manage-chip is-blocked" title="${core.escapeHtml(message)}">Conflict · ${core.escapeHtml(shortLabel)}</span>`;
     }
+    if (naState === 'override') {
+      const message = resolveHoldBlockerMessage(sessionId, { attendance });
+      const shortLabel = formatManageAttendanceLabel(attendance) || 'marked';
+      return `<span class="session-manage-chip is-na-projected" title="${core.escapeHtml(message)}">N/A · was ${core.escapeHtml(shortLabel)}</span>`;
+    }
     if (naState === 'projected') return '<span class="session-manage-chip is-na-projected">N/A · projected</span>';
     if (naState === 'saved') return '<span class="session-manage-chip is-na-saved">N/A</span>';
     if (naState === 'pending') return '<span class="session-manage-chip is-na-pending">N/A · pending</span>';
@@ -892,16 +908,21 @@
       naState === 'saved' ? 'is-na-saved' : '',
       naState === 'pending' ? 'is-na-pending' : '',
       naState === 'projected' ? 'is-na-projected' : '',
+      naState === 'override' ? 'is-na-override' : '',
       naState === 'blocked' ? 'is-blocked' : '',
       hasAttendance ? 'has-attendance' : '',
       isOpenSession ? 'is-scheduled-open' : ''
     ].filter(Boolean).join(' ');
     const timeLabel = buildManageSessionTimeLabel(ev);
     const metaLabel = buildManageSessionMetaLine(ev, naState);
-    const metaClass = naState === 'blocked' ? 'small is-hold-blocker-reason' : 'small text-muted';
+    const metaClass = (naState === 'blocked' || naState === 'override')
+      ? 'small is-hold-blocker-reason'
+      : 'small text-muted';
     const chipHtml = buildManageListChipHtml(naState, attendance, sessionId);
     const inlineStyle = buildManageBlockInlineStyle(naState, attendance);
-    const blockerTitle = naState === 'blocked' ? resolveHoldBlockerMessage(sessionId, ev) : '';
+    const blockerTitle = (naState === 'blocked' || naState === 'override')
+      ? resolveHoldBlockerMessage(sessionId, ev)
+      : '';
     const titleAttr = blockerTitle ? ` title="${core.escapeHtml(blockerTitle)}"` : '';
     const selectableAttr = isOnHoldPreviewMode() ? '0' : '1';
     return `
