@@ -4998,7 +4998,7 @@ async function assignReportToSession(req, res) {
             reqUser: req.user
         });
 
-        const result = await sessionReportAssignmentService.createAssignmentForSession({
+        const result = await sessionReportAssignmentService.upsertSessionTargetRowForAssignment({
             classData,
             session,
             sessionRoster: enrichedRoster,
@@ -5025,6 +5025,7 @@ async function assignReportToSession(req, res) {
             status: 'success',
             message: result.message || 'Report assigned to this session.',
             assignmentId: result.assignment?.id || '',
+            createdAssignment: Boolean(result.createdAssignment),
             rows,
             actionStateId: req.actionStateId
         });

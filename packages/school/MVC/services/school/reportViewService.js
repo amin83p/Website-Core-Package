@@ -277,7 +277,7 @@ function parseBooleanFlag(rawValue, fallback = false) {
 }
 
 function parseTargetRowsField(rawValue) {
-  const parsed = parseJsonSafe(rawValue, []);
+  const parsed = Array.isArray(rawValue) ? rawValue : parseJsonSafe(rawValue, []);
   if (!Array.isArray(parsed)) return [];
   return parsed
     .filter((row) => row && typeof row === 'object' && !Array.isArray(row))

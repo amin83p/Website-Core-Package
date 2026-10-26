@@ -189,11 +189,12 @@ async function resolveEligibleStudentsForAssignment({
   const duration = resolveAssignmentDurationFromTargetRows(targetRows);
   const effectiveStartDate = normalizeDateOnly(startDate) || duration.startDate;
   const effectiveEndDate = normalizeDateOnly(endDate) || duration.endDate;
+  // Report-period picker counts sessions across the full start/due range, not only the anchored session row.
   const scopedSessions = resolveScopedSessions({
     sessions,
     startDate: effectiveStartDate,
     endDate: effectiveEndDate,
-    targetSessionIds
+    targetSessionIds: []
   });
 
   const eligiblePersonIds = await resolveEligiblePersonIdsForDuration({

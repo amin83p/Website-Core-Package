@@ -19,6 +19,7 @@ function buildMasterScheduleViewerClientConfig({
   const canDeleteClassSessions = caps.canDeleteClassSessions === true || access.canDeleteClassSessions === true;
   const canOpenRollingEnrollment = caps.canOpenRollingEnrollment === true || access.canOpenRollingEnrollment === true;
   const canUseGlobalComparison = caps.canUseGlobalComparison === true || access.canUseGlobalComparison === true;
+  const canAssignSessionReports = caps.canAssignSessionReports === true || access.canAssignSessionReports === true;
 
   const scheduleRoles = Array.isArray(access.availableRoles) ? access.availableRoles : [];
   const defaultRole = access.selectedRole || (scheduleRoles.length >= 1 ? scheduleRoles[0].key : '');
@@ -36,6 +37,7 @@ function buildMasterScheduleViewerClientConfig({
     canDeleteClassSessions,
     canOpenRollingEnrollment,
     canUseGlobalComparison,
+    canAssignSessionReports,
     initialScheduleRoles: scheduleRoles,
     initialDefaultRole: defaultRole,
     initialLockedPersonId: String(lockedPersonId || ''),

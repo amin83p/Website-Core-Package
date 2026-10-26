@@ -204,6 +204,12 @@ async function buildScheduleCapabilities(reqUser = {}, options = {}) {
     OPERATIONS.DELETE,
     orgContext
   ));
+  const canAssignSessionReports = Boolean(adminAuthorityService.isAdminForRequest(
+    reqUser,
+    SECTIONS.SCHOOL_REPORTS_ASSIGNMENT,
+    OPERATIONS.CREATE,
+    orgContext
+  ));
 
   const canRead = Boolean(readEval?.allowed);
   const canReadAll = Boolean(readAllEval?.allowed);
@@ -237,6 +243,7 @@ async function buildScheduleCapabilities(reqUser = {}, options = {}) {
     canDragCreateSessions,
     canLoadAllSchedules,
     canDeleteClassSessions,
+    canAssignSessionReports,
     canOpenRollingEnrollment,
     activeOrgId,
     ...locked
@@ -312,7 +319,8 @@ function toViewerScheduleAccess(capabilities = {}) {
     canDragCreateSessions: capabilities.canDragCreateSessions === true,
     canLoadAllSchedules: capabilities.canLoadAllSchedules === true,
     canUseGlobalComparison: capabilities.canUseGlobalComparison === true,
-    canDeleteClassSessions: capabilities.canDeleteClassSessions === true
+    canDeleteClassSessions: capabilities.canDeleteClassSessions === true,
+    canAssignSessionReports: capabilities.canAssignSessionReports === true
   };
 }
 

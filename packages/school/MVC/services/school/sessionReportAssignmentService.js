@@ -1,5 +1,9 @@
 const schoolDataService = require('./schoolDataService');
 const reportIntegrityService = require('./reportIntegrityService');
+const classReferenceSyncService = require('./classReferenceSyncService');
+const reportScopePolicy = require('./reportScopePolicy');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 function clean(value) {
   return String(value || '').trim();
@@ -92,7 +96,291 @@ function collectRosterStudentIds(sessionRoster = []) {
     .filter(Boolean));
 }
 
-async function createAssignmentForSession({
+function assignmentScope(assignment = {}) {
+  try {
+    return reportScopePolicy.normalizeReportScope(assignment.reportScope);
+  } catch (error) {
+    return 'class';
+  }
+}
+
+function findReportAssignmentForClass(assignments = [], classId = '', reportScope = 'class') {
+  const scope = reportScopePolicy.normalizeReportScope(reportScope);
+  const classToken = toPublicId(classId);
+  if (!classToken) return null;
+  return (Array.isArray(assignments) ? assignments : []).find((row) => (
+    idsEqual(row?.classId, classToken) && assignmentScope(row) === scope
+  )) || null;
+}
+
+function resolveWizardRowStudentIds(reportScope = 'class', targetStudentIds = [], sessionRoster = []) {
+  const scope = reportScopePolicy.normalizeReportScope(reportScope);
+  const selected = (Array.isArray(targetStudentIds) ? targetStudentIds : [])
+    .map((id) => toPublicId(id))
+    .filter(Boolean);
+  if (scope === 'selected_students') return selected;
+  if (scope === 'each_student') {
+    if (selected.length) return selected;
+    return (Array.isArray(sessionRoster) ? sessionRoster : [])
+      .map((row) => toPublicId(row?.personId))
+      .filter(Boolean);
+  }
+  return [];
+}
+
+function buildSessionTargetRow({
+  session,
+  reportStartDate,
+  reportDueDate,
+  taskStartTime,
+  taskEndTime,
+  conflictPermitted,
+  timesheetReflection,
+  allocatedHours,
+  conductRequiredBeforeFill,
+  teacherId,
+  reportScope,
+  targetStudentIds,
+  sessionRoster,
+  notes = ''
+} = {}) {
+  const sessionId = toPublicId(session?.sessionId);
+  const sessionDateValue = normalizeDate(session?.date || session?.sessionDate);
+  const scope = reportScopePolicy.normalizeReportScope(reportScope);
+  const studentScoped = scope === 'each_student' || scope === 'selected_students';
+  const rowStudentIds = resolveWizardRowStudentIds(scope, targetStudentIds, sessionRoster);
+  return {
+    rowId: `session:${sessionId}:${normalizeDate(reportStartDate)}`,
+    targetType: 'session',
+    sessionId,
+    sessionDate: sessionDateValue,
+    dueDate: '',
+    reportStartDate: normalizeDate(reportStartDate),
+    reportDueDate: normalizeDate(reportDueDate),
+    taskStartTime,
+    taskEndTime,
+    conflictPermitted: Boolean(conflictPermitted),
+    timesheetReflection: Boolean(timesheetReflection),
+    allocatedHours: Number(allocatedHours) || 0,
+    conductRequiredBeforeFill: conductRequiredBeforeFill !== false,
+    teacherId: toPublicId(teacherId),
+    status: 'active',
+    notes: clean(notes),
+    ...(studentScoped && rowStudentIds.length ? { targetStudentIds: rowStudentIds } : {})
+  };
+}
+
+function mergeTargetRows(existingRows = [], incomingRow = {}) {
+  const rows = Array.isArray(existingRows) ? [...existingRows] : [];
+  const rowId = String(incomingRow?.rowId || '').trim();
+  const index = rows.findIndex((row) => String(row?.rowId || '').trim() === rowId);
+  if (index >= 0) rows[index] = { ...rows[index], ...incomingRow };
+  else rows.push(incomingRow);
+  return rows;
+}
+
+async function loadScopedReportAssignments(reqUser) {
+  const assignments = await schoolDataService.fetchAllData('reportAssignments', {}, reqUser);
+  const orgId = toPublicId(reqUser?.activeOrgId);
+  return (Array.isArray(assignments) ? assignments : []).filter((row) => (
+    !orgId || !row?.orgId || idsEqual(row.orgId, orgId)
+  ));
+}
+
+function parseSessionAssignmentInput({
+  classData,
+  session,
+  sessionRoster = [],
+  input = {}
+}) {
+  const classId = clean(classData.id);
+  const sessionId = clean(session.sessionId);
+  const sessionDate = normalizeDate(session.date);
+  const sessionStartTime = normalizeTime(session.startTime);
+  const sessionEndTime = normalizeTime(session.endTime);
+  const teacherId = resolveTeacherId(session, classData);
+  const teacherName = resolveTeacherName(session, classData);
+
+  const reportScope = reportScopePolicy.normalizeReportScope(input.reportScope || 'class');
+  const reportStartDate = normalizeDate(input.reportStartDate);
+  const reportDueDate = normalizeDate(input.reportDueDate) || sessionDate;
+  const taskStartTime = normalizeTime(input.taskStartTime || sessionStartTime);
+  const taskEndTime = normalizeTime(input.taskEndTime || sessionEndTime);
+  const conflictPermitted = input.conflictPermitted !== undefined
+    ? parseBoolean(input.conflictPermitted, true)
+    : true;
+  const timesheetReflection = parseBoolean(input.timesheetReflection, false);
+  const conductRequiredBeforeFill = input.conductRequiredBeforeFill !== undefined
+    ? parseBoolean(input.conductRequiredBeforeFill, true)
+    : true;
+  const allocatedHours = timesheetReflection
+    ? parseNumber(input.allocatedHours, resolveAllocatedHours(taskStartTime, taskEndTime))
+    : 0;
+  const notes = clean(input.notes);
+  const templateId = clean(input.templateId);
+  const selectedTargetStudentIds = Array.isArray(input.targetStudentIds)
+    ? input.targetStudentIds.map(clean).filter(Boolean)
+    : clean(input.targetStudentIds).split(',').map(clean).filter(Boolean);
+
+  return {
+    classId,
+    sessionId,
+    sessionDate,
+    sessionStartTime,
+    sessionEndTime,
+    teacherId,
+    teacherName,
+    reportScope,
+    reportStartDate,
+    reportDueDate,
+    taskStartTime,
+    taskEndTime,
+    conflictPermitted,
+    timesheetReflection,
+    conductRequiredBeforeFill,
+    allocatedHours,
+    notes,
+    templateId,
+    selectedTargetStudentIds
+  };
+}
+
+function validateSessionAssignmentParsed(parsed, sessionRoster = []) {
+  if (!parsed.sessionDate) throw new Error('Session date is required before assigning a report.');
+  if (!parsed.teacherId) throw new Error('The session needs an assigned teacher before assigning a report.');
+  if (!parsed.templateId) throw new Error('Template is required.');
+  if (!parsed.reportStartDate) throw new Error('Start Date is required.');
+  if (parsed.reportStartDate > parsed.reportDueDate) {
+    throw new Error('Start Date cannot be after the report due date.');
+  }
+
+  assertTaskWindowInsideSession({
+    taskStartTime: parsed.taskStartTime,
+    taskEndTime: parsed.taskEndTime,
+    sessionStartTime: parsed.sessionStartTime,
+    sessionEndTime: parsed.sessionEndTime
+  });
+
+  if (parsed.reportScope === 'selected_students') {
+    const rosterIds = collectRosterStudentIds(sessionRoster);
+    if (!parsed.selectedTargetStudentIds.length) {
+      throw new Error('Select at least one student for Specific Students scope.');
+    }
+    const invalidIds = parsed.selectedTargetStudentIds.filter((id) => !rosterIds.has(id));
+    if (invalidIds.length) throw new Error('One or more selected students are not in this session roster.');
+  }
+}
+
+async function updateExistingAssignmentWithMergedRow({
+  existing,
+  classData,
+  classId,
+  session,
+  sessionRoster,
+  parsed,
+  incomingRow,
+  reqUser
+}) {
+  const resolvedTemplateId = toPublicId(existing?.templateId || parsed.templateId);
+  if (!resolvedTemplateId) throw new Error('Template is required.');
+
+  const mergedRows = mergeTargetRows(existing.targetRows, incomingRow);
+  const rowStudentIds = resolveWizardRowStudentIds(
+    parsed.reportScope,
+    parsed.selectedTargetStudentIds,
+    sessionRoster
+  );
+
+  const {
+    template,
+    effectiveTargetRows,
+    persistedTargetStudentIds
+  } = await reportIntegrityService.validateAssignmentCrossEntityContext({
+    classId: toPublicId(classId),
+    templateId: resolvedTemplateId,
+    reqUser,
+    reportScope: parsed.reportScope,
+    hasSessionTargets: true,
+    selectedSessionIds: [parsed.sessionId],
+    teacherIds: [parsed.teacherId],
+    requestedTaskStartTime: parsed.taskStartTime,
+    requestedTaskEndTime: parsed.taskEndTime,
+    conflictPermitted: parsed.conflictPermitted,
+    requestedReportStartDate: parsed.reportStartDate,
+    requestedReportDueDate: parsed.reportDueDate,
+    selectedTargetStudentIds: rowStudentIds,
+    targetRows: mergedRows,
+    excludeAssignmentId: toPublicId(existing.id)
+  });
+
+  const firstActiveRow = effectiveTargetRows.find((row) => String(row?.status || '').toLowerCase() === 'active')
+    || effectiveTargetRows[0];
+  const rowTeacherIds = [...new Set(effectiveTargetRows
+    .map((row) => toPublicId(row?.teacherId))
+    .filter(Boolean))];
+  const resolvedConductRequired = parsed.conductRequiredBeforeFill !== undefined
+    ? parsed.conductRequiredBeforeFill
+    : parseBoolean(template?.conductRequiredBeforeFill, true);
+  const now = new Date().toISOString();
+  const basePayload = {
+    orgId: toPublicId(existing.orgId || classData.orgId || reqUser?.activeOrgId),
+    classId: toPublicId(classId),
+    reportScope: parsed.reportScope,
+    targetStudentIds: persistedTargetStudentIds,
+    templateId: template.id,
+    templateVersion: Number(template.version || 1),
+    teacherIds: rowTeacherIds.length ? rowTeacherIds : [parsed.teacherId],
+    targetRows: effectiveTargetRows.map((row) => ({
+      ...row,
+      conductRequiredBeforeFill: resolvedConductRequired
+    })),
+    targetType: firstActiveRow.targetType,
+    sessionId: firstActiveRow.sessionId,
+    sessionDate: firstActiveRow.sessionDate,
+    dueDate: firstActiveRow.dueDate,
+    conflictPermitted: firstActiveRow.conflictPermitted,
+    taskStartTime: firstActiveRow.taskStartTime,
+    taskEndTime: firstActiveRow.taskEndTime,
+    reportStartDate: firstActiveRow.reportStartDate,
+    reportDueDate: firstActiveRow.reportDueDate,
+    status: existing.status || 'active',
+    notes: existing.notes || incomingRow.notes,
+    timesheetReflection: firstActiveRow.timesheetReflection,
+    allocatedHours: firstActiveRow.timesheetReflection ? Number(firstActiveRow.allocatedHours) : 0,
+    conductRequiredBeforeFill: resolvedConductRequired,
+    audit: {
+      createUser: existing?.audit?.createUser || reqUser?.id || '',
+      createDateTime: existing?.audit?.createDateTime || now,
+      lastUpdateUser: reqUser?.id || '',
+      lastUpdateDateTime: now
+    }
+  };
+
+  await schoolDataService.updateData('reportAssignments', existing.id, basePayload, reqUser);
+  await classReferenceSyncService.cleanupReportInstancesForRemovedTargetRows({
+    assignmentId: existing.id,
+    previousAssignment: existing,
+    nextAssignment: { ...existing, ...basePayload, id: existing.id },
+    reqUser
+  });
+  await classReferenceSyncService.notifyClassReferencesChanged({
+    classId: toPublicId(classId),
+    reason: `session_target_row:${existing.id}`,
+    reqUser
+  });
+
+  return {
+    assignment: { ...existing, ...basePayload, id: existing.id },
+    template,
+    teacherId: parsed.teacherId,
+    teacherName: parsed.teacherName,
+    targetRows: basePayload.targetRows,
+    createdAssignment: false,
+    message: 'Report target row added to the existing report assignment.'
+  };
+}
+
+async function upsertSessionTargetRowForAssignment({
   classData,
   session,
   sessionRoster = [],
@@ -102,64 +390,94 @@ async function createAssignmentForSession({
   if (!classData?.id) throw new Error('Class is required.');
   if (!session?.sessionId) throw new Error('Session is required.');
 
-  const classId = clean(classData.id);
-  const sessionId = clean(session.sessionId);
-  const sessionDate = normalizeDate(session.date);
-  const sessionStartTime = normalizeTime(session.startTime);
-  const sessionEndTime = normalizeTime(session.endTime);
-  const teacherId = resolveTeacherId(session, classData);
-  const teacherName = resolveTeacherName(session, classData);
+  const parsed = parseSessionAssignmentInput({ classData, session, sessionRoster, input });
+  validateSessionAssignmentParsed(parsed, sessionRoster);
 
-  if (!sessionDate) throw new Error('Session date is required before assigning a report.');
-  if (!teacherId) throw new Error('The session needs an assigned teacher before assigning a report.');
-
-  const templateId = clean(input.templateId);
-  const reportScope = clean(input.reportScope || 'class').toLowerCase() || 'class';
-  const reportStartDate = normalizeDate(input.reportStartDate);
-  const reportDueDate = sessionDate;
-  const taskStartTime = normalizeTime(input.taskStartTime || sessionStartTime);
-  const taskEndTime = normalizeTime(input.taskEndTime || sessionEndTime);
-  const conflictPermitted = parseBoolean(input.conflictPermitted, false);
-  const timesheetReflection = parseBoolean(input.timesheetReflection, false);
-  const conductRequiredBeforeFill = input.conductRequiredBeforeFill !== undefined
-    ? parseBoolean(input.conductRequiredBeforeFill, true)
-    : true;
-  const allocatedHours = timesheetReflection
-    ? parseNumber(input.allocatedHours, resolveAllocatedHours(taskStartTime, taskEndTime))
-    : 0;
-  const notes = clean(input.notes);
-  const selectedTargetStudentIds = Array.isArray(input.targetStudentIds)
-    ? input.targetStudentIds.map(clean).filter(Boolean)
-    : clean(input.targetStudentIds).split(',').map(clean).filter(Boolean);
-
-  if (!templateId) throw new Error('Template is required.');
-  if (!reportStartDate) throw new Error('Start Date is required.');
-  if (reportStartDate > reportDueDate) throw new Error('Start Date cannot be after the session date.');
-
-  assertTaskWindowInsideSession({
-    taskStartTime,
-    taskEndTime,
-    sessionStartTime,
-    sessionEndTime
+  const incomingRow = buildSessionTargetRow({
+    session,
+    reportStartDate: parsed.reportStartDate,
+    reportDueDate: parsed.reportDueDate,
+    taskStartTime: parsed.taskStartTime,
+    taskEndTime: parsed.taskEndTime,
+    conflictPermitted: parsed.conflictPermitted,
+    timesheetReflection: parsed.timesheetReflection,
+    allocatedHours: parsed.allocatedHours,
+    conductRequiredBeforeFill: parsed.conductRequiredBeforeFill,
+    teacherId: parsed.teacherId,
+    reportScope: parsed.reportScope,
+    targetStudentIds: parsed.selectedTargetStudentIds,
+    sessionRoster,
+    notes: parsed.notes
   });
 
-  const studentScoped = reportScope === 'each_student' || reportScope === 'selected_students';
-  if (reportScope === 'selected_students') {
-    const rosterIds = collectRosterStudentIds(sessionRoster);
-    if (!selectedTargetStudentIds.length) throw new Error('Select at least one student for Specific Students scope.');
-    const invalidIds = selectedTargetStudentIds.filter((id) => !rosterIds.has(id));
-    if (invalidIds.length) throw new Error('One or more selected students are not in this session roster.');
+  const assignments = await loadScopedReportAssignments(reqUser);
+  const existing = findReportAssignmentForClass(assignments, parsed.classId, parsed.reportScope);
+
+  if (existing?.id) {
+    return updateExistingAssignmentWithMergedRow({
+      existing,
+      classData,
+      classId: parsed.classId,
+      session,
+      sessionRoster,
+      parsed,
+      incomingRow,
+      reqUser
+    });
   }
 
-  const rowStudentIds = studentScoped
-    ? selectedTargetStudentIds.map(clean).filter(Boolean)
-    : [];
-  const targetRows = [{
-    rowId: `session:${sessionId}:${reportStartDate}`,
-    targetType: 'session',
+  const createResult = await createAssignmentForSession({
+    classData,
+    session,
+    sessionRoster,
+    input,
+    reqUser,
+    parsed,
+    incomingRow
+  });
+  return {
+    ...createResult,
+    createdAssignment: true
+  };
+}
+
+async function createAssignmentForSession({
+  classData,
+  session,
+  sessionRoster = [],
+  input = {},
+  reqUser,
+  parsed: parsedOverride,
+  incomingRow: incomingRowOverride
+}) {
+  if (!classData?.id) throw new Error('Class is required.');
+  if (!session?.sessionId) throw new Error('Session is required.');
+
+  const parsed = parsedOverride || parseSessionAssignmentInput({ classData, session, sessionRoster, input });
+  if (!parsedOverride) validateSessionAssignmentParsed(parsed, sessionRoster);
+
+  const {
+    classId,
     sessionId,
     sessionDate,
-    dueDate: '',
+    teacherId,
+    teacherName,
+    reportScope,
+    reportStartDate,
+    reportDueDate,
+    taskStartTime,
+    taskEndTime,
+    conflictPermitted,
+    timesheetReflection,
+    conductRequiredBeforeFill,
+    allocatedHours,
+    notes,
+    templateId,
+    selectedTargetStudentIds
+  } = parsed;
+
+  const targetRows = [incomingRowOverride || buildSessionTargetRow({
+    session,
     reportStartDate,
     reportDueDate,
     taskStartTime,
@@ -169,10 +487,11 @@ async function createAssignmentForSession({
     allocatedHours,
     conductRequiredBeforeFill,
     teacherId,
-    status: 'active',
-    notes,
-    ...(studentScoped && rowStudentIds.length ? { targetStudentIds: rowStudentIds } : {})
-  }];
+    reportScope,
+    targetStudentIds: selectedTargetStudentIds,
+    sessionRoster,
+    notes
+  })];
 
   const {
     template,
@@ -191,11 +510,10 @@ async function createAssignmentForSession({
     conflictPermitted,
     requestedReportStartDate: reportStartDate,
     requestedReportDueDate: reportDueDate,
-    selectedTargetStudentIds,
+    selectedTargetStudentIds: resolveWizardRowStudentIds(reportScope, selectedTargetStudentIds, sessionRoster),
     targetRows
   });
 
-  const firstActiveRow = effectiveTargetRows.find((row) => String(row?.status || '').toLowerCase() === 'active') || effectiveTargetRows[0];
   const resolvedConductRequired = input.conductRequiredBeforeFill !== undefined
     ? parseBoolean(input.conductRequiredBeforeFill, true)
     : parseBoolean(template?.conductRequiredBeforeFill, true);
@@ -250,8 +568,13 @@ async function createAssignmentForSession({
 
 module.exports = {
   addMinutes,
+  buildSessionTargetRow,
   createAssignmentForSession,
+  findReportAssignmentForClass,
+  mergeTargetRows,
   resolveAllocatedHours,
   resolveTeacherId,
-  resolveTeacherName
+  resolveTeacherName,
+  resolveWizardRowStudentIds,
+  upsertSessionTargetRowForAssignment
 };

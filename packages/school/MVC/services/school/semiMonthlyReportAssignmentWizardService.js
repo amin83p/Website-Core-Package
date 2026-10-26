@@ -5,8 +5,6 @@ const semiMonthlyReportPolicyModel = require('../../models/school/semiMonthlyRep
 const sessionReportAssignmentService = require('./sessionReportAssignmentService');
 const reportAssignmentStudentEligibilityService = require('./reportAssignmentStudentEligibilityService');
 const reportViewService = require('./reportViewService');
-const reportIntegrityService = require('./reportIntegrityService');
-const classReferenceSyncService = require('./classReferenceSyncService');
 const reportScopePolicy = require('./reportScopePolicy');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -124,14 +122,9 @@ function classesForPrograms({ classes = [], programIds = [] } = {}) {
     .sort((a, b) => String(a.title || a.id).localeCompare(String(b.title || b.id)));
 }
 
-function findReportAssignmentForClass(assignments = [], classId = '', reportScope = 'class') {
-  const scope = reportScopePolicy.normalizeReportScope(reportScope);
-  const classToken = toPublicId(classId);
-  if (!classToken) return null;
-  return (Array.isArray(assignments) ? assignments : []).find((row) => (
-    idsEqual(row?.classId, classToken) && assignmentScope(row) === scope
-  )) || null;
-}
+const findReportAssignmentForClass = sessionReportAssignmentService.findReportAssignmentForClass;
+const mergeTargetRows = sessionReportAssignmentService.mergeTargetRows;
+const resolveWizardRowStudentIds = sessionReportAssignmentService.resolveWizardRowStudentIds;
 
 function normalizeSessionForAssignment(session = {}) {
   const sessionId = toPublicId(session?.sessionId || session?.id);
@@ -139,69 +132,11 @@ function normalizeSessionForAssignment(session = {}) {
   return { ...session, sessionId };
 }
 
-function resolveWizardRowStudentIds(reportScope = 'class', targetStudentIds = [], sessionRoster = []) {
-  const scope = reportScopePolicy.normalizeReportScope(reportScope);
-  const selected = (Array.isArray(targetStudentIds) ? targetStudentIds : [])
-    .map((id) => toPublicId(id))
-    .filter(Boolean);
-  if (scope === 'selected_students') return selected;
-  if (scope === 'each_student') {
-    if (selected.length) return selected;
-    return (Array.isArray(sessionRoster) ? sessionRoster : [])
-      .map((row) => toPublicId(row?.personId))
-      .filter(Boolean);
-  }
-  return [];
-}
-
-function buildSemiMonthlyTargetRow({
-  session,
-  reportStartDate,
-  reportDueDate,
-  taskStartTime,
-  taskEndTime,
-  conflictPermitted,
-  timesheetReflection,
-  allocatedHours,
-  conductRequiredBeforeFill,
-  teacherId,
-  reportScope,
-  targetStudentIds,
-  sessionRoster,
-  notes = 'Semi-monthly report assignment wizard.'
-} = {}) {
-  const sessionId = toPublicId(session?.sessionId);
-  const sessionDateValue = normalizeDateOnly(session?.date || session?.sessionDate);
-  const studentScoped = reportScope === 'each_student' || reportScope === 'selected_students';
-  const rowStudentIds = resolveWizardRowStudentIds(reportScope, targetStudentIds, sessionRoster);
-  return {
-    rowId: `session:${sessionId}:${normalizeDateOnly(reportStartDate)}`,
-    targetType: 'session',
-    sessionId,
-    sessionDate: sessionDateValue,
-    dueDate: '',
-    reportStartDate: normalizeDateOnly(reportStartDate),
-    reportDueDate: normalizeDateOnly(reportDueDate),
-    taskStartTime,
-    taskEndTime,
-    conflictPermitted: Boolean(conflictPermitted),
-    timesheetReflection: Boolean(timesheetReflection),
-    allocatedHours: Number(allocatedHours) || 0,
-    conductRequiredBeforeFill: conductRequiredBeforeFill !== false,
-    teacherId: toPublicId(teacherId),
-    status: 'active',
-    notes,
-    ...(studentScoped && rowStudentIds.length ? { targetStudentIds: rowStudentIds } : {})
-  };
-}
-
-function mergeTargetRows(existingRows = [], incomingRow = {}) {
-  const rows = Array.isArray(existingRows) ? [...existingRows] : [];
-  const rowId = String(incomingRow?.rowId || '').trim();
-  const index = rows.findIndex((row) => String(row?.rowId || '').trim() === rowId);
-  if (index >= 0) rows[index] = { ...rows[index], ...incomingRow };
-  else rows.push(incomingRow);
-  return rows;
+function buildSemiMonthlyTargetRow(args = {}) {
+  return sessionReportAssignmentService.buildSessionTargetRow({
+    ...args,
+    notes: args.notes || 'Semi-monthly report assignment wizard.'
+  });
 }
 
 function sessionsOnDate(sessions = [], date = '') {
@@ -531,88 +466,7 @@ async function applyClassTemplate({
   );
   if (!resolvedTemplateId) throw new Error('Choose at least one report template in Semi-Monthly Report settings.');
 
-  if (existing?.id) {
-    const mergedRows = mergeTargetRows(existing.targetRows, incomingRow);
-    const {
-      template,
-      effectiveTargetRows,
-      persistedTargetStudentIds
-    } = await reportIntegrityService.validateAssignmentCrossEntityContext({
-      classId: toPublicId(classId),
-      templateId: resolvedTemplateId,
-      reqUser,
-      reportScope: scope,
-      hasSessionTargets: true,
-      selectedSessionIds: [session.sessionId],
-      teacherIds: [teacherId],
-      requestedTaskStartTime: window.taskStartTime,
-      requestedTaskEndTime: window.taskEndTime,
-      conflictPermitted,
-      requestedReportStartDate: normalizeDateOnly(reportStartDate),
-      requestedReportDueDate: reportDueDate,
-      selectedTargetStudentIds: resolveWizardRowStudentIds(scope, targetStudentIds, sessionRoster),
-      targetRows: mergedRows,
-      excludeAssignmentId: toPublicId(existing.id)
-    });
-
-    const firstActiveRow = effectiveTargetRows.find((row) => String(row?.status || '').toLowerCase() === 'active')
-      || effectiveTargetRows[0];
-    const rowTeacherIds = [...new Set(effectiveTargetRows
-      .map((row) => toPublicId(row?.teacherId))
-      .filter(Boolean))];
-    const now = new Date().toISOString();
-    const basePayload = {
-      orgId: toPublicId(existing.orgId || classData.orgId || reqUser?.activeOrgId),
-      classId: toPublicId(classId),
-      reportScope: scope,
-      targetStudentIds: persistedTargetStudentIds,
-      templateId: template.id,
-      templateVersion: Number(template.version || 1),
-      teacherIds: rowTeacherIds.length ? rowTeacherIds : [teacherId],
-      targetRows: effectiveTargetRows,
-      targetType: firstActiveRow.targetType,
-      sessionId: firstActiveRow.sessionId,
-      sessionDate: firstActiveRow.sessionDate,
-      dueDate: firstActiveRow.dueDate,
-      conflictPermitted: firstActiveRow.conflictPermitted,
-      taskStartTime: firstActiveRow.taskStartTime,
-      taskEndTime: firstActiveRow.taskEndTime,
-      reportStartDate: firstActiveRow.reportStartDate,
-      reportDueDate: firstActiveRow.reportDueDate,
-      status: existing.status || 'active',
-      notes: existing.notes || incomingRow.notes,
-      timesheetReflection: firstActiveRow.timesheetReflection,
-      allocatedHours: firstActiveRow.timesheetReflection ? Number(firstActiveRow.allocatedHours) : 0,
-      conductRequiredBeforeFill: conductRequiredBeforeFill !== false,
-      audit: {
-        createUser: existing?.audit?.createUser || reqUser?.id || '',
-        createDateTime: existing?.audit?.createDateTime || now,
-        lastUpdateUser: reqUser?.id || '',
-        lastUpdateDateTime: now
-      }
-    };
-
-    await dependencies.schoolDataService.updateData('reportAssignments', existing.id, basePayload, reqUser);
-    await classReferenceSyncService.cleanupReportInstancesForRemovedTargetRows({
-      assignmentId: existing.id,
-      previousAssignment: existing,
-      nextAssignment: { ...existing, ...basePayload, id: existing.id },
-      reqUser
-    });
-    await classReferenceSyncService.notifyClassReferencesChanged({
-      classId: toPublicId(classId),
-      reason: `semi_monthly_wizard_target_row:${existing.id}`,
-      reqUser
-    });
-
-    return {
-      assignmentId: toPublicId(existing.id),
-      createdAssignment: false,
-      message: 'Report target row added to the existing report assignment.'
-    };
-  }
-
-  const result = await dependencies.sessionReportAssignmentService.createAssignmentForSession({
+  const result = await dependencies.sessionReportAssignmentService.upsertSessionTargetRowForAssignment({
     classData,
     session,
     sessionRoster,
@@ -621,20 +475,21 @@ async function applyClassTemplate({
       templateId: resolvedTemplateId,
       reportScope: scope,
       reportStartDate,
+      reportDueDate,
       taskStartTime: window.taskStartTime,
       taskEndTime: window.taskEndTime,
       conflictPermitted,
       timesheetReflection,
       conductRequiredBeforeFill,
-      allocatedHours,
+      allocatedHours: timesheetReflection ? allocatedHours : 0,
       targetStudentIds: resolveWizardRowStudentIds(scope, targetStudentIds, sessionRoster),
       notes: incomingRow.notes
     }
   });
   return {
     assignmentId: toPublicId(result?.assignment?.id),
-    createdAssignment: true,
-    message: result?.message || 'Report assignment created with target row.'
+    createdAssignment: Boolean(result?.createdAssignment),
+    message: result?.message || 'Report assignment saved.'
   };
 }
 

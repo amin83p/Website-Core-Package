@@ -105,9 +105,9 @@ test('apply creates one assignment for the latest session on the verified date',
     },
     sessionReportAssignmentService: {
       resolveTeacherId: () => 'TCH_1',
-      createAssignmentForSession: async (args) => {
+      upsertSessionTargetRowForAssignment: async (args) => {
         created.push(args);
-        return { assignment: { id: 'ASG_NEW' }, message: 'assigned' };
+        return { assignment: { id: 'ASG_NEW' }, createdAssignment: true, message: 'assigned' };
       }
     },
     semiMonthlyReportPolicyModel: {

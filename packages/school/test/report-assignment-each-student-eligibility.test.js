@@ -674,7 +674,7 @@ test('resolveEligibleStudentsForAssignment returns eligible session counts for t
 
     assert.equal(students.length, 1);
     assert.equal(students[0].personId, 'STU-1');
-    assert.equal(students[0].eligibleSessionCount, 1);
+    assert.equal(students[0].eligibleSessionCount, 2);
   } finally {
     schoolDataService.fetchAllData = originals.fetchAllData;
     schoolDataService.getClassEnrollmentPeriodsByClassId = originals.getClassEnrollmentPeriodsByClassId;

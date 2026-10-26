@@ -20,6 +20,7 @@
     const canLoadAllSchedules = cfg.canLoadAllSchedules === true;
     const canDeleteClassSessions = cfg.canDeleteClassSessions === true;
     const canOpenRollingEnrollment = cfg.canOpenRollingEnrollment === true;
+    const canAssignSessionReports = cfg.canAssignSessionReports === true;
     const initialScheduleRoles = Array.isArray(cfg.initialScheduleRoles) ? cfg.initialScheduleRoles : [];
     const initialDefaultRole = String(cfg.initialDefaultRole || '');
     const initialLockedPersonId = String(cfg.initialLockedPersonId || '');
@@ -3138,6 +3139,7 @@
             document.getElementById('btn_scheduleSessionContextMove')?.classList.add('d-none');
             document.getElementById('btn_scheduleSessionContextAttendance')?.classList.add('d-none');
             document.getElementById('btn_scheduleSessionContextEnrollment')?.classList.add('d-none');
+            document.getElementById('btn_scheduleSessionContextAssignReport')?.classList.add('d-none');
             document.getElementById('btn_scheduleSessionContextOpenSession')?.classList.add('d-none');
             document.getElementById('btn_scheduleSessionContextRollingEnrollment')?.classList.add('d-none');
             document.querySelectorAll('#scheduleSessionContextMenu .schedule-session-context-menu-divider').forEach((el) => {
@@ -3171,6 +3173,8 @@
             document.getElementById('btn_scheduleSessionContextMove')?.classList.toggle('d-none', !(quickEdit && canMoveDate));
             document.getElementById('btn_scheduleSessionContextAttendance')?.classList.toggle('d-none', !isClass);
             document.getElementById('btn_scheduleSessionContextEnrollment')?.classList.toggle('d-none', !isClass);
+            const showAssignReport = canAssignSessionReports && isClass && event?.isDraft !== true;
+            document.getElementById('btn_scheduleSessionContextAssignReport')?.classList.toggle('d-none', !showAssignReport);
             const manageUrl = buildSessionManagerUrlForEvent(event);
             document.getElementById('btn_scheduleSessionContextOpenSession')?.classList.toggle('d-none', !manageUrl);
             const classId = String(event?.classId || '').trim();
@@ -8453,6 +8457,15 @@ if (canLoadAllSchedules) {
             refreshScheduleViewWithHolidays,
             syncPartialModalFromTimelineDrafts,
             schedulePersistDraftBackup: () => { if (canDragCreateSessions) schedulePersistDraftBackup(); },
+            applyScheduleSessionChangesInView
+        });
+    }
+    if (canAssignSessionReports && typeof global.installMasterScheduleAssignReport === 'function') {
+        global.installMasterScheduleAssignReport({
+            uiAlert,
+            escapeHtml,
+            hideScheduleSessionContextMenu,
+            getScheduleSessionContextEvent: () => scheduleSessionContextEvent,
             applyScheduleSessionChangesInView
         });
     }

@@ -9,7 +9,8 @@ test('buildMasterScheduleViewerClientConfig whitelists capability flags and sani
     scheduleCapabilities: {
       canSelectAnyPerson: true,
       canDragCreateSessions: true,
-      canLoadAllSchedules: true
+      canLoadAllSchedules: true,
+      canAssignSessionReports: true
     },
     viewerScheduleAccess: {
       availableRoles: [{ key: 'teacher', label: 'Teacher' }],
@@ -24,6 +25,7 @@ test('buildMasterScheduleViewerClientConfig whitelists capability flags and sani
 
   assert.equal(config.canSelectAnyPerson, true);
   assert.equal(config.canDragCreateSessions, true);
+  assert.equal(config.canAssignSessionReports, true);
   assert.equal(config.initialScheduleViewerPrefs.startDate, '2026-09-01');
   assert.equal(config.initialScheduleViewerPrefs.autoChangeDetector, false);
   assert.equal(config.api.viewerPreferences, '/school/schedules/api/viewer-preferences');

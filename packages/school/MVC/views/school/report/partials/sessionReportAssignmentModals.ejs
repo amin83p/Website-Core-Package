@@ -1,0 +1,152 @@
+<div class="modal fade" id="sessionReportAssignmentModal" tabindex="-1" aria-hidden="true" aria-labelledby="sessionReportAssignmentModalTitle">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header">
+        <div>
+          <h5 class="modal-title" id="sessionReportAssignmentModalTitle">Assign report</h5>
+          <div class="small text-muted" id="sessionReportAssignmentModalSubtitle">Link a report template to this class session</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="sessionReportAssignmentLoading" class="text-center text-muted py-5 d-none">
+          <div class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></div>
+          Loading session and templates…
+        </div>
+        <div id="sessionReportAssignmentFormWrap" class="d-none">
+          <div class="small text-muted mb-3" id="sessionReportAssignmentContext"></div>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-semibold" for="sessionReportTemplateId">Report template</label>
+              <select class="form-select" id="sessionReportTemplateId" disabled>
+                <option value="">Loading templates…</option>
+              </select>
+              <div class="form-text" id="sessionReportTemplateHelp">Active templates only.</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold" for="sessionReportScope">Report scope</label>
+              <select class="form-select" id="sessionReportScope" disabled>
+                <option value="class">Whole Class</option>
+                <option value="each_student">Each Student</option>
+                <option value="selected_students">Specific Students</option>
+              </select>
+              <div class="form-text" id="sessionReportScopeHelp">Select a template to see its approved scopes.</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-semibold" for="sessionReportTargetMode">Target mode</label>
+              <input type="text" class="form-control bg-light" id="sessionReportTargetMode" value="Session" readonly>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold" for="sessionReportStartDate">Start date</label>
+              <input type="date" class="form-control" id="sessionReportStartDate">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold" for="sessionReportDueDate">Due date</label>
+              <input type="date" class="form-control" id="sessionReportDueDate">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-semibold" for="sessionReportTaskStart">Task start</label>
+              <input type="time" class="form-control" id="sessionReportTaskStart">
+            </div>
+            <div class="col-md-2">
+              <label class="form-label fw-semibold" for="sessionReportTaskEnd">Task end</label>
+              <input type="time" class="form-control" id="sessionReportTaskEnd">
+            </div>
+            <div class="col-12 d-none" id="sessionReportSpecificStudentsWrap">
+              <label class="form-label fw-semibold" for="sessionReportStudentSummary">Students</label>
+              <div class="input-group">
+                <input type="text" class="form-control bg-white" id="sessionReportStudentSummary" placeholder="No students selected" readonly>
+                <button type="button" class="btn btn-outline-primary btn-sm" id="btnPickSessionReportStudents"><i class="bi bi-people me-1"></i>Pick students</button>
+              </div>
+              <div id="sessionReportSelectedStudents" class="d-flex flex-wrap gap-1 mt-2"></div>
+              <div class="form-text" id="sessionReportStudentHint">Pick students with valid enrollment for this report period.</div>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-semibold" for="sessionReportAllocatedHours">Allocated hours</label>
+              <input type="number" class="form-control" id="sessionReportAllocatedHours" min="0" step="0.25" value="0">
+            </div>
+            <div class="col-md-8 d-flex align-items-end flex-wrap gap-4">
+              <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="sessionReportTimesheetReflection">
+                <label class="form-check-label" for="sessionReportTimesheetReflection">Reflect on timesheet</label>
+              </div>
+              <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="sessionReportConflictPermitted" checked>
+                <label class="form-check-label" for="sessionReportConflictPermitted">Permit schedule conflict</label>
+              </div>
+              <div class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="sessionReportConductRequiredBeforeFill" checked>
+                <label class="form-check-label" for="sessionReportConductRequiredBeforeFill">Require class conduct before filling</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-semibold" for="sessionReportNotes">Notes</label>
+              <textarea class="form-control" id="sessionReportNotes" rows="3" maxlength="1500" placeholder="Optional assignment notes"></textarea>
+            </div>
+          </div>
+          <div id="sessionReportExistingReportsSection" class="mt-4 d-none">
+            <div class="border-top pt-3">
+              <h6 class="fw-semibold mb-2">Reports on this session</h6>
+              <p class="small text-muted mb-2" id="sessionReportExistingReportsHint">These reports are already linked to this session.</p>
+              <div class="table-responsive border rounded">
+                <table class="table table-sm align-middle mb-0">
+                  <thead class="table-light">
+                    <tr>
+                      <th>Report</th>
+                      <th>Scope / student</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody id="sessionReportExistingReportsBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btnSaveSessionReportAssignment" disabled>
+          <i class="bi bi-save me-1"></i>Save assignment
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="sessionReportStudentPickerModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static" aria-labelledby="sessionReportStudentPickerModalTitle">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header">
+        <h5 class="modal-title" id="sessionReportStudentPickerModalTitle">Pick students</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="sessionReportStudentPickerSelectAll" checked>
+            <label class="form-check-label small" for="sessionReportStudentPickerSelectAll">Select all</label>
+          </div>
+          <span class="small text-muted" id="sessionReportStudentPickerSummary"></span>
+        </div>
+        <div class="table-responsive border rounded" style="max-height: 360px; overflow-y: auto;">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light sticky-top">
+              <tr>
+                <th style="width: 2rem;"></th>
+                <th>Student</th>
+                <th class="text-end" style="width: 8rem;">Eligible sessions</th>
+              </tr>
+            </thead>
+            <tbody id="sessionReportStudentPickerBody"></tbody>
+          </table>
+        </div>
+        <div id="sessionReportStudentPickerEmpty" class="small text-muted mt-2 d-none">No enrollment-eligible students were found for this report period.</div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary btn-sm" id="btnConfirmSessionReportStudentPicker">Apply selection</button>
+      </div>
+    </div>
+  </div>
+</div>
