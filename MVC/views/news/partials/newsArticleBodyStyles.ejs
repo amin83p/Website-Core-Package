@@ -60,11 +60,45 @@
   margin: 0.35rem 0 0.85rem 1.25rem;
 }
 
-.article-body .news-figure--layout-float-left + p,
-.article-body .news-figure--layout-float-right + p,
-.ql-editor .news-figure--layout-float-left + p,
-.ql-editor .news-figure--layout-float-right + p {
+.article-body .news-figure--layout-float-left ~ p:not(.news-figure-clear):not(.news-p-float-gap):not(.news-figure-post-float):not(:empty),
+.ql-editor .news-figure--layout-float-left ~ p:not(.news-figure-clear):not(.news-p-float-gap):not(.news-figure-post-float):not(:empty),
+.article-body .news-figure--layout-float-right ~ p:not(.news-figure-clear):not(.news-p-float-gap):not(.news-figure-post-float):not(:empty),
+.ql-editor .news-figure--layout-float-right ~ p:not(.news-figure-clear):not(.news-p-float-gap):not(.news-figure-post-float):not(:empty) {
   overflow: hidden;
+}
+
+.article-body p.news-figure-post-float,
+.ql-editor p.news-figure-post-float {
+  clear: both;
+  overflow: visible;
+}
+
+.article-body p.news-figure-clear,
+.ql-editor p.news-figure-clear {
+  clear: both;
+  margin-bottom: 1.45rem;
+  margin-top: 0.35rem;
+  min-height: 0;
+}
+
+.article-body p.news-p-float-gap,
+.ql-editor p.news-p-float-gap {
+  clear: none;
+  line-height: 0;
+  margin-bottom: 0;
+  margin-top: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 0;
+}
+
+.article-body p.news-p-float-gap:has(> br:only-child),
+.ql-editor p.news-p-float-gap:has(> br:only-child),
+.article-body p.news-p-float-gap:empty,
+.ql-editor p.news-p-float-gap:empty {
+  height: 0;
+  margin: 0;
+  padding: 0;
 }
 
 .ql-editor .news-figure {

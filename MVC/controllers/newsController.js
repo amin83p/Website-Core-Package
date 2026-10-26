@@ -518,6 +518,55 @@ async function listAdmin(req, res) {
     }
 }
 
+async function previewDraft(req, res) {
+    try {
+        const body = req.body || {};
+        const user = req.user;
+        const now = new Date().toISOString();
+        const tags = body.tags
+            ? String(body.tags).split(',').map((t) => t.trim()).filter(Boolean)
+            : [];
+
+        const synthetic = normalizeNewsItem({
+            id: 'DRAFT_PREVIEW',
+            status: 'draft',
+            visibility: 'public',
+            metrics: { views: 0 },
+            meta: {
+                title: body.title || 'Untitled preview',
+                slug: 'draft-preview',
+                category: body.category || 'General',
+                tags,
+                author: {
+                    userId: user?.id || '',
+                    displayName: user?.username || user?.displayName || 'Editor'
+                },
+                publishDate: body.publishDate || now
+            },
+            content: {
+                featuredImage: ensureRootRelativeWebPath(body.featuredImage || ''),
+                summary: body.summary || '',
+                body: normalizeNewsHtmlAssetUrls(body.htmlContent || '')
+            }
+        });
+
+        res.set('X-Robots-Tag', 'noindex, nofollow');
+        res.render('news/article', {
+            title: `${synthetic.meta.title} (Preview)`,
+            article: synthetic,
+            latestNews: [],
+            relatedNews: [],
+            draftPreview: true,
+            htmlClass: 'news-public-root',
+            bodyClass: 'news-public-body public-zoom-centered-body',
+            mainClass: 'container news-public-main',
+            user
+        });
+    } catch (error) {
+        res.status(500).render('error', { title: 'Preview Error', message: error.message, user: req.user });
+    }
+}
+
 async function showForm(req, res) {
     try {
         const id = req.params.id;
@@ -934,6 +983,7 @@ module.exports = {
     viewArticle,
     listAdmin,
     showForm,
+    previewDraft,
     saveNews,
     deleteNews,
     showStats,

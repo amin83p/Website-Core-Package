@@ -40,12 +40,18 @@
   const latestItems = (Array.isArray(latestNews) ? latestNews : []).map(normalizeStory).filter((story) => story.hrefToken);
   const relatedItems = (Array.isArray(relatedNews) ? relatedNews : []).map(normalizeStory).filter((story) => story.hrefToken);
   const readCount = Number(metrics.views || 0);
+  const isDraftPreview = typeof draftPreview !== 'undefined' && !!draftPreview;
 %>
 
 <%- include('news/partials/newsPublicBackground', { newsBgIncludeShapes: true }) %>
 <%- include('partials/newsArticleBodyStyles') %>
 
 <section class="news-public-page news-article-page">
+  <% if (isDraftPreview) { %>
+  <div class="alert alert-warning border-0 shadow-sm mx-auto mb-3 news-draft-preview-banner" role="status">
+    <strong>Draft preview</strong> — not saved. Close this tab and return to the editor to publish.
+  </div>
+  <% } %>
   <section class="news-article-hero" aria-labelledby="newsArticleTitle">
     <div class="news-hero-orbit" aria-hidden="true">
       <span></span>
@@ -501,8 +507,13 @@ html.news-public-root body.news-public-body:has(.news-article-page) .news-public
   .news-article-card { border-radius: 26px; }
   .reading-toolbar { justify-content: flex-start; }
 }
+.news-draft-preview-banner {
+  max-width: 1120px;
+  width: calc(100% - 2rem);
+}
 </style>
 
+<script src="/scripts/news/quillNewsFigureFloatLayout.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const state = {
@@ -512,6 +523,9 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const bodyText = document.getElementById('articleBodyContent');
+    if (bodyText && window.NewsFigureFloatLayout?.syncNewsFigureFloatLayout) {
+        window.NewsFigureFloatLayout.syncNewsFigureFloatLayout(bodyText);
+    }
     if (bodyText) {
         const rewriteArticleImageSrc = (rawSrc) => {
             const src = String(rawSrc || '').trim();

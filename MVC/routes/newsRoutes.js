@@ -43,6 +43,7 @@ router.post('/api/upload',
 // Create New
 router.get('/manage/new', requireAuth, controller.showForm);
 router.post('/manage/new', requireAuth, upload('news').array('attachments', 10), controller.saveNews);
+router.post('/manage/preview', requireAuth, controller.previewDraft);
 
 // Edit Existing
 router.get('/manage/edit/:id', requireAuth, controller.showForm);
