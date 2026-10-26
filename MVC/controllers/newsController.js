@@ -14,6 +14,8 @@ const {
     normalizeNewsHtmlAssetUrls,
     extractImgSrcList
 } = require('../utils/newsHtmlAssetUrls');
+const newsRoleNotifyService = require('../services/newsRoleNotifyService');
+const { defaultSendAtLocalFromNow } = require('../utils/scheduleSendAtUtils');
 
 const MAX_ARTICLE_VISIT_PAGE_LIMIT = 100;
 
@@ -350,7 +352,8 @@ function buildNewsObject(body, files, user, existing = null) {
         finalAttachments = existing ? (existing.attachments || []) : [];
     }
 
-    const status = body.status || 'draft'; 
+    const status = body.status || 'draft';
+    const notifyParsed = newsRoleNotifyService.parseNotifyRequestBody(body);
 
     return {
         active: status !== 'archived',
@@ -377,6 +380,12 @@ function buildNewsObject(body, files, user, existing = null) {
         },
 
         attachments: finalAttachments,
+
+        notifications: newsRoleNotifyService.buildNotificationsAudit({
+            roleKeys: notifyParsed.roleKeys,
+            recipientCount: notifyParsed.recipients.filter((row) => row.included !== false).length,
+            existing
+        }),
 
         audit: {
             createUser: existing?.audit?.createUser || user.id,
@@ -578,6 +587,17 @@ async function showForm(req, res) {
         
         const categories = await getCategories();
 
+        const activeOrgId = newsRoleNotifyService.resolveActiveOrgId(req.user);
+        let notifyOrgTimeZone = '';
+        let notifyRoleOptions = [];
+        if (activeOrgId) {
+            notifyOrgTimeZone = await newsRoleNotifyService.resolveOrgTimeZone(activeOrgId, req.user);
+            notifyRoleOptions = await newsRoleNotifyService.resolveOrgNotifyRoleCatalog({
+                orgId: activeOrgId,
+                user: req.user
+            });
+        }
+
         res.render('news/form', {
             title: id ? 'Edit News' : 'Compose News',
             item,
@@ -585,6 +605,12 @@ async function showForm(req, res) {
             user: req.user,
             actionStateId: req.actionStateId,
             newsMediaDefaultFolder: getNewsMediaDefaultFolder(),
+            notifyRoleOptions,
+            notifyActiveOrgId: activeOrgId,
+            notifyOrgTimeZone,
+            notifyDefaultSendAtLocal: activeOrgId
+                ? defaultSendAtLocalFromNow(notifyOrgTimeZone, 60)
+                : '',
             includeModal: true
         });
     } catch (error) {
@@ -601,6 +627,8 @@ async function saveNews(req, res) {
         }
 
         const newsData = buildNewsObject(req.body, req.files, req.user, existing);
+        const notifyParsed = newsRoleNotifyService.parseNotifyRequestBody(req.body);
+        const activeOrgId = newsRoleNotifyService.resolveActiveOrgId(req.user);
 
         let result;
         if (id) {
@@ -609,14 +637,136 @@ async function saveNews(req, res) {
             result = await dataService.addData('news', newsData, req.user);
         }
 
+        const savedArticle = normalizeNewsItem(result || newsData);
+        let notifySummary = null;
+
+        if (
+            savedArticle.status === 'published'
+            && notifyParsed.notifyEnabled
+            && activeOrgId
+        ) {
+            const wasPublished = existing && String(existing.status || '').toLowerCase() === 'published';
+            const shouldSend = !wasPublished || notifyParsed.notifyResend;
+            if (shouldSend) {
+                const recipients = await newsRoleNotifyService.validateSubmittedRecipients({
+                    orgId: activeOrgId,
+                    roleKeys: notifyParsed.roleKeys,
+                    submitted: notifyParsed.recipients,
+                    user: req.user
+                });
+                if (recipients.length) {
+                    const timeZone = await newsRoleNotifyService.resolveOrgTimeZone(activeOrgId, req.user);
+                    const sendNow = notifyParsed.sendNow
+                        || (!String(notifyParsed.sendAtLocal || '').trim() ? '1' : '');
+                    const sendAtIso = newsRoleNotifyService.resolveSendAtForSchedule({
+                        sendAtLocal: notifyParsed.sendAtLocal,
+                        sendNow,
+                        timeZone
+                    });
+                    notifySummary = await newsRoleNotifyService.scheduleArticleNotifications({
+                        orgId: activeOrgId,
+                        article: savedArticle,
+                        recipients,
+                        sendAtIso,
+                        user: req.user,
+                        resend: notifyParsed.notifyResend,
+                        roleKeys: notifyParsed.roleKeys,
+                        req
+                    });
+                    const notifications = {
+                        ...(savedArticle.notifications || {}),
+                        lastSentAt: new Date().toISOString(),
+                        recipientCount: recipients.length,
+                        roleKeys: notifyParsed.roleKeys,
+                        lastOutboxBatchId: notifySummary.outboxIds[0] || ''
+                    };
+                    await dataService.updateData('news', savedArticle.id, { notifications }, req.user).catch(() => {});
+                }
+            }
+        }
+
+        const successMessage = notifySummary && notifySummary.queued
+            ? `News saved. ${notifySummary.queued} notification email(s) queued.`
+            : 'News saved.';
+
         if (req.headers['x-ajax-request']) {
-            return res.json({ status: 'success', message: 'News saved.', redirect: '/news/manage' });
+            const outboxUrl = notifySummary && notifySummary.queued
+                ? '/scheduled-tasks/outbox?eventKey__eq=NEWS_ARTICLE_NOTIFY'
+                : '';
+            return res.json({
+                status: 'success',
+                message: successMessage,
+                redirect: '/news/manage',
+                notify: notifySummary,
+                outboxUrl
+            });
         }
         res.redirect('/news/manage');
 
     } catch (error) {
         if (req.headers['x-ajax-request']) return res.status(400).json({ status: 'error', message: error.message });
         res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+    }
+}
+
+async function getNotifyRoles(req, res) {
+    try {
+        const activeOrgId = newsRoleNotifyService.resolveActiveOrgId(req.user);
+        if (!activeOrgId) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Select an organization to notify members by role.'
+            });
+        }
+
+        const roles = await newsRoleNotifyService.resolveOrgNotifyRoleCatalog({
+            orgId: activeOrgId,
+            user: req.user
+        });
+
+        return res.json({
+            status: 'success',
+            roles,
+            orgId: activeOrgId
+        });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message || 'Unable to load roles.' });
+    }
+}
+
+async function postNotifyRecipients(req, res) {
+    try {
+        const activeOrgId = newsRoleNotifyService.resolveActiveOrgId(req.user);
+        if (!activeOrgId) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Select an organization to notify members by role.'
+            });
+        }
+
+        const body = req.body && typeof req.body === 'object' ? req.body : {};
+        let roleKeys = body.roleKeys;
+        if (typeof roleKeys === 'string') {
+            try {
+                roleKeys = JSON.parse(roleKeys);
+            } catch (_) {
+                roleKeys = roleKeys.split(',').map((token) => token.trim());
+            }
+        }
+
+        const recipients = await newsRoleNotifyService.resolveRecipients({
+            orgId: activeOrgId,
+            roleKeys,
+            user: req.user
+        });
+
+        return res.json({
+            status: 'success',
+            recipients,
+            orgId: activeOrgId
+        });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message || 'Unable to load recipients.' });
     }
 }
 
@@ -989,6 +1139,8 @@ module.exports = {
     showStats,
     uploadMedia,
     listNewsMediaLibrary,
+    getNotifyRoles,
+    postNotifyRecipients,
     buildArticleVisitLogPage,
     resolveArticleVisitAnalytics,
     resolveGuestVisitLabels,
