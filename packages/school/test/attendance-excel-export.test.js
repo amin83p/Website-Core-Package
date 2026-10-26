@@ -432,6 +432,44 @@ test('filterMatrixBySessionIds keeps only requested sessions and aligned records
   );
 });
 
+test('attendance matrix export keeps one wide table across calendar months', async () => {
+  const { buffer } = await attendanceExcelExportService.buildAttendanceExcelWorkbook({
+    className: 'EAL Morning',
+    teacherName: 'Fatima Majoka',
+    startDate: '2026-09-01',
+    endDate: '2026-10-31',
+    enabledAttendanceStatuses: ['present', 'absent'],
+    sessions: [
+      { id: 's1', date: '2026-09-28' },
+      { id: 's2', date: '2026-10-05' }
+    ],
+    matrix: [{
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      records: [
+        { sessionId: 's1', date: '2026-09-28', status: 'present' },
+        { sessionId: 's2', date: '2026-10-05', status: 'present' }
+      ],
+      summary: { performancePercent: 100 }
+    }]
+  });
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  const sheet = workbook.getWorksheet(1);
+  let headerRow = null;
+  for (let row = 1; row <= 20; row += 1) {
+    if (sheet.getCell(row, 1).value === 'Funder' && sheet.getCell(row, 5).value === 28) {
+      headerRow = row;
+      break;
+    }
+  }
+  assert.ok(headerRow);
+  assert.equal(sheet.getCell(headerRow, 6).value, 5);
+  assert.equal(sheet.getColumn(5).width, 5);
+  assert.equal(sheet.getColumn(6).width, 5);
+});
+
 test('workbook layout: Att %, banding, title/class/teacher, Fatima fills, notes, CLBs', async () => {
   const { buffer, filename, legend, title } = await attendanceExcelExportService.buildAttendanceExcelWorkbook({
     className: 'EAL Morning',

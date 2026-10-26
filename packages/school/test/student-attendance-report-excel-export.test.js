@@ -29,6 +29,41 @@ function sampleClassPayload(className, sessionDate) {
   };
 }
 
+test('groupSessionsByCalendarMonth orders chunks chronologically', () => {
+  const chunks = attendanceExcelExportService.groupSessionsByCalendarMonth([
+    { id: 's2', date: '2026-10-05' },
+    { id: 's1', date: '2026-09-28' }
+  ]);
+  assert.equal(chunks.length, 2);
+  assert.equal(chunks[0].monthKey, '2026-09');
+  assert.equal(chunks[0].startDate, '2026-09-28');
+  assert.equal(chunks[1].monthKey, '2026-10');
+  assert.equal(chunks[1].startDate, '2026-10-05');
+});
+
+test('groupDatesByCalendarMonth groups and sorts date strings', () => {
+  const chunks = attendanceExcelExportService.groupDatesByCalendarMonth([
+    '2026-10-01',
+    '2026-09-15',
+    '2026-09-08'
+  ]);
+  assert.deepEqual(chunks.map((row) => row.monthKey), ['2026-09', '2026-10']);
+  assert.deepEqual(chunks[0].dates, ['2026-09-08', '2026-09-15']);
+  assert.deepEqual(chunks[1].dates, ['2026-10-01']);
+});
+
+test('shouldSplitAttendanceExportByMonth is true only for multiple chunks', () => {
+  assert.equal(attendanceExcelExportService.shouldSplitAttendanceExportByMonth([]), false);
+  assert.equal(attendanceExcelExportService.shouldSplitAttendanceExportByMonth([{ monthKey: '2026-09' }]), false);
+  assert.equal(
+    attendanceExcelExportService.shouldSplitAttendanceExportByMonth([
+      { monthKey: '2026-09' },
+      { monthKey: '2026-10' }
+    ]),
+    true
+  );
+});
+
 test('sanitizeExcelSheetName enforces length and uniqueness', () => {
   const used = new Set();
   const first = attendanceExcelExportService.sanitizeExcelSheetName('Morning EAL Class A', used);
@@ -93,6 +128,139 @@ test('buildStudentAttendanceExcelWorkbook singleSheet stacks all classes on one 
   const text = collectWorksheetText(workbook.getWorksheet(1));
   assert.match(text, /Class: Alpha Class/);
   assert.match(text, /Class: Beta Class/);
+});
+
+test('buildStudentAttendanceExcelWorkbook splits class matrix by calendar month on one sheet', async () => {
+  const payload = {
+    ...sampleClassPayload('Alpha Class', '2026-09-28'),
+    startDate: '2026-09-01',
+    endDate: '2026-10-31',
+    sessions: [
+      { id: 's1', date: '2026-09-28' },
+      { id: 's2', date: '2026-10-05' }
+    ],
+    matrix: [{
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      records: [
+        { sessionId: 's1', date: '2026-09-28', status: 'present' },
+        { sessionId: 's2', date: '2026-10-05', status: 'late' }
+      ],
+      summary: { performancePercent: 100 }
+    }]
+  };
+
+  const { buffer } = await attendanceExcelExportService.buildStudentAttendanceExcelWorkbook([
+    { payload, sheetName: 'Alpha Class' }
+  ], {
+    studentName: 'Ada Lovelace',
+    startDate: '2026-09-01',
+    endDate: '2026-10-31'
+  }, {
+    sheetLayout: 'singleSheet'
+  });
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  const text = collectWorksheetText(workbook.getWorksheet(1));
+  assert.match(text, /Attendance September 2026 \(28–28\)/);
+  assert.doesNotMatch(text, /Attendance October 2026/);
+  assert.match(text, /\b28\b/);
+  assert.match(text, /\b5\b/);
+  const afterFirstMonthBody = text.split('P(1)/L(1)/E(0)/A(0)/ACF(0)/N(0)').pop();
+  assert.doesNotMatch(afterFirstMonthBody, /Teacher: Teacher One/);
+  assert.doesNotMatch(afterFirstMonthBody, /Attendance October 2026/);
+
+  const sheet = workbook.getWorksheet(1);
+  assert.equal(sheet.getColumn(5).width, 7);
+});
+
+test('multi-month student SAR uses roomier session columns than matrix export', async () => {
+  const sessions = [];
+  const records = [];
+  for (let day = 1; day <= 12; day += 1) {
+    const date = `2026-09-${String(day).padStart(2, '0')}`;
+    sessions.push({ id: `s${day}`, date });
+    records.push({ sessionId: `s${day}`, date, status: 'present' });
+  }
+  sessions.push({ id: 'sOct', date: '2026-10-05' });
+  records.push({ sessionId: 'sOct', date: '2026-10-05', status: 'present' });
+
+  const payload = {
+    className: 'Alpha Class',
+    teacherName: 'Teacher One',
+    startDate: '2026-09-01',
+    endDate: '2026-10-31',
+    enabledAttendanceStatuses: ['present', 'absent'],
+    sessions,
+    matrix: [{
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      records,
+      summary: { performancePercent: 100 }
+    }]
+  };
+
+  const { buffer } = await attendanceExcelExportService.buildStudentAttendanceExcelWorkbook([
+    { payload, sheetName: 'Alpha Class' }
+  ], {}, { sheetLayout: 'singleSheet' });
+
+  const matrixReference = await attendanceExcelExportService.buildAttendanceExcelWorkbook({
+    ...payload,
+    sessions: sessions.slice(0, 12),
+    endDate: '2026-09-12'
+  });
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  const reference = new ExcelJS.Workbook();
+  await reference.xlsx.load(matrixReference.buffer);
+
+  const sheet = workbook.getWorksheet(1);
+  const refSheet = reference.getWorksheet(1);
+  assert.equal(refSheet.getColumn(5).width, 5);
+  for (let col = 5; col <= 12; col += 1) {
+    assert.equal(sheet.getColumn(col).width, 7);
+  }
+});
+
+test('buildOfficialStudentAttendanceExcelWorkbook splits consolidated table by calendar month', async () => {
+  const exportModel = {
+    student: { name: 'Ada Lovelace' },
+    startDate: '2026-09-01',
+    endDate: '2026-10-31',
+    enabledAttendanceStatuses: ['present', 'absent', 'not_applicable'],
+    unionSessionDates: ['2026-09-28', '2026-10-05'],
+    classRows: [{
+      className: 'Alpha Class',
+      teacherName: 'Fatima Majoka',
+      studentRow: {},
+      sessionDateSet: new Set(['2026-09-28', '2026-10-05']),
+      sessionsByDate: new Map([
+        ['2026-09-28', { date: '2026-09-28', startTime: '09:00', endTime: '12:00' }],
+        ['2026-10-05', { date: '2026-10-05', startTime: '09:00', endTime: '12:00' }]
+      ]),
+      recordsByDate: new Map([
+        ['2026-09-28', { status: 'present', sessionId: 's1' }],
+        ['2026-10-05', { status: 'present', sessionId: 's2' }]
+      ])
+    }]
+  };
+
+  const { buffer } = await attendanceExcelExportService.buildOfficialStudentAttendanceExcelWorkbook(exportModel, {
+    studentName: 'Ada Lovelace',
+    startDate: '2026-09-01',
+    endDate: '2026-10-31'
+  });
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  const text = collectWorksheetText(workbook.getWorksheet(1));
+  assert.match(text, /Attendance Report - September 28, 2026 - September 28, 2026/);
+  assert.doesNotMatch(text, /Attendance Report - October 05, 2026/);
+  assert.match(text, /\b28\b/);
+  assert.match(text, /\b5\b/);
+  assert.equal(text.split('Not Applicable').length - 1, 1);
 });
 
 test('buildUnionSessionDatesFromExportEntries dedupes and sorts session dates', () => {
