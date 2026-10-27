@@ -44,17 +44,7 @@ function clonePlainValue(value, fallback) {
 }
 
 function uploadedFileRecord(file) {
-  if (!file) return null;
-  const storedPath = uploadMiddleware.getStoredFilePath(file);
-  const storedUrl = uploadMiddleware.getStoredFileUrl(file);
-  if (!storedPath && !storedUrl) return null;
-  return {
-    fileName: String(file.filename || ''),
-    originalName: String(file.originalname || file.filename || ''),
-    path: String(storedPath || storedUrl),
-    url: String(storedUrl || storedPath),
-    uploadedAt: new Date().toISOString()
-  };
+  return reportViewService.resolveUploadedFileRecord(file);
 }
 
 function sendError(req, res, error, title = 'Overall Report Error') {

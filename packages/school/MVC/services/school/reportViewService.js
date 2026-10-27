@@ -3,6 +3,8 @@ const reportRuleEngineService = require('./reportRuleEngineService');
 const schoolIdentityLookupService = require('./schoolIdentityLookupService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const uploadMiddleware = requireCoreModule('MVC/middleware/upload');
+const uploadPathUtils = requireCoreModule('MVC/utils/uploadPathUtils');
+const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
 const schoolAdminAccessService = require('./schoolAdminAccessService');
 const accessService = requireCoreModule('MVC/services/security');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
@@ -540,16 +542,27 @@ function filterRecordsByOrg(rows, reqUser) {
   return list.filter((row) => idsEqual(row?.orgId, activeOrgId));
 }
 
+function normalizeStoredUploadRef(storedPath = '', storedUrl = '') {
+  const uploadUrl = String(storedUrl || '').trim();
+  const pathToken = String(storedPath || '').trim();
+  if (uploadUrl && fileAssetStorage.isUploadReference(uploadUrl)) return uploadUrl;
+  if (pathToken && fileAssetStorage.isUploadReference(pathToken)) return pathToken;
+  const fromDisk = uploadPathUtils.fromDiskPathToUploadsUrl(pathToken || uploadUrl);
+  if (fromDisk) return fromDisk;
+  return uploadUrl || pathToken;
+}
+
 function resolveUploadedFileRecord(file) {
   if (!file) return null;
   const storedPath = uploadMiddleware.getStoredFilePath(file);
   const storedUrl = uploadMiddleware.getStoredFileUrl(file);
   if (!storedPath && !storedUrl) return null;
+  const canonicalRef = normalizeStoredUploadRef(storedPath, storedUrl);
   return {
     fileName: String(file.filename),
     originalName: String(file.originalname || file.filename),
-    path: String(storedPath || storedUrl),
-    url: String(storedUrl || storedPath),
+    path: canonicalRef,
+    url: canonicalRef,
     uploadedAt: new Date().toISOString()
   };
 }
@@ -2270,6 +2283,8 @@ module.exports = {
   validateTargetDepartmentIdsForSave,
   buildTemplateSavePayload,
   buildTemplateComplianceDraft,
+  resolveUploadedFileRecord,
+  normalizeStoredUploadRef,
   buildDocxTemplatesByFunderFromUpload,
   buildPdfTemplatesByFunderFromUpload,
   buildPdfFieldMapFromPayload,

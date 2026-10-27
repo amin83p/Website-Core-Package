@@ -3,7 +3,7 @@ const fsSync = require('fs');
 const path = require('path');
 const { buildSignedHeaders } = require('./fileGatewayAuthService');
 const { writeGatewayUploadBuffer } = require('./fileGatewayStorageService');
-const { getGatewayBaseUrl, getGatewayTimeoutMs } = require('../utils/uploadModeUtils');
+const { getGatewayBaseUrl, getGatewayTimeoutMs, isRailwayProxyMode } = require('../utils/uploadModeUtils');
 const uploadPathUtils = require('../utils/uploadPathUtils');
 
 function clean(value) {
@@ -296,6 +296,24 @@ async function gatewayDeleteByRelativePath({ scopeKey = '', relativePath = '' } 
   });
 }
 
+async function gatewayDownloadByUploadUrl(uploadUrl = '') {
+  const token = clean(uploadUrl);
+  if (!token) throw new Error('Upload URL is required.');
+  const response = await fetchGatewayResponse('/internal/file-gateway/download', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ uploadUrl: token })
+  });
+  const buffer = Buffer.from(await response.arrayBuffer());
+  const mimeType = response.headers.get('content-type') || 'application/octet-stream';
+  return {
+    buffer,
+    mimeType,
+    size: buffer.length,
+    uploadUrl: token
+  };
+}
+
 async function downloadRemoteUploadFile(scopeKey = '', relativePath = '') {
   const local = await readLocalUploadIfPresent(scopeKey, relativePath);
   if (local) {
@@ -305,6 +323,26 @@ async function downloadRemoteUploadFile(scopeKey = '', relativePath = '') {
       size: local.size,
       uploadUrl: local.uploadUrl
     };
+  }
+
+  const relativeUploadUrl = buildRelativeUploadUrl(scopeKey, relativePath);
+  if (isRailwayProxyMode() || getGatewayBaseUrl()) {
+    try {
+      const signed = await gatewayDownloadByUploadUrl(relativeUploadUrl);
+      return {
+        blob: new Blob([signed.buffer], { type: signed.mimeType }),
+        mimeType: signed.mimeType,
+        size: signed.size,
+        uploadUrl: signed.uploadUrl
+      };
+    } catch (signedError) {
+      if (!isRailwayProxyMode()) {
+        // fall through to public GET for hybrid local setups
+      } else {
+        signedError.statusCode = signedError.statusCode || 404;
+        throw signedError;
+      }
+    }
   }
 
   const uploadUrl = buildUploadUrl(scopeKey, relativePath);
@@ -616,6 +654,7 @@ async function gatewayRestoreOrgBackup({
 module.exports = {
   gatewayUploadBlob,
   gatewayUploadFile,
+  gatewayDownloadByUploadUrl,
   downloadRemoteUploadFile,
   gatewayDeleteByUploadUrl,
   gatewayDeleteByRelativePath,

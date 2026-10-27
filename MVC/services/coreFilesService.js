@@ -159,7 +159,9 @@ function collectRequestFiles(req = {}) {
 }
 
 async function mirrorUploadedFilesIfNeeded(req = {}, fixedCategory = '') {
-  if (!isRailwayProxyMode()) return;
+  if (!isRailwayProxyMode()) {
+    return;
+  }
   if (shouldKeepLocalProxyPath(fixedCategory)) return;
   const requestPath = String(req.originalUrl || req.url || '').toLowerCase();
   if (requestPath.includes('/internal/file-gateway/')) return;

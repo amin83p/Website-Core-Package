@@ -40,16 +40,39 @@ function normalizeCollectionRows(rows = []) {
     });
 }
 
+function normalizeUploadReadRef(raw = '') {
+  const token = String(raw || '').trim();
+  if (!token) return '';
+  if (fileAssetStorage.isUploadReference?.(token)) {
+    const relativeUploadPath = uploadPathUtils.extractRelativeUploadPath(token);
+    return relativeUploadPath ? `/uploads/${relativeUploadPath}` : token;
+  }
+  const relativeUploadPath = uploadPathUtils.extractRelativeUploadPath(token);
+  if (relativeUploadPath) return `/uploads/${relativeUploadPath}`;
+  return token;
+}
+
 function resolveTemplateFilePath(docxTemplate = {}) {
   const fromRecord = String(docxTemplate.path || '').trim();
   if (!fromRecord) return '';
 
-  if (fileAssetStorage.isUploadReference?.(fromRecord)) {
-    const relativeUploadPath = uploadPathUtils.extractRelativeUploadPath(fromRecord);
-    return relativeUploadPath ? `/uploads/${relativeUploadPath}` : fromRecord;
-  }
+  const normalized = normalizeUploadReadRef(fromRecord);
+  if (fileAssetStorage.isUploadReference?.(normalized)) return normalized;
   if (path.isAbsolute(fromRecord)) return fromRecord;
   return path.resolve(process.cwd(), fromRecord);
+}
+
+function resolveDocxTemplateReadRef(docxTemplate = {}) {
+  const candidates = [
+    docxTemplate.url,
+    docxTemplate.path,
+    resolveTemplateFilePath(docxTemplate)
+  ].map((value) => String(value || '').trim()).filter(Boolean);
+  for (const raw of candidates) {
+    const normalized = normalizeUploadReadRef(raw);
+    if (fileAssetStorage.isUploadReference?.(normalized)) return normalized;
+  }
+  return candidates[candidates.length - 1] || '';
 }
 
 function buildRenderData(placeholders = {}, collections = {}) {
@@ -122,16 +145,29 @@ function getDocxDependencies() {
 }
 
 async function readDocxTemplateBuffer(docxTemplate = {}) {
-  const filePath = resolveTemplateFilePath(docxTemplate);
+  const filePath = resolveDocxTemplateReadRef(docxTemplate);
   if (!filePath) throw new Error('This report template has no DOCX file configured. Upload a DOCX template first.');
+  const useAssetStorage = fileAssetStorage.isUploadReference?.(filePath)
+    || Boolean(uploadPathUtils.extractRelativeUploadPath(filePath));
   try {
-    const binary = fileAssetStorage.isUploadReference?.(filePath)
-      ? (await fileAssetStorage.readBuffer(filePath)).buffer
+    const binary = useAssetStorage
+      ? (await fileAssetStorage.readBuffer(
+        fileAssetStorage.isUploadReference?.(filePath)
+          ? filePath
+          : normalizeUploadReadRef(filePath)
+      )).buffer
       : await fs.readFile(filePath);
     return { binary, filePath };
   } catch (error) {
     if (error && (error.code === 'ENOENT' || error.code === 'EPERM')) {
       throw new Error(`DOCX template file is not accessible: ${filePath}`);
+    }
+    const statusCode = Number(error?.statusCode || 0);
+    if (statusCode === 404) {
+      throw new Error(`DOCX template file was not found on the file gateway: ${filePath}. Re-upload the template or verify RAILWAY_GATEWAY_BASE_URL.`);
+    }
+    if (statusCode >= 400) {
+      throw new Error(`DOCX template could not be loaded from the file gateway (${statusCode}): ${filePath}`);
     }
     throw error;
   }

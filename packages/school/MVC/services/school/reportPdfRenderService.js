@@ -64,23 +64,52 @@ function getPdfDependencies() {
   return pdfLib;
 }
 
+function normalizeUploadReadRef(raw = '') {
+  const token = String(raw || '').trim();
+  if (!token) return '';
+  if (fileAssetStorage.isUploadReference?.(token)) {
+    const relativeUploadPath = uploadPathUtils.extractRelativeUploadPath(token);
+    return relativeUploadPath ? `/uploads/${relativeUploadPath}` : token;
+  }
+  const relativeUploadPath = uploadPathUtils.extractRelativeUploadPath(token);
+  if (relativeUploadPath) return `/uploads/${relativeUploadPath}`;
+  return token;
+}
+
 function resolveTemplateFilePath(pdfTemplate = {}) {
   const fromRecord = String(pdfTemplate.path || '').trim();
   if (!fromRecord) return '';
-  if (fileAssetStorage.isUploadReference?.(fromRecord)) {
-    const relativeUploadPath = uploadPathUtils.extractRelativeUploadPath(fromRecord);
-    return relativeUploadPath ? `/uploads/${relativeUploadPath}` : fromRecord;
-  }
+  const normalized = normalizeUploadReadRef(fromRecord);
+  if (fileAssetStorage.isUploadReference?.(normalized)) return normalized;
   if (path.isAbsolute(fromRecord)) return fromRecord;
   return path.resolve(process.cwd(), fromRecord);
 }
 
+function resolvePdfTemplateReadRef(pdfTemplate = {}) {
+  const candidates = [
+    pdfTemplate.url,
+    pdfTemplate.path,
+    resolveTemplateFilePath(pdfTemplate)
+  ].map((value) => String(value || '').trim()).filter(Boolean);
+  for (const raw of candidates) {
+    const normalized = normalizeUploadReadRef(raw);
+    if (fileAssetStorage.isUploadReference?.(normalized)) return normalized;
+  }
+  return candidates[candidates.length - 1] || '';
+}
+
 async function readPdfTemplateBuffer(pdfTemplate = {}) {
-  const filePath = resolveTemplateFilePath(pdfTemplate);
+  const filePath = resolvePdfTemplateReadRef(pdfTemplate);
   if (!filePath) throw new Error('This report template has no PDF file configured. Upload a PDF template first.');
+  const useAssetStorage = fileAssetStorage.isUploadReference?.(filePath)
+    || Boolean(uploadPathUtils.extractRelativeUploadPath(filePath));
   try {
-    const binary = fileAssetStorage.isUploadReference?.(filePath)
-      ? (await fileAssetStorage.readBuffer(filePath)).buffer
+    const binary = useAssetStorage
+      ? (await fileAssetStorage.readBuffer(
+        fileAssetStorage.isUploadReference?.(filePath)
+          ? filePath
+          : normalizeUploadReadRef(filePath)
+      )).buffer
       : await fs.readFile(filePath);
     return { binary, filePath };
   } catch (error) {

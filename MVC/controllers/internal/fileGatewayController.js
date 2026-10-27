@@ -600,6 +600,22 @@ exports.downloadRuntimePackage = async (req, res) => {
   }
 };
 
+exports.downloadUpload = async (req, res) => {
+  try {
+    const uploadUrl = clean(req.body.uploadUrl || req.query.uploadUrl || '');
+    const targetPath = uploadPathUtils.fromUploadsUrlToDiskPath(uploadUrl);
+    if (!targetPath) throw new Error('Unable to resolve upload URL.');
+    if (!fs.existsSync(targetPath)) {
+      return res.status(404).json({ status: 'error', message: 'Upload file not found.' });
+    }
+    const buffer = fs.readFileSync(targetPath);
+    res.setHeader('Content-Type', 'application/octet-stream');
+    return res.send(buffer);
+  } catch (error) {
+    return respondError(res, error);
+  }
+};
+
 exports.resolve = (req, res) => {
   try {
     const uploadUrl = clean(req.body.uploadUrl || req.query.uploadUrl || '');

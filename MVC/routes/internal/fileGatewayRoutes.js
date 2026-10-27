@@ -52,6 +52,7 @@ router.post('/move', gatewayRateLimiter, fileGatewayAuth('/internal/file-gateway
 router.post('/copy', gatewayRateLimiter, fileGatewayAuth('/internal/file-gateway/copy'), controller.copy);
 router.post('/rename', gatewayRateLimiter, fileGatewayAuth('/internal/file-gateway/rename'), controller.rename);
 router.post('/list', gatewayRateLimiter, fileGatewayAuth('/internal/file-gateway/list'), controller.list);
+router.post('/download', gatewayRateLimiter, fileGatewayAuth('/internal/file-gateway/download'), controller.downloadUpload);
 router.post('/packages/runtime/list', gatewayRateLimiter, fileGatewayAuth('/internal/file-gateway/packages/runtime/list'), controller.listRuntimePackages);
 router.post('/packages/runtime/download', gatewayRateLimiter, fileGatewayAuth('/internal/file-gateway/packages/runtime/download'), controller.downloadRuntimePackage);
 router.post('/resolve', gatewayRateLimiter, fileGatewayAuth('/internal/file-gateway/resolve'), controller.resolve);

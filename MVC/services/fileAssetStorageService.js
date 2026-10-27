@@ -3,7 +3,7 @@ const fsp = require('fs').promises;
 const path = require('path');
 const uploadPathUtils = require('../utils/uploadPathUtils');
 const pathResolver = require('../utils/pathResolver');
-const { isRailwayProxyMode } = require('../utils/uploadModeUtils');
+const { isRailwayProxyMode, getGatewayBaseUrl } = require('../utils/uploadModeUtils');
 const {
   gatewayUploadBlob,
   downloadRemoteUploadFile,
@@ -202,41 +202,60 @@ async function saveJson({ scopeKey = 'GLOBAL', relativeDir = '', fileName = 'dat
   });
 }
 
+async function readUploadReferenceBufferFromDisk(token = '', diskPath = '') {
+  const resolvedDiskPath = diskPath || uploadPathUtils.fromUploadsUrlToDiskPath(token);
+  if (!resolvedDiskPath || !fs.existsSync(resolvedDiskPath)) return null;
+  return {
+    buffer: await fsp.readFile(resolvedDiskPath),
+    mimeType: '',
+    size: fs.statSync(resolvedDiskPath).size,
+    path: resolvedDiskPath,
+    url: token
+  };
+}
+
+async function readUploadReferenceBufferFromGateway(token = '', parsed = null) {
+  const resolved = parsed || parseUploadReference(token);
+  if (!resolved) throw new Error('Invalid upload URL.');
+  const remote = await downloadRemoteUploadFile(resolved.scopeKey, resolved.relativePath);
+  const arrayBuffer = await remote.blob.arrayBuffer();
+  return {
+    buffer: Buffer.from(arrayBuffer),
+    mimeType: remote.mimeType || 'application/octet-stream',
+    size: remote.size || 0,
+    url: token
+  };
+}
+
+async function readUploadReferenceBuffer(token = '') {
+  const parsed = parseUploadReference(token);
+  if (!parsed) throw new Error('Invalid upload URL.');
+  const diskPath = uploadPathUtils.fromUploadsUrlToDiskPath(token);
+  const canUseGateway = isRailwayProxyMode() || Boolean(getGatewayBaseUrl());
+
+  if (canUseGateway) {
+    try {
+      return await readUploadReferenceBufferFromGateway(token, parsed);
+    } catch (gatewayError) {
+      const fromDisk = await readUploadReferenceBufferFromDisk(token, diskPath);
+      if (fromDisk) return fromDisk;
+      throw gatewayError;
+    }
+  }
+
+  const fromDisk = await readUploadReferenceBufferFromDisk(token, diskPath);
+  if (fromDisk) return fromDisk;
+  if (!diskPath) throw new Error('Unable to resolve upload URL.');
+  const error = new Error(`ENOENT: no such file or directory, open '${diskPath}'`);
+  error.code = 'ENOENT';
+  throw error;
+}
+
 async function readBuffer(ref = '') {
   const token = clean(ref);
   if (!token) throw new Error('File reference is required.');
   if (isUploadReference(token)) {
-    if (isRailwayProxyMode()) {
-      const parsed = parseUploadReference(token);
-      if (!parsed) throw new Error('Invalid upload URL.');
-      const diskPath = uploadPathUtils.fromUploadsUrlToDiskPath(token);
-      if (diskPath && fs.existsSync(diskPath)) {
-        return {
-          buffer: await fsp.readFile(diskPath),
-          mimeType: '',
-          size: fs.statSync(diskPath).size,
-          path: diskPath,
-          url: token
-        };
-      }
-      const remote = await downloadRemoteUploadFile(parsed.scopeKey, parsed.relativePath);
-      const arrayBuffer = await remote.blob.arrayBuffer();
-      return {
-        buffer: Buffer.from(arrayBuffer),
-        mimeType: remote.mimeType || 'application/octet-stream',
-        size: remote.size || 0,
-        url: token
-      };
-    }
-
-    const diskPath = uploadPathUtils.fromUploadsUrlToDiskPath(token);
-    if (!diskPath) throw new Error('Unable to resolve upload URL.');
-    return {
-      buffer: await fsp.readFile(diskPath),
-      mimeType: '',
-      size: fs.existsSync(diskPath) ? fs.statSync(diskPath).size : 0,
-      path: diskPath
-    };
+    return readUploadReferenceBuffer(token);
   }
 
   const diskPath = path.isAbsolute(token) ? token : path.resolve(process.cwd(), token);
