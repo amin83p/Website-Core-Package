@@ -301,7 +301,9 @@ async function loadTemplateMetaMap(templateIds = [], reqUser, policy = {}) {
     );
     map.set(templateId, {
       ...rawMeta,
-      ...effective
+      ...effective,
+      docxOptions: reportFunderDocxService.buildAvailableDocxOptions(template),
+      pdfOptions: reportFunderPdfService.buildAvailablePdfOptions(template)
     });
   }
   return map;
@@ -372,16 +374,121 @@ function flattenInstanceRows(student, templateMetaMap, policy) {
         templateTitle: meta.templateTitle || clean(instance.templateLabel) || templateId,
         sessionDate: normalizeDateOnly(instance.sessionDate),
         status: clean(instance.status),
+        assignmentId: clean(instance.assignmentId),
         classId: clean(classRow.classId),
         className: clean(classRow.className) || clean(classRow.classId),
         hasDocx: effective.hasDocx,
         hasPdf: effective.hasPdf,
         hasPayload: effective.hasPayload,
+        docxOptions: Array.isArray(meta.docxOptions) ? meta.docxOptions : [],
+        pdfOptions: Array.isArray(meta.pdfOptions) ? meta.pdfOptions : [],
         exportable
       });
     });
   });
   return rows;
+}
+
+async function enrichInstanceRowsForExport(student, instanceRows = [], { startDate = '', endDate = '', reqUser } = {}) {
+  const rows = Array.isArray(instanceRows) ? instanceRows : [];
+  const studentRecordId = clean(student?.studentRecordId);
+  const personId = clean(student?.personId);
+  const studentName = clean(student?.name) || personId;
+  const templateCache = new Map();
+  const assignmentCache = new Map();
+  const instanceCache = new Map();
+  const enriched = [];
+
+  for (const row of rows) {
+    if (!row?.exportable) {
+      enriched.push(row);
+      continue;
+    }
+    const templateId = clean(row.templateId);
+    const instanceId = clean(row.instanceId);
+    let template = templateCache.get(templateId);
+    if (!template && templateId) {
+      // eslint-disable-next-line no-await-in-loop
+      template = await schoolDataService.getDataById('reportTemplates', templateId, reqUser);
+      templateCache.set(templateId, template);
+    }
+
+    let instanceRecord = instanceCache.get(instanceId);
+    if (!instanceRecord && instanceId) {
+      // eslint-disable-next-line no-await-in-loop
+      instanceRecord = await schoolDataService.getDataById('reportInstances', instanceId, reqUser);
+      instanceCache.set(instanceId, instanceRecord);
+    }
+
+    const assignmentId = clean(row.assignmentId || instanceRecord?.assignmentId);
+    let assignment = assignmentCache.get(assignmentId);
+    if (!assignment && assignmentId) {
+      // eslint-disable-next-line no-await-in-loop
+      assignment = await schoolDataService.getDataById('reportAssignments', assignmentId, reqUser);
+      assignmentCache.set(assignmentId, assignment);
+    }
+
+    const effectiveAssignment = reportViewService.applyAssignmentRow(
+      assignment,
+      reportViewService.findAssignmentRow(assignment, instanceRecord?.assignmentRowId || '')
+    );
+
+    const docxOptions = Array.isArray(row.docxOptions) && row.docxOptions.length
+      ? row.docxOptions
+      : (template ? reportFunderDocxService.buildAvailableDocxOptions(template) : []);
+    const pdfOptions = Array.isArray(row.pdfOptions) && row.pdfOptions.length
+      ? row.pdfOptions
+      : (template ? reportFunderPdfService.buildAvailablePdfOptions(template) : []);
+
+    let suggestedDocxKey = '';
+    let suggestedPdfKey = '';
+    let funderLabel = '';
+    if (template) {
+      const suggestionStudent = {
+        studentId: studentRecordId || clean(instanceRecord?.studentId),
+        personId,
+        instanceId,
+        studentName
+      };
+      // eslint-disable-next-line no-await-in-loop
+      const docxSuggestions = await reportFunderDocxService.buildExportDocxSuggestions({
+        template,
+        assignment: effectiveAssignment,
+        reqUser,
+        windowStart: startDate,
+        windowEnd: endDate,
+        students: [suggestionStudent]
+      });
+      const docxRow = (docxSuggestions.rows || [])[0] || {};
+      suggestedDocxKey = clean(docxRow.suggestedDocxKey)
+        || reportFunderDocxService.suggestDocxKeyForFunder({ template, funderKey: docxRow.funderKey });
+      funderLabel = clean(docxRow.funderLabel);
+
+      // eslint-disable-next-line no-await-in-loop
+      const pdfSuggestions = await reportFunderPdfService.buildExportPdfSuggestions({
+        template,
+        assignment: effectiveAssignment,
+        reqUser,
+        windowStart: startDate,
+        windowEnd: endDate,
+        students: [suggestionStudent]
+      });
+      const pdfRow = (pdfSuggestions.rows || [])[0] || {};
+      suggestedPdfKey = clean(pdfRow.suggestedPdfKey)
+        || reportFunderPdfService.suggestPdfKeyForFunder({ template, funderKey: pdfRow.funderKey });
+    }
+
+    enriched.push({
+      ...row,
+      docxOptions,
+      pdfOptions,
+      suggestedDocxKey,
+      suggestedPdfKey,
+      funderLabel
+    });
+  }
+
+  return enriched;
 }
 
 async function buildSemiMonthlyReportExportPlan(req, options = {}) {
@@ -408,10 +515,18 @@ async function buildSemiMonthlyReportExportPlan(req, options = {}) {
       reqUser: req.user
     });
     const overall = overallOptions.find((option) => option.eligible) || overallOptions[0] || null;
+    const instanceRows = flattenInstanceRows(student, templateMetaMap, policy);
+    // eslint-disable-next-line no-await-in-loop
+    const instances = await enrichInstanceRowsForExport(student, instanceRows, {
+      startDate,
+      endDate,
+      reqUser: req.user
+    });
     planStudents.push({
       personId: clean(student.personId),
+      studentRecordId: clean(student.studentRecordId),
       name: clean(student.name) || clean(student.personId),
-      instances: flattenInstanceRows(student, templateMetaMap, policy),
+      instances,
       overall,
       overallOptions
     });
@@ -469,7 +584,7 @@ async function buildSemiMonthlyReportExportPlan(req, options = {}) {
   };
 }
 
-async function exportStoredInstance(instanceId, format, reqUser) {
+async function exportStoredInstance(instanceId, format, reqUser, options = {}) {
   const instance = await reportIntegrityService.getAccessibleInstanceOrThrow(instanceId, reqUser);
   const [template, assignment] = await Promise.all([
     schoolDataService.getDataById('reportTemplates', instance.templateId, reqUser),
@@ -495,9 +610,24 @@ async function exportStoredInstance(instanceId, format, reqUser) {
     if (!reportFunderDocxService.templateHasAnyDocx(template)) {
       throw new Error('This report template has no DOCX file configured.');
     }
+    const snapshotScopeOptions = reportService.templateUsesSnapshotScope(template)
+      ? { respectSnapshotKeys: true }
+      : {};
     const placeholderBundle = lockSnapshot?.placeholders && typeof lockSnapshot.placeholders === 'object'
-      ? { placeholders: lockSnapshot.placeholders, conversionDiagnostics: [] }
-      : reportService.buildDocxPlaceholderPayloadDetailed(template, instance, effectiveAssignment);
+      ? {
+        placeholders: reportService.expandDocxShortcutPlaceholderTokens(
+          template,
+          lockSnapshot.placeholders,
+          snapshotScopeOptions
+        ),
+        conversionDiagnostics: []
+      }
+      : reportService.buildDocxPlaceholderPayloadDetailed(
+        template,
+        instance,
+        effectiveAssignment,
+        snapshotScopeOptions
+      );
     const collections = lockSnapshot
       ? {}
       : await reportService.buildReportDocxCollections({
@@ -506,7 +636,10 @@ async function exportStoredInstance(instanceId, format, reqUser) {
         assignment: effectiveAssignment,
         reqUser
       });
-    const resolved = reportFunderDocxService.resolveDocxTemplateForFunder({ template, funderKey: 'default' });
+    const resolved = reportFunderDocxService.resolveDocxTemplateForFunder({
+      template,
+      funderKey: clean(options.docxKey) || 'default'
+    });
     const rendered = await reportDocxRenderService.renderReportInstanceDocx({
       template,
       instance,
@@ -528,7 +661,10 @@ async function exportStoredInstance(instanceId, format, reqUser) {
     const placeholderBundle = lockSnapshot?.placeholders && typeof lockSnapshot.placeholders === 'object'
       ? { placeholders: lockSnapshot.placeholders, conversionDiagnostics: [] }
       : reportService.buildPdfPlaceholderPayloadDetailed(template, instance, effectiveAssignment);
-    const resolved = reportFunderPdfService.resolvePdfTemplateForFunder({ template, funderKey: 'default' });
+    const resolved = reportFunderPdfService.resolvePdfTemplateForFunder({
+      template,
+      funderKey: clean(options.pdfKey) || 'default'
+    });
     const rendered = await reportPdfRenderService.renderReportInstancePdf({
       template,
       instance,
@@ -889,7 +1025,9 @@ async function exportSemiMonthlyReportSelections(req, options = {}) {
         clean(instanceRow.templateId),
         format
       );
-      const rendered = await exportStoredInstance(instanceId, format, req.user);
+      const docxKey = clean(target?.docxKey) || clean(instanceRow.suggestedDocxKey);
+      const pdfKey = clean(target?.pdfKey) || clean(instanceRow.suggestedPdfKey);
+      const rendered = await exportStoredInstance(instanceId, format, req.user, { docxKey, pdfKey });
       const stem = safeFileToken(`${student.name || studentId}_${instanceRow.className}_${instanceRow.sessionDate || instanceId}`);
       files.push({
         ...rendered,
@@ -937,5 +1075,8 @@ module.exports = {
   exportSemiMonthlyReportSelections,
   buildSmmrOverallExportBlock,
   buildClassRowsForOverall,
-  resolveOverallSlotAssignments
+  resolveOverallSlotAssignments,
+  flattenInstanceRows,
+  enrichInstanceRowsForExport,
+  exportStoredInstance
 };

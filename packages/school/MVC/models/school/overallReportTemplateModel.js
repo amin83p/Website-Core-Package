@@ -179,7 +179,7 @@ function sanitizeSchema(rawSchema, sourceSlots, inputPlaceholderMap = {}) {
     if (expression) {
       reportRuleEngineService.validateExpressionSyntax(expression);
       reportRuleEngineService.validateExpressionSymbols(expression, {
-        additionalHelpers: ['source'],
+        additionalHelpers: ['source', 'sourceSlotPopulated'],
         allowedRoots: ['value', 'answers']
       });
     }

@@ -58,11 +58,37 @@ function mergeTwoClassNote(amPresence, amNote, pmPresence, pmNote) {
   return `${amPart}/${pmPart}`;
 }
 
+const SLOT_POPULATED_ANCHOR_KEYS = [
+  'student_full_name',
+  'class_name',
+  'report_period_start_date',
+  'report_period_due_date'
+];
+
+function isSourceSlotPopulated(slotBag) {
+  if (!slotBag || typeof slotBag !== 'object') return false;
+  if (SLOT_POPULATED_ANCHOR_KEYS.some((key) => String(slotBag[key] ?? '').trim())) return true;
+  return Object.values(slotBag).some((value) => String(value ?? '').trim() !== '');
+}
+
+function flexTwoClassPresence(amPresence, pmPresence, pmSlotActive) {
+  if (!pmSlotActive) return collapsePresence(normalizePresence(amPresence));
+  return mergeTwoClassPresence(amPresence, pmPresence);
+}
+
+function flexTwoClassNote(amPresence, amNote, pmPresence, pmNote, pmSlotActive) {
+  if (!pmSlotActive) return String(amNote ?? '').trim();
+  return mergeTwoClassNote(amPresence, amNote, pmPresence, pmNote);
+}
+
 module.exports = {
   normalizePresence,
   mergeTwoClassPresence,
   collapsePresence,
   formatAttendanceNoteWithPeriod,
   mergeSlotNote,
-  mergeTwoClassNote
+  mergeTwoClassNote,
+  isSourceSlotPopulated,
+  flexTwoClassPresence,
+  flexTwoClassNote
 };

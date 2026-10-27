@@ -111,6 +111,18 @@ test('export viewers include overall variant select and bundleMode wiring', () =
   assert.match(smmrViewer, /js-smmr-overall-variant-select/);
   assert.match(smmrViewer, /templateVariantKey/);
   assert.match(smmrViewer, /bundleMode/);
+  assert.match(smmrViewer, /js-smmr-instance-docx-select/);
+  assert.match(smmrViewer, /js-smmr-instance-pdf-select/);
+  assert.match(smmrViewer, /readSmmrInstanceExportKeys/);
+  assert.match(smmrViewer, /docxKey/);
+});
+
+test('semi-monthly export service enriches instance rows with file options', () => {
+  const smmrService = read('MVC/services/school/schoolSemiMonthlyReportExportService.js');
+  assert.match(smmrService, /buildAvailableDocxOptions/);
+  assert.match(smmrService, /buildAvailablePdfOptions/);
+  assert.match(smmrService, /buildExportDocxSuggestions/);
+  assert.match(smmrService, /buildExportPdfSuggestions/);
 });
 
 test('export services pass templateVariantKey and bundleMode merge', () => {

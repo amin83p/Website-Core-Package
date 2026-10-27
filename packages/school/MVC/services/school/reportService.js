@@ -3514,6 +3514,31 @@ function isStudentTargetedScope(scopeRaw) {
   return scope === 'each_student' || scope === 'selected_students';
 }
 
+function expandDocxShortcutPlaceholderTokens(template, placeholders = {}, options = {}) {
+  const out = placeholders && typeof placeholders === 'object' ? placeholders : {};
+  const scopeResolved = resolveSnapshotScopeOptions(template, options);
+  const useScope = scopeResolved.respectSnapshotKeys === true && templateUsesSnapshotScope(template);
+  const ctx = useScope ? resolveSnapshotScopeContext(template) : null;
+  const valueByCatalogKey = new Map();
+  Object.entries(out).forEach(([token, value]) => {
+    const catalogKey = normalizeSnapshotKey(normalizePrefillKey(token));
+    if (!catalogKey) return;
+    valueByCatalogKey.set(catalogKey.toLowerCase(), value);
+  });
+  const snapshotKeyDocxAliases = template?.snapshotKeyDocxAliases && typeof template.snapshotKeyDocxAliases === 'object'
+    ? template.snapshotKeyDocxAliases
+    : {};
+  Object.entries(snapshotKeyDocxAliases).forEach(([rawKey, rawAlias]) => {
+    const catalogKey = normalizeSnapshotKey(rawKey);
+    const alias = reportRuleEngineService.normalizeDocxAlias(rawAlias);
+    if (!catalogKey || !reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias)) return;
+    if (useScope && ctx && !ctx.baseLowerSet.has(catalogKey.toLowerCase())) return;
+    if (!valueByCatalogKey.has(catalogKey.toLowerCase())) return;
+    out[`{{${alias}}}`] = valueByCatalogKey.get(catalogKey.toLowerCase());
+  });
+  return out;
+}
+
 function buildPlaceholderPayloadDetailed(
   template,
   instance,
@@ -4050,6 +4075,7 @@ module.exports = {
   validateTemplateDocxSnapshotTokens,
   buildSnapshotAllowedTokenSummary,
   inspectTemplateDocxSnapshotCompliance,
+  expandDocxShortcutPlaceholderTokens,
   inspectTemplatePdfSnapshotCompliance,
   runTemplateSnapshotComplianceChecks,
   formatSnapshotComplianceError,

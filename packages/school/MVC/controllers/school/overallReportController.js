@@ -133,7 +133,7 @@ async function loadTemplateFormData(req, template = null) {
     funderPickerOptions: reportFunderDocxService.buildFunderPickerOptions(activeFunders),
     valueModes: overallReportTemplateModel.OVERALL_VALUE_MODES,
     statuses: overallReportTemplateModel.TEMPLATE_STATUSES,
-    expressionHelperNames: ['source', ...Object.keys(reportRuleEngineService.HELPERS || {})]
+    expressionHelperNames: ['source', 'sourceSlotPopulated', ...Object.keys(reportRuleEngineService.HELPERS || {})]
   };
 }
 

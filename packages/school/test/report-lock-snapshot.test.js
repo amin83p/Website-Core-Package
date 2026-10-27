@@ -396,6 +396,27 @@ test('mergeTemplateData with respectSnapshotKeys omits out-of-scope field answer
   assert.equal(scoped.class_attendance_present, undefined);
 });
 
+test('buildDocxPlaceholderPayloadDetailed adds snapshotKeyDocxAliases shortcut tokens', () => {
+  const template = {
+    ...baseTemplatePayload,
+    snapshotKeys: ['student_full_name', 'student_last_name'],
+    snapshotKeyDocxAliases: {
+      student_last_name: 'n2de',
+      student_full_name: 'vubg'
+    },
+    schema: baseTemplatePayload.schema,
+    placeholderMap: baseTemplatePayload.placeholderMap
+  };
+  const instance = {
+    prefillSnapshot: { student_full_name: 'Ada Lovelace', student_last_name: 'Lovelace' },
+    answers: {}
+  };
+  const scoped = reportService.buildDocxPlaceholderPayloadDetailed(template, instance, null, { respectSnapshotKeys: true });
+  assert.equal(scoped.placeholders['{{student_last_name}}'], 'Lovelace');
+  assert.equal(scoped.placeholders['{{n2de}}'], 'Lovelace');
+  assert.equal(scoped.placeholders['{{vubg}}'], 'Ada Lovelace');
+});
+
 test('buildDocxPlaceholderPayloadDetailed respectSnapshotKeys omits out-of-scope placeholder tokens', () => {
   const template = {
     ...baseTemplatePayload,

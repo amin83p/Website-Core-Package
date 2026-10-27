@@ -821,8 +821,80 @@
     }
   }
 
+  function buildSmmrFileOptionSelectHtml({ className, options = [], suggestedKey = '', instanceId = '', ariaLabel = '' }) {
+    const rows = (Array.isArray(options) ? options : []).filter((opt) => opt && String(opt.key || '').trim());
+    if (!rows.length) return '';
+    const suggested = String(suggestedKey || rows[0]?.key || '').trim();
+    const optionsHtml = rows.map((opt) => {
+      const key = String(opt.key || '').trim();
+      const label = String(opt.label || key);
+      const fileName = String(opt.fileName || '').trim();
+      const text = fileName ? `${label} (${fileName})` : label;
+      const selected = key === suggested ? ' selected' : '';
+      return `<option value="${escapeHtml(key)}"${selected}>${escapeHtml(text)}</option>`;
+    }).join('');
+    const disabled = rows.length <= 1 ? ' disabled' : '';
+    return `<select class="form-select form-select-sm ${className} mb-1" style="max-width: 14rem;" data-instance-id="${escapeHtml(instanceId)}"${disabled} aria-label="${escapeHtml(ariaLabel)}">${optionsHtml}</select>`;
+  }
+
+  function readSmmrInstanceExportKeys(instanceRowEl, format = '') {
+    if (!instanceRowEl) return {};
+    const token = String(format || '').trim().toLowerCase();
+    const keys = {};
+    if (token === 'docx' || token === 'all') {
+      const docxKey = String(instanceRowEl.querySelector('.js-smmr-instance-docx-select')?.value || '').trim();
+      if (docxKey) keys.docxKey = docxKey;
+    }
+    if (token === 'pdf' || token === 'all') {
+      const pdfKey = String(instanceRowEl.querySelector('.js-smmr-instance-pdf-select')?.value || '').trim();
+      if (pdfKey) keys.pdfKey = pdfKey;
+    }
+    return keys;
+  }
+
+  function buildSmmrInstanceExportControls(row = {}, personId = '') {
+    const instanceId = String(row.instanceId || '').trim();
+    const parts = [];
+    const funderHint = String(row.funderLabel || '').trim();
+    if (funderHint) {
+      parts.push(`<div class="small text-muted mb-1">Detected funder: <strong>${escapeHtml(funderHint)}</strong></div>`);
+    }
+    const controls = [];
+    if (row.hasDocx) {
+      const docxSelect = buildSmmrFileOptionSelectHtml({
+        className: 'js-smmr-instance-docx-select',
+        options: row.docxOptions,
+        suggestedKey: row.suggestedDocxKey,
+        instanceId,
+        ariaLabel: 'Word template for this report'
+      });
+      if (docxSelect) controls.push(docxSelect);
+      controls.push(`<button type="button" class="btn btn-outline-primary btn-sm py-0 js-smmr-row-export" data-format="docx" data-export-type="instance" data-student-id="${escapeHtml(personId)}" data-instance-id="${escapeHtml(instanceId)}">DOCX</button>`);
+    }
+    if (row.hasPdf) {
+      const pdfSelect = buildSmmrFileOptionSelectHtml({
+        className: 'js-smmr-instance-pdf-select',
+        options: row.pdfOptions,
+        suggestedKey: row.suggestedPdfKey,
+        instanceId,
+        ariaLabel: 'PDF template for this report'
+      });
+      if (pdfSelect) controls.push(pdfSelect);
+      controls.push(`<button type="button" class="btn btn-outline-danger btn-sm py-0 js-smmr-row-export" data-format="pdf" data-export-type="instance" data-student-id="${escapeHtml(personId)}" data-instance-id="${escapeHtml(instanceId)}">PDF</button>`);
+    }
+    if (row.hasPayload !== false) {
+      controls.push(`<button type="button" class="btn btn-outline-secondary btn-sm py-0 js-smmr-row-export" data-format="json" data-export-type="instance" data-student-id="${escapeHtml(personId)}" data-instance-id="${escapeHtml(instanceId)}">JSON</button>`);
+    }
+    if (!controls.length) return '';
+    parts.push(`<div class="d-flex flex-wrap gap-1 align-items-start mt-1">${controls.join('')}</div>`);
+    return parts.join('');
+  }
+
   function buildSmmrFormatButtons(row = {}, exportType = 'instance') {
     const personId = String(row.personId || row.studentId || '').trim();
+    if (exportType === 'instance') {
+      return buildSmmrInstanceExportControls(row, personId);
+    }
     const instanceId = String(row.instanceId || '').trim();
     const overallTemplateId = String(row.templateId || '').trim();
     const idAttr = exportType === 'overall'
@@ -914,7 +986,9 @@
         if (normalizedFormat === 'docx' && !row.hasDocx) return;
         if (normalizedFormat === 'pdf' && !row.hasPdf) return;
         if (normalizedFormat === 'json' && row.hasPayload === false) return;
-        targets.push({ type: 'instance', studentId, instanceId });
+        const block = checkbox.closest('.smmr-export-instance-row');
+        const fileKeys = readSmmrInstanceExportKeys(block, normalizedFormat);
+        targets.push({ type: 'instance', studentId, instanceId, ...fileKeys });
       });
     }
 
@@ -1127,7 +1201,9 @@
       const targets = [];
       if (exportType === 'instance') {
         const instanceId = String(rowBtn.getAttribute('data-instance-id') || '').trim();
-        if (studentId && instanceId) targets.push({ type: 'instance', studentId, instanceId });
+        const block = rowBtn.closest('.smmr-export-instance-row');
+        const fileKeys = readSmmrInstanceExportKeys(block, format);
+        if (studentId && instanceId) targets.push({ type: 'instance', studentId, instanceId, ...fileKeys });
       } else if (exportType === 'overall') {
         const cell = rowBtn.closest('.js-smmr-overall-cell');
         const overallTemplateId = String(

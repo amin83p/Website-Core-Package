@@ -81,6 +81,44 @@ function toFiniteNumber(value, fallback = 0) {
   return Number.isFinite(n) ? n : fallback;
 }
 
+function parseDateParts(value) {
+  const text = String(value ?? '').trim();
+  if (!text) return null;
+  const isoDate = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
+  if (isoDate) {
+    return { year: isoDate[1], month: isoDate[2], day: isoDate[3] };
+  }
+  const slashDmy = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashDmy) {
+    return {
+      year: slashDmy[3],
+      month: String(slashDmy[2]).padStart(2, '0'),
+      day: String(slashDmy[1]).padStart(2, '0')
+    };
+  }
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return {
+    year: String(parsed.getFullYear()),
+    month: String(parsed.getMonth() + 1).padStart(2, '0'),
+    day: String(parsed.getDate()).padStart(2, '0')
+  };
+}
+
+function formatDateWithPattern(parts, pattern = 'dd/mm/yyyy') {
+  if (!parts) return '';
+  const token = String(pattern || 'dd/mm/yyyy').trim().toLowerCase();
+  const year = String(parts.year || '');
+  const month = String(parts.month || '').padStart(2, '0');
+  const day = String(parts.day || '').padStart(2, '0');
+  if (!year || !month || !day) return '';
+  return token
+    .replace(/yyyy/g, year)
+    .replace(/yy/g, year.slice(-2))
+    .replace(/mm/g, month)
+    .replace(/dd/g, day);
+}
+
 function createHelperSet() {
   return Object.freeze({
     num(value, fallback = 0) {
@@ -193,8 +231,17 @@ function createHelperSet() {
     twoClassNote(amPresence, amNote, pmPresence, pmNote) {
       return twoClassAttendanceMergeService.mergeTwoClassNote(amPresence, amNote, pmPresence, pmNote);
     },
+    flexTwoClassPresence(amPresence, pmPresence, pmSlotActive) {
+      return twoClassAttendanceMergeService.flexTwoClassPresence(amPresence, pmPresence, pmSlotActive);
+    },
+    flexTwoClassNote(amPresence, amNote, pmPresence, pmNote, pmSlotActive) {
+      return twoClassAttendanceMergeService.flexTwoClassNote(amPresence, amNote, pmPresence, pmNote, pmSlotActive);
+    },
     collapsePresence(value) {
       return twoClassAttendanceMergeService.collapsePresence(value);
+    },
+    formatDate(value, pattern = 'dd/mm/yyyy') {
+      return formatDateWithPattern(parseDateParts(value), pattern);
     }
   });
 }
@@ -534,6 +581,16 @@ function evalAst(node, context) {
         : null;
       if (!slotValues || typeof slotValues !== 'object') return undefined;
       return slotValues[sourceKey];
+    }
+    if (fnName === 'sourceSlotPopulated') {
+      const args = node.args.map((arg) => evalAst(arg, context));
+      if (args.length !== 1) throw new Error('sourceSlotPopulated() requires a slot key.');
+      const slotKey = String(args[0] ?? '').trim().toUpperCase();
+      if (!slotKey) throw new Error('sourceSlotPopulated() requires a non-empty slot key.');
+      const slotValues = context?.sources && typeof context.sources === 'object'
+        ? context.sources[slotKey]
+        : null;
+      return twoClassAttendanceMergeService.isSourceSlotPopulated(slotValues);
     }
     const fn = HELPERS[fnName];
     if (typeof fn !== 'function') throw new Error(`Unknown helper "${fnName}".`);
