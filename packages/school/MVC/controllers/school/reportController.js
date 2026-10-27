@@ -1629,7 +1629,15 @@ async function buildInstanceEditorRenderContext(req) {
       }, req.user);
     }
   }
-  const mergedBeforeCalculation = reportService.mergeTemplateData(template, latestInstance, effectiveAssignment);
+  const editorMergeOptions = reportService.templateUsesSnapshotScope(template)
+    ? { respectSnapshotKeys: true }
+    : {};
+  const mergedBeforeCalculation = reportService.mergeTemplateData(
+    template,
+    latestInstance,
+    effectiveAssignment,
+    editorMergeOptions
+  );
   const preparedForRender = reportRuleEngineService.prepareReportAnswersForUI({
     template,
     mergedAnswers: mergedBeforeCalculation,
@@ -2299,36 +2307,16 @@ async function exportInstance(req, res) {
       reportViewService.findAssignmentRow(assignment, instance.assignmentRowId || '')
     );
     const format = String(req.query.format || req.body?.format || 'json').trim().toLowerCase();
-    const placeholderBundle = format === 'docx'
-      ? reportService.buildDocxPlaceholderPayloadDetailed(template, instance, effectiveAssignment)
-      : (format === 'pdf'
-          ? reportService.buildPdfPlaceholderPayloadDetailed(template, instance, effectiveAssignment)
-          : reportService.buildPlaceholderPayloadDetailed(template, instance, effectiveAssignment));
-    const placeholders = placeholderBundle.placeholders;
-    const collections = await reportService.buildReportDocxCollections({
+    const payload = await reportService.buildReportInstanceExportPayload({
       template,
       instance,
       assignment: effectiveAssignment,
+      format,
       reqUser: req.user
     });
-    const mergedAnswers = reportService.mergeTemplateData(template, instance, effectiveAssignment);
-    const collectionDiagnostics = Object.fromEntries(
-      Object.entries(collections || {}).map(([key, rows]) => [key, { rowCount: Array.isArray(rows) ? rows.length : 0 }])
-    );
-    const payload = {
-      instanceId: instance.id,
-      templateId: template.id,
-      templateVersion: template.version,
-      status: instance.status,
-      placeholders,
-      collections,
-      answers: instance.answers || {},
-      mergedAnswers,
-      conversionDiagnostics: placeholderBundle.conversionDiagnostics || [],
-      collectionDiagnostics,
-      assignmentSharedAnswers: effectiveAssignment?.sharedAnswers || {},
-      prefillSnapshot: instance.prefillSnapshot || {}
-    };
+    const placeholders = payload.placeholders;
+    const collections = payload.collections;
+    const mergedAnswers = payload.mergedAnswers;
 
     if (format === 'docx') {
       if (!reportFunderDocxService.templateHasAnyDocx(template)) {

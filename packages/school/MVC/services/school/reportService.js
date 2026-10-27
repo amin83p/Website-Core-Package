@@ -3534,7 +3534,12 @@ function expandDocxShortcutPlaceholderTokens(template, placeholders = {}, option
     if (!catalogKey || !reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias)) return;
     if (useScope && ctx && !ctx.baseLowerSet.has(catalogKey.toLowerCase())) return;
     if (!valueByCatalogKey.has(catalogKey.toLowerCase())) return;
-    out[`{{${alias}}}`] = valueByCatalogKey.get(catalogKey.toLowerCase());
+    const aliasToken = `{{${alias}}}`;
+    const nextVal = valueByCatalogKey.get(catalogKey.toLowerCase());
+    if (Object.prototype.hasOwnProperty.call(out, aliasToken)) {
+      return;
+    }
+    out[aliasToken] = nextVal;
   });
   return out;
 }
@@ -3561,6 +3566,14 @@ function buildPlaceholderPayloadDetailed(
   const prefill = instance?.prefillSnapshot && typeof instance.prefillSnapshot === 'object'
     ? instance.prefillSnapshot
     : {};
+  const preparedForExport = reportRuleEngineService.prepareReportAnswersForUI({
+    template,
+    mergedAnswers: merged,
+    prefill
+  });
+  const exportAnswers = preparedForExport.displayAnswers && typeof preparedForExport.displayAnswers === 'object'
+    ? preparedForExport.displayAnswers
+    : merged;
 
   const out = {};
   const conversionDiagnostics = [];
@@ -3581,12 +3594,26 @@ function buildPlaceholderPayloadDetailed(
     if (useScope && field && !fieldIsInSnapshotScope(field, ctx.baseLowerSet, ctx.placeholderMap)) {
       return;
     }
-    const conversion = reportRuleEngineService.convertFieldValueForExport({
-      field,
-      value: merged[fieldId],
-      answers: merged,
-      prefill
-    });
+    let conversion;
+    if (reportRuleEngineService.shouldApplyReadOnlyDisplayConversion(field)) {
+      const displayValue = exportAnswers[fieldId];
+      const displayMissing = displayValue === undefined || displayValue === null || String(displayValue).trim() === '';
+      conversion = displayMissing
+        ? reportRuleEngineService.convertFieldValueForExport({
+          field,
+          value: preparedForExport.calculationAnswers[fieldId],
+          answers: preparedForExport.calculationAnswers,
+          prefill
+        })
+        : { value: displayValue, diagnostic: null };
+    } else {
+      conversion = reportRuleEngineService.convertFieldValueForExport({
+        field,
+        value: preparedForExport.calculationAnswers[fieldId],
+        answers: preparedForExport.calculationAnswers,
+        prefill
+      });
+    }
     const printableValue = toPrintableValue(conversion.value);
     const exportedValue = applyDocxValueCase
       ? reportRuleEngineService.applyExportTextCase(printableValue, field?.exportTextCase)
@@ -3610,10 +3637,13 @@ function buildPlaceholderPayloadDetailed(
 }
 
 function buildDocxPlaceholderPayloadDetailed(template, instance, assignment = null, options = {}) {
-  return buildPlaceholderPayloadDetailed(template, instance, assignment, {
+  const mergedOptions = {
     applyDocxValueCase: true,
     ...(options && typeof options === 'object' ? options : {})
-  });
+  };
+  const bundle = buildPlaceholderPayloadDetailed(template, instance, assignment, mergedOptions);
+  const placeholders = expandDocxShortcutPlaceholderTokens(template, bundle.placeholders, mergedOptions);
+  return { placeholders, conversionDiagnostics: bundle.conversionDiagnostics };
 }
 
 function buildPdfPlaceholderPayloadDetailed(template, instance, assignment = null, options = {}) {
@@ -3977,6 +4007,133 @@ function validateTemplateSnapshotKeys(template) {
   return invalid;
 }
 
+function resolveExportLockSnapshot(instance) {
+  if (String(instance?.status || '').toLowerCase() !== 'locked') return null;
+  if (!instance.lockSnapshot || typeof instance.lockSnapshot !== 'object') return null;
+  return instance.lockSnapshot;
+}
+
+function filterAnswersToSnapshotScope(template, answers = {}) {
+  const fieldIds = resolveSnapshotComputationFieldIds(template);
+  if (!fieldIds) {
+    return answers && typeof answers === 'object' ? { ...answers } : {};
+  }
+  const out = {};
+  fieldIds.forEach((fieldId) => {
+    if (Object.prototype.hasOwnProperty.call(answers, fieldId)) {
+      out[fieldId] = answers[fieldId];
+    }
+  });
+  return out;
+}
+
+function shouldBuildExportCollections(template, format, lockSnapshot) {
+  if (lockSnapshot) return false;
+  const token = String(format || 'json').trim().toLowerCase();
+  if (token === 'json' && templateUsesSnapshotScope(template)) return false;
+  return true;
+}
+
+async function buildReportInstanceExportPayload({
+  template,
+  instance,
+  assignment = null,
+  format = 'json',
+  reqUser = null,
+  options = {}
+} = {}) {
+  const token = String(format || 'json').trim().toLowerCase();
+  const scopeOptions = templateUsesSnapshotScope(template) ? { respectSnapshotKeys: true } : {};
+  const ctx = resolveSnapshotScopeContext(template);
+  const lockSnapshot = options.lockSnapshot !== undefined
+    ? options.lockSnapshot
+    : resolveExportLockSnapshot(instance);
+  const fillKeySet = resolveTemplateFillKeys(template);
+
+  let workingInstance = instance;
+  if (!lockSnapshot && reqUser) {
+    const freshPrefill = await buildPrefillSnapshot({
+      assignment,
+      teacherId: instance?.teacherId,
+      studentId: instance?.studentId,
+      reqUser,
+      requiredKeys: fillKeySet,
+      dataCache: options.dataCache || null
+    });
+    workingInstance = {
+      ...instance,
+      prefillSnapshot: freshPrefill
+    };
+  }
+
+  let mergedAnswers;
+  if (lockSnapshot?.mergedAnswers && typeof lockSnapshot.mergedAnswers === 'object') {
+    mergedAnswers = ctx.active
+      ? stripOutOfScopeMergedAnswers(template, lockSnapshot.mergedAnswers, ctx)
+      : { ...lockSnapshot.mergedAnswers };
+  } else {
+    mergedAnswers = mergeTemplateData(template, workingInstance, assignment, scopeOptions);
+  }
+
+  let placeholderBundle;
+  if (lockSnapshot?.placeholders && typeof lockSnapshot.placeholders === 'object') {
+    const placeholders = token === 'docx'
+      ? expandDocxShortcutPlaceholderTokens(template, lockSnapshot.placeholders, scopeOptions)
+      : lockSnapshot.placeholders;
+    placeholderBundle = { placeholders, conversionDiagnostics: [] };
+  } else if (token === 'docx') {
+    placeholderBundle = buildDocxPlaceholderPayloadDetailed(template, workingInstance, assignment, scopeOptions);
+  } else if (token === 'pdf') {
+    placeholderBundle = buildPdfPlaceholderPayloadDetailed(template, workingInstance, assignment, scopeOptions);
+  } else {
+    placeholderBundle = buildPlaceholderPayloadDetailed(template, workingInstance, assignment, scopeOptions);
+  }
+
+  let collections = {};
+  const buildCollections = options.buildCollections !== false
+    && shouldBuildExportCollections(template, token, lockSnapshot);
+  if (buildCollections) {
+    collections = await buildReportDocxCollections({
+      template,
+      instance,
+      assignment,
+      reqUser,
+      dataCache: options.dataCache || null
+    });
+  }
+
+  const rawPrefill = workingInstance?.prefillSnapshot && typeof workingInstance.prefillSnapshot === 'object'
+    ? workingInstance.prefillSnapshot
+    : {};
+  const prefillSnapshot = ctx.active
+    ? pickKeySubset(rawPrefill, fillKeySet)
+    : { ...rawPrefill };
+
+  const rawAnswers = instance?.answers && typeof instance.answers === 'object' ? instance.answers : {};
+  const answers = ctx.active
+    ? filterAnswersToSnapshotScope(template, rawAnswers)
+    : { ...rawAnswers };
+
+  const collectionDiagnostics = Object.fromEntries(
+    Object.entries(collections || {}).map(([key, rows]) => [key, { rowCount: Array.isArray(rows) ? rows.length : 0 }])
+  );
+
+  return {
+    instanceId: instance?.id || '',
+    templateId: template?.id || '',
+    templateVersion: template?.version,
+    status: instance?.status || '',
+    placeholders: placeholderBundle.placeholders,
+    collections,
+    answers,
+    mergedAnswers,
+    conversionDiagnostics: placeholderBundle.conversionDiagnostics || [],
+    collectionDiagnostics,
+    assignmentSharedAnswers: assignment?.sharedAnswers || {},
+    prefillSnapshot
+  };
+}
+
 async function buildLockSnapshot({ template, instance, assignment = null, reqUser }) {
   void reqUser;
   const overallReportService = require('./overallReportService');
@@ -4064,6 +4221,9 @@ module.exports = {
   resolveTemplateLockKeys,
   fieldIsInSnapshotScope,
   buildLockSnapshot,
+  buildReportInstanceExportPayload,
+  resolveExportLockSnapshot,
+  filterAnswersToSnapshotScope,
   buildTemplateSnapshotKeySuggestions,
   resolveSnapshotKeyLabel,
   resolveCanonicalSnapshotKeyForField,

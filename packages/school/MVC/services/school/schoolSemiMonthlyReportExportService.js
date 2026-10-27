@@ -597,45 +597,18 @@ async function exportStoredInstance(instanceId, format, reqUser, options = {}) {
     reportViewService.findAssignmentRow(assignment, instance.assignmentRowId || '')
   );
   const token = clean(format).toLowerCase();
-  const lockSnapshot = String(instance.status || '').toLowerCase() === 'locked'
-    && instance.lockSnapshot
-    && typeof instance.lockSnapshot === 'object'
-    ? instance.lockSnapshot
-    : null;
-  const mergedAnswers = lockSnapshot?.mergedAnswers && typeof lockSnapshot.mergedAnswers === 'object'
-    ? lockSnapshot.mergedAnswers
-    : reportService.mergeTemplateData(template, instance, effectiveAssignment);
 
   if (token === 'docx') {
     if (!reportFunderDocxService.templateHasAnyDocx(template)) {
       throw new Error('This report template has no DOCX file configured.');
     }
-    const snapshotScopeOptions = reportService.templateUsesSnapshotScope(template)
-      ? { respectSnapshotKeys: true }
-      : {};
-    const placeholderBundle = lockSnapshot?.placeholders && typeof lockSnapshot.placeholders === 'object'
-      ? {
-        placeholders: reportService.expandDocxShortcutPlaceholderTokens(
-          template,
-          lockSnapshot.placeholders,
-          snapshotScopeOptions
-        ),
-        conversionDiagnostics: []
-      }
-      : reportService.buildDocxPlaceholderPayloadDetailed(
-        template,
-        instance,
-        effectiveAssignment,
-        snapshotScopeOptions
-      );
-    const collections = lockSnapshot
-      ? {}
-      : await reportService.buildReportDocxCollections({
-        template,
-        instance,
-        assignment: effectiveAssignment,
-        reqUser
-      });
+    const exportPayload = await reportService.buildReportInstanceExportPayload({
+      template,
+      instance,
+      assignment: effectiveAssignment,
+      format: 'docx',
+      reqUser
+    });
     const resolved = reportFunderDocxService.resolveDocxTemplateForFunder({
       template,
       funderKey: clean(options.docxKey) || 'default'
@@ -643,8 +616,8 @@ async function exportStoredInstance(instanceId, format, reqUser, options = {}) {
     const rendered = await reportDocxRenderService.renderReportInstanceDocx({
       template,
       instance,
-      placeholders: placeholderBundle.placeholders,
-      collections,
+      placeholders: exportPayload.placeholders,
+      collections: exportPayload.collections,
       docxTemplateOverride: resolved.docxTemplate
     });
     return {
@@ -658,9 +631,13 @@ async function exportStoredInstance(instanceId, format, reqUser, options = {}) {
     if (!reportFunderPdfService.templateHasAnyPdf(template)) {
       throw new Error('This report template has no PDF file configured.');
     }
-    const placeholderBundle = lockSnapshot?.placeholders && typeof lockSnapshot.placeholders === 'object'
-      ? { placeholders: lockSnapshot.placeholders, conversionDiagnostics: [] }
-      : reportService.buildPdfPlaceholderPayloadDetailed(template, instance, effectiveAssignment);
+    const exportPayload = await reportService.buildReportInstanceExportPayload({
+      template,
+      instance,
+      assignment: effectiveAssignment,
+      format: 'pdf',
+      reqUser
+    });
     const resolved = reportFunderPdfService.resolvePdfTemplateForFunder({
       template,
       funderKey: clean(options.pdfKey) || 'default'
@@ -668,8 +645,8 @@ async function exportStoredInstance(instanceId, format, reqUser, options = {}) {
     const rendered = await reportPdfRenderService.renderReportInstancePdf({
       template,
       instance,
-      placeholders: placeholderBundle.placeholders,
-      mergedAnswers,
+      placeholders: exportPayload.placeholders,
+      mergedAnswers: exportPayload.mergedAnswers,
       pdfTemplateOverride: resolved.pdfTemplate
     });
     return {
@@ -679,30 +656,13 @@ async function exportStoredInstance(instanceId, format, reqUser, options = {}) {
     };
   }
 
-  const placeholderBundle = lockSnapshot?.placeholders && typeof lockSnapshot.placeholders === 'object'
-    ? { placeholders: lockSnapshot.placeholders, conversionDiagnostics: [] }
-    : reportService.buildPlaceholderPayloadDetailed(template, instance, effectiveAssignment);
-  const collections = lockSnapshot
-    ? {}
-    : await reportService.buildReportDocxCollections({
-      template,
-      instance,
-      assignment: effectiveAssignment,
-      reqUser
-    });
-  const payload = {
-    instanceId: instance.id,
-    templateId: template.id,
-    templateVersion: template.version,
-    status: instance.status,
-    placeholders: placeholderBundle.placeholders,
-    collections,
-    answers: instance.answers || {},
-    mergedAnswers,
-    conversionDiagnostics: placeholderBundle.conversionDiagnostics || [],
-    assignmentSharedAnswers: effectiveAssignment?.sharedAnswers || {},
-    prefillSnapshot: instance.prefillSnapshot || {}
-  };
+  const payload = await reportService.buildReportInstanceExportPayload({
+    template,
+    instance,
+    assignment: effectiveAssignment,
+    format: 'json',
+    reqUser
+  });
   const buffer = Buffer.from(JSON.stringify({ status: 'success', payload }, null, 2), 'utf8');
   return {
     buffer,

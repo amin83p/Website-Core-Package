@@ -597,35 +597,21 @@ async function buildStudentPayload({
   const mergeOptions = reportService.templateUsesSnapshotScope(template)
     ? { respectSnapshotKeys: true }
     : {};
-  const mergedAnswers = reportService.mergeTemplateData(template, instance, assignment, mergeOptions);
-  const placeholderBundle = buildPlaceholderBundle(template, instance, assignment, format);
-  const collections = await reportService.buildReportDocxCollections({
+  const exportPayload = await reportService.buildReportInstanceExportPayload({
     template,
     instance,
     assignment,
+    format,
     reqUser,
-    dataCache: options.dataCache || null
+    options: { dataCache: options.dataCache || null }
   });
-  const warnings = assessGenerationWarnings(template, assignment, instance, mergedAnswers, mergeOptions);
-  const collectionDiagnostics = Object.fromEntries(
-    Object.entries(collections || {}).map(([key, rows]) => [key, { rowCount: Array.isArray(rows) ? rows.length : 0 }])
-  );
+  const warnings = assessGenerationWarnings(template, assignment, instance, exportPayload.mergedAnswers, mergeOptions);
 
   return {
-    instanceId: instance?.id || '',
+    ...exportPayload,
     studentId: instance?.studentId || '',
     studentName: String(instance?.prefillSnapshot?.student_full_name || instance?.studentId || '').trim(),
-    templateId: template?.id || '',
-    templateVersion: template?.version,
     status: instance?.status || 'engine',
-    placeholders: placeholderBundle.placeholders,
-    collections,
-    answers: instance?.answers || {},
-    mergedAnswers,
-    conversionDiagnostics: placeholderBundle.conversionDiagnostics || [],
-    collectionDiagnostics,
-    assignmentSharedAnswers: assignment?.sharedAnswers || {},
-    prefillSnapshot: instance?.prefillSnapshot || {},
     warnings
   };
 }
