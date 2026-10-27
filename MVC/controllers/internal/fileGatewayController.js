@@ -6,6 +6,7 @@ const uploadPathUtils = require('../../utils/uploadPathUtils');
 const orgFileBackupService = require('../../services/orgFileBackupService');
 const packageManifestService = require('../../services/packageManifestService');
 const { getPackageStorageRootResolution } = require('../../utils/packageStoragePathUtils');
+const { writeGatewayUploadBuffer } = require('../../services/fileGatewayStorageService');
 
 const INVALID_NAME_PATTERN = /[<>:"/\\|?*\x00-\x1F]/;
 const WINDOWS_RESERVED_NAMES = new Set([
@@ -350,30 +351,20 @@ exports.upload = async (req, res) => {
     const scopeKey = clean(req.body.scopeKey || 'GLOBAL');
     const relativeDir = clean(req.body.relativeDir || '');
     const desiredName = assertValidName(req.body.desiredName || req.file.originalname || req.file.filename, 'file name');
-    const { targetDir } = resolveDir(scopeKey, relativeDir);
-
-    const availablePath = resolveAvailableFilePath(targetDir, desiredName);
-    const renamed = path.basename(availablePath) !== desiredName;
-    await fs.promises.writeFile(availablePath, req.file.buffer);
-
-    const payload = serializeUploadResult({
-      filePath: availablePath,
-      originalName: desiredName,
+    const result = await writeGatewayUploadBuffer({
+      scopeKey,
+      relativeDir,
+      desiredName,
+      buffer: req.file.buffer,
       mimeType: req.file.mimetype
     });
     logGateway('upload', {
       scopeKey,
       relativeDir,
-      fileName: payload.fileName,
-      renamed
+      fileName: result.fileName,
+      renamed: result.renamed
     });
-
-    return res.json({
-      status: 'success',
-      message: 'File uploaded via gateway.',
-      renamed,
-      ...payload
-    });
+    return res.json(result);
   } catch (error) {
     return respondError(res, error);
   }

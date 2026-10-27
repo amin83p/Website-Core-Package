@@ -209,6 +209,16 @@ async function readBuffer(ref = '') {
     if (isRailwayProxyMode()) {
       const parsed = parseUploadReference(token);
       if (!parsed) throw new Error('Invalid upload URL.');
+      const diskPath = uploadPathUtils.fromUploadsUrlToDiskPath(token);
+      if (diskPath && fs.existsSync(diskPath)) {
+        return {
+          buffer: await fsp.readFile(diskPath),
+          mimeType: '',
+          size: fs.statSync(diskPath).size,
+          path: diskPath,
+          url: token
+        };
+      }
       const remote = await downloadRemoteUploadFile(parsed.scopeKey, parsed.relativePath);
       const arrayBuffer = await remote.blob.arrayBuffer();
       return {

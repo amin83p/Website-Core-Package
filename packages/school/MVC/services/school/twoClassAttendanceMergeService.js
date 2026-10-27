@@ -10,7 +10,16 @@ function mergeTwoClassPresence(amPresence, pmPresence) {
   const am = normalizePresence(amPresence);
   const pm = normalizePresence(pmPresence);
   if (am === 'X' && pm === 'X') return 'X';
+  if (am === pm) return am;
   return `${am}/${pm}`;
+}
+
+function collapsePresence(value) {
+  const text = String(value ?? '').trim();
+  if (!text.includes('/')) return normalizePresence(text);
+  const parts = text.split('/').map((part) => normalizePresence(part));
+  if (parts.length && parts.every((part) => part === parts[0])) return parts[0];
+  return parts.join('/');
 }
 
 function formatAttendanceNoteWithPeriod(note, period) {
@@ -52,6 +61,7 @@ function mergeTwoClassNote(amPresence, amNote, pmPresence, pmNote) {
 module.exports = {
   normalizePresence,
   mergeTwoClassPresence,
+  collapsePresence,
   formatAttendanceNoteWithPeriod,
   mergeSlotNote,
   mergeTwoClassNote

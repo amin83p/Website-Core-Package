@@ -171,6 +171,8 @@ async function mirrorUploadedFilesIfNeeded(req = {}, fixedCategory = '') {
   for (const file of rows) {
     const absolutePath = clean(file?.path);
     if (!absolutePath) continue;
+    const fileSize = Number(file?.size);
+    if (!Number.isFinite(fileSize) || fileSize <= 0) continue;
     if (!uploadPathUtils.isInsideUploadRoot(absolutePath, uploadRoot)) continue;
 
     const relative = path.relative(uploadRoot, absolutePath).split(path.sep).join('/');

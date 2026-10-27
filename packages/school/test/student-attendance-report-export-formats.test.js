@@ -171,6 +171,38 @@ test('buildOverallExportBlock omits payload when policy disables it', () => {
   assert.equal(block.hasPayload, false);
 });
 
+test('applyOverallTemplateVariantToOption gates variant pdf flags by school settings', () => {
+  const policy = {
+    templateExportFormats: {
+      report: {},
+      overall: { 'overall-1': { docx: true, pdf: false, payload: true } }
+    }
+  };
+  const overallTemplate = {
+    id: 'overall-1',
+    title: 'Overall',
+    docxTemplate: { path: '/tmp/overall.docx' },
+    pdfTemplate: { path: '/tmp/overall.pdf' }
+  };
+  const option = generationService.buildOverallExportBlock(
+    { personId: 'p1' },
+    policy,
+    overallTemplate,
+    []
+  );
+  const enriched = generationService.applyOverallTemplateVariantToOption(
+    option,
+    overallTemplate,
+    policy,
+    ''
+  );
+  assert.equal(enriched.hasPdf, false);
+  const defaultVariant = (enriched.templateVariantOptions || []).find((row) => row.key === 'default');
+  assert.ok(defaultVariant);
+  assert.equal(defaultVariant.hasDocx, true);
+  assert.equal(defaultVariant.hasPdf, false);
+});
+
 test('buildOverallExportBlock exposes pdf when overall template has attached pdf', () => {
   const policy = {
     reportTemplateId: 'tpl-1',

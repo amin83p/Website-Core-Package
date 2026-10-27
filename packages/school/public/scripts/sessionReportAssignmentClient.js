@@ -26,6 +26,28 @@
     });
   }
 
+  function normalizeTemplateTargetDepartmentIds(template) {
+    const ids = Array.isArray(template?.targetDepartmentIds) ? template.targetDepartmentIds : [];
+    return ids.map((id) => String(id || '').trim()).filter(Boolean);
+  }
+
+  function templateMatchesDeliveryDepartment(template, deliveryDepartmentId) {
+    const targets = normalizeTemplateTargetDepartmentIds(template);
+    if (!targets.length) return true;
+    const deptId = String(deliveryDepartmentId || '').trim();
+    if (!deptId) return false;
+    return targets.some((id) => id === deptId);
+  }
+
+  function filterTemplatesForDeliveryDepartment(templates, deliveryDepartmentId, options = {}) {
+    const alwaysIncludeTemplateId = String(options.alwaysIncludeTemplateId || '').trim();
+    return (Array.isArray(templates) ? templates : []).filter((row) => {
+      const rowId = String(row?.id || '').trim();
+      if (alwaysIncludeTemplateId && rowId === alwaysIncludeTemplateId) return true;
+      return templateMatchesDeliveryDepartment(row, deliveryDepartmentId);
+    });
+  }
+
   function formatReportTemplateOptionLabel(template) {
     const title = String(template?.title || template?.id || 'Template').trim();
     const version = Number(template?.version || 1);
@@ -325,8 +347,11 @@
       `).join('');
     }
 
-    async function fetchActiveReportTemplates() {
-      const res = await fetch('/school/reports/templates?limit=1000', {
+    async function fetchActiveReportTemplates(context = {}) {
+      const classId = String(context?.classId || '').trim();
+      const params = new URLSearchParams({ limit: '1000' });
+      if (classId) params.set('classId', classId);
+      const res = await fetch(`/school/reports/templates?${params.toString()}`, {
         credentials: 'same-origin',
         headers: {
           Accept: 'application/json',
@@ -738,7 +763,7 @@
           if (patch && typeof patch === 'object') resolvedCtx = { ...resolvedCtx, ...patch };
         }
         ctx = resolvedCtx;
-        const loadTasks = [fetchActiveReportTemplates()];
+        const loadTasks = [fetchActiveReportTemplates(ctx)];
         if (hasFetchExistingReports) {
           loadTasks.push(deps.fetchExistingReports(ctx));
         }
@@ -772,6 +797,8 @@
     normalizeSessionReportTemplateScopes,
     isSessionReportStudentScoped,
     filterActiveReportTemplates,
+    filterTemplatesForDeliveryDepartment,
+    templateMatchesDeliveryDepartment,
     formatReportTemplateOptionLabel,
     buildExistingReportDisplayRows
   };

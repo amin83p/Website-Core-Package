@@ -253,7 +253,7 @@ router.get('/templates/edit/:id',
 router.post('/templates/edit/:id',
   requireAccess(REPORT_TEMPLATE_SECTION, OPERATIONS.UPDATE),
   upload('school-reports').any(),
-  trackActionState(REPORT_TEMPLATE_SECTION, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(REPORT_TEMPLATE_SECTION, OPERATIONS.UPDATE, reportTemplateCreateActionState),
   ctrl.saveTemplate);
 
 router.get('/templates/delete/:id',

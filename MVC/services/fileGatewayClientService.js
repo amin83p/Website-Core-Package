@@ -1,7 +1,10 @@
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 const { buildSignedHeaders } = require('./fileGatewayAuthService');
+const { writeGatewayUploadBuffer } = require('./fileGatewayStorageService');
 const { getGatewayBaseUrl, getGatewayTimeoutMs } = require('../utils/uploadModeUtils');
+const uploadPathUtils = require('../utils/uploadPathUtils');
 
 function clean(value) {
   return String(value || '').trim();
@@ -50,12 +53,32 @@ function buildConflictName(name = '', index = 0) {
   return `${base}_${index}${ext}`;
 }
 
+function buildRelativeUploadUrl(scopeKey = '', relativePath = '') {
+  const scope = normalizeScopeKey(scopeKey);
+  const scopeFolder = scope === 'GLOBAL' ? 'GLOBAL' : `ORG_${scope}`;
+  const parts = [scopeFolder, ...cleanRelativePath(relativePath).split('/').filter(Boolean)];
+  return `/uploads/${parts.join('/')}`;
+}
+
 function buildUploadUrl(scopeKey = '', relativePath = '') {
   const scope = normalizeScopeKey(scopeKey);
   const scopeFolder = scope === 'GLOBAL' ? 'GLOBAL' : `ORG_${scope}`;
   const parts = [scopeFolder, ...cleanRelativePath(relativePath).split('/').filter(Boolean)];
   const encoded = parts.map((part) => encodeURIComponent(part)).join('/');
   return `${clean(getGatewayBaseUrl()).replace(/\/+$/, '')}/uploads/${encoded}`;
+}
+
+async function readLocalUploadIfPresent(scopeKey = '', relativePath = '') {
+  const relativeUrl = buildRelativeUploadUrl(scopeKey, relativePath);
+  const diskPath = uploadPathUtils.fromUploadsUrlToDiskPath(relativeUrl);
+  if (!diskPath || !fsSync.existsSync(diskPath)) return null;
+  const buffer = await fs.readFile(diskPath);
+  return {
+    buffer,
+    mimeType: 'application/octet-stream',
+    size: buffer.length,
+    uploadUrl: relativeUrl
+  };
 }
 
 function getRoutePath(routePath = '') {
@@ -225,15 +248,13 @@ async function gatewayUploadBlob({
   blob = null,
   mimeType = 'application/octet-stream'
 } = {}) {
-  const form = new FormData();
-  form.append('scopeKey', clean(scopeKey));
-  form.append('relativeDir', clean(relativeDir));
-  form.append('desiredName', clean(desiredName));
-  form.append('file', blob, clean(desiredName) || 'file');
-
-  return fetchJson('/internal/file-gateway/upload', {
-    method: 'POST',
-    body: form
+  const buffer = Buffer.from(await blob.arrayBuffer());
+  return writeGatewayUploadBuffer({
+    scopeKey: clean(scopeKey),
+    relativeDir: clean(relativeDir),
+    desiredName: clean(desiredName) || 'file',
+    buffer,
+    mimeType: clean(mimeType) || 'application/octet-stream'
   });
 }
 
@@ -276,6 +297,16 @@ async function gatewayDeleteByRelativePath({ scopeKey = '', relativePath = '' } 
 }
 
 async function downloadRemoteUploadFile(scopeKey = '', relativePath = '') {
+  const local = await readLocalUploadIfPresent(scopeKey, relativePath);
+  if (local) {
+    return {
+      blob: new Blob([local.buffer], { type: local.mimeType }),
+      mimeType: local.mimeType,
+      size: local.size,
+      uploadUrl: local.uploadUrl
+    };
+  }
+
   const uploadUrl = buildUploadUrl(scopeKey, relativePath);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), getGatewayTimeoutMs());

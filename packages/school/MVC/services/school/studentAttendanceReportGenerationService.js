@@ -386,7 +386,22 @@ async function loadEnrollmentPeriodRowsForClassIds(classIds = [], reqUser) {
 
 function applyOverallTemplateVariantToOption(option, overallTemplate, policy, funderKey = '') {
   if (!option || !overallTemplate) return option;
-  const templateVariantOptions = overallReportService.buildOverallTemplateVariantOptions(overallTemplate);
+  const templateVariantOptions = overallReportService.buildOverallTemplateVariantOptions(overallTemplate)
+    .map((variantRow) => {
+      const variantEffective = studentAttendanceReportExportFormatService.resolveEffectiveOverallExportFlags(
+        policy,
+        option.templateId,
+        {
+          hasDocx: Boolean(variantRow?.hasDocx),
+          hasPdf: Boolean(variantRow?.hasPdf)
+        }
+      );
+      return {
+        ...variantRow,
+        hasDocx: variantEffective.hasDocx,
+        hasPdf: variantEffective.hasPdf
+      };
+    });
   const { suggestedTemplateVariantKey } = overallReportService.suggestOverallTemplateVariantKeys(
     overallTemplate,
     funderKey
@@ -1169,6 +1184,7 @@ module.exports = {
   buildClassExportRowsForStudent,
   buildOverallExportBlock,
   buildOverallExportOptions,
+  applyOverallTemplateVariantToOption,
   enrichOverallExportOptionsForStudent,
   buildStudentAttendanceReportExportPlan,
   exportStudentAttendanceReportSelections,

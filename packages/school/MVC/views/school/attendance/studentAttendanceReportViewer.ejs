@@ -2205,18 +2205,19 @@
         const variants = getOverallVariantOptionsForOption(option);
         const key = String(variantKey || option?.suggestedTemplateVariantKey || variants[0]?.key || '').trim();
         const variant = variants.find((row) => String(row.key || '').trim() === key) || variants[0];
-        if (variant) {
-            return {
-                hasDocx: Boolean(variant.hasDocx),
-                hasPdf: Boolean(variant.hasPdf),
-                hasPayload: option?.hasPayload !== false
-            };
-        }
-        return {
+        const base = {
             hasDocx: Boolean(option?.hasDocx),
             hasPdf: Boolean(option?.hasPdf),
             hasPayload: option?.hasPayload !== false
         };
+        if (variant) {
+            return {
+                hasDocx: Boolean(variant.hasDocx),
+                hasPdf: Boolean(variant.hasPdf),
+                hasPayload: base.hasPayload
+            };
+        }
+        return base;
     }
 
     function buildSarOverallVariantSelectHtml(personId, option) {

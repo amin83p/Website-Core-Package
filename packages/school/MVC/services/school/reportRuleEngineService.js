@@ -192,8 +192,18 @@ function createHelperSet() {
     },
     twoClassNote(amPresence, amNote, pmPresence, pmNote) {
       return twoClassAttendanceMergeService.mergeTwoClassNote(amPresence, amNote, pmPresence, pmNote);
+    },
+    collapsePresence(value) {
+      return twoClassAttendanceMergeService.collapsePresence(value);
     }
   });
+}
+
+function compareExpressionEquality(left, right) {
+  if (typeof left === 'string' && typeof right === 'string') {
+    return left.trim().toUpperCase() === right.trim().toUpperCase();
+  }
+  return left == right; // eslint-disable-line eqeqeq
 }
 
 function normalizePhoneRows(value) {
@@ -557,8 +567,8 @@ function evalAst(node, context) {
     if (node.op === '>') return left > right;
     if (node.op === '<=') return left <= right;
     if (node.op === '>=') return left >= right;
-    if (node.op === '==') return left == right; // eslint-disable-line eqeqeq
-    if (node.op === '!=') return left != right; // eslint-disable-line eqeqeq
+    if (node.op === '==') return compareExpressionEquality(left, right);
+    if (node.op === '!=') return !compareExpressionEquality(left, right);
     throw new Error(`Unsupported operator "${node.op}".`);
   }
   throw new Error('Unsupported AST node.');

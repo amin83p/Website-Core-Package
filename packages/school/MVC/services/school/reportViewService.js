@@ -15,6 +15,7 @@ const reportFunderPdfService = require('./reportFunderPdfService');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const reportScopePolicy = require('./reportScopePolicy');
 const reportPeriodBasePolicy = require('./reportPeriodBasePolicy');
+const reportTargetDepartmentPolicy = require('./reportTargetDepartmentPolicy');
 const reportRosterService = require('./reportRosterService');
 const reportAssignmentStudentEligibilityService = require('./reportAssignmentStudentEligibilityService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -798,11 +799,28 @@ function mapReportInstanceParticipantFields({
   };
 }
 
+function withResolvedReportTemplateFields(row) {
+  return reportTargetDepartmentPolicy.withResolvedTargetDepartments(
+    reportPeriodBasePolicy.withResolvedReportPeriod(
+      reportScopePolicy.withResolvedAllowedReportScopes(row)
+    )
+  );
+}
+
+async function validateTargetDepartmentIdsForSave(targetDepartmentIds, reqUser) {
+  const ids = reportTargetDepartmentPolicy.normalizeTargetDepartmentIds(targetDepartmentIds);
+  for (const departmentId of ids) {
+    const dept = await schoolDataService.getDataById('departments', departmentId, reqUser);
+    if (!dept) {
+      throw new Error(`Target department not found or inaccessible: ${departmentId}.`);
+    }
+  }
+  return ids;
+}
+
 async function listAllReportTemplates(reqUser) {
   const rows = await schoolDataService.fetchAllData('reportTemplates', {}, reqUser);
-  return (Array.isArray(rows) ? rows : []).map((row) => reportPeriodBasePolicy.withResolvedReportPeriod(
-    reportScopePolicy.withResolvedAllowedReportScopes(row)
-  ));
+  return (Array.isArray(rows) ? rows : []).map(withResolvedReportTemplateFields);
 }
 
 async function listAllReportAssignments(reqUser) {
@@ -977,6 +995,7 @@ function buildTemplateSavePayload({
     ? []
     : body.allowedReportScopes;
   const periodFields = reportPeriodBasePolicy.parseReportPeriodFieldsFromBody(body, existingTemplate);
+  const targetDepartmentIds = reportTargetDepartmentPolicy.parseTargetDepartmentIdsFromBody(body, existingTemplate);
   const payload = {
     orgId: existingTemplate?.orgId || activeOrgId,
     type: String(body.type || '').trim().toLowerCase(),
@@ -987,6 +1006,7 @@ function buildTemplateSavePayload({
     allowedReportScopes: reportScopePolicy.normalizeAllowedReportScopes(submittedAllowedScopes),
     reportPeriodBase: periodFields.reportPeriodBase,
     reportPeriodOffset: periodFields.reportPeriodOffset,
+    targetDepartmentIds,
     conductRequiredBeforeFill: String(body.conductRequiredBeforeFillPresent || '').trim()
       ? parseBooleanFlag(body.conductRequiredBeforeFill, false)
       : (existingTemplate?.conductRequiredBeforeFill !== undefined
@@ -1463,6 +1483,7 @@ async function buildAssignmentFormContext({ assignment = null, requestedClassId 
     sessions,
     selectedClassId,
     selectedClassTitle: selectedClass?.title || '',
+    selectedClassDeliveryDepartmentId: reportTargetDepartmentPolicy.resolveClassDeliveryDepartmentId(selectedClass),
     selectedTemplateId,
     selectedTemplateTitle: selectedTemplate?.title || '',
     selectedTemplateAllowedReportScopes: selectedTemplate
@@ -2245,6 +2266,8 @@ module.exports = {
   isRecordAccessibleByOrg,
   filterRecordsByOrg,
   buildHomeSummary,
+  withResolvedReportTemplateFields,
+  validateTargetDepartmentIdsForSave,
   buildTemplateSavePayload,
   buildTemplateComplianceDraft,
   buildDocxTemplatesByFunderFromUpload,

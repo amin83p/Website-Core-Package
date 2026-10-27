@@ -4057,6 +4057,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const defaultSessionStatusCode = <%- jsonForScript(fallbackStatusCode) %>;
     const sessionInitialStatusCode = <%- jsonForScript(currentSessionStatus) %>;
     const sessionManagerClassId = <%- jsonForScript(classData.id) %>;
+    const sessionManagerDeliveryDepartmentId = <%- jsonForScript(classData?.deliveryDepartmentId || '') %>;
     const sessionManagerSessionId = <%- jsonForScript(session.sessionId) %>;
     const sessionManagerOrgId = <%- jsonForScript(classData?.orgId || user?.activeOrgId || '') %>;
     const sessionAutosavePolicy = <%- jsonForScript(typeof autosavePolicyResolved !== 'undefined' ? autosavePolicyResolved : { defaultMinutes: 5, sections: {} }) %>;
@@ -6730,6 +6731,7 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             resolveOpenContext: async () => ({
                 classId: sessionManagerClassId,
+                deliveryDepartmentId: sessionManagerDeliveryDepartmentId,
                 sessionId: sessionManagerSessionId,
                 sessionDate: sessionDefaultDate,
                 startTime: sessionDefaultStartTime,

@@ -36,6 +36,7 @@
         <th>Version</th>
         <th>Status</th>
         <th>Approved Scopes</th>
+        <th>Departments</th>
         <th>Fields</th>
         <th>DOCX</th>
         <th class="text-end pe-4">Actions</th>
@@ -43,7 +44,7 @@
     </thead>
     <tbody>
       <% if (!data || !data.length) { %>
-        <tr><td colspan="8" class="text-center py-4 text-muted">No templates found.</td></tr>
+        <tr><td colspan="9" class="text-center py-4 text-muted">No templates found.</td></tr>
       <% } %>
       <% (data || []).forEach((row) => { %>
         <tr>
@@ -67,6 +68,10 @@
                 <span class="badge bg-light text-dark border"><%= scope.label %></span>
               <% }); %>
             </div>
+          </td>
+          <td>
+            <% const deptIds = Array.isArray(row?.targetDepartmentIds) ? row.targetDepartmentIds : []; %>
+            <span class="badge bg-light text-dark border"><%= deptIds.length ? (deptIds.length + ' dept' + (deptIds.length === 1 ? '' : 's')) : 'General' %></span>
           </td>
           <td><%= Array.isArray(row?.schema?.fields) ? row.schema.fields.length : 0 %></td>
           <td>

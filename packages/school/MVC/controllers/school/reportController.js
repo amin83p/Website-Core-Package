@@ -25,6 +25,7 @@ const reportFunderPdfService = require('../../services/school/reportFunderPdfSer
 const reportScopePolicy = require('../../services/school/reportScopePolicy');
 const reportPeriodBasePolicy = require('../../services/school/reportPeriodBasePolicy');
 const reportPeriodBaseService = require('../../services/school/reportPeriodBaseService');
+const reportTargetDepartmentPolicy = require('../../services/school/reportTargetDepartmentPolicy');
 const sessionConductService = require('../../services/school/sessionConductService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
@@ -441,14 +442,56 @@ async function showHome(req, res) {
   }
 }
 
+async function resolveTemplateListDeliveryDepartmentId(req) {
+  const classId = toPublicId(req.query?.classId);
+  if (classId) {
+    const classData = await schoolDataService.getDataById('classes', classId, req.user);
+    return reportTargetDepartmentPolicy.resolveClassDeliveryDepartmentId(classData);
+  }
+  const deliveryDepartmentId = toPublicId(req.query?.deliveryDepartmentId);
+  return deliveryDepartmentId || '';
+}
+
+async function buildInitialTargetDepartments(template, reqUser) {
+  const ids = reportTargetDepartmentPolicy.resolveTargetDepartmentFields(template).targetDepartmentIds;
+  if (!ids.length) return [];
+  const rows = [];
+  for (const departmentId of ids) {
+    const dept = await schoolDataService.getDataById('departments', departmentId, reqUser);
+    rows.push({
+      id: departmentId,
+      name: String(dept?.name || dept?.identity?.displayName || departmentId).trim(),
+      code: String(dept?.code || '').trim()
+    });
+  }
+  return rows;
+}
+
 async function listTemplates(req, res) {
   try {
     const q = String(req.query.q || '').trim().toLowerCase();
     const templateRows = await schoolDataService.fetchAllData('reportTemplates', {}, req.user);
     const allTemplates = (Array.isArray(templateRows) ? templateRows : [])
-      .map((row) => reportPeriodBasePolicy.withResolvedReportPeriod(reportScopePolicy.withResolvedAllowedReportScopes(row)));
+      .map((row) => reportViewService.withResolvedReportTemplateFields(row));
 
-    const filtered = allTemplates
+    const classIdFilter = toPublicId(req.query?.classId);
+    const deliveryDepartmentFilter = toPublicId(req.query?.deliveryDepartmentId);
+    const shouldFilterByDepartment = isAjax(req) && (classIdFilter || deliveryDepartmentFilter);
+    const deliveryDepartmentId = shouldFilterByDepartment
+      ? await resolveTemplateListDeliveryDepartmentId(req)
+      : '';
+    const alwaysIncludeTemplateId = toPublicId(req.query?.includeTemplateId);
+
+    let scopedTemplates = allTemplates;
+    if (shouldFilterByDepartment) {
+      scopedTemplates = reportTargetDepartmentPolicy.filterTemplatesForDeliveryDepartment(
+        allTemplates,
+        deliveryDepartmentId,
+        { alwaysIncludeTemplateId }
+      );
+    }
+
+    const filtered = scopedTemplates
       .filter((row) => {
         if (!q) return true;
         return [row.id, row.title, row.type, row.status]
@@ -525,7 +568,8 @@ function buildCopiedTemplateDraft(sourceTemplate = {}, templates = [], activeOrg
     snapshotKeyDocxAliases: clonePlainValue(sourceTemplate?.snapshotKeyDocxAliases, {}),
     allowedReportScopes: reportScopePolicy.resolveAllowedReportScopes(sourceTemplate),
     reportPeriodBase: reportPeriodBasePolicy.resolveReportPeriodFields(sourceTemplate).reportPeriodBase,
-    reportPeriodOffset: reportPeriodBasePolicy.resolveReportPeriodFields(sourceTemplate).reportPeriodOffset
+    reportPeriodOffset: reportPeriodBasePolicy.resolveReportPeriodFields(sourceTemplate).reportPeriodOffset,
+    targetDepartmentIds: reportTargetDepartmentPolicy.resolveTargetDepartmentFields(sourceTemplate).targetDepartmentIds
   };
 }
 async function showTemplateForm(req, res) {
@@ -544,11 +588,15 @@ async function showTemplateForm(req, res) {
 
     const activeFunders = await reportFunderDocxService.loadActiveFunderOptions(req.user, activeOrgId);
     const funderPickerOptions = reportFunderDocxService.buildFunderPickerOptions(activeFunders);
+    const initialTargetDepartments = template
+      ? await buildInitialTargetDepartments(template, req.user)
+      : [];
 
     res.render('school/report/templateForm', {
       title: isEdit ? 'Edit Report Template' : 'New Report Template',
       template,
       funderPickerOptions,
+      initialTargetDepartments,
       fieldTypes: reportTemplateModel.FIELD_TYPES,
       templateStatuses: reportTemplateModel.TEMPLATE_STATUSES,
       reportScopeDefinitions: reportScopePolicy.REPORT_SCOPE_DEFINITIONS,
@@ -574,12 +622,14 @@ async function showTemplateCopyForm(req, res) {
     const template = buildCopiedTemplateDraft(sourceTemplate, allTemplates, activeOrgId);
     const activeFunders = await reportFunderDocxService.loadActiveFunderOptions(req.user, activeOrgId);
     const funderPickerOptions = reportFunderDocxService.buildFunderPickerOptions(activeFunders);
+    const initialTargetDepartments = await buildInitialTargetDepartments(template, req.user);
 
     res.render('school/report/templateForm', {
       title: 'Copy Report Template',
       template,
       copySourceTemplate: sourceTemplate,
       funderPickerOptions,
+      initialTargetDepartments,
       fieldTypes: reportTemplateModel.FIELD_TYPES,
       templateStatuses: reportTemplateModel.TEMPLATE_STATUSES,
       reportScopeDefinitions: reportScopePolicy.REPORT_SCOPE_DEFINITIONS,
@@ -626,6 +676,10 @@ async function saveTemplate(req, res) {
       uploadedFile: defaultFile,
       uploadedFiles
     });
+    payload.targetDepartmentIds = await reportViewService.validateTargetDepartmentIdsForSave(
+      payload.targetDepartmentIds,
+      req.user
+    );
     reportRuleEngineService.ensureTemplateDocxAliases(payload);
     reportRuleEngineService.validateCalculatedFieldExpressions(payload, { strict: true });
     reportRuleEngineService.validateTemplateExportTextCases(payload);

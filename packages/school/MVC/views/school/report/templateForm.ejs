@@ -179,6 +179,7 @@
 
   <form method="POST" action="<%= isEdit ? ('/school/reports/templates/edit/' + template.id) : '/school/reports/templates/new' %>" enctype="multipart/form-data" id="templateForm">
     <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
     <input type="hidden" name="schemaJson" id="schemaJsonInput">
     <input type="hidden" name="placeholderMapJson" id="placeholderMapJsonInput">
     <input type="hidden" name="pdfFieldMapJson" id="pdfFieldMapJsonInput">
@@ -285,6 +286,45 @@
             <label class="form-label fw-bold" for="reportPeriodOffset">Offset</label>
             <input type="number" class="form-control" name="reportPeriodOffset" id="reportPeriodOffset" min="1" max="999" step="1" value="<%= initialReportPeriodOffset %>">
             <div class="form-text">For Days, Weeks, or Months.</div>
+          </div>
+          <div class="col-12">
+            <input type="hidden" name="targetDepartmentIdsPresent" value="true">
+            <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+              <label class="form-label fw-bold mb-0">Target departments</label>
+              <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddTargetDepartment">
+                <i class="bi bi-diagram-3 me-1"></i>Add department
+              </button>
+            </div>
+            <div class="form-text mb-2">Leave empty for a general template available to all departments. When set, only classes with a matching delivery department can use this template.</div>
+            <div class="table-responsive border rounded">
+              <table class="table table-sm align-middle mb-0" id="targetDepartmentsTable">
+                <thead class="table-light">
+                  <tr>
+                    <th class="ps-3">Department</th>
+                    <th>Code</th>
+                    <th class="text-end pe-3" style="width: 6rem;">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="targetDepartmentsTbody">
+                  <% const targetDeptRows = (typeof initialTargetDepartments !== 'undefined' && Array.isArray(initialTargetDepartments))
+                    ? initialTargetDepartments
+                    : []; %>
+                  <% targetDeptRows.forEach((dept) => { %>
+                    <tr data-department-id="<%= dept.id %>">
+                      <td class="ps-3">
+                        <input type="hidden" name="targetDepartmentIds" value="<%= dept.id %>">
+                        <span class="fw-semibold js-target-dept-name"><%= dept.name || dept.id %></span>
+                      </td>
+                      <td class="js-target-dept-code"><%= dept.code || '—' %></td>
+                      <td class="text-end pe-3">
+                        <button type="button" class="btn btn-outline-danger btn-sm js-remove-target-dept">Remove</button>
+                      </td>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+            <div class="form-text mt-1" id="targetDepartmentsEmptyHint">No departments selected — template is general.</div>
           </div>
           <div class="col-12">
             <label class="form-label fw-bold">Description</label>
@@ -1121,6 +1161,72 @@
   }
   baseEl?.addEventListener('change', syncReportPeriodOffsetUi);
   syncReportPeriodOffsetUi();
+})();
+(function initTargetDepartmentsUi() {
+  const tbody = document.getElementById('targetDepartmentsTbody');
+  const emptyHint = document.getElementById('targetDepartmentsEmptyHint');
+  const addBtn = document.getElementById('btnAddTargetDepartment');
+  if (!tbody || !addBtn) return;
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function syncTargetDepartmentsEmptyHint() {
+    const hasRows = tbody.querySelectorAll('tr[data-department-id]').length > 0;
+    if (emptyHint) emptyHint.classList.toggle('d-none', hasRows);
+  }
+
+  function hasDepartmentId(id) {
+    const token = String(id || '').trim();
+    if (!token) return false;
+    return Array.from(tbody.querySelectorAll('tr[data-department-id]'))
+      .some((row) => String(row.getAttribute('data-department-id') || '').trim() === token);
+  }
+
+  function appendDepartmentRow(item) {
+    const id = String(item?.id || '').trim();
+    if (!id || hasDepartmentId(id)) return;
+    const name = String(item?.name || item?.title || id).trim();
+    const code = String(item?.code || '').trim() || '—';
+    const tr = document.createElement('tr');
+    tr.setAttribute('data-department-id', id);
+    tr.innerHTML = `
+      <td class="ps-3">
+        <input type="hidden" name="targetDepartmentIds" value="${escapeHtml(id)}">
+        <span class="fw-semibold js-target-dept-name">${escapeHtml(name)}</span>
+      </td>
+      <td class="js-target-dept-code">${escapeHtml(code)}</td>
+      <td class="text-end pe-3">
+        <button type="button" class="btn btn-outline-danger btn-sm js-remove-target-dept">Remove</button>
+      </td>`;
+    tbody.appendChild(tr);
+    syncTargetDepartmentsEmptyHint();
+  }
+
+  addBtn.addEventListener('click', () => {
+    if (!window.GenericPicker || !window.GenericPickerPresets) return;
+    GenericPicker.open(GenericPickerPresets.department({
+      title: 'Select Department',
+      apiEndpoint: '/school/departments/api/data',
+      placeholder: 'Search departments...',
+      onSelect: (item) => appendDepartmentRow(item)
+    }));
+  });
+
+  tbody.addEventListener('click', (event) => {
+    const btn = event.target?.closest?.('.js-remove-target-dept');
+    if (!btn) return;
+    const row = btn.closest('tr[data-department-id]');
+    row?.remove();
+    syncTargetDepartmentsEmptyHint();
+  });
+
+  syncTargetDepartmentsEmptyHint();
 })();
   (function () {
     const fieldTypes = <%- JSON.stringify(fieldTypes || []) %>;
@@ -3078,24 +3184,24 @@ num(value) <= 95</code></pre>
       renderFieldRows();
     });
 
-    document.querySelectorAll('.btn-copy-key').forEach((button) => {
-      button.addEventListener('click', async () => {
-        const value = String(
-          button.getAttribute('data-copy-token')
-          || button.getAttribute('data-copy-value')
-          || ''
-        ).trim();
-        if (!value) return;
-        try {
-          const copied = await copyText(value);
-          if (!copied) return;
-          const oldHtml = button.innerHTML;
-          button.innerHTML = '<i class="bi bi-check2"></i>';
-          setTimeout(() => { button.innerHTML = oldHtml; }, 1000);
-        } catch (_) {
-          // ignore clipboard errors quietly
-        }
-      });
+    document.addEventListener('click', async (event) => {
+      const button = event.target.closest?.('.btn-copy-key');
+      if (!button) return;
+      const value = String(
+        button.getAttribute('data-copy-token')
+        || button.getAttribute('data-copy-value')
+        || ''
+      ).trim();
+      if (!value) return;
+      try {
+        const copied = await copyText(value);
+        if (!copied) return;
+        const oldHtml = button.innerHTML;
+        button.innerHTML = '<i class="bi bi-check2"></i>';
+        setTimeout(() => { button.innerHTML = oldHtml; }, 1000);
+      } catch (_) {
+        // ignore clipboard errors quietly
+      }
     });
     function setAccordionPanelShown(panel, shouldShow) {
       if (!panel) return;
@@ -3521,14 +3627,34 @@ num(value) <= 95</code></pre>
       }
 
       try {
-        const response = await fetch(form.action, {
+        const formData = new FormData(form);
+        const actionStateId = String(formData.get('actionStateId') || '').trim();
+        const csrfToken = String(
+          formData.get('_csrf')
+          || document.querySelector('meta[name="csrf-token"]')?.content
+          || ''
+        ).trim();
+        const requestUrl = new URL(form.action, window.location.origin);
+        if (actionStateId) requestUrl.searchParams.set('actionStateId', actionStateId);
+        const saveHeaders = {
+          'X-Requested-With': 'XMLHttpRequest',
+          'X-AJAX-Request': 'true',
+          Accept: 'application/json'
+        };
+        if (csrfToken) {
+          saveHeaders['x-csrf-token'] = csrfToken;
+          saveHeaders['csrf-token'] = csrfToken;
+        }
+        const response = await fetch(requestUrl.toString(), {
           method: 'POST',
-          headers: { 'X-Requested-With': 'XMLHttpRequest' },
-          body: new FormData(form)
+          headers: saveHeaders,
+          credentials: 'same-origin',
+          body: formData
         });
 
+        const responseText = await response.text();
         let result = null;
-        try { result = await response.json(); } catch (_) { result = null; }
+        try { result = responseText ? JSON.parse(responseText) : null; } catch (_) { result = null; }
         if (!response.ok || result?.status !== 'success') {
           if (result?.errorCode === 'SNAPSHOT_DOCX_COMPLIANCE' && result?.compliance && window.ReportMessaging?.buildSnapshotComplianceSaveFailureModalHtml) {
             await showReportModal({

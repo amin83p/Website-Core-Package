@@ -7,6 +7,7 @@ const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const reportRuleEngineService = require('../../services/school/reportRuleEngineService');
 const { normalizePrefillKey } = require('../../services/school/reportPrefillKeyUtils');
 const reportScopePolicy = require('../../services/school/reportScopePolicy');
+const reportTargetDepartmentPolicy = require('../../services/school/reportTargetDepartmentPolicy');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/reportTemplates.json');
 
@@ -502,6 +503,9 @@ function sanitizeTemplate(input, { isUpdate = false, existing = null } = {}) {
       snapshotKeys
     ),
     allowedReportScopes: reportScopePolicy.normalizeAllowedReportScopes(input.allowedReportScopes),
+    targetDepartmentIds: reportTargetDepartmentPolicy.normalizeTargetDepartmentIds(
+      input.targetDepartmentIds !== undefined ? input.targetDepartmentIds : existing?.targetDepartmentIds
+    ),
     conductRequiredBeforeFill: cleanBoolean(
       input.conductRequiredBeforeFill,
       existing?.conductRequiredBeforeFill !== undefined

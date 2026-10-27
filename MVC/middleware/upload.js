@@ -143,6 +143,16 @@ function upload(fixedCategory = 'misc', isDynamic = false, forceGlobal = false, 
             return next();
           } catch (mirrorError) {
             await coreFilesService.deleteUploadedFiles(req).catch(() => {});
+            const wantsJson = Boolean(req.headers['x-ajax-request'])
+              || String(req.headers['x-requested-with'] || '').toLowerCase() === 'xmlhttprequest';
+            if (wantsJson && !res.headersSent) {
+              const statusCode = Number(mirrorError?.statusCode);
+              const status = Number.isFinite(statusCode) && statusCode >= 400 ? statusCode : 500;
+              return res.status(status).json({
+                status: 'error',
+                message: mirrorError?.message || 'Upload mirroring failed.'
+              });
+            }
             return next(mirrorError);
           }
         });

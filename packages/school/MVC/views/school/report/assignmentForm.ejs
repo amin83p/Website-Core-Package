@@ -75,13 +75,18 @@
           </div>
 
           <div class="col-md-4">
-            <label class="form-label fw-bold">Template</label>
-            <div class="input-group">
-              <input type="hidden" name="templateId" id="templateIdInput" value="<%= selectedTemplateId || '' %>">
-              <input type="text" class="form-control bg-white" id="templateTitleInput" value="<%= templateLabel %>" placeholder="Pick template..." readonly>
-              <button type="button" class="btn btn-outline-primary" id="btnPickTemplate"><i class="bi bi-search"></i></button>
-            </div>
-            <div class="form-text">Template is selected from report templates picker.</div>
+            <label class="form-label fw-bold" for="assignmentTemplateSelect">Template</label>
+            <select class="form-select" name="templateId" id="assignmentTemplateSelect" <%= selectedClassId ? '' : 'disabled' %> required>
+              <% if (!selectedClassId) { %>
+                <option value="" selected>Select a class first</option>
+              <% } else { %>
+                <option value="" <%= selectedTemplateId ? '' : 'selected' %> disabled>Select a template…</option>
+                <% if (selectedTemplateId) { %>
+                  <option value="<%= selectedTemplateId %>" selected><%= templateLabel %></option>
+                <% } %>
+              <% } %>
+            </select>
+            <div class="form-text" id="assignmentTemplateHelp">Active templates for this class delivery department.</div>
           </div>
 
           <div class="col-md-4">
@@ -465,13 +470,16 @@
 
 <%- include('partials/reportMessageHelpers') %>
 <script src="/scripts/reportPeriodBasePolicy.js"></script>
+<script src="/scripts/sessionReportAssignmentClient.js"></script>
 
 <script>
   (function () {
     const classIdInput = document.getElementById('classIdInput');
     const classTitleInput = document.getElementById('classTitleInput');
-    const templateIdInput = document.getElementById('templateIdInput');
-    const templateTitleInput = document.getElementById('templateTitleInput');
+    const templateSelect = document.getElementById('assignmentTemplateSelect');
+    const templateHelp = document.getElementById('assignmentTemplateHelp');
+    const initialSelectedTemplateId = <%- JSON.stringify(selectedTemplateId || '') %>;
+    let assignmentTemplateCatalog = new Map();
     const targetRowsInput = document.getElementById('targetRowsJson');
     const sessionIdsInput = document.getElementById('sessionIdsJson');
     const dateTargetsInput = document.getElementById('dateTargetsJson');
@@ -527,6 +535,107 @@
     let selectedTemplateReportPeriodOffset = <%= (typeof selectedTemplateReportPeriodOffset !== 'undefined' && selectedTemplateReportPeriodOffset != null) ? Number(selectedTemplateReportPeriodOffset) : 'null' %>;
     let rowStartDateUserEdited = false;
     let rowLastAutoSuggestedStartDate = '';
+
+    function escapeHtml(value) {
+      return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function getSelectedAssignmentTemplateId() {
+      return String(templateSelect?.value || '').trim();
+    }
+
+    function applyAssignmentTemplateMetaFromSelection() {
+      const templateId = getSelectedAssignmentTemplateId();
+      const meta = assignmentTemplateCatalog.get(templateId);
+      if (!meta) return;
+      selectedTemplateAllowedReportScopes = normalizeTemplateAllowedScopes(meta.allowedReportScopes);
+      selectedTemplateConductRequired = meta.conductRequiredBeforeFill !== false;
+      selectedTemplateReportPeriodBase = String(meta.reportPeriodBase || 'none').trim().toLowerCase() || 'none';
+      selectedTemplateReportPeriodOffset = meta.reportPeriodOffset != null ? Number(meta.reportPeriodOffset) : null;
+      const bulkConduct = document.getElementById('bulkConductRequiredBeforeFill');
+      if (bulkConduct) bulkConduct.checked = selectedTemplateConductRequired !== false;
+      applyTemplateScopePolicy();
+    }
+
+    function populateAssignmentTemplateSelect(templates, preserveTemplateId) {
+      if (!templateSelect) return;
+      const filterFn = typeof window.filterActiveReportTemplates === 'function'
+        ? window.filterActiveReportTemplates
+        : (rows) => (Array.isArray(rows) ? rows : []);
+      const formatLabel = typeof window.formatReportTemplateOptionLabel === 'function'
+        ? window.formatReportTemplateOptionLabel
+        : (row) => String(row?.title || row?.id || 'Template');
+      const active = filterFn(templates)
+        .sort((a, b) => formatLabel(a).localeCompare(formatLabel(b)));
+      assignmentTemplateCatalog = new Map(
+        active.map((row) => [String(row.id).trim(), row])
+      );
+      const preserve = String(preserveTemplateId || '').trim();
+      if (!active.length) {
+        templateSelect.innerHTML = '<option value="">No active templates for this class</option>';
+        templateSelect.disabled = true;
+        if (templateHelp) templateHelp.textContent = 'No templates match this class delivery department (or none are active).';
+        applyTemplateScopePolicy();
+        return;
+      }
+      templateSelect.disabled = false;
+      templateSelect.innerHTML = [
+        '<option value="" disabled>Select a template…</option>',
+        ...active.map((row) => {
+          const id = String(row.id).trim();
+          const selected = preserve && id === preserve ? ' selected' : '';
+          return `<option value="${escapeHtml(id)}"${selected}>${escapeHtml(formatLabel(row))}</option>`;
+        })
+      ].join('');
+      if (preserve && assignmentTemplateCatalog.has(preserve)) {
+        templateSelect.value = preserve;
+      }
+      if (templateHelp) {
+        templateHelp.textContent = active.length === 1
+          ? 'One active template for this class.'
+          : `${active.length} active templates for this class delivery department.`;
+      }
+      applyAssignmentTemplateMetaFromSelection();
+    }
+
+    async function loadAssignmentTemplatesForClass(classId, preserveTemplateId) {
+      if (!templateSelect) return;
+      const cleanClassId = String(classId || '').trim();
+      if (!cleanClassId) {
+        templateSelect.disabled = true;
+        templateSelect.innerHTML = '<option value="" selected>Select a class first</option>';
+        assignmentTemplateCatalog = new Map();
+        if (templateHelp) templateHelp.textContent = 'Select a class to load templates.';
+        applyTemplateScopePolicy();
+        return;
+      }
+      const params = new URLSearchParams({ limit: '1000', classId: cleanClassId });
+      const preserve = String(preserveTemplateId || getSelectedAssignmentTemplateId() || '').trim();
+      if (preserve) params.set('includeTemplateId', preserve);
+      templateSelect.disabled = true;
+      templateSelect.innerHTML = '<option value="">Loading templates…</option>';
+      try {
+        const res = await fetch(`/school/reports/templates?${params.toString()}`, {
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' }
+        });
+        const payload = await res.json().catch(() => ({}));
+        if (!res.ok || payload?.status === 'error') {
+          throw new Error(payload?.message || 'Unable to load report templates.');
+        }
+        populateAssignmentTemplateSelect(payload.results || [], preserve);
+      } catch (error) {
+        templateSelect.innerHTML = '<option value="">Unable to load templates</option>';
+        templateSelect.disabled = true;
+        assignmentTemplateCatalog = new Map();
+        if (templateHelp) templateHelp.textContent = String(error?.message || 'Unable to load templates.');
+        applyTemplateScopePolicy();
+      }
+    }
     const firstTeacherId = <%- JSON.stringify(firstTeacherId) %>;
     const isEditAssignment = <%= isEdit ? 'true' : 'false' %>;
     const assignmentId = <%- JSON.stringify(assignment?.id || '') %>;
@@ -916,7 +1025,7 @@
 
     async function applyRowSuggestedStartDate() {
       const sessionDate = toDateOnly(modalFields.sessionDate.value || '');
-      const templateId = String(templateIdInput?.value || '').trim();
+      const templateId = getSelectedAssignmentTemplateId();
       const classId = String(classIdInput?.value || '').trim();
       const hintEl = document.getElementById('rowModalReportStartDateHint');
       if (!sessionDate || !templateId || !window.resolveSuggestedReportStartDate) {
@@ -1685,7 +1794,7 @@
     }
 
     function applyTemplateScopePolicy() {
-      const hasTemplate = Boolean(String(templateIdInput?.value || '').trim());
+      const hasTemplate = Boolean(getSelectedAssignmentTemplateId());
       const allowedScopes = hasTemplate
         ? normalizeTemplateAllowedScopes(selectedTemplateAllowedReportScopes)
         : [];
@@ -1731,29 +1840,9 @@
       }));
     });
 
-    document.getElementById('btnPickTemplate')?.addEventListener('click', function () {
-      if (!window.GenericPicker || !window.GenericPickerPresets) return;
-      GenericPicker.open(GenericPickerPresets.normalizeConfig({
-        title: 'Select Template',
-        icon: 'bi-journal-text',
-        apiEndpoint: '/school/reports/templates',
-        placeholder: 'Search templates...',
-        onSelect: function (item) {
-          const id = String(item?.id || '').trim();
-          if (!id) return;
-          templateIdInput.value = id;
-          const version = Number(item?.version || 1);
-          templateTitleInput.value = `${item?.title || id} | ${item?.type || '-'} v${version}`;
-          selectedTemplateAllowedReportScopes = normalizeTemplateAllowedScopes(item?.allowedReportScopes);
-          selectedTemplateConductRequired = item?.conductRequiredBeforeFill !== false;
-          selectedTemplateReportPeriodBase = String(item?.reportPeriodBase || 'none').trim().toLowerCase() || 'none';
-          selectedTemplateReportPeriodOffset = item?.reportPeriodOffset != null ? Number(item.reportPeriodOffset) : null;
-          const bulkConduct = document.getElementById('bulkConductRequiredBeforeFill');
-          if (bulkConduct) bulkConduct.checked = selectedTemplateConductRequired !== false;
-          applyTemplateScopePolicy();
-          applyRowSuggestedStartDate().catch(() => {});
-        }
-      }));
+    templateSelect?.addEventListener('change', () => {
+      applyAssignmentTemplateMetaFromSelection();
+      applyRowSuggestedStartDate().catch(() => {});
     });
 
     reportScopeInput?.addEventListener('change', () => {
@@ -1821,7 +1910,7 @@
       if (isSavingAssignment) return;
 
       const classId = String(classIdInput.value || '').trim();
-      const templateId = String(templateIdInput.value || '').trim();
+      const templateId = getSelectedAssignmentTemplateId();
       const reportScope = String(reportScopeInput?.value || '').trim().toLowerCase();
       if (!classId) {
         await showReportModal({ title: 'Class Required', icon: 'warning', message: 'Select a class.' });
@@ -1933,5 +2022,6 @@
 
     renderTargetRows();
     applyTemplateScopePolicy();
+    loadAssignmentTemplatesForClass(String(classIdInput?.value || '').trim(), initialSelectedTemplateId).catch(() => {});
   })();
 </script>

@@ -10,6 +10,7 @@ const {
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const reportScopePolicy = require('./reportScopePolicy');
+const reportTargetDepartmentPolicy = require('./reportTargetDepartmentPolicy');
 const reportRosterService = require('./reportRosterService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
 const classEnrollmentDeleteService = require('./classEnrollmentDeleteService');
@@ -671,6 +672,8 @@ const reportIntegrityService = {
         `"${reportScopePolicy.getReportScopeLabel(reportScope)}" is not approved for the selected report template.`
       );
     }
+
+    reportTargetDepartmentPolicy.assertTemplateMatchesClass(template, classData);
 
     const effectiveTargetRows = Array.isArray(targetRows) && targetRows.length
       ? targetRows

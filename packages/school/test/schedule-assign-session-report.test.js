@@ -65,3 +65,22 @@ test('assign report modal uses template dropdown markup', () => {
   assert.match(partial, /sessionReportExistingReportsSection/);
   assert.doesNotMatch(partial, /btnPickSessionReportTemplate/);
 });
+
+test('assignment form uses template dropdown with class-scoped fetch', () => {
+  const assignmentForm = read('MVC/views/school/report/assignmentForm.ejs');
+  assert.match(assignmentForm, /id="assignmentTemplateSelect"/);
+  assert.match(assignmentForm, /loadAssignmentTemplatesForClass/);
+  assert.doesNotMatch(assignmentForm, /btnPickTemplate/);
+});
+
+test('sessionReportAssignmentClient fetch templates supports class department filter', () => {
+  const source = read('public/scripts/sessionReportAssignmentClient.js');
+  assert.match(source, /params\.set\('classId', classId\)/);
+  assert.match(source, /fetchActiveReportTemplates\(ctx\)/);
+  const { filterTemplatesForDeliveryDepartment } = require('../public/scripts/sessionReportAssignmentClient.js');
+  const rows = filterTemplatesForDeliveryDepartment(
+    [{ id: 'A', targetDepartmentIds: ['DEPT_1'] }, { id: 'B', targetDepartmentIds: [] }],
+    'DEPT_1'
+  );
+  assert.equal(rows.length, 2);
+});
