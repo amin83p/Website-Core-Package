@@ -23,6 +23,8 @@ const matrixWindowService = require('../../services/school/matrixWindowService')
 const reportFunderDocxService = require('../../services/school/reportFunderDocxService');
 const reportFunderPdfService = require('../../services/school/reportFunderPdfService');
 const reportScopePolicy = require('../../services/school/reportScopePolicy');
+const reportPeriodBasePolicy = require('../../services/school/reportPeriodBasePolicy');
+const reportPeriodBaseService = require('../../services/school/reportPeriodBaseService');
 const sessionConductService = require('../../services/school/sessionConductService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
@@ -444,7 +446,7 @@ async function listTemplates(req, res) {
     const q = String(req.query.q || '').trim().toLowerCase();
     const templateRows = await schoolDataService.fetchAllData('reportTemplates', {}, req.user);
     const allTemplates = (Array.isArray(templateRows) ? templateRows : [])
-      .map(reportScopePolicy.withResolvedAllowedReportScopes);
+      .map((row) => reportPeriodBasePolicy.withResolvedReportPeriod(reportScopePolicy.withResolvedAllowedReportScopes(row)));
 
     const filtered = allTemplates
       .filter((row) => {
@@ -521,7 +523,9 @@ function buildCopiedTemplateDraft(sourceTemplate = {}, templates = [], activeOrg
     snapshotKeys: clonePlainValue(sourceTemplate?.snapshotKeys, []),
     snapshotKeyLabels: clonePlainValue(sourceTemplate?.snapshotKeyLabels, {}),
     snapshotKeyDocxAliases: clonePlainValue(sourceTemplate?.snapshotKeyDocxAliases, {}),
-    allowedReportScopes: reportScopePolicy.resolveAllowedReportScopes(sourceTemplate)
+    allowedReportScopes: reportScopePolicy.resolveAllowedReportScopes(sourceTemplate),
+    reportPeriodBase: reportPeriodBasePolicy.resolveReportPeriodFields(sourceTemplate).reportPeriodBase,
+    reportPeriodOffset: reportPeriodBasePolicy.resolveReportPeriodFields(sourceTemplate).reportPeriodOffset
   };
 }
 async function showTemplateForm(req, res) {
@@ -548,6 +552,7 @@ async function showTemplateForm(req, res) {
       fieldTypes: reportTemplateModel.FIELD_TYPES,
       templateStatuses: reportTemplateModel.TEMPLATE_STATUSES,
       reportScopeDefinitions: reportScopePolicy.REPORT_SCOPE_DEFINITIONS,
+      reportPeriodBaseDefinitions: reportPeriodBasePolicy.REPORT_PERIOD_BASE_DEFINITIONS,
       prefillCatalog: reportService.getPrefillCatalog(),
       includeModal: true,
       user: req.user,
@@ -578,6 +583,7 @@ async function showTemplateCopyForm(req, res) {
       fieldTypes: reportTemplateModel.FIELD_TYPES,
       templateStatuses: reportTemplateModel.TEMPLATE_STATUSES,
       reportScopeDefinitions: reportScopePolicy.REPORT_SCOPE_DEFINITIONS,
+      reportPeriodBaseDefinitions: reportPeriodBasePolicy.REPORT_PERIOD_BASE_DEFINITIONS,
       prefillCatalog: reportService.getPrefillCatalog(),
       includeModal: true,
       user: req.user,
@@ -1040,6 +1046,44 @@ async function postSemiMonthlyApply(req, res) {
     return res.json({ status: 'success', data });
   } catch (error) {
     return res.status(400).json({ status: 'error', message: error.message || 'Unable to assign the report.' });
+  }
+}
+
+async function getSuggestedReportStartDate(req, res) {
+  try {
+    const classId = toPublicId(req.body?.classId);
+    const templateId = String(req.body?.templateId || '').trim();
+    const sessionDate = reportViewService.parseDateOnlyValue(req.body?.sessionDate);
+    const reportScope = String(req.body?.reportScope || 'class').trim().toLowerCase();
+    if (!classId) throw new Error('Class is required.');
+    if (!templateId) throw new Error('Template is required.');
+    if (!sessionDate) throw new Error('Session date is required.');
+
+    const classData = await schoolDataService.getDataById('classes', classId, req.user);
+    if (!classData) throw new Error('Class not found or inaccessible.');
+    const template = await reportIntegrityService.assertTemplateAccessible(templateId, req.user);
+
+    const rawStudentIds = req.body?.targetStudentIds;
+    const targetStudentIds = (Array.isArray(rawStudentIds) ? rawStudentIds : String(rawStudentIds || '').split(','))
+      .map((id) => toPublicId(id))
+      .filter(Boolean);
+
+    const suggestedStartDate = await reportPeriodBaseService.resolveSuggestedReportStartDate({
+      template,
+      sessionDate,
+      classData,
+      reqUser: req.user,
+      reportScope,
+      targetStudentIds
+    });
+
+    return res.json({
+      status: 'success',
+      suggestedStartDate,
+      hint: reportPeriodBasePolicy.buildSuggestionHint(template)
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
   }
 }
 
@@ -2731,6 +2775,7 @@ module.exports = {
   generateAssignmentTargetRows,
   previewAssignmentTargetRows,
   getAssignmentEligibleStudents,
+  getSuggestedReportStartDate,
   showSemiMonthlyAssignmentWizard,
   postSemiMonthlyProgramCount,
   postSemiMonthlyResolveDates,

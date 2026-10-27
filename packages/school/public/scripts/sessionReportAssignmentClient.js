@@ -86,6 +86,8 @@
     let saving = false;
     let opening = false;
     let eventsBound = false;
+    let startDateUserEdited = false;
+    let lastAutoSuggestedStartDate = '';
 
     function getModal() {
       const modal = document.getElementById('sessionReportAssignmentModal');
@@ -218,6 +220,53 @@
       syncScope();
     }
 
+    async function applySuggestedStartDate() {
+      const modal = getModal();
+      if (!modal) return;
+      const startInput = modal.querySelector('#sessionReportStartDate');
+      const hintEl = modal.querySelector('#sessionReportStartDateHint');
+      const sessionDate = String(ctx.sessionDate || '').trim();
+      if (!startInput || !sessionDate) return;
+      const templateId = String(modal.querySelector('#sessionReportTemplateId')?.value || '').trim();
+      const templateMeta = templateCatalog.get(templateId) || {};
+      if (!templateId) {
+        if (hintEl) hintEl.textContent = '';
+        return;
+      }
+      const reportScope = String(modal.querySelector('#sessionReportScope')?.value || 'class').trim();
+      const targetStudentIds = Array.from(selectedStudents.keys());
+      const resolveFn = typeof global.resolveSuggestedReportStartDate === 'function'
+        ? global.resolveSuggestedReportStartDate
+        : null;
+      let suggestedStartDate = '';
+      let hint = '';
+      if (resolveFn) {
+        const result = await resolveFn({
+          template: templateMeta,
+          sessionDate,
+          classId: ctx.classId,
+          templateId,
+          reportScope,
+          targetStudentIds
+        });
+        suggestedStartDate = String(result?.suggestedStartDate || '').trim();
+        hint = String(result?.hint || '').trim();
+      } else if (typeof global.computeSuggestedReportStartDateSync === 'function') {
+        suggestedStartDate = global.computeSuggestedReportStartDateSync({
+          reportPeriodBase: templateMeta.reportPeriodBase,
+          reportPeriodOffset: templateMeta.reportPeriodOffset,
+          sessionDate
+        });
+        hint = typeof global.buildSuggestionHint === 'function' ? global.buildSuggestionHint(templateMeta) : '';
+      }
+      const current = String(startInput.value || '').trim();
+      if (suggestedStartDate && (!startDateUserEdited || !current || current === lastAutoSuggestedStartDate)) {
+        startInput.value = suggestedStartDate;
+        lastAutoSuggestedStartDate = suggestedStartDate;
+      }
+      if (hintEl) hintEl.textContent = hint;
+    }
+
     function onTemplateSelectionChanged() {
       const modal = getModal();
       if (!modal) return;
@@ -229,6 +278,7 @@
       const conductCheckbox = modal.querySelector('#sessionReportConductRequiredBeforeFill');
       if (conductCheckbox && templateMeta) conductCheckbox.checked = conductRequired;
       applyTemplateScopePolicy();
+      applySuggestedStartDate().catch(() => {});
     }
 
     function populateTemplateSelect(templates) {
@@ -433,11 +483,14 @@
         if (itemMap.has(id)) selectedStudents.set(id, itemMap.get(id));
       });
       renderSelectedStudents();
+      applySuggestedStartDate().catch(() => {});
     }
 
     function applyFormDefaults() {
       const modal = getModal();
       if (!modal) return;
+      startDateUserEdited = false;
+      lastAutoSuggestedStartDate = '';
       selectedStudents = new Map();
       selectedTemplateScopes = [];
       const templateSelect = modal.querySelector('#sessionReportTemplateId');
@@ -474,6 +527,8 @@
       syncAllocatedHours(true);
       const saveBtn = modal.querySelector('#btnSaveSessionReportAssignment');
       if (saveBtn) saveBtn.disabled = false;
+      const hintEl = modal.querySelector('#sessionReportStartDateHint');
+      if (hintEl) hintEl.textContent = '';
     }
 
     async function openStudentPicker() {
@@ -620,7 +675,15 @@
       document.getElementById('btnPickSessionReportStudents')?.addEventListener('click', () => {
         openStudentPicker().catch((error) => showMessage('Student Picker', error.message, 'error'));
       });
-      document.getElementById('sessionReportScope')?.addEventListener('change', syncScope);
+      document.getElementById('sessionReportScope')?.addEventListener('change', () => {
+        syncScope();
+        applySuggestedStartDate().catch(() => {});
+      });
+      document.getElementById('sessionReportStartDate')?.addEventListener('change', () => {
+        const modal = getModal();
+        const value = String(modal?.querySelector('#sessionReportStartDate')?.value || '').trim();
+        if (value && value !== lastAutoSuggestedStartDate) startDateUserEdited = true;
+      });
       document.getElementById('sessionReportStudentPickerBody')?.addEventListener('change', (event) => {
         const checkbox = event.target?.closest?.('.js-session-report-student-picker-check');
         if (!checkbox) return;
@@ -684,6 +747,7 @@
         const instanceRows = hasFetchExistingReports ? (loadResults[1] || []) : [];
         populateTemplateSelect(templates);
         applyFormDefaults();
+        await applySuggestedStartDate();
         renderExistingReports(instanceRows, ctx.embeddedReports);
       } catch (error) {
         if (assignmentModalInstance) assignmentModalInstance.hide();

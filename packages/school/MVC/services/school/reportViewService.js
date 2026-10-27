@@ -14,6 +14,7 @@ const reportFunderDocxService = require('./reportFunderDocxService');
 const reportFunderPdfService = require('./reportFunderPdfService');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const reportScopePolicy = require('./reportScopePolicy');
+const reportPeriodBasePolicy = require('./reportPeriodBasePolicy');
 const reportRosterService = require('./reportRosterService');
 const reportAssignmentStudentEligibilityService = require('./reportAssignmentStudentEligibilityService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -799,7 +800,9 @@ function mapReportInstanceParticipantFields({
 
 async function listAllReportTemplates(reqUser) {
   const rows = await schoolDataService.fetchAllData('reportTemplates', {}, reqUser);
-  return (Array.isArray(rows) ? rows : []).map(reportScopePolicy.withResolvedAllowedReportScopes);
+  return (Array.isArray(rows) ? rows : []).map((row) => reportPeriodBasePolicy.withResolvedReportPeriod(
+    reportScopePolicy.withResolvedAllowedReportScopes(row)
+  ));
 }
 
 async function listAllReportAssignments(reqUser) {
@@ -973,6 +976,7 @@ function buildTemplateSavePayload({
     && String(body.allowedReportScopesPresent || '').trim()
     ? []
     : body.allowedReportScopes;
+  const periodFields = reportPeriodBasePolicy.parseReportPeriodFieldsFromBody(body, existingTemplate);
   const payload = {
     orgId: existingTemplate?.orgId || activeOrgId,
     type: String(body.type || '').trim().toLowerCase(),
@@ -981,6 +985,8 @@ function buildTemplateSavePayload({
     status: String(body.status || 'draft').trim().toLowerCase(),
     description: String(body.description || '').trim(),
     allowedReportScopes: reportScopePolicy.normalizeAllowedReportScopes(submittedAllowedScopes),
+    reportPeriodBase: periodFields.reportPeriodBase,
+    reportPeriodOffset: periodFields.reportPeriodOffset,
     conductRequiredBeforeFill: String(body.conductRequiredBeforeFillPresent || '').trim()
       ? parseBooleanFlag(body.conductRequiredBeforeFill, false)
       : (existingTemplate?.conductRequiredBeforeFill !== undefined
@@ -1374,6 +1380,9 @@ async function buildAssignmentFormContext({ assignment = null, requestedClassId 
 
   const selectedTemplateId = String(assignment?.templateId || '').trim();
   const selectedTemplate = orgTemplates.find((tpl) => idsEqual(tpl.id, selectedTemplateId)) || null;
+  const selectedTemplatePeriod = selectedTemplate
+    ? reportPeriodBasePolicy.resolveReportPeriodFields(selectedTemplate)
+    : { reportPeriodBase: 'none', reportPeriodOffset: null };
 
   const selectedSessionIds = [];
   const selectedDateTargets = [];
@@ -1459,6 +1468,8 @@ async function buildAssignmentFormContext({ assignment = null, requestedClassId 
     selectedTemplateAllowedReportScopes: selectedTemplate
       ? reportScopePolicy.resolveAllowedReportScopes(selectedTemplate)
       : [],
+    selectedTemplateReportPeriodBase: selectedTemplatePeriod.reportPeriodBase,
+    selectedTemplateReportPeriodOffset: selectedTemplatePeriod.reportPeriodOffset,
     selectedSessionIds,
     selectedDateTargets,
     selectedTaskStartTime,

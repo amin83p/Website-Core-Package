@@ -682,6 +682,10 @@ router.post('/assignments/eligible-students',
   trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE, reportAssignmentBulkActionState),
   ctrl.getAssignmentEligibleStudents);
 
+router.post('/assignments/suggested-report-start',
+  requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE),
+  ctrl.getSuggestedReportStartDate);
+
 router.get('/assignments/edit/:id',
   requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE),
   trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE),

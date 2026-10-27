@@ -254,6 +254,38 @@
             </div>
             <div class="form-text">When this template is assigned to a session, teachers must complete Step 1 class conduct before opening or filling reports unless the assignment overrides this setting.</div>
           </div>
+          <%
+            const periodBaseDefs = (typeof reportPeriodBaseDefinitions !== 'undefined' && Array.isArray(reportPeriodBaseDefinitions))
+              ? reportPeriodBaseDefinitions
+              : [];
+            const initialReportPeriodBase = String(template?.reportPeriodBase || 'none').trim().toLowerCase() || 'none';
+            const initialReportPeriodOffset = template?.reportPeriodOffset != null && template?.reportPeriodOffset !== ''
+              ? Number(template.reportPeriodOffset)
+              : 1;
+          %>
+          <div class="col-md-4">
+            <input type="hidden" name="reportPeriodBasePresent" value="true">
+            <label class="form-label fw-bold" for="reportPeriodBase">Report period base</label>
+            <select class="form-select" name="reportPeriodBase" id="reportPeriodBase">
+              <% periodBaseDefs.forEach((row) => { %>
+                <option value="<%= row.value %>" <%= initialReportPeriodBase === row.value ? 'selected' : '' %>><%= row.label %></option>
+              <% }); %>
+              <% if (!periodBaseDefs.length) { %>
+                <option value="none" selected>None</option>
+                <option value="days">Days</option>
+                <option value="weeks">Weeks</option>
+                <option value="months">Months</option>
+                <option value="year">Year</option>
+                <option value="enrollment">Enrollment</option>
+              <% } %>
+            </select>
+            <div class="form-text">Suggested report start date when assigning to a session.</div>
+          </div>
+          <div class="col-md-2" id="reportPeriodOffsetWrap">
+            <label class="form-label fw-bold" for="reportPeriodOffset">Offset</label>
+            <input type="number" class="form-control" name="reportPeriodOffset" id="reportPeriodOffset" min="1" max="999" step="1" value="<%= initialReportPeriodOffset %>">
+            <div class="form-text">For Days, Weeks, or Months.</div>
+          </div>
           <div class="col-12">
             <label class="form-label fw-bold">Description</label>
             <textarea name="description" class="form-control" rows="2" maxlength="4000"><%= template?.description || '' %></textarea>
@@ -1077,6 +1109,19 @@
 <script src="/scripts/reportSelectField.js"></script>
 
 <script>
+(function initReportPeriodBaseFields() {
+  const baseEl = document.getElementById('reportPeriodBase');
+  const wrap = document.getElementById('reportPeriodOffsetWrap');
+  const offsetEl = document.getElementById('reportPeriodOffset');
+  function syncReportPeriodOffsetUi() {
+    const base = String(baseEl?.value || 'none').trim().toLowerCase();
+    const showOffset = base === 'days' || base === 'weeks' || base === 'months';
+    if (wrap) wrap.classList.toggle('d-none', !showOffset);
+    if (offsetEl) offsetEl.required = showOffset;
+  }
+  baseEl?.addEventListener('change', syncReportPeriodOffsetUi);
+  syncReportPeriodOffsetUi();
+})();
   (function () {
     const fieldTypes = <%- JSON.stringify(fieldTypes || []) %>;
     const initialFields = <%- JSON.stringify(initialFields).replace(/</g, '\\u003c') %>;

@@ -196,6 +196,7 @@
           <div class="col-md-4">
             <label class="form-label fw-bold">Report Start Date</label>
             <input type="date" class="form-control" id="rowModalReportStartDate" min="<%= classFirstSessionDate %>" max="<%= classLastSessionDate %>">
+            <div class="form-text" id="rowModalReportStartDateHint"></div>
           </div>
 
           <div class="col-md-4">
@@ -463,6 +464,7 @@
 <%- include('partials/modal_GenericPicker') %>
 
 <%- include('partials/reportMessageHelpers') %>
+<script src="/scripts/reportPeriodBasePolicy.js"></script>
 
 <script>
   (function () {
@@ -521,6 +523,10 @@
     );
     let selectedTemplateAllowedReportScopes = <%- JSON.stringify(initialTemplateAllowedReportScopes) %>;
     let selectedTemplateConductRequired = <%= (typeof assignment !== 'undefined' && assignment && assignment.conductRequiredBeforeFill === false) ? 'false' : 'true' %>;
+    let selectedTemplateReportPeriodBase = <%- JSON.stringify(typeof selectedTemplateReportPeriodBase !== 'undefined' ? selectedTemplateReportPeriodBase : 'none') %>;
+    let selectedTemplateReportPeriodOffset = <%= (typeof selectedTemplateReportPeriodOffset !== 'undefined' && selectedTemplateReportPeriodOffset != null) ? Number(selectedTemplateReportPeriodOffset) : 'null' %>;
+    let rowStartDateUserEdited = false;
+    let rowLastAutoSuggestedStartDate = '';
     const firstTeacherId = <%- JSON.stringify(firstTeacherId) %>;
     const isEditAssignment = <%= isEdit ? 'true' : 'false' %>;
     const assignmentId = <%- JSON.stringify(assignment?.id || '') %>;
@@ -908,7 +914,40 @@
       modalFields.teacherWarning?.classList.toggle('d-none', !show);
     }
 
+    async function applyRowSuggestedStartDate() {
+      const sessionDate = toDateOnly(modalFields.sessionDate.value || '');
+      const templateId = String(templateIdInput?.value || '').trim();
+      const classId = String(classIdInput?.value || '').trim();
+      const hintEl = document.getElementById('rowModalReportStartDateHint');
+      if (!sessionDate || !templateId || !window.resolveSuggestedReportStartDate) {
+        if (hintEl) hintEl.textContent = '';
+        return;
+      }
+      const reportScope = getCurrentReportScope();
+      const targetStudentIds = uniq(rowModalStudentIds);
+      const result = await window.resolveSuggestedReportStartDate({
+        template: {
+          reportPeriodBase: selectedTemplateReportPeriodBase,
+          reportPeriodOffset: selectedTemplateReportPeriodOffset
+        },
+        sessionDate,
+        classId,
+        templateId,
+        reportScope,
+        targetStudentIds
+      });
+      const suggested = toDateOnly(result?.suggestedStartDate || '');
+      const current = toDateOnly(modalFields.reportStartDate.value || '');
+      if (suggested && (!rowStartDateUserEdited || !current || current === rowLastAutoSuggestedStartDate)) {
+        modalFields.reportStartDate.value = suggested;
+        rowLastAutoSuggestedStartDate = suggested;
+      }
+      if (hintEl) hintEl.textContent = String(result?.hint || '').trim();
+    }
+
     function populateRowModal(row = {}, index = '') {
+      rowStartDateUserEdited = false;
+      rowLastAutoSuggestedStartDate = '';
       const normalized = normalizeTargetRow(row);
       modalFields.index.value = index;
       modalFields.rowId.value = normalized.rowId;
@@ -1578,10 +1617,12 @@
           modalFields.sessionId.value = selectedSessionId;
           modalFields.sessionDate.value = toDateOnly(session.date || '');
           modalFields.sessionSummary.value = getSessionDisplay(session);
-          if (!modalFields.reportStartDate.value) modalFields.reportStartDate.value = toDateOnly(session.date || '');
           if (!modalFields.reportDueDate.value) modalFields.reportDueDate.value = toDateOnly(session.date || '');
           if (!modalFields.taskStartTime.value) modalFields.taskStartTime.value = String(session.startTime || '');
           if (!modalFields.taskEndTime.value) modalFields.taskEndTime.value = String(session.endTime || '');
+          applyRowSuggestedStartDate().catch(() => {
+            if (!modalFields.reportStartDate.value) modalFields.reportStartDate.value = toDateOnly(session.date || '');
+          });
           const sessionTeacherId = getSessionTeacherId(session);
           if (sessionTeacherId) {
             modalFields.teacherId.value = sessionTeacherId;
@@ -1705,14 +1746,25 @@
           templateTitleInput.value = `${item?.title || id} | ${item?.type || '-'} v${version}`;
           selectedTemplateAllowedReportScopes = normalizeTemplateAllowedScopes(item?.allowedReportScopes);
           selectedTemplateConductRequired = item?.conductRequiredBeforeFill !== false;
+          selectedTemplateReportPeriodBase = String(item?.reportPeriodBase || 'none').trim().toLowerCase() || 'none';
+          selectedTemplateReportPeriodOffset = item?.reportPeriodOffset != null ? Number(item.reportPeriodOffset) : null;
           const bulkConduct = document.getElementById('bulkConductRequiredBeforeFill');
           if (bulkConduct) bulkConduct.checked = selectedTemplateConductRequired !== false;
           applyTemplateScopePolicy();
+          applyRowSuggestedStartDate().catch(() => {});
         }
       }));
     });
 
-    reportScopeInput?.addEventListener('change', applyScopeState);
+    reportScopeInput?.addEventListener('change', () => {
+      applyScopeState();
+      applyRowSuggestedStartDate().catch(() => {});
+    });
+
+    modalFields.reportStartDate?.addEventListener('change', () => {
+      const value = toDateOnly(modalFields.reportStartDate.value || '');
+      if (value && value !== rowLastAutoSuggestedStartDate) rowStartDateUserEdited = true;
+    });
 
     document.getElementById('btnOpenRowStudentPicker')?.addEventListener('click', async function () {
       if (isLoadingRowPickerStudents) return;
@@ -1758,6 +1810,7 @@
 
     document.getElementById('btnConfirmRowStudentPicker')?.addEventListener('click', function () {
       rowModalStudentIds = uniq(rowPickerSelectedIds);
+      applyRowSuggestedStartDate().catch(() => {});
       renderRowModalStudentSummary();
       hideRowStudentPickerModal();
     });
