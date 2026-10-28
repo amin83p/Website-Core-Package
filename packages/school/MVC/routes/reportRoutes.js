@@ -13,6 +13,7 @@ const accessService = requireCoreModule('MVC/services/security/index');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const reportIntegrityService = require('../services/school/reportIntegrityService');
+const { attachReportSectionNavLocals } = require('../services/school/reportSectionNavLocals');
 const { SECTIONS, OPERATIONS } = require('./schoolRouteDependencies');
 const REPORT_NAV_SECTION = SECTIONS.SCHOOL_REPORTS;
 const REPORT_TEMPLATE_SECTION = SECTIONS.SCHOOL_REPORTS_TEMPLATE;
@@ -42,6 +43,11 @@ const reportAssignmentBulkActionState = {
 };
 
 router.use(requireAuth);
+
+router.use((req, res, next) => {
+  attachReportSectionNavLocals(res);
+  next();
+});
 
 function sendReportInstanceAccessRequired(req, res, reason) {
   const payload = {
