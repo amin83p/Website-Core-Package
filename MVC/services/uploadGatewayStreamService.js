@@ -1,6 +1,7 @@
 'use strict';
 
 const uploadPathUtils = require('../utils/uploadPathUtils');
+const { downloadRemoteUploadFile } = require('./fileGatewayClientService');
 
 function cleanRelativePath(value = '') {
   return String(value || '').trim().replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
@@ -34,21 +35,17 @@ async function streamUploadFromGateway(req, res) {
     return;
   }
   try {
-    const { readLocalUploadIfPresent, gatewayDownloadByUploadUrl } = require('./fileGatewayClientService');
-    const local = await readLocalUploadIfPresent(parsed.scopeKey, parsed.relativePath);
-    if (local) {
-      res.setHeader('Content-Type', local.mimeType || 'application/octet-stream');
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-      return res.status(200).send(local.buffer);
+    let decodedRelativePath = String(parsed.relativePath || '');
+    try {
+      decodedRelativePath = decodeURIComponent(decodedRelativePath);
+    } catch (_) {
+      // keep encoded path when URI decoding fails
     }
-    const relativeUrl = `/uploads/${[
-      parsed.scopeKey === 'GLOBAL' ? 'GLOBAL' : `ORG_${parsed.scopeKey}`,
-      parsed.relativePath
-    ].filter(Boolean).join('/')}`;
-    const signed = await gatewayDownloadByUploadUrl(relativeUrl);
-    res.setHeader('Content-Type', signed.mimeType || 'application/octet-stream');
+    const downloaded = await downloadRemoteUploadFile(parsed.scopeKey, decodedRelativePath);
+    const buffer = Buffer.from(await downloaded.blob.arrayBuffer());
+    res.setHeader('Content-Type', downloaded.mimeType || 'application/octet-stream');
     res.setHeader('Cache-Control', 'public, max-age=3600');
-    return res.status(200).send(signed.buffer);
+    return res.status(200).send(buffer);
   } catch (_) {
     res.status(404).send('Not found');
   }

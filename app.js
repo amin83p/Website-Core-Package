@@ -11,27 +11,16 @@ const helmet = require('helmet');
 const compression = require('compression');
 const crypto = require('crypto');
 
+const { loadEnvFileIntoProcessEnv } = require('./MVC/utils/envFileUtils');
+
 function loadLocalEnvFile() {
   try {
     const envPath = path.join(__dirname, '.env');
-    if (!fs.existsSync(envPath)) return;
-    const raw = fs.readFileSync(envPath, 'utf8');
-    const lines = raw.split(/\r?\n/);
-    for (const line of lines) {
-      const trimmed = String(line || '').trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
-      const eqIdx = trimmed.indexOf('=');
-      if (eqIdx <= 0) continue;
-      const key = trimmed.slice(0, eqIdx).trim();
-      if (!key || Object.prototype.hasOwnProperty.call(process.env, key)) continue;
-      let value = trimmed.slice(eqIdx + 1).trim();
-      if (
-        (value.startsWith('"') && value.endsWith('"')) ||
-        (value.startsWith("'") && value.endsWith("'"))
-      ) {
-        value = value.slice(1, -1);
-      }
-      process.env[key] = value;
+    loadEnvFileIntoProcessEnv(envPath, { fsModule: fs });
+    const gatewayBase = String(process.env.RAILWAY_GATEWAY_BASE_URL || '').trim();
+    const sharedKey = String(process.env.FILE_GATEWAY_SHARED_KEY || '').trim();
+    if (gatewayBase && !sharedKey) {
+      console.warn('[env] RAILWAY_GATEWAY_BASE_URL is set but FILE_GATEWAY_SHARED_KEY is missing or empty after .env load. Wrap keys with @, #, or = in double quotes.');
     }
   } catch (error) {
     console.warn(`[env] Unable to load .env file: ${error.message}`);
@@ -372,14 +361,13 @@ app.use('/uploads', async (req, res, next) => {
   const requestedDiskPath = uploadPathUtils.fromUploadsUrlToDiskPath(req.originalUrl || req.url, uploadRoot);
   const hasLocalArtifact = Boolean(requestedDiskPath && fs.existsSync(requestedDiskPath));
 
-  if (isRailwayProxyMode()) {
-    const gatewayBaseUrl = getGatewayBaseUrl();
-    // Prefer local disk when the artifact exists. Otherwise stream from the file gateway on the
-    // server so browsers never follow redirects to localhost/private Railway hosts (PNA prompts).
-    if (gatewayBaseUrl && !hasLocalArtifact) {
-      await streamUploadFromGateway(req, res);
-      return;
-    }
+  const gatewayBaseUrl = getGatewayBaseUrl();
+  // Prefer local disk when the artifact exists. Otherwise stream via signed gateway download so
+  // local dev can read files stored on Railway volume (shared Mongo paths) without redirecting
+  // the browser to the gateway host (PNA / private-network prompts).
+  if (gatewayBaseUrl && !hasLocalArtifact) {
+    await streamUploadFromGateway(req, res);
+    return;
   }
 
   return uploadsStaticContext.middleware(req, res, next);

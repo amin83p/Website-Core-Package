@@ -335,13 +335,8 @@ async function downloadRemoteUploadFile(scopeKey = '', relativePath = '') {
         size: signed.size,
         uploadUrl: signed.uploadUrl
       };
-    } catch (signedError) {
-      if (!isRailwayProxyMode()) {
-        // fall through to public GET for hybrid local setups
-      } else {
-        signedError.statusCode = signedError.statusCode || 404;
-        throw signedError;
-      }
+    } catch (_) {
+      // Fall through to public GET (local dev without key, or signed route unavailable).
     }
   }
 
@@ -652,6 +647,7 @@ async function gatewayRestoreOrgBackup({
 }
 
 module.exports = {
+  readLocalUploadIfPresent,
   gatewayUploadBlob,
   gatewayUploadFile,
   gatewayDownloadByUploadUrl,
