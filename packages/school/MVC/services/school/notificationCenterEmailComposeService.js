@@ -24,6 +24,7 @@ function buildSessionRuleBodyHtml(introHtml = '') {
 }
 
 const PLACEHOLDER_TOKEN_REGEX = /\{\{\s*([A-Za-z0-9_]+)\s*\}\}/g;
+const COMPOSE_PREVIEW_BUILD_VERSION = 3;
 
 const PLACEHOLDER_DEFINITIONS = Object.freeze([
   { token: 'TEACHER_NAME', description: 'Recipient display name.' },
@@ -57,16 +58,45 @@ function resolveAppDisplayName() {
   }
 }
 
+function camelToSnakeUpper(token = '') {
+  return cleanText(token)
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/[-\s]+/g, '_')
+    .toUpperCase();
+}
+
+function resolveTemplateContextValue(token, context = {}) {
+  const raw = cleanText(token);
+  if (!raw) return undefined;
+  if (Object.prototype.hasOwnProperty.call(context, raw)) {
+    return context[raw];
+  }
+  const upper = raw.toUpperCase();
+  if (Object.prototype.hasOwnProperty.call(context, upper)) {
+    return context[upper];
+  }
+  const snake = camelToSnakeUpper(raw);
+  if (snake !== upper && Object.prototype.hasOwnProperty.call(context, snake)) {
+    return context[snake];
+  }
+  return undefined;
+}
+
 function renderTemplate(template, context = {}) {
   const text = String(template || '');
   if (!text) return '';
   return text.replace(PLACEHOLDER_TOKEN_REGEX, (match, token) => {
-    const key = cleanText(token).toUpperCase();
-    if (Object.prototype.hasOwnProperty.call(context, key)) {
-      return String(context[key] ?? '');
-    }
+    const resolved = resolveTemplateContextValue(token, context);
+    if (resolved !== undefined) return String(resolved ?? '');
     return match;
   });
+}
+
+function countUnrenderedTemplateTokens(text = '') {
+  const haystack = String(text || '');
+  if (!haystack) return 0;
+  const matches = haystack.match(PLACEHOLDER_TOKEN_REGEX);
+  return matches ? matches.length : 0;
 }
 
 function buildDefaultTemplates(ruleType = '') {
@@ -213,12 +243,32 @@ function buildDefaultTemplates(ruleType = '') {
 }
 
 function mapItemsToSessionEntries(items = []) {
-  return items
-    .filter((item) => item?.payload?.session)
-    .map((item) => ({
-      ...(item.payload && typeof item.payload === 'object' ? item.payload : {}),
+  const mapped = [];
+  (Array.isArray(items) ? items : []).forEach((item) => {
+    if (item?.payload?.session) {
+      mapped.push({
+        ...(item.payload && typeof item.payload === 'object' ? item.payload : {}),
+        title: item.title
+      });
+      return;
+    }
+    const payload = item?.payload && typeof item.payload === 'object' ? item.payload : {};
+    const classData = payload.classData && typeof payload.classData === 'object' ? payload.classData : {};
+    const sessionDate = cleanText(item?.sessionDate);
+    const sessionId = cleanText(item?.id);
+    if (!sessionDate && !sessionId) return;
+    mapped.push({
+      classData,
+      session: {
+        sessionId: sessionId || sessionDate,
+        date: sessionDate,
+        startTime: cleanText(item?.title).match(/\d{2}:\d{2}/)?.[0] || '',
+        endTime: ''
+      },
       title: item.title
-    }));
+    });
+  });
+  return mapped;
 }
 
 async function buildListContext({
@@ -247,15 +297,25 @@ async function buildListContext({
     '</ul>'
   ].join('');
   const org = cleanText(orgName) || 'School';
+  const itemCount = String(items.length);
   return {
     TEACHER_NAME: teacherName,
+    teacherName,
     ORG_NAME: org,
+    orgName: org,
     RULE_LABEL: cleanText(ruleLabel) || 'School reminder',
-    ITEM_COUNT: String(items.length),
+    ITEM_COUNT: itemCount,
+    itemCount,
+    SESSION_COUNT: itemCount,
+    sessionCount: itemCount,
     SESSION_LIST: sessionList,
+    sessionList,
     SESSION_LIST_HTML: sessionListHtml,
+    sessionListHtml,
     ITEM_LIST: itemList,
+    itemList,
     ITEM_LIST_HTML: itemListHtml,
+    itemListHtml,
     APP_NAME: resolveAppDisplayName()
   };
 }
@@ -264,15 +324,78 @@ function readEmailTemplates(rule = {}) {
   const email = rule?.channels?.email && typeof rule.channels.email === 'object'
     ? rule.channels.email
     : {};
+  const legacyBody = cleanText(email.bodyTemplate);
+  const legacyPlain = legacyBody && !/<[a-z][\s\S]*>/i.test(legacyBody) ? legacyBody : '';
+  const legacyHtml = legacyBody && /<[a-z][\s\S]*>/i.test(legacyBody) ? legacyBody : '';
   return {
     subjectTemplate: cleanText(email.subjectTemplate),
-    bodyTextTemplate: cleanText(email.bodyTextTemplate),
-    bodyHtmlTemplate: cleanText(email.bodyHtmlTemplate)
+    bodyTextTemplate: cleanText(email.bodyTextTemplate) || legacyPlain,
+    bodyHtmlTemplate: cleanText(email.bodyHtmlTemplate) || legacyHtml
   };
 }
 
-function hasCustomTemplates(templates = {}) {
-  return Boolean(templates.subjectTemplate || templates.bodyTextTemplate || templates.bodyHtmlTemplate);
+function hasCustomBodyTemplates(templates = {}) {
+  return Boolean(templates.bodyTextTemplate || templates.bodyHtmlTemplate);
+}
+
+function usesLegacySessionListBodyTemplate(templates = {}) {
+  const html = cleanText(templates.bodyHtmlTemplate);
+  if (!html) return false;
+  return /\{\{\s*sessionListHtml\s*\}\}/i.test(html)
+    || /\{\{\s*SESSION_LIST_HTML\s*\}\}/i.test(html)
+    || /\{\{\s*sessionList\s*\}\}/i.test(html)
+    || /\{\{\s*SESSION_LIST\s*\}\}/i.test(html);
+}
+
+function shouldUseUncompletedRichEmailBody(defaults, custom, sessionEntries, items = []) {
+  const sessionCount = sessionEntries.length
+    || (Array.isArray(items) ? items.filter((item) => cleanText(item?.id)).length : 0);
+  if (!defaults.useUncompletedBuilder || !sessionCount) return false;
+  if (!hasCustomBodyTemplates(custom)) return true;
+  if (usesLegacySessionListBodyTemplate(custom)) return true;
+  const html = cleanText(custom.bodyHtmlTemplate);
+  if (html && /\{\{\s*[a-z][a-zA-Z0-9_]*\s*\}\}/.test(html)) return true;
+  return false;
+}
+
+async function applySessionEmailPreviewFallback(preview, {
+  defaults,
+  custom,
+  sessionEntries,
+  items,
+  name,
+  orgName,
+  baseUrl,
+  orgId,
+  orgTimeZone,
+  context,
+  ruleLabel
+}) {
+  const before = countUnrenderedTemplateTokens(preview.htmlBody);
+  if (!before) return preview;
+  const entries = sessionEntries.length ? sessionEntries : mapItemsToSessionEntries(items);
+  if (defaults.useUncompletedBuilder && entries.length) {
+    const emailContent = await sessionUncompletedNotificationService.buildTeacherReviewEmailContent({
+      teacherName: name,
+      orgName,
+      entries,
+      baseUrl,
+      orgId,
+      orgTimeZone
+    });
+    preview.htmlBody = emailContent.htmlBody;
+    if (!custom.bodyTextTemplate) preview.plainText = emailContent.plainText;
+  } else if (custom.bodyHtmlTemplate) {
+    const bodyInner = renderTemplate(custom.bodyHtmlTemplate, context);
+    preview.htmlBody = buildBrandedEmailLayout({
+      baseUrl,
+      eyebrow: defaults.eyebrow,
+      title: defaults.emailTitle || ruleLabel,
+      preheader: `${ruleLabel} — ${items.length} item(s)`,
+      bodyHtml: bodyInner
+    });
+  }
+  return preview;
 }
 
 async function buildEmailPreview({
@@ -301,54 +424,81 @@ async function buildEmailPreview({
     orgName,
     ruleLabel
   });
+  const useRich = shouldUseUncompletedRichEmailBody(defaults, custom, sessionEntries, items);
 
-  if (defaults.useUncompletedBuilder && !hasCustomTemplates(custom) && sessionEntries.length) {
+  let preview;
+  if (useRich) {
     const emailContent = await sessionUncompletedNotificationService.buildTeacherReviewEmailContent({
       teacherName: name,
       orgName,
-      entries: sessionEntries,
+      entries: sessionEntries.length ? sessionEntries : mapItemsToSessionEntries(items),
       baseUrl,
       orgId,
       orgTimeZone
     });
     const subject = renderTemplate(custom.subjectTemplate || defaults.subject, context);
-    return {
+    preview = {
       recipientPersonId: teacherId,
       recipientName: name,
       subject: subject || `${ruleLabel} (${items.length} item(s))`,
-      plainText: emailContent.plainText,
+      plainText: custom.bodyTextTemplate
+        ? renderTemplate(custom.bodyTextTemplate, context)
+        : emailContent.plainText,
       htmlBody: emailContent.htmlBody,
-      smsText: renderTemplate(defaults.smsText, context)
+      smsText: renderTemplate(defaults.smsText, context),
+      previewBuildVersion: COMPOSE_PREVIEW_BUILD_VERSION
+    };
+  } else {
+    const subjectTemplate = custom.subjectTemplate || defaults.subject;
+    const bodyTextTemplate = custom.bodyTextTemplate || defaults.bodyText;
+    const bodyHtmlTemplate = custom.bodyHtmlTemplate || defaults.bodyHtml;
+    const plainText = renderTemplate(bodyTextTemplate, context);
+    const bodyInner = renderTemplate(bodyHtmlTemplate, context);
+    preview = {
+      recipientPersonId: teacherId,
+      recipientName: name,
+      subject: renderTemplate(subjectTemplate, context) || `${ruleLabel} (${items.length} item(s))`,
+      plainText,
+      htmlBody: buildBrandedEmailLayout({
+        baseUrl,
+        eyebrow: defaults.eyebrow,
+        title: defaults.emailTitle || ruleLabel,
+        preheader: `${ruleLabel} — ${items.length} item(s)`,
+        bodyHtml: bodyInner
+      }),
+      smsText: renderTemplate(defaults.smsText, context),
+      previewBuildVersion: COMPOSE_PREVIEW_BUILD_VERSION
     };
   }
 
-  const subjectTemplate = custom.subjectTemplate || defaults.subject;
-  const bodyTextTemplate = custom.bodyTextTemplate || defaults.bodyText;
-  const bodyHtmlTemplate = custom.bodyHtmlTemplate || defaults.bodyHtml;
+  const unrenderedBefore = countUnrenderedTemplateTokens(preview.htmlBody);
+  if (unrenderedBefore > 0) {
+    preview = await applySessionEmailPreviewFallback(preview, {
+      defaults,
+      custom,
+      sessionEntries,
+      items,
+      name,
+      orgName,
+      baseUrl,
+      orgId,
+      orgTimeZone,
+      context,
+      ruleLabel
+    });
+  }
 
-  const plainText = renderTemplate(bodyTextTemplate, context);
-  const bodyInner = renderTemplate(bodyHtmlTemplate, context);
-  const htmlBody = buildBrandedEmailLayout({
-    baseUrl,
-    eyebrow: defaults.eyebrow,
-    title: defaults.emailTitle || ruleLabel,
-    preheader: `${ruleLabel} — ${items.length} item(s)`,
-    bodyHtml: bodyInner
-  });
-
-  return {
-    recipientPersonId: teacherId,
-    recipientName: name,
-    subject: renderTemplate(subjectTemplate, context) || `${ruleLabel} (${items.length} item(s))`,
-    plainText,
-    htmlBody,
-    smsText: renderTemplate(defaults.smsText, context)
-  };
+  return preview;
 }
 
 module.exports = {
   PLACEHOLDER_DEFINITIONS,
   renderTemplate,
+  resolveTemplateContextValue,
+  countUnrenderedTemplateTokens,
+  COMPOSE_PREVIEW_BUILD_VERSION,
+  shouldUseUncompletedRichEmailBody,
+  usesLegacySessionListBodyTemplate,
   buildDefaultTemplates,
   buildEmailPreview,
   buildListContext

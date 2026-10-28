@@ -44,6 +44,65 @@ test('renderTemplate leaves unknown placeholders literal', () => {
   assert.equal(out, 'Hi Ada {{UNKNOWN_TOKEN}}');
 });
 
+test('renderTemplate resolves legacy session-notification camelCase placeholders', () => {
+  const out = composeService.renderTemplate(
+    'Hi {{teacherName}}, {{sessionCount}} sessions. {{orgName}}',
+    {
+      TEACHER_NAME: 'Ada',
+      SESSION_COUNT: '3',
+      ORG_NAME: 'Demo School'
+    }
+  );
+  assert.equal(out, 'Hi Ada, 3 sessions. Demo School');
+});
+
+test('legacy uncompleted rule html template renders without leftover placeholders', async () => {
+  const bodyHtmlTemplate = '<p>Hi {{teacherName}},</p><p>{{sessionCount}} items</p>{{sessionListHtml}}<p>{{orgName}}</p>';
+  const preview = await composeService.buildEmailPreview({
+    rule: {
+      ruleType: 'session_not_final',
+      label: 'Uncompleted sessions',
+      channels: {
+        email: {
+          subjectTemplate: 'Reminder: {{sessionCount}} uncompleted session(s) need attention',
+          bodyHtmlTemplate
+        }
+      }
+    },
+    recipientPersonId: 'T1',
+    items: [sampleSessionItem],
+    orgName: 'Demo School',
+    baseUrl: 'https://school.example'
+  });
+  assert.equal(composeService.countUnrenderedTemplateTokens(preview.subject), 0);
+  assert.equal(composeService.countUnrenderedTemplateTokens(preview.htmlBody), 0);
+  assert.match(preview.subject, /Reminder: 1 uncompleted/);
+  assert.match(preview.htmlBody, /Hi Teacher T1/);
+  assert.match(preview.htmlBody, /need review and completion/i);
+  assert.match(preview.htmlBody, /https:\/\/school\.example\/uploads\//);
+  assert.doesNotMatch(preview.htmlBody, /font-family:Arial,Helvetica,sans-serif;font-size:15px;line-height:1.5;color:#212529/);
+});
+
+test('custom subject only still uses uncompleted builder for session_not_final', async () => {
+  const preview = await composeService.buildEmailPreview({
+    rule: {
+      ruleType: 'session_not_final',
+      label: 'Complete sessions',
+      channels: {
+        email: {
+          subjectTemplate: 'Custom subject {{sessionCount}}'
+        }
+      }
+    },
+    recipientPersonId: 'T1',
+    items: [sampleSessionItem],
+    orgName: 'Demo School',
+    baseUrl: 'https://school.example'
+  });
+  assert.match(preview.plainText, /require review and completion/i);
+  assert.equal(composeService.countUnrenderedTemplateTokens(preview.htmlBody), 0);
+});
+
 test('session_without_book_report default mentions book coverage not session completion', async () => {
   const preview = await composeService.buildEmailPreview({
     rule: { ruleType: 'session_without_book_report', label: 'Book reports' },
@@ -72,7 +131,7 @@ test('session_not_final default uses uncompleted session completion copy', async
   });
   assert.match(preview.plainText, /require review and completion/i);
   assert.match(preview.htmlBody, /Session completion reminder/);
-  assert.match(preview.htmlBody, /max-width:680px/);
+  assert.match(preview.htmlBody, /max-width:720px/);
   assert.ok(preview.htmlBody.includes(NC_EMAIL_CLASSES.sessionCard));
   assert.ok(preview.htmlBody.includes(NC_EMAIL_CLASSES.container));
 });

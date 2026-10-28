@@ -231,6 +231,19 @@ function buildBrandedEmailLayout({
   ].join('');
 }
 
+function injectEmailPreviewBaseHref(html = '', baseHref = '') {
+  const doc = String(html || '');
+  let base = String(baseHref || '').trim();
+  if (!doc || !base) return doc;
+  if (/<base[\s>]/i.test(doc)) return doc;
+  if (!base.endsWith('/')) base += '/';
+  const safe = escapeHtml(base);
+  if (/<head[\s>]/i.test(doc)) {
+    return doc.replace(/<head(\s[^>]*)?>/i, (match) => `${match}<base href="${safe}">`);
+  }
+  return doc;
+}
+
 module.exports = {
   NEWS_BLUE,
   NEWS_TEAL,
@@ -241,6 +254,7 @@ module.exports = {
   NC_EMAIL_CLASSES,
   escapeHtml,
   resolveAbsoluteAssetUrl,
+  injectEmailPreviewBaseHref,
   buildEmailButton,
   buildBrandedEmailLayout
 };
