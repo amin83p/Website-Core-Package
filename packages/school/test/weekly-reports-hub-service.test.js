@@ -95,3 +95,87 @@ test('mapStudentBoardRows omits students with no expected sessions in the period
   assert.equal(rows.length, 1);
   assert.equal(rows[0].studentId, 'STU/1');
 });
+
+test('buildStudentDetailRowFromClass attaches punctuality summary', () => {
+  const row = weeklyReportsHubService.buildStudentDetailRowFromClass({
+    matrixRow: {
+      studentRecordId: 'student-1',
+      personId: 'person-1',
+      name: 'Ada Student',
+      records: [
+        {
+          expectedForSession: true,
+          status: 'present',
+          lateMinutes: 0,
+          earlyLeaveMinutes: 0
+        },
+        {
+          expectedForSession: true,
+          status: 'late',
+          lateMinutes: 5,
+          earlyLeaveMinutes: 0
+        }
+      ]
+    },
+    sessions: [{ id: 's1', date: '2026-01-06' }, { id: 's2', date: '2026-01-07' }],
+    gradesPayload: {},
+    sessionsById: new Map(),
+    caseRows: [],
+    sessionIdSet: new Set(['s1', 's2']),
+    classData: {},
+    orgPolicyLayer: {}
+  });
+  assert.equal(row.punctuality.attendedSessions, 2);
+  assert.equal(row.punctuality.onTimeSessions, 1);
+  assert.equal(row.punctuality.punctualityPercent, 50);
+});
+
+test('mergeStudentDetailIntoMap merges punctuality across classes', () => {
+  const studentMap = new Map();
+  const baseDetail = weeklyReportsHubService.buildStudentDetailRowFromClass({
+    matrixRow: {
+      studentRecordId: 'student-1',
+      personId: 'person-1',
+      name: 'Ada Student',
+      records: [{
+        expectedForSession: true,
+        status: 'present',
+        lateMinutes: 0,
+        earlyLeaveMinutes: 0
+      }]
+    },
+    sessions: [{ id: 's1' }],
+    gradesPayload: {},
+    sessionsById: new Map(),
+    caseRows: [],
+    sessionIdSet: new Set(['s1']),
+    classData: {},
+    orgPolicyLayer: {}
+  });
+  weeklyReportsHubService.mergeStudentDetailIntoMap(studentMap, 'class-a', baseDetail);
+  const lateDetail = weeklyReportsHubService.buildStudentDetailRowFromClass({
+    matrixRow: {
+      studentRecordId: 'student-1',
+      personId: 'person-1',
+      name: 'Ada Student',
+      records: [{
+        expectedForSession: true,
+        status: 'late',
+        lateMinutes: 10,
+        earlyLeaveMinutes: 0
+      }]
+    },
+    sessions: [{ id: 's2' }],
+    gradesPayload: {},
+    sessionsById: new Map(),
+    caseRows: [],
+    sessionIdSet: new Set(['s2']),
+    classData: {},
+    orgPolicyLayer: {}
+  });
+  weeklyReportsHubService.mergeStudentDetailIntoMap(studentMap, 'class-b', lateDetail);
+  const merged = studentMap.get('student-1');
+  assert.equal(merged.punctuality.attendedSessions, 2);
+  assert.equal(merged.punctuality.onTimeSessions, 1);
+  assert.equal(merged.punctuality.punctualityPercent, 50);
+});

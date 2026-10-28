@@ -3,6 +3,7 @@ const classEnrollmentReadService = require('./classEnrollmentReadService');
 const semiMonthlyReportPolicyModel = require('../../models/school/semiMonthlyReportPolicyModel');
 const semiMonthlyReportPolicyService = require('./semiMonthlyReportPolicyService');
 const studentAttendanceReportService = require('./studentAttendanceReportService');
+const { runWithConcurrency } = require('../../utils/asyncPool');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -129,14 +130,21 @@ function sortInstancesDesc(instances = []) {
 
 async function buildTemplateLabelMap(templateIds = [], reqUser) {
   const map = new Map();
-  for (const templateId of templateIds) {
-    const id = String(templateId || '').trim();
-    if (!id) continue;
-    // eslint-disable-next-line no-await-in-loop
+  const uniqueIds = [...new Set((Array.isArray(templateIds) ? templateIds : [])
+    .map((id) => String(id || '').trim())
+    .filter(Boolean))];
+  await Promise.all(uniqueIds.map(async (id) => {
     const template = await schoolDataService.getDataById('reportTemplates', id, reqUser);
     map.set(id, semiMonthlyReportPolicyService.formatTemplateLabel(template, id));
-  }
+  }));
   return map;
+}
+
+function filterInstancesForSemiMonthlyWindow(instances = [], templateIdSet = new Set(), startDate = '', endDate = '') {
+  return (Array.isArray(instances) ? instances : []).filter((row) => (
+    templateIdMatches(row?.templateId, templateIdSet)
+    && sessionDateInRange(row?.sessionDate, startDate, endDate)
+  ));
 }
 
 async function buildSemiMonthlyReportPayload(req, options = {}) {
@@ -185,7 +193,7 @@ async function buildSemiMonthlyReportPayload(req, options = {}) {
     req.user,
     routeAccessContext
   );
-  const instances = Array.isArray(allInstances) ? allInstances : [];
+  const instances = filterInstancesForSemiMonthlyWindow(allInstances, templateIdSet, startDate, endDate);
 
   const selectedStudentIdSet = new Set(
     selectedStudents.map((row) => String(row.studentRecordId || '').trim()).filter(Boolean)
@@ -207,9 +215,9 @@ async function buildSemiMonthlyReportPayload(req, options = {}) {
 
   const canonicalStatuses = classEnrollmentReadService.HISTORICAL_ROLLING_ROSTER_STATUSES;
 
-  for (const classRow of activeClasses) {
+  const enrollmentMatches = await runWithConcurrency(activeClasses, 6, async (classRow) => {
     const classId = String(classRow?.id || '').trim();
-    if (!classId) continue;
+    if (!classId) return null;
 
     const enrollmentSnapshot = await classEnrollmentReadService.listActiveStudentIdsForClass({
       classId,
@@ -224,11 +232,18 @@ async function buildSemiMonthlyReportPayload(req, options = {}) {
       ? enrollmentSnapshot.studentIds
       : new Set();
     const matchedStudentIds = [...selectedStudentIdSet].filter((studentId) => enrolledStudentIds.has(studentId));
-    if (!matchedStudentIds.length) continue;
+    if (!matchedStudentIds.length) return null;
 
-    const className = String(classRow?.name || classRow?.title || classId).trim();
-    const teacherName = String(classRow?.instructors?.[0]?.name || classRow?.teacherName || '').trim();
+    return {
+      classId,
+      className: String(classRow?.name || classRow?.title || classId).trim(),
+      teacherName: String(classRow?.instructors?.[0]?.name || classRow?.teacherName || '').trim(),
+      matchedStudentIds
+    };
+  });
 
+  enrollmentMatches.filter(Boolean).forEach((match) => {
+    const { classId, className, teacherName, matchedStudentIds } = match;
     matchedStudentIds.forEach((studentRecordId) => {
       const studentRow = selectedStudents.find((row) => idsEqual(row.studentRecordId, studentRecordId));
       if (!studentRow || !studentMap.has(studentRow.personId)) return;
@@ -251,7 +266,7 @@ async function buildSemiMonthlyReportPayload(req, options = {}) {
         instances: serialized
       });
     });
-  }
+  });
 
   const students = [...studentMap.values()].map((row) => {
     row.classes.sort((a, b) => String(a.className || '').localeCompare(String(b.className || '')));

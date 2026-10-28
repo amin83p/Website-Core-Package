@@ -169,7 +169,9 @@ async function buildExportPdfSuggestions({
   students = [],
   reqUser,
   windowStart = '',
-  windowEnd = ''
+  windowEnd = '',
+  cachedPeriodRows = null,
+  cachedFunderOptions = null
 } = {}) {
   if (!template) throw new Error('Report template is required.');
   const start = normalizeDateOnly(windowStart)
@@ -180,10 +182,14 @@ async function buildExportPdfSuggestions({
   const orgId = clean(template.orgId || assignment?.orgId || reqUser?.activeOrgId);
 
   const [periodRows, funderOptions] = await Promise.all([
-    classId
-      ? schoolDataService.getClassEnrollmentPeriodsByClassId(classId, reqUser).catch(() => [])
-      : Promise.resolve([]),
-    loadActiveFunderOptions(reqUser, orgId).catch(() => [])
+    Array.isArray(cachedPeriodRows)
+      ? Promise.resolve(cachedPeriodRows)
+      : (classId
+        ? schoolDataService.getClassEnrollmentPeriodsByClassId(classId, reqUser).catch(() => [])
+        : Promise.resolve([])),
+    Array.isArray(cachedFunderOptions)
+      ? Promise.resolve(cachedFunderOptions)
+      : loadActiveFunderOptions(reqUser, orgId).catch(() => [])
   ]);
 
   const labelById = new Map(

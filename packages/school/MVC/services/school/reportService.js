@@ -10,12 +10,18 @@ const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSes
 const reportRuleEngineService = require('./reportRuleEngineService');
 const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
-const { getPrefillValue, normalizePrefillKey, isAutoRefreshPrefillKey } = require('./reportPrefillKeyUtils');
+const {
+  getPrefillValue,
+  normalizePrefillKey,
+  isAutoRefreshPrefillKey,
+  stableValueToken
+} = require('./reportPrefillKeyUtils');
 const gradebookSkillCatalogService = require('./gradebookSkillCatalogService');
 const gradebookWeightService = require('./gradebookWeightService');
 const reportFunderDocxService = require('./reportFunderDocxService');
 const sessionGradebookMakeupService = require('./sessionGradebookMakeupService');
 const reportExportBatchCacheService = require('./reportExportBatchCacheService');
+const studentPunctualityMetricsService = require('./studentPunctualityMetricsService');
 
 const STUDENT_PHONE_TYPES = Object.freeze(['mobile', 'home', 'work', 'other']);
 const STUDENT_PHONE_TYPE_LABELS = Object.freeze({
@@ -178,7 +184,7 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'student_funder_note', label: 'Student Funder Note', description: 'Funder note from student registry.' }),
     Object.freeze({ key: 'student_record_notes', label: 'Student Record Notes', description: 'Notes from student registry record.' }),
     Object.freeze({ key: 'student_attendance_total_sessions', label: 'Student Attendance Total Sessions', description: 'Total tracked sessions for this student.' }),
-    Object.freeze({ key: 'student_attendance_present', label: 'Student Attendance Present', description: 'Count of present sessions for this student.' }),
+    Object.freeze({ key: 'student_attendance_present', label: 'Student Attendance Present', description: 'Present session count for this student within the report period (each-student reports).' }),
     Object.freeze({ key: 'student_attendance_late', label: 'Student Attendance Late', description: 'Count of late sessions for this student.' }),
     Object.freeze({ key: 'student_attendance_excused', label: 'Student Attendance Excused', description: 'Count of excused sessions for this student.' }),
     Object.freeze({ key: 'student_attendance_absent', label: 'Student Attendance Absent', description: 'Count of absent-like sessions (absent + ACF) for this student.' }),
@@ -667,84 +673,13 @@ async function buildStudentAttendanceSummary(sessions, studentId, statusMap = nu
   return out;
 }
 
-function getPunctualityLabel(percent, attendedSessions) {
-  if (!Number.isFinite(Number(attendedSessions)) || Number(attendedSessions) <= 0) return 'Not available';
-  const p = Number(percent);
-  if (!Number.isFinite(p)) return 'Not available';
-  if (p >= 95) return 'Excellent punctuality';
-  if (p >= 85) return 'Good punctuality';
-  if (p >= 70) return 'Needs attention';
-  return 'Punctuality concern';
-}
-
 function buildStudentPunctualitySummary(sessions, studentId, statusMap = null, options = {}) {
-  const out = {
-    attendedSessions: 0,
-    onTimeSessions: 0,
-    lateSessions: 0,
-    leftEarlySessions: 0,
-    lateMinutes: 0,
-    leftEarlyMinutes: 0,
-    lateExcusedSessions: 0,
-    lateExcusedMinutes: 0,
-    leftEarlyExcusedSessions: 0,
-    leftEarlyExcusedMinutes: 0,
-    totalIssueSessions: 0,
-    punctualityPercent: 'N/A',
-    punctualityLabel: 'Not available'
-  };
-
-  const target = toPublicId(studentId);
-  if (!target) return out;
-  const effectiveStatusMap = statusMap instanceof Map ? statusMap : new Map();
-  const classData = options?.classData && typeof options.classData === 'object' ? options.classData : {};
-  const orgPolicyLayer = options?.orgPolicyLayer && typeof options.orgPolicyLayer === 'object' ? options.orgPolicyLayer : {};
-  const matrixPolicy = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayer);
-  const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
-
-  (Array.isArray(sessions) ? sessions : []).forEach((session) => {
-    if (sessionStatusPolicyService.shouldExcludeFromAttendanceByMap(effectiveStatusMap, {
-      status: session?.status,
-      notes: session?.notes
-    })) return;
-    if (sessionForcesNotApplicableAttendance(session, effectiveStatusMap)) return;
-    const roster = Array.isArray(session?.roster) ? session.roster : [];
-    const row = roster.find((item) => idsEqual(item?.personId, target));
-    if (!row) return;
-
-    const normalized = attendanceMatrixMetricsService.applyAttendanceMatrixRosterRules(
-      row,
-      matrixPolicy,
-      enabledAttendanceStatuses
-    );
-    const status = String(normalized?.attendance || '').trim().toLowerCase();
-    if (status !== 'present' && status !== 'late') return;
-
-    const timing = attendanceMatrixMetricsService.normalizeAttendanceTimingFields(normalized);
-    const late = timing.lateMinutes;
-    const leftEarly = timing.earlyLeaveMinutes;
-    out.attendedSessions += 1;
-    out.lateMinutes += late;
-    out.leftEarlyMinutes += leftEarly;
-    if (late > 0) out.lateSessions += 1;
-    if (leftEarly > 0) out.leftEarlySessions += 1;
-    if (timing.lateExcused) {
-      out.lateExcusedSessions += 1;
-      out.lateExcusedMinutes += late;
-    }
-    if (timing.earlyLeaveExcused) {
-      out.leftEarlyExcusedSessions += 1;
-      out.leftEarlyExcusedMinutes += leftEarly;
-    }
-    if (late > 0 || leftEarly > 0) out.totalIssueSessions += 1;
-    if (late <= 0 && leftEarly <= 0) out.onTimeSessions += 1;
-  });
-
-  if (out.attendedSessions > 0) {
-    out.punctualityPercent = Number(((out.onTimeSessions / out.attendedSessions) * 100).toFixed(2));
-  }
-  out.punctualityLabel = getPunctualityLabel(out.punctualityPercent, out.attendedSessions);
-  return out;
+  return studentPunctualityMetricsService.buildStudentPunctualityFromSessions(
+    sessions,
+    studentId,
+    statusMap,
+    options
+  );
 }
 
 function normalizeSessionRatingPercent(value, fallback = 100) {
@@ -2440,8 +2375,9 @@ async function buildPrefillSnapshot({
   const classAttendance = needsAttendanceWork
     ? buildClassAttendanceSummary(session, statusMap)
     : { total: 0, present: 0, late: 0, excused: 0, absent: 0, acf: 0, notApplicable: 0 };
+  const periodSessions = filterSessionsByDateRange(sessions, reportPeriod.startDate, reportPeriod.dueDate);
   let allAttendanceApplicabilityContext = {};
-  if (needsAttendanceWork) {
+  if (needsAttendanceWork && !studentPersonId) {
     allAttendanceApplicabilityContext = await buildStudentAttendanceApplicabilityContext({
       classData,
       sessions,
@@ -2451,11 +2387,30 @@ async function buildPrefillSnapshot({
       orgId: reportOrgId || reqUser?.activeOrgId || ''
     });
   }
+  let attendanceApplicabilityContext = {};
+  const needsPeriodStudentApplicability = needsAttendanceWork && Boolean(studentPersonId)
+    && (wants(PREFILL_COMPUTE_BUNDLE.STUDENT_SESSION_ATTENDANCE)
+      || wants(PREFILL_COMPUTE_BUNDLE.STUDENT_ATTENDANCE_SPAN)
+      || wants(PREFILL_COMPUTE_BUNDLE.STUDENT_PUNCTUALITY_SPAN)
+      || wants(PREFILL_COMPUTE_BUNDLE.OVERALL_ATTENDANCE_DAYS));
+  if (needsPeriodStudentApplicability) {
+    attendanceApplicabilityContext = await buildStudentAttendanceApplicabilityContext({
+      classData,
+      sessions: periodSessions,
+      studentRecord,
+      studentPersonId,
+      reqUser,
+      orgId: reportOrgId || reqUser?.activeOrgId || ''
+    });
+  }
+  const studentAttendanceSessions = studentPersonId ? periodSessions : sessions;
+  const studentAttendanceApplicability = studentPersonId ? attendanceApplicabilityContext : allAttendanceApplicabilityContext;
   const studentAttendance = needsAttendanceWork && wants(PREFILL_COMPUTE_BUNDLE.STUDENT_SESSION_ATTENDANCE)
-    ? await buildStudentAttendanceSummary(sessions, studentId, statusMap, {
+    ? await buildStudentAttendanceSummary(studentAttendanceSessions, studentId, statusMap, {
+      countMissingAsAbsent: Boolean(studentPersonId),
       classData,
       orgPolicyLayer,
-      ...allAttendanceApplicabilityContext
+      ...studentAttendanceApplicability
     })
     : {
       totalSessions: 0,
@@ -2473,7 +2428,6 @@ async function buildPrefillSnapshot({
       earlyLeaveExcusedSessions: 0,
       earlyLeaveExcusedMinutes: 0
     };
-  const periodSessions = filterSessionsByDateRange(sessions, reportPeriod.startDate, reportPeriod.dueDate);
   const periodSessionsGrade = wants(PREFILL_COMPUTE_BUNDLE.GRADEBOOK_PERIOD) || wants(PREFILL_COMPUTE_BUNDLE.GRADEBOOK_SKILLS)
     ? filterPeriodSessionsForGradeMetrics(sessions, reportPeriod.startDate, reportPeriod.dueDate, statusMap)
     : [];
@@ -2494,18 +2448,6 @@ async function buildPrefillSnapshot({
       studentRecord?.id
     )
     : {};
-  let attendanceApplicabilityContext = {};
-  if (needsAttendanceWork && (wants(PREFILL_COMPUTE_BUNDLE.STUDENT_ATTENDANCE_SPAN)
-    || wants(PREFILL_COMPUTE_BUNDLE.OVERALL_ATTENDANCE_DAYS))) {
-    attendanceApplicabilityContext = await buildStudentAttendanceApplicabilityContext({
-      classData,
-      sessions: periodSessions,
-      studentRecord,
-      studentPersonId,
-      reqUser,
-      orgId: reportOrgId || reqUser?.activeOrgId || ''
-    });
-  }
   const classAttendanceSpan = wants(PREFILL_COMPUTE_BUNDLE.CLASS_ATTENDANCE_SPAN)
     ? await buildClassAttendanceSpanSummary(periodSessions, statusMap, {
       classData,
@@ -3888,6 +3830,8 @@ function buildTemplateSnapshotKeySuggestions(template = {}) {
 function resolveSnapshotKeyLabel(template, rawKey = '') {
   const key = normalizeSnapshotKey(rawKey);
   if (!key) return '';
+  const fieldLabel = resolveTemplateFieldLabelForPrefillKey(template, key);
+  if (fieldLabel) return fieldLabel;
   const labels = template?.snapshotKeyLabels && typeof template.snapshotKeyLabels === 'object'
     ? template.snapshotKeyLabels
     : {};
@@ -3921,6 +3865,22 @@ function resolveSnapshotKeyLabel(template, rawKey = '') {
   return key;
 }
 
+function resolveTemplateFieldLabelForPrefillKey(template = {}, rawKey = '') {
+  const key = normalizeSnapshotKey(rawKey);
+  if (!key) return '';
+  const lower = key.toLowerCase();
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  for (const field of fields) {
+    if (isVisualOnlyField(field)) continue;
+    const prefillKey = normalizeSnapshotKey(normalizePrefillKey(field?.prefillKey || ''));
+    if (prefillKey && prefillKey.toLowerCase() === lower) {
+      const label = String(field?.label || '').trim();
+      if (label) return label;
+    }
+  }
+  return '';
+}
+
 function collectFieldExpressionDependencyKeys(field) {
   const deps = new Set();
   if (isVisualOnlyField(field)) return deps;
@@ -3942,11 +3902,36 @@ function resolveLegacyTemplateFillKeys(template) {
   buildTemplateSnapshotKeySuggestions(template).forEach((row) => {
     if (row?.key) set.add(row.key);
   });
+  collectTemplateScopedPrefillKeys(template).forEach((key) => set.add(key));
   const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
   fields.forEach((field) => {
     collectFieldExpressionDependencyKeys(field).forEach((dep) => set.add(dep));
   });
   return set;
+}
+
+function collectTemplateScopedPrefillKeys(template = {}) {
+  const keys = new Set();
+  const ctx = resolveSnapshotScopeContext(template);
+  const placeholderMap = template?.placeholderMap && typeof template.placeholderMap === 'object'
+    ? template.placeholderMap
+    : {};
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  fields.forEach((field) => {
+    if (isVisualOnlyField(field)) return;
+    if (ctx.active && !fieldIsInSnapshotScope(field, ctx.baseLowerSet, placeholderMap)) return;
+    const prefillKey = normalizeSnapshotKey(normalizePrefillKey(field?.prefillKey || ''));
+    if (prefillKey) keys.add(prefillKey);
+  });
+  return keys;
+}
+
+function templateScopedPrefillValuesChanged(prevPrefill = {}, nextPrefill = {}, template = {}) {
+  const prev = prevPrefill && typeof prevPrefill === 'object' ? prevPrefill : {};
+  const next = nextPrefill && typeof nextPrefill === 'object' ? nextPrefill : {};
+  return [...collectTemplateScopedPrefillKeys(template)].some(
+    (key) => stableValueToken(prev[key]) !== stableValueToken(next[key])
+  );
 }
 
 function fieldIsInSnapshotScope(field, baseLowerSet, placeholderMap = {}) {
@@ -3975,6 +3960,8 @@ function resolveTemplateFillKeys(template) {
   const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
   fields.forEach((field) => {
     if (!fieldIsInSnapshotScope(field, baseLowerSet, placeholderMap)) return;
+    const prefillKey = normalizeSnapshotKey(normalizePrefillKey(field?.prefillKey || ''));
+    if (prefillKey) set.add(prefillKey);
     collectFieldExpressionDependencyKeys(field).forEach((dep) => set.add(dep));
   });
   return set;
@@ -4214,6 +4201,8 @@ module.exports = {
   normalizeSnapshotKey,
   pickKeySubset,
   resolveTemplateFillKeys,
+  collectTemplateScopedPrefillKeys,
+  templateScopedPrefillValuesChanged,
   resolveTemplateUsedKeys,
   reconcileTemplateSnapshotKeys,
   resolvePrefillBundlesForKeys,

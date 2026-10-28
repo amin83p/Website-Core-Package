@@ -1288,6 +1288,47 @@
     dominant-baseline: middle;
   }
 
+  .school-master-hub .hub-wr-punctuality-ring {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.15rem;
+  }
+
+  .school-master-hub .hub-wr-punctuality-label {
+    font-size: 0.6rem;
+    line-height: 1.1;
+    color: var(--bs-secondary-color);
+    max-width: 6.5rem;
+    text-align: center;
+  }
+
+  .school-master-hub .hub-wr-punctuality-svg .hub-wr-punctuality-track {
+    stroke: #fbbf24;
+    opacity: 0.35;
+  }
+
+  .school-master-hub .hub-wr-punctuality-svg .hub-wr-punctuality-progress {
+    stroke: #16a34a;
+  }
+
+  .school-master-hub .hub-wr-punctuality-svg .hub-wr-punctuality-text {
+    font-size: 0.52rem;
+    font-weight: 700;
+    fill: #0f172a;
+    dominant-baseline: middle;
+  }
+
+  .school-master-hub .hub-wr-punctuality-breakdown {
+    font-size: 0.75rem;
+    color: var(--bs-secondary-color);
+  }
+
+  .hub-wr-print-student-list-table .hub-wr-print-punctuality-ring .hub-wr-punctuality-svg {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
   .school-master-hub .hub-weekly-reports-engagement-ring--loading .hub-weekly-reports-engagement-placeholder {
     width: 100%;
     height: 100%;
@@ -2467,6 +2508,10 @@
     display: none;
   }
 
+  #hubStudentProgressPrintRoot.hub-sp-print-root {
+    display: none;
+  }
+
   .hub-wr-print-doc {
     font-size: 11px;
     color: #111827;
@@ -3149,6 +3194,41 @@
 
     .hub-wr-print-student-detail-card .hub-wr-print-student-sessions-grid .hub-wr-print-session-cell {
       font-size: 10px;
+    }
+
+    body.hub-print-student-progress > *:not(#hubStudentProgressPrintRoot) {
+      display: none !important;
+    }
+
+    body.hub-print-student-progress #hubStudentProgressPrintRoot.hub-sp-print-root {
+      display: block !important;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    body.hub-print-student-progress {
+      margin: 0;
+      padding: 0;
+      min-height: 0 !important;
+      height: auto !important;
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
+
+    body.hub-print-student-progress #hubStudentProgressPrintRoot.hub-sp-print-root,
+    body.hub-print-student-progress #hubStudentProgressPrintRoot.hub-sp-print-root * {
+      print-color-adjust: exact;
+      -webkit-print-color-adjust: exact;
+    }
+
+    .hub-sp-print-student-page:not(:last-child) {
+      break-after: page;
+      page-break-after: always;
     }
   }
 </style>
@@ -6543,6 +6623,10 @@
       renderWeeklyReportsPrintStudentEngagementRing(row.engagement),
       '<div class="hub-wr-print-engagement-caption">Engagement</div>',
       '</div>',
+      '<div class="hub-wr-print-teacher-engagement-ring hub-wr-print-engagement">',
+      renderWeeklyReportsPunctualityCell(readWeeklyReportsStudentPunctuality(row), { compact: true, showLabel: false }),
+      '<div class="hub-wr-print-engagement-caption">Punctuality</div>',
+      '</div>',
       '<div>',
       '<div class="hub-wr-print-teacher-name">', escapeHtml(name), '</div>',
       idLine,
@@ -6588,6 +6672,7 @@
         '<td class="ps-2"><div class="fw-semibold">', escapeHtml(String(row.name || row.studentId || '')), '</div>',
         '<div class="small text-muted font-monospace">', escapeHtml(row.studentId || '-'), '</div></td>',
         '<td class="text-center">', renderWeeklyReportsPrintStudentEngagementRing(row.engagement, { listCompact: true }), '</td>',
+        '<td class="text-center">', renderWeeklyReportsPunctualityCell(readWeeklyReportsStudentPunctuality(row), { compact: true, showLabel: false, printList: true }), '</td>',
         '<td class="text-center">', renderWeeklyReportsMetricStack(String(att.sessionCount), '', { tone: 'info' }), '</td>',
         '<td class="text-center">', renderWeeklyReportsAttendanceCountCell(att.presentCount, { tone: 'success' }), '</td>',
         '<td class="text-center">', renderWeeklyReportsAttendanceCountCell(att.lateCount, {
@@ -6619,6 +6704,7 @@
       '<thead><tr>',
       '<th class="ps-2">Student</th>',
       '<th class="text-center">Engagement</th>',
+      '<th class="text-center">Punctuality</th>',
       '<th class="text-center">Sessions</th>',
       '<th class="text-center">Present</th>',
       '<th class="text-center">Late</th>',
@@ -7657,6 +7743,275 @@
     };
   }
 
+  function readWeeklyReportsStudentPunctuality(rowOrWeek) {
+    const raw = rowOrWeek && rowOrWeek.punctuality && typeof rowOrWeek.punctuality === 'object'
+      ? rowOrWeek.punctuality
+      : null;
+    if (raw) return raw;
+    return {
+      attendedSessions: 0,
+      onTimeSessions: 0,
+      totalIssueSessions: 0,
+      punctualityPercent: 'N/A',
+      punctualityLabel: 'Not available'
+    };
+  }
+
+  function punctualityPercentNumber(summary) {
+    const n = Number(summary && summary.punctualityPercent);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  function punctualityToneFromPercent(percent) {
+    const pct = punctualityPercentNumber({ punctualityPercent: percent });
+    if (pct == null) return 'info';
+    if (pct >= 95) return 'success';
+    if (pct >= 85) return 'info';
+    if (pct >= 70) return 'warning';
+    return 'danger';
+  }
+
+  function punctualityStrokeColor(percent) {
+    const tone = punctualityToneFromPercent(percent);
+    if (tone === 'success') return '#16a34a';
+    if (tone === 'warning') return '#d97706';
+    if (tone === 'danger') return '#dc2626';
+    return '#0284c7';
+  }
+
+  function buildPunctualityDonutSvg(summary, options) {
+    const opts = options || {};
+    const data = readWeeklyReportsStudentPunctuality({ punctuality: summary });
+    const attended = Number(data.attendedSessions || 0);
+    if (!attended) {
+      return '<div class="hub-weekly-reports-engagement-placeholder" title="No attended sessions in period">—</div>';
+    }
+    const pctRaw = punctualityPercentNumber(data);
+    const pct = pctRaw == null ? 0 : Math.max(0, Math.min(100, Math.round(pctRaw)));
+    const radius = 15;
+    const circumference = 2 * Math.PI * radius;
+    const offset = circumference * (1 - pct / 100);
+    const onTime = Number(data.onTimeSessions || 0);
+    const issues = Math.max(0, attended - onTime);
+    const tooltip = onTime + ' on time / ' + attended + ' attended (' + issues + ' timing issues)';
+    const strokeColor = punctualityStrokeColor(pctRaw);
+    const svgClass = opts.svgClass || 'hub-wr-punctuality-svg';
+    return [
+      '<svg class="', escapeHtml(svgClass), '" viewBox="0 0 36 36" role="img" aria-label="Punctuality ', escapeHtml(String(pct)), ' percent">',
+      '<title>', escapeHtml(tooltip), '</title>',
+      '<circle class="hub-wr-punctuality-track" cx="18" cy="18" r="', String(radius), '" fill="none" stroke-width="3"></circle>',
+      '<circle class="hub-wr-punctuality-progress" cx="18" cy="18" r="', String(radius), '" fill="none" stroke-width="3" stroke-linecap="round" stroke="',
+      escapeHtml(strokeColor), '" stroke-dasharray="', String(circumference), '" stroke-dashoffset="', String(offset), '" transform="rotate(-90 18 18)"></circle>',
+      '<text class="hub-wr-punctuality-text" x="18" y="18" text-anchor="middle" dominant-baseline="central" fill="', escapeHtml(strokeColor), '">', escapeHtml(String(pct)), '</text>',
+      '</svg>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsPunctualityCell(summary, options) {
+    const opts = options || {};
+    const data = readWeeklyReportsStudentPunctuality({ punctuality: summary });
+    const showLabel = opts.showLabel !== false;
+    const compact = !!opts.compact;
+    const ringClass = [
+      'hub-wr-punctuality-ring',
+      compact ? 'hub-wr-punctuality-ring--compact' : '',
+      opts.printList ? 'hub-wr-print-punctuality-ring' : ''
+    ].filter(Boolean).join(' ');
+    const labelHtml = showLabel && data.punctualityLabel
+      ? '<div class="hub-wr-punctuality-label">' + escapeHtml(String(data.punctualityLabel)) + '</div>'
+      : '';
+    return [
+      '<div class="', ringClass, '">',
+      buildPunctualityDonutSvg(data, opts),
+      labelHtml,
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsPunctualityBreakdown(summary) {
+    const data = readWeeklyReportsStudentPunctuality({ punctuality: summary });
+    const attended = Number(data.attendedSessions || 0);
+    if (!attended) return '';
+    const onTime = Number(data.onTimeSessions || 0);
+    const issues = Number(data.totalIssueSessions || Math.max(0, attended - onTime));
+    return [
+      '<div class="hub-wr-punctuality-breakdown mt-2">',
+      escapeHtml(String(onTime) + ' on time · ' + String(issues) + ' timing issue' + (issues === 1 ? '' : 's')),
+      ' · ',
+      escapeHtml(String(attended) + ' attended'),
+      '</div>'
+    ].join('');
+  }
+
+  function renderStudentProgressPunctualityWeekBar(week, options) {
+    const opts = options || {};
+    const data = readWeeklyReportsStudentPunctuality(week);
+    const pct = punctualityPercentNumber(data);
+    const barWidth = pct == null ? 0 : Math.max(0, Math.min(100, Math.round(pct)));
+    const pctLabel = pct == null ? 'N/A' : String(Math.round(pct)) + '%';
+    const fillColor = punctualityStrokeColor(pct);
+    const blockClass = opts.print
+      ? 'hub-wr-student-skill-block hub-wr-student-skill-block--print-list'
+      : 'hub-wr-student-skill-block';
+    return [
+      '<div class="', blockClass, '">',
+      '<div class="hub-wr-student-skill-bar-track" title="', escapeHtml(pctLabel), '">',
+      '<div class="hub-wr-student-skill-bar-fill" style="width:', escapeHtml(String(barWidth)), '%;background:', escapeHtml(fillColor), ';"></div>',
+      '</div>',
+      '<div class="hub-wr-student-skill-pct">', escapeHtml(pctLabel), '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function ensureStudentProgressPrintRootElement() {
+    let root = document.getElementById('hubStudentProgressPrintRoot');
+    if (root) return root;
+    root = document.createElement('div');
+    root.id = 'hubStudentProgressPrintRoot';
+    root.className = 'hub-sp-print-root';
+    root.setAttribute('aria-hidden', 'true');
+    document.body.appendChild(root);
+    return root;
+  }
+
+  async function runStudentProgressPrintJob(renderPrintHtml) {
+    const root = ensureStudentProgressPrintRootElement();
+    root.innerHTML = renderPrintHtml();
+    root.setAttribute('aria-hidden', 'false');
+    const cleanup = function () {
+      document.body.classList.remove('hub-print-student-progress');
+      root.innerHTML = '';
+      root.setAttribute('aria-hidden', 'true');
+    };
+    if (typeof window.hideLoading === 'function') {
+      window.hideLoading({ force: true });
+    }
+    document.body.classList.add('hub-print-student-progress');
+    if (typeof window.scrollTo === 'function') {
+      window.scrollTo(0, 0);
+    }
+    await new Promise(function (resolve) {
+      if (typeof window.requestAnimationFrame === 'function') {
+        window.requestAnimationFrame(function () {
+          window.requestAnimationFrame(resolve);
+        });
+      } else {
+        window.setTimeout(resolve, 0);
+      }
+    });
+    window.addEventListener('afterprint', cleanup, { once: true });
+    window.print();
+    window.setTimeout(cleanup, 1500);
+  }
+
+  function renderStudentProgressPrintClassTable(classBlock) {
+    const weeks = Array.isArray(classBlock && classBlock.weeks) ? classBlock.weeks : [];
+    const showAcfColumn = !!(classBlock && classBlock.showAcfColumn);
+    const acfHeader = showAcfColumn ? '<th class="text-center">ACF</th>' : '';
+    const body = weeks.map(function (week) {
+      const att = readWeeklyReportsStudentAttendance(week);
+      const acfCell = showAcfColumn
+        ? '<td class="text-center">' + renderWeeklyReportsAttendanceCountCell(att.acfCount, {
+          excusedCount: att.acfExcusedCount,
+          showMinutes: false,
+          tone: 'danger'
+        }) + '</td>'
+        : '';
+      return [
+        '<tr>',
+        '<td class="ps-2 fw-semibold">', escapeHtml(formatStudentProgressWeekLabel(week.startDate, week.endDate)), '</td>',
+        '<td class="text-center">', renderWeeklyReportsPunctualityCell(readWeeklyReportsStudentPunctuality(week), { compact: true, showLabel: false, printList: true }), '</td>',
+        '<td class="text-center">', renderStudentProgressPunctualityWeekBar(week, { print: true }), '</td>',
+        '<td class="text-center">', renderWeeklyReportsPrintStudentEngagementRing(week.engagement, { listCompact: true }), '</td>',
+        '<td class="text-center">', renderWeeklyReportsMetricStack(String(att.sessionCount), '', { tone: 'info' }), '</td>',
+        '<td class="text-center">', renderWeeklyReportsAttendanceCountCell(att.presentCount, { tone: 'success' }), '</td>',
+        '<td class="text-center">', renderWeeklyReportsAttendanceCountCell(att.lateCount, { tone: 'warning' }), '</td>',
+        '<td class="text-center">', renderWeeklyReportsAttendanceCountCell(att.earlyCount, { tone: 'early' }), '</td>',
+        '<td class="text-center">', renderWeeklyReportsAttendanceCountCell(att.absenceCount, { showMinutes: false, tone: 'danger' }), '</td>',
+        acfCell,
+        '<td class="text-center">', renderWeeklyReportsMetricStack(String(Number(week.caseCount || 0)), ''), '</td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+    return [
+      '<div class="hub-wr-print-class-block mb-3">',
+      '<div class="hub-wr-print-student-section-title mb-2">', escapeHtml(classBlock.className || classBlock.classId || 'Class'), '</div>',
+      '<div class="d-flex align-items-center gap-3 mb-2">',
+      '<div class="small text-muted">Period punctuality</div>',
+      renderWeeklyReportsPunctualityCell(readWeeklyReportsStudentPunctuality(classBlock), { compact: true, showLabel: true }),
+      '</div>',
+      '<div class="hub-table-wrap">',
+      '<table class="table align-middle hub-wr-print-metrics-table mb-0">',
+      '<thead><tr>',
+      '<th class="ps-2">Week</th>',
+      '<th class="text-center">Punctuality</th>',
+      '<th class="text-center">Trend</th>',
+      '<th class="text-center">Engagement</th>',
+      '<th class="text-center">Sessions</th>',
+      '<th class="text-center">Present</th>',
+      '<th class="text-center">Late</th>',
+      '<th class="text-center">Early</th>',
+      '<th class="text-center">Absent</th>',
+      acfHeader,
+      '<th class="text-center">Cases</th>',
+      '</tr></thead>',
+      '<tbody>', body, '</tbody>',
+      '</table>',
+      '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function renderStudentProgressPrintDocument(payload) {
+    const students = Array.isArray(payload && payload.students) ? payload.students : [];
+    const range = payload && payload.range ? payload.range : {};
+    const rangeLabel = formatStudentProgressWeekLabel(range.startDate, range.endDate);
+    const prepared = formatHubInstant(new Date());
+    const pages = students.map(function (student) {
+      const classHtml = (Array.isArray(student.classes) ? student.classes : [])
+        .map(function (classBlock) {
+          return renderStudentProgressPrintClassTable(classBlock);
+        }).join('');
+      const title = 'Student Progress — ' + studentProgressDisplayName(student);
+      return [
+        '<section class="hub-sp-print-student-page hub-wr-print-student-page">',
+        '<div class="hub-wr-print-doc-meta">',
+        '<div class="hub-wr-print-doc-title">', escapeHtml(title), '</div>',
+        '<div class="text-muted small">', escapeHtml(rangeLabel), ' &nbsp;|&nbsp; Printed ', escapeHtml(prepared), '</div>',
+        '</div>',
+        classHtml || '<div class="text-muted">No scheduled sessions in this range.</div>',
+        '</section>'
+      ].join('');
+    }).join('');
+    return [
+      '<div class="hub-wr-print-doc hub-sp-print-doc">',
+      pages,
+      '</div>'
+    ].join('');
+  }
+
+  async function printStudentProgressHub() {
+    if (hubStudentProgressPrintInProgress) {
+      void showHubMessage({ title: 'Print', icon: 'info', message: 'Print is already preparing. Please wait…' });
+      return;
+    }
+    if (!hubStudentProgressPayload || !Array.isArray(hubStudentProgressPayload.students) || !hubStudentProgressPayload.students.length) {
+      void showHubMessage({ title: 'Print', icon: 'info', message: 'Generate a progress report before printing.' });
+      return;
+    }
+    hubStudentProgressPrintInProgress = true;
+    try {
+      await runStudentProgressPrintJob(function () {
+        return renderStudentProgressPrintDocument(hubStudentProgressPayload);
+      });
+    } finally {
+      hubStudentProgressPrintInProgress = false;
+      if (typeof window.hideLoading === 'function') {
+        window.hideLoading({ force: true });
+      }
+    }
+  }
+
   function weeklyReportsStudentSortValue(row, key) {
     if (key === 'name') return String(row.name || '');
     if (key === 'sessionCount' || key === 'presentCount') {
@@ -7666,6 +8021,14 @@
     if (key === 'engagement.percent') {
       const pct = row.engagement && row.engagement.percent != null ? Number(row.engagement.percent) : -1;
       return Number.isFinite(pct) ? pct : -1;
+    }
+    if (key === 'punctuality.punctualityPercent') {
+      const pct = punctualityPercentNumber(readWeeklyReportsStudentPunctuality(row));
+      return pct == null ? -1 : pct;
+    }
+    if (String(key || '').indexOf('punctuality.') === 0) {
+      const p = readWeeklyReportsStudentPunctuality(row);
+      return Number(p[String(key).slice('punctuality.'.length)] || 0);
     }
     if (String(key || '').indexOf('attendance.') === 0) {
       const att = readWeeklyReportsStudentAttendance(row);
@@ -7680,7 +8043,7 @@
     const dir = sort.dir === 'desc' ? -1 : 1;
     const numericKeys = [
       'sessionCount', 'classCount', 'attendanceHealth', 'presentCount', 'lateCount', 'absenceCount', 'caseCount',
-      'engagement.percent', 'attendance.earlyCount', 'attendance.naCount', 'attendance.acfCount',
+      'engagement.percent', 'punctuality.punctualityPercent', 'attendance.earlyCount', 'attendance.naCount', 'attendance.acfCount',
       'attendance.absenceCount', 'attendance.lateCount'
     ];
     list.sort(function (a, b) {
@@ -9409,7 +9772,10 @@
       '<div class="hub-weekly-reports-student-tile" style="' + tileStyle + '" title="' + escapeHtml(row.name || row.studentId || '') + '">',
       '<div class="hub-weekly-reports-student-tile-body">',
       '<div class="hub-weekly-reports-student-tile-name">' + hubStudentNameHtml(row.name || row.studentId, row.studentId) + '</div>',
-      '<div class="d-flex justify-content-center mb-2">' + renderWeeklyReportsStudentEngagementRing(row.engagement) + '</div>',
+      '<div class="d-flex justify-content-center gap-3 flex-wrap mb-2">',
+      renderWeeklyReportsStudentEngagementRing(row.engagement),
+      renderWeeklyReportsPunctualityCell(readWeeklyReportsStudentPunctuality(row), { compact: true, showLabel: true }),
+      '</div>',
       renderWeeklyReportsStudentAttendanceSummary(row),
       renderWeeklyReportsStudentSkillsSummary(row.skillAverages),
       caseLine,
@@ -9461,7 +9827,7 @@
     return [
       '<div class="hub-weekly-reports-student-detail-wrap">',
       '<div class="hub-weekly-reports-student-detail-layout">',
-      '<div>', renderWeeklyReportsStudentTile(row), '</div>',
+      '<div>', renderWeeklyReportsStudentTile(row), renderWeeklyReportsPunctualityBreakdown(readWeeklyReportsStudentPunctuality(row)), '</div>',
       '<div>',
       '<div class="small text-uppercase fw-bold text-muted mb-2">Sessions in range</div>',
       renderWeeklyReportsStudentSessionTable(row),
@@ -9517,6 +9883,7 @@
         '<td class="ps-3"><div class="fw-semibold">' + hubStudentNameHtml(row.name || row.studentId, row.studentId) + '</div>',
         '<div class="small text-muted font-monospace">' + escapeHtml(row.studentId || '-') + '</div></td>',
         '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsStudentEngagementRing(row.engagement) + '</td>',
+        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsPunctualityCell(readWeeklyReportsStudentPunctuality(row), { compact: true, showLabel: false }) + '</td>',
         '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsMetricStack(String(att.sessionCount), '', { tone: 'info' }) + '</td>',
         '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsAttendanceCountCell(att.presentCount, { tone: 'success' }) + '</td>',
         '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsAttendanceCountCell(att.lateCount, {
@@ -9550,6 +9917,7 @@
       '<thead><tr>',
       '<th class="ps-3 hub-weekly-reports-list-sort" data-hub-weekly-reports-sort="name">Student' + weeklyReportsSortIndicator('name') + '</th>',
       '<th class="text-center hub-weekly-reports-list-sort" data-hub-weekly-reports-sort="engagement.percent">Engagement' + weeklyReportsSortIndicator('engagement.percent') + '</th>',
+      '<th class="text-center hub-weekly-reports-list-sort" data-hub-weekly-reports-sort="punctuality.punctualityPercent">Punctuality' + weeklyReportsSortIndicator('punctuality.punctualityPercent') + '</th>',
       '<th class="text-center hub-weekly-reports-list-sort" data-hub-weekly-reports-sort="sessionCount">Sessions' + weeklyReportsSortIndicator('sessionCount') + '</th>',
       '<th class="text-center hub-weekly-reports-list-sort" data-hub-weekly-reports-sort="presentCount">Present' + weeklyReportsSortIndicator('presentCount') + '</th>',
       '<th class="text-center hub-weekly-reports-list-sort" data-hub-weekly-reports-sort="attendance.lateCount">Late' + weeklyReportsSortIndicator('attendance.lateCount') + '</th>',
@@ -12614,6 +12982,7 @@
   let hubStudentProgressViewMode = 'table';
   let hubStudentProgressPayload = null;
   let hubStudentProgressCharts = [];
+  let hubStudentProgressPrintInProgress = false;
 
   function studentProgressResultsEl() {
     const live = document.getElementById('hubStudentProgressResults');
@@ -12758,7 +13127,7 @@
   function renderStudentProgressWeekRows(studentIndex, classIndex, classBlock) {
     const weeks = Array.isArray(classBlock && classBlock.weeks) ? classBlock.weeks : [];
     const showAcfColumn = !!(classBlock && classBlock.showAcfColumn);
-    const columnCount = showAcfColumn ? 9 : 8;
+    const columnCount = showAcfColumn ? 10 : 9;
     return weeks.map(function (week, weekIndex) {
       const att = readWeeklyReportsStudentAttendance(week);
       const key = String(studentIndex) + '-' + String(classIndex) + '-' + String(weekIndex);
@@ -12773,6 +13142,7 @@
         '<tr class="hub-student-progress-week-row" data-hub-student-progress-week="' + escapeHtml(key) + '" aria-expanded="false">',
         '<td class="ps-3 fw-semibold">' + escapeHtml(formatStudentProgressWeekLabel(week.startDate, week.endDate)) + '</td>',
         '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsStudentEngagementRing(week.engagement) + '</td>',
+        '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsPunctualityCell(readWeeklyReportsStudentPunctuality(week), { compact: true, showLabel: false }) + '</td>',
         '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsMetricStack(String(att.sessionCount), '', { tone: 'info' }) + '</td>',
         '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsAttendanceCountCell(att.presentCount, { tone: 'success' }) + '</td>',
         '<td class="text-center hub-weekly-reports-metric-cell">' + renderWeeklyReportsAttendanceCountCell(att.lateCount, {
@@ -12845,6 +13215,7 @@
     return [
       '<div class="hub-student-progress-chart-grid">',
       chartCard('engagement', 'Engagement'),
+      chartCard('punctuality', 'Punctuality'),
       chartCard('timing', 'Late and early'),
       chartCard('activity', 'Activity average'),
       renderStudentProgressWeekLegend(weeks),
@@ -12878,6 +13249,7 @@
       '<thead><tr>',
       '<th class="ps-3">Week</th>',
       '<th class="text-center">Engagement</th>',
+      '<th class="text-center">Punctuality</th>',
       '<th class="text-center">Sessions</th>',
       '<th class="text-center">Present</th>',
       '<th class="text-center">Late</th>',
@@ -12939,6 +13311,7 @@
       escapeHtml(rangeLabel),
       '</div>',
       renderStudentProgressViewToggle(),
+      '<button type="button" class="btn btn-outline-secondary btn-sm" id="hubStudentProgressPrint"><i class="bi bi-printer me-1"></i>Print</button>',
       '</div>',
       chartsMissing
         ? '<div class="alert alert-warning py-2 small">Charts are not available on this page yet.</div>'
@@ -13058,6 +13431,16 @@
           label: 'Activity average',
           data: weeks.map(function (week) {
             return week.activityAveragePercent == null ? null : Number(week.activityAveragePercent);
+          }),
+          backgroundColor: '#16a34a'
+        }];
+      } else if (metric === 'punctuality') {
+        percentScale = true;
+        datasets = [{
+          label: 'Punctuality',
+          data: weeks.map(function (week) {
+            const pct = punctualityPercentNumber(readWeeklyReportsStudentPunctuality(week));
+            return pct == null ? null : Number(pct);
           }),
           backgroundColor: '#16a34a'
         }];
@@ -13226,6 +13609,11 @@
     }
     if (results) {
       results.addEventListener('click', function (event) {
+        const printButton = event.target.closest('#hubStudentProgressPrint');
+        if (printButton && results.contains(printButton)) {
+          void printStudentProgressHub();
+          return;
+        }
         const viewButton = event.target.closest('[data-hub-student-progress-view]');
         if (viewButton && results.contains(viewButton) && hubStudentProgressPayload) {
           const nextMode = viewButton.getAttribute('data-hub-student-progress-view') === 'analytics' ? 'analytics' : 'table';

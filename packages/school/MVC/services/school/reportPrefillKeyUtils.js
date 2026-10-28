@@ -10,7 +10,22 @@ function isAutoRefreshPrefillKey(rawKey = '') {
   const key = normalizePrefillKey(rawKey);
   if (!key) return false;
   if (key === 'gradebook_skill_rows') return true;
-  return /^(student|class)_(gradebook|exam)_/.test(key);
+  if (/^(student|class)_(gradebook|exam)_/.test(key)) return true;
+  if (/^student_attendance(_span)?_/.test(key)) return true;
+  if (/^student_punctuality_span_/.test(key)) return true;
+  if (/^student_session_rating_span_/.test(key)) return true;
+  if (/^class_attendance(_span)?_/.test(key)) return true;
+  if (/^attendance_(day|presence|note)_\d{2}$/.test(key)) return true;
+  return false;
+}
+
+function stableValueToken(value) {
+  if (value === undefined) return '__undefined__';
+  try {
+    return JSON.stringify(value);
+  } catch (_) {
+    return String(value);
+  }
 }
 
 function getPrefillValue(prefill = {}, rawKey = '') {
@@ -27,5 +42,6 @@ function getPrefillValue(prefill = {}, rawKey = '') {
 module.exports = {
   normalizePrefillKey,
   getPrefillValue,
-  isAutoRefreshPrefillKey
+  isAutoRefreshPrefillKey,
+  stableValueToken
 };

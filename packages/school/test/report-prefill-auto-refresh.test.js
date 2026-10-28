@@ -9,6 +9,7 @@ const { isAutoRefreshPrefillKey } = require('../MVC/services/school/reportPrefil
 
 test('isAutoRefreshPrefillKey marks gradebook skill metrics', () => {
   assert.equal(isAutoRefreshPrefillKey('student_gradebook_skill_reading_avg_percent'), true);
+  assert.equal(isAutoRefreshPrefillKey('student_attendance_span_percent'), true);
   assert.equal(isAutoRefreshPrefillKey('teacher_name'), false);
 });
 
@@ -31,6 +32,27 @@ test('mergeTemplateData prefers fresh prefill over stale saved answers when not 
   };
   const merged = reportService.mergeTemplateData(template, instance, null);
   assert.equal(merged.reading_avg, 75);
+});
+
+test('mergeTemplateData prefers fresh attendance span prefill over stale saved answers', () => {
+  const template = {
+    schema: {
+      fields: [
+        {
+          id: 'attendance_pct',
+          type: 'number',
+          prefillKey: 'student_attendance_span_percent'
+        }
+      ]
+    }
+  };
+  const instance = {
+    prefillSnapshot: { student_attendance_span_percent: 87.5 },
+    answers: { attendance_pct: 1 },
+    derivedOverrides: {}
+  };
+  const merged = reportService.mergeTemplateData(template, instance, null);
+  assert.equal(merged.attendance_pct, 87.5);
 });
 
 test('mergeTemplateData keeps manual answers when gradebook skill field is overridden', () => {
@@ -96,4 +118,35 @@ test('hydrateAnswersFromPrefill keeps overridden gradebook skill answers', () =>
   const hydrated = reportGenerationEngineService.hydrateAnswersFromPrefill(template, instance);
   assert.equal(hydrated.changed, false);
   assert.equal(hydrated.answers.writing_avg, 50);
+});
+
+test('templateScopedPrefillValuesChanged compares scoped keys without throwing', () => {
+  const template = {
+    schema: {
+      fields: [
+        {
+          id: 'attendance_pct',
+          label: 'Attendance',
+          type: 'number',
+          prefillKey: 'student_attendance_span_percent'
+        }
+      ]
+    }
+  };
+  assert.equal(
+    reportService.templateScopedPrefillValuesChanged(
+      { student_attendance_span_percent: 1 },
+      { student_attendance_span_percent: 87.5 },
+      template
+    ),
+    true
+  );
+  assert.equal(
+    reportService.templateScopedPrefillValuesChanged(
+      { student_attendance_span_percent: 50 },
+      { student_attendance_span_percent: 50 },
+      template
+    ),
+    false
+  );
 });

@@ -1599,23 +1599,17 @@ async function buildInstanceEditorRenderContext(req) {
     const prevPrefill = latestInstance.prefillSnapshot && typeof latestInstance.prefillSnapshot === 'object'
       ? latestInstance.prefillSnapshot
       : {};
-    const ratingPrefillChanged = [
-      'student_session_rating_span_rated_sessions',
-      'student_session_rating_span_class_effort_percent',
-      'student_session_rating_span_class_participation_percent',
-      'student_session_rating_span_respects_teachers_percent',
-      'student_session_rating_span_respects_students_percent'
-    ].some((key) => String(prevPrefill[key] ?? '') !== String(freshPrefill?.[key] ?? ''));
-    const gradebookSkillPrefillChanged = Object.keys(freshPrefill || {}).some((key) => (
-      key.startsWith('student_gradebook_skill_')
-      && String(prevPrefill[key] ?? '') !== String(freshPrefill[key] ?? '')
-    ));
+    const templatePrefillChanged = reportService.templateScopedPrefillValuesChanged(
+      prevPrefill,
+      freshPrefill,
+      template
+    );
     latestInstance = {
       ...latestInstance,
       prefillSnapshot: freshPrefill
     };
     const hydrated = hydrateInitialAnswersFromPrefill(template, latestInstance);
-    if (hydrated.changed || ratingPrefillChanged || gradebookSkillPrefillChanged) {
+    if (hydrated.changed || templatePrefillChanged) {
       latestInstance = await schoolDataService.updateData('reportInstances', latestInstance.id, {
         ...(hydrated.changed ? { answers: hydrated.answers } : {}),
         prefillSnapshot: freshPrefill,

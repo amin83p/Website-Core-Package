@@ -127,12 +127,6 @@
 }) %>
 
 <div class="schedule-shell">
-    <p class="text-muted small mb-3">
-        Review enrolled classes and matching report instances for one or more students.
-        Configure which templates are included in
-        <a href="/school/settings#school-semi-monthly-report">School Settings</a>
-        (<%= typeof configuredTemplateCount !== 'undefined' ? configuredTemplateCount : 0 %> selected).
-    </p>
 
     <div class="card border-0 shadow-sm mb-3">
         <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
@@ -239,10 +233,11 @@
         </div>
         <div class="smmr-export-bulk-panel mt-3 d-none" id="smmrExportOverallBulkPanel">
           <div class="fw-semibold small mb-2"><i class="bi bi-layers me-1"></i>Overall reports (bulk)</div>
+          <div class="js-smmr-overall-bulk-badges mb-2"></div>
           <div class="smmr-export-bulk-toolbar">
-            <button type="button" class="btn btn-outline-primary btn-sm js-smmr-bulk-export" data-format="docx" data-export-scope="overall">DOCX</button>
-            <button type="button" class="btn btn-outline-danger btn-sm js-smmr-bulk-export" data-format="pdf" data-export-scope="overall">PDF</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm js-smmr-bulk-export" data-format="json" data-export-scope="overall">Payload</button>
+            <button type="button" class="btn btn-outline-primary btn-sm js-smmr-bulk-export" data-format="docx" data-export-scope="overall"><i class="bi bi-filetype-docx me-1"></i>DOCX</button>
+            <button type="button" class="btn btn-outline-danger btn-sm js-smmr-bulk-export" data-format="pdf" data-export-scope="overall"><i class="bi bi-filetype-pdf me-1"></i>PDF</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm js-smmr-bulk-export" data-format="json" data-export-scope="overall"><i class="bi bi-braces me-1"></i>Payload</button>
           </div>
         </div>
       </div>
@@ -270,6 +265,50 @@
 
   let selectedStudents = [];
   let smmrExportPlan = null;
+  let smmrExportPlanCacheKey = '';
+
+  function buildSmmrExportPlanCacheKey(filters = {}) {
+    const ids = (Array.isArray(filters.studentIds) ? filters.studentIds : [])
+      .map((id) => String(id || '').trim())
+      .filter(Boolean)
+      .sort()
+      .join(',');
+    return `${String(filters.startDate || '').trim()}|${String(filters.endDate || '').trim()}|${ids}`;
+  }
+
+  function setSmmrExportPlanCache(filters, plan) {
+    smmrExportPlanCacheKey = buildSmmrExportPlanCacheKey(filters);
+    smmrExportPlan = plan && typeof plan === 'object' ? plan : null;
+  }
+
+  function clearSmmrExportPlanCache() {
+    smmrExportPlanCacheKey = '';
+    smmrExportPlan = null;
+  }
+
+  async function fetchSmmrExportPlan(filters) {
+    const params = new URLSearchParams();
+    params.set('startDate', filters.startDate);
+    params.set('endDate', filters.endDate);
+    params.set('studentIds', filters.studentIds.join(','));
+    const response = await fetch(`/school/reports/semi-monthly/api/export-plan?${params.toString()}`, {
+      credentials: 'same-origin',
+      headers: { 'X-AJAX-Request': 'true' }
+    });
+    const payload = await response.json();
+    if (!response.ok || payload.status !== 'success') {
+      throw new Error(payload.message || 'Could not load export options.');
+    }
+    setSmmrExportPlanCache(filters, payload.plan || {});
+    return payload.plan || {};
+  }
+
+  function prefetchSmmrExportPlan(filters) {
+    if (!canExportReport || configuredTemplateCount <= 0) return;
+    const key = buildSmmrExportPlanCacheKey(filters);
+    if (key && key === smmrExportPlanCacheKey && smmrExportPlan) return;
+    fetchSmmrExportPlan(filters).catch(() => null);
+  }
 
   function escapeHtml(value) {
     return String(value ?? '')
@@ -701,6 +740,14 @@
         : '<p class="text-muted mb-0">No enrolled classes found for the selected students and date range.</p>';
       document.getElementById('resultsContainer').classList.remove('d-none');
       syncShareUrl();
+      const filterSnapshot = getFilterParams();
+      if (payload.exportPreview && typeof payload.exportPreview === 'object') {
+        setSmmrExportPlanCache(filterSnapshot, payload.exportPreview);
+      } else if (canExportReport) {
+        prefetchSmmrExportPlan(filterSnapshot);
+      } else {
+        clearSmmrExportPlanCache();
+      }
     } catch (error) {
       showReportMessage({ icon: 'error', message: error.message || 'Load failed.' });
     } finally {
@@ -893,6 +940,29 @@
     return parts.join('');
   }
 
+  function buildSmmrFormatBadges(row = {}) {
+    const badges = [];
+    if (row.hasDocx) badges.push('<span class="badge bg-primary-subtle text-primary border">DOCX</span>');
+    if (row.hasPdf) badges.push('<span class="badge bg-danger-subtle text-danger border">PDF</span>');
+    if (row.hasPayload !== false) badges.push('<span class="badge bg-secondary-subtle text-secondary border">Payload</span>');
+    return badges.length ? `<div class="d-flex flex-wrap gap-1">${badges.join('')}</div>` : '';
+  }
+
+  function applySmmrBulkFormatVisibility(panel, flags = {}) {
+    if (!panel) return false;
+    let visibleCount = 0;
+    panel.querySelectorAll('.js-smmr-bulk-export').forEach((btn) => {
+      const format = String(btn.getAttribute('data-format') || '').trim().toLowerCase();
+      let show = false;
+      if (format === 'docx') show = Boolean(flags.hasDocx);
+      else if (format === 'pdf') show = Boolean(flags.hasPdf);
+      else if (format === 'json') show = flags.hasPayload !== false;
+      btn.classList.toggle('d-none', !show);
+      if (show) visibleCount += 1;
+    });
+    return visibleCount > 0;
+  }
+
   function buildSmmrFormatButtons(row = {}, exportType = 'instance') {
     const personId = String(row.personId || row.studentId || '').trim();
     if (exportType === 'instance') {
@@ -904,9 +974,15 @@
       ? `data-overall-template-id="${escapeHtml(overallTemplateId)}"`
       : `data-instance-id="${escapeHtml(instanceId)}"`;
     const parts = [];
-    if (row.hasDocx) parts.push(`<button type="button" class="btn btn-outline-primary btn-sm py-0 js-smmr-row-export" data-format="docx" data-export-type="${exportType}" data-student-id="${escapeHtml(personId)}" ${idAttr}>DOCX</button>`);
-    if (row.hasPdf) parts.push(`<button type="button" class="btn btn-outline-danger btn-sm py-0 js-smmr-row-export" data-format="pdf" data-export-type="${exportType}" data-student-id="${escapeHtml(personId)}" ${idAttr}>PDF</button>`);
-    if (row.hasPayload !== false) parts.push(`<button type="button" class="btn btn-outline-secondary btn-sm py-0 js-smmr-row-export" data-format="json" data-export-type="${exportType}" data-student-id="${escapeHtml(personId)}" ${idAttr}>JSON</button>`);
+    if (row.hasDocx) {
+      parts.push(`<button type="button" class="btn btn-outline-primary btn-sm py-0 js-smmr-row-export" data-format="docx" data-export-type="${exportType}" data-student-id="${escapeHtml(personId)}" ${idAttr}><i class="bi bi-filetype-docx me-1"></i>DOCX</button>`);
+    }
+    if (row.hasPdf) {
+      parts.push(`<button type="button" class="btn btn-outline-danger btn-sm py-0 js-smmr-row-export" data-format="pdf" data-export-type="${exportType}" data-student-id="${escapeHtml(personId)}" ${idAttr}><i class="bi bi-filetype-pdf me-1"></i>PDF</button>`);
+    }
+    if (row.hasPayload !== false) {
+      parts.push(`<button type="button" class="btn btn-outline-secondary btn-sm py-0 js-smmr-row-export" data-format="json" data-export-type="${exportType}" data-student-id="${escapeHtml(personId)}" ${idAttr}><i class="bi bi-braces me-1"></i>Payload</button>`);
+    }
     return parts.length ? `<div class="d-flex flex-wrap gap-1 mt-1">${parts.join('')}</div>` : '';
   }
 
@@ -918,7 +994,23 @@
     document.getElementById('smmrExportEmpty')?.classList.toggle('d-none', exportableCount > 0 || hasOverall);
     document.getElementById('smmrExportTableWrap')?.classList.toggle('d-none', !students.length);
     document.getElementById('smmrExportOverallHeader')?.classList.toggle('d-none', !hasOverall);
-    document.getElementById('smmrExportOverallBulkPanel')?.classList.toggle('d-none', !hasOverall);
+
+    const overallBulkFormats = plan.overallBulkExportFormats || (() => {
+      const templates = Array.isArray(plan.overallReportTemplates) ? plan.overallReportTemplates : [];
+      return {
+        hasDocx: templates.some((row) => row.hasDocx),
+        hasPdf: templates.some((row) => row.hasPdf),
+        hasPayload: templates.some((row) => row.hasPayload !== false)
+      };
+    })();
+    const overallBulkPanel = document.getElementById('smmrExportOverallBulkPanel');
+    const overallBulkBadges = overallBulkPanel?.querySelector('.js-smmr-overall-bulk-badges');
+    if (overallBulkBadges) {
+      overallBulkBadges.innerHTML = buildSmmrFormatBadges(overallBulkFormats);
+    }
+    const overallBulkVisible = hasOverall && applySmmrBulkFormatVisibility(overallBulkPanel, overallBulkFormats);
+    overallBulkPanel?.classList.toggle('d-none', !overallBulkVisible);
+
     const body = document.getElementById('smmrExportTableBody');
     if (!body) return;
     body.innerHTML = students.map((student) => {
@@ -1076,27 +1168,24 @@
     if (!filters) return;
     const modalEl = document.getElementById('smmrExportModal');
     if (!modalEl || !window.bootstrap?.Modal) return;
+    const dateRangeEl = document.getElementById('smmrExportDateRange');
+    const cacheKey = buildSmmrExportPlanCacheKey(filters);
+    const hasCachedPlan = cacheKey && cacheKey === smmrExportPlanCacheKey && smmrExportPlan;
     window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    if (hasCachedPlan) {
+      document.getElementById('smmrExportLoading')?.classList.add('d-none');
+      if (dateRangeEl) dateRangeEl.textContent = `${filters.startDate} → ${filters.endDate}`;
+      renderSmmrExportPlan(smmrExportPlan);
+      return;
+    }
     document.getElementById('smmrExportLoading')?.classList.remove('d-none');
     document.getElementById('smmrExportEmpty')?.classList.add('d-none');
     document.getElementById('smmrExportTableWrap')?.classList.add('d-none');
-    const dateRangeEl = document.getElementById('smmrExportDateRange');
     if (dateRangeEl) dateRangeEl.textContent = `${filters.startDate} → ${filters.endDate} · loading…`;
     try {
-      const params = new URLSearchParams();
-      params.set('startDate', filters.startDate);
-      params.set('endDate', filters.endDate);
-      params.set('studentIds', filters.studentIds.join(','));
-      const response = await fetch(`/school/reports/semi-monthly/api/export-plan?${params.toString()}`, {
-        credentials: 'same-origin',
-        headers: { 'X-AJAX-Request': 'true' }
-      });
-      const payload = await response.json();
-      if (!response.ok || payload.status !== 'success') {
-        throw new Error(payload.message || 'Could not load export options.');
-      }
+      const plan = await fetchSmmrExportPlan(filters);
       if (dateRangeEl) dateRangeEl.textContent = `${filters.startDate} → ${filters.endDate}`;
-      renderSmmrExportPlan(payload.plan || {});
+      renderSmmrExportPlan(plan);
     } catch (error) {
       showReportMessage({ icon: 'error', message: error.message || 'Could not load export options.' });
     } finally {
@@ -1193,6 +1282,15 @@
   });
   document.getElementById('btn_exportSmmr')?.addEventListener('click', () => {
     openSmmrExportPanel().catch((error) => showReportMessage({ icon: 'error', message: error.message || 'Export failed.' }));
+  });
+  let smmrExportPrefetchTimer = null;
+  document.getElementById('btn_exportSmmr')?.addEventListener('mouseenter', () => {
+    const filters = validateSmmrFilters();
+    if (!filters) return;
+    smmrExportPrefetchTimer = window.setTimeout(() => prefetchSmmrExportPlan(filters), 180);
+  });
+  document.getElementById('btn_exportSmmr')?.addEventListener('mouseleave', () => {
+    if (smmrExportPrefetchTimer) window.clearTimeout(smmrExportPrefetchTimer);
   });
   document.getElementById('smmrExportModal')?.addEventListener('click', (event) => {
     const rowBtn = event.target.closest('.js-smmr-row-export');

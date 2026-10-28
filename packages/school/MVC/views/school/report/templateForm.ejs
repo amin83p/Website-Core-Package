@@ -1362,6 +1362,28 @@
       window.GenericPicker.open(pickerConfig({ sourceMode: 'local', multiselect: false, limit: 5000, ...config }));
     }
 
+    function resolveTemplateFieldLabelForPrefillKeyClient(key = '') {
+      const normalized = normalizeSnapshotKeyToken(key);
+      if (!normalized) return '';
+      const lower = normalized.toLowerCase();
+      const fields = Array.isArray(fieldsState) ? fieldsState : [];
+      for (const field of fields) {
+        if (isVisualOnlyType(field?.type)) continue;
+        const prefillKey = normalizeSnapshotKeyToken(String(field?.prefillKey || '').trim());
+        if (prefillKey && prefillKey.toLowerCase() === lower) {
+          const label = String(field?.label || '').trim();
+          if (label) return label;
+        }
+      }
+      return '';
+    }
+
+    function resolvePrefillSuggestionLabel(key = '') {
+      return resolveTemplateFieldLabelForPrefillKeyClient(key)
+        || lookupPrefillCatalogLabel(key)
+        || normalizeSnapshotKeyToken(key);
+    }
+
     function prefillCatalogItems() {
       const groups = [
         { key: 'common', label: 'Common' },
@@ -1380,14 +1402,15 @@
         rows.forEach((row) => {
           const key = String(row?.key || '').trim();
           if (!key) return;
+          const suggestionLabel = resolvePrefillSuggestionLabel(key);
           items.push({
             id: `${group.key}|${key}`,
             key,
-            label: String(row?.label || key).trim(),
+            label: suggestionLabel,
             description: String(row?.description || '').trim(),
             group: group.label,
             origin: 'catalog',
-            title: String(row?.label || key).trim()
+            title: suggestionLabel
           });
         });
       });
@@ -1428,6 +1451,16 @@
           input.focus();
         }
       });
+    }
+
+    function refreshPrefillKeyOptionsDatalist() {
+      const datalist = document.getElementById('prefillKeyOptions');
+      if (!datalist) return;
+      datalist.innerHTML = prefillCatalogItems().map((item) => {
+        const key = escapeHtml(item.key);
+        const label = escapeHtml(resolvePrefillSuggestionLabel(item.key));
+        return `<option value="${key}">${label}</option>`;
+      }).join('');
     }
 
     function defaultField() {
@@ -1936,6 +1969,7 @@ num(value) <= 95</code></pre>
     function renderFieldRows() {
       if (!Array.isArray(fieldsState) || !fieldsState.length) {
         tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No fields yet. Click "Add Field" to start.</td></tr>';
+        refreshPrefillKeyOptionsDatalist();
         return;
       }
 
@@ -2009,6 +2043,7 @@ num(value) <= 95</code></pre>
           </tr>
         `;
       }).join('');
+      refreshPrefillKeyOptionsDatalist();
     }
 
     function collect() {
@@ -2185,6 +2220,8 @@ num(value) <= 95</code></pre>
     function resolveSnapshotKeyLabelClient(key = '') {
       const normalized = normalizeSnapshotKeyToken(key);
       if (!normalized) return '';
+      const fieldLabel = resolveTemplateFieldLabelForPrefillKeyClient(normalized);
+      if (fieldLabel) return fieldLabel;
       if (snapshotKeyLabelsState[normalized]) return String(snapshotKeyLabelsState[normalized]).trim();
       const lower = normalized.toLowerCase();
       const stored = Object.entries(snapshotKeyLabelsState).find(([labelKey]) => (
@@ -2393,7 +2430,6 @@ num(value) <= 95</code></pre>
       if (exists) return false;
       snapshotKeysState.push(key);
       const resolvedLabel = String(label || '').trim()
-        || lookupPrefillCatalogLabel(key)
         || resolveSnapshotKeyLabelClient(key);
       if (resolvedLabel && resolvedLabel.toLowerCase() !== key.toLowerCase()) {
         snapshotKeyLabelsState[key] = resolvedLabel;
@@ -2472,7 +2508,7 @@ num(value) <= 95</code></pre>
         return false;
       }
       const label = String(item?.label || item?.title || '').trim()
-        || lookupPrefillCatalogLabel(key);
+        || resolvePrefillSuggestionLabel(key);
       return addSnapshotKey(key, label);
     }
 
@@ -2481,14 +2517,15 @@ num(value) <= 95</code></pre>
       prefillCatalogItems().forEach((item) => {
         const key = normalizeSnapshotKeyToken(item?.key || '');
         if (!key) return;
+        const suggestionLabel = resolvePrefillSuggestionLabel(key);
         byKey.set(key.toLowerCase(), {
           id: `catalog|${key}`,
           key,
-          label: String(item?.label || key).trim(),
+          label: suggestionLabel,
           description: String(item?.description || '').trim(),
           group: String(item?.group || 'Catalog').trim(),
           origin: 'catalog',
-          title: String(item?.label || key).trim()
+          title: suggestionLabel
         });
       });
       buildCanonicalSnapshotSuggestions(collect()).forEach((row) => {
@@ -3826,6 +3863,7 @@ num(value) <= 95</code></pre>
 
     initializeState();
     renderFieldRows();
+    refreshPrefillKeyOptionsDatalist();
     applyPrefillFilter();
   })();
 </script>

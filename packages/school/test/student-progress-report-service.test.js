@@ -70,6 +70,8 @@ test('one student in two classes stays in two class blocks', () => {
   assert.equal(students[0].classes[1].classId, 'class-science');
   assert.equal(students[0].classes[0].weeks[0].sessions[0].sessionId, 'math-1');
   assert.equal(students[0].classes[1].weeks[0].sessions[0].sessionId, 'science-1');
+  assert.equal(students[0].classes[0].weeks[0].punctuality.punctualityPercent, 100);
+  assert.equal(students[0].classes[0].punctuality.punctualityPercent, 100);
 });
 
 test('a week with no expected sessions is omitted', () => {

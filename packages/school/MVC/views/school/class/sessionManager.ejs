@@ -2904,8 +2904,8 @@
                             <h5 class="m-0 fw-bold text-primary"><i class="bi bi-clipboard-check me-2"></i>Session reports</h5>
                             <div class="small text-muted mt-1">Fill assigned reports for students selected on each report assignment.</div>
                         </div>
-                        <% if (hasSessionReportsAssignedFlag) { %>
-                        <div class="d-flex flex-wrap gap-2">
+                        <% if (canAssignSessionReports || hasSessionReportsAssignedFlag) { %>
+                        <div id="sessionReportsHeaderActions" class="d-flex flex-wrap gap-2<%= hasSessionReportsAssignedFlag ? '' : ' d-none' %>">
                             <% if (canAssignSessionReports) { %>
                                 <button type="button" class="btn btn-outline-primary btn-sm" id="btnOpenSessionReportAssignmentModal"><i class="bi bi-file-earmark-plus me-1"></i>Assign Report</button>
                             <% } %>
@@ -2914,9 +2914,21 @@
                         <% } %>
                     </div>
 
-                    <% if (hasSessionReportsAssignedFlag) { %>
-                        <% if (sessionHasConductRequiredReportsResolved && canManageReportClassConductFlag && !conductSectionReadOnly) { %>
-                        <div class="session-panel-cta-zone session-panel-cta-zone--primary" id="sessionReportConductCtaZone">
+                    <div id="sessionReportsEmptyState" class="card-body py-4<%= hasSessionReportsAssignedFlag ? ' d-none' : '' %>">
+                            <div class="session-placeholder-card mb-0">
+                                <div class="fw-semibold text-dark mb-1">No reports assigned yet</div>
+                                <div class="small text-muted mb-3">Assign a report to this session to unlock report filling.</div>
+                                <% if (canAssignSessionReports) { %>
+                                <button type="button" class="btn btn-outline-primary session-panel-open-btn w-100" id="btnOpenSessionReportAssignmentModalEmpty">
+                                    <i class="bi bi-file-earmark-plus me-2"></i>Assign Report
+                                </button>
+                                <% } %>
+                            </div>
+                    </div>
+
+                    <div id="sessionReportsAssignedState" class="<%= hasSessionReportsAssignedFlag ? '' : 'd-none' %>">
+                        <% if (canManageReportClassConductFlag && !conductSectionReadOnly) { %>
+                        <div class="session-panel-cta-zone session-panel-cta-zone--primary<%= sessionHasConductRequiredReportsResolved ? '' : ' d-none' %>" id="sessionReportConductCtaZone">
                             <button type="button" class="btn btn-outline-primary session-panel-open-btn w-100" id="btnOpenConductBulkModal">
                                 <i class="bi bi-lightning-charge me-2"></i>Quick rate class conduct
                             </button>
@@ -2964,60 +2976,48 @@
                                 </div>
                             </div>
                         </div>
-                    <% } else { %>
-                        <div class="card-body py-4">
-                            <div class="session-placeholder-card mb-0">
-                                <div class="fw-semibold text-dark mb-1">No reports assigned yet</div>
-                                <div class="small text-muted mb-3">Assign a report to this session to unlock report filling.</div>
-                                <% if (canAssignSessionReports) { %>
-                                <button type="button" class="btn btn-outline-primary session-panel-open-btn w-100" id="btnOpenSessionReportAssignmentModalEmpty">
-                                    <i class="bi bi-file-earmark-plus me-2"></i>Assign Report
-                                </button>
-                                <% } %>
-                            </div>
-                        </div>
-                    <% } %>
-                </div>
-
-                <% if (hasSessionReportsAssignedFlag && sessionHasConductRequiredReportsResolved && canManageReportClassConductFlag) { %>
-                <div class="d-none" id="sessionReportConductDataHost">
-                    <table class="table table-hover align-middle mb-0" id="conductTable">
-                        <thead class="table-light">
-                            <tr>
-                                <th class="ps-4">Student Name</th>
-                                <% conductDimensions.forEach((dim) => { %>
-                                    <th class="text-center <%= dim.peClass %>"><div><%= dim.label %></div></th>
-                                <% }) %>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <% if (reportConductStudents.length === 0) { %>
-                                <tr><td colspan="5" class="text-center py-4 text-muted">No students are selected for reports on this session.</td></tr>
-                            <% } else { %>
-                                <% reportConductStudents.forEach((student) => { %>
-                                    <tr class="conduct-row" data-personid="<%= student.personId %>" data-student-name="<%= student.name %>">
-                                        <td class="ps-4 fw-bold align-middle">
-                                            <%- include('school/partials/studentNameLink', { name: student.name, studentRecordId: student.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %>
-                                        </td>
+                        <% if (canManageReportClassConductFlag) { %>
+                        <div class="d-none" id="sessionReportConductDataHost">
+                            <table class="table table-hover align-middle mb-0" id="conductTable">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="ps-4">Student Name</th>
                                         <% conductDimensions.forEach((dim) => { %>
-                                            <td class="text-center <%= dim.peClass %>">
-                                                <div class="conduct-rating-cell" data-dimension="<%= dim.key %>">
-                                                    <div class="conduct-emoji-picker" role="group" aria-label="<%= dim.label %> rating">
-                                                        <% conductPickerLevels.forEach((level) => { %>
-                                                            <button type="button" class="conduct-emoji-btn conduct-code-btn" data-code="<%= level.code %>" title="<%= level.label %><%= level.minPercent != null ? (' (' + level.minPercent + '%–' + level.maxPercent + '%)') : '' %>"><%= level.displayCode || level.code %></button>
-                                                        <% }) %>
-                                                    </div>
-                                                    <input type="number" class="form-control form-control-sm conduct-percent-input conduct-rating-input <%= dim.className %>" min="0" max="100" step="0.5" value="<%= resolveConductPrefillValue(student, dim.valueKey) %>" <%= conductSectionReadOnly ? 'disabled' : '' %>>
-                                                </div>
-                                            </td>
+                                            <th class="text-center <%= dim.peClass %>"><div><%= dim.label %></div></th>
                                         <% }) %>
                                     </tr>
-                                <% }) %>
-                            <% } %>
-                        </tbody>
-                    </table>
+                                </thead>
+                                <tbody>
+                                    <% if (sessionHasConductRequiredReportsResolved && reportConductStudents.length === 0) { %>
+                                        <tr><td colspan="5" class="text-center py-4 text-muted">No students are selected for reports on this session.</td></tr>
+                                    <% } else if (sessionHasConductRequiredReportsResolved) { %>
+                                        <% reportConductStudents.forEach((student) => { %>
+                                            <tr class="conduct-row" data-personid="<%= student.personId %>" data-student-name="<%= student.name %>">
+                                                <td class="ps-4 fw-bold align-middle">
+                                                    <%- include('school/partials/studentNameLink', { name: student.name, studentRecordId: student.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %>
+                                                </td>
+                                                <% conductDimensions.forEach((dim) => { %>
+                                                    <td class="text-center <%= dim.peClass %>">
+                                                        <div class="conduct-rating-cell" data-dimension="<%= dim.key %>">
+                                                            <div class="conduct-emoji-picker" role="group" aria-label="<%= dim.label %> rating">
+                                                                <% conductPickerLevels.forEach((level) => { %>
+                                                                    <button type="button" class="conduct-emoji-btn conduct-code-btn" data-code="<%= level.code %>" title="<%= level.label %><%= level.minPercent != null ? (' (' + level.minPercent + '%–' + level.maxPercent + '%)') : '' %>"><%= level.displayCode || level.code %></button>
+                                                                <% }) %>
+                                                            </div>
+                                                            <input type="number" class="form-control form-control-sm conduct-percent-input conduct-rating-input <%= dim.className %>" min="0" max="100" step="0.5" value="<%= resolveConductPrefillValue(student, dim.valueKey) %>" <%= conductSectionReadOnly ? 'disabled' : '' %>>
+                                                        </div>
+                                                    </td>
+                                                <% }) %>
+                                            </tr>
+                                        <% }) %>
+                                    <% } %>
+                                </tbody>
+                            </table>
+                        </div>
+                        <% } %>
+                    </div>
                 </div>
-                <% } %>
+
             </div>
 
             <div class="session-panel" id="session-panel-book-covering" role="tabpanel">
@@ -4052,7 +4052,7 @@ function formatSchoolInstant(value) {
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-    const actionStateId = <%- jsonForScript((typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '') %>;
+    let actionStateId = <%- jsonForScript((typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '') %>;
     const csrfToken = <%- jsonForScript((typeof csrfToken !== 'undefined' && csrfToken) ? csrfToken : '') %>;
     const defaultSessionStatusCode = <%- jsonForScript(fallbackStatusCode) %>;
     const sessionInitialStatusCode = <%- jsonForScript(currentSessionStatus) %>;
@@ -5246,8 +5246,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const CONDUCT_SCALE_FALLBACK_LEVELS = <%- jsonForScript(conductScaleDefaultLevels) %>;
     const CONDUCT_NA_LEVEL = <%- jsonForScript(conductNaLevel) %>;
     let sessionConductReadyForReports = <%- jsonForScript(Boolean(conductReadyForReports)) %>;
-    const sessionHasConductRequiredReports = <%- jsonForScript(Boolean(sessionHasConductRequiredReportsResolved)) %>;
-    const hasSessionReportsAssigned = <%- jsonForScript(Boolean(hasSessionReportsAssignedFlag)) %>;
+    let sessionHasConductRequiredReports = <%- jsonForScript(Boolean(sessionHasConductRequiredReportsResolved)) %>;
+    let hasSessionReportsAssigned = <%- jsonForScript(Boolean(hasSessionReportsAssignedFlag)) %>;
     const REPORT_CONDUCT_TABLE_SELECTOR = '#sessionReportConductDataHost #conductTable';
     const optionalConductRosterSeed = <%- jsonForScript((session.roster || []).map((student) => ({
         personId: String(student.personId || ''),
@@ -5943,6 +5943,59 @@ document.addEventListener('DOMContentLoaded', () => {
             ${cells}
             ${removeCell}
         </tr>`;
+    }
+
+    function buildReportConductRowHtml(student) {
+        const personId = String(student?.personId || '').trim();
+        const name = String(student?.name || personId);
+        const cells = (conductDimensionMeta || []).map((dim) => {
+            const percent = normalizeConductPercent(student?.[dim.valueKey], null);
+            const valueAttr = percent === null ? '' : String(percent);
+            return `<td class="text-center ${conductEscapeHtml(dim.peClass || '')}">
+                <div class="conduct-rating-cell" data-dimension="${conductEscapeHtml(dim.key)}">
+                    <div class="conduct-emoji-picker" role="group" aria-label="${conductEscapeHtml(dim.label)} rating">
+                        ${getConductPickerLevels().map((level) => {
+                            const title = level.code === 'NA'
+                                ? conductEscapeHtml(level.label)
+                                : `${conductEscapeHtml(level.label)} (${level.minPercent}%–${level.maxPercent}%)`;
+                            return `<button type="button" class="conduct-emoji-btn conduct-code-btn" data-code="${conductEscapeHtml(level.code)}" title="${title}">${conductEscapeHtml(conductDisplayCode(level))}</button>`;
+                        }).join('')}
+                    </div>
+                    <input type="number" class="form-control form-control-sm conduct-percent-input conduct-rating-input ${conductEscapeHtml(dim.className || '')}" min="0" max="100" step="0.5" value="${conductEscapeHtml(valueAttr)}"${sessionConductReadOnly ? ' disabled' : ''}>
+                </div>
+            </td>`;
+        }).join('');
+        return `<tr class="conduct-row" data-personid="${conductEscapeHtml(personId)}" data-student-name="${conductEscapeHtml(name)}">
+            <td class="ps-4 fw-bold align-middle">${conductEscapeHtml(name)}</td>
+            ${cells}
+        </tr>`;
+    }
+
+    function syncSessionReportConductAfterAssignment(conductPayload) {
+        const payload = conductPayload && typeof conductPayload === 'object' ? conductPayload : {};
+        sessionHasConductRequiredReports = Boolean(payload.sessionHasConductRequiredReports);
+        if (Object.prototype.hasOwnProperty.call(payload, 'conductReadyForReports')) {
+            sessionConductReadyForReports = Boolean(payload.conductReadyForReports);
+        }
+        const ctaZone = document.getElementById('sessionReportConductCtaZone');
+        const conductHost = document.getElementById('sessionReportConductDataHost');
+        const tbody = document.querySelector(`${REPORT_CONDUCT_TABLE_SELECTOR} tbody`);
+        const roster = Array.isArray(payload.reportConductRoster) ? payload.reportConductRoster : [];
+        const conductColspan = Math.max(2, (conductDimensionMeta || []).length + 1);
+        if (ctaZone) {
+            ctaZone.classList.toggle('d-none', !sessionHasConductRequiredReports);
+        }
+        if (sessionHasConductRequiredReports && tbody) {
+            if (!roster.length) {
+                tbody.innerHTML = `<tr><td colspan="${conductColspan}" class="text-center py-4 text-muted">No students are selected for reports on this session.</td></tr>`;
+            } else {
+                tbody.innerHTML = roster.map((student) => buildReportConductRowHtml(student)).join('');
+                initAllConductRatingCells(conductHost || tbody);
+            }
+        }
+        updateSessionConductStepStatusUi();
+        syncReportWorkflowStepUi();
+        renderSessionReportInstances();
     }
 
     function getOptionalConductStudentsInTable() {
@@ -6643,6 +6696,21 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function revealSessionReportsAssignedPanel() {
+        if (hasSessionReportsAssigned) return;
+        hasSessionReportsAssigned = true;
+        document.getElementById('sessionReportsEmptyState')?.classList.add('d-none');
+        document.getElementById('sessionReportsAssignedState')?.classList.remove('d-none');
+        document.getElementById('sessionReportsHeaderActions')?.classList.remove('d-none');
+        const collapseEl = document.getElementById('sessionReportInstancesCollapse');
+        if (collapseEl && window.bootstrap?.Collapse) {
+            const instance = window.bootstrap.Collapse.getOrCreateInstance(collapseEl, { toggle: false });
+            instance.show();
+            document.getElementById('btnToggleSessionReportInstancesTable')?.classList.remove('collapsed');
+            document.getElementById('btnToggleSessionReportInstancesTable')?.setAttribute('aria-expanded', 'true');
+        }
+    }
+
     function renderSessionReportInstances() {
         const body = document.getElementById('sessionReportInstancesBody');
         if (!body) return;
@@ -6752,8 +6820,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 const token = String(result?.actionStateId || '').trim();
                 if (token) actionStateId = token;
                 if (Array.isArray(result.rows)) {
+                    revealSessionReportsAssignedPanel();
                     sessionReportInstancesState = result.rows;
-                    renderSessionReportInstances();
+                    syncSessionReportConductAfterAssignment(result.conduct);
                     renderSessionStatusButtons();
                 } else {
                     await refreshSessionReportInstances();

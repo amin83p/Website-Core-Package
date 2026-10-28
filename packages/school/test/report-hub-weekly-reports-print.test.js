@@ -39,6 +39,12 @@ test('weekly reports student list print uses summary table with engagement and a
   assert.match(reportHubView, /hub-wr-print-student-list-engagement-ring/);
 });
 
+test('weekly reports student print includes punctuality column and donut', () => {
+  assert.match(reportHubView, /renderWeeklyReportsPunctualityCell/);
+  assert.match(reportHubView, /punctuality\.punctualityPercent/);
+  assert.match(reportHubView, /hub-wr-print-punctuality-ring/);
+});
+
 test('weekly reports student detail print uses card, cases, and horizontal sessions', () => {
   assert.match(reportHubView, /function renderWeeklyReportsPrintStudentDetailCard\(/);
   assert.match(reportHubView, /weeklyReportsPrintStudentDetailMode/);

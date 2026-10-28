@@ -160,3 +160,58 @@ test('resolveOverallSlotAssignments is not eligible when two slots need the same
   assert.equal(block.eligible, false);
   assert.equal(block.matchedInstanceIds.length, 1);
 });
+
+test('applyPreviewInstanceExportKeys adds default funder template keys without full enrichment', () => {
+  const policy = { reportTemplateIds: ['tpl-1'], templateExportFormats: { report: {}, overall: {} } };
+  const template = {
+    id: 'tpl-1',
+    docxTemplate: { path: '/uploads/default.docx' },
+    docxTemplatesByFunder: []
+  };
+  const templateMetaMap = new Map([['tpl-1', {
+    templateTitle: 'Class Report',
+    hasDocx: true,
+    hasPdf: false,
+    hasPayload: true,
+    docxOptions: [{ key: 'default', label: 'Default' }],
+    pdfOptions: [],
+    template
+  }]]);
+  const student = {
+    personId: 'P-1',
+    studentRecordId: 'STU-1',
+    name: 'Student',
+    classes: [{ classId: 'CLS-1', instances: [{ id: 'INS-1', templateId: 'tpl-1', exportable: true }] }]
+  };
+  const instanceRows = smmrExportService.flattenInstanceRows(
+    {
+      personId: 'P-1',
+      classes: [{
+        classId: 'CLS-1',
+        className: 'Math',
+        instances: [{
+          id: 'INS-1',
+          templateId: 'tpl-1',
+          sessionDate: '2026-01-10',
+          status: 'submitted',
+          assignmentId: 'ASG-1'
+        }]
+      }]
+    },
+    templateMetaMap,
+    policy
+  );
+  const periodRowsByClassId = new Map();
+  const previewRows = smmrExportService.applyPreviewInstanceExportKeys(
+    instanceRows,
+    student,
+    templateMetaMap,
+    periodRowsByClassId,
+    '2026-01-01',
+    '2026-01-31'
+  );
+  assert.equal(previewRows.length, 1);
+  assert.equal(previewRows[0].exportable, true);
+  assert.equal(previewRows[0].suggestedDocxKey, 'default');
+  assert.ok(Array.isArray(previewRows[0].docxOptions));
+});

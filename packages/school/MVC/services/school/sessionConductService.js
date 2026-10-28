@@ -468,6 +468,126 @@ async function assertAssignmentSessionConductReadyOrThrow({
   assertSessionConductReadyForReportsOrThrow(session, 'this session');
 }
 
+function resolveSessionHasConductRequiredReports({
+  instanceRows = [],
+  sessionMatchedAssignments = [],
+  sessionContext = {}
+} = {}) {
+  const rows = Array.isArray(instanceRows) ? instanceRows : [];
+  if (rows.some((row) => row?.conductRequiredBeforeFill)) {
+    return true;
+  }
+  return (Array.isArray(sessionMatchedAssignments) ? sessionMatchedAssignments : []).some((assignment) => {
+    const activeRows = reportAssignmentSessionUtils.getEffectiveTargetRows(assignment)
+      .filter((row) => String(row?.status || 'active').trim().toLowerCase() === 'active');
+    if (!activeRows.length) {
+      return assignmentRequiresConductBeforeFill(assignment);
+    }
+    return activeRows.some((targetRow) => {
+      const rowAssignment = reportAssignmentSessionUtils.applyTargetRow(assignment, targetRow);
+      if (!reportAssignmentSessionUtils.reportAssignmentMatchesSession(rowAssignment, sessionContext)) {
+        return false;
+      }
+      return assignmentRequiresConductBeforeFill(assignment, { assignmentRowId: targetRow?.rowId });
+    });
+  });
+}
+
+/**
+ * Conduct UI payload for manage-session and post-assignment refresh.
+ * @param {object} args
+ * @returns {{ sessionHasConductRequiredReports: boolean, conductReadyForReports: boolean, reportConductRoster: object[] }}
+ */
+function buildSessionReportConductUiPayload({
+  session = null,
+  sessions = [],
+  sessionRoster = [],
+  assignmentMap = null,
+  instanceRows = [],
+  sessionId = '',
+  classId = '',
+  prefetchedStudents = [],
+  prefetchedPersons = []
+} = {}) {
+  const sessionContext = {
+    classId: String(classId || '').trim(),
+    sessionId: String(sessionId || '').trim(),
+    sessionDate: session?.date
+  };
+  const assignments = assignmentMap instanceof Map
+    ? [...assignmentMap.values()]
+    : (Array.isArray(assignmentMap) ? assignmentMap : []);
+  const sessionMatchedAssignments = assignments.filter((assignment) => (
+    reportAssignmentSessionUtils.reportAssignmentMatchesSession(assignment, sessionContext)
+  ));
+
+  const sessionHasConductRequiredReports = resolveSessionHasConductRequiredReports({
+    instanceRows,
+    sessionMatchedAssignments,
+    sessionContext
+  });
+  const conductReadyForReports = isSessionConductReady(session);
+
+  if (!sessionHasConductRequiredReports) {
+    return {
+      sessionHasConductRequiredReports: false,
+      conductReadyForReports,
+      reportConductRoster: []
+    };
+  }
+
+  const sessionConductReportPeriod = resolveReportPeriodForSession(assignmentMap, sessionId);
+  const reportConductPersonIds = resolveSessionReportConductPersonIds({
+    assignments: sessionMatchedAssignments,
+    sessionContext
+  });
+  const reportConductRoster = buildReportConductRoster({
+    personIds: reportConductPersonIds,
+    sessionRoster,
+    prefetchedStudents,
+    prefetchedPersons
+  });
+  const persistedSession = (Array.isArray(sessions) ? sessions : []).find((row) => (
+    idsEqual(row?.sessionId, sessionId) || String(row?.sessionId || '').trim() === String(sessionId || '').trim()
+  )) || session;
+  const prefillMap = buildConductPrefillMap({
+    roster: reportConductRoster,
+    currentSession: {
+      ...(persistedSession || {}),
+      roster: sessionRoster
+    },
+    allSessions: sessions,
+    periodStart: sessionConductReportPeriod.startDate,
+    periodDue: sessionConductReportPeriod.dueDate
+  });
+
+  const rosterForClient = reportConductRoster.map((row) => {
+    const pid = personKey(row?.personId);
+    const prefill = pid ? (prefillMap.get(pid) || {}) : {};
+    const merged = { ...row };
+    CONDUCT_PERCENT_KEYS.forEach((key) => {
+      if (Object.prototype.hasOwnProperty.call(prefill, key)) {
+        merged[key] = prefill[key];
+      }
+    });
+    return {
+      personId: merged.personId,
+      name: merged.name,
+      studentRecordId: merged.studentRecordId || '',
+      classEffortPercent: merged.classEffortPercent ?? null,
+      classParticipationPercent: merged.classParticipationPercent ?? null,
+      respectsTeachersPercent: merged.respectsTeachersPercent ?? null,
+      respectsStudentsPercent: merged.respectsStudentsPercent ?? null
+    };
+  });
+
+  return {
+    sessionHasConductRequiredReports: true,
+    conductReadyForReports,
+    reportConductRoster: rosterForClient
+  };
+}
+
 module.exports = {
   CONDUCT_PERCENT_KEYS,
   normalizeConductPercent,
@@ -488,5 +608,7 @@ module.exports = {
   assignmentTargetsSession,
   assignmentRequiresConductBeforeFill,
   parseConductRequiredFlag,
-  assertAssignmentSessionConductReadyOrThrow
+  assertAssignmentSessionConductReadyOrThrow,
+  resolveSessionHasConductRequiredReports,
+  buildSessionReportConductUiPayload
 };

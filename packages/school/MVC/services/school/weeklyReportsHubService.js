@@ -6,6 +6,7 @@ const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatri
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const gradebookSkillCatalogService = require('./gradebookSkillCatalogService');
 const weeklyReportsClassMetricsService = require('./weeklyReportsClassMetricsService');
+const studentPunctualityMetricsService = require('./studentPunctualityMetricsService');
 
 function getWeeklyReportsEngagementService() {
   return require('./weeklyReportsEngagementService');
@@ -593,6 +594,7 @@ function mergeStudentDetailIntoMap(studentMap, classId, detailRow = {}) {
     attendanceHealth: 100,
     attendance: emptyStudentAttendanceSummary(),
     engagement: { presentMinutes: 0, scheduledMinutes: 0, percent: null },
+    punctuality: studentPunctualityMetricsService.emptyStudentPunctualitySummary(),
     sessions: [],
     skillAverages: [],
     caseCount: 0,
@@ -623,6 +625,10 @@ function mergeStudentDetailIntoMap(studentMap, classId, detailRow = {}) {
     existing.engagement,
     detailRow.engagement
   );
+  existing.punctuality = studentPunctualityMetricsService.mergeStudentPunctualitySummaries(
+    existing.punctuality,
+    detailRow.punctuality
+  );
   existing.attendanceHealth = mergedHealth;
   existing.sessions = mergedSessions;
   existing.skillAverages = mergeSkillAverages(existing.skillAverages, detailRow.skillAverages);
@@ -642,6 +648,9 @@ function buildWeeklyReportsStudentDetailRow(row = {}) {
   const engagement = row.engagement && typeof row.engagement === 'object'
     ? row.engagement
     : { presentMinutes: 0, scheduledMinutes: 0, percent: null };
+  const punctuality = row.punctuality && typeof row.punctuality === 'object'
+    ? row.punctuality
+    : studentPunctualityMetricsService.emptyStudentPunctualitySummary();
   return {
     studentId: row.studentId,
     personId: row.personId || '',
@@ -653,6 +662,7 @@ function buildWeeklyReportsStudentDetailRow(row = {}) {
     absenceCount: Number(row.absenceCount != null ? row.absenceCount : attendance.absenceCount || 0),
     attendance,
     engagement,
+    punctuality,
     sessions: Array.isArray(row.sessions) ? row.sessions : [],
     skillAverages: Array.isArray(row.skillAverages) ? row.skillAverages : [],
     caseCount: Number(row.caseCount || 0),
@@ -670,7 +680,8 @@ function buildStudentDetailRowFromClass({
   caseRows = [],
   sessionIdSet = new Set(),
   classData = {},
-  orgPolicyLayer = {}
+  orgPolicyLayer = {},
+  statusMap = null
 } = {}) {
   const studentId = toPublicId(matrixRow?.studentRecordId);
   const personId = toPublicId(matrixRow?.personId);
@@ -680,6 +691,12 @@ function buildStudentDetailRowFromClass({
     classData,
     orgPolicyLayer
   );
+  const punctuality = studentPunctualityMetricsService.buildStudentPunctualityFromMatrixRow(matrixRow, {
+    classData,
+    orgPolicyLayer,
+    sessions,
+    statusMap
+  });
   const studentCaseItems = buildStudentCaseItems(
     caseRows,
     personId,
@@ -698,6 +715,7 @@ function buildStudentDetailRowFromClass({
     absenceCount: attendance.absenceCount,
     attendance,
     engagement,
+    punctuality,
     sessions: buildStudentSessionRows(matrixRow, sessions),
     skillAverages: buildStudentSkillAverages(gradesPayload, personId, sessionsById),
     caseCount: studentCaseItems.length || countStudentCases(caseRows, personId, sessionIdSet),
@@ -1123,7 +1141,8 @@ async function buildWeeklyReportsStudentBoard({
           caseRows: classCaseRows,
           sessionIdSet,
           classData: classRow,
-          orgPolicyLayer: orgPolicyCatalog
+          orgPolicyLayer: orgPolicyCatalog,
+          statusMap
         });
         mergeStudentDetailIntoMap(studentMap, classId, detailRow);
       });

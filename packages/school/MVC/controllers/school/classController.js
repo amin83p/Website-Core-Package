@@ -5021,12 +5021,23 @@ async function assignReportToSession(req, res) {
             sessionRoster: enrichedRoster
         });
 
+        const conduct = sessionConductService.buildSessionReportConductUiPayload({
+            session,
+            sessions,
+            sessionRoster: enrichedRoster,
+            assignmentMap: viewerContext.assignmentMap,
+            instanceRows: rows,
+            sessionId,
+            classId
+        });
+
         return res.json({
             status: 'success',
             message: result.message || 'Report assigned to this session.',
             assignmentId: result.assignment?.id || '',
             createdAssignment: Boolean(result.createdAssignment),
             rows,
+            conduct,
             actionStateId: req.actionStateId
         });
     } catch (error) {

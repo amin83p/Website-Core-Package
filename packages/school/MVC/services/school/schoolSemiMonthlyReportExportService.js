@@ -20,6 +20,7 @@ const {
   sortClasses,
   enrichOverallExportOptionsForStudent
 } = studentAttendanceReportGenerationService;
+const { runWithConcurrency } = require('../../utils/asyncPool');
 
 function clean(value = '') {
   return String(value ?? '').trim();
@@ -283,12 +284,136 @@ function buildSmmrOverallExportOptions(student, policy, overallTemplates = []) {
     .filter(Boolean);
 }
 
+function collectUniqueClassIdsFromStudents(students = []) {
+  const ids = new Set();
+  (Array.isArray(students) ? students : []).forEach((student) => {
+    sortClasses(student.classes).forEach((classRow) => {
+      const classId = clean(classRow.classId);
+      if (classId) ids.add(classId);
+    });
+  });
+  return [...ids];
+}
+
+async function loadPeriodRowsByClassIdMap(classIds = [], reqUser) {
+  const map = new Map();
+  const uniqueIds = [...new Set((Array.isArray(classIds) ? classIds : []).map((id) => clean(id)).filter(Boolean))];
+  if (!uniqueIds.length) return map;
+  await runWithConcurrency(uniqueIds, 6, async (classId) => {
+    const rows = await schoolDataService.getClassEnrollmentPeriodsByClassId(classId, reqUser).catch(() => []);
+    map.set(classId, Array.isArray(rows) ? rows : []);
+  });
+  return map;
+}
+
+function resolveStudentFunderContext(student, periodRowsByClassId, startDate, endDate) {
+  const periodRows = [];
+  sortClasses(student.classes).forEach((classRow) => {
+    const rows = periodRowsByClassId instanceof Map ? periodRowsByClassId.get(clean(classRow.classId)) : null;
+    if (Array.isArray(rows)) periodRows.push(...rows);
+  });
+  return reportFunderDocxService.resolveStudentFunderForReportPeriod({
+    periodRows,
+    personId: clean(student.personId),
+    studentId: clean(student.studentRecordId),
+    windowStart: startDate,
+    windowEnd: endDate
+  });
+}
+
+function applyPreviewInstanceExportKeys(instanceRows, student, templateMetaMap, periodRowsByClassId, startDate, endDate) {
+  const funder = resolveStudentFunderContext(student, periodRowsByClassId, startDate, endDate);
+  const funderKey = funder.funderKey || '';
+  return (Array.isArray(instanceRows) ? instanceRows : []).map((row) => {
+    if (!row?.exportable) {
+      return { ...row, suggestedDocxKey: '', suggestedPdfKey: '', funderLabel: '' };
+    }
+    const meta = templateMetaMap.get(clean(row.templateId)) || {};
+    const template = meta.template || null;
+    return {
+      ...row,
+      suggestedDocxKey: template
+        ? reportFunderDocxService.suggestDocxKeyForFunder({ template, funderKey })
+        : 'default',
+      suggestedPdfKey: template
+        ? reportFunderPdfService.suggestPdfKeyForFunder({ template, funderKey })
+        : 'default',
+      funderLabel: clean(funder.funderLabel) || ''
+    };
+  });
+}
+
+function buildExportPlanSummaries(templateIds, templateMetaMap, policy, overallTemplates) {
+  const reportTemplateSummaries = templateIds.map((templateId) => {
+    const meta = templateMetaMap.get(templateId) || {};
+    const effective = studentAttendanceReportExportFormatService.resolveEffectiveClassExportFlags(
+      policy,
+      templateId,
+      meta
+    );
+    return {
+      id: templateId,
+      title: meta.templateTitle || templateId,
+      hasDocx: effective.hasDocx,
+      hasPdf: effective.hasPdf,
+      hasPayload: effective.hasPayload
+    };
+  });
+
+  const overallTemplateSummaries = (Array.isArray(overallTemplates) ? overallTemplates : []).map((template) => {
+    const templateId = clean(template.id);
+    const rawOverallMeta = {
+      hasDocx: overallReportService.templateHasAttachedDocx(template),
+      hasPdf: overallReportService.templateHasAttachedPdf(template)
+    };
+    const effectiveOverall = studentAttendanceReportExportFormatService.resolveEffectiveOverallExportFlags(
+      policy,
+      templateId,
+      rawOverallMeta
+    );
+    return {
+      id: templateId,
+      title: clean(template.title) || templateId,
+      hasDocx: effectiveOverall.hasDocx,
+      hasPdf: effectiveOverall.hasPdf,
+      hasPayload: effectiveOverall.hasPayload
+    };
+  });
+
+  return { reportTemplateSummaries, overallTemplateSummaries };
+}
+
+function finalizeExportPlanShape({
+  startDate,
+  endDate,
+  templateIds,
+  policy,
+  reportTemplateSummaries,
+  overallTemplateSummaries,
+  planStudents
+}) {
+  return {
+    startDate,
+    endDate,
+    reportTemplateIds: templateIds,
+    reportTemplates: reportTemplateSummaries,
+    overallReportTemplateIds: policy.overallReportTemplateIds || [],
+    overallReportTemplates: overallTemplateSummaries,
+    overallBulkExportFormats: {
+      hasDocx: overallTemplateSummaries.some((row) => row.hasDocx),
+      hasPdf: overallTemplateSummaries.some((row) => row.hasPdf),
+      hasPayload: overallTemplateSummaries.some((row) => row.hasPayload !== false)
+    },
+    students: planStudents
+  };
+}
+
 async function loadTemplateMetaMap(templateIds = [], reqUser, policy = {}) {
   const map = new Map();
   const uniqueIds = [...new Set(templateIds.map((id) => clean(id)).filter(Boolean))];
-  for (const templateId of uniqueIds) {
+  await Promise.all(uniqueIds.map(async (templateId) => {
     const template = await schoolDataService.getDataById('reportTemplates', templateId, reqUser);
-    if (!template) continue;
+    if (!template) return;
     const rawMeta = {
       templateTitle: semiMonthlyReportPolicyService.formatTemplateLabel(template, templateId),
       hasDocx: reportFunderDocxService.templateHasAnyDocx(template),
@@ -303,9 +428,10 @@ async function loadTemplateMetaMap(templateIds = [], reqUser, policy = {}) {
       ...rawMeta,
       ...effective,
       docxOptions: reportFunderDocxService.buildAvailableDocxOptions(template),
-      pdfOptions: reportFunderPdfService.buildAvailablePdfOptions(template)
+      pdfOptions: reportFunderPdfService.buildAvailablePdfOptions(template),
+      template
     });
-  }
+  }));
   return map;
 }
 
@@ -331,7 +457,10 @@ async function loadExportContext(req, options = {}) {
     req.user
   );
   const overallTemplateMap = new Map(overallTemplates.map((template) => [clean(template.id), template]));
-  const payload = await schoolSemiMonthlyReportService.buildSemiMonthlyReportPayload(req, options);
+  const payload = options.existingPayload
+    && typeof options.existingPayload === 'object'
+    ? options.existingPayload
+    : await schoolSemiMonthlyReportService.buildSemiMonthlyReportPayload(req, options);
   const students = Array.isArray(payload.students) ? payload.students : [];
   if (!students.length) {
     const error = new Error('No students matched the current filters.');
@@ -389,115 +518,183 @@ function flattenInstanceRows(student, templateMetaMap, policy) {
   return rows;
 }
 
-async function enrichInstanceRowsForExport(student, instanceRows = [], { startDate = '', endDate = '', reqUser } = {}) {
+async function enrichInstanceRowsForExport(student, instanceRows = [], options = {}) {
+  const {
+    startDate = '',
+    endDate = '',
+    reqUser,
+    periodRowsByClassId = null,
+    sharedCaches = null
+  } = options;
   const rows = Array.isArray(instanceRows) ? instanceRows : [];
   const studentRecordId = clean(student?.studentRecordId);
   const personId = clean(student?.personId);
   const studentName = clean(student?.name) || personId;
-  const templateCache = new Map();
-  const assignmentCache = new Map();
-  const instanceCache = new Map();
-  const enriched = [];
+  const templateCache = sharedCaches?.templateCache || new Map();
+  const assignmentCache = sharedCaches?.assignmentCache || new Map();
+  const instanceCache = sharedCaches?.instanceCache || new Map();
+  const suggestionCache = sharedCaches?.suggestionCache || new Map();
+  const orgId = clean(reqUser?.activeOrgId);
+  let funderOptionsPromise = sharedCaches?.funderOptionsPromise || null;
+  if (!funderOptionsPromise && orgId) {
+    funderOptionsPromise = reportFunderDocxService.loadActiveFunderOptions(reqUser, orgId).catch(() => []);
+    if (sharedCaches) sharedCaches.funderOptionsPromise = funderOptionsPromise;
+  }
 
-  for (const row of rows) {
-    if (!row?.exportable) {
-      enriched.push(row);
-      continue;
+  const periodRowsForClass = (classId) => {
+    if (periodRowsByClassId instanceof Map) {
+      return periodRowsByClassId.get(clean(classId)) || [];
     }
-    const templateId = clean(row.templateId);
-    const instanceId = clean(row.instanceId);
+    return [];
+  };
+
+  async function resolveSuggestionForGroup(groupRows = [], template, effectiveAssignment) {
+    if (!template || !groupRows.length) return new Map();
+    const groupKey = [
+      clean(template.id),
+      clean(effectiveAssignment?.id || effectiveAssignment?.assignmentId),
+      clean(groupRows[0]?.classId)
+    ].join('|');
+    if (suggestionCache.has(groupKey)) {
+      return suggestionCache.get(groupKey);
+    }
+    const classId = clean(groupRows[0]?.classId);
+    const periodRows = periodRowsForClass(classId);
+    const funderOptions = funderOptionsPromise ? await funderOptionsPromise : [];
+    const suggestionStudent = {
+      studentId: studentRecordId,
+      personId,
+      studentName
+    };
+    const [docxSuggestions, pdfSuggestions] = await Promise.all([
+      reportFunderDocxService.buildExportDocxSuggestions({
+        template,
+        assignment: effectiveAssignment,
+        reqUser,
+        windowStart: startDate,
+        windowEnd: endDate,
+        students: [suggestionStudent],
+        cachedPeriodRows: periodRows,
+        cachedFunderOptions: funderOptions
+      }).catch(() => ({ rows: [] })),
+      reportFunderPdfService.buildExportPdfSuggestions({
+        template,
+        assignment: effectiveAssignment,
+        reqUser,
+        windowStart: startDate,
+        windowEnd: endDate,
+        students: [suggestionStudent],
+        cachedPeriodRows: periodRows,
+        cachedFunderOptions: funderOptions
+      }).catch(() => ({ rows: [] }))
+    ]);
+    const docxRow = (docxSuggestions.rows || [])[0] || {};
+    const pdfRow = (pdfSuggestions.rows || [])[0] || {};
+    const resolved = {
+      suggestedDocxKey: clean(docxRow.suggestedDocxKey)
+        || reportFunderDocxService.suggestDocxKeyForFunder({ template, funderKey: docxRow.funderKey }),
+      suggestedPdfKey: clean(pdfRow.suggestedPdfKey)
+        || reportFunderPdfService.suggestPdfKeyForFunder({ template, funderKey: pdfRow.funderKey }),
+      funderLabel: clean(docxRow.funderLabel)
+    };
+    suggestionCache.set(groupKey, resolved);
+    return resolved;
+  }
+
+  const exportableRows = rows.filter((row) => row?.exportable);
+  const groups = new Map();
+  exportableRows.forEach((row) => {
+    const groupKey = [
+      clean(row.templateId),
+      clean(row.assignmentId),
+      clean(row.classId)
+    ].join('|');
+    if (!groups.has(groupKey)) groups.set(groupKey, []);
+    groups.get(groupKey).push(row);
+  });
+
+  const groupSuggestionByKey = new Map();
+  await runWithConcurrency([...groups.entries()], 4, async ([groupKey, groupRows]) => {
+    const templateId = clean(groupRows[0]?.templateId);
     let template = templateCache.get(templateId);
     if (!template && templateId) {
-      // eslint-disable-next-line no-await-in-loop
       template = await schoolDataService.getDataById('reportTemplates', templateId, reqUser);
       templateCache.set(templateId, template);
     }
-
+    const sampleRow = groupRows[0];
+    const instanceId = clean(sampleRow?.instanceId);
     let instanceRecord = instanceCache.get(instanceId);
     if (!instanceRecord && instanceId) {
-      // eslint-disable-next-line no-await-in-loop
       instanceRecord = await schoolDataService.getDataById('reportInstances', instanceId, reqUser);
       instanceCache.set(instanceId, instanceRecord);
     }
-
-    const assignmentId = clean(row.assignmentId || instanceRecord?.assignmentId);
+    const assignmentId = clean(sampleRow?.assignmentId || instanceRecord?.assignmentId);
     let assignment = assignmentCache.get(assignmentId);
     if (!assignment && assignmentId) {
-      // eslint-disable-next-line no-await-in-loop
       assignment = await schoolDataService.getDataById('reportAssignments', assignmentId, reqUser);
       assignmentCache.set(assignmentId, assignment);
     }
-
     const effectiveAssignment = reportViewService.applyAssignmentRow(
       assignment,
       reportViewService.findAssignmentRow(assignment, instanceRecord?.assignmentRowId || '')
     );
+    const assignmentForSuggestion = effectiveAssignment && typeof effectiveAssignment === 'object'
+      ? {
+        ...effectiveAssignment,
+        classId: clean(effectiveAssignment.classId) || clean(sampleRow?.classId)
+      }
+      : { classId: clean(sampleRow?.classId) };
+    const resolved = await resolveSuggestionForGroup(groupRows, template, assignmentForSuggestion);
+    groupSuggestionByKey.set(groupKey, { template, resolved });
+  });
 
+  return rows.map((row) => {
+    if (!row?.exportable) return row;
+    const groupKey = [
+      clean(row.templateId),
+      clean(row.assignmentId),
+      clean(row.classId)
+    ].join('|');
+    const groupData = groupSuggestionByKey.get(groupKey) || {};
+    const template = groupData.template || templateCache.get(clean(row.templateId));
+    const resolved = groupData.resolved || {};
     const docxOptions = Array.isArray(row.docxOptions) && row.docxOptions.length
       ? row.docxOptions
       : (template ? reportFunderDocxService.buildAvailableDocxOptions(template) : []);
     const pdfOptions = Array.isArray(row.pdfOptions) && row.pdfOptions.length
       ? row.pdfOptions
       : (template ? reportFunderPdfService.buildAvailablePdfOptions(template) : []);
-
-    let suggestedDocxKey = '';
-    let suggestedPdfKey = '';
-    let funderLabel = '';
-    if (template) {
-      const suggestionStudent = {
-        studentId: studentRecordId || clean(instanceRecord?.studentId),
-        personId,
-        instanceId,
-        studentName
-      };
-      // eslint-disable-next-line no-await-in-loop
-      const docxSuggestions = await reportFunderDocxService.buildExportDocxSuggestions({
-        template,
-        assignment: effectiveAssignment,
-        reqUser,
-        windowStart: startDate,
-        windowEnd: endDate,
-        students: [suggestionStudent]
-      });
-      const docxRow = (docxSuggestions.rows || [])[0] || {};
-      suggestedDocxKey = clean(docxRow.suggestedDocxKey)
-        || reportFunderDocxService.suggestDocxKeyForFunder({ template, funderKey: docxRow.funderKey });
-      funderLabel = clean(docxRow.funderLabel);
-
-      // eslint-disable-next-line no-await-in-loop
-      const pdfSuggestions = await reportFunderPdfService.buildExportPdfSuggestions({
-        template,
-        assignment: effectiveAssignment,
-        reqUser,
-        windowStart: startDate,
-        windowEnd: endDate,
-        students: [suggestionStudent]
-      });
-      const pdfRow = (pdfSuggestions.rows || [])[0] || {};
-      suggestedPdfKey = clean(pdfRow.suggestedPdfKey)
-        || reportFunderPdfService.suggestPdfKeyForFunder({ template, funderKey: pdfRow.funderKey });
-    }
-
-    enriched.push({
+    return {
       ...row,
       docxOptions,
       pdfOptions,
-      suggestedDocxKey,
-      suggestedPdfKey,
-      funderLabel
-    });
-  }
-
-  return enriched;
+      suggestedDocxKey: resolved.suggestedDocxKey || '',
+      suggestedPdfKey: resolved.suggestedPdfKey || '',
+      funderLabel: resolved.funderLabel || ''
+    };
+  });
 }
 
-async function buildSemiMonthlyReportExportPlan(req, options = {}) {
-  const ctx = await loadExportContext(req, options);
+async function buildPlanStudentsFromContext(
+  ctx,
+  reqUser,
+  templateMetaMap,
+  periodRowsByClassId,
+  enrichMode = 'preview',
+  instanceIdsToEnrich = null
+) {
   const { policy, overallTemplates, students, startDate, endDate } = ctx;
-  const templateIds = semiMonthlyReportPolicyService.normalizeIdList(policy.reportTemplateIds);
-  const templateMetaMap = await loadTemplateMetaMap(templateIds, req.user, policy);
-
+  const enrichSet = instanceIdsToEnrich instanceof Set ? instanceIdsToEnrich : null;
+  const sharedCaches = (enrichMode === 'full' || (enrichSet && enrichSet.size))
+    ? {
+      templateCache: new Map(),
+      assignmentCache: new Map(),
+      instanceCache: new Map(),
+      suggestionCache: new Map()
+    }
+    : null;
   const planStudents = [];
+
   for (const student of students) {
     let overallOptions = buildSmmrOverallExportOptions(student, policy, overallTemplates);
     const classRows = sortClasses(student.classes).map((classRow) => ({
@@ -512,16 +709,57 @@ async function buildSemiMonthlyReportExportPlan(req, options = {}) {
       policy,
       startDate,
       endDate,
-      reqUser: req.user
+      reqUser,
+      periodRowsByClassId
     });
     const overall = overallOptions.find((option) => option.eligible) || overallOptions[0] || null;
     const instanceRows = flattenInstanceRows(student, templateMetaMap, policy);
-    // eslint-disable-next-line no-await-in-loop
-    const instances = await enrichInstanceRowsForExport(student, instanceRows, {
-      startDate,
-      endDate,
-      reqUser: req.user
-    });
+
+    let instances;
+    if (enrichMode === 'full') {
+      // eslint-disable-next-line no-await-in-loop
+      instances = await enrichInstanceRowsForExport(student, instanceRows, {
+        startDate,
+        endDate,
+        reqUser,
+        periodRowsByClassId,
+        sharedCaches
+      });
+    } else if (enrichSet && enrichSet.size) {
+      const rowsToEnrich = instanceRows.filter((row) => (
+        row.exportable && enrichSet.has(clean(row.instanceId))
+      ));
+      // eslint-disable-next-line no-await-in-loop
+      const enrichedRows = rowsToEnrich.length
+        ? await enrichInstanceRowsForExport(student, rowsToEnrich, {
+          startDate,
+          endDate,
+          reqUser,
+          periodRowsByClassId,
+          sharedCaches
+        })
+        : [];
+      const enrichedById = new Map(enrichedRows.map((row) => [clean(row.instanceId), row]));
+      const previewRows = applyPreviewInstanceExportKeys(
+        instanceRows,
+        student,
+        templateMetaMap,
+        periodRowsByClassId,
+        startDate,
+        endDate
+      );
+      instances = previewRows.map((row) => enrichedById.get(clean(row.instanceId)) || row);
+    } else {
+      instances = applyPreviewInstanceExportKeys(
+        instanceRows,
+        student,
+        templateMetaMap,
+        periodRowsByClassId,
+        startDate,
+        endDate
+      );
+    }
+
     planStudents.push({
       personId: clean(student.personId),
       studentRecordId: clean(student.studentRecordId),
@@ -532,56 +770,80 @@ async function buildSemiMonthlyReportExportPlan(req, options = {}) {
     });
   }
 
-  const reportTemplateSummaries = templateIds.map((templateId) => {
-    const meta = templateMetaMap.get(templateId) || {};
-    const effective = studentAttendanceReportExportFormatService.resolveEffectiveClassExportFlags(
-      policy,
-      templateId,
-      meta
-    );
-    return {
-      id: templateId,
-      title: meta.templateTitle || templateId,
-      hasDocx: effective.hasDocx,
-      hasPdf: effective.hasPdf,
-      hasPayload: effective.hasPayload
-    };
-  });
+  return planStudents;
+}
 
-  const overallTemplateSummaries = overallTemplates.map((template) => {
-    const templateId = clean(template.id);
-    const rawOverallMeta = {
-      hasDocx: overallReportService.templateHasAttachedDocx(template),
-      hasPdf: overallReportService.templateHasAttachedPdf(template)
-    };
-    const effectiveOverall = studentAttendanceReportExportFormatService.resolveEffectiveOverallExportFlags(
-      policy,
-      templateId,
-      rawOverallMeta
-    );
-    return {
-      id: templateId,
-      title: clean(template.title) || templateId,
-      hasDocx: effectiveOverall.hasDocx,
-      hasPdf: effectiveOverall.hasPdf,
-      hasPayload: effectiveOverall.hasPayload
-    };
-  });
-
-  return {
+async function buildSemiMonthlyReportExportPreview(req, options = {}) {
+  const ctx = options.existingContext || await loadExportContext(req, options);
+  const { policy, overallTemplates, students, startDate, endDate } = ctx;
+  const templateIds = semiMonthlyReportPolicyService.normalizeIdList(policy.reportTemplateIds);
+  const templateMetaMap = await loadTemplateMetaMap(templateIds, req.user, policy);
+  const periodRowsByClassId = await loadPeriodRowsByClassIdMap(
+    collectUniqueClassIdsFromStudents(students),
+    req.user
+  );
+  const planStudents = await buildPlanStudentsFromContext(
+    ctx,
+    req.user,
+    templateMetaMap,
+    periodRowsByClassId,
+    'preview'
+  );
+  const { reportTemplateSummaries, overallTemplateSummaries } = buildExportPlanSummaries(
+    templateIds,
+    templateMetaMap,
+    policy,
+    overallTemplates
+  );
+  return finalizeExportPlanShape({
     startDate,
     endDate,
-    reportTemplateIds: templateIds,
-    reportTemplates: reportTemplateSummaries,
-    overallReportTemplateIds: policy.overallReportTemplateIds || [],
-    overallReportTemplates: overallTemplateSummaries,
-    overallBulkExportFormats: {
-      hasDocx: overallTemplateSummaries.some((row) => row.hasDocx),
-      hasPdf: overallTemplateSummaries.some((row) => row.hasPdf),
-      hasPayload: overallTemplateSummaries.some((row) => row.hasPayload !== false)
-    },
-    students: planStudents
-  };
+    templateIds,
+    policy,
+    reportTemplateSummaries,
+    overallTemplateSummaries,
+    planStudents
+  });
+}
+
+async function buildSemiMonthlyReportExportPlan(req, options = {}) {
+  const ctx = options.existingContext || await loadExportContext(req, options);
+  const { policy, overallTemplates, students, startDate, endDate } = ctx;
+  const templateIds = semiMonthlyReportPolicyService.normalizeIdList(policy.reportTemplateIds);
+  const templateMetaMap = await loadTemplateMetaMap(templateIds, req.user, policy);
+  const periodRowsByClassId = await loadPeriodRowsByClassIdMap(
+    collectUniqueClassIdsFromStudents(students),
+    req.user
+  );
+  const enrichMode = options.enrichMode === 'full' ? 'full' : 'targeted';
+  const instanceIdsToEnrich = options.instanceIdsToEnrich instanceof Set
+    ? options.instanceIdsToEnrich
+    : null;
+  const planStudents = await buildPlanStudentsFromContext(
+    ctx,
+    req.user,
+    templateMetaMap,
+    periodRowsByClassId,
+    enrichMode === 'full' ? 'full' : 'targeted',
+    instanceIdsToEnrich
+  );
+
+  const { reportTemplateSummaries, overallTemplateSummaries } = buildExportPlanSummaries(
+    templateIds,
+    templateMetaMap,
+    policy,
+    overallTemplates
+  );
+
+  return finalizeExportPlanShape({
+    startDate,
+    endDate,
+    templateIds,
+    policy,
+    reportTemplateSummaries,
+    overallTemplateSummaries,
+    planStudents
+  });
 }
 
 async function exportStoredInstance(instanceId, format, reqUser, options = {}) {
@@ -947,12 +1209,23 @@ async function exportSemiMonthlyReportSelections(req, options = {}) {
   }
 
   const ctx = await loadExportContext(req, options);
-  const plan = await buildSemiMonthlyReportExportPlan(req, options);
+  const instanceIdsToEnrich = new Set();
+  targets.forEach((target) => {
+    if (clean(target?.type).toLowerCase() === 'instance') {
+      const instanceId = clean(target?.instanceId);
+      if (instanceId) instanceIdsToEnrich.add(instanceId);
+    }
+  });
+  const plan = await buildSemiMonthlyReportExportPlan(req, {
+    ...options,
+    existingContext: ctx,
+    enrichMode: 'targeted',
+    instanceIdsToEnrich
+  });
   const studentMap = new Map(ctx.students.map((row) => [clean(row.personId), row]));
   const planStudentMap = new Map(plan.students.map((row) => [clean(row.personId), row]));
-  const files = [];
 
-  for (const target of targets) {
+  const exportJobs = targets.map((target) => async () => {
     const type = clean(target?.type).toLowerCase();
     const studentId = clean(target?.studentId);
     const student = studentMap.get(studentId);
@@ -976,9 +1249,9 @@ async function exportSemiMonthlyReportSelections(req, options = {}) {
         error.statusCode = 400;
         throw error;
       }
-      if (format === 'docx' && !instanceRow.hasDocx) continue;
-      if (format === 'pdf' && !instanceRow.hasPdf) continue;
-      if (format === 'json' && instanceRow.hasPayload === false) continue;
+      if (format === 'docx' && !instanceRow.hasDocx) return null;
+      if (format === 'pdf' && !instanceRow.hasPdf) return null;
+      if (format === 'json' && instanceRow.hasPayload === false) return null;
       studentAttendanceReportExportFormatService.assertSarExportFormatAllowed(
         ctx.policy,
         'report',
@@ -989,12 +1262,11 @@ async function exportSemiMonthlyReportSelections(req, options = {}) {
       const pdfKey = clean(target?.pdfKey) || clean(instanceRow.suggestedPdfKey);
       const rendered = await exportStoredInstance(instanceId, format, req.user, { docxKey, pdfKey });
       const stem = safeFileToken(`${student.name || studentId}_${instanceRow.className}_${instanceRow.sessionDate || instanceId}`);
-      files.push({
+      return {
         ...rendered,
         fileName: rendered.fileName || `${stem}.${format === 'json' ? 'json' : format}`,
         warnings: []
-      });
-      continue;
+      };
     }
 
     if (type === 'overall') {
@@ -1002,7 +1274,7 @@ async function exportSemiMonthlyReportSelections(req, options = {}) {
       const instanceIdsBySlot = target?.instanceIdsBySlot && typeof target.instanceIdsBySlot === 'object'
         ? target.instanceIdsBySlot
         : {};
-      files.push(await exportOverallTarget(
+      return exportOverallTarget(
         planStudent,
         overallTemplateId,
         format,
@@ -1010,14 +1282,16 @@ async function exportSemiMonthlyReportSelections(req, options = {}) {
         ctx,
         req.user,
         clean(target?.templateVariantKey)
-      ));
-      continue;
+      );
     }
 
     const error = new Error(`Unsupported export target type: ${type || '(empty)'}.`);
     error.statusCode = 400;
     throw error;
-  }
+  });
+
+  const fileResults = await runWithConcurrency(exportJobs, 3, async (job) => job());
+  const files = fileResults.filter(Boolean);
 
   if (!files.length) {
     const error = new Error('Select at least one report that supports this export format.');
@@ -1032,11 +1306,14 @@ async function exportSemiMonthlyReportSelections(req, options = {}) {
 
 module.exports = {
   buildSemiMonthlyReportExportPlan,
+  buildSemiMonthlyReportExportPreview,
   exportSemiMonthlyReportSelections,
   buildSmmrOverallExportBlock,
   buildClassRowsForOverall,
   resolveOverallSlotAssignments,
   flattenInstanceRows,
+  applyPreviewInstanceExportKeys,
   enrichInstanceRowsForExport,
-  exportStoredInstance
+  exportStoredInstance,
+  loadExportContext
 };

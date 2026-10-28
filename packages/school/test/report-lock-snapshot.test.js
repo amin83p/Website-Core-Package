@@ -90,6 +90,29 @@ test('resolveTemplateFillKeys with snapshotKeys uses explicit keys plus deps for
   assert.ok(!keys.has('class_attendance_present'));
 });
 
+test('resolveTemplateFillKeys includes in-scope field prefillKey for live bundle computation', () => {
+  const keys = reportService.resolveTemplateFillKeys({
+    ...baseTemplatePayload,
+    snapshotKeys: ['attendance_pct'],
+    schema: {
+      version: 1,
+      fields: [
+        ...baseTemplatePayload.schema.fields,
+        {
+          id: 'attendance_pct',
+          label: 'Attendance %',
+          type: 'number',
+          readOnly: false,
+          prefillKey: 'student_attendance_span_percent',
+          valueMode: 'manual'
+        }
+      ]
+    }
+  });
+  assert.ok(keys.has('attendance_pct'));
+  assert.ok(keys.has('student_attendance_span_percent'));
+});
+
 test('resolveTemplateFillKeys adds expression deps when calculated field is in snapshotKeys', () => {
   const keys = reportService.resolveTemplateFillKeys({
     ...baseTemplatePayload,
@@ -267,15 +290,27 @@ test('buildTemplateSnapshotKeySuggestions skips visual fields and docx alias dup
   assert.ok(!suggestions.some((row) => row.key === 'stnm'));
 });
 
-test('resolveSnapshotKeyLabel prefers stored snapshotKeyLabels', () => {
+test('resolveSnapshotKeyLabel prefers template field label over stored snapshotKeyLabels', () => {
   const label = reportService.resolveSnapshotKeyLabel({
     ...baseTemplatePayload,
     snapshotKeyLabels: { student_full_name: 'Learner legal name' }
   }, 'student_full_name');
-  assert.equal(label, 'Learner legal name');
+  assert.equal(label, 'Student Name');
 });
 
-test('getSourceTemplateKeyOptions uses friendly labels for snapshotted keys', () => {
+test('resolveSnapshotKeyLabel uses stored snapshotKeyLabels when no field binds the key', () => {
+  const label = reportService.resolveSnapshotKeyLabel({
+    ...baseTemplatePayload,
+    snapshotKeyLabels: { report_period_days: 'Days in period' },
+    schema: {
+      version: 1,
+      fields: baseTemplatePayload.schema.fields
+    }
+  }, 'report_period_days');
+  assert.equal(label, 'Days in period');
+});
+
+test('getSourceTemplateKeyOptions prefers template field label over snapshotKeyLabels', () => {
   const options = overallReportService.getSourceTemplateKeyOptions({
     ...baseTemplatePayload,
     id: 'RPTTPL-1',
@@ -284,7 +319,7 @@ test('getSourceTemplateKeyOptions uses friendly labels for snapshotted keys', ()
   });
   const match = options.find((row) => row.key === 'student_full_name');
   assert.ok(match);
-  assert.equal(match.label, 'Student full name (locked)');
+  assert.equal(match.label, 'Student Name');
 });
 
 test('reportTemplateModel sanitizes snapshotKeyLabels against snapshotKeys', () => {

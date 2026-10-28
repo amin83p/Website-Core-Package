@@ -418,6 +418,7 @@ test('buildPrefillSnapshot uses attendance matrix percent and counts unmarked se
           assert.equal(snapshot.class_attendance_present, 83.33);
           assert.equal(snapshot.class_attendance_absent, 1);
           assert.equal(snapshot.student_attendance_span_total_sessions, 4);
+          assert.equal(snapshot.student_attendance_present, 1);
           assert.equal(snapshot.student_attendance_span_present, 1);
           assert.equal(snapshot.student_attendance_span_late, 2);
           assert.equal(snapshot.student_attendance_span_absent, 1);

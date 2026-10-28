@@ -4,6 +4,8 @@ const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatri
 const classEnrollmentReadService = require('./classEnrollmentReadService');
 const weeklyReportsHubService = require('./weeklyReportsHubService');
 const weeklyReportsEngagementService = require('./weeklyReportsEngagementService');
+const sessionStatusPolicyService = require('./sessionStatusPolicyService');
+const studentPunctualityMetricsService = require('./studentPunctualityMetricsService');
 const { buildAttendanceMatrixPayload } = require('../../controllers/school/attendanceController');
 const { buildGradesMatrixPayload } = require('../../controllers/school/gradesMatrixController');
 const { requireCoreModule } = require('./schoolCoreContracts');
@@ -217,11 +219,19 @@ function buildStudentProgressWeekRow({
   orgPolicyLayer,
   caseRows,
   gradesColumns,
-  gradesCells
+  gradesCells,
+  statusMap = null
 } = {}) {
   const sliced = sliceMatrixRowToWeek(matrixRow, sessions, week);
   const attendance = weeklyReportsHubService.summarizeStudentAttendanceForWeeklyReport(sliced.matrixRow);
   if (!Number(attendance.sessionCount || 0)) return null;
+
+  const punctuality = studentPunctualityMetricsService.buildStudentPunctualityFromMatrixRow(sliced.matrixRow, {
+    classData: classRow,
+    orgPolicyLayer,
+    sessions: sliced.sessions,
+    statusMap
+  });
 
   return {
     startDate: week.startDate,
@@ -232,6 +242,7 @@ function buildStudentProgressWeekRow({
       orgPolicyLayer
     ),
     attendance,
+    punctuality,
     activityAveragePercent: averageGradebookActivityPercent({
       columns: gradesColumns,
       cells: gradesCells,
@@ -287,15 +298,25 @@ function assembleStudentProgressReport({
           orgPolicyLayer: bundle?.orgPolicyLayer || {},
           caseRows: bundle?.caseRows,
           gradesColumns: bundle?.gradesColumns,
-          gradesCells: gradesRow?.cells
+          gradesCells: gradesRow?.cells,
+          statusMap: bundle?.statusMap || null
         }))
         .filter(Boolean);
       if (!classWeeks.length) return;
+
+      const punctuality = classWeeks.reduce(
+        (merged, weekRow) => studentPunctualityMetricsService.mergeStudentPunctualitySummaries(
+          merged,
+          weekRow.punctuality
+        ),
+        studentPunctualityMetricsService.emptyStudentPunctualitySummary()
+      );
 
       studentClasses.push({
         classId,
         className: readClassName(classRow, classId),
         showAcfColumn: classShowsAcf(classRow),
+        punctuality,
         weeks: classWeeks
       });
     });
@@ -374,6 +395,7 @@ async function buildStudentProgressReport({
     ? await schoolDataService.fetchAllData('sessionStudentCases', {}, reqUser)
     : [];
   const policyCache = new Map();
+  const statusMapCache = new Map();
   const classBundles = [];
 
   for (const classRow of classes) {
@@ -381,6 +403,11 @@ async function buildStudentProgressReport({
     if (!classId) continue;
     const orgId = toPublicId(classRow?.orgId) || activeOrgId;
     try {
+      let statusMap = statusMapCache.get(orgId);
+      if (!statusMap) {
+        statusMap = await sessionStatusPolicyService.getStatusMap(orgId, { includeInactive: true });
+        statusMapCache.set(orgId, statusMap);
+      }
       const [attendancePayload, gradesPayload] = await Promise.all([
         buildAttendanceMatrixPayload({
           user: reqUser,
@@ -415,6 +442,7 @@ async function buildStudentProgressReport({
         caseRows: (Array.isArray(allCaseRows) ? allCaseRows : [])
           .filter((row) => idsEqual(row?.classId, classId)),
         orgPolicyLayer: orgPolicyLayer || {},
+        statusMap,
         gradesColumns: Array.isArray(gradesPayload?.columns) ? gradesPayload.columns : [],
         gradesMatrix: Array.isArray(gradesPayload?.matrix) ? gradesPayload.matrix : []
       });

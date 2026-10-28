@@ -57,9 +57,21 @@ async function showSemiMonthlyReportPage(req, res) {
 async function getSemiMonthlyReportData(req, res) {
   try {
     const payload = await schoolSemiMonthlyReportService.buildSemiMonthlyReportPayload(req);
+    let exportPreview = null;
+    const canExportReport = await reportViewService.canExportReportInstance(req.user);
+    if (canExportReport) {
+      try {
+        exportPreview = await schoolSemiMonthlyReportExportService.buildSemiMonthlyReportExportPreview(req, {
+          existingPayload: payload
+        });
+      } catch (_previewError) {
+        exportPreview = null;
+      }
+    }
     res.json({
       status: 'success',
-      ...payload
+      ...payload,
+      exportPreview
     });
   } catch (error) {
     res.status(Number(error?.statusCode) || 400).json({
@@ -78,7 +90,7 @@ async function getExportPlan(req, res) {
         message: 'You do not have permission to export report instances.'
       });
     }
-    const plan = await schoolSemiMonthlyReportExportService.buildSemiMonthlyReportExportPlan(req);
+    const plan = await schoolSemiMonthlyReportExportService.buildSemiMonthlyReportExportPreview(req);
     return res.json({ status: 'success', plan });
   } catch (error) {
     return res.status(Number(error?.statusCode) || 400).json({
