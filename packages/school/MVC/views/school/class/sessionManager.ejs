@@ -560,13 +560,39 @@
         gap: 0.25rem;
         margin-top: 0.45rem;
     }
+    .session-manager-page-header-actions {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-end;
+        flex: 0 0 auto;
+    }
+    .session-manager-page .page-heading {
+        font-size: clamp(1.2rem, 1.35rem + 1.1vw, 2.5rem);
+        line-height: 1.15;
+        margin-bottom: clamp(0.35rem, 0.25rem + 0.5vw, 1rem);
+    }
+    .session-manager-page .page-heading.size-md,
+    .session-manager-page .page-heading.size-sm,
+    .session-manager-page .page-heading.size-lg {
+        font-size: clamp(1.2rem, 1.35rem + 1.1vw, 2.5rem);
+    }
+    .session-manager-page .page-heading .bi {
+        font-size: 0.88em;
+        vertical-align: -0.05em;
+    }
+    .session-manager-page .page-heading .session-completed-check {
+        width: clamp(1.6rem, 1.2rem + 1.5vw, 2.75rem);
+        height: clamp(1.6rem, 1.2rem + 1.5vw, 2.75rem);
+        margin-left: clamp(0.25rem, 0.15rem + 0.4vw, 0.65rem);
+        font-size: clamp(0.95rem, 0.7rem + 1vw, 1.8rem);
+    }
     .session-manager-page-meta-class {
         display: flex;
         align-items: center;
         gap: 0.4rem;
         min-width: 0;
         color: #1d4ed8;
-        font-size: 1.15rem;
+        font-size: clamp(0.85rem, 0.75rem + 0.55vw, 1.15rem);
         font-weight: 700;
         line-height: 1.25;
     }
@@ -582,7 +608,7 @@
         align-items: center;
         gap: 0.45rem 0.85rem;
         color: #334155;
-        font-size: 0.98rem;
+        font-size: clamp(0.72rem, 0.65rem + 0.45vw, 0.98rem);
         font-weight: 600;
         line-height: 1.3;
     }
@@ -595,12 +621,6 @@
     .session-manager-page-meta-when-item i {
         color: #64748b;
         font-size: 0.95em;
-    }
-    .session-manager-page-header-actions {
-        display: flex;
-        flex-direction: column;
-        align-items: flex-end;
-        flex: 0 0 auto;
     }
     .session-manager-toolbar-row {
         display: flex;
@@ -1149,26 +1169,304 @@
         border-radius: 0 12px 12px 0;
         padding: 1rem 1.15rem 1.25rem;
     }
-    @media (max-width: 991.98px) {
-        .session-manager-shell { flex-direction: column; }
-        .session-manager-sidebar {
-            flex-basis: auto;
-            width: 100%;
-            border-radius: 12px 12px 0 0;
-            border-bottom: none;
-            flex-direction: row;
-            flex-wrap: wrap;
-            align-items: center;
+
+    /* Tablet: keep desktop row layout with a narrower sidebar and smaller nav type */
+    @media (min-width: 576px) and (max-width: 991.98px) {
+        main.container:has(.session-manager-page) {
+            max-width: 100%;
+            padding-left: 0.4rem;
+            padding-right: 0.4rem;
         }
-        .session-manager-sidebar.collapsed { width: 100%; flex-basis: auto; }
-        .session-manager-sidebar-nav {
-            flex-direction: row;
-            flex-wrap: wrap;
+        .session-manager-page {
+            --sections-page-max-width: 100%;
+            --session-sidebar-w: 200px;
+            --session-sidebar-collapsed-w: 64px;
+            max-width: none;
             width: 100%;
+            padding: 0.4rem 0.25rem;
+            margin-left: 0;
+            margin-right: 0;
+        }
+        .session-manager-page .session-manager-sidebar-head {
+            padding: 0.35rem 0.4rem 0.35rem 0.5rem;
+        }
+        .session-manager-page .session-manager-sidebar-nav {
             padding: 0.35rem;
         }
-        .session-manager-nav-item { flex: 1 1 auto; min-width: 120px; justify-content: center; }
-        .session-manager-main { border-radius: 0 0 12px 12px; border: 1px solid #e2e8f0; border-top: none; }
+        .session-manager-page .session-manager-nav-item {
+            gap: 0.45rem;
+            padding: 0.5rem 0.55rem;
+            font-size: 0.78rem;
+        }
+        .session-manager-page .session-manager-nav-item > i.fs-5 {
+            font-size: 1.05rem !important;
+        }
+        .session-manager-page .session-manager-nav-item .session-nav-badge {
+            min-width: 1.2rem;
+            font-size: 0.65rem;
+            padding: 0.15rem 0.32rem;
+        }
+        .session-manager-page .session-manager-main {
+            padding: 0.75rem 0.85rem 1rem;
+        }
+    }
+
+    /* Mobile: icon-only sidebar (row layout preserved) */
+    @media (max-width: 575.98px) {
+        .session-manager-page {
+            --sections-page-max-width: 100%;
+            --session-sidebar-collapsed-w: 52px;
+            max-width: none;
+            width: 100%;
+            padding: 0.15rem 0.1rem;
+            margin-left: 0;
+            margin-right: 0;
+        }
+        .session-manager-page .session-manager-shell {
+            min-height: 50vh;
+        }
+        .session-manager-page .session-manager-sidebar,
+        .session-manager-page .session-manager-sidebar.collapsed {
+            flex: 0 0 var(--session-sidebar-collapsed-w);
+            width: var(--session-sidebar-collapsed-w);
+            flex-basis: var(--session-sidebar-collapsed-w);
+            border-radius: 8px 0 0 8px;
+        }
+        .session-manager-page .session-manager-sidebar-head {
+            padding: 0.2rem 0.15rem;
+        }
+        .session-manager-page .session-manager-sidebar-head #btnToggleSessionSidebar {
+            display: none;
+        }
+        .session-manager-page .session-manager-nav-label {
+            display: none;
+        }
+        .session-manager-page .session-manager-sidebar-nav {
+            padding: 0.2rem 0.15rem;
+        }
+        .session-manager-page .session-manager-sidebar .session-manager-nav-item {
+            justify-content: center;
+            padding: 0.42rem 0.2rem;
+            position: relative;
+        }
+        .session-manager-page .session-manager-nav-item > i.fs-5 {
+            font-size: 0.95rem !important;
+        }
+        .session-manager-page .session-manager-sidebar .session-manager-nav-item .session-nav-badge {
+            position: absolute;
+            top: 0.12rem;
+            right: 0.12rem;
+            margin-left: 0;
+            min-width: 0.95rem;
+            padding: 0.08rem 0.22rem;
+            font-size: 0.58rem;
+        }
+        .session-manager-page .session-manager-sidebar .session-manager-nav-item .session-nav-badge-group {
+            position: absolute;
+            top: 0.12rem;
+            right: 0.12rem;
+            margin-left: 0;
+        }
+        .session-manager-page .session-manager-sidebar .session-manager-nav-item .session-nav-badge-group .session-nav-badge {
+            position: static;
+        }
+        .session-manager-page .session-manager-sidebar .session-manager-nav-item .session-nav-badge.session-nav-badge--dot {
+            min-width: 0.5rem;
+            width: 0.5rem;
+            height: 0.5rem;
+            padding: 0;
+        }
+        .session-manager-page .session-manager-main {
+            padding: 0.4rem 0.35rem 0.55rem;
+            border-radius: 0 8px 8px 0;
+        }
+        .session-manager-page .session-manager-page-header {
+            margin-bottom: 0.45rem;
+            gap: 0.3rem 0.45rem;
+        }
+        .session-manager-page .session-manager-page-meta {
+            margin-top: 0.25rem;
+            gap: 0.15rem;
+        }
+        .session-manager-page .session-manager-page-meta-class {
+            gap: 0.28rem;
+        }
+        .session-manager-page .session-manager-page-meta-when {
+            font-weight: 600;
+            gap: 0.2rem 0.45rem;
+        }
+        .session-manager-page .session-manager-toolbar-row {
+            margin-bottom: 0.45rem;
+            gap: 0.3rem 0.4rem;
+        }
+        .session-manager-page .session-manager-toolbar-actions {
+            gap: 0.3rem;
+        }
+        .session-manager-page .session-manager-toolbar-row .btn-save-session,
+        .session-manager-page .session-manager-toolbar-row .btn-close-session {
+            min-width: 0;
+            font-size: 0.72rem;
+            padding: 0.28rem 0.5rem;
+        }
+        .session-manager-page .btn:not(.btn-link):not(.session-manager-nav-item) {
+            font-size: 0.72rem;
+            padding: 0.28rem 0.48rem;
+            line-height: 1.25;
+        }
+        .session-manager-page .btn-sm {
+            font-size: 0.66rem;
+            padding: 0.18rem 0.36rem;
+        }
+        .session-manager-page .form-control,
+        .session-manager-page .form-select,
+        .session-manager-page textarea.form-control {
+            font-size: 0.78rem;
+            padding: 0.22rem 0.38rem;
+            min-height: calc(1.45em + 0.45rem + 2px);
+        }
+        .session-manager-page .input-group-text {
+            font-size: 0.72rem;
+            padding: 0.22rem 0.38rem;
+        }
+        .session-manager-page .form-label,
+        .session-manager-page label.col-form-label,
+        .session-manager-page .session-manager-info-card .info-label,
+        .session-manager-page .session-summary-label {
+            font-size: 0.66rem;
+            margin-bottom: 0.12rem;
+        }
+        .session-manager-page .session-manager-info-card .info-value,
+        .session-manager-page .session-summary-value {
+            font-size: 0.82rem;
+        }
+        .session-manager-page .session-manager-info-card .card-body {
+            padding: 0.55rem 0.6rem;
+        }
+        .session-manager-page .session-panel-matrix-link {
+            font-size: 0.68rem;
+            padding: 0.22rem 0.45rem;
+        }
+        .session-manager-page h5,
+        .session-manager-page .h5 {
+            font-size: 0.92rem;
+        }
+        .session-manager-page h6,
+        .session-manager-page .h6 {
+            font-size: 0.82rem;
+        }
+        .session-manager-page .card-header {
+            padding: 0.4rem 0.45rem;
+        }
+        .session-manager-page .card-header .h5,
+        .session-manager-page .card-header h5 {
+            font-size: 0.82rem;
+        }
+        .session-manager-page .table {
+            font-size: 0.72rem;
+            --bs-table-cell-padding-y: 0.28rem;
+            --bs-table-cell-padding-x: 0.32rem;
+        }
+        .session-manager-page .table > :not(caption) > * > * {
+            padding: var(--bs-table-cell-padding-y) var(--bs-table-cell-padding-x);
+        }
+        .session-manager-page .table thead th {
+            font-size: 0.64rem;
+            font-weight: 600;
+            line-height: 1.2;
+        }
+        .session-manager-page .table tbody td {
+            font-size: 0.72rem;
+        }
+        .session-manager-page #attendanceTable thead th {
+            min-width: 0 !important;
+        }
+        .session-manager-page #attendanceTable thead th:nth-child(3) {
+            width: 55%;
+        }
+        .session-manager-page #attendanceTable .attendance-order-col,
+        .session-manager-page #attendanceTable .attendance-order-cell {
+            padding-left: 0.2rem !important;
+            padding-right: 0.15rem !important;
+            font-size: 0.62rem;
+            width: 1.4rem;
+        }
+        .session-manager-page #attendanceTable .sortable-att-name {
+            font-size: 0.64rem;
+        }
+        .session-manager-page #attendanceTable tbody td.ps-2.fw-bold {
+            font-size: 0.7rem;
+            font-weight: 600 !important;
+            padding-left: 0.25rem !important;
+        }
+        .session-manager-page #attendanceTable tbody td.pe-3 {
+            padding-top: 0.3rem !important;
+            padding-bottom: 0.3rem !important;
+            padding-right: 0.25rem !important;
+        }
+        .session-manager-page #attendanceTable .d-flex.gap-2 {
+            gap: 0.2rem !important;
+        }
+        .session-manager-page #attendanceTable .btn-group-sm > .btn,
+        .session-manager-page #attendanceTable .att-label {
+            font-size: 0.58rem;
+            padding: 0.12rem 0.22rem;
+            line-height: 1.15;
+        }
+        .session-manager-page #attendanceTable .att-label .bi {
+            font-size: 0.75em;
+            margin-right: 0.1rem !important;
+        }
+        .session-manager-page #attendanceTable .att-label-late-le {
+            min-width: 2.15rem;
+            letter-spacing: 0;
+        }
+        .session-manager-page #attendanceTable .btn-details {
+            padding: 0.12rem 0.28rem;
+            font-size: 0.65rem;
+        }
+        .session-manager-page #attendanceTable .js-na-note-trigger {
+            padding: 0.08rem 0.2rem !important;
+            font-size: 0.65rem;
+        }
+        .session-manager-page .att-bulk-btn {
+            font-size: 0.62rem;
+            padding: 0.18rem 0.32rem;
+        }
+        .session-manager-page .attendance-timing-table th,
+        .session-manager-page .attendance-timing-table td {
+            padding: 0.2rem 0.28rem;
+            font-size: 0.66rem;
+        }
+        .session-manager-page .attendance-timing-table tbody th[scope="row"] {
+            font-size: 0.68rem;
+        }
+        .session-manager-page .attendance-timing-table .attendance-timing-input-time {
+            width: 5.5rem;
+            font-size: 0.72rem;
+        }
+        .session-manager-page .attendance-timing-table .attendance-timing-input-mins {
+            width: 4rem;
+            font-size: 0.72rem;
+        }
+        .session-manager-page .conduct-bulk-table th,
+        .session-manager-page .conduct-bulk-table td,
+        .session-manager-page #optionalConductTable th,
+        .session-manager-page #optionalConductTable td {
+            padding: 0.25rem 0.3rem;
+            font-size: 0.7rem;
+        }
+        .session-manager-page .conduct-emoji-btn,
+        .session-manager-page .conduct-code-btn {
+            min-width: 1.65rem;
+            height: 1.55rem;
+            padding: 0 0.2rem;
+            font-size: 0.62rem;
+        }
+        .session-manager-page .conduct-rating-input {
+            max-width: 4.5rem;
+            font-size: 0.72rem;
+            padding: 0.2rem 0.3rem;
+        }
     }
 
     .session-panel { display: none; animation: sessionPanelIn 0.2s ease; }

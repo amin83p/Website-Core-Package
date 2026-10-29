@@ -1,18 +1,35 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('path');
-const fs = require('fs');
+const fsp = require('fs/promises');
 
 const { requireCoreModule } = require('../MVC/services/school/schoolCoreContracts');
 const schoolFileService = require('../MVC/services/school/schoolFileService');
 const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
 const uploadPathUtils = requireCoreModule('MVC/utils/uploadPathUtils');
+const settingService = requireCoreModule('MVC/services/settingService');
 
+const TEST_UPLOAD_ROOT = path.join(process.cwd(), 'tmp', 'school-upload-storage-test-uploads');
 const ORIGINAL_UPLOAD_MODE = process.env.UPLOAD_MODE;
+const ORIGINAL_GET_VALUE = settingService.getValue;
 
-test.afterEach(() => {
+async function ensureTestUploadRoot() {
+  await fsp.mkdir(path.join(TEST_UPLOAD_ROOT, 'ORG_900000', 'reports'), { recursive: true });
+}
+
+test.beforeEach(async () => {
+  await ensureTestUploadRoot();
+  settingService.getValue = (section, key) => {
+    if (section === 'app' && key === 'uploadsPath') return TEST_UPLOAD_ROOT;
+    return ORIGINAL_GET_VALUE.call(settingService, section, key);
+  };
+});
+
+test.afterEach(async () => {
+  settingService.getValue = ORIGINAL_GET_VALUE;
   if (ORIGINAL_UPLOAD_MODE === undefined) delete process.env.UPLOAD_MODE;
   else process.env.UPLOAD_MODE = ORIGINAL_UPLOAD_MODE;
+  await fsp.rm(TEST_UPLOAD_ROOT, { recursive: true, force: true });
 });
 
 test('resolveMulterStoredRef returns canonical upload URL from storedRef', () => {
