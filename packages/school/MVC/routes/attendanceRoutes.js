@@ -49,12 +49,22 @@ router.get('/report/api/data',
   trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.READ, { keepActive: true }),
   ctrl.getStudentAttendanceReportData);
 
+router.post('/report/api/data-async',
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.READ),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.READ, { keepActive: true }),
+  ctrl.startStudentAttendanceReportDataJob);
+
+router.get('/report/api/funder-students',
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.READ),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.READ, { keepActive: true }),
+  ctrl.getFunderStudentSelection);
+
 router.post('/report/api/generate',
   requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.READ_ALL, { keepActive: true }),
   ctrl.generateStudentAttendanceReport);
 
-router.get('/report/api/export-plan',
+router.get('/report/api/report-plan',
   requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT),
   trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT, { keepActive: true }),
   ctrl.getStudentAttendanceReportExportPlan);
@@ -64,12 +74,12 @@ router.post('/report/api/export',
   trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT, { keepActive: true }),
   ctrl.exportStudentAttendanceReport);
 
-router.get('/report/api/export-jobs/:jobId',
-  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT),
-  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT, { keepActive: true }),
+router.get('/report/api/report-jobs/:jobId',
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.READ),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.READ, { keepActive: true }),
   ctrl.getStudentAttendanceReportExportJob);
 
-router.get('/report/api/export-jobs/:jobId/download',
+router.get('/report/api/report-jobs/:jobId/download',
   requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT),
   trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT, { keepActive: true }),
   ctrl.downloadStudentAttendanceReportExportJob);

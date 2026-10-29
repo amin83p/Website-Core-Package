@@ -1,0 +1,78 @@
+<div class="modal fade" id="reportByFunderModal" tabindex="-1" aria-labelledby="reportByFunderModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable report-by-funder-modal-dialog">
+    <div class="modal-content report-by-funder-modal-content">
+      <div class="modal-header py-3">
+        <div>
+          <h5 class="modal-title fw-bold" id="reportByFunderModalLabel"><i class="bi bi-diagram-3 me-2 text-primary"></i>Report By Funder</h5>
+          <div class="small text-muted mt-1">Choose a funder and date range, then select students to load on the report.</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body pt-2 report-by-funder-modal-body">
+        <div class="row g-3 align-items-end mb-3">
+          <div class="col-md-4">
+            <label class="form-label" for="reportByFunderSelect">Funder</label>
+            <select id="reportByFunderSelect" class="form-select size-md">
+              <option value="">Choose funder…</option>
+              <% (Array.isArray(funderPickerOptions) ? funderPickerOptions : []).forEach((opt) => { %>
+                <option value="<%= String(opt.id || '').replace(/"/g, '&quot;') %>"><%= opt.label || opt.id %></option>
+              <% }); %>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="reportByFunderStartDate">Start date</label>
+            <input type="date" id="reportByFunderStartDate" class="form-control size-md">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="reportByFunderEndDate">End date</label>
+            <input type="date" id="reportByFunderEndDate" class="form-control size-md">
+          </div>
+          <div class="col-md-2">
+            <button type="button" class="btn btn-filled btn-primary btn-md w-100" id="btn_reportByFunderLoad">
+              <i class="bi bi-search me-1"></i> Load
+            </button>
+          </div>
+        </div>
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3" id="reportByFunderRangeChips" role="group" aria-label="Date range shortcuts">
+          <button type="button" class="btn btn-outline-secondary btn-sm report-by-funder-range-chip" data-range="lastMonthFirstHalf">Last month · 1st half</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm report-by-funder-range-chip" data-range="lastMonthSecondHalf">Last month · 2nd half</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm report-by-funder-range-chip" data-range="currentMonthFirstHalf">This month · 1st half</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm report-by-funder-range-chip" data-range="currentMonthSecondHalf">This month · 2nd half</button>
+        </div>
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2 d-none" id="reportByFunderSelectionToolbar">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_reportByFunderSelectAll">Select all</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_reportByFunderSelectNone">Unselect all</button>
+          <span class="small text-muted ms-auto" id="reportByFunderSelectionCount">0 selected</span>
+        </div>
+        <div id="reportByFunderLoading" class="text-center text-muted py-4 d-none">
+          <div class="spinner-border spinner-border-sm text-primary me-2" role="status" aria-hidden="true"></div>
+          Loading students…
+        </div>
+        <div id="reportByFunderEmpty" class="text-center text-muted py-4 d-none">No matching enrollments for this funder and date range.</div>
+        <div id="reportByFunderTableWrap" class="d-none table-responsive report-by-funder-table-wrap flex-grow-1">
+          <table class="table table-hover align-middle mb-0 report-by-funder-table" id="reportByFunderTable">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3 report-by-funder-check-col"><input type="checkbox" class="form-check-input" id="reportByFunderCheckAll" title="Select all"></th>
+                <th class="report-by-funder-sortable js-report-by-funder-sort" data-sort-key="student" scope="col" aria-sort="ascending">
+                  Student <i class="bi bi-caret-up-fill report-by-funder-sort-icon ms-1" aria-hidden="true"></i>
+                </th>
+                <th class="report-by-funder-sortable js-report-by-funder-sort" data-sort-key="class" scope="col" aria-sort="none">
+                  Class <i class="bi bi-arrow-down-up report-by-funder-sort-icon ms-1 text-muted" aria-hidden="true"></i>
+                </th>
+                <th class="report-by-funder-sortable js-report-by-funder-sort" data-sort-key="enrollment" scope="col" aria-sort="none">
+                  Enrollment <i class="bi bi-arrow-down-up report-by-funder-sort-icon ms-1 text-muted" aria-hidden="true"></i>
+                </th>
+              </tr>
+            </thead>
+            <tbody id="reportByFunderTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-filled btn-primary btn-sm" id="btn_reportByFunderApply" disabled>Apply selection</button>
+      </div>
+    </div>
+  </div>
+</div>

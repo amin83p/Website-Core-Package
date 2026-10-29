@@ -376,20 +376,34 @@ async function buildStudentAttendanceReportPayload(req, options = {}) {
   });
 
   const matrixConcurrency = sarExportConfigService.getExportConcurrency();
+  const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
+  const matrixTotal = matrixJobs.length;
+  let matrixProcessed = 0;
+  if (onProgress) {
+    onProgress({ processed: 0, total: matrixTotal, phase: 'classMatrix' });
+  }
+
   const matrixResults = await runWithConcurrency(matrixJobs, matrixConcurrency, async (job) => {
-    const matrixReq = {
-      user: req.user,
-      query: {
-        classId: job.classId,
-        startDate,
-        endDate
+    try {
+      const matrixReq = {
+        user: req.user,
+        query: {
+          classId: job.classId,
+          startDate,
+          endDate
+        }
+      };
+      const payload = await buildAttendanceMatrixPayload(matrixReq, {
+        applyWindow: false,
+        filterPersonIds: job.matchedPersonIds.join(',')
+      });
+      return { ...job, payload };
+    } finally {
+      matrixProcessed += 1;
+      if (onProgress) {
+        onProgress({ processed: matrixProcessed, total: matrixTotal, phase: 'classMatrix' });
       }
-    };
-    const payload = await buildAttendanceMatrixPayload(matrixReq, {
-      applyWindow: false,
-      filterPersonIds: job.matchedPersonIds.join(',')
-    });
-    return { ...job, payload };
+    }
   });
 
   matrixResults.forEach(({ classRow, payload }) => {

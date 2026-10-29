@@ -63,27 +63,103 @@ async function showSemiMonthlyReportPage(req, res) {
 
 async function getSemiMonthlyReportData(req, res) {
   try {
-    const payload = await schoolSemiMonthlyReportService.buildSemiMonthlyReportPayload(req);
-    let exportPreview = null;
-    const canExportReport = await reportViewService.canExportReportInstance(req.user);
-    if (canExportReport) {
-      try {
-        exportPreview = await schoolSemiMonthlyReportExportService.buildSemiMonthlyReportExportPreview(req, {
-          existingPayload: payload
-        });
-      } catch (_previewError) {
-        exportPreview = null;
-      }
-    }
-    res.json({
-      status: 'success',
-      ...payload,
-      exportPreview
-    });
+    const payload = await buildSemiMonthlyReportResponsePayload(req);
+    res.json(payload);
   } catch (error) {
     res.status(Number(error?.statusCode) || 400).json({
       status: 'error',
       message: error.message || 'Could not load semi-monthly report.'
+    });
+  }
+}
+
+async function buildSemiMonthlyReportResponsePayload(req, options = {}) {
+  const payload = await schoolSemiMonthlyReportService.buildSemiMonthlyReportPayload(req, options);
+  let exportPreview = null;
+  const canExportReport = await reportViewService.canExportReportInstance(req.user);
+  if (canExportReport) {
+    try {
+      exportPreview = await schoolSemiMonthlyReportExportService.buildSemiMonthlyReportExportPreview(req, {
+        existingPayload: payload
+      });
+    } catch (_previewError) {
+      exportPreview = null;
+    }
+  }
+  return {
+    status: 'success',
+    ...payload,
+    exportPreview
+  };
+}
+
+async function startSemiMonthlyReportDataJob(req, res) {
+  try {
+    const sarExportJobService = require('../../services/school/sarExportJobService');
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const fauxReq = {
+      user: req.user,
+      query: {
+        startDate: body.startDate || req.query?.startDate,
+        endDate: body.endDate || req.query?.endDate,
+        studentIds: body.studentIds || req.query?.studentIds
+      }
+    };
+    const job = sarExportJobService.createJob({
+      userId: req.user?.id || req.user?.userId,
+      activeOrgId: req.user?.activeOrgId,
+      jobType: 'report',
+      totalItems: 0
+    });
+    sarExportJobService.startJob(job.id, async (runningJob) => {
+      const reportPayload = await buildSemiMonthlyReportResponsePayload(fauxReq, {
+        onProgress: ({ processed, total, phase }) => {
+          sarExportJobService.updateJobProgress(runningJob.id, {
+            processedItems: processed,
+            totalItems: total,
+            phase: phase || 'classes'
+          });
+        }
+      });
+      return { reportPayload };
+    });
+    return res.status(202).json({
+      status: 'accepted',
+      async: true,
+      job: sarExportJobService.toPublicJob(job),
+      pollUrl: `/school/reports/semi-monthly/api/report-jobs/${job.id}`
+    });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 400).json({
+      status: 'error',
+      message: error.message || 'Could not start report load.'
+    });
+  }
+}
+
+async function getSemiMonthlyReportJob(req, res) {
+  try {
+    const sarExportJobService = require('../../services/school/sarExportJobService');
+    const jobId = String(req.params?.jobId || '').trim();
+    const job = sarExportJobService.getJobForUser(jobId, req.user);
+    if (job.jobType !== 'report') {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Report job was not found or has expired.'
+      });
+    }
+    const reportPayload = job.status === 'complete'
+      ? sarExportJobService.getJobResultPayload(job)
+      : null;
+    return res.json({
+      status: 'success',
+      job: sarExportJobService.toPublicJob(job),
+      reportPayload: reportPayload ? { status: 'success', ...reportPayload } : null
+    });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 400).json({
+      status: 'error',
+      message: error.message || 'Could not load report job status.'
     });
   }
 }
@@ -162,6 +238,8 @@ async function exportSelections(req, res) {
 module.exports = {
   showSemiMonthlyReportPage,
   getSemiMonthlyReportData,
+  startSemiMonthlyReportDataJob,
+  getSemiMonthlyReportJob,
   getFunderStudentSelection,
   getExportPlan,
   exportSelections

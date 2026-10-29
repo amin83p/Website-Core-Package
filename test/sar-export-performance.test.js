@@ -140,10 +140,52 @@ test('sarExportConfigService reads async export threshold from integration varia
 });
 
 test('sarExportJobService stores and returns job status', () => {
-  const job = sarExportJobService.createJob({ userId: 'USER-1', activeOrgId: 'ORG-1' });
+  const job = sarExportJobService.createJob({ userId: 'USER-1', activeOrgId: 'ORG-1', totalItems: 5 });
   const loaded = sarExportJobService.getJobForUser(job.id, { id: 'USER-1', activeOrgId: 'ORG-1' });
   assert.equal(loaded.status, 'pending');
-  assert.equal(sarExportJobService.toPublicJob(loaded).jobId, job.id);
+  const pub = sarExportJobService.toPublicJob(loaded);
+  assert.equal(pub.jobId, job.id);
+  assert.equal(pub.totalItems, 5);
+  assert.equal(pub.processedItems, 0);
+  assert.equal(pub.remainingItems, 5);
+});
+
+test('sarExportJobService updateJobProgress computes remaining and ETA', () => {
+  const job = sarExportJobService.createJob({ userId: 'USER-1', totalItems: 10 });
+  job.startedAt = Date.now() - 10000;
+  sarExportJobService.updateJobProgress(job.id, { processedItems: 5, totalItems: 10 });
+  const pub = sarExportJobService.toPublicJob(sarExportJobService.getJobForUser(job.id, { id: 'USER-1' }));
+  assert.equal(pub.processedItems, 5);
+  assert.equal(pub.remainingItems, 5);
+  assert.equal(pub.progressPercent, 50);
+  assert.ok(Number(pub.estimatedSecondsRemaining) >= 1);
+});
+
+test('sarExportJobService report jobs store result payload', () => {
+  const job = sarExportJobService.createJob({ userId: 'USER-1', jobType: 'report', totalItems: 1 });
+  sarExportJobService.completeJobWithPayload(job.id, { startDate: '2026-01-01', students: [] });
+  const loaded = sarExportJobService.getJobForUser(job.id, { id: 'USER-1' });
+  assert.equal(loaded.status, 'complete');
+  assert.deepEqual(sarExportJobService.getJobResultPayload(loaded), { startDate: '2026-01-01', students: [] });
+});
+
+test('sarExportConfigService reads report async student threshold', () => {
+  const originalGet = settingService.get;
+  settingService.get = () => ({
+    app: {
+      integrationVariables: [{
+        key: 'SAR_REPORT_ASYNC_MIN_STUDENTS',
+        isSecret: false,
+        value: '3'
+      }]
+    }
+  });
+  delete process.env.SAR_REPORT_ASYNC_MIN_STUDENTS;
+  try {
+    assert.equal(sarExportConfigService.getReportAsyncMinStudents(), 3);
+  } finally {
+    settingService.get = originalGet;
+  }
 });
 
 test('sarExportConfigService enables timing from integration variables', () => {

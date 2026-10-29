@@ -229,6 +229,70 @@
         gap: 0.35rem;
         margin-right: 0 !important;
     }
+    .report-by-funder-modal-dialog {
+        max-width: min(1200px, 96vw);
+        margin: 0.75rem auto;
+    }
+    .report-by-funder-modal-dialog.report-by-funder-modal-dialog--expanded {
+        height: calc(100vh - 1.5rem);
+    }
+    .report-by-funder-modal-content {
+        display: flex;
+        flex-direction: column;
+    }
+    .report-by-funder-modal-dialog.report-by-funder-modal-dialog--expanded .report-by-funder-modal-content {
+        height: 100%;
+        max-height: calc(100vh - 1.5rem);
+    }
+    .report-by-funder-modal-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+    }
+    .report-by-funder-modal-dialog.report-by-funder-modal-dialog--expanded .report-by-funder-modal-body {
+        overflow: hidden;
+    }
+    .report-by-funder-range-chip.active {
+        box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.15);
+    }
+    .report-by-funder-sortable {
+        cursor: pointer;
+        user-select: none;
+        white-space: nowrap;
+    }
+    .report-by-funder-sortable:hover {
+        background: #eef2f6;
+    }
+    .report-by-funder-table-wrap {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: auto;
+        border: 1px solid #e9ecef;
+        border-radius: 10px;
+    }
+    .report-by-funder-table { font-size: 0.95rem; }
+    .report-by-funder-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: #f8f9fa;
+    }
+    .report-by-funder-check-col { width: 2.75rem; }
+    .report-by-funder-student-name {
+        font-size: 1.12rem;
+        font-weight: 700;
+        line-height: 1.25;
+        color: #212529;
+    }
+    .report-by-funder-class-name {
+        font-size: 1.05rem;
+        font-weight: 600;
+        line-height: 1.3;
+        color: #0d3b66;
+    }
+    .report-by-funder-student-id { font-size: 0.78rem; }
+    .report-by-funder-enrollment-detail { font-size: 0.88rem; line-height: 1.45; }
 </style>
 
 <%
@@ -236,9 +300,9 @@
     ? schoolSectionDashboardHref
     : '/dashboard/section-nav/SCHOOL';
   const manageBtns = [
+    '<button type="button" id="btn_openReportByFunderModal" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-diagram-3 me-1"></i> Report By Funder</button>',
     '<a href="/school/attendances" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-clipboard-check me-1"></i> Attendance Matrix</a>',
-    '<a href="/school/settings" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-gear me-1"></i> School Settings</a>',
-    '<a href="/school/grades-matrix" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-table me-1"></i> Grades Matrix</a>'
+    '<a href="/school/settings" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-gear me-1"></i> School Settings</a>'
   ];
   const optionalBtnsBeforePrint = [
     '<button type="button" id="btn_copyReportLink" class="btn btn-outline-primary btn-md me-2 mb-2" title="Copy a shareable link with the current students and date range"><i class="bi bi-link-45deg me-1"></i> Copy Link</button>',
@@ -654,8 +718,10 @@
 <%- include('partials/modal_GenericPicker') %>
 <%- include('school/partials/modal_SchoolEntityPicker') %>
 <%- include('../report/partials/reportMessageHelpers') %>
+<%- include('school/report/partials/reportByFunderModal', { funderPickerOptions: typeof funderPickerOptions !== 'undefined' ? funderPickerOptions : [] }) %>
 <%- include('partials/tablePages-end') %>
 <script src="/scripts/attendanceMarkAppearanceClient.js"></script>
+<script src="/scripts/reportByFunderModal.js"></script>
 
 <script>
 (() => {
@@ -1025,13 +1091,28 @@
         patchSarAttendanceCellsForHistoryMode();
     }
 
-    function showSarReportWaiting() {
-        if (sarReportLoadToken) return sarReportLoadToken;
+    function showSarReportWaiting(options = {}) {
+        const studentCount = Number(options.studentCount) || 0;
+        const studentNote = studentCount
+            ? `Loading ${studentCount} student${studentCount === 1 ? '' : 's'}…`
+            : 'Please wait while student attendance data is loaded…';
+        if (sarReportLoadToken) {
+            if (studentCount > 0) {
+                updateSarLoadingProgress(sarReportLoadToken, {
+                    progress: 0,
+                    note: studentNote,
+                    title: 'Loading Report',
+                    operation: 'Student Attendance Report'
+                });
+            }
+            return sarReportLoadToken;
+        }
         if (typeof window.showLoading === 'function') {
             sarReportLoadToken = window.showLoading({
                 title: 'Loading Report',
-                note: 'Please wait while student attendance data is loaded…',
-                operation: 'Student Attendance Report'
+                note: studentNote,
+                operation: 'Student Attendance Report',
+                progress: 0
             });
             return sarReportLoadToken;
         }
@@ -1040,10 +1121,82 @@
                 if (typeof window.showLoading !== 'function') return;
                 window.clearInterval(sarReportLoadWaitingPoll);
                 sarReportLoadWaitingPoll = null;
-                showSarReportWaiting();
+                showSarReportWaiting(options);
             }, 50);
         }
         return null;
+    }
+
+    const SAR_REPORT_ASYNC_MIN_STUDENTS = 2;
+
+    function formatSarEtaSeconds(seconds) {
+        const total = Math.max(0, Math.ceil(Number(seconds) || 0));
+        if (!total) return '';
+        if (total < 60) return `~${total} sec left`;
+        const minutes = Math.ceil(total / 60);
+        return minutes === 1 ? '~1 min left' : `~${minutes} min left`;
+    }
+
+    function formatSarProgressNote({
+        processed = 0,
+        total = 0,
+        estimatedSecondsRemaining = null,
+        startedAt = 0,
+        unitLabel = 'items'
+    } = {}) {
+        const processedCount = Math.max(0, Number(processed) || 0);
+        const totalCount = Math.max(0, Number(total) || 0);
+        const parts = [];
+        if (totalCount > 0) {
+            const remaining = Math.max(0, totalCount - processedCount);
+            parts.push(`Processed ${processedCount} of ${totalCount} ${unitLabel}`);
+            if (remaining > 0) parts.push(`${remaining} remaining`);
+        }
+        let etaSeconds = estimatedSecondsRemaining;
+        if ((etaSeconds === null || etaSeconds === undefined) && startedAt && processedCount > 0 && totalCount > processedCount) {
+            const elapsedMs = Date.now() - Number(startedAt);
+            const remaining = totalCount - processedCount;
+            etaSeconds = Math.ceil((elapsedMs / processedCount) * remaining / 1000);
+        }
+        const etaLabel = formatSarEtaSeconds(etaSeconds);
+        if (etaLabel) parts.push(etaLabel);
+        return parts.join(' · ') || 'Working…';
+    }
+
+    function updateSarLoadingProgress(loadingToken, patch = {}) {
+        if (!loadingToken || typeof window.updateLoading !== 'function') return;
+        window.updateLoading({
+            title: patch.title,
+            note: patch.note,
+            operation: patch.operation,
+            progress: patch.progress
+        });
+    }
+
+    function applySarJobProgressToLoading(loadingToken, job = {}, { unitLabel = 'items' } = {}) {
+        if (!loadingToken) return;
+        const total = Number(job.totalItems) || 0;
+        const processed = Number(job.processedItems) || 0;
+        const progress = total > 0
+            ? Math.max(0, Math.min(100, Math.round((processed / total) * 100)))
+            : (job.status === 'complete' ? 100 : 0);
+        updateSarLoadingProgress(loadingToken, {
+            progress,
+            note: formatSarProgressNote({
+                processed,
+                total,
+                estimatedSecondsRemaining: job.estimatedSecondsRemaining,
+                startedAt: job.startedAt,
+                unitLabel: job.jobType === 'report' ? 'class loads' : unitLabel
+            })
+        });
+    }
+
+    function applyLoadedReportPayload(payload) {
+        sarLastReportPayload = payload;
+        renderStudentReportSections(payload);
+        syncSarUrlFromFilters();
+        document.getElementById('resultsContainer').classList.remove('d-none');
     }
 
     function hideSarReportWaiting() {
@@ -1062,6 +1215,19 @@
     function runSarReportLoadWhenReady(callback) {
         const run = () => {
             if (typeof window.showLoading !== 'function') {
+                window.setTimeout(run, 50);
+                return;
+            }
+            callback();
+        };
+        if (document.readyState === 'complete') run();
+        else window.addEventListener('load', run, { once: true });
+    }
+
+    function runWhenReportMessageModalReady(callback) {
+        const run = () => {
+            const ready = typeof window.showMessageModal === 'function' && document.getElementById('messageModal');
+            if (!ready) {
                 window.setTimeout(run, 50);
                 return;
             }
@@ -1394,6 +1560,12 @@
                 name: studentDisplayName(item)
             };
         }).filter((row) => row.studentRecordId);
+    }
+
+    function replaceSelectedStudents(items) {
+        selectedStudents = normalizeSelectedStudentItems(items);
+        renderSelectedStudents();
+        syncSarUrlFromFilters();
     }
 
     function renderSelectedStudents() {
@@ -1845,13 +2017,49 @@
 
         const loadBtn = document.getElementById('btn_loadData');
         const loadBtnHtml = loadBtn?.innerHTML;
-        showSarReportWaiting();
+        const loadWaitingToken = showSarReportWaiting({ studentCount: studentIds.length });
         if (loadBtn) {
             loadBtn.disabled = true;
             loadBtn.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
         }
 
         try {
+            const filters = { startDate, endDate, studentIds };
+            if (studentIds.length >= SAR_REPORT_ASYNC_MIN_STUDENTS) {
+                const response = await fetch('/school/attendances/report/api/data-async', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        Accept: 'application/json',
+                        'X-AJAX-Request': 'true'
+                    },
+                    body: new URLSearchParams({
+                        startDate,
+                        endDate,
+                        studentIds: studentIds.join(',')
+                    }).toString()
+                });
+                if (response.status !== 202) {
+                    const errPayload = await response.json().catch(() => null);
+                    throw new Error(errPayload?.message || `Could not start report load (${response.status}).`);
+                }
+                const accepted = await response.json().catch(() => null);
+                const jobId = accepted?.job?.jobId || accepted?.jobId;
+                if (!jobId) {
+                    throw new Error('Report load did not return a job id.');
+                }
+                const pollResult = await pollSarExportJob(jobId, filters, loadWaitingToken);
+                if (pollResult?.type === 'report' && pollResult.payload) {
+                    applyLoadedReportPayload(pollResult.payload);
+                }
+                return;
+            }
+
+            updateSarLoadingProgress(loadWaitingToken, {
+                progress: 0,
+                note: `Loading ${studentIds.length} student${studentIds.length === 1 ? '' : 's'}…`
+            });
             const params = new URLSearchParams();
             params.set('startDate', startDate);
             params.set('endDate', endDate);
@@ -1865,10 +2073,10 @@
                 throw new Error(payload.message || 'Could not load student attendance report.');
             }
 
-            sarLastReportPayload = payload;
-            renderStudentReportSections(payload);
-            syncSarUrlFromFilters();
-            document.getElementById('resultsContainer').classList.remove('d-none');
+            updateSarLoadingProgress(loadWaitingToken, { progress: 100, note: 'Report loaded.' });
+            applyLoadedReportPayload(payload);
+        } catch (error) {
+            showReportMessage({ icon: 'error', message: error.message || 'Load failed.' });
         } finally {
             hideSarReportWaiting();
             if (loadBtn) {
@@ -2581,11 +2789,13 @@
         if (typeof window.showLoading !== 'function') return null;
         const label = getSarExportLoadingLabel(format);
         const count = Number(targetCount) || 1;
-        const countLabel = count > 1 ? `${count} selected report${count === 1 ? '' : 's'}` : 'selected report';
+        const countLabel = count > 1 ? `${count} selected reports` : 'selected report';
         return window.showLoading({
             title: 'Exporting Reports',
-            note: `Generating ${label} for ${countLabel}. Please wait…`,
-            operation: `Export ${label}`
+            note: formatSarProgressNote({ processed: 0, total: count, unitLabel: 'reports' })
+                || `Generating ${label} for ${countLabel}. Please wait…`,
+            operation: `Export ${label}`,
+            progress: 0
         });
     }
 
@@ -2618,24 +2828,44 @@
         URL.revokeObjectURL(url);
     }
 
-    async function pollSarExportJob(jobId, filters) {
+    async function pollSarExportJob(jobId, filters, loadingToken = null) {
         const maxAttempts = 450;
+        const pollMs = 1500;
+        const maxBackoffMs = 30000;
         for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-            const statusResponse = await fetch(`/school/attendances/report/api/export-jobs/${encodeURIComponent(jobId)}`, {
+            const statusResponse = await fetch(`/school/attendances/report/api/report-jobs/${encodeURIComponent(jobId)}`, {
                 credentials: 'same-origin',
                 headers: { 'X-AJAX-Request': 'true', Accept: 'application/json' }
             });
+            if (statusResponse.status === 429) {
+                const retryAfterHeader = statusResponse.headers.get('Retry-After');
+                const retrySec = Number.parseInt(String(retryAfterHeader || ''), 10);
+                const delayMs = Number.isFinite(retrySec) && retrySec > 0
+                    ? Math.min(retrySec * 1000, maxBackoffMs)
+                    : Math.min(pollMs * 4, maxBackoffMs);
+                await new Promise((resolve) => setTimeout(resolve, delayMs));
+                continue;
+            }
             const statusPayload = await statusResponse.json().catch(() => null);
             if (!statusResponse.ok || statusPayload?.status !== 'success') {
                 throw new Error(statusPayload?.message || `Could not check export status (${statusResponse.status}).`);
             }
             const job = statusPayload.job || {};
+            applySarJobProgressToLoading(loadingToken, job, { unitLabel: 'reports' });
             if (job.status === 'failed') {
                 throw new Error(job.error || 'Background export failed.');
             }
             if (job.status === 'complete') {
+                if (job.jobType === 'report') {
+                    const reportPayload = statusPayload.reportPayload;
+                    if (!reportPayload || reportPayload.status !== 'success') {
+                        throw new Error(reportPayload?.message || 'Report load failed.');
+                    }
+                    updateSarLoadingProgress(loadingToken, { progress: 100, note: 'Report loaded.' });
+                    return { type: 'report', payload: reportPayload };
+                }
                 const downloadUrl = statusPayload.downloadUrl
-                    || `/school/attendances/report/api/export-jobs/${encodeURIComponent(jobId)}/download`;
+                    || `/school/attendances/report/api/report-jobs/${encodeURIComponent(jobId)}/download`;
                 const downloadResponse = await fetch(downloadUrl, {
                     credentials: 'same-origin',
                     headers: { 'X-AJAX-Request': 'true', Accept: 'application/octet-stream' }
@@ -2646,10 +2876,11 @@
                 }
                 const blob = await downloadResponse.blob();
                 const fileName = job.fileName || `student_attendance_export_${filters.startDate}_${filters.endDate}`;
+                updateSarLoadingProgress(loadingToken, { progress: 100, note: 'Download starting…' });
                 await downloadSarExportBlob(blob, fileName);
-                return;
+                return { type: 'export' };
             }
-            await new Promise((resolve) => setTimeout(resolve, 2000));
+            await new Promise((resolve) => setTimeout(resolve, pollMs));
         }
         throw new Error('Export is taking longer than expected. Try again with fewer reports or check server logs.');
     }
@@ -2674,6 +2905,9 @@
                 targets: JSON.stringify(targets)
             };
             if (bundleMode) params.bundleMode = bundleMode;
+            if (targets.length >= 2 || exportOptions.forceAsync) {
+                params.async = '1';
+            }
             const response = await fetch('/school/attendances/report/api/export', {
                 method: 'POST',
                 credentials: 'same-origin',
@@ -2691,7 +2925,7 @@
                 if (!jobId) {
                     throw new Error('Server accepted a background export but did not return a job id.');
                 }
-                await pollSarExportJob(jobId, filters);
+                await pollSarExportJob(jobId, filters, loadingToken);
                 showReportMessage({ icon: 'success', message: 'Export downloaded successfully.' });
                 return;
             }
@@ -2701,6 +2935,7 @@
                 throw new Error(payload?.message || `Export failed (${response.status}).`);
             }
 
+            updateSarLoadingProgress(loadingToken, { progress: 100, note: 'Download starting…' });
             const blob = await response.blob();
             const disposition = response.headers.get('Content-Disposition') || '';
             const fileNameMatch = disposition.match(/filename="([^"]+)"/i);
@@ -2734,13 +2969,21 @@
         }
 
         if (exportBtn) exportBtn.disabled = true;
+        const exportPlanLoadingToken = typeof window.showLoading === 'function'
+            ? window.showLoading({
+                title: 'Loading Export Options',
+                note: 'Preparing export choices for the selected students…',
+                operation: 'Student Attendance Report',
+                progress: 0
+            })
+            : null;
         try {
             const params = new URLSearchParams();
             params.set('startDate', filters.startDate);
             params.set('endDate', filters.endDate);
             params.set('studentIds', filters.studentIds.join(','));
 
-            const response = await fetch(`/school/attendances/report/api/export-plan?${params.toString()}`, {
+            const response = await fetch(`/school/attendances/report/api/report-plan?${params.toString()}`, {
                 credentials: 'same-origin',
                 headers: { 'X-AJAX-Request': 'true' }
             });
@@ -2757,6 +3000,9 @@
             showReportMessage({ icon: 'error', message: formatSarFetchError(error, 'Could not load export options.') });
         } finally {
             loadingEl?.classList.add('d-none');
+            if (exportPlanLoadingToken && typeof window.hideLoading === 'function') {
+                window.hideLoading(exportPlanLoadingToken);
+            }
             if (exportBtn && canGenerateReport && canExportReport) exportBtn.disabled = false;
         }
     }
@@ -2895,7 +3141,7 @@
             const bundleMode = scope === 'overall' && (normalizedFormat === 'docx' || normalizedFormat === 'pdf')
                 ? 'merge'
                 : '';
-            runSarExport(format, targets, { bundleMode }).catch((error) => {
+            runSarExport(format, targets, { bundleMode, forceAsync: true }).catch((error) => {
                 showReportMessage({ icon: 'error', message: error.message || 'Export failed.' });
             });
         }
@@ -3014,10 +3260,96 @@
 
     syncSarUrlFromFilters();
 
-    if ((initialStudents.length || initialStudentIds.length) && initialStartDate && initialEndDate) {
-        showSarReportWaiting();
+    if (typeof window.ReportByFunderModal !== 'undefined' && typeof window.ReportByFunderModal.init === 'function') {
+        window.ReportByFunderModal.init({
+            apiUrl: '/school/attendances/report/api/funder-students',
+            escapeHtml,
+            showReportMessage,
+            setDateRange,
+            replaceSelectedStudents,
+            loadReport: loadStudentAttendanceReport
+        });
+    }
+
+    function buildSarSharedLinkConfirmHtml({ startDate = '', endDate = '', studentCount = 0 } = {}) {
+        const start = escapeHtml(String(startDate || '').trim());
+        const end = escapeHtml(String(endDate || '').trim());
+        const count = Math.max(0, Number(studentCount) || 0);
+        const studentLabel = count === 1 ? '1 student' : `${count} students`;
+        return (
+            '<div class="text-start sar-shared-link-prompt">'
+            + '<p class="mb-3">This page was opened from a <strong>shared link</strong>.</p>'
+            + '<p class="small text-muted text-uppercase fw-semibold mb-2">Applied from the link</p>'
+            + '<ul class="list-unstyled mb-3 border rounded bg-light px-3 py-2">'
+            + `<li class="mb-2 d-flex align-items-start gap-2">`
+            + '<i class="bi bi-calendar-range text-primary mt-1"></i>'
+            + '<span><span class="text-muted d-block small">Date range</span>'
+            + `<strong>${start}</strong> <span class="text-muted">to</span> <strong>${end}</strong></span></li>`
+            + `<li class="mb-0 d-flex align-items-start gap-2">`
+            + '<i class="bi bi-people text-primary mt-1"></i>'
+            + `<span><span class="text-muted d-block small">Students selected</span><strong>${escapeHtml(studentLabel)}</strong></span></li>`
+            + '</ul>'
+            + '<p class="mb-0">Load the report now with these settings, or choose <strong>Not now</strong> to review the filters first.</p>'
+            + '</div>'
+        );
+    }
+
+    function buildSarSharedLinkDeclinedHtml() {
+        return (
+            '<div class="text-start sar-shared-link-prompt">'
+            + '<p class="mb-2">No report was loaded.</p>'
+            + '<p class="mb-2">The date range and students from the link are still shown in the filter panel.</p>'
+            + '<p class="mb-0">When you are ready, click <strong>Load</strong> to run the report.</p>'
+            + '</div>'
+        );
+    }
+
+    async function promptLoadReportFromUrlLink() {
+        const studentCount = selectedStudents.length;
+        let confirmed = false;
+        if (window.ReportMessaging?.confirmReportAction) {
+            confirmed = await window.ReportMessaging.confirmReportAction({
+                title: 'Open report from link?',
+                icon: 'info',
+                html: true,
+                message: buildSarSharedLinkConfirmHtml({
+                    startDate: initialStartDate,
+                    endDate: initialEndDate,
+                    studentCount
+                }),
+                confirmText: 'Load report',
+                cancelText: 'Not now',
+                confirmClass: 'btn-primary'
+            });
+        }
+        if (!confirmed) {
+            if (window.ReportMessaging?.showReportMessage) {
+                await window.ReportMessaging.showReportMessage({
+                    title: 'Student Attendance Report',
+                    icon: 'info',
+                    html: true,
+                    message: buildSarSharedLinkDeclinedHtml()
+                });
+            } else {
+                await showReportMessage({
+                    icon: 'info',
+                    message: 'The link settings are on the page. When you are ready, click Load to run the report.'
+                });
+            }
+            return;
+        }
         runSarReportLoadWhenReady(() => {
             loadStudentAttendanceReport().catch((error) => showReportMessage({ icon: 'error', message: error.message || 'Load failed.' }));
+        });
+    }
+
+    const sarOpenedFromUrlQuery = Boolean(
+        (initialStudents.length || initialStudentIds.length) && initialStartDate && initialEndDate
+    );
+
+    if (sarOpenedFromUrlQuery) {
+        runWhenReportMessageModalReady(() => {
+            void promptLoadReportFromUrlLink();
         });
     }
 })();

@@ -26,8 +26,16 @@ function getAsyncExportMinTargets() {
   return Math.min(parsed, 100);
 }
 
+function getReportAsyncMinStudents() {
+  const raw = String(getIntegrationVariableService().getIntegrationVariable('SAR_REPORT_ASYNC_MIN_STUDENTS') || '2').trim();
+  const parsed = Number.parseInt(raw, 10);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 2;
+  return Math.min(parsed, 50);
+}
+
 module.exports = {
   getExportConcurrency,
   isExportTimingEnabled,
-  getAsyncExportMinTargets
+  getAsyncExportMinTargets,
+  getReportAsyncMinStudents
 };

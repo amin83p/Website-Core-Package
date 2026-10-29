@@ -213,33 +213,47 @@ async function buildSemiMonthlyReportPayload(req, options = {}) {
     .filter((row) => classBelongsToActiveOrg(row, activeOrgId))
     .filter(isActiveClass);
 
+  const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
+  const classTotal = activeClasses.length;
+  let classProcessed = 0;
+  if (onProgress && classTotal > 0) {
+    onProgress({ processed: 0, total: classTotal, phase: 'classes' });
+  }
+
   const canonicalStatuses = classEnrollmentReadService.HISTORICAL_ROLLING_ROSTER_STATUSES;
 
   const enrollmentMatches = await runWithConcurrency(activeClasses, 6, async (classRow) => {
-    const classId = String(classRow?.id || '').trim();
-    if (!classId) return null;
+    try {
+      const classId = String(classRow?.id || '').trim();
+      if (!classId) return null;
 
-    const enrollmentSnapshot = await classEnrollmentReadService.listActiveStudentIdsForClass({
-      classId,
-      classItem: classRow,
-      reqUser: req.user,
-      activeOrgId,
-      startDate,
-      endDate,
-      canonicalStatuses
-    });
-    const enrolledStudentIds = enrollmentSnapshot.studentIds instanceof Set
-      ? enrollmentSnapshot.studentIds
-      : new Set();
-    const matchedStudentIds = [...selectedStudentIdSet].filter((studentId) => enrolledStudentIds.has(studentId));
-    if (!matchedStudentIds.length) return null;
+      const enrollmentSnapshot = await classEnrollmentReadService.listActiveStudentIdsForClass({
+        classId,
+        classItem: classRow,
+        reqUser: req.user,
+        activeOrgId,
+        startDate,
+        endDate,
+        canonicalStatuses
+      });
+      const enrolledStudentIds = enrollmentSnapshot.studentIds instanceof Set
+        ? enrollmentSnapshot.studentIds
+        : new Set();
+      const matchedStudentIds = [...selectedStudentIdSet].filter((studentId) => enrolledStudentIds.has(studentId));
+      if (!matchedStudentIds.length) return null;
 
-    return {
-      classId,
-      className: String(classRow?.name || classRow?.title || classId).trim(),
-      teacherName: String(classRow?.instructors?.[0]?.name || classRow?.teacherName || '').trim(),
-      matchedStudentIds
-    };
+      return {
+        classId,
+        className: String(classRow?.name || classRow?.title || classId).trim(),
+        teacherName: String(classRow?.instructors?.[0]?.name || classRow?.teacherName || '').trim(),
+        matchedStudentIds
+      };
+    } finally {
+      if (onProgress && classTotal > 0) {
+        classProcessed += 1;
+        onProgress({ processed: classProcessed, total: classTotal, phase: 'classes' });
+      }
+    }
   });
 
   enrollmentMatches.filter(Boolean).forEach((match) => {

@@ -203,12 +203,22 @@ router.get('/semi-monthly/api/data',
   trackActionState(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ, { keepActive: true }),
   semiMonthlyCtrl.getSemiMonthlyReportData);
 
+router.post('/semi-monthly/api/data-async',
+  requireAccess(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ),
+  trackActionState(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ, { keepActive: true }),
+  semiMonthlyCtrl.startSemiMonthlyReportDataJob);
+
+router.get('/semi-monthly/api/report-jobs/:jobId',
+  requireAccess(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ),
+  trackActionState(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ, { keepActive: true }),
+  semiMonthlyCtrl.getSemiMonthlyReportJob);
+
 router.get('/semi-monthly/api/funder-students',
   requireAccess(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ),
   trackActionState(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ, { keepActive: true }),
   semiMonthlyCtrl.getFunderStudentSelection);
 
-router.get('/semi-monthly/api/export-plan',
+router.get('/semi-monthly/api/report-plan',
   requireAccess(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ),
   trackActionState(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ, { keepActive: true }),
   semiMonthlyCtrl.getExportPlan);

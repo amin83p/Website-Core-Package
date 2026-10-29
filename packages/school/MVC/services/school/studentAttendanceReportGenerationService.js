@@ -961,45 +961,58 @@ async function exportStudentAttendanceReportSelections(req, options = {}) {
 
   const studentMap = new Map(ctx.students.map((row) => [clean(row.personId), row]));
   const concurrency = parseExportConcurrency();
+  const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
+  const totalTargets = targets.length;
+  let processedTargets = 0;
+  if (onProgress) {
+    onProgress({ processed: 0, total: totalTargets, phase: 'export' });
+  }
 
   const files = await runWithConcurrency(targets, concurrency, async (target) => {
-    const type = clean(target?.type).toLowerCase();
-    const studentId = clean(target?.studentId);
-    const student = studentMap.get(studentId);
-    if (!student) {
-      const error = new Error(`Student ${studentId || '(unknown)'} was not found in the current selection.`);
-      error.statusCode = 400;
-      throw error;
-    }
-
-    if (type === 'class') {
-      const classId = clean(target?.classId);
-      if (!classId) {
-        const error = new Error('Class export targets require classId.');
+    try {
+      const type = clean(target?.type).toLowerCase();
+      const studentId = clean(target?.studentId);
+      const student = studentMap.get(studentId);
+      if (!student) {
+        const error = new Error(`Student ${studentId || '(unknown)'} was not found in the current selection.`);
         error.statusCode = 400;
         throw error;
       }
-      return exportClassTarget(student, classId, format, ctx, req.user, exportBatchCache);
-    }
 
-    if (type === 'overall') {
-      const classIds = Array.isArray(target?.classIds)
-        ? target.classIds.map((id) => clean(id)).filter(Boolean)
-        : [];
-      return exportOverallTarget(
-        student,
-        classIds,
-        clean(target?.overallTemplateId),
-        format,
-        ctx,
-        req.user,
-        clean(target?.templateVariantKey)
-      );
-    }
+      if (type === 'class') {
+        const classId = clean(target?.classId);
+        if (!classId) {
+          const error = new Error('Class export targets require classId.');
+          error.statusCode = 400;
+          throw error;
+        }
+        return exportClassTarget(student, classId, format, ctx, req.user, exportBatchCache);
+      }
 
-    const error = new Error(`Unsupported export target type: ${type || '(empty)'}.`);
-    error.statusCode = 400;
-    throw error;
+      if (type === 'overall') {
+        const classIds = Array.isArray(target?.classIds)
+          ? target.classIds.map((id) => clean(id)).filter(Boolean)
+          : [];
+        return exportOverallTarget(
+          student,
+          classIds,
+          clean(target?.overallTemplateId),
+          format,
+          ctx,
+          req.user,
+          clean(target?.templateVariantKey)
+        );
+      }
+
+      const error = new Error(`Unsupported export target type: ${type || '(empty)'}.`);
+      error.statusCode = 400;
+      throw error;
+    } finally {
+      processedTargets += 1;
+      if (onProgress) {
+        onProgress({ processed: processedTargets, total: totalTargets, phase: 'export' });
+      }
+    }
   });
   exportTimer.mark('targets_complete', { fileCount: files.length });
 

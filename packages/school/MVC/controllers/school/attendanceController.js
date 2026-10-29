@@ -39,6 +39,8 @@ const {
     userCanMarkAttendanceExcused
 } = require('../../services/school/attendanceMatrixAccessService');
 const attendanceAccessService = require('../../services/school/attendanceAccessService');
+const reportFunderDocxService = require('../../services/school/reportFunderDocxService');
+const schoolSemiMonthlyReportByFunderService = require('../../services/school/schoolSemiMonthlyReportByFunderService');
 const sessionManagementService = require('../../services/school/sessionManagementService');
 const attendanceOperationPolicyService = require('../../services/school/attendanceOperationPolicyService');
 const attendanceEnrollmentNaLockService = require('../../services/school/attendanceEnrollmentNaLockService');
@@ -1644,6 +1646,10 @@ async function showStudentAttendanceReportPage(req, res) {
         const reportTemplate = policy.reportTemplateId
             ? await schoolDataService.getDataById('reportTemplates', policy.reportTemplateId, req.user)
             : null;
+        const activeFunders = activeOrgId
+            ? await reportFunderDocxService.loadActiveFunderOptions(req.user, activeOrgId).catch(() => [])
+            : [];
+        const funderPickerOptions = reportFunderDocxService.buildFunderPickerOptions(activeFunders);
         const overallReportTemplateLabels = [];
         for (const overallTemplateId of policy.overallReportTemplateIds || []) {
             // eslint-disable-next-line no-await-in-loop
@@ -1676,10 +1682,26 @@ async function showStudentAttendanceReportPage(req, res) {
                 policy.reportTemplateId
             ),
             overallReportTemplateLabel: overallReportTemplateLabels[0]?.label || '',
-            overallReportTemplateLabels
+            overallReportTemplateLabels,
+            funderPickerOptions
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+    }
+}
+
+async function getFunderStudentSelection(req, res) {
+    try {
+        const payload = await schoolSemiMonthlyReportByFunderService.buildFunderStudentSelectionPayload(req);
+        return res.json({
+            status: 'success',
+            ...payload
+        });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            message: error.message || 'Could not load students for funder.'
+        });
     }
 }
 
@@ -1724,6 +1746,58 @@ async function getStudentAttendanceReportData(req, res) {
         });
     } catch (error) {
         res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
+async function startStudentAttendanceReportDataJob(req, res) {
+    try {
+        const reportAccess = await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip);
+        if (!reportAccess.canOpenReport) {
+            return res.status(403).json({
+                status: 'error',
+                message: 'You do not have permission to view student attendance reports.'
+            });
+        }
+        const studentAttendanceReportService = require('../../services/school/studentAttendanceReportService');
+        const sarExportJobService = require('../../services/school/sarExportJobService');
+        const body = req.body && typeof req.body === 'object' ? req.body : {};
+        const fauxReq = {
+            user: req.user,
+            query: {
+                startDate: body.startDate || req.query?.startDate,
+                endDate: body.endDate || req.query?.endDate,
+                studentIds: body.studentIds || req.query?.studentIds
+            }
+        };
+        const job = sarExportJobService.createJob({
+            userId: req.user?.id || req.user?.userId,
+            activeOrgId: req.user?.activeOrgId,
+            jobType: 'report',
+            totalItems: 0
+        });
+        sarExportJobService.startJob(job.id, async (runningJob) => {
+            const reportPayload = await studentAttendanceReportService.buildStudentAttendanceReportPayload(fauxReq, {
+                onProgress: ({ processed, total, phase }) => {
+                    sarExportJobService.updateJobProgress(runningJob.id, {
+                        processedItems: processed,
+                        totalItems: total,
+                        phase: phase || 'classMatrix'
+                    });
+                }
+            });
+            return { reportPayload };
+        });
+        return res.status(202).json({
+            status: 'accepted',
+            async: true,
+            job: sarExportJobService.toPublicJob(job),
+            pollUrl: `/school/attendances/report/api/report-jobs/${job.id}`
+        });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            message: error.message || 'Could not start report load.'
+        });
     }
 }
 
@@ -1837,16 +1911,26 @@ async function exportStudentAttendanceReport(req, res) {
         if (shouldRunSarExportAsync(body, targets.length)) {
             const job = sarExportJobService.createJob({
                 userId: req.user?.id || req.user?.userId,
-                activeOrgId: req.user?.activeOrgId
+                activeOrgId: req.user?.activeOrgId,
+                jobType: 'export',
+                totalItems: targets.length
             });
-            sarExportJobService.startJob(job.id, () =>
-                studentAttendanceReportGenerationService.exportStudentAttendanceReportSelections(fauxReq)
+            sarExportJobService.startJob(job.id, (runningJob) =>
+                studentAttendanceReportGenerationService.exportStudentAttendanceReportSelections(fauxReq, {
+                    onProgress: ({ processed, total }) => {
+                        sarExportJobService.updateJobProgress(runningJob.id, {
+                            processedItems: processed,
+                            totalItems: total,
+                            phase: 'export'
+                        });
+                    }
+                })
             );
             return res.status(202).json({
                 status: 'accepted',
                 async: true,
                 job: sarExportJobService.toPublicJob(job),
-                pollUrl: `/school/attendances/report/api/export-jobs/${job.id}`
+                pollUrl: `/school/attendances/report/api/report-jobs/${job.id}`
             });
         }
 
@@ -1872,20 +1956,37 @@ async function exportStudentAttendanceReport(req, res) {
 async function getStudentAttendanceReportExportJob(req, res) {
     try {
         const reportAccess = await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip);
+        const sarExportJobService = require('../../services/school/sarExportJobService');
+        const jobId = String(req.params?.jobId || '').trim();
+        const job = sarExportJobService.getJobForUser(jobId, req.user);
+        if (job.jobType === 'report') {
+            if (!reportAccess.canOpenReport) {
+                return res.status(403).json({
+                    status: 'error',
+                    message: 'You do not have permission to view student attendance reports.'
+                });
+            }
+            const reportPayload = job.status === 'complete'
+                ? sarExportJobService.getJobResultPayload(job)
+                : null;
+            return res.json({
+                status: 'success',
+                job: sarExportJobService.toPublicJob(job),
+                downloadUrl: '',
+                reportPayload: reportPayload ? { status: 'success', ...reportPayload } : null
+            });
+        }
         if (!reportAccess.canExportReport) {
             return res.status(403).json({
                 status: 'error',
                 message: 'You do not have permission to export student attendance reports.'
             });
         }
-        const sarExportJobService = require('../../services/school/sarExportJobService');
-        const jobId = String(req.params?.jobId || '').trim();
-        const job = sarExportJobService.getJobForUser(jobId, req.user);
         return res.json({
             status: 'success',
             job: sarExportJobService.toPublicJob(job),
             downloadUrl: job.status === 'complete'
-                ? `/school/attendances/report/api/export-jobs/${job.id}/download`
+                ? `/school/attendances/report/api/report-jobs/${job.id}/download`
                 : ''
         });
     } catch (error) {
@@ -2003,6 +2104,8 @@ module.exports = {
     buildAttendanceMatrixPayload,
     getAttendanceData,
     getStudentAttendanceReportData,
+    startStudentAttendanceReportDataJob,
+    getFunderStudentSelection,
     postAttendanceRollups,
     exportAttendanceExcel,
     uploadAttendanceFile,
