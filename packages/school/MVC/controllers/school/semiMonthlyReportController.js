@@ -3,9 +3,11 @@
 const semiMonthlyReportPolicyModel = require('../../models/school/semiMonthlyReportPolicyModel');
 const semiMonthlyReportPolicyService = require('../../services/school/semiMonthlyReportPolicyService');
 const schoolSemiMonthlyReportService = require('../../services/school/schoolSemiMonthlyReportService');
+const schoolSemiMonthlyReportByFunderService = require('../../services/school/schoolSemiMonthlyReportByFunderService');
 const schoolSemiMonthlyReportExportService = require('../../services/school/schoolSemiMonthlyReportExportService');
 const studentAttendanceReportService = require('../../services/school/studentAttendanceReportService');
 const reportViewService = require('../../services/school/reportViewService');
+const reportFunderDocxService = require('../../services/school/reportFunderDocxService');
 
 function parseIdListParam(value = '') {
   if (Array.isArray(value)) {
@@ -35,6 +37,10 @@ async function showSemiMonthlyReportPage(req, res) {
     const configuredOverallCount = semiMonthlyReportPolicyService.normalizeIdList(
       policy.overallReportTemplateIds
     ).length;
+    const activeFunders = activeOrgId
+      ? await reportFunderDocxService.loadActiveFunderOptions(req.user, activeOrgId).catch(() => [])
+      : [];
+    const funderPickerOptions = reportFunderDocxService.buildFunderPickerOptions(activeFunders);
     res.render('school/report/semiMonthlyReportViewer', {
       title: 'School Semi-Monthly Report',
       includeModal: true,
@@ -47,7 +53,8 @@ async function showSemiMonthlyReportPage(req, res) {
       initialStudents,
       configuredTemplateCount: (policy.reportTemplateIds || []).length,
       configuredOverallCount,
-      canExportReport
+      canExportReport,
+      funderPickerOptions
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
@@ -100,6 +107,21 @@ async function getExportPlan(req, res) {
   }
 }
 
+async function getFunderStudentSelection(req, res) {
+  try {
+    const payload = await schoolSemiMonthlyReportByFunderService.buildFunderStudentSelectionPayload(req);
+    return res.json({
+      status: 'success',
+      ...payload
+    });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 400).json({
+      status: 'error',
+      message: error.message || 'Could not load students for funder.'
+    });
+  }
+}
+
 async function exportSelections(req, res) {
   try {
     const canExportReport = await reportViewService.canExportReportInstance(req.user);
@@ -140,6 +162,7 @@ async function exportSelections(req, res) {
 module.exports = {
   showSemiMonthlyReportPage,
   getSemiMonthlyReportData,
+  getFunderStudentSelection,
   getExportPlan,
   exportSelections
 };

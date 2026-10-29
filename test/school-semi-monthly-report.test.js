@@ -84,6 +84,39 @@ test('semi-monthly report header shortcut targets reports dashboard', () => {
   assert.match(view, /aria-keyshortcuts="Alt\+Shift\+R"/);
 });
 
+test('semi-monthly report toolbar second row links Report By Funder and settings only', () => {
+  const view = fs.readFileSync(
+    path.join(__dirname, '../packages/school/MVC/views/school/report/semiMonthlyReportViewer.ejs'),
+    'utf8'
+  );
+  const manageBlock = view.slice(view.indexOf('const manageBtns = ['), view.indexOf('];', view.indexOf('const manageBtns = [')) + 2);
+  assert.match(manageBlock, /Report By Funder/);
+  assert.match(manageBlock, /btn btn-outline-primary btn-md mb-2/);
+  assert.match(manageBlock, /id="btn_openSmmrByFunderModal"/);
+  assert.doesNotMatch(manageBlock, /\/school\/reports\/semi-monthly\/by-funder/);
+  assert.doesNotMatch(manageBlock, /Report Instances/);
+  assert.doesNotMatch(manageBlock, /School Reports/);
+});
+
+test('semi-monthly report viewer includes Report By Funder modal and API', () => {
+  const view = fs.readFileSync(
+    path.join(__dirname, '../packages/school/MVC/views/school/report/semiMonthlyReportViewer.ejs'),
+    'utf8'
+  );
+  const modalPartial = fs.readFileSync(
+    path.join(__dirname, '../packages/school/MVC/views/school/report/partials/smmrByFunderModal.ejs'),
+    'utf8'
+  );
+  const modalJs = fs.readFileSync(
+    path.join(__dirname, '../packages/school/public/scripts/semiMonthlyReportByFunderModal.js'),
+    'utf8'
+  );
+  assert.match(view, /smmrByFunderModal/);
+  assert.match(view, /semiMonthlyReportByFunderModal\.js/);
+  assert.match(modalPartial, /id="smmrByFunderModal"/);
+  assert.match(modalJs, /\/school\/reports\/semi-monthly\/api\/funder-students/);
+});
+
 test('semi-monthly report viewer wires picker and data API', () => {
   const view = fs.readFileSync(
     path.join(__dirname, '../packages/school/MVC/views/school/report/semiMonthlyReportViewer.ejs'),
@@ -109,7 +142,9 @@ test('semi-monthly export routes are registered', () => {
   );
   assert.match(routes, /\/semi-monthly\/api\/export-plan/);
   assert.match(routes, /\/semi-monthly\/api\/export/);
+  assert.match(routes, /\/semi-monthly\/api\/funder-students/);
   assert.match(routes, /semiMonthlyCtrl\.getExportPlan/);
+  assert.match(routes, /semiMonthlyCtrl\.getFunderStudentSelection/);
   assert.match(routes, /semiMonthlyCtrl\.exportSelections/);
 });
 

@@ -47,7 +47,28 @@
     return { setDevice };
   }
 
+  function prepareEmailPreviewSrcdoc(html) {
+    let doc = String(html || '');
+    if (!doc) return '';
+    const origin = String(window.location.origin || '').trim().replace(/\/$/, '');
+    if (origin) {
+      doc = doc.replace(/\bsrc=(["'])(\/[^"']+)\1/gi, (_, quote, path) => `src=${quote}${origin}${path}${quote}`);
+      doc = doc.replace(
+        /\bsrc=(["'])https?:\/\/[^"']+(\/uploads\/[^"']+)\1/gi,
+        (_, quote, path) => `src=${quote}${origin}${path}${quote}`
+      );
+      doc = doc.replace(/\bhref=(["'])(\/uploads\/[^"']+)\1/gi, (_, quote, path) => `href=${quote}${origin}${path}${quote}`);
+    }
+    if (/<base[\s>]/i.test(doc)) return doc;
+    if (/<head[\s>]/i.test(doc)) {
+      const safeOrigin = origin ? `${origin}/` : '/';
+      return doc.replace(/<head(\s[^>]*)?>/i, (match) => `${match}<base href="${safeOrigin.replace(/"/g, '&quot;')}">`);
+    }
+    return doc;
+  }
+
   window.NotificationCenterEmailPreviewDevices = {
-    bindDevicePreview
+    bindDevicePreview,
+    prepareEmailPreviewSrcdoc
   };
 })();

@@ -291,5 +291,6 @@ module.exports = {
   isPastPeriod,
   isOpenWorkflowPeriod,
   isValidForSessionsToday,
-  markValidEnrollmentOnPeriodRows
+  markValidEnrollmentOnPeriodRows,
+  matchesFunderFilter
 };

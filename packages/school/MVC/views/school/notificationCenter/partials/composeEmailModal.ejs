@@ -17,6 +17,11 @@
     background: linear-gradient(90deg, rgba(var(--bs-primary-rgb), 0.1), transparent);
     border-bottom: 1px solid rgba(var(--bs-primary-rgb), 0.15);
     padding: 1rem 1.25rem;
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem;
   }
   .nc-schedule-email-modal .modal-title {
     font-weight: 700;
@@ -108,7 +113,8 @@
     background: #e9ecef;
     border-radius: 8px;
     padding: 12px;
-    overflow: auto;
+    overflow-x: hidden;
+    overflow-y: auto;
   }
   .nc-schedule-email-modal .nc-compose-preview-shell {
     border: 1px solid var(--bs-border-color);
@@ -123,7 +129,8 @@
     transition: max-width 0.2s ease;
   }
   .nc-schedule-email-modal .nc-compose-preview-shell.nc-preview--mobile {
-    max-width: 375px;
+    max-width: min(375px, 100%);
+    width: 100%;
   }
   .nc-schedule-email-modal .nc-compose-preview-shell.nc-preview--tablet {
     max-width: 768px;
@@ -147,6 +154,17 @@
     .nc-schedule-email-modal .modal-dialog.nc-schedule-email-modal__dialog {
       height: calc(100vh - 1rem);
       margin: 0.5rem auto;
+      width: calc(100% - 0.75rem);
+    }
+    .nc-schedule-email-modal .nc-compose-preview-outer {
+      padding: 6px;
+    }
+    .nc-schedule-email-modal .nc-compose-preview-shell,
+    .nc-schedule-email-modal .nc-compose-preview-shell.nc-preview--mobile,
+    .nc-schedule-email-modal .nc-compose-preview-shell.nc-preview--tablet,
+    .nc-schedule-email-modal .nc-compose-preview-shell.nc-preview--desktop {
+      max-width: 100%;
+      width: 100%;
     }
   }
 </style>
@@ -155,13 +173,13 @@
   <div class="modal-dialog nc-schedule-email-modal__dialog modal-dialog-centered">
     <div class="modal-content d-flex flex-column">
       <div class="modal-header border-bottom-0 flex-shrink-0">
-        <div>
+        <div class="flex-grow-1 pe-2">
           <h5 class="modal-title mb-1" id="ncScheduleEmailModalLabel">
             <i class="bi bi-envelope-plus me-2 text-primary"></i>Schedule email
           </h5>
           <p class="small text-muted mb-0">Review content, then send now or pick a send time.</p>
         </div>
-        <button type="button" class="btn-close ms-3" data-bs-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn-close flex-shrink-0 mt-1" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body flex-grow-1 overflow-auto">
         <div id="ncComposeLoading" class="text-center py-5 d-none">

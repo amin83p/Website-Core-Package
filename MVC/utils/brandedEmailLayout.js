@@ -20,6 +20,8 @@ const NC_EMAIL_CLASSES = Object.freeze({
   preheader: 'nc-email-preheader',
   sessionCard: 'nc-session-card',
   sessionRow: 'nc-session-row',
+  sessionRowInner: 'nc-session-row-inner',
+  sessionTimingChip: 'nc-session-timing-chip',
   sessionLink: 'nc-session-link',
   summaryTable: 'nc-summary-table',
   prose: 'nc-email-prose',
@@ -56,21 +58,32 @@ function buildEmailHeadStyles() {
   const w = EMAIL_CONTAINER_WIDTH;
   return [
     '<style type="text/css">',
-    'body{margin:0;padding:0;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;}',
+    'body{margin:0;padding:0;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;overflow-x:hidden;}',
     'table{border-collapse:collapse;mso-table-lspace:0pt;mso-table-rspace:0pt;}',
-    `img{-ms-interpolation-mode:bicubic;border:0;height:auto;line-height:100%;outline:none;text-decoration:none;}`,
+    `img{max-width:100%!important;height:auto!important;-ms-interpolation-mode:bicubic;border:0;line-height:100%;outline:none;text-decoration:none;}`,
     `.${NC_EMAIL_CLASSES.preheader}{display:none!important;max-height:0;overflow:hidden;mso-hide:all;opacity:0;color:transparent;}`,
     `.${NC_EMAIL_CLASSES.container}{width:100%!important;max-width:${w}px!important;}`,
-    `.${NC_EMAIL_CLASSES.sessionLink}{word-break:break-word;}`,
+    `.${NC_EMAIL_CLASSES.sessionCard}{width:100%!important;max-width:100%!important;}`,
+    `.${NC_EMAIL_CLASSES.sessionLink}{word-break:break-word;overflow-wrap:anywhere;}`,
+    `.${NC_EMAIL_CLASSES.sessionTimingChip}{max-width:100%;box-sizing:border-box;}`,
     `.${NC_EMAIL_CLASSES.button} a{display:inline-block;text-decoration:none;}`,
     `@media screen and (max-width:600px){`,
+    `body,html{overflow-x:hidden!important;}`,
     `.${NC_EMAIL_CLASSES.container}{width:100%!important;max-width:100%!important;}`,
-    `.${NC_EMAIL_CLASSES.wrap}{padding:20px 12px!important;}`,
-    `.${NC_EMAIL_CLASSES.header}{padding:20px 18px 18px!important;}`,
-    `.${NC_EMAIL_CLASSES.body}{padding:22px 18px!important;}`,
-    `.${NC_EMAIL_CLASSES.footer}{padding:14px 18px 18px!important;}`,
+    `.${NC_EMAIL_CLASSES.wrap}{padding:16px 8px!important;}`,
+    `.${NC_EMAIL_CLASSES.header}{padding:18px 14px 16px!important;}`,
+    `.${NC_EMAIL_CLASSES.body}{padding:18px 14px!important;}`,
+    `.${NC_EMAIL_CLASSES.footer}{padding:12px 14px 16px!important;}`,
     `.${NC_EMAIL_CLASSES.title}{font-size:20px!important;line-height:1.35!important;}`,
-    `.${NC_EMAIL_CLASSES.logo}{max-width:140px!important;width:140px!important;}`,
+    `.${NC_EMAIL_CLASSES.logo}{max-width:120px!important;width:120px!important;}`,
+    `.${NC_EMAIL_CLASSES.sessionCard}{width:100%!important;max-width:100%!important;}`,
+    `.${NC_EMAIL_CLASSES.sessionRow}>td:first-child{display:none!important;}`,
+    `.${NC_EMAIL_CLASSES.sessionRow}>td:last-child{display:block!important;width:100%!important;padding:12px 14px!important;box-sizing:border-box!important;}`,
+    `.${NC_EMAIL_CLASSES.sessionRowInner},.${NC_EMAIL_CLASSES.sessionRowInner} tbody,.${NC_EMAIL_CLASSES.sessionRowInner} tr,.${NC_EMAIL_CLASSES.sessionRowInner} td{display:block!important;width:100%!important;max-width:100%!important;box-sizing:border-box!important;}`,
+    `.${NC_EMAIL_CLASSES.sessionRowInner} td{padding-right:0!important;padding-left:0!important;text-align:left!important;}`,
+    `.${NC_EMAIL_CLASSES.sessionRowInner} td+td{margin-top:10px!important;}`,
+    `.${NC_EMAIL_CLASSES.sessionTimingChip}{white-space:normal!important;word-break:break-word;overflow-wrap:anywhere;}`,
+    `.${NC_EMAIL_CLASSES.button}{width:100%!important;max-width:100%!important;}`,
     `.${NC_EMAIL_CLASSES.button} a{display:block!important;width:100%!important;max-width:100%!important;box-sizing:border-box!important;text-align:center!important;}`,
     `.${NC_EMAIL_CLASSES.summaryTable} thead{display:none!important;}`,
     `.${NC_EMAIL_CLASSES.summaryTable} tr,.${NC_EMAIL_CLASSES.summaryTable} td{display:block!important;width:100%!important;box-sizing:border-box!important;}`,
@@ -93,14 +106,15 @@ function buildEmailHeadStyles() {
 /**
  * Primary CTA button for HTML emails (inline styles + class for responsive width).
  */
-function buildEmailButton(href = '', label = 'Open') {
+function buildEmailButton(href = '', label = 'Open', options = {}) {
   const url = String(href || '').trim();
   const text = escapeHtml(String(label || 'Open').trim() || 'Open');
+  const margin = options.compact ? '0' : '12px 0 0';
   if (!url) return '';
   const safeHref = escapeHtml(url);
   return [
     `<table role="presentation" cellpadding="0" cellspacing="0" border="0" class="${NC_EMAIL_CLASSES.button}"`,
-    ' style="margin:12px 0 0;border-collapse:separate;">',
+    ` style="margin:${margin};border-collapse:separate;">`,
     `<tr><td align="center" bgcolor="${NEWS_BLUE}"`,
     ` style="border-radius:6px;background-color:${NEWS_BLUE};">`,
     `<!--[if mso]><v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" href="${safeHref}"`,
@@ -197,10 +211,10 @@ function buildBrandedEmailLayout({
     `<body style="margin:0;padding:0;background-color:#f4f8fc;background:#f4f8fc;">`,
     preheaderBlock,
     `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" class="${NC_EMAIL_CLASSES.wrap}"`,
-    ' bgcolor="#f4f8fc" style="background-color:#f4f8fc;padding:32px 16px;">',
+    ' bgcolor="#f4f8fc" style="background-color:#f4f8fc;padding:32px 16px;width:100%;max-width:100%;">',
     '<tr><td align="center">',
     `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="${EMAIL_CONTAINER_WIDTH}" class="${NC_EMAIL_CLASSES.container}"`,
-    ` style="width:${EMAIL_CONTAINER_WIDTH}px;max-width:${EMAIL_CONTAINER_WIDTH}px;border-collapse:collapse;">`,
+    ` style="width:100%;max-width:${EMAIL_CONTAINER_WIDTH}px;border-collapse:collapse;">`,
     '<tr>',
     `<td class="${NC_EMAIL_CLASSES.header}" bgcolor="${NEWS_BLUE}"`,
     ` style="padding:28px 32px 24px;background-color:${NEWS_BLUE};`,
@@ -244,6 +258,22 @@ function injectEmailPreviewBaseHref(html = '', baseHref = '') {
   return doc;
 }
 
+/**
+ * Rewrites upload/logo asset URLs for in-app iframe preview (srcdoc) so images load from the
+ * same host the user is browsing, not a mismatched APP_PUBLIC_URL.
+ */
+function prepareEmailHtmlForInAppPreview(html = '', previewOrigin = '') {
+  const origin = String(previewOrigin || '').trim().replace(/\/$/, '');
+  let doc = String(html || '');
+  if (!doc || !origin) return doc;
+  doc = doc.replace(/\bsrc=(["'])(\/[^"']+)\1/gi, (_, quote, path) => `src=${quote}${origin}${path}${quote}`);
+  doc = doc.replace(
+    /\bsrc=(["'])https?:\/\/[^"']+(\/uploads\/[^"']+)\1/gi,
+    (_, quote, path) => `src=${quote}${origin}${path}${quote}`
+  );
+  return injectEmailPreviewBaseHref(doc, `${origin}/`);
+}
+
 module.exports = {
   NEWS_BLUE,
   NEWS_TEAL,
@@ -255,6 +285,7 @@ module.exports = {
   escapeHtml,
   resolveAbsoluteAssetUrl,
   injectEmailPreviewBaseHref,
+  prepareEmailHtmlForInAppPreview,
   buildEmailButton,
   buildBrandedEmailLayout
 };

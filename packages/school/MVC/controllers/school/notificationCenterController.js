@@ -574,7 +574,7 @@ async function showRun(req, res) {
     });
 
     const managerSummaryRows = notificationCenterManagerSummaryService.buildManagerSummaryRows(run);
-    const managerSummaryPreview = rule?.managerSummary?.enabled
+    let managerSummaryPreview = rule?.managerSummary?.enabled
       ? await notificationCenterManagerSummaryService.buildManagerSummaryPreview({
         run,
         rule,
@@ -582,6 +582,12 @@ async function showRun(req, res) {
         baseUrl: notificationCenterComposeService.resolveRequestBaseUrl(req)
       })
       : null;
+    if (managerSummaryPreview) {
+      managerSummaryPreview = notificationCenterComposeService.applyInAppPreviewHtml(
+        managerSummaryPreview,
+        notificationCenterComposeService.resolveInAppPreviewOrigin(req)
+      );
+    }
     const managerTimeZone = await notificationCenterComposeService.resolveOrgTimeZone(orgId);
     const defaultManagerSendAtLocal = notificationCenterComposeService.resolveDefaultSendAtLocal({
       rule,
@@ -667,6 +673,9 @@ async function showComposeEmail(req, res) {
 
     });
 
+    const previewOrigin = notificationCenterComposeService.resolveInAppPreviewOrigin(req);
+    const previewForModal = notificationCenterComposeService.applyInAppPreviewHtml(preview, previewOrigin);
+
     const timeZone = await notificationCenterComposeService.resolveOrgTimeZone(orgId);
 
     const defaultSendAtLocal = notificationCenterComposeService.resolveDefaultSendAtLocal({
@@ -677,7 +686,7 @@ async function showComposeEmail(req, res) {
 
     const composePayload = {
 
-      preview,
+      preview: previewForModal,
 
       selectionKeys,
 

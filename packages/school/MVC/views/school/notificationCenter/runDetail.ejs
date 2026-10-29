@@ -570,14 +570,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const orgTimeZone = <%- JSON.stringify(typeof managerTimeZone !== 'undefined' ? managerTimeZone : '') %>;
 
   function prepareEmailPreviewSrcdoc(html) {
-    const doc = String(html || '');
-    if (!doc) return '';
-    const origin = `${window.location.origin}/`;
-    if (/<base[\s>]/i.test(doc)) return doc;
-    if (/<head[\s>]/i.test(doc)) {
-      return doc.replace(/<head(\s[^>]*)?>/i, (match) => `${match}<base href="${origin.replace(/"/g, '&quot;')}">`);
+    if (window.NotificationCenterEmailPreviewDevices?.prepareEmailPreviewSrcdoc) {
+      return window.NotificationCenterEmailPreviewDevices.prepareEmailPreviewSrcdoc(html);
     }
-    return doc;
+    return String(html || '');
   }
 
   function setComposePreviewHtml(html) {

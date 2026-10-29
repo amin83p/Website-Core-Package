@@ -202,6 +202,20 @@ function resolveAbsoluteSessionUrl(classData = {}, session = {}, baseUrl = '') {
   return origin ? `${origin}${relativePath}` : relativePath;
 }
 
+function buildSessionTimingChipHtml(chipLabel = '', options = {}) {
+  const text = cleanText(chipLabel);
+  if (!text) return '';
+  const below = options.below === true;
+  const spacing = below ? 'margin-top:6px;margin-left:0;' : 'margin-left:8px;';
+  const chipClass = NC_EMAIL_CLASSES.sessionTimingChip;
+  return [
+    `<span class="${chipClass}" style="display:inline-block;${spacing}padding:3px 10px;font-size:11px;font-weight:700;`,
+    `line-height:1.35;border-radius:999px;background:#e8f2f8;color:${NEWS_TEAL};white-space:nowrap;vertical-align:middle;max-width:100%;box-sizing:border-box;">`,
+    escapeHtml(text),
+    '</span>'
+  ].join('');
+}
+
 function buildSessionBulletLabel(session = {}, entryTitle = '') {
   const custom = cleanText(entryTitle);
   if (custom) return custom;
@@ -270,17 +284,24 @@ async function resolveSessionCompletionTiming({
   const deadlineMs = deadlineAt ? deadlineAt.getTime() : null;
 
   let timingLabel = 'Please review and complete this session when you are able.';
+  let chipLabel = '';
   if (Number.isFinite(sessionEndMs) && nowMs < sessionEndMs) {
-    timingLabel = `Session ends in ${formatDurationMs(sessionEndMs - nowMs)} (${sessionDate} ${endTime}) — complete it after the session finishes.`;
+    const duration = formatDurationMs(sessionEndMs - nowMs);
+    timingLabel = `Session ends in ${duration} (${sessionDate} ${endTime}) — complete it after the session finishes.`;
+    chipLabel = `Starts in ${duration}`;
   } else if (deadlineMs && nowMs <= deadlineMs) {
-    timingLabel = `Time remaining to complete (per your organization's session edit settings): ${formatDurationMs(deadlineMs - nowMs)} (through ${deadlineDateKey}).`;
+    const duration = formatDurationMs(deadlineMs - nowMs);
+    timingLabel = `Time remaining to complete (per your organization's session edit settings): ${duration} (through ${deadlineDateKey}).`;
+    chipLabel = `${duration} left · through ${deadlineDateKey}`;
   } else if (deadlineDateKey) {
     timingLabel = `The configured edit window ended on ${deadlineDateKey}. Please review and complete this session as soon as possible.`;
+    chipLabel = `Window ended ${deadlineDateKey}`;
   } else if (Number.isFinite(sessionEndMs) && nowMs >= sessionEndMs) {
     timingLabel = 'This session has ended — please open it and mark it complete.';
+    chipLabel = 'Complete when ready';
   }
 
-  return { timingLabel, deadlineDateKey, deadlineMs, sessionEndMs };
+  return { timingLabel, chipLabel, deadlineDateKey, deadlineMs, sessionEndMs };
 }
 
 async function buildSessionTimingMap(entries = [], { orgId = '', orgTimeZone = 'UTC', now = new Date() } = {}) {
@@ -307,14 +328,13 @@ function buildSessionListText(entries = [], { baseUrl = '', sessionTimingByKey =
       const sessionKey = cleanText(session?.sessionId || session?.id);
       const label = buildSessionBulletLabel(session, entry?.title);
       const sessionUrl = resolveAbsoluteSessionUrl(entry?.classData || {}, session, baseUrl);
-      const timing = timingMap?.get(sessionKey)?.timingLabel || '';
+      const timing = timingMap?.get(sessionKey)?.chipLabel || timingMap?.get(sessionKey)?.timingLabel || '';
       if (sessionUrl) {
-        lines.push(`  • ${label}`);
+        lines.push(`  • ${label}${timing ? `  [${timing}]` : ''}`);
         lines.push(`    ${sessionUrl}`);
       } else {
-        lines.push(`  • ${label}`);
+        lines.push(`  • ${label}${timing ? `  [${timing}]` : ''}`);
       }
-      if (timing) lines.push(`    ${timing}`);
     });
     return lines.join('\n');
   }).join('\n\n');
@@ -335,18 +355,28 @@ function buildSessionListHtml(entries = [], { baseUrl = '', sessionTimingByKey =
       const sessionKey = cleanText(session?.sessionId || session?.id);
       const label = escapeHtml(buildSessionBulletLabel(session, entry?.title));
       const sessionUrl = resolveAbsoluteSessionUrl(entry?.classData || {}, session, baseUrl);
-      const timing = escapeHtml(timingMap?.get(sessionKey)?.timingLabel || '');
+      const chipLabel = timingMap?.get(sessionKey)?.chipLabel || '';
       const linkCell = sessionUrl
         ? `<a href="${escapeHtml(sessionUrl)}" class="${sessionLinkClass}" style="color:${NEWS_BLUE};text-decoration:none;font-weight:700;border-bottom:1px solid rgba(29,95,184,0.35);word-break:break-word;">${formal ? label : `${buildEmailIcon('link')}${label}`}</a>`
         : `<span class="${sessionLinkClass}" style="word-break:break-word;">${formal ? label : `${buildEmailIcon('session')}${label}`}</span>`;
-      const ctaBlock = sessionUrl ? buildEmailButton(sessionUrl, 'Open session') : '';
+      const chipHtml = buildSessionTimingChipHtml(chipLabel, { below: true });
+      const ctaBlock = sessionUrl ? buildEmailButton(sessionUrl, 'Open session', { compact: true }) : '';
+      const sessionInfoBlock = [
+        `<div style="font-size:14px;line-height:1.55;color:${NEWS_INK};">${linkCell}</div>`,
+        chipHtml ? `<div>${chipHtml}</div>` : ''
+      ].filter(Boolean).join('');
       return [
         `<tr class="${sessionRowClass}">`,
-        `<td style="padding:14px 16px 6px;border-bottom:1px solid ${NEWS_LINE};vertical-align:top;width:20px;color:${NEWS_TEAL};font-weight:700;">&#8226;</td>`,
-        `<td style="padding:14px 16px;border-bottom:1px solid ${NEWS_LINE};vertical-align:top;">`,
-        `<div style="font-size:14px;line-height:1.55;color:${NEWS_INK};">${linkCell}</div>`,
-        timing ? `<div style="font-size:13px;line-height:1.45;color:${NEWS_MUTED};margin-top:6px;">${formal ? timing : `${buildEmailIcon('clock')}${timing}`}</div>` : '',
-        ctaBlock,
+        `<td style="padding:14px 16px;border-bottom:1px solid ${NEWS_LINE};vertical-align:middle;width:20px;color:${NEWS_TEAL};font-weight:700;">&#8226;</td>`,
+        `<td style="padding:14px 16px;border-bottom:1px solid ${NEWS_LINE};vertical-align:middle;">`,
+        `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" class="${NC_EMAIL_CLASSES.sessionRowInner}" style="width:100%;max-width:100%;border-collapse:collapse;">`,
+        '<tr>',
+        `<td style="vertical-align:middle;padding-right:12px;">${sessionInfoBlock}</td>`,
+        sessionUrl
+          ? `<td style="vertical-align:middle;text-align:right;white-space:nowrap;width:1%;">${ctaBlock}</td>`
+          : '',
+        '</tr>',
+        '</table>',
         '</td>',
         '</tr>'
       ].join('');

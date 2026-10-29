@@ -9,6 +9,7 @@ const notificationSendLedgerModel = require('../../models/school/notificationSen
 const { requireCoreModule } = require('./schoolCoreContracts');
 const emailOutboxService = requireCoreModule('MVC/services/emailOutboxService');
 const appPublicUrlService = requireCoreModule('MVC/services/appPublicUrlService');
+const { prepareEmailHtmlForInAppPreview } = requireCoreModule('MVC/utils/brandedEmailLayout');
 const {
   resolveDefaultTimezone,
   resolveOrganizationTimezoneFromRow,
@@ -26,6 +27,25 @@ function cleanText(value) {
 
 function resolveRequestBaseUrl(req) {
   return appPublicUrlService.resolvePublicSiteUrl({ req });
+}
+
+function resolveInAppPreviewOrigin(req) {
+  if (!req || typeof req !== 'object') return '';
+  const host = cleanText(typeof req.get === 'function' ? req.get('host') : req.headers?.host);
+  if (!host) return '';
+  const forwarded = typeof req.get === 'function' ? req.get('x-forwarded-proto') : req.headers?.['x-forwarded-proto'];
+  const protocol = cleanText(forwarded || req.protocol || 'http').split(',')[0] || 'http';
+  return `${protocol}://${host}`.replace(/\/$/, '');
+}
+
+function applyInAppPreviewHtml(preview, previewOrigin = '') {
+  if (!preview || typeof preview !== 'object') return preview;
+  const origin = cleanText(previewOrigin);
+  if (!origin || !cleanText(preview.htmlBody)) return preview;
+  return {
+    ...preview,
+    htmlBody: prepareEmailHtmlForInAppPreview(preview.htmlBody, origin)
+  };
 }
 
 async function resolveOrgDisplayName(orgId) {
@@ -314,6 +334,8 @@ module.exports = {
   isTruthySendNow,
   buildImmediateSendAtIso,
   resolveRequestBaseUrl,
+  resolveInAppPreviewOrigin,
+  applyInAppPreviewHtml,
   buildDedupeKey,
   hashSelectionKeys
 };

@@ -86,6 +86,53 @@
     .smmr-export-instance-row:last-child { margin-bottom: 0; }
     .smmr-export-bulk-panel { border: 1px solid #dce9ff; border-radius: 10px; padding: 0.75rem 0.9rem; background: #f8fbff; }
     .smmr-export-bulk-toolbar { display: flex; flex-wrap: wrap; gap: 0.45rem; }
+    .smmr-by-funder-modal-dialog {
+        max-width: min(1200px, 96vw);
+        height: calc(100vh - 1.5rem);
+        margin: 0.75rem auto;
+    }
+    .smmr-by-funder-modal-content {
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+    }
+    .smmr-by-funder-modal-body {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+    }
+    .smmr-by-funder-table-wrap {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: auto;
+        border: 1px solid #e9ecef;
+        border-radius: 10px;
+    }
+    .smmr-by-funder-table { font-size: 0.95rem; }
+    .smmr-by-funder-table thead th {
+        position: sticky;
+        top: 0;
+        z-index: 2;
+        background: #f8f9fa;
+    }
+    .smmr-by-funder-check-col { width: 2.75rem; }
+    .smmr-by-funder-student-name {
+        font-size: 1.12rem;
+        font-weight: 700;
+        line-height: 1.25;
+        color: #212529;
+    }
+    .smmr-by-funder-class-name {
+        font-size: 1.05rem;
+        font-weight: 600;
+        line-height: 1.3;
+        color: #0d3b66;
+    }
+    .smmr-by-funder-student-id { font-size: 0.78rem; }
+    .smmr-by-funder-enrollment-detail { font-size: 0.88rem; line-height: 1.45; }
+    .smmr-by-funder-enrollment-block:last-child { margin-bottom: 0 !important; padding-bottom: 0 !important; border-bottom: none !important; }
 </style>
 
 <%
@@ -96,8 +143,7 @@
     ? String(schoolReportsDashboardHref).trim()
     : '/dashboard/section-nav/SCHOOL_REPORTS';
   const manageBtns = [
-    '<a href="' + reportDashHrefLocal.replace(/"/g, '&quot;') + '" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-file-earmark-richtext me-1"></i> School Reports</a>',
-    '<a href="/school/reports/instances" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-file-earmark-text me-1"></i> Report Instances</a>',
+    '<button type="button" id="btn_openSmmrByFunderModal" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-diagram-3 me-1"></i> Report By Funder</button>',
     '<a href="/school/settings#school-semi-monthly-report" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-gear me-1"></i> Semi-Monthly Settings</a>'
   ];
   const smmrCanExport = typeof canExportReport !== 'undefined' && canExportReport;
@@ -201,6 +247,8 @@
     </div>
 </div>
 
+<%- include('school/report/partials/smmrByFunderModal', { funderPickerOptions: typeof funderPickerOptions !== 'undefined' ? funderPickerOptions : [] }) %>
+
 <div class="modal fade" id="smmrExportModal" tabindex="-1" aria-labelledby="smmrExportModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
@@ -253,6 +301,7 @@
 <%- include('partials/tablePages-end') %>
 <%- include('partials/reportMessageHelpers') %>
 
+<script src="/scripts/semiMonthlyReportByFunderModal.js"></script>
 <script>
 (function () {
   const initialStartDate = '<%= typeof initialStartDate !== "undefined" ? initialStartDate : "" %>';
@@ -389,6 +438,11 @@
         name: studentDisplayName(item)
       };
     }).filter((row) => row.studentRecordId);
+  }
+
+  function replaceSelectedStudents(items) {
+    selectedStudents = normalizeSelectedStudentItems(items);
+    renderSelectedStudents();
   }
 
   function renderSelectedStudents() {
@@ -1371,6 +1425,16 @@
   }
   renderSelectedStudents();
   syncShareUrl();
+
+  if (typeof window.SmmrByFunderModal !== 'undefined' && typeof window.SmmrByFunderModal.init === 'function') {
+    window.SmmrByFunderModal.init({
+      escapeHtml,
+      showReportMessage,
+      setDateRange,
+      replaceSelectedStudents,
+      loadSemiMonthlyReport
+    });
+  }
 
   if ((initialStudents.length || initialStudentIds.length) && initialStartDate && initialEndDate) {
     loadSemiMonthlyReport();
