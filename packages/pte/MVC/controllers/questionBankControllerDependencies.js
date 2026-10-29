@@ -12,8 +12,10 @@ const { coreFilesService } = require('../services/coreFilesService');
 const uploadMiddleware = require('../middleware/upload');
 const {
   settingService,
-  adminChekersService
+  adminChekersService,
+  uploadStorageService
 } = require('../services/pte/pteCoreContracts');
+const pteUploadStorageHelper = require('../services/pte/pteUploadStorageHelper');
 const pteQuestionBankDataService = require('../services/pte/pteQuestionBankDataService');
 const questionBankAiAutofillService = require('../services/pte/questionBankAiAutofillService');
 const pteQuestionScoringProfileService = require('../services/pte/pteQuestionScoringProfileService');
@@ -27,6 +29,8 @@ module.exports = {
   inferSearchableFields,
   pteUploadPathUtils,
   coreFilesService,
+  uploadStorage: uploadStorageService,
+  pteUploadStorageHelper,
   uploadMiddleware,
   settingService,
   pteQuestionBankDataService,

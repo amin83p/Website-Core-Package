@@ -5,6 +5,7 @@ const dataService = require('../services/dataService');
 const {isAjax, buildDataServiceQuery, inferSearchableFields} = require('../utils/generalTools');
 const emailOrgCapabilityService = require('../services/emailOrgCapabilityService');
 const emailDispatchService = require('../services/emailDispatchService');
+const uploadStorage = require('../services/uploadStorageService');
 
 // ✅ NEW IMPORTS
 const settingService = require('../services/settingService');
@@ -207,7 +208,7 @@ exports.processImport = async (req, res) => {
     }
 
     if (file) {
-        const content = await fs.readFile(file.path, 'utf8');
+        const content = await uploadStorage.readUploadedFileAsUtf8(file);
         if (file.mimetype.includes('json') || file.originalname.endsWith('.json')) {
             try {
                 const json = JSON.parse(content);

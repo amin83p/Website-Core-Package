@@ -148,8 +148,14 @@
               <input type="text" name="logoUrl" class="form-control font-monospace" value="<%= brand.logoUrl || '' %>" placeholder="/uploads/GLOBAL/logo/Logo1.png">
             </div>
             <div class="col-md-6">
+              <label class="form-label fw-bold">Browser tab icon (favicon)</label>
+              <input type="text" name="faviconUrl" class="form-control font-monospace" value="<%= brand.faviconUrl || '' %>" placeholder="/uploads/GLOBAL/logo/icon.svg">
+              <div class="form-text">Shown in the browser tab. PNG, SVG, or ICO. If empty, falls back to SVG Icon URL, then Logo URL.</div>
+            </div>
+            <div class="col-md-6">
               <label class="form-label fw-bold">SVG Icon URL</label>
               <input type="text" name="iconSvgUrl" class="form-control font-monospace" value="<%= brand.iconSvgUrl || '' %>" placeholder="/uploads/GLOBAL/logo/icon.svg">
+              <div class="form-text">Used for the browser tab when Browser tab icon is empty.</div>
             </div>
             <div class="col-md-6">
               <label class="form-label fw-bold">Apple Touch Icon URL</label>

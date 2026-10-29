@@ -1,7 +1,7 @@
 'use strict';
 
 const { requireCoreModule } = require('./schoolCoreContracts');
-const coreFilesService = requireCoreModule('MVC/services/coreFilesService');
+const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
 const {
   listUploadLimitSections,
   listUploadLimitSectionKeys,
@@ -61,7 +61,7 @@ function resolveFallbackMaxMb(sectionKey) {
 }
 
 function getGlobalDefaultMb() {
-  return coreFilesService.getMaxUploadFileMb();
+  return uploadStorage.getMaxUploadFileMb();
 }
 
 function effectiveMaxFileSizeMb(sectionKey, storedRow = {}) {

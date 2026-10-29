@@ -1,11 +1,13 @@
 const fs = require('fs');
 const path = require('path');
 const { Readable } = require('stream');
-const { isRailwayProxyMode } = require('../utils/uploadModeUtils');
 const organizationRepository = require('../repositories/organizationRepository');
 const orgFileBackupService = require('../services/orgFileBackupService');
 const adminAuthorityService = require('../services/adminAuthorityService');
 const coreFilesService = require('../services/coreFilesService');
+const uploadStorage = require('../services/uploadStorageService');
+const uploadStoragePolicy = require('../services/uploadStoragePolicyService');
+const fileManager = uploadStorage.fileManager;
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 const {
   gatewayDownloadOrgBackup,
@@ -157,7 +159,7 @@ async function handleFileTransfer(req, res, operation = 'move') {
       const normalizedSourcePath = coreFilesService.assertValidRelativePath(sourcePaths[0], 'source path');
       if (!normalizedSourcePath) throw new Error('Source path is required.');
       const sourceContext = coreFilesService.resolveContextFromPath(req.user, normalizedSourcePath);
-      const transfer = await coreFilesService.transferSingleItem({
+      const transfer = await fileManager.transferSingleItem({
         operation,
         sourceContext,
         destinationContext
@@ -185,7 +187,7 @@ async function handleFileTransfer(req, res, operation = 'move') {
         const normalizedSourcePath = coreFilesService.assertValidRelativePath(rawSourcePath, 'source path');
         if (!normalizedSourcePath) throw new Error('Source path is required.');
         const sourceContext = coreFilesService.resolveContextFromPath(req.user, normalizedSourcePath);
-        const transfer = await coreFilesService.transferSingleItem({
+        const transfer = await fileManager.transferSingleItem({
           operation,
           sourceContext,
           destinationContext
@@ -254,6 +256,13 @@ async function handleFileTransfer(req, res, operation = 'move') {
   }
 }
 
+function fileListUploadStorageLocals() {
+  return {
+    uploadStorageBackend: uploadStoragePolicy.getStorageBackend(),
+    uploadUsesRemoteStorage: uploadStoragePolicy.isRemoteUploadBackend()
+  };
+}
+
 exports.listFiles = async (req, res) => {
   try {
     const user = req.user;
@@ -276,11 +285,12 @@ exports.listFiles = async (req, res) => {
         canManageOrgBackups: orgBackupEnabled,
         orgBackupOrganizations,
         orgBackupRestoreMaxUploadMb,
-        actionStateId: req.actionStateId
+        actionStateId: req.actionStateId,
+        ...fileListUploadStorageLocals()
       });
     }
 
-    const contents = await coreFilesService.listContextDirectory(context);
+    const contents = await fileManager.listContextDirectory(context);
     contents.sort((a, b) => {
       if (a.isDir && !b.isDir) return -1;
       if (!a.isDir && b.isDir) return 1;
@@ -302,7 +312,8 @@ exports.listFiles = async (req, res) => {
       canManageOrgBackups: orgBackupEnabled,
       orgBackupOrganizations,
       orgBackupRestoreMaxUploadMb,
-      actionStateId: req.actionStateId
+      actionStateId: req.actionStateId,
+      ...fileListUploadStorageLocals()
     });
   } catch (error) {
     return res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
@@ -352,7 +363,7 @@ exports.listFolderLibrary = async (req, res) => {
 exports.downloadOrgBackup = async (req, res) => {
   try {
     const { orgId } = await assertOrgBackupRequest(req);
-    if (isRailwayProxyMode()) {
+    if (uploadStoragePolicy.isRailwayGatewayBackend()) {
       const gatewayResponse = await gatewayDownloadOrgBackup({ orgId });
       return pipeGatewayBackupResponse(res, gatewayResponse, orgFileBackupService.getBackupFileName(orgId));
     }
@@ -370,7 +381,7 @@ exports.restoreOrgBackup = async (req, res) => {
     const { orgId } = await assertOrgBackupRequest(req);
     if (!req.file || !req.file.buffer) throw new Error('Select an organization backup file to restore.');
 
-    const result = isRailwayProxyMode()
+    const result = uploadStoragePolicy.isRailwayGatewayBackend()
       ? await gatewayRestoreOrgBackup({
         orgId,
         buffer: req.file.buffer,
@@ -399,7 +410,7 @@ exports.restoreOrgBackup = async (req, res) => {
 exports.downloadFile = (req, res) => {
   try {
     const requestedPath = coreFilesService.sanitizeDrivePath(req.query.path || '');
-    if (isRailwayProxyMode()) {
+    if (uploadStoragePolicy.isRailwayGatewayBackend()) {
       if (!requestedPath) return res.status(400).send('Invalid path');
       return res.redirect(`/uploads/${encodeURI(requestedPath)}`);
     }
@@ -423,7 +434,7 @@ exports.deleteFile = async (req, res) => {
     if (!requestedPath) throw new Error('No path provided.');
 
     const context = coreFilesService.resolveContextFromPath(req.user, requestedPath);
-    const deleted = await coreFilesService.deletePathByContext(context);
+    const deleted = await fileManager.deletePathByContext(context);
 
     if (isAjax(req)) {
       if (!deleted) return res.status(404).json({ status: 'error', message: 'Item not found' });
@@ -448,7 +459,7 @@ exports.renameItem = async (req, res) => {
     if (!sourcePathInput) throw new Error('Source path is required.');
 
     const sourceContext = coreFilesService.resolveContextFromPath(req.user, sourcePathInput);
-    const result = await coreFilesService.renamePathByContext(sourceContext, newName);
+    const result = await fileManager.renamePathByContext(sourceContext, newName);
     const parentPath = sourceContext.currentPath.split('/').slice(0, -1).join('/');
 
     const payload = {
@@ -476,7 +487,7 @@ exports.createFolder = async (req, res) => {
     const currentPath = coreFilesService.assertValidRelativePath(req.body.path || '', 'path');
     const folderName = coreFilesService.assertValidName(req.body.folderName, 'folder name');
     const context = coreFilesService.resolveContextFromPath(req.user, currentPath);
-    await coreFilesService.createFolderByContext(context, folderName);
+    await fileManager.createFolderByContext(context, folderName);
 
     if (isAjax(req)) {
       return res.json({ status: 'success', message: `Folder "${folderName}" created.` });
@@ -494,16 +505,22 @@ exports.uploadFile = async (req, res) => {
       throw new Error('No files were uploaded.');
     }
 
-    const currentPath = coreFilesService.buildCurrentPathFromUploadBody(req.body || {});
+    const currentPath = fileManager.buildCurrentPathFromUploadBody(req.body || {});
     const context = coreFilesService.resolveContextFromPath(req.user, currentPath);
-    const relativePaths = coreFilesService.parseRelativePathsMap(req.body || {});
-    const payload = await coreFilesService.uploadFilesToContext({
+    const relativePaths = fileManager.parseRelativePathsMap(req.body || {});
+    const payload = await fileManager.uploadFilesToContext({
       context,
       files: req.files,
       relativePaths
     });
 
-    if (isAjax(req)) return res.json(payload);
+    const responsePayload = {
+      ...payload,
+      currentPath: context.currentPath,
+      targetPath: context.targetPath
+    };
+
+    if (isAjax(req)) return res.json(responsePayload);
     return res.redirect(`/files?path=${encodeURIComponent(context.currentPath)}`);
   } catch (error) {
     if (req.files) {

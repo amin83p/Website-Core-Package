@@ -1,6 +1,6 @@
 const path = require('path');
 const coreFilesService = require('./coreFilesService');
-const fileAssetStorage = require('./fileAssetStorageService');
+const uploadStorage = require('./uploadStorageService');
 const uploadFolderSettingsService = require('./uploadFolderSettingsService');
 
 const MIME_TYPES_BY_EXTENSION = Object.freeze({
@@ -105,7 +105,7 @@ async function loadAttachment(conversationId = '', fileName = '') {
   for (const ref of candidates) {
     try {
       // eslint-disable-next-line no-await-in-loop
-      const loaded = await fileAssetStorage.readBuffer(ref);
+      const loaded = await uploadStorage.readBuffer(ref);
       if (loaded?.buffer) {
         return {
           ...loaded,

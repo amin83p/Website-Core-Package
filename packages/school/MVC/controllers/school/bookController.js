@@ -10,8 +10,8 @@ const { isAjax, buildDataServiceQuery } = requireCoreModule('MVC/utils/generalTo
 const { applyGenericFilter } = requireCoreModule('MVC/utils/queryEngine');
 const settingService = requireCoreModule('MVC/services/settingService');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
-const uploadMiddleware = requireCoreModule('MVC/middleware/upload');
-const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
+const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
+const schoolFileService = require('../../services/school/schoolFileService');
 const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
 const uploadLimitsPolicyService = require('../../services/school/uploadLimitsPolicyService');
 const {
@@ -70,17 +70,7 @@ function buildPayload(reqBody, activeOrgId, userId) {
 }
 
 function buildBookFileFromUpload(file) {
-  if (!file || !file.path && !file.filename) return null;
-  const storedPath = String(uploadMiddleware.getStoredFilePath(file) || '').trim();
-  const storedUrl = String(uploadMiddleware.getStoredFileUrl(file) || storedPath).trim();
-  if (!storedPath && !storedUrl) return null;
-  return {
-    fileName: String(file.filename || '').trim(),
-    originalName: String(file.originalname || file.filename || '').trim(),
-    path: storedPath,
-    url: storedUrl,
-    uploadedAt: new Date().toISOString()
-  };
+  return bookModel.enrichBookFileAsset(schoolFileService.buildBookFileAssetFromMulter(file));
 }
 
 function buildCoverPhotoFromUpload(file) {
@@ -144,7 +134,7 @@ async function relocateBookAssetIfNeeded(book, orgId, reqUser, { folderKey, fiel
   if (!sourceRef) return book;
   const targetRelativeDir = uploadFolderSettingsService.resolveUploadFolder(folderKey, { bookId });
   try {
-    const moved = await fileAssetStorage.moveUploadReference({
+    const moved = await uploadStorage.moveReference({
       sourceRef,
       destinationScopeKey: orgId,
       destinationDir: targetRelativeDir

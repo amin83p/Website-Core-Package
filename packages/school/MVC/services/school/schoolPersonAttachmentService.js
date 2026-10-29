@@ -1,5 +1,4 @@
 const path = require('path');
-const crypto = require('crypto');
 
 const dataService = require('./schoolDataService');
 const idempotencyGuardService = require('./idempotencyGuardService');
@@ -7,10 +6,8 @@ const { requireCoreModule } = require('./schoolCoreContracts');
 
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const { isAjax } = requireCoreModule('MVC/utils/generalTools');
-const fileService = requireCoreModule('MVC/services/fileService');
-const coreFilesService = requireCoreModule('MVC/services/coreFilesService');
-const upload = requireCoreModule('MVC/middleware/upload');
-const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
+const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
+const schoolFileService = require('./schoolFileService');
 
 function parseAttachments(rawValue, fallback = []) {
   if (rawValue === undefined || rawValue === null || rawValue === '') {
@@ -35,18 +32,9 @@ function buildAttachmentsFromRequest(req, fallback = []) {
       : [commentsRaw];
 
   (Array.isArray(req.files) ? req.files : []).forEach((file, index) => {
-    const normalizedPath = String(upload.getStoredFilePath(file) || '').replace(/\\/g, '/');
-    const fileUrl = String(upload.getStoredFileUrl(file) || normalizedPath).replace(/\\/g, '/');
-    attachments.push({
-      id: crypto.randomBytes(8).toString('hex'),
-      originalName: file.originalname,
-      filename: file.filename,
-      path: normalizedPath,
-      url: fileUrl,
-      size: file.size,
-      uploadDate: new Date().toISOString(),
+    attachments.push(schoolFileService.buildAttachmentFromMulterFile(file, {
       comment: String(comments[index] || '').trim()
-    });
+    }));
   });
 
   return attachments;
@@ -88,10 +76,10 @@ function createAttachmentHandlers({
       const attachment = index >= 0 ? attachments[index] : null;
       if (!attachment) return res.status(404).send('Attachment not found.');
 
-      const fileRef = attachment.url || attachment.path;
+      const fileRef = schoolFileService.normalizeAttachmentDownloadRef(attachment);
       if (!fileRef) return res.status(404).send('Attachment file is unavailable.');
-      const downloadName = attachment.originalName || attachment.filename || path.basename(String(attachment.path || 'attachment'));
-      return fileAssetStorage.sendDownload(res, fileRef, downloadName);
+      const downloadName = attachment.originalName || attachment.filename || path.basename(String(fileRef || 'attachment'));
+      return uploadStorage.sendDownload(res, fileRef, downloadName);
     } catch (error) {
       if (isAjax(req)) return res.status(Number(error?.statusCode || error?.status || 500)).json({ status: 'error', message: error.message });
       return res.status(Number(error?.statusCode || error?.status || 500)).send(error.message || 'Unable to download attachment.');
@@ -149,12 +137,7 @@ function createAttachmentHandlers({
       const [attachment] = attachments.splice(index, 1);
       await dataService.updateData(entityType, req.params.id, { ...record, attachments }, req.user);
 
-      const fileUrl = attachment?.url || coreFilesService.fromDiskPathToUploadsUrl(attachment?.path || '');
-      let deleted = false;
-      if (fileUrl) deleted = await fileService.deleteFile(fileUrl);
-      if (!deleted && attachment?.path) {
-        await upload.deleteFilePaths(path.resolve(attachment.path));
-      }
+      await schoolFileService.deleteAttachmentFile(attachment);
 
       const payload = { status: 'success', message: 'Attachment deleted.', attachments };
       idempotencyGuardService.completeGuard(guardKey, payload);

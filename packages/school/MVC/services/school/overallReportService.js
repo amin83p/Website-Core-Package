@@ -2,7 +2,7 @@
 
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
-const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
+const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
 const schoolDataService = require('./schoolDataService');
 const reportService = require('./reportService');
 const reportRuleEngineService = require('./reportRuleEngineService');
@@ -1329,7 +1329,7 @@ async function exportOverallReport(instance, reqUser) {
     collections: {},
     docxTemplateOverride: preview.resolved.docxTemplate
   });
-  const saved = await fileAssetStorage.saveBuffer({
+  const saved = await uploadStorage.saveBuffer({
     scopeKey: instance.orgId,
     relativeDir: 'school-reports/overall/generated',
     fileName: rendered.fileName,
@@ -1945,7 +1945,7 @@ async function renderEntryDocx(instance, entry, docxKey, reqUser) {
   const fileName = rendered.fileName?.includes(safeStudent)
     ? rendered.fileName
     : `${safeStudent}_${rendered.fileName || 'overall.docx'}`;
-  const saved = await fileAssetStorage.saveBuffer({
+  const saved = await uploadStorage.saveBuffer({
     scopeKey: instance.orgId,
     relativeDir: 'school-reports/overall/generated',
     fileName,
@@ -2012,7 +2012,7 @@ async function exportWorkspaceZip({ instance, docxKey = '', reqUser }) {
   }
   const zipBuffer = await reportDocxRenderService.zipReportInstanceDocxFiles(files);
   const zipName = `${clean(workspace.title || 'overall-report').replace(/[^\w.-]+/g, '_') || 'overall-report'}.zip`;
-  const saved = await fileAssetStorage.saveBuffer({
+  const saved = await uploadStorage.saveBuffer({
     scopeKey: instance.orgId,
     relativeDir: 'school-reports/overall/generated',
     fileName: zipName,
@@ -2073,7 +2073,7 @@ async function renderEntryPdf(instance, entry, pdfKey, reqUser) {
   const fileName = rendered.fileName?.includes(safeStudent)
     ? rendered.fileName
     : `${safeStudent}_${rendered.fileName || 'overall.pdf'}`;
-  const saved = await fileAssetStorage.saveBuffer({
+  const saved = await uploadStorage.saveBuffer({
     scopeKey: instance.orgId,
     relativeDir: 'school-reports/overall/generated',
     fileName,
@@ -2140,7 +2140,7 @@ async function exportWorkspacePdfZip({ instance, pdfKey = '', reqUser }) {
   }
   const zipBuffer = await reportPdfRenderService.zipReportInstancePdfFiles(files);
   const zipName = `${clean(workspace.title || 'overall-report').replace(/[^\w.-]+/g, '_') || 'overall-report'}_pdf.zip`;
-  const saved = await fileAssetStorage.saveBuffer({
+  const saved = await uploadStorage.saveBuffer({
     scopeKey: instance.orgId,
     relativeDir: 'school-reports/overall/generated',
     fileName: zipName,
@@ -2205,7 +2205,7 @@ async function exportOverallReportPdf(instance, reqUser) {
     mergedAnswers: entryInstance.answers,
     pdfTemplateOverride: preview.resolved.pdfTemplate
   });
-  const saved = await fileAssetStorage.saveBuffer({
+  const saved = await uploadStorage.saveBuffer({
     scopeKey: instance.orgId,
     relativeDir: 'school-reports/overall/generated',
     fileName: rendered.fileName,

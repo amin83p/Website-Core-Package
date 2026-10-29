@@ -6,6 +6,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const { buildDataServiceQuery } = require('../utils/generalTools');
 const uploadMiddleware = require('../middleware/upload');
+const coreUploadRefService = require('../services/coreUploadRefService');
 const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
 const settingService = require('../services/settingService');
 const paginate = require('../utils/paginationHelper');
@@ -18,6 +19,42 @@ const newsRoleNotifyService = require('../services/newsRoleNotifyService');
 const { defaultSendAtLocalFromNow } = require('../utils/scheduleSendAtUtils');
 
 const MAX_ARTICLE_VISIT_PAGE_LIMIT = 100;
+
+function resolveNewsBodyForPersist(rawHtml = '') {
+    const raw = String(rawHtml || '');
+    const figureCountBefore = (raw.match(/<figure\b/gi) || []).length;
+    const normalized = normalizeNewsHtmlAssetUrls(raw);
+    const figureCountAfter = (String(normalized).match(/<figure\b/gi) || []).length;
+    if (figureCountBefore > 0 && figureCountAfter < figureCountBefore) {
+        return raw;
+    }
+    return normalized;
+}
+
+function listRecoverableNewsBodyImages(item = {}) {
+    const body = String(item?.content?.body || item?.body || '');
+    if (/<img\b/i.test(body) || /<figure\b/i.test(body)) {
+        return [];
+    }
+    const attachments = Array.isArray(item.attachments) ? item.attachments : [];
+    const seen = new Set();
+    const images = [];
+    attachments.forEach((entry) => {
+        const url = String(entry?.url || '').trim();
+        if (!url || seen.has(url)) return;
+        const type = String(entry?.type || '').trim().toLowerCase();
+        const looksLikeImage = type === 'image'
+            || /\.(jpe?g|png|gif|webp|avif|svg)(\?|$)/i.test(url)
+            || /\/uploads\//i.test(url);
+        if (!looksLikeImage) return;
+        seen.add(url);
+        images.push({
+            url,
+            name: String(entry?.name || entry?.originalName || 'Image').trim() || 'Image'
+        });
+    });
+    return images;
+}
 
 const NEWS_ADMIN_QUERY_OPTIONS = Object.freeze({
   allowedExactKeys: [
@@ -77,11 +114,15 @@ const NEWS_ADMIN_SEARCHABLE_FIELDS = Object.freeze([
 // ✅ NEW: Helper to generate Web URL from Disk Path (Same as Chat)
 function getWebUrlFromFile(file) {
     if (file && typeof file === 'object') {
-        return uploadMiddleware.getStoredFileUrl(file) || uploadMiddleware.getStoredFilePath(file) || '';
+        return coreUploadRefService.resolveMulterStoredRefOrEmpty(file);
     }
     const token = String(file || '').trim();
     if (/^\/uploads\//i.test(token)) return token;
-    return coreFilesService.getWebUrlForUpload(token);
+    try {
+        return coreUploadRefService.normalizePersistedUploadRef(token);
+    } catch (_) {
+        return coreFilesService.getWebUrlForUpload(token);
+    }
 }
 
 // Helper: Calculate Read Time
@@ -376,7 +417,7 @@ function buildNewsObject(body, files, user, existing = null) {
                 body.featuredImage || (finalAttachments.find(a => a.type === 'image')?.url) || ''
             ) || null,
             summary: body.summary,
-            body: normalizeNewsHtmlAssetUrls(body.htmlContent || '')
+            body: resolveNewsBodyForPersist(body.htmlContent || '')
         },
 
         attachments: finalAttachments,
@@ -555,7 +596,7 @@ async function previewDraft(req, res) {
             content: {
                 featuredImage: ensureRootRelativeWebPath(body.featuredImage || ''),
                 summary: body.summary || '',
-                body: normalizeNewsHtmlAssetUrls(body.htmlContent || '')
+                body: body.htmlContent || ''
             }
         });
 
@@ -580,9 +621,12 @@ async function showForm(req, res) {
     try {
         const id = req.params.id;
         let item = null;
+        let recoverableBodyImages = [];
         if (id) {
             item = await dataService.getDataById('news', id, req.user);
             if (!item) throw new Error("Item not found");
+            item = normalizeNewsItem(item);
+            recoverableBodyImages = listRecoverableNewsBodyImages(item);
         }
         
         const categories = await getCategories();
@@ -601,6 +645,7 @@ async function showForm(req, res) {
         res.render('news/form', {
             title: id ? 'Edit News' : 'Compose News',
             item,
+            recoverableBodyImages: recoverableBodyImages || [],
             categories,
             user: req.user,
             actionStateId: req.actionStateId,

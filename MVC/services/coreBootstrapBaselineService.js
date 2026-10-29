@@ -9,6 +9,9 @@ const coreBootstrapRunRepository = require('../repositories/coreBootstrapRunRepo
 const firstRunBootstrapService = require('./firstRunBootstrapService');
 const dataBackendRuntimeService = require('./dataBackendRuntimeService');
 const coreFilesService = require('./coreFilesService');
+const uploadPathUtils = require('../utils/uploadPathUtils');
+const uploadStorage = require('./uploadStorageService');
+const uploadStoragePolicy = require('./uploadStoragePolicyService');
 const { getMongoCollection } = require('../infrastructure/mongo/mongoConnection');
 const { SYSTEM_CONTEXT } = require('../../config/constants');
 
@@ -321,6 +324,37 @@ function resolveActor(options = {}) {
   return { id, label: id };
 }
 
+function parseUploadRefForSave(targetUploadRef = '') {
+  const relative = uploadPathUtils.extractRelativeUploadPath(targetUploadRef);
+  if (!relative) return null;
+  const segments = relative.split('/').filter(Boolean);
+  if (!segments.length) return null;
+  const fileName = segments.pop();
+  let scopeKey = 'GLOBAL';
+  let relativeDir = segments.join('/');
+  if (/^ORG_/i.test(segments[0] || '')) {
+    scopeKey = String(segments[0]).replace(/^ORG_/i, '');
+    relativeDir = segments.slice(1).join('/');
+  } else if (String(segments[0] || '').toUpperCase() === 'GLOBAL') {
+    relativeDir = segments.slice(1).join('/');
+  }
+  return { scopeKey, relativeDir, fileName };
+}
+
+async function uploadRefExistsOnStorage(ref = '') {
+  if (!uploadPathUtils.extractRelativeUploadPath(ref)) return false;
+  if (uploadStoragePolicy.isRemoteUploadBackend()) {
+    try {
+      await uploadStorage.readBuffer(ref);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+  const diskPath = coreFilesService.fromUploadsUrlToDiskPath(ref);
+  return Boolean(diskPath && fsSync.existsSync(diskPath));
+}
+
 function summarizeAssetItems(items = []) {
   return (Array.isArray(items) ? items : []).reduce((acc, row) => {
     const status = cleanText(row?.status, 80).toLowerCase();
@@ -341,14 +375,13 @@ function summarizeAssetItems(items = []) {
   });
 }
 
-function resolveAssetPreflightItems(bundle = {}) {
+async function resolveAssetPreflightItems(bundle = {}) {
   const items = [];
   const assetRows = Array.isArray(bundle.assets) ? bundle.assets : [];
   for (const asset of assetRows) {
     const sourceExists = asset.sourceExists === true;
-    const targetPath = coreFilesService.fromUploadsUrlToDiskPath(asset.targetUploadRef || '');
-    const targetValid = Boolean(targetPath);
-    const targetExists = targetValid && fsSync.existsSync(targetPath);
+    const targetValid = Boolean(uploadPathUtils.extractRelativeUploadPath(asset.targetUploadRef || ''));
+    const targetExists = targetValid && await uploadRefExistsOnStorage(asset.targetUploadRef || '');
     let status = 'ready';
     let reason = '';
     if (!sourceExists) {
@@ -409,7 +442,7 @@ async function preflight(options = {}) {
 
   const systemSettingsState = await getSystemSettingsState(backendMode);
   const emptyDatabase = totals.existingRows === 0 && !systemSettingsState.exists;
-  const assetItems = resolveAssetPreflightItems(bundle);
+  const assetItems = await resolveAssetPreflightItems(bundle);
   const assetSummary = summarizeAssetItems(assetItems);
 
   const report = {
@@ -596,8 +629,8 @@ async function apply(options = {}) {
       continue;
     }
 
-    const targetPath = coreFilesService.fromUploadsUrlToDiskPath(row.targetUploadRef || '');
-    if (!targetPath) {
+    const parsedTarget = parseUploadRefForSave(row.targetUploadRef || '');
+    if (!parsedTarget) {
       row.status = 'failed';
       row.reason = 'target_upload_ref_invalid';
       assetSummary.failed += 1;
@@ -606,7 +639,8 @@ async function apply(options = {}) {
       continue;
     }
 
-    if (fsSync.existsSync(targetPath)) {
+    // eslint-disable-next-line no-await-in-loop
+    if (await uploadRefExistsOnStorage(row.targetUploadRef || '')) {
       row.status = 'skipped_existing';
       row.reason = 'target_exists';
       assetSummary.skippedExisting += 1;
@@ -623,12 +657,20 @@ async function apply(options = {}) {
     }
 
     try {
+      const buffer = await fs.readFile(sourcePath);
       // eslint-disable-next-line no-await-in-loop
-      await fs.mkdir(path.dirname(targetPath), { recursive: true });
-      // eslint-disable-next-line no-await-in-loop
-      await fs.copyFile(sourcePath, targetPath);
+      await uploadStorage.saveBuffer({
+        scopeKey: parsedTarget.scopeKey,
+        relativeDir: parsedTarget.relativeDir,
+        fileName: parsedTarget.fileName,
+        originalName: parsedTarget.fileName,
+        buffer,
+        overwrite: true
+      });
       row.status = 'copied';
-      row.reason = 'copied_to_upload_volume';
+      row.reason = uploadStoragePolicy.isRemoteUploadBackend()
+        ? 'copied_to_remote_upload_volume'
+        : 'copied_to_upload_volume';
       assetSummary.copied += 1;
     } catch (error) {
       row.status = 'failed';

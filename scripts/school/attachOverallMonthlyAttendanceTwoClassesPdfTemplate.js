@@ -23,7 +23,7 @@ function loadDotEnv() {
 loadDotEnv();
 
 const { connectMongo, disconnectMongo, getMongoCollection } = require('../../MVC/infrastructure/mongo/mongoConnection');
-const fileAssetStorage = require('../../MVC/services/fileAssetStorageService');
+const uploadStorage = require('../../MVC/services/uploadStorageService');
 const reportPdfRenderService = require('../../packages/school/MVC/services/school/reportPdfRenderService');
 const overallReportTemplateModel = require('../../packages/school/MVC/models/school/overallReportTemplateModel');
 const { PDFDocument } = require('pdf-lib');
@@ -136,7 +136,7 @@ async function main() {
 
   const templateBuffer = Buffer.from(await pdfDoc.save());
   const orgId = existing.orgId || process.env.SCHOOL_REPORT_TEMPLATE_ORG_ID || process.env.ACTIVE_ORG_ID || '900000';
-  const stored = await fileAssetStorage.saveBuffer({
+  const stored = await uploadStorage.saveBuffer({
     scopeKey: orgId,
     relativeDir: 'school-reports/overall',
     fileName: existing.pdfTemplate.fileName || 'Monthly_Attendance_Two_Classes.pdf',

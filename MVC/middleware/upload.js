@@ -1,6 +1,7 @@
 const multer = require('multer');
 const path = require('path');
 const coreFilesService = require('../services/coreFilesService');
+const uploadStorageService = require('../services/uploadStorageService');
 const adminAuthorityService = require('../services/adminAuthorityService');
 
 // Define a strict allowlist of safe extensions and MIME types
@@ -139,7 +140,10 @@ function upload(fixedCategory = 'misc', isDynamic = false, forceGlobal = false, 
             return next(error);
           }
           try {
-            await coreFilesService.mirrorUploadedFilesIfNeeded(req, fixedCategory);
+            await uploadStorageService.persistMulterUploads({
+              category: fixedCategory,
+              req
+            });
             return next();
           } catch (mirrorError) {
             await coreFilesService.deleteUploadedFiles(req).catch(() => {});

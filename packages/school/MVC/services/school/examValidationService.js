@@ -1,5 +1,5 @@
+const schoolFileService = require('./schoolFileService');
 const { requireCoreModule } = require('./schoolCoreContracts');
-const uploadMiddleware = requireCoreModule('MVC/middleware/upload');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 const WINDOW_POLICY_OPTIONS = new Set(['strict_fixed_window', 'suggested_window']);
@@ -220,24 +220,9 @@ function parseObjectiveOptions(body = {}, questionType, objectiveMode) {
 
 function buildUploadedMediaRefs(files = []) {
   const list = Array.isArray(files) ? files : [];
-  const now = Date.now();
   return list
-    .filter((file) => file && file.path && file.filename)
-    .map((file, index) => {
-      const storedPath = String(uploadMiddleware.getStoredFilePath(file) || '').trim();
-      const storedUrl = String(uploadMiddleware.getStoredFileUrl(file) || storedPath).trim();
-      return {
-        id: `MEDIA_${now}_${index + 1}`,
-        fileId: '',
-        label: String(file.originalname || file.filename || '').trim(),
-        fileName: String(file.filename || '').trim(),
-        originalName: String(file.originalname || file.filename || '').trim(),
-        mimeType: String(file.mimetype || '').trim(),
-        storagePath: storedPath,
-        url: storedUrl,
-        sizeBytes: Number(file.size || 0) || 0
-      };
-    });
+    .filter((file) => file && (file.path || file.storedRef) && file.filename)
+    .map((file, index) => schoolFileService.buildExamMediaRefFromMulter(file, index));
 }
 
 function parseMediaUrlRows(body = {}) {

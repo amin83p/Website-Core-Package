@@ -24,6 +24,7 @@ const integrationVariableModel = require('../models/integrationVariableModel');
 const integrationVariableService = require('../services/integrationVariableService');
 const publicPageContentSettingsDataService = require('../services/publicPageContentSettingsDataService');
 const coreFilesService = require('../services/coreFilesService');
+const coreUploadRefService = require('../services/coreUploadRefService');
 const localPackageSyncService = require('../services/localPackageSyncService');
 const { checkAdminVerificationCode } = require('../utils/encyptors');
 const { getPackageStorageRootAbsolute, getPackageStorageRootResolution } = require('../utils/packageStoragePathUtils');
@@ -353,11 +354,15 @@ function encodePublicPageUploadUrl(uploadPath = '') {
 }
 
 function toPublicPageUploadReference(filePath = '', fileUrl = '') {
-  const fromUrl = coreFilesService.extractRelativeUploadPath(fileUrl);
-  if (fromUrl) return `/uploads/${fromUrl}`;
-  const fromPathUrl = coreFilesService.extractRelativeUploadPath(filePath);
-  if (fromPathUrl) return `/uploads/${fromPathUrl}`;
-  return coreFilesService.fromDiskPathToUploadsUrl(filePath) || String(fileUrl || filePath || '').replace(/\\/g, '/').trim();
+  try {
+    return coreUploadRefService.normalizePersistedUploadRef(fileUrl || filePath || '');
+  } catch (_) {
+    const fromUrl = coreFilesService.extractRelativeUploadPath(fileUrl);
+    if (fromUrl) return `/uploads/${fromUrl}`;
+    const fromPathUrl = coreFilesService.extractRelativeUploadPath(filePath);
+    if (fromPathUrl) return `/uploads/${fromPathUrl}`;
+    return coreFilesService.fromDiskPathToUploadsUrl(filePath) || String(fileUrl || filePath || '').replace(/\\/g, '/').trim();
+  }
 }
 
 function buildPublicPageUploadPath(scopeFolder = 'GLOBAL', folder = '', fileName = '') {
@@ -650,6 +655,7 @@ exports.updateAppSettings = async (req, res) => {
           appShortName: req.body.appShortName,
           tagline: req.body.tagline,
           logoUrl: req.body.logoUrl,
+          faviconUrl: req.body.faviconUrl,
           iconSvgUrl: req.body.iconSvgUrl,
           appleTouchIconUrl: req.body.appleTouchIconUrl,
           themeColor: req.body.themeColor,

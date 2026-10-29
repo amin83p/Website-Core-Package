@@ -5,7 +5,7 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
-const coreFilesService = requireCoreModule('MVC/services/coreFilesService');
+const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
 const uploadPathUtils = requireCoreModule('MVC/utils/uploadPathUtils');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/books.json');
@@ -278,18 +278,43 @@ function parseDigitalPdfInput(value) {
   return parseBookFileInput(value, 'digital PDF');
 }
 
+function uploadsUrlFromLegacyToken(token = '') {
+  const relative = uploadPathUtils.extractRelativeUploadPath(token);
+  return relative ? `${uploadPathUtils.UPLOADS_URL_PREFIX}/${relative}` : '';
+}
+
 function resolveBookFileAssetPublicUrl(asset = {}) {
   if (!asset || typeof asset !== 'object') return '';
   const directUrl = cleanString(asset.url, { max: 600, allowEmpty: true });
-  if (directUrl) return directUrl;
-  const pathValue = cleanString(asset.path || asset.storagePath, { max: 600, allowEmpty: true });
-  if (!pathValue) return '';
-  if (pathValue.startsWith('/')) return pathValue;
-  const relativeUploadPath = uploadPathUtils.extractRelativeUploadPath(pathValue);
-  if (relativeUploadPath) {
-    return `${uploadPathUtils.UPLOADS_URL_PREFIX}/${relativeUploadPath}`;
+  if (directUrl && uploadStorage.isUploadReference(directUrl)) {
+    try {
+      return uploadStorage.normalizeReference(directUrl);
+    } catch (_) {
+      return directUrl;
+    }
   }
-  return coreFilesService.fromDiskPathToUploadsUrl(pathValue) || pathValue;
+  if (directUrl && directUrl.startsWith('/')) return directUrl;
+  if (directUrl) {
+    const legacyDirect = uploadsUrlFromLegacyToken(directUrl);
+    if (legacyDirect) return legacyDirect;
+  }
+  const pathValue = cleanString(asset.path || asset.storagePath, { max: 600, allowEmpty: true });
+  if (!pathValue) return directUrl;
+  if (pathValue.startsWith('/') && uploadStorage.isUploadReference(pathValue)) {
+    try {
+      return uploadStorage.normalizeReference(pathValue);
+    } catch (_) {
+      return pathValue;
+    }
+  }
+  if (pathValue.startsWith('/')) return pathValue;
+  const legacyPath = uploadsUrlFromLegacyToken(pathValue);
+  if (legacyPath) return legacyPath;
+  try {
+    return uploadStorage.normalizeReference(pathValue);
+  } catch (_) {
+    return directUrl || pathValue;
+  }
 }
 
 function enrichBookFileAsset(value) {

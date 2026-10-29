@@ -7,7 +7,8 @@ const emailOrgCapabilityService = require('../services/emailOrgCapabilityService
 const contactNotificationService = require('../services/contactNotificationService');
 const appBrandingService = require('../services/appBrandingService');
 const uploadMiddleware = require('../middleware/upload');
-const fileAssetStorage = require('../services/fileAssetStorageService');
+const coreUploadRefService = require('../services/coreUploadRefService');
+const uploadStorage = require('../services/uploadStorageService');
 const CONTACT_LIST_QUERY_OPTIONS = Object.freeze({
   allowedExactKeys: ['id', 'name', 'email', 'subject', 'type', 'status'],
   allowedSearchFields: ['id', 'name', 'email', 'subject', 'message', 'type', 'status'],
@@ -26,14 +27,17 @@ function safeJsonParse(s) {
 
 function normalizeFiles(req) {
   const files = req.files || [];
-  return files.map(f => ({
-    originalName: f.originalname,
-    fileName: f.filename,
-    mimeType: f.mimetype,
-    size: f.size,
-    path: uploadMiddleware.getStoredFilePath(f),
-    url: uploadMiddleware.getStoredFileUrl(f)
-  }));
+  return files.map((f) => {
+    const url = coreUploadRefService.resolveMulterStoredRef(f);
+    return {
+      originalName: f.originalname,
+      fileName: f.filename,
+      mimeType: f.mimetype,
+      size: f.size,
+      path: url,
+      url
+    };
+  });
 }
 
 function includesCI(haystack, needle) {
@@ -309,7 +313,7 @@ async function downloadAttachment(req, res) {
     const ref = String(hit.url || hit.path || '').trim();
     if (!ref) throw new Error('File not found.');
 
-    return await fileAssetStorage.sendDownload(res, ref, hit.originalName || hit.fileName);
+    return await uploadStorage.sendDownload(res, ref, hit.originalName || hit.fileName);
   } catch (error) {
     if (gtools.isAjax(req)) return res.status(404).json({ status: 'error', error, message: error.message });
     res.status(404).render('error', { title: 'Error', error, message: error.message, user: req.user || null });

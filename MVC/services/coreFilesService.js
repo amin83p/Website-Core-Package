@@ -3,9 +3,9 @@ const fsp = require('fs').promises;
 const path = require('path');
 const pathResolver = require('../utils/pathResolver');
 const uploadPathUtils = require('../utils/uploadPathUtils');
+const uploadStoragePolicy = require('./uploadStoragePolicyService');
 const uploadFolderSettingsService = require('./uploadFolderSettingsService');
 const uploadCategoryResolverService = require('./uploadCategoryResolverService');
-const { isRailwayProxyMode } = require('../utils/uploadModeUtils');
 const adminAuthorityService = require('./adminAuthorityService');
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 const {
@@ -33,11 +33,6 @@ const {
  * - file-manager path validation and drive context resolution
  * - list/copy/move/rename/delete/create-folder/upload operations
  */
-
-const PROXY_LOCAL_REQUIRED_CATEGORIES = new Set([
-  'imports',
-  'public-pages-staging'
-]);
 
 const INVALID_NAME_PATTERN = /[<>:"/\\|?*\x00-\x1F]/;
 const WINDOWS_RESERVED_NAMES = new Set([
@@ -76,10 +71,6 @@ function sanitizeDrivePath(pathValue = '') {
     .replace(/^\/+/, '')
     .replace(/\/+$/, '')
     .trim();
-}
-
-function shouldKeepLocalProxyPath(category = '') {
-  return PROXY_LOCAL_REQUIRED_CATEGORIES.has(clean(category));
 }
 
 function cleanFolderId(value, fallback = '') {
@@ -159,10 +150,10 @@ function collectRequestFiles(req = {}) {
 }
 
 async function mirrorUploadedFilesIfNeeded(req = {}, fixedCategory = '') {
-  if (!isRailwayProxyMode()) {
+  if (!uploadStoragePolicy.isRailwayGatewayBackend()) {
     return;
   }
-  if (shouldKeepLocalProxyPath(fixedCategory)) return;
+  uploadStoragePolicy.assertRailwayGatewayReady();
   const requestPath = String(req.originalUrl || req.url || '').toLowerCase();
   if (requestPath.includes('/internal/file-gateway/')) return;
   if (requestPath.includes('/files/upload')) return;
@@ -225,17 +216,20 @@ async function deleteFilePaths(filePaths = []) {
     list.map(async (rawPath) => {
       const target = clean(rawPath);
       if (!target) return;
-      if (isUploadReference(target) && isRailwayProxyMode()) {
-        try {
+      if (isUploadReference(target)) {
+        if (uploadStoragePolicy.isRemoteUploadBackend()) {
           await gatewayDeleteByUploadUrl(target);
-        } catch (_) {
-          // best-effort cleanup
+          return;
         }
+        const diskPath = uploadPathUtils.fromUploadsUrlToDiskPath(target);
+        if (!diskPath) return;
+        await fsp.unlink(diskPath).catch(() => {});
         return;
       }
-      const diskPath = isUploadReference(target)
-        ? uploadPathUtils.fromUploadsUrlToDiskPath(target)
-        : target;
+      if (uploadStoragePolicy.isRemoteUploadBackend()) {
+        return;
+      }
+      const diskPath = target;
       if (!diskPath) return;
       await fsp.unlink(diskPath).catch(() => {});
     })
@@ -249,12 +243,16 @@ async function deleteUploadedFiles(req = {}) {
 }
 
 function getStoredFilePath(file = {}) {
-  return clean(file?.uploadUrl || file?.storagePath || file?.path || '');
+  return clean(file?.storedRef || file?.uploadUrl || file?.storagePath || file?.path || '');
 }
 
 function getStoredFileUrl(file = {}) {
-  return clean(file?.uploadUrl || file?.storagePath || '')
-    || uploadPathUtils.fromDiskPathToUploadsUrl(file?.path || '');
+  const direct = clean(file?.storedRef || file?.uploadUrl || file?.storagePath || '');
+  if (direct) return direct;
+  if (uploadStoragePolicy.isRemoteUploadBackend()) {
+    return '';
+  }
+  return uploadPathUtils.fromDiskPathToUploadsUrl(file?.path || '');
 }
 
 function getUploadRootAbsolute() {
@@ -513,7 +511,7 @@ function movePathSafe(sourcePath, destinationPath) {
 }
 
 async function listContextDirectory(context = {}) {
-  if (isRailwayProxyMode()) {
+  if (uploadStoragePolicy.isRailwayGatewayBackend()) {
     const gatewayResult = await gatewayListDirectory({
       scopeKey: context.scopeKey,
       relativeDir: context.relativeSub
@@ -542,7 +540,7 @@ async function listContextDirectory(context = {}) {
 }
 
 async function listDirectoryByScope({ scopeKey = '', relativeDir = '' } = {}) {
-  if (isRailwayProxyMode()) {
+  if (uploadStoragePolicy.isRailwayGatewayBackend()) {
     const gatewayResult = await gatewayListDirectory({
       scopeKey,
       relativeDir
@@ -581,7 +579,7 @@ async function transferSingleItem({ operation = 'move', sourceContext = {}, dest
 
   let finalName = '';
   let targetPath = '';
-  if (isRailwayProxyMode()) {
+  if (uploadStoragePolicy.isRailwayGatewayBackend()) {
     const payload = {
       sourceScopeKey: sourceContext.scopeKey,
       sourceRelativePath: sourceContext.relativeSub,
@@ -620,7 +618,7 @@ async function transferSingleItem({ operation = 'move', sourceContext = {}, dest
 
 async function deletePathByContext(context = {}) {
   if (!context.relativeSub) throw new Error('Cannot delete root drives.');
-  if (isRailwayProxyMode()) {
+  if (uploadStoragePolicy.isRailwayGatewayBackend()) {
     await gatewayDeleteByRelativePath({
       scopeKey: context.scopeKey,
       relativePath: context.relativeSub
@@ -646,7 +644,7 @@ async function renamePathByContext(sourceContext = {}, newName = '') {
   let targetPath = [parentPath, safeName].filter(Boolean).join('/').replace(/\\/g, '/');
   let finalName = safeName;
 
-  if (isRailwayProxyMode()) {
+  if (uploadStoragePolicy.isRailwayGatewayBackend()) {
     const result = await gatewayRenameItem({
       scopeKey: sourceContext.scopeKey,
       relativePath: sourceContext.relativeSub,
@@ -676,7 +674,7 @@ async function renamePathByContext(sourceContext = {}, newName = '') {
 
 async function createFolderByContext(context = {}, folderName = '') {
   const safeFolderName = assertValidName(folderName, 'folder name');
-  if (isRailwayProxyMode()) {
+  if (uploadStoragePolicy.isRailwayGatewayBackend()) {
     await gatewayCreateFolder({
       scopeKey: context.scopeKey,
       relativeDir: context.relativeSub,
@@ -728,7 +726,7 @@ function getWebUrl(scopeId, subfolder, filename) {
 
 async function uploadFilesToContext({ context = {}, files = [], relativePaths = [] } = {}) {
   const baseTargetDir = context.targetPath;
-  if (!isRailwayProxyMode()) {
+  if (!uploadStoragePolicy.isRailwayGatewayBackend()) {
     pathResolver.ensureDir(baseTargetDir);
   }
 
@@ -745,7 +743,7 @@ async function uploadFilesToContext({ context = {}, files = [], relativePaths = 
       const { relativeDir, fileName } = splitFilePath(relativeFromClient, file.originalname);
       const finalSubfolder = [context.relativeSub, relativeDir].filter(Boolean).join('/').replace(/\\/g, '/');
 
-      if (isRailwayProxyMode()) {
+      if (uploadStoragePolicy.isRailwayGatewayBackend()) {
         const gatewayResult = await gatewayUploadFile({
           scopeKey: context.scopeKey,
           relativeDir: finalSubfolder,
@@ -762,8 +760,10 @@ async function uploadFilesToContext({ context = {}, files = [], relativePaths = 
           fs.unlinkSync(file.path);
         }
         uploadedCount += 1;
+        const logicalPath = [context.currentPath, relativeDir, finalName].filter(Boolean).join('/').replace(/\\/g, '/');
         finalFiles.push({
           name: finalName,
+          path: logicalPath,
           size: file.size,
           url: clean(gatewayResult.url || getWebUrl(context.scopeKey, finalSubfolder, finalName)),
           type: String(file.mimetype || '').startsWith('image/') ? 'image' : 'file'
@@ -783,8 +783,10 @@ async function uploadFilesToContext({ context = {}, files = [], relativePaths = 
       }
       fs.renameSync(file.path, availablePath);
       uploadedCount += 1;
+      const logicalPath = [context.currentPath, relativeDir, finalName].filter(Boolean).join('/').replace(/\\/g, '/');
       finalFiles.push({
         name: finalName,
+        path: logicalPath,
         size: file.size,
         url: getWebUrl(context.scopeKey, finalSubfolder, finalName),
         type: String(file.mimetype || '').startsWith('image/') ? 'image' : 'file'
@@ -824,7 +826,6 @@ module.exports = {
   // Upload middleware compatibility adapter surface
   getMaxUploadFileMb,
   isUploadReference,
-  shouldKeepLocalProxyPath,
   resolveUploadCategory,
   resolveUploadDestination,
   mirrorUploadedFilesIfNeeded,

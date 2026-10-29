@@ -49,12 +49,16 @@ function buildFigureHtml({ src = '', layout = 'center', widthPct = 72, alt = '' 
   return `<figure class="news-figure news-figure--layout-${layoutToken}" data-news-figure="1" data-src="${safeUrl}" data-width-pct="${pct}" data-layout="${layoutToken}" style="max-width:${pct}%"><img src="${safeUrl}" alt="${altText}" loading="lazy"></figure>`;
 }
 
-function normalizeSingleFigureOpenTag(attrs = '') {
+function normalizeSingleFigureOpenTag(attrs = '', innerHtml = '') {
   const srcMatch = attrs.match(/\bdata-src\s*=\s*(["'])([^"']*)\1/i)
     || attrs.match(/\bsrc\s*=\s*(["'])([^"']*)\1/i);
   const layoutMatch = attrs.match(/\bdata-layout\s*=\s*(["'])([^"']*)\1/i);
   const widthMatch = attrs.match(/\bdata-width-pct\s*=\s*(["'])([^"']*)\1/i);
-  const rawSrc = srcMatch ? srcMatch[2] : '';
+  let rawSrc = srcMatch ? srcMatch[2] : '';
+  if (!rawSrc && innerHtml) {
+    const imgMatch = String(innerHtml).match(/<img\b[^>]*\ssrc\s*=\s*(["'])([^"']*)\1/i);
+    if (imgMatch) rawSrc = imgMatch[2];
+  }
   const url = normalizeFigureAssetUrl(rawSrc);
   if (!url) return '';
   const layoutToken = normalizeLayoutToken(layoutMatch ? layoutMatch[2] : 'center');
@@ -68,9 +72,9 @@ function normalizeFiguresInHtml(html = '') {
   if (!source.includes('news-figure') && !source.includes('data-news-figure')) {
     return source;
   }
-  return source.replace(/<figure\b([^>]*)>[\s\S]*?<\/figure>/gi, (full, attrs) => {
-    const rebuilt = normalizeSingleFigureOpenTag(attrs || '');
-    return rebuilt || '';
+  return source.replace(/<figure\b([^>]*)>([\s\S]*?)<\/figure>/gi, (full, attrs, innerHtml) => {
+    const rebuilt = normalizeSingleFigureOpenTag(attrs || '', innerHtml || '');
+    return rebuilt || full;
   });
 }
 

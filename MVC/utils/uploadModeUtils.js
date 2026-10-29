@@ -5,6 +5,7 @@ function clean(value) {
 function getUploadMode() {
   const token = clean(process.env.UPLOAD_MODE).toLowerCase();
   if (token === 'railway_proxy') return 'railway_proxy';
+  if (token === 's3') return 's3';
   return 'local';
 }
 
@@ -35,10 +36,16 @@ function getGatewayTimeoutMs() {
   return raw;
 }
 
+function shouldPersistUploadsViaRemoteGateway() {
+  const uploadStoragePolicy = require('../services/uploadStoragePolicyService');
+  return uploadStoragePolicy.isRailwayGatewayBackend();
+}
+
 module.exports = {
   getUploadMode,
   isRailwayProxyMode,
   getGatewayBaseUrl,
   getGatewayTimeoutMs,
-  isBrowserUnsafeGatewayBaseUrl
+  isBrowserUnsafeGatewayBaseUrl,
+  shouldPersistUploadsViaRemoteGateway
 };

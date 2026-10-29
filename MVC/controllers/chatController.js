@@ -17,7 +17,9 @@ const fsPromises = require('fs').promises;
 const path = require('path');
 const { OPERATIONS } = require('../../config/accessConstants');
 const uploadMiddleware = require('../middleware/upload');
-const fileAssetStorage = require('../services/fileAssetStorageService');
+const coreUploadRefService = require('../services/coreUploadRefService');
+const uploadStorage = require('../services/uploadStorageService');
+const uploadStoragePolicy = require('../services/uploadStoragePolicyService');
 const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
 const { normalizeUnreadCount } = require('../services/chatUnreadStateService');
 const {
@@ -31,6 +33,9 @@ const {
 
 // Helper: Calculate Folder Size (Recursive)
 function getFolderSize(directoryPath) {
+    if (!uploadStoragePolicy.allowLocalUploadFallback()) {
+        return 0;
+    }
     let totalSize = 0;
     try {
         if (fs.existsSync(directoryPath)) {
@@ -49,6 +54,48 @@ function getFolderSize(directoryPath) {
         // Ignore permission errors or race conditions
     }
     return totalSize;
+}
+
+async function sumUploadDirectoryBytes(scopeKey, relativeDir = '') {
+    let total = 0;
+    try {
+        const entries = await uploadStorage.listDirectory({ scopeKey, relativeDir });
+        for (const entry of (Array.isArray(entries) ? entries : [])) {
+            const name = String(entry?.name || '').trim();
+            if (!name) continue;
+            const childRelative = [relativeDir, name].filter(Boolean).join('/').replace(/\\/g, '/');
+            if (entry.isDir) {
+                total += await sumUploadDirectoryBytes(scopeKey, childRelative);
+            } else {
+                total += Number(entry?.size || 0);
+            }
+        }
+    } catch (_) {
+        // Missing folder or gateway error — treat as empty.
+    }
+    return total;
+}
+
+async function getChatAttachmentBytes(convId) {
+    const context = { conversationId: convId };
+    const folders = [...new Set([
+        uploadFolderSettingsService.resolveUploadFolder('core.chat', context),
+        uploadFolderSettingsService.resolveDefaultUploadFolder('core.chat', context)
+    ].filter(Boolean))];
+    let total = 0;
+    for (const relativePath of folders) {
+        total += await sumUploadDirectoryBytes('GLOBAL', relativePath);
+    }
+    if (uploadStoragePolicy.allowLocalUploadFallback()) {
+        try {
+            const root = coreFilesService.getRootPath('GLOBAL');
+            const chatDir = coreFilesService.resolveSafePath(root, `chat/${convId}`);
+            total += getFolderSize(chatDir);
+        } catch (_) {
+            // Legacy path may not exist.
+        }
+    }
+    return total;
 }
 
 // Helper: Format Bytes
@@ -94,7 +141,7 @@ function parseRecipientIds(rawValue) {
 function normalizeBroadcastAttachmentRows(files = []) {
     return (Array.isArray(files) ? files : [])
         .map((file) => {
-            const fileUrl = uploadMiddleware.getStoredFileUrl(file) || uploadMiddleware.getStoredFilePath(file);
+            const fileUrl = coreUploadRefService.resolveMulterStoredRefOrEmpty(file);
             if (!fileUrl) return null;
             const type = String(file?.mimetype || '').startsWith('image/') ? 'image' : 'file';
             return {
@@ -268,14 +315,8 @@ exports.listAllChats = async (req, res) => {
             const msgFile = path.join(__dirname, '../../data/messages/', `${c.id}.json`);
             if (fs.existsSync(msgFile)) totalBytes += fs.statSync(msgFile).size;
 
-            // B. Attachment Folder Size (Dynamic Path via Resolver)
-            try {
-                const root = coreFilesService.getRootPath('GLOBAL');
-                const chatDir = coreFilesService.resolveSafePath(root, `chat/${c.id}`);
-                totalBytes += getFolderSize(chatDir);
-            } catch (e) {
-                // Folder might not exist if no attachments were sent
-            }
+            // B. Attachment storage under /uploads/ (remote volume or local disk)
+            totalBytes += await getChatAttachmentBytes(c.id);
 
             return {
                 id: c.id,
@@ -372,7 +413,7 @@ exports.uploadAttachment = async (req, res) => {
         });
 
         const uploadedResults = req.files.map(file => {
-            const storedUrl = uploadMiddleware.getStoredFileUrl(file) || uploadMiddleware.getStoredFilePath(file);
+            const storedUrl = coreUploadRefService.resolveMulterStoredRef(file);
             const fileName = chatAttachmentAccessService.getFileNameFromReference(storedUrl);
             const secureUrl = chatAttachmentAccessService.getSecureAttachmentUrl(conversation.id, fileName);
             chatPendingAttachmentService.registerPendingAttachment({
@@ -428,7 +469,7 @@ exports.deleteChat = async (req, res) => {
             });
             for (const relativePath of [...new Set([configuredFolder, defaultFolder])]) {
                 // eslint-disable-next-line no-await-in-loop
-                const removedUploadFolder = await fileAssetStorage.deleteRelativePath({
+                const removedUploadFolder = await uploadStorage.deleteRelativePath({
                     scopeKey: 'GLOBAL',
                     relativePath
                 });
@@ -437,13 +478,13 @@ exports.deleteChat = async (req, res) => {
                     console.log(`[Chat] Deleted attachments for: ${convId}`);
                 }
             }
-            if (!filesDeleted) {
+            if (!filesDeleted && uploadStoragePolicy.allowLocalUploadFallback()) {
                 // resolveSafePath ensures we don't accidentally delete outside our scope
                 const chatDir = coreFilesService.resolveSafePath(root, `chat/${convId}`);
                 if (fs.existsSync(chatDir)) {
                     await fsPromises.rm(chatDir, { recursive: true, force: true });
                     filesDeleted = true;
-                    console.log(`[Chat] Deleted attachments for: ${convId}`);
+                    console.log(`[Chat] Deleted legacy attachments for: ${convId}`);
                 }
             }
         } catch (e) {

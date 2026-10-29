@@ -14,10 +14,8 @@ const {
 } = requireCoreModule('MVC/utils/orgContextUtils');
 
 // File handling helpers (centralized)
-const fileService = requireCoreModule('MVC/services/fileService');
-const coreFilesService = requireCoreModule('MVC/services/coreFilesService');
-const upload = requireCoreModule('MVC/middleware/upload');
-const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
+const schoolFileService = require('../../services/school/schoolFileService');
+const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
 const path = require('path');
 const crypto = require('crypto');
 const { createTransactionContext, addDeleteCompensation } = requireCoreModule('MVC/services/transactionContextService');
@@ -950,21 +948,12 @@ exports.saveStudent = async (req, res) => {
         const newFileComments = Array.isArray(commentsRaw) ? commentsRaw : (commentsRaw ? [commentsRaw] : []);
 
         if (req.files && req.files.length > 0) {
-            req.files.forEach((file, idx) => {
-                const normalizedPath = String(upload.getStoredFilePath(file) || '').replace(/\\/g, '/');
-                const fileUrl = String(upload.getStoredFileUrl(file) || normalizedPath).replace(/\\/g, '/');
-
-                parsedAttachments.push({
-                    id: crypto.randomBytes(8).toString('hex'),
-                    originalName: file.originalname,
-                    filename: file.filename,
-                    path: normalizedPath,
-                    url: fileUrl,
-                    size: file.size,
-                    uploadDate: new Date().toISOString(),
+            for (let idx = 0; idx < req.files.length; idx += 1) {
+                const file = req.files[idx];
+                parsedAttachments.push(schoolFileService.buildAttachmentFromMulterFile(file, {
                     comment: String(newFileComments[idx] || '').trim()
-                });
-            });
+                }));
+            }
         }
 
         const personMode = existingStudent
@@ -1535,11 +1524,11 @@ exports.downloadAttachment = async (req, res) => {
 
         if (!attachment) return res.status(404).send('Attachment not found.');
 
-        const fileRef = String(attachment.url || attachment.path || '').trim();
+        const fileRef = schoolFileService.normalizeAttachmentDownloadRef(attachment);
         if (!fileRef) return res.status(404).send('File path missing.');
 
         const downloadName = attachment.originalName || attachment.filename || path.basename(fileRef);
-        return await fileAssetStorage.sendDownload(res, fileRef, downloadName);
+        return await uploadStorage.sendDownload(res, fileRef, downloadName);
     } catch (error) {
         if (isAjax(req)) return res.status(500).json({ status: 'error', error, message: error.message });
         return res.status(500).send(error.message);
@@ -1582,27 +1571,11 @@ exports.deleteAttachment = async (req, res) => {
 
         const attachment = attachments[index];
 
-        // Build URL for deletion (FileService expects /uploads/...)
-        let fileUrl = String(attachment?.url || '').trim();
-        if (!fileUrl) {
-            const normalizedPath = String(attachment?.path || '').replace(/\\/g, '/');
-            fileUrl = coreFilesService.fromDiskPathToUploadsUrl(normalizedPath) || normalizedPath;
-        }
-
         // Remove from DB first
         attachments.splice(index, 1);
         await dataService.updateData('students', id, { attachments }, req.user);
 
-        // Delete physical file using centralized services
-        let deleted = false;
-        if (fileUrl) {
-            deleted = await fileService.deleteFile(fileUrl);
-        }
-
-        // Fallback to upload helper if fileUrl missing or deleteFile returned false
-        if (!deleted && attachment?.path) {
-            await upload.deleteFilePaths(path.resolve(String(attachment.path)));
-        }
+        await schoolFileService.deleteAttachmentFile(attachment);
 
         if (isAjax(req)) {
             const payloadOut = { status: 'success', message: 'Attachment deleted.', attachments };

@@ -17,6 +17,9 @@
   const savedNotifyRoleKeys = (item && item.notifications && Array.isArray(item.notifications.roleKeys))
     ? item.notifications.roleKeys
     : [];
+  const recoverableBodyImagesList = (typeof recoverableBodyImages !== 'undefined' && Array.isArray(recoverableBodyImages))
+    ? recoverableBodyImages
+    : [];
 %>
 
 <link href="https://cdn.jsdelivr.net/npm/quill@1.3.6/dist/quill.snow.css" rel="stylesheet">
@@ -33,6 +36,7 @@
   </div>
 
   <form id="newsForm" action="<%= isEdit ? '/news/manage/edit/' + item.id : '/news/manage/new' %>" method="POST">
+    <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
     <input type="hidden" name="actionStateId" value="<%= typeof actionStateId !== 'undefined' ? actionStateId : '' %>">
     
     <input type="hidden" name="htmlContent" id="hiddenHtmlContent">
@@ -80,6 +84,18 @@
                 </div>
 
                 <p class="small text-muted mb-2">Tip: with a left/right figure, add wrap text beside the image; press Enter twice on a blank line to start full-width content below the image.</p>
+                <% if (recoverableBodyImagesList.length > 0) { %>
+                <div class="alert alert-warning border-0 shadow-sm mb-3" role="status" id="newsBodyImagesRecoveryBanner">
+                    <strong>Body images missing from saved HTML.</strong>
+                    <span class="d-block small mt-1 mb-2">
+                        The stored article text no longer includes your photos (likely removed by an earlier save).
+                        <%= recoverableBodyImagesList.length %> image(s) are still listed on this article&rsquo;s attachments—you can re-insert them below, then adjust placement and save.
+                    </span>
+                    <button type="button" class="btn btn-sm btn-warning" id="btnRestoreBodyImagesFromAttachments">
+                        Re-insert <%= recoverableBodyImagesList.length %> image(s) from attachments
+                    </button>
+                </div>
+                <% } %>
                 <div id="editor-wrapper" class="border rounded">
                     <div id="editor-container" style="height: 600px; font-size: 16px; border:none;">
                         <%- item ? item.content.body : '' %>
@@ -435,6 +451,16 @@ document.addEventListener('DOMContentLoaded', () => {
     const newsMediaLibraryCache = new Map();
 
     let articleAttachments = JSON.parse(document.getElementById('initArticleAttachments').textContent || '[]');
+    const INITIAL_NEWS_BODY = <%- JSON.stringify((item && item.content && item.content.body) ? item.content.body : '') %>;
+    const RECOVERABLE_BODY_IMAGES = <%- JSON.stringify(recoverableBodyImagesList) %>;
+
+    function countFiguresInHtml(html) {
+        const token = String(html || '');
+        return {
+            figureTags: (token.match(/<figure\b/gi) || []).length,
+            imgTags: (token.match(/<img\b/gi) || []).length
+        };
+    }
 
     const quill = new Quill('#editor-container', {
         theme: 'snow',
@@ -558,6 +584,17 @@ document.addEventListener('DOMContentLoaded', () => {
         quill.clipboard.dangerouslyPasteHTML(index, source, 'user');
         return true;
     }
+
+    (function hydrateNewsEditorFiguresAfterQuillInit() {
+        const expected = countFiguresInHtml(INITIAL_NEWS_BODY);
+        const inEditor = {
+            figureTags: quill.root.querySelectorAll('figure').length,
+            imgTags: quill.root.querySelectorAll('img').length
+        };
+        if (expected.figureTags > 0 && inEditor.figureTags < expected.figureTags) {
+            applyHtmlToQuillEditor(INITIAL_NEWS_BODY, { replaceAll: true });
+        }
+    })();
 
     quill.root.addEventListener('paste', (event) => {
         const html = event.clipboardData && typeof event.clipboardData.getData === 'function'
@@ -779,6 +816,26 @@ document.addEventListener('DOMContentLoaded', () => {
         quill.insertText(range ? range.index : quill.getLength(), ` ${name} `, 'link', url);
     }
 
+    document.getElementById('btnRestoreBodyImagesFromAttachments')?.addEventListener('click', () => {
+        if (!Array.isArray(RECOVERABLE_BODY_IMAGES) || !RECOVERABLE_BODY_IMAGES.length) return;
+        try {
+            RECOVERABLE_BODY_IMAGES.forEach((entry) => {
+                insertFigureIntoEditor(
+                    { url: entry.url, name: entry.name, originalName: entry.name },
+                    { layout: 'center', widthPct: 72 }
+                );
+            });
+            document.getElementById('newsBodyImagesRecoveryBanner')?.classList.add('d-none');
+            showNewsMessage(
+                'Images re-inserted',
+                'Figures were added from your attachment list. Move them where you want in the body, then save the article.',
+                'success'
+            );
+        } catch (error) {
+            showNewsMessage('Restore failed', error.message || 'Could not re-insert images.');
+        }
+    });
+
     async function openNewsMediaPicker(mode) {
         if (!mediaManagerModalApi || typeof mediaManagerModalApi.open !== 'function') {
             await showNewsMessage('Media Library Unavailable', 'The media manager is not available on this page.', 'warning');
@@ -886,51 +943,71 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     function collectPreviewBodyHtml() {
+        const cloneRoot = quill.root.cloneNode(true);
         if (floatLayout?.syncNewsFigureFloatLayout) {
-            floatLayout.syncNewsFigureFloatLayout(quill.root);
+            floatLayout.syncNewsFigureFloatLayout(cloneRoot);
         }
-        let editorHtml = document.querySelector('.ql-editor').innerHTML;
+        cloneRoot.querySelectorAll('figure.news-figure').forEach((node) => {
+            if (figureEditor?.NewsFigureDom?.applyToNode && figureEditor?.NewsFigureDom?.readFromNode) {
+                figureEditor.NewsFigureDom.applyToNode(node, figureEditor.NewsFigureDom.readFromNode(node));
+            }
+        });
+        let editorHtml = cloneRoot.innerHTML;
         if (figureEditor?.stripEmbeddedImagesFromHtml) {
             editorHtml = figureEditor.stripEmbeddedImagesFromHtml(editorHtml);
         }
         return normalizeHtmlAssetUrls(editorHtml);
     }
 
-    document.getElementById('btnPreviewArticle')?.addEventListener('click', () => {
-        const previewForm = document.createElement('form');
-        previewForm.method = 'POST';
-        previewForm.action = '/news/manage/preview';
-        previewForm.target = '_blank';
-        previewForm.style.display = 'none';
-
+    document.getElementById('btnPreviewArticle')?.addEventListener('click', async () => {
         const csrfMeta = document.querySelector('meta[name="csrf-token"]')?.content || '';
         const newsFormCsrf = document.querySelector('#newsForm input[name="_csrf"]')?.value || '';
         const csrfToken = String(csrfMeta || newsFormCsrf || '').trim();
-
-        const fields = {
-            actionStateId: document.querySelector('input[name="actionStateId"]')?.value || '',
-            title: document.querySelector('input[name="title"]')?.value || '',
-            summary: document.querySelector('textarea[name="summary"]')?.value || '',
-            htmlContent: collectPreviewBodyHtml(),
-            featuredImage: document.getElementById('featuredImageInput')?.value || '',
-            category: document.querySelector('select[name="category"]')?.value || 'General',
-            tags: document.querySelector('input[name="tags"]')?.value || ''
-        };
-        if (csrfToken) {
-            fields._csrf = csrfToken;
+        if (!csrfToken) {
+            showNewsMessage('Preview unavailable', 'Refresh the edit page and try preview again.');
+            return;
         }
 
-        Object.entries(fields).forEach(([name, value]) => {
-            const input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = name;
-            input.value = value;
-            previewForm.appendChild(input);
-        });
+        const previewPayload = new URLSearchParams();
+        previewPayload.set('_csrf', csrfToken);
+        previewPayload.set('actionStateId', document.querySelector('input[name="actionStateId"]')?.value || '');
+        previewPayload.set('title', document.querySelector('input[name="title"]')?.value || '');
+        previewPayload.set('summary', document.querySelector('textarea[name="summary"]')?.value || '');
+        previewPayload.set('htmlContent', collectPreviewBodyHtml());
+        previewPayload.set('featuredImage', document.getElementById('featuredImageInput')?.value || '');
+        previewPayload.set('category', document.querySelector('select[name="category"]')?.value || 'General');
+        previewPayload.set('tags', document.querySelector('input[name="tags"]')?.value || '');
 
-        document.body.appendChild(previewForm);
-        previewForm.submit();
-        previewForm.remove();
+        try {
+            const response = await fetch('/news/manage/preview', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'text/html',
+                    'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                    'X-CSRF-Token': csrfToken
+                },
+                body: previewPayload.toString()
+            });
+            const html = await response.text();
+            if (!response.ok) {
+                showNewsMessage(
+                    'Preview failed',
+                    html.trim() || 'Could not open preview. Refresh the page and try again.'
+                );
+                return;
+            }
+            const previewWindow = window.open('', '_blank');
+            if (!previewWindow) {
+                showNewsMessage('Preview blocked', 'Allow pop-ups for this site to open the preview tab.');
+                return;
+            }
+            previewWindow.document.open();
+            previewWindow.document.write(html);
+            previewWindow.document.close();
+        } catch (error) {
+            showNewsMessage('Preview failed', error.message || 'Could not open preview.');
+        }
     });
 
     document.getElementById('btnOpenMediaForEditor').addEventListener('click', () => {
@@ -1126,11 +1203,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
         try {
             const fd = new FormData(newsForm);
+            const csrfToken = String(
+                document.querySelector('#newsForm input[name="_csrf"]')?.value
+                || document.querySelector('meta[name="csrf-token"]')?.content
+                || ''
+            ).trim();
             const response = await fetch(newsForm.action, {
                 method: 'POST',
                 headers: {
                     'X-AJAX-Request': 'true',
-                    Accept: 'application/json'
+                    Accept: 'application/json',
+                    ...(csrfToken ? { 'X-CSRF-Token': csrfToken } : {})
                 },
                 body: fd
             });

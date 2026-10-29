@@ -4,8 +4,9 @@
   const layoutAppName = layoutBrand.appName || 'Amin Paknejad';
   const layoutShortName = layoutBrand.appShortName || layoutAppName || 'Website';
   const layoutThemeColor = layoutBrand.themeColor || '#ffffff';
-  const layoutIconSvgUrl = layoutBrand.iconSvgUrl || '/uploads/GLOBAL/logo/icon.svg';
   const layoutLogoUrl = layoutBrand.logoUrl || '/uploads/GLOBAL/logo/Logo1.png';
+  const layoutBrowserTabIconUrl = layoutBrand.browserTabIconUrl || layoutBrand.iconSvgUrl || '/uploads/GLOBAL/logo/icon.svg';
+  const layoutBrowserTabIconType = layoutBrand.browserTabIconType || 'image/svg+xml';
   const layoutAppleIconUrl = layoutBrand.appleTouchIconUrl || layoutLogoUrl;
   const layoutHtmlClass = (typeof htmlClass !== 'undefined' && htmlClass) ? String(htmlClass).trim() : '';
   const layoutBodyClass = (typeof bodyClass !== 'undefined' && bodyClass) ? String(bodyClass).trim() : '';
@@ -44,9 +45,8 @@
     window.__APP_UI_SETTINGS__ = <%- JSON.stringify((typeof appUiSettings !== 'undefined' && appUiSettings) ? appUiSettings : { genericPickerSearchDebounceMs: 400 }) %>;
   </script>
 
-  <link rel="icon" type="image/svg+xml" href="<%= layoutIconSvgUrl %>">
-  <link rel="icon" type="image/png" href="<%= layoutLogoUrl %>">
-  <link rel="shortcut icon" type="image/png" href="<%= layoutLogoUrl %>">
+  <link rel="icon" type="<%= layoutBrowserTabIconType %>" href="<%= layoutBrowserTabIconUrl %>">
+  <link rel="shortcut icon" type="<%= layoutBrowserTabIconType %>" href="<%= layoutBrowserTabIconUrl %>">
   <link rel="apple-touch-icon" sizes="180x180" href="<%= layoutAppleIconUrl %>">
   <link rel="manifest" href="/site.webmanifest">
 

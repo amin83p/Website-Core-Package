@@ -36,7 +36,7 @@ const { SYSTEM_CONTEXT } = require('../../config/constants');
 const { loadMergedProfileByIds } = require('../services/security/profileMergeService');
 const { normalizeOrgRoles, getOrgRolesDisplay, getPrimaryOrgRole } = require('../utils/orgContextUtils');
 const { randomUUID } = require('crypto');
-const fileAssetStorage = require('../services/fileAssetStorageService');
+const uploadStorage = require('../services/uploadStorageService');
 const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
 const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 
@@ -446,7 +446,7 @@ async function processHeicConversion_HDD(req, res){
         for (const file of req.files) {
             try {
                 const inputBuffer = file.buffer || await fs.promises.readFile(file.path);
-                const originalAsset = await fileAssetStorage.saveBuffer({
+                const originalAsset = await uploadStorage.saveBuffer({
                     scopeKey: 'GLOBAL',
                     relativeDir,
                     fileName: file.originalname,
@@ -456,7 +456,7 @@ async function processHeicConversion_HDD(req, res){
                 });
                 const jpgBuffer = await heicConvert({ buffer: inputBuffer, format: 'JPEG', quality: 0.8 });
                 const jpgName = file.originalname.replace(/\.(heic|heif)$/i, '.jpg');
-                const convertedAsset = await fileAssetStorage.saveBuffer({
+                const convertedAsset = await uploadStorage.saveBuffer({
                     scopeKey: 'GLOBAL',
                     relativeDir,
                     fileName: jpgName,

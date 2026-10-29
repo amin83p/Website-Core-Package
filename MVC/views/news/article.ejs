@@ -254,6 +254,12 @@ html.news-public-root body.news-public-body:has(.news-article-page) .news-public
   display: block;
 }
 
+.news-article-hero-title-rest {
+  animation: newsTitleReveal 0.85s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--news-title-rest-delay, 0.78s);
+  display: block;
+}
+
 @media (min-width: 992px) {
   .news-article-hero-title-line1 { grid-area: title-line1; }
   .news-article-hero-title-line1 {
@@ -437,11 +443,13 @@ html.news-public-root body.news-public-body:has(.news-article-page) .news-public
   .news-article-page .news-article-card,
   .news-hero-orbit span,
   html.news-public-root body.news-public-body:has(.news-article-page) .news-public-bg-gradient,
-  .news-article-hero-title-line1 {
+  .news-article-hero-title-line1,
+  .news-article-hero-title-rest {
     animation: none !important;
   }
 
-  .news-article-hero-title-line1 {
+  .news-article-hero-title-line1,
+  .news-article-hero-title-rest {
     clip-path: none;
     opacity: 1;
     transform: none;
@@ -513,7 +521,10 @@ html.news-public-root body.news-public-body:has(.news-article-page) .news-public
 }
 </style>
 
-<script src="/scripts/news/quillNewsFigureFloatLayout.js"></script>
+<%- include('../partials/modal_ImageViewer') %>
+
+<script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/news/quillNewsFigureFloatLayout.js') : '/scripts/news/quillNewsFigureFloatLayout.js' %>"></script>
+<script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/news/newsArticleImageViewer.js') : '/scripts/news/newsArticleImageViewer.js' %>"></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
     const state = {
@@ -523,45 +534,20 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const bodyText = document.getElementById('articleBodyContent');
+    const heroImg = document.querySelector('.news-article-hero-media img');
+    const articleTitleLabel = <%- JSON.stringify(articleTitle) %>;
+
     if (bodyText && window.NewsFigureFloatLayout?.syncNewsFigureFloatLayout) {
         window.NewsFigureFloatLayout.syncNewsFigureFloatLayout(bodyText);
     }
-    if (bodyText) {
-        const rewriteArticleImageSrc = (rawSrc) => {
-            const src = String(rawSrc || '').trim();
-            if (!src) return src;
-            if (/^https?:\/\//i.test(src)) {
-                try {
-                    const parsed = new URL(src);
-                    const host = parsed.hostname.toLowerCase();
-                    const isPrivate = host === 'localhost'
-                        || host.endsWith('.localhost')
-                        || host.endsWith('.local')
-                        || host.endsWith('.internal')
-                        || /^127\./.test(host)
-                        || /^10\./.test(host)
-                        || /^192\.168\./.test(host)
-                        || /^169\.254\./.test(host);
-                    if (isPrivate) {
-                        const uploadsMatch = parsed.pathname.match(/\/uploads\/(.+)$/i);
-                        if (uploadsMatch && uploadsMatch[1]) {
-                            return `/uploads/${uploadsMatch[1]}`;
-                        }
-                    }
-                } catch (_) {
-                    return src;
-                }
-                return src;
-            }
-            if (!src.startsWith('/')) return `/${src.replace(/^\/+/, '')}`;
-            return src;
-        };
-        bodyText.querySelectorAll('img[src]').forEach((img) => {
-            const nextSrc = rewriteArticleImageSrc(img.getAttribute('src'));
-            if (nextSrc && nextSrc !== img.getAttribute('src')) {
-                img.setAttribute('src', nextSrc);
-            }
+    if (window.NewsArticleImageViewer?.bind) {
+        window.NewsArticleImageViewer.bind({
+            heroImg,
+            bodyRoot: bodyText,
+            defaultName: articleTitleLabel
         });
+    } else if (bodyText && window.NewsArticleImageViewer?.rewriteImageSources) {
+        window.NewsArticleImageViewer.rewriteImageSources({ heroImg, bodyRoot: bodyText });
     }
     const mainCol = document.getElementById('mainColumn');
     const rightBar = document.getElementById('rightSidebar');
@@ -636,6 +622,19 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+function replayTitleReveal(el, delaySeconds = 0) {
+    if (!el) return;
+    const hasText = String(el.textContent || '').trim().length > 0;
+    if (!hasText) {
+        el.style.animation = 'none';
+        return;
+    }
+    el.style.animationDelay = `${Math.max(0, Number(delaySeconds) || 0)}s`;
+    el.style.animation = 'none';
+    void el.offsetWidth;
+    el.style.animation = '';
+}
+
 function layoutHeroTitle() {
     const h1 = document.getElementById('newsArticleTitle');
     const body = h1 && h1.closest('.news-article-hero-body');
@@ -659,6 +658,8 @@ function layoutHeroTitle() {
     if (window.matchMedia('(max-width: 991.98px)').matches) {
         line1El.textContent = full;
         restEl.textContent = '';
+        replayTitleReveal(line1El, 0);
+        restEl.style.animation = 'none';
         return;
     }
 
@@ -698,7 +699,23 @@ function layoutHeroTitle() {
         }
     }
 
-    line1El.textContent = line1Words.join(' ');
-    restEl.textContent = words.slice(line1Words.length).join(' ');
+    const line1Text = line1Words.join(' ');
+    const restText = words.slice(line1Words.length).join(' ');
+    line1El.textContent = line1Text;
+    restEl.textContent = restText;
+
+    const line1DurationSec = 0.85;
+    const restDelaySec = restText
+        ? Math.min(1.15, Math.max(0.35, line1DurationSec * 0.88))
+        : 0;
+    if (h1) {
+        h1.style.setProperty('--news-title-rest-delay', `${restDelaySec}s`);
+    }
+    replayTitleReveal(line1El, 0);
+    if (restText) {
+        replayTitleReveal(restEl, restDelaySec);
+    } else {
+        restEl.style.animation = 'none';
+    }
 }
 </script>

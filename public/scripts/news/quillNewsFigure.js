@@ -22,7 +22,12 @@
 
   const NewsFigureDom = {
     applyToNode(node, value) {
-      const src = String(value?.src || '').trim();
+      const existingImg = node.querySelector('img');
+      const existingSrc = String(
+        node.getAttribute('data-src') || existingImg?.getAttribute('src') || ''
+      ).trim();
+      let src = String(value?.src || '').trim();
+      if (!src) src = existingSrc;
       const layout = normalizeLayoutToken(value?.layout);
       const widthPct = clampWidthPct(value?.widthPct, 72);
       const alt = String(value?.alt || '').trim();
@@ -37,7 +42,7 @@
         img = document.createElement('img');
         node.appendChild(img);
       }
-      img.src = src;
+      if (src) img.src = src;
       img.alt = alt;
       img.loading = 'lazy';
     },

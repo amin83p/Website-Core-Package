@@ -11,6 +11,7 @@ const {
   adminChekersService,
   dataService,
   coreFilesService,
+  uploadStorageService,
   isRailwayProxyMode,
   activityQuotaLedgerService,
   consumptionDefinitionPolicyService,
@@ -1034,9 +1035,10 @@ function collectArtifactLocationValues(row = {}) {
 
 async function removeRemoteUploadIfExists(uploadUrl = '') {
   const token = cleanString(uploadUrl, { max: 2000, allowEmpty: true }) || '';
-  if (!token || !isUploadUrlLike(token) || !isRailwayProxyMode()) return false;
+  if (!token || !isUploadUrlLike(token)) return false;
+  if (!uploadStorageService.isRemoteUploadBackend()) return false;
   try {
-    await coreFilesService.deleteFilePaths([token]);
+    await uploadStorageService.deleteByReference(token);
     return true;
   } catch (_) {
     return false;
@@ -1083,10 +1085,12 @@ async function cleanupPracticeAttemptUploads(session = {}, artifacts = [], event
   });
 
   let removedFiles = 0;
-  for (const filePath of filePaths) {
-    // eslint-disable-next-line no-await-in-loop
-    const removed = await removePathIfExists(filePath);
-    if (removed) removedFiles += 1;
+  if (!uploadStorageService.isRemoteUploadBackend()) {
+    for (const filePath of filePaths) {
+      // eslint-disable-next-line no-await-in-loop
+      const removed = await removePathIfExists(filePath);
+      if (removed) removedFiles += 1;
+    }
   }
 
   let removedRemoteFiles = 0;
@@ -1146,6 +1150,19 @@ async function cleanupPracticeAttemptUploads(session = {}, artifacts = [], event
   }
 
   let removedDirectories = 0;
+  if (uploadStorageService.isRemoteUploadBackend()) {
+    const scopeKey = orgId
+      ? String(orgId).replace(/^ORG_/i, '').trim() || 'GLOBAL'
+      : 'GLOBAL';
+    for (const relativePath of relativeCandidates) {
+      // eslint-disable-next-line no-await-in-loop
+      const removed = await uploadStorageService.deleteRelativePath({
+        scopeKey,
+        relativePath: String(relativePath || '').replace(/\\/g, '/')
+      }).catch(() => false);
+      if (removed) removedDirectories += 1;
+    }
+  } else {
   const baseRoots = new Set();
   if (orgId) baseRoots.add(coreFilesService.getRootPath(orgId));
   baseRoots.add(coreFilesService.getRootPath('GLOBAL'));
@@ -1165,6 +1182,7 @@ async function cleanupPracticeAttemptUploads(session = {}, artifacts = [], event
       const removed = await removePathIfExists(targetDirectory, { recursive: true });
       if (removed) removedDirectories += 1;
     }
+  }
   }
 
   return {

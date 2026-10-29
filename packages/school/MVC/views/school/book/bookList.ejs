@@ -59,7 +59,7 @@
         <tr>
           <td class="ps-4" data-sort-value="<%= coverUrl ? '1' : '0' %>">
             <% if (coverUrl) { %>
-              <img src="<%= coverUrl %>" alt="" class="rounded border" style="width: 48px; height: 64px; object-fit: cover;">
+              <img src="<%= coverUrl %>" alt="" class="rounded border" loading="lazy" decoding="async" style="width: 48px; height: 64px; object-fit: cover;">
             <% } else { %>
               <div class="border rounded bg-light text-muted d-flex align-items-center justify-content-center" style="width: 48px; height: 64px;">
                 <i class="bi bi-book"></i>

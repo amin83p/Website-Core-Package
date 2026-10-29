@@ -12,6 +12,9 @@
     const AUDIO_EXT = /\.(mp3|wav|m4a|aac|ogg|webm|flac)$/i;
     const VIDEO_EXT = /\.(mp4|mov|avi|mkv|webm|m4v)$/i;
 
+    const uploadUsesRemoteStorage = Boolean(typeof uploadUsesRemoteStorage !== 'undefined' && uploadUsesRemoteStorage);
+    const uploadStorageBackend = String(typeof uploadStorageBackend !== 'undefined' ? uploadStorageBackend : 'local');
+
     function previewUrlFromPath(filePath) {
       return '/uploads/' + String(filePath || '').split('/').filter(Boolean).map(encodeURIComponent).join('/');
     }
@@ -70,8 +73,12 @@
   </nav>
 
   <div class="alert alert-info py-2 px-3 mb-4 small">
-    <strong>Upload destination:</strong> Files are saved to <code>app.uploadsPath</code> from System Settings.
-    Railway uses volume only when that path points to the mounted volume path. Local development writes to local disk.
+    <% if (uploadUsesRemoteStorage) { %>
+    <strong>Upload destination:</strong> Files are stored on the remote upload volume (<code><%= uploadStorageBackend %></code>).
+    Uploads and downloads use <code>/uploads/</code> URLs; this app node does not serve stale copies from local disk.
+    <% } else { %>
+    <strong>Upload destination:</strong> Files are saved under <code>app.uploadsPath</code> from System Settings (local disk).
+    <% } %>
   </div>
 
   <% if (isRoot) { %>
@@ -705,10 +712,17 @@
     };
     let droppedFolderFiles = [];
 
+    function getFileManagerCsrfToken() {
+      return String(document.querySelector('meta[name="csrf-token"]')?.content || '').trim();
+    }
+
     function ajaxHeaders(extra = {}) {
+      const csrfToken = getFileManagerCsrfToken();
+      const actionStateId = String(document.querySelector('input[name="actionStateId"]')?.value || '').trim();
       return {
         'X-AJAX-Request': 'true',
-        'X-Action-State-Id': '',
+        'X-Action-State-Id': actionStateId,
+        ...(csrfToken ? { 'x-csrf-token': csrfToken, 'csrf-token': csrfToken } : {}),
         ...(extra || {})
       };
     }
@@ -1495,7 +1509,8 @@
 
         const formData = new FormData();
         const currentPathInput = uploadForm.querySelector('input[name="path"]');
-        formData.append('path', currentPathInput ? currentPathInput.value : '');
+        const uploadPath = currentPathInput ? currentPathInput.value : '';
+        formData.append('path', uploadPath);
         formData.append('relativePathsJson', JSON.stringify(relativePaths));
         selectedFiles.forEach((file) => {
           formData.append('files', file, file.name);
@@ -1522,8 +1537,13 @@
 
           const result = await new Promise((resolve, reject) => {
             const xhr = new XMLHttpRequest();
+            const csrfToken = getFileManagerCsrfToken();
             xhr.open('POST', '/files/upload', true);
             xhr.setRequestHeader('X-AJAX-Request', 'true');
+            if (csrfToken) {
+              xhr.setRequestHeader('x-csrf-token', csrfToken);
+              xhr.setRequestHeader('csrf-token', csrfToken);
+            }
 
             xhr.upload.onprogress = (eventProgress) => {
               if (!eventProgress.lengthComputable || typeof updateLoading !== 'function') return;
@@ -1562,9 +1582,20 @@
           const uploadedCount = Number(result.uploadedCount || 0);
           const renamedCount = Number(result.renamedCount || 0);
           const skippedCount = Number(result.skippedCount || 0);
+          const savedFolderPath = normalizeFilePath(result.currentPath || uploadPath);
           const statusLine = `Uploaded: ${uploadedCount}, Renamed: ${renamedCount}, Skipped: ${skippedCount}`;
 
           let details = statusLine;
+          if (savedFolderPath) {
+            details += `<br><br><strong>Saved to folder:</strong> <code>${escapeHtml(savedFolderPath)}</code>`;
+          }
+          if (Array.isArray(result.files) && result.files.length > 0) {
+            const savedPreview = result.files
+              .slice(0, 8)
+              .map((row) => escapeHtml(row.path || row.name || 'file'))
+              .join('<br>');
+            details += `<br><br><strong>Files saved:</strong><br>${savedPreview}`;
+          }
           if (Array.isArray(result.renamedFiles) && result.renamedFiles.length > 0) {
             const renamedPreview = result.renamedFiles
               .slice(0, 8)
@@ -1591,7 +1622,12 @@
             buttons: [{ text: 'OK', class: result.status === 'partial' ? 'btn-warning' : 'btn-success' }]
           });
 
-          window.location.reload();
+          const refreshPath = savedFolderPath || normalizeFilePath(new URLSearchParams(window.location.search).get('path') || '');
+          if (refreshPath) {
+            window.location.assign(`/files?path=${encodeURIComponent(refreshPath)}&_=${Date.now()}`);
+          } else {
+            window.location.assign(`/files?_=${Date.now()}`);
+          }
         } catch (error) {
           await showFileManagerMessage({
             title: 'Upload Failed',

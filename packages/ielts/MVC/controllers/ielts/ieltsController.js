@@ -22,6 +22,7 @@ const {
 } = requireCoreModule('MVC/utils/orgContextUtils');
 const adminChekersService = requireCoreModule('MVC/services/adminChekersService');
 const coreFilesService = requireCoreModule('MVC/services/coreFilesService');
+const coreUploadRefService = requireCoreModule('MVC/services/coreUploadRefService');
 
 const path = require('path');
 const fs = require('fs/promises');
@@ -251,7 +252,18 @@ function buildScoringHistoryCategoryPayload(session, id, category = {}, actorId 
 // Helper to convert physical path to web URL
 function getWebUrl(physicalPath) {
     if (!physicalPath) return null;
-    return coreFilesService.fromDiskPathToUploadsUrl(physicalPath);
+    if (physicalPath && typeof physicalPath === 'object') {
+        try {
+            return coreUploadRefService.resolveMulterStoredRef(physicalPath);
+        } catch (_) {
+            return null;
+        }
+    }
+    try {
+        return coreUploadRefService.normalizePersistedUploadRef(physicalPath);
+    } catch (_) {
+        return coreFilesService.fromDiskPathToUploadsUrl(physicalPath);
+    }
 }
 
 function runIeltsCommitHelper(scriptArgs = []) {

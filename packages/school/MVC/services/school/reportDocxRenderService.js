@@ -1,8 +1,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 const { requireCoreModule } = require('./schoolCoreContracts');
-const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
-const uploadPathUtils = requireCoreModule('MVC/utils/uploadPathUtils');
+const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
 
 function normalizeTokenKey(rawToken) {
   const clean = String(rawToken || '').trim();
@@ -43,13 +42,18 @@ function normalizeCollectionRows(rows = []) {
 function normalizeUploadReadRef(raw = '') {
   const token = String(raw || '').trim();
   if (!token) return '';
-  if (fileAssetStorage.isUploadReference?.(token)) {
-    const relativeUploadPath = uploadPathUtils.extractRelativeUploadPath(token);
-    return relativeUploadPath ? `/uploads/${relativeUploadPath}` : token;
+  if (uploadStorage.isUploadReference(token)) {
+    try {
+      return uploadStorage.normalizeReference(token);
+    } catch (_) {
+      return token;
+    }
   }
-  const relativeUploadPath = uploadPathUtils.extractRelativeUploadPath(token);
-  if (relativeUploadPath) return `/uploads/${relativeUploadPath}`;
-  return token;
+  try {
+    return uploadStorage.normalizeReference(token);
+  } catch (_) {
+    return token;
+  }
 }
 
 function resolveTemplateFilePath(docxTemplate = {}) {
@@ -57,7 +61,7 @@ function resolveTemplateFilePath(docxTemplate = {}) {
   if (!fromRecord) return '';
 
   const normalized = normalizeUploadReadRef(fromRecord);
-  if (fileAssetStorage.isUploadReference?.(normalized)) return normalized;
+  if (uploadStorage.isUploadReference?.(normalized)) return normalized;
   if (path.isAbsolute(fromRecord)) return fromRecord;
   return path.resolve(process.cwd(), fromRecord);
 }
@@ -70,7 +74,7 @@ function resolveDocxTemplateReadRef(docxTemplate = {}) {
   ].map((value) => String(value || '').trim()).filter(Boolean);
   for (const raw of candidates) {
     const normalized = normalizeUploadReadRef(raw);
-    if (fileAssetStorage.isUploadReference?.(normalized)) return normalized;
+    if (uploadStorage.isUploadReference?.(normalized)) return normalized;
   }
   return candidates[candidates.length - 1] || '';
 }
@@ -147,14 +151,11 @@ function getDocxDependencies() {
 async function readDocxTemplateBuffer(docxTemplate = {}) {
   const filePath = resolveDocxTemplateReadRef(docxTemplate);
   if (!filePath) throw new Error('This report template has no DOCX file configured. Upload a DOCX template first.');
-  const useAssetStorage = fileAssetStorage.isUploadReference?.(filePath)
-    || Boolean(uploadPathUtils.extractRelativeUploadPath(filePath));
+  const useUploadStorage = uploadStorage.isUploadReference(filePath) || uploadStorage.isRailwayGatewayBackend();
   try {
-    const binary = useAssetStorage
-      ? (await fileAssetStorage.readBuffer(
-        fileAssetStorage.isUploadReference?.(filePath)
-          ? filePath
-          : normalizeUploadReadRef(filePath)
+    const binary = useUploadStorage
+      ? (await uploadStorage.readBuffer(
+        uploadStorage.isUploadReference(filePath) ? filePath : normalizeUploadReadRef(filePath)
       )).buffer
       : await fs.readFile(filePath);
     return { binary, filePath };

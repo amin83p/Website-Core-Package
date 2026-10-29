@@ -3,6 +3,7 @@ const dataService = require('../services/dataService');const { idsEqual } = requ
 const { buildDataServiceQuery } = require('../utils/generalTools');
 
 const uploadMiddleware = require('../middleware/upload');
+const coreUploadRefService = require('../services/coreUploadRefService');
 const SYMBOL_LIST_QUERY_OPTIONS = Object.freeze({
   allowedExactKeys: ['id', 'name', 'type', 'orgId', 'value'],
   allowedSearchFields: ['id', 'name', 'tags', 'value', 'orgId', 'type'],
@@ -115,7 +116,7 @@ async function addSymbol(req, res) {
 
     let value = req.body.value;
     if (req.file){
-      value = uploadMiddleware.getStoredFileUrl(req.file) || uploadMiddleware.getStoredFilePath(req.file);
+      value = coreUploadRefService.resolveMulterStoredRef(req.file);
     }
     const payload = { ...req.body, value, orgId: activeOrgId };
 
@@ -156,7 +157,7 @@ async function editSymbol(req, res) {
     // Handle File Replacement... (Same as before)
     let value = req.body.value;
     if (req.body.type === 'image' && req.file) {
-        value = uploadMiddleware.getStoredFileUrl(req.file) || uploadMiddleware.getStoredFilePath(req.file);
+        value = coreUploadRefService.resolveMulterStoredRef(req.file);
     } else if (req.body.type === 'image' && !req.file && existing.type === 'image') {
         value = existing.value; 
     }

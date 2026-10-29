@@ -1,7 +1,6 @@
 // MVC/controllers/importControllerFactory.js
-const fs = require('fs');
 const { parse } = require('csv-parse');
-const fileAssetStorage = require('../services/fileAssetStorageService');
+const uploadStorage = require('../services/uploadStorageService');
 const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
 
 // Shared in-memory job store
@@ -35,10 +34,10 @@ function createImportController({ processRecord, validateRecord, buildContext, o
       const jobId = Math.random().toString(36).substring(7);
 
       // ✅ Capture User Context automatically
-      const userContext = req.user ? { 
-          userId: req.user.id, 
+      const userContext = req.user ? {
+          userId: req.user.id,
           username: req.user.username || req.user.email,
-          orgId: req.user.activeOrgId 
+          orgId: req.user.activeOrgId
       } : { userId: 'guest', orgId: 'GLOBAL' };
 
       // Merge with custom context if provided
@@ -49,7 +48,8 @@ function createImportController({ processRecord, validateRecord, buildContext, o
         progress: 0,
         clients: [],
         aborted: false,
-        filePath: req.file.path,
+        uploadFile: req.file,
+        uploadRef: uploadStorage.getStoredRefFromFile(req.file),
         context,
       };
 
@@ -98,7 +98,7 @@ function createImportController({ processRecord, validateRecord, buildContext, o
   // ─────────────────────────────────────────
   // 4. Download - Legacy Support
   // ─────────────────────────────────────────
-  // Note: V2 mostly uses the URL sent in the SSE 'complete' event, 
+  // Note: V2 mostly uses the URL sent in the SSE 'complete' event,
   // but we keep this for backward compatibility if needed.
   function downloadImportReport(req, res) {
       res.status(410).send("Please use the File Manager to download reports.");
@@ -111,7 +111,7 @@ function createImportController({ processRecord, validateRecord, buildContext, o
     const job = activeJobs[jobId];
     if (!job) return;
 
-    const { filePath, context } = job;
+    const { context } = job;
 
     const reportLines = [
       `IMPORT REPORT`,
@@ -126,7 +126,7 @@ function createImportController({ processRecord, validateRecord, buildContext, o
     let errorCount = 0;
 
     try {
-      const fileContent = fs.readFileSync(filePath, 'utf8');
+      const fileContent = await uploadStorage.readUploadedFileAsUtf8(job.uploadFile || job.uploadRef);
 
       parse(
         fileContent,
@@ -171,7 +171,7 @@ function createImportController({ processRecord, validateRecord, buildContext, o
 
           // ✅ NEW: Save to 'importReports' in the correct Scope
           const reportContent = reportLines.join('\n');
-          
+
           // 1. Determine scoped File Manager path
           const scopeId = (context.orgId && context.orgId !== 'SYSTEM') ? context.orgId : 'GLOBAL';
           const reportDir = uploadFolderSettingsService.resolveUploadFolder('generated.importReports');
@@ -182,7 +182,7 @@ function createImportController({ processRecord, validateRecord, buildContext, o
           const filename = `ImportReport_${dateStr}_${safeUser}_${jobId}.txt`;
 
           // 3. Write File
-          const savedReport = await fileAssetStorage.saveBuffer({
+          const savedReport = await uploadStorage.saveBuffer({
             scopeKey: scopeId,
             relativeDir: reportDir,
             fileName: filename,
@@ -232,8 +232,14 @@ function createImportController({ processRecord, validateRecord, buildContext, o
   function cleanup(jobId) {
     const job = activeJobs[jobId];
     if (!job) return;
-    setTimeout(() => {
-      try { if (fs.existsSync(job.filePath)) fs.unlinkSync(job.filePath); } catch (e) {}
+    setTimeout(async () => {
+      try {
+        if (job.uploadFile) {
+          await uploadStorage.removeUploadedMulterFile(job.uploadFile);
+        } else if (job.uploadRef) {
+          await uploadStorage.removeUploadedMulterFile(job.uploadRef);
+        }
+      } catch (_) { /* ignore */ }
       delete activeJobs[jobId];
     }, 1000);
   }

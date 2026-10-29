@@ -66,6 +66,8 @@ const scheduledTaskSchedulerService = require('./MVC/services/scheduledTaskSched
 const { runWithRequestContext } = require('./MVC/utils/requestContextStore');
 const uploadPathUtils = require('./MVC/utils/uploadPathUtils');
 const { isRailwayProxyMode, getGatewayBaseUrl } = require('./MVC/utils/uploadModeUtils');
+const uploadStorageService = require('./MVC/services/uploadStorageService');
+const uploadStoragePolicy = require('./MVC/services/uploadStoragePolicyService');
 const { streamUploadFromGateway } = require('./MVC/services/uploadGatewayStreamService');
 const buildVersionResolver = require('./MVC/utils/buildVersionResolver');
 const { buildStaticAssetUrl } = require('./MVC/utils/staticAssetUrl');
@@ -352,20 +354,39 @@ app.use('/uploads', async (req, res, next) => {
     return res.status(404).send('Not found');
   }
 
+  const { shouldServePublicUploadsFromRemoteOnly } = require('./MVC/utils/uploadPublicRoutePolicy');
+  if (shouldServePublicUploadsFromRemoteOnly()) {
+    await uploadStorageService.streamPublicUpload(req, res);
+    return;
+  }
+
   const uploadRoot = uploadPathUtils.getUploadRootAbsolute();
   if (!uploadsStaticContext.middleware || uploadsStaticContext.root !== uploadRoot) {
     uploadsStaticContext.root = uploadRoot;
     uploadsStaticContext.middleware = createAppStaticMiddleware(uploadRoot, 'upload');
   }
 
-  const requestedDiskPath = uploadPathUtils.fromUploadsUrlToDiskPath(req.originalUrl || req.url, uploadRoot);
-  const hasLocalArtifact = Boolean(requestedDiskPath && fs.existsSync(requestedDiskPath));
+  const localUpload = uploadPathUtils.resolveExistingUploadDiskPath(req.originalUrl || req.url, uploadRoot);
+
+  if (localUpload) {
+    const primaryRoot = path.resolve(uploadRoot);
+    const localRoot = path.resolve(localUpload.root);
+    if (process.platform === 'win32'
+      ? primaryRoot.toLowerCase() === localRoot.toLowerCase()
+      : primaryRoot === localRoot) {
+      return uploadsStaticContext.middleware(req, res, next);
+    }
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    return res.sendFile(localUpload.diskPath, (err) => {
+      if (err) return next(err);
+    });
+  }
 
   const gatewayBaseUrl = getGatewayBaseUrl();
   // Prefer local disk when the artifact exists. Otherwise stream via signed gateway download so
   // local dev can read files stored on Railway volume (shared Mongo paths) without redirecting
   // the browser to the gateway host (PNA / private-network prompts).
-  if (gatewayBaseUrl && !hasLocalArtifact) {
+  if (gatewayBaseUrl && !localUpload) {
     await streamUploadFromGateway(req, res);
     return;
   }
@@ -985,6 +1006,17 @@ async function startServer() {
     }
 
     await settingService.init();
+    try {
+      const { validateUploadStorageAtBoot } = require('./MVC/services/uploadStoragePolicyService');
+      const strictBoot = String(process.env.UPLOAD_STORAGE_STRICT_BOOT || 'true').trim().toLowerCase() !== 'false';
+      validateUploadStorageAtBoot({ failFast: strictBoot });
+      startupLogger.success('UPLOAD_STORAGE', 'VALIDATION', 'Upload storage configuration validated.', {
+        backend: require('./MVC/services/uploadStoragePolicyService').getStorageBackend()
+      });
+    } catch (uploadBootError) {
+      startupLogger.error('UPLOAD_STORAGE', 'VALIDATION', uploadBootError?.message || String(uploadBootError));
+      throw uploadBootError;
+    }
     try {
       const domainOpsService = require('./MVC/services/data/domainOpsService');
       const { ensureWriteHeavyRateLimitEnforcement } = require('./MVC/services/security/requestRateEnforcementBootstrap');

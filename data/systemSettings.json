@@ -29,7 +29,7 @@
     "requestCacheMaxEntries": 500,
     "buildVersionOverride": "",
     "defaultTimezone": "UTC",
-    "publicSiteUrl": "https://equalizer.up.railway.app",
+    "publicSiteUrl": "https://equportal.app",
     "uploadsPath": "/app/uploads",
     "uploadFolders": {
       "core.fileManager": "misc",
@@ -67,6 +67,7 @@
       "appShortName": "EQZ",
       "tagline": "EQUALIZER Platform",
       "logoUrl": "/uploads/GLOBAL/logo/Logo1.png",
+      "faviconUrl": "/uploads/GLOBAL/logo/tabLogo.png",
       "iconSvgUrl": "/uploads/GLOBAL/logo/Logo.svg",
       "appleTouchIconUrl": "/uploads/GLOBAL/logo/Logo1.png",
       "themeColor": "#ffffff",
@@ -317,6 +318,6 @@
   },
   "audit": {
     "lastUpdateUser": "ROOT_001",
-    "lastUpdateDateTime": "2026-10-24T05:53:29.125Z"
+    "lastUpdateDateTime": "2026-10-29T17:05:25.377Z"
   }
 }

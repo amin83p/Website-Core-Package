@@ -16,6 +16,8 @@ const { getMongoCollection, getMongoDbOrNull } = require('../infrastructure/mong
 const { getPackageStorageRootAbsolute } = require('../utils/packageStoragePathUtils');
 const uploadPathUtils = require('../utils/uploadPathUtils');
 const { isRailwayProxyMode, getGatewayBaseUrl } = require('../utils/uploadModeUtils');
+const uploadStorage = require('./uploadStorageService');
+const uploadStoragePolicy = require('./uploadStoragePolicyService');
 
 const SYSTEM_CONTEXT = Object.freeze({
   id: 'SYSTEM',
@@ -212,6 +214,21 @@ async function pathExists(filePath = '') {
   } catch (_) {
     return false;
   }
+}
+
+async function uploadRefExistsOnStorage(ref = '') {
+  const uploadRelative = uploadPathUtils.extractRelativeUploadPath(ref);
+  if (!uploadRelative) return true;
+  if (uploadStoragePolicy.isRemoteUploadBackend()) {
+    try {
+      await uploadStorage.readBuffer(ref);
+      return true;
+    } catch (_) {
+      return false;
+    }
+  }
+  const diskPath = uploadPathUtils.fromUploadsUrlToDiskPath(ref) || '';
+  return diskPath ? fs.existsSync(diskPath) : false;
 }
 
 function getMigrationCatalogCollectionMap() {
@@ -2624,7 +2641,7 @@ function createService(overrides = {}) {
       ...Array.from(tableArtifactRefSet),
       ...Array.from(globalArtifactRefSet)
     ]));
-    const normalizedFileRefsRaw = combinedFileRefs.map((item) => {
+    const normalizedFileRefsRaw = await Promise.all(combinedFileRefs.map(async (item) => {
       const symbolRows = symbolRefRows.filter((row) => row.ref === item);
       const symbolNames = Array.from(new Set(symbolRows.map((row) => row.symbolName).filter(Boolean)));
       const uploadRelative = uploadPathUtils.extractRelativeUploadPath(item);
@@ -2644,10 +2661,10 @@ function createService(overrides = {}) {
         symbolNames,
         requiredSymbolAsset: symbolNames.length > 0,
         uploadRelativePath: uploadRelative || '',
-        exists: uploadRelative ? fs.existsSync(uploadPathUtils.fromUploadsUrlToDiskPath(item) || '') : true,
+        exists: uploadRelative ? await uploadRefExistsOnStorage(item) : true,
         detectedOrgTokens: extractOrgTokensFromUploadRef(item)
       };
-    });
+    }));
     const normalizedFileRefs = applyFileSelection(normalizedFileRefsRaw, input.fileSelection || {});
     const selectedNormalizedFileRefs = normalizedFileRefs.filter((row) => row.selected !== false);
 

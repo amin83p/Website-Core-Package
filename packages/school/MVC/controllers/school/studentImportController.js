@@ -7,9 +7,9 @@
  * customStudentId, academicStatus, notes, ...]
  */
 
-const fs = require('fs');
 const { parse } = require('csv-parse');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
+const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
 const {
   getActiveOrgIdOrThrow,
   assertCreateOrgContextOrThrow,
@@ -74,7 +74,7 @@ async function previewImport(req, res) {
     }
 
     const context = buildContext(req);
-    const fileContent = fs.readFileSync(req.file.path, 'utf8');
+    const fileContent = await uploadStorage.readUploadedFileAsUtf8(req.file);
 
     parse(
       fileContent,

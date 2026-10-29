@@ -6,6 +6,7 @@ const { buildDataServiceQuery } = require('../utils/generalTools');
 const {isAdmin} = require('../services/adminChekersService');
 const path = require('path');
 const coreFilesService = require('../services/coreFilesService');
+const coreUploadRefService = require('../services/coreUploadRefService');
 const TASK_LIST_QUERY_OPTIONS = Object.freeze({
   allowedExactKeys: ['id', 'status', 'priority', 'projectName', 'phaseName'],
   allowedSearchFields: ['id', 'title', 'description', 'status', 'priority', 'projectName', 'phaseName', 'assignments.name', 'assignments.userId'],
@@ -33,7 +34,15 @@ function getTaskPermissions(user, task) {
 }
 
 function getWebUrl(physicalPath) {
-    return coreFilesService.fromDiskPathToUploadsUrl(physicalPath);
+    try {
+        return coreUploadRefService.normalizePersistedUploadRef(physicalPath);
+    } catch (_) {
+        return coreFilesService.fromDiskPathToUploadsUrl(physicalPath) || String(physicalPath || '').replace(/\\/g, '/').trim();
+    }
+}
+
+function getWebUrlFromMulterFile(file) {
+    return coreUploadRefService.resolveMulterStoredRef(file);
 }
 
 function parseJsonSafe(jsonString) {
@@ -201,7 +210,7 @@ async function uploadDeliverable(req, res) {
            const permissions = getTaskPermissions(req.user, task);
             if(!permissions.canSubmit && !permissions.canEdit) throw new Error("Access Denied.");
         }
-        const webUrl = getWebUrl(req.file.path);
+        const webUrl = getWebUrlFromMulterFile(req.file);
         const deliverableData = { filename: req.file.originalname, url: webUrl, size: req.file.size, mimetype: req.file.mimetype, description: description || '', checkpointId: checkpointId || null, uploadedAt: new Date() };
         await taskRepository.addDeliverable(taskId, deliverableData, req.user.id);
         if (req.headers['x-ajax-request']) return res.json({ status: 'success', message: 'File uploaded successfully.', file: deliverableData });
@@ -266,7 +275,7 @@ async function addComment(req, res) {
         let fileData = null;
         if (req.file) fileData = { 
             filename: req.file.originalname, 
-            url: getWebUrl(req.file.path), 
+            url: getWebUrlFromMulterFile(req.file), 
             mimetype: req.file.mimetype 
         };
         

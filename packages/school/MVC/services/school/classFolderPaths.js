@@ -3,7 +3,7 @@ const fsSync = require('fs');
 const path = require('path');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { resolveCoreRoot } = require('./schoolCoreModuleResolver');
-const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
+const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
 const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -102,13 +102,13 @@ async function deleteClassFolderTargets(classData = {}) {
 
   for (const target of buildUploadTargetsForClass(classData)) {
     try {
-      const removedUpload = await fileAssetStorage.deleteRelativePath(target);
+      const removedUpload = await uploadStorage.deleteRelativePath(target);
       if (removedUpload) {
-        removed.push(`/uploads/${fileAssetStorage.scopeFolder(target.scopeKey)}/${target.relativePath}`);
+        removed.push(`/uploads/${uploadStorage.scopeFolder(target.scopeKey)}/${target.relativePath}`);
       }
     } catch (error) {
       failed.push({
-        basePath: `/uploads/${fileAssetStorage.scopeFolder(target.scopeKey)}`,
+        basePath: `/uploads/${uploadStorage.scopeFolder(target.scopeKey)}`,
         segments: target.relativePath,
         message: error?.message || String(error)
       });
@@ -130,7 +130,7 @@ async function listUploadClassIdsForOrg(orgId) {
 
   for (const root of UPLOAD_CLASS_ROOTS) {
     try {
-      const entries = await fileAssetStorage.listDirectory({ scopeKey, relativeDir: root });
+      const entries = await uploadStorage.listDirectory({ scopeKey, relativeDir: root });
       for (const entry of entries) {
         if (!entry?.isDir) continue;
         const name = String(entry?.name || '').trim();
@@ -147,7 +147,7 @@ async function listUploadClassIdsForOrg(orgId) {
 async function classWorkspaceExists(classRow = {}) {
   const targets = buildUploadTargetsForClass(classRow);
   for (const target of targets) {
-    const entries = await fileAssetStorage.listDirectory({
+    const entries = await uploadStorage.listDirectory({
       scopeKey: target.scopeKey,
       relativeDir: target.relativePath
     });
@@ -187,7 +187,7 @@ async function scanOrphanClassFolders(orgId, liveClassIds, globalLiveClassIds = 
   }
 
   const uploadClassIds = await listUploadClassIdsForOrg(orgId);
-  const scopeFolder = fileAssetStorage.scopeFolder(orgId);
+  const scopeFolder = uploadStorage.scopeFolder(orgId);
   for (const classId of uploadClassIds) {
     const normalizedId = toPublicId(classId) || classId;
     if (liveClassIds.has(normalizedId)) continue;
@@ -237,13 +237,13 @@ async function deleteOrphanFolderTarget(target, reqUser, globalLiveClassIds) {
   }
 
   if (target?.deleteTarget?.type === 'upload') {
-    const removed = await fileAssetStorage.deleteRelativePath({
+    const removed = await uploadStorage.deleteRelativePath({
       scopeKey: target.deleteTarget.scopeKey,
       relativePath: target.deleteTarget.relativePath
     });
     return {
       removed: Boolean(removed),
-      path: `/uploads/${fileAssetStorage.scopeFolder(target.deleteTarget.scopeKey)}/${target.deleteTarget.relativePath}`
+      path: `/uploads/${uploadStorage.scopeFolder(target.deleteTarget.scopeKey)}/${target.deleteTarget.relativePath}`
     };
   }
 

@@ -46,6 +46,15 @@ test('normalizeNewsHtmlAssetUrls normalizes figure markup and preserves layout a
   assert.match(output, /src="\/images\/news\/pic\.jpg"/);
 });
 
+test('normalizeNewsHtmlAssetUrls keeps figure images when data-src is only on inner img', () => {
+  const input =
+    '<figure class="news-figure" data-news-figure="1" data-layout="center" data-width-pct="72">' +
+    '<img src="/uploads/GLOBAL/news/photo.jpg" alt=""></figure>';
+  const output = normalizeNewsHtmlAssetUrls(input);
+  assert.match(output, /src="\/uploads\/GLOBAL\/news\/photo\.jpg"/);
+  assert.match(output, /data-src="\/uploads\/GLOBAL\/news\/photo\.jpg"/);
+});
+
 test('normalizeNewsHtmlAssetUrls removes figures with embedded data-src', () => {
   const input =
     '<p>x</p><figure data-news-figure="1" data-src="data:image/png;base64,xx">' +

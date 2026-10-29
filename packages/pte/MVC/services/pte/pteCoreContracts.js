@@ -8,6 +8,7 @@ const consumptionDefinitionPolicyService = requireCoreModule('MVC/services/activ
 const packageDataService = requireCoreModule('MVC/services/activityQuota/packageDataService');
 const packageManagerDataService = requireCoreModule('MVC/services/activityQuota/packageManagerDataService');
 const coreFilesService = requireCoreModule('MVC/services/coreFilesService');
+const uploadStorageService = requireCoreModule('MVC/services/uploadStorageService');
 const uploadCategoryResolverService = requireCoreModule('MVC/services/uploadCategoryResolverService');
 const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
 const settingService = requireCoreModule('MVC/services/settingService');
@@ -67,6 +68,7 @@ module.exports = {
   packageDataService,
   packageManagerDataService,
   coreFilesService,
+  uploadStorageService,
   uploadCategoryResolverService,
   uploadFolderSettingsService,
   settingService,

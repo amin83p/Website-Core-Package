@@ -13,6 +13,7 @@ const DEFAULT_APP_BRAND = {
   appShortName: 'Website',
   tagline: 'Learn, work, and thrive in new places.',
   logoUrl: '/uploads/GLOBAL/logo/Logo1.png',
+  faviconUrl: '',
   iconSvgUrl: '/uploads/GLOBAL/logo/icon.svg',
   appleTouchIconUrl: '/uploads/GLOBAL/logo/Logo1.png',
   themeColor: '#ffffff',

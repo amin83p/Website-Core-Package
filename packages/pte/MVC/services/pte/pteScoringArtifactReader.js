@@ -1,6 +1,7 @@
 const fs = require('fs/promises');
 const path = require('path');
-const { coreFilesService, getGatewayBaseUrl } = require('./pteCoreContracts');
+const { coreFilesService, getGatewayBaseUrl, uploadStorageService } = require('./pteCoreContracts');
+const pteUploadStorageHelper = require('./pteUploadStorageHelper');
 
 const DEFAULT_REMOTE_FETCH_TIMEOUT_MS = 25000;
 
@@ -193,6 +194,24 @@ async function readUploadArtifactForAi({
   inferMimeType = null,
   tooLargeLabel = 'Uploaded artifact'
 } = {}) {
+  try {
+    const remoteBuffer = await pteUploadStorageHelper.readArtifactUploadBuffer(artifact, { maxBytes });
+    if (remoteBuffer) {
+      const mimeType = typeof inferMimeType === 'function'
+        ? inferMimeType(artifact, remoteBuffer.ref)
+        : remoteBuffer.mimeType;
+      return {
+        absolutePath: '',
+        sourceUrl: remoteBuffer.ref,
+        mimeType,
+        dataBase64: remoteBuffer.buffer.toString('base64'),
+        sizeBytes: remoteBuffer.sizeBytes
+      };
+    }
+  } catch (error) {
+    if (uploadStorageService.isRemoteUploadBackend()) throw error;
+  }
+
   const absolutePath = resolveUploadArtifactPath(artifact);
   if (!absolutePath) {
     const remote = await readRemoteUploadArtifactForAi({

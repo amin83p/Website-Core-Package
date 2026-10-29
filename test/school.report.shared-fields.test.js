@@ -19,7 +19,7 @@ const attendanceMatrixPolicyModel = require('../packages/school/MVC/models/schoo
 const classEnrollmentReadService = require('../packages/school/MVC/services/school/classEnrollmentReadService');
 const { requireCoreModule } = require('../packages/school/MVC/services/school/schoolCoreContracts');
 const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
-const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
+const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
 const uploadPathUtils = requireCoreModule('MVC/utils/uploadPathUtils');
 
 const ROOT = path.resolve(__dirname, '..');
@@ -266,7 +266,7 @@ test('DOCX template resolver treats /app/uploads paths as upload storage referen
     uploadPathUtils.fromDiskPathToUploadsUrl(storedPath, railwayVolumeRoot),
     '/uploads/ORG_900000/reports/Semi-Monthly-Report_1783055912591.docx'
   );
-  assert.equal(fileAssetStorage.isUploadReference(storedPath), true);
+  assert.equal(uploadStorage.isUploadReference(storedPath), true);
   assert.equal(
     reportDocxRenderService.resolveTemplateFilePath({ path: storedPath }),
     '/uploads/ORG_900000/reports/Semi-Monthly-Report_1783055912591.docx'

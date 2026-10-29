@@ -1,7 +1,7 @@
 const { requireCoreModule } = require('../../services/benchpath/benchpathCoreModuleResolver');
 const benchpathDataService = require('../../services/benchpath/benchpathDataService');
 const { isAjax } = requireCoreModule('MVC/utils/generalTools');
-const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
+const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
 const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
 
 const REPORT_SCOPE = 'GLOBAL';
@@ -18,7 +18,7 @@ function buildReportFilename(prefix) {
 
 async function listBenchpathReports() {
   try {
-    const files = await fileAssetStorage.listDirectory({ scopeKey: REPORT_SCOPE, relativeDir: getReportsDir() });
+    const files = await uploadStorage.listDirectory({ scopeKey: REPORT_SCOPE, relativeDir: getReportsDir() });
 
     const stats = files
       .filter((item) => item && !item.isDir && SAFE_REPORT_FILE.test(item.name))
@@ -66,7 +66,7 @@ async function runDryRun(req, res) {
     const report = await benchpathDataService.runMigrationDryRunReport({ sampleLimit: 100 });
     const fileName = buildReportFilename('dry-run');
 
-    await fileAssetStorage.saveJson({ scopeKey: REPORT_SCOPE, relativeDir: getReportsDir(), fileName, data: report });
+    await uploadStorage.saveJson({ scopeKey: REPORT_SCOPE, relativeDir: getReportsDir(), fileName, data: report });
 
     const recentReports = await listBenchpathReports();
 
@@ -107,7 +107,7 @@ async function applyMigration(req, res) {
     });
 
     const fileName = buildReportFilename('apply');
-    await fileAssetStorage.saveJson({ scopeKey: REPORT_SCOPE, relativeDir: getReportsDir(), fileName, data: report });
+    await uploadStorage.saveJson({ scopeKey: REPORT_SCOPE, relativeDir: getReportsDir(), fileName, data: report });
 
     const recentReports = await listBenchpathReports();
 
@@ -152,9 +152,9 @@ async function downloadReport(req, res) {
       });
     }
 
-    return await fileAssetStorage.sendDownload(
+    return await uploadStorage.sendDownload(
       res,
-      fileAssetStorage.uploadsUrlForParts(REPORT_SCOPE, getReportsDir(), fileName),
+      uploadStorage.uploadsUrlForParts(REPORT_SCOPE, getReportsDir(), fileName),
       fileName
     );
   } catch (error) {

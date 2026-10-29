@@ -1,10 +1,10 @@
-﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
+const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 // MVC/models/school/subjectModel.js
 const fs = require('fs').promises;
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue'); 
 const { isValidFeeCategory } = require('./feeCategoryCatalog');
-const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
+const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
 const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
 const { parseLowerClbBandFromText } = require('../../utils/clbSubjectBandParser');
 
@@ -41,14 +41,14 @@ async function createSubjectWorkspace(subject) {
     subjectId: subject.id
   });
   subject.uploadWorkspace = {
-    scopeKey: fileAssetStorage.normalizeScopeKey(scopeKey),
+    scopeKey: uploadStorage.normalizeScopeKey(scopeKey),
     relativePath: relativeDir
   };
   
-  await fileAssetStorage.ensureDirectory(scopeKey, relativeDir);
-  await fileAssetStorage.ensureDirectory(scopeKey, `${relativeDir}/sessions`);
-  await fileAssetStorage.ensureDirectory(scopeKey, `${relativeDir}/media`);
-  await fileAssetStorage.ensureDirectory(scopeKey, `${relativeDir}/attachments`);
+  await uploadStorage.ensureDirectory(scopeKey, relativeDir);
+  await uploadStorage.ensureDirectory(scopeKey, `${relativeDir}/sessions`);
+  await uploadStorage.ensureDirectory(scopeKey, `${relativeDir}/media`);
+  await uploadStorage.ensureDirectory(scopeKey, `${relativeDir}/attachments`);
 
   const initialStructure = {
     subjectId: subject.id,
@@ -63,7 +63,7 @@ async function createSubjectWorkspace(subject) {
     files: []
   };
 
-  await fileAssetStorage.saveJson({ scopeKey, relativeDir, fileName: 'structure.json', data: initialStructure });
+  await uploadStorage.saveJson({ scopeKey, relativeDir, fileName: 'structure.json', data: initialStructure });
 }
 
 function getSubjectWorkspaceCandidates(subject = {}) {
@@ -325,7 +325,7 @@ async function clearStorageByOrg(orgId, options = {}) {
       try {
         for (const relativePath of getSubjectWorkspaceCandidates(s)) {
           // eslint-disable-next-line no-await-in-loop
-          if (await fileAssetStorage.deleteRelativePath({ scopeKey: targetOrgId, relativePath })) {
+          if (await uploadStorage.deleteRelativePath({ scopeKey: targetOrgId, relativePath })) {
             removedDirs += 1;
           }
         }

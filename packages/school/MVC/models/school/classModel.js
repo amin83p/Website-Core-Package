@@ -1,11 +1,11 @@
-﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
+const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 // MVC/models/school/classModel.js
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const finalGradesWorkflowService = require('../../services/school/finalGradesWorkflowService');
-const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
+const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
 const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
 const { normalizeSkillCode } = require('../../../config/skillDefinitions');
 
@@ -187,22 +187,22 @@ async function createClassWorkspace(classItem) {
     classId: classItem.id
   });
   classItem.uploadWorkspace = {
-    scopeKey: fileAssetStorage.normalizeScopeKey(scopeKey),
+    scopeKey: uploadStorage.normalizeScopeKey(scopeKey),
     relativePath: relativeDir
   };
   
   // 1. Create main directory and subfolders
-  await fileAssetStorage.ensureDirectory(scopeKey, relativeDir);
-  await fileAssetStorage.ensureDirectory(scopeKey, `${relativeDir}/materials`);
-  await fileAssetStorage.ensureDirectory(scopeKey, `${relativeDir}/assignments`);
-  await fileAssetStorage.ensureDirectory(scopeKey, `${relativeDir}/submissions`);
+  await uploadStorage.ensureDirectory(scopeKey, relativeDir);
+  await uploadStorage.ensureDirectory(scopeKey, `${relativeDir}/materials`);
+  await uploadStorage.ensureDirectory(scopeKey, `${relativeDir}/assignments`);
+  await uploadStorage.ensureDirectory(scopeKey, `${relativeDir}/submissions`);
 
   // 2. Generate and write the Ledger (sessions.json)
   const sessions = generateInitialSessions(classItem.schedule);
-  await fileAssetStorage.saveJson({ scopeKey, relativeDir, fileName: 'sessions.json', data: sessions });
+  await uploadStorage.saveJson({ scopeKey, relativeDir, fileName: 'sessions.json', data: sessions });
 
   // 3. Create empty Gradebook
-  await fileAssetStorage.saveJson({ scopeKey, relativeDir, fileName: 'gradebook.json', data: { assignments: [], grades: [] } });
+  await uploadStorage.saveJson({ scopeKey, relativeDir, fileName: 'gradebook.json', data: { assignments: [], grades: [] } });
 
   // 4. Create the structure.json manifest
   const initialStructure = {
@@ -216,7 +216,7 @@ async function createClassWorkspace(classItem) {
     },
     files: ["sessions.json", "gradebook.json"]
   };
-  await fileAssetStorage.saveJson({ scopeKey, relativeDir, fileName: 'structure.json', data: initialStructure });
+  await uploadStorage.saveJson({ scopeKey, relativeDir, fileName: 'structure.json', data: initialStructure });
 
   // 5. Copy Subject Materials into the Class Workspace
   if (classItem.curriculum && Array.isArray(classItem.curriculum.subjects)) {
@@ -236,7 +236,7 @@ async function createClassWorkspace(classItem) {
               for (const sourceRelativePath of [...new Set(sourceCandidates)]) {
                 try {
                   // eslint-disable-next-line no-await-in-loop
-                  const copied = await fileAssetStorage.copyRelativePath({
+                  const copied = await uploadStorage.copyRelativePath({
                     sourceScopeKey: scopeKey,
                     sourceRelativePath,
                     destinationScopeKey: scopeKey,
@@ -432,7 +432,7 @@ async function clearEnrollmentsByOrg(orgId, options = {}) {
 }
 
 /**
- * Deletes classes_storage/<classId>/ for each id (ENOENT ignored). Does not use fileQueue — safe to call from mongo cleanup.
+ * Deletes classes_storage/<classId>/ for each id (ENOENT ignored). Does not use fileQueue � safe to call from mongo cleanup.
  */
 async function removePhysicalClassStorageByClassIds(classIds) {
   const ids = (Array.isArray(classIds) ? classIds : [])
@@ -501,7 +501,7 @@ async function clearRuntimeStorageByOrg(orgId, options = {}) {
         const candidates = getClassWorkspaceCandidates(item);
         for (const relativePath of candidates) {
           // eslint-disable-next-line no-await-in-loop
-          if (await fileAssetStorage.deleteRelativePath({ scopeKey: item.orgId, relativePath })) {
+          if (await uploadStorage.deleteRelativePath({ scopeKey: item.orgId, relativePath })) {
             removedDirs += 1;
           }
         }
@@ -527,22 +527,25 @@ async function getClassSessions(classId) {
     const scopeKey = classItem?.orgId || 'GLOBAL';
     const candidates = getClassWorkspaceCandidates(classItem || { id: classId });
     for (const relativeDir of candidates) {
-        const sessionUrl = fileAssetStorage.uploadsUrlForParts(scopeKey, relativeDir, 'sessions.json');
+        const sessionUrl = uploadStorage.uploadsUrlForParts(scopeKey, relativeDir, 'sessions.json');
         try {
             // eslint-disable-next-line no-await-in-loop
-            const data = await fileAssetStorage.readBuffer(sessionUrl);
+            const data = await uploadStorage.readBuffer(sessionUrl);
             return JSON.parse(data.buffer.toString('utf8'));
         } catch (_) {
             // Try the next configured/default location.
         }
     }
-    const legacySessionsPath = path.join(legacyStorageBasePath, String(classId), 'sessions.json');
-    try {
-        const data = await fs.readFile(legacySessionsPath, 'utf8');
-        return JSON.parse(data);
-    } catch (_) {
-        return []; // Return empty array if no sessions file exists yet
+    if (!uploadStorage.isRailwayGatewayBackend()) {
+        const legacySessionsPath = path.join(legacyStorageBasePath, String(classId), 'sessions.json');
+        try {
+            const data = await fs.readFile(legacySessionsPath, 'utf8');
+            return JSON.parse(data);
+        } catch (_) {
+            // fall through
+        }
     }
+    return []; // Return empty array if no sessions file exists yet
 }
 
 async function saveClassSessions(classId, sessions) {
@@ -551,8 +554,8 @@ async function saveClassSessions(classId, sessions) {
     const relativeDir = getClassWorkspaceRelativePath(classItem || { id: classId });
     
     await queueWrite(async () => {
-        await fileAssetStorage.ensureDirectory(scopeKey, relativeDir);
-        await fileAssetStorage.saveJson({
+        await uploadStorage.ensureDirectory(scopeKey, relativeDir);
+        await uploadStorage.saveJson({
           scopeKey,
           relativeDir,
           fileName: 'sessions.json',

@@ -69,6 +69,13 @@ function getUploadRootAbsolute() {
     lastWarnedInvalidRoot = resolved;
     console.warn(`[UploadPath] Configured uploadsPath is not a readable directory: "${resolved}". Falling back to "${DEFAULT_UPLOAD_ROOT}".`);
   }
+  try {
+    if (require('../services/uploadStoragePolicyService').isRemoteUploadBackend()) {
+      return resolved || '';
+    }
+  } catch (_) {
+    // policy module unavailable during early boot
+  }
   return DEFAULT_UPLOAD_ROOT;
 }
 
@@ -108,6 +115,16 @@ function fromDiskPathToUploadsUrl(absolutePath = '', rootPath = '') {
   return `${UPLOADS_URL_PREFIX}/${cleanedRelative}`;
 }
 
+function resolveExistingUploadDiskPath(uploadUrl = '', primaryRoot = '') {
+  const primary = normalizeAbsolutePath(primaryRoot || getUploadRootAbsolute());
+  if (!primary) return null;
+  const diskPath = fromUploadsUrlToDiskPath(uploadUrl, primary);
+  if (diskPath && fs.existsSync(diskPath)) {
+    return { diskPath, root: primary };
+  }
+  return null;
+}
+
 module.exports = {
   UPLOADS_URL_PREFIX,
   DEFAULT_UPLOAD_ROOT,
@@ -115,5 +132,6 @@ module.exports = {
   isInsideUploadRoot,
   extractRelativeUploadPath,
   fromUploadsUrlToDiskPath,
-  fromDiskPathToUploadsUrl
+  fromDiskPathToUploadsUrl,
+  resolveExistingUploadDiskPath
 };

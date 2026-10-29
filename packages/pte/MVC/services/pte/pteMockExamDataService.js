@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const { coreFilesService } = require('./pteCoreContracts');
+const { coreFilesService, uploadStorageService } = require('./pteCoreContracts');
+const pteUploadStorageHelper = require('./pteUploadStorageHelper');
 const pteTestVersionRepository = require('../../repositories/pteTestVersionRepository');
 const pteQuestionVersionRepository = require('../../repositories/pteQuestionVersionRepository');
 const pteAttemptSessionRepository = require('../../repositories/pteAttemptSessionRepository');
@@ -143,24 +144,28 @@ function resolveMediaUrl(questionRow = {}, assetRef = '') {
   return '';
 }
 
-function uploadUrlExistsOnDisk(url = '') {
+async function uploadUrlExistsOnStorage(url = '') {
   const token = cleanString(url, { max: 1000, allowEmpty: true }) || '';
   if (!token) return false;
   if (/^https?:\/\//i.test(token) || /^data:/i.test(token)) return true;
   const match = token.replace(/\\/g, '/').match(/\/uploads\/(.+)$/i);
   if (!match || !match[1]) return true;
+  const uploadRef = `/uploads/${String(match[1]).replace(/^\/+/, '')}`;
+  if (uploadStorageService.isRemoteUploadBackend()) {
+    return pteUploadStorageHelper.uploadReferenceExists(uploadRef);
+  }
   const uploadRoot = coreFilesService.getUploadRootAbsolute();
-  const diskPath = coreFilesService.fromUploadsUrlToDiskPath(`/uploads/${match[1]}`);
+  const diskPath = coreFilesService.fromUploadsUrlToDiskPath(uploadRef);
   if (!diskPath || !coreFilesService.isInsideUploadRoot(diskPath, uploadRoot)) return false;
   return fs.existsSync(diskPath);
 }
 
-function hasUsableMedia(questionRow = {}, assetRef = '') {
+async function hasUsableMedia(questionRow = {}, assetRef = '') {
   const url = resolveMediaUrl(questionRow, assetRef);
-  return Boolean(url && uploadUrlExistsOnDisk(url));
+  return Boolean(url && await uploadUrlExistsOnStorage(url));
 }
 
-function resolveRequiredMediaProblems(questionRow = {}) {
+async function resolveRequiredMediaProblems(questionRow = {}) {
   const payload = isPlainObject(questionRow?.payload) ? questionRow.payload : {};
   const questionType = cleanString(questionRow?.questionType, { max: 120, allowEmpty: true }).toLowerCase();
   const problems = [];
@@ -172,7 +177,7 @@ function resolveRequiredMediaProblems(questionRow = {}) {
         : payload.promptAudioAssetId,
       { max: 1000, allowEmpty: true }
     );
-    if (!hasUsableMedia(questionRow, audioRef)) {
+    if (!(await hasUsableMedia(questionRow, audioRef))) {
       problems.push(`${formatQuestionTypeLabel(questionType) || questionType} requires a readable prompt audio file.`);
     }
   }
@@ -182,7 +187,7 @@ function resolveRequiredMediaProblems(questionRow = {}) {
       max: 1000,
       allowEmpty: true
     });
-    if (!hasUsableMedia(questionRow, imageRef)) {
+    if (!(await hasUsableMedia(questionRow, imageRef))) {
       problems.push('Describe Image requires a readable prompt image file.');
     }
   }
@@ -354,7 +359,7 @@ async function hydrateAllocatedQuestions(testRow = {}, requestingUser, accessCon
     if (status !== 'published') {
       errors.push(`Question ${ref.questionVersionId} is ${status || 'not published'}.`);
     }
-    const mediaProblems = resolveRequiredMediaProblems(question);
+    const mediaProblems = await resolveRequiredMediaProblems(question);
     errors.push(...mediaProblems.map((problem) => `${question?.code || ref.questionVersionId}: ${problem}`));
     rows.push(question);
   }

@@ -7,6 +7,8 @@ const {
   inferSearchableFields,
   pteUploadPathUtils,
   coreFilesService,
+  uploadStorage,
+  pteUploadStorageHelper,
   uploadMiddleware,
   settingService,
   pteQuestionBankDataService,
@@ -177,7 +179,21 @@ function resolveDiskPathFromUploadsUrl(fileUrl = '') {
   return normalizeAbsolutePath(coreFilesService.fromUploadsUrlToDiskPath(token));
 }
 
+function questionBankMediaRelativePrefixes() {
+  return [
+    pteUploadPathUtils.getQuestionBankRoot(),
+    'pte-question-bank'
+  ].map((row) => String(row || '').replace(/\\/g, '/').replace(/^\/+/, '')).filter(Boolean);
+}
+
 function normalizeSafeQuestionBankPath(filePath = '', fileUrl = '', orgId = '') {
+  const canonicalRef = pteUploadStorageHelper.toCanonicalUploadReference(filePath, fileUrl);
+  if (uploadStorage.isRemoteUploadBackend() && canonicalRef.startsWith('/uploads/')) {
+    return pteUploadStorageHelper.isUploadRefUnderRelativePrefixes(canonicalRef, questionBankMediaRelativePrefixes())
+      ? canonicalRef
+      : '';
+  }
+
   const mediaRoots = getAllowedQuestionBankRoots(orgId);
   if (!mediaRoots.length) return '';
 
@@ -191,11 +207,7 @@ function normalizeSafeQuestionBankPath(filePath = '', fileUrl = '', orgId = '') 
 }
 
 function toCanonicalUploadReference(filePath = '', fileUrl = '') {
-  const fromUrl = coreFilesService.extractRelativeUploadPath(fileUrl);
-  if (fromUrl) return `/uploads/${fromUrl}`;
-  const fromPathUrl = coreFilesService.extractRelativeUploadPath(filePath);
-  if (fromPathUrl) return `/uploads/${fromPathUrl}`;
-  return coreFilesService.fromDiskPathToUploadsUrl(filePath) || String(filePath || '').replace(/\\/g, '/').trim();
+  return pteUploadStorageHelper.toCanonicalUploadReference(filePath, fileUrl);
 }
 
 function sanitizeIncomingMediaRows(mediaRows = [], orgId = '') {
@@ -350,7 +362,7 @@ async function listOrgMediaLibrary(req, res) {
     let entries = [];
     for (const folderToken of candidateFolders) {
       // eslint-disable-next-line no-await-in-loop
-      const listed = await coreFilesService.listDirectoryByScope({
+      const listed = await uploadStorage.listDirectory({
         scopeKey,
         relativeDir: normalizeRelativeFolderToken(folderToken)
       }).catch(() => null);

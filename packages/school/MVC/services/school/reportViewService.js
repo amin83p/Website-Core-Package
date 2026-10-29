@@ -2,9 +2,8 @@ const schoolDataService = require('./schoolDataService');
 const reportRuleEngineService = require('./reportRuleEngineService');
 const schoolIdentityLookupService = require('./schoolIdentityLookupService');
 const { requireCoreModule } = require('./schoolCoreContracts');
-const uploadMiddleware = requireCoreModule('MVC/middleware/upload');
-const uploadPathUtils = requireCoreModule('MVC/utils/uploadPathUtils');
-const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
+const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
+const schoolFileService = require('./schoolFileService');
 const schoolAdminAccessService = require('./schoolAdminAccessService');
 const accessService = requireCoreModule('MVC/services/security');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
@@ -545,26 +544,34 @@ function filterRecordsByOrg(rows, reqUser) {
 function normalizeStoredUploadRef(storedPath = '', storedUrl = '') {
   const uploadUrl = String(storedUrl || '').trim();
   const pathToken = String(storedPath || '').trim();
-  if (uploadUrl && fileAssetStorage.isUploadReference(uploadUrl)) return uploadUrl;
-  if (pathToken && fileAssetStorage.isUploadReference(pathToken)) return pathToken;
-  const fromDisk = uploadPathUtils.fromDiskPathToUploadsUrl(pathToken || uploadUrl);
-  if (fromDisk) return fromDisk;
-  return uploadUrl || pathToken;
+  if (uploadUrl && uploadStorage.isUploadReference(uploadUrl)) return uploadUrl;
+  if (pathToken && uploadStorage.isUploadReference(pathToken)) return pathToken;
+  const combined = pathToken || uploadUrl;
+  if (!combined) return '';
+  try {
+    return uploadStorage.normalizeReference(combined);
+  } catch (error) {
+    if (uploadStorage.isRailwayGatewayBackend()) {
+      throw new Error('Uploaded file must be stored as an /uploads/ URL when using railway_proxy mode.');
+    }
+    return combined;
+  }
 }
 
 function resolveUploadedFileRecord(file) {
   if (!file) return null;
-  const storedPath = uploadMiddleware.getStoredFilePath(file);
-  const storedUrl = uploadMiddleware.getStoredFileUrl(file);
-  if (!storedPath && !storedUrl) return null;
-  const canonicalRef = normalizeStoredUploadRef(storedPath, storedUrl);
-  return {
-    fileName: String(file.filename),
-    originalName: String(file.originalname || file.filename),
-    path: canonicalRef,
-    url: canonicalRef,
-    uploadedAt: new Date().toISOString()
-  };
+  try {
+    const canonicalRef = schoolFileService.resolveMulterStoredRef(file);
+    return {
+      fileName: String(file.filename),
+      originalName: String(file.originalname || file.filename),
+      path: canonicalRef,
+      url: canonicalRef,
+      uploadedAt: new Date().toISOString()
+    };
+  } catch (_) {
+    return null;
+  }
 }
 
 function buildSchemaFromBuilderPayload(body) {

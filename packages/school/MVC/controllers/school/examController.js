@@ -6,7 +6,7 @@ const { isAjax } = requireCoreModule('MVC/utils/generalTools');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const { resolveOrgTodayFromRequest } = requireCoreModule('MVC/utils/timezoneUtils');
 const uploadMiddleware = requireCoreModule('MVC/middleware/upload');
-const fileAssetStorage = requireCoreModule('MVC/services/fileAssetStorageService');
+const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
 const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
 const schoolAdminAccessService = require('../../services/school/schoolAdminAccessService');
 const schoolDataService = require('../../services/school/schoolDataService');
@@ -1123,7 +1123,7 @@ async function relocateUnsavedQuestionMediaRefs(question, reqUser) {
     }
     try {
       // eslint-disable-next-line no-await-in-loop
-      const moved = await fileAssetStorage.moveUploadReference({
+      const moved = await uploadStorage.moveReference({
         sourceRef: originalRef,
         destinationScopeKey: activeOrgId,
         destinationDir: targetRelativeDir

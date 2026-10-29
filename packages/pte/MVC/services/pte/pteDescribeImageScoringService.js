@@ -1,6 +1,7 @@
 const fs = require('fs/promises');
 const path = require('path');
 const { uploadPathUtils, getGatewayBaseUrl } = require('./pteCoreContracts');
+const pteUploadStorageHelper = require('./pteUploadStorageHelper');
 const pteAiProviderDataService = require('./pteAiProviderDataService');
 const pteAiProviderService = require('./ai/aiProviderService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
@@ -1301,6 +1302,22 @@ async function sendWithGeminiCapacityFallback({
 }
 
 async function readAudioArtifactForAi(artifact = {}) {
+  try {
+    const remoteBuffer = await pteUploadStorageHelper.readArtifactUploadBuffer(artifact, { maxBytes: AUDIO_MAX_BYTES });
+    if (remoteBuffer) {
+      return {
+        absolutePath: '',
+        sourceUrl: remoteBuffer.ref,
+        mimeType: inferAudioMimeType(artifact, remoteBuffer.ref),
+        dataBase64: remoteBuffer.buffer.toString('base64'),
+        sizeBytes: remoteBuffer.sizeBytes
+      };
+    }
+  } catch (error) {
+    const { uploadStorageService } = require('./pteCoreContracts');
+    if (uploadStorageService.isRemoteUploadBackend()) throw error;
+  }
+
   const absolutePath = resolveArtifactPath(artifact);
   if (!absolutePath) {
     const remoteAudio = await readRemoteUploadArtifactForAi({
@@ -1348,6 +1365,22 @@ async function readAudioArtifactForAi(artifact = {}) {
 }
 
 async function readImageArtifactForAi(artifact = {}) {
+  try {
+    const remoteBuffer = await pteUploadStorageHelper.readArtifactUploadBuffer(artifact, { maxBytes: IMAGE_MAX_BYTES });
+    if (remoteBuffer) {
+      return {
+        absolutePath: '',
+        sourceUrl: remoteBuffer.ref,
+        mimeType: inferImageMimeType(artifact, remoteBuffer.ref),
+        dataBase64: remoteBuffer.buffer.toString('base64'),
+        sizeBytes: remoteBuffer.sizeBytes
+      };
+    }
+  } catch (error) {
+    const { uploadStorageService } = require('./pteCoreContracts');
+    if (uploadStorageService.isRemoteUploadBackend()) throw error;
+  }
+
   const absolutePath = resolveArtifactPath(artifact);
   if (!absolutePath) {
     const remoteImage = await readRemoteUploadArtifactForAi({

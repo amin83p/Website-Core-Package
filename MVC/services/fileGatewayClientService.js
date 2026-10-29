@@ -10,6 +10,56 @@ function clean(value) {
   return String(value || '').trim();
 }
 
+const gatewayDownloadWaiters = [];
+let gatewayDownloadActive = 0;
+
+function getGatewayDownloadConcurrency() {
+  const raw = Number.parseInt(String(process.env.FILE_GATEWAY_DOWNLOAD_CONCURRENCY || '').trim(), 10);
+  if (!Number.isFinite(raw) || raw <= 0) return 1;
+  return Math.min(12, Math.max(1, raw));
+}
+
+function getGatewayDownloadMinIntervalMs() {
+  const raw = Number.parseInt(String(process.env.FILE_GATEWAY_DOWNLOAD_MIN_INTERVAL_MS || '').trim(), 10);
+  if (!Number.isFinite(raw) || raw < 0) return 450;
+  return Math.min(5000, raw);
+}
+
+let lastGatewayDownloadStartMs = 0;
+
+async function waitGatewayDownloadInterval() {
+  const minGap = getGatewayDownloadMinIntervalMs();
+  const now = Date.now();
+  const waitMs = Math.max(0, lastGatewayDownloadStartMs + minGap - now);
+  if (waitMs) await sleep(waitMs);
+  lastGatewayDownloadStartMs = Date.now();
+}
+
+function drainGatewayDownloadQueue() {
+  while (gatewayDownloadActive < getGatewayDownloadConcurrency() && gatewayDownloadWaiters.length) {
+    const entry = gatewayDownloadWaiters.shift();
+    gatewayDownloadActive += 1;
+    Promise.resolve()
+      .then(entry.task)
+      .then(entry.resolve, entry.reject)
+      .finally(() => {
+        gatewayDownloadActive -= 1;
+        drainGatewayDownloadQueue();
+      });
+  }
+}
+
+function runGatewayDownloadQueued(task) {
+  return new Promise((resolve, reject) => {
+    gatewayDownloadWaiters.push({ task, resolve, reject });
+    drainGatewayDownloadQueue();
+  });
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 function normalizeScopeKey(scopeKey = '') {
   const token = clean(scopeKey).toUpperCase();
   if (!token || token === 'GLOBAL') return 'GLOBAL';
@@ -70,9 +120,9 @@ function buildUploadUrl(scopeKey = '', relativePath = '') {
 
 async function readLocalUploadIfPresent(scopeKey = '', relativePath = '') {
   const relativeUrl = buildRelativeUploadUrl(scopeKey, relativePath);
-  const diskPath = uploadPathUtils.fromUploadsUrlToDiskPath(relativeUrl);
-  if (!diskPath || !fsSync.existsSync(diskPath)) return null;
-  const buffer = await fs.readFile(diskPath);
+  const resolved = uploadPathUtils.resolveExistingUploadDiskPath(relativeUrl);
+  if (!resolved?.diskPath) return null;
+  const buffer = await fs.readFile(resolved.diskPath);
   return {
     buffer,
     mimeType: 'application/octet-stream',
@@ -241,6 +291,42 @@ async function fetchGatewayResponse(routePath = '', options = {}) {
   }
 }
 
+async function gatewayUploadBlobViaRemoteGateway({
+  scopeKey = '',
+  relativeDir = '',
+  desiredName = '',
+  blob = null,
+  mimeType = 'application/octet-stream'
+} = {}) {
+  const safeName = clean(desiredName) || 'file';
+  const buffer = Buffer.from(await blob.arrayBuffer());
+  const form = new FormData();
+  form.append('scopeKey', clean(scopeKey) || 'GLOBAL');
+  form.append('relativeDir', clean(relativeDir) || '');
+  form.append('desiredName', safeName);
+  form.append(
+    'file',
+    new Blob([buffer], { type: clean(mimeType) || 'application/octet-stream' }),
+    safeName
+  );
+
+  const result = await fetchJson('/internal/file-gateway/upload', {
+    method: 'POST',
+    body: form
+  });
+
+  return {
+    status: result?.status || 'success',
+    message: result?.message || 'File uploaded via gateway.',
+    renamed: Boolean(result?.renamed),
+    url: clean(result?.url),
+    relativePath: clean(result?.relativePath),
+    fileName: clean(result?.fileName) || safeName,
+    originalName: clean(result?.originalName) || safeName,
+    type: clean(result?.type) || (String(mimeType || '').startsWith('image/') ? 'image' : 'file')
+  };
+}
+
 async function gatewayUploadBlob({
   scopeKey = '',
   relativeDir = '',
@@ -248,6 +334,18 @@ async function gatewayUploadBlob({
   blob = null,
   mimeType = 'application/octet-stream'
 } = {}) {
+  if (isRailwayProxyMode()) {
+    const uploadStoragePolicy = require('./uploadStoragePolicyService');
+    uploadStoragePolicy.assertRailwayGatewayReady();
+    return gatewayUploadBlobViaRemoteGateway({
+      scopeKey,
+      relativeDir,
+      desiredName,
+      blob,
+      mimeType
+    });
+  }
+
   const buffer = Buffer.from(await blob.arrayBuffer());
   return writeGatewayUploadBuffer({
     scopeKey: clean(scopeKey),
@@ -296,7 +394,8 @@ async function gatewayDeleteByRelativePath({ scopeKey = '', relativePath = '' } 
   });
 }
 
-async function gatewayDownloadByUploadUrl(uploadUrl = '') {
+async function gatewayDownloadByUploadUrlOnce(uploadUrl = '') {
+  await waitGatewayDownloadInterval();
   const token = clean(uploadUrl);
   if (!token) throw new Error('Upload URL is required.');
   const response = await fetchGatewayResponse('/internal/file-gateway/download', {
@@ -314,30 +413,56 @@ async function gatewayDownloadByUploadUrl(uploadUrl = '') {
   };
 }
 
+async function gatewayDownloadByUploadUrl(uploadUrl = '') {
+  const token = clean(uploadUrl);
+  if (!token) throw new Error('Upload URL is required.');
+  const maxAttempts = 4;
+  let lastError = null;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await runGatewayDownloadQueued(() => gatewayDownloadByUploadUrlOnce(token));
+    } catch (error) {
+      lastError = error;
+      if (Number(error?.statusCode) === 429 && attempt < maxAttempts) {
+        await sleep(Math.min(8000, 600 * (2 ** (attempt - 1))));
+        continue;
+      }
+      throw error;
+    }
+  }
+  throw lastError || new Error('Gateway download failed.');
+}
+
 async function downloadRemoteUploadFile(scopeKey = '', relativePath = '') {
-  const local = await readLocalUploadIfPresent(scopeKey, relativePath);
-  if (local) {
-    return {
-      blob: new Blob([local.buffer], { type: local.mimeType }),
-      mimeType: local.mimeType,
-      size: local.size,
-      uploadUrl: local.uploadUrl
-    };
+  const uploadStoragePolicy = require('./uploadStoragePolicyService');
+  const strictGateway = uploadStoragePolicy.isRailwayGatewayBackend();
+
+  if (uploadStoragePolicy.allowLocalUploadFallback()) {
+    const local = await readLocalUploadIfPresent(scopeKey, relativePath);
+    if (local) {
+      return {
+        blob: new Blob([local.buffer], { type: local.mimeType }),
+        mimeType: local.mimeType,
+        size: local.size,
+        uploadUrl: local.uploadUrl
+      };
+    }
   }
 
   const relativeUploadUrl = buildRelativeUploadUrl(scopeKey, relativePath);
   if (isRailwayProxyMode() || getGatewayBaseUrl()) {
-    try {
-      const signed = await gatewayDownloadByUploadUrl(relativeUploadUrl);
-      return {
-        blob: new Blob([signed.buffer], { type: signed.mimeType }),
-        mimeType: signed.mimeType,
-        size: signed.size,
-        uploadUrl: signed.uploadUrl
-      };
-    } catch (_) {
-      // Fall through to public GET (local dev without key, or signed route unavailable).
-    }
+    uploadStoragePolicy.assertRailwayGatewayReady();
+    const signed = await gatewayDownloadByUploadUrl(relativeUploadUrl);
+    return {
+      blob: new Blob([signed.buffer], { type: signed.mimeType }),
+      mimeType: signed.mimeType,
+      size: signed.size,
+      uploadUrl: signed.uploadUrl
+    };
+  }
+
+  if (strictGateway) {
+    throw new Error('Railway gateway download is required but gateway is not configured.');
   }
 
   const uploadUrl = buildUploadUrl(scopeKey, relativePath);

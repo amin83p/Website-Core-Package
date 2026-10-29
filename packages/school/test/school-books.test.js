@@ -9,7 +9,7 @@ const bookController = require('../MVC/controllers/school/bookController');
 const accessConstants = require('../config/accessConstants');
 const { requireCoreModule } = require('../MVC/services/school/schoolCoreContracts');
 const uploadCategoryResolverService = requireCoreModule('MVC/services/uploadCategoryResolverService');
-const coreFilesService = requireCoreModule('MVC/services/coreFilesService');
+const uploadStorageService = requireCoreModule('MVC/services/uploadStorageService');
 const { registerSchoolUploadCategoryResolvers } = require('../MVC/services/school/schoolUploadCategoryRegistration');
 
 const BOOK_LIST_VIEW = path.join(ROOT, 'packages/school/MVC/views/school/book/bookList.ejs');
@@ -139,11 +139,31 @@ test('bookModel normalizes legacy string cover photo metadata on read', () => {
   assert.equal(normalized.coverPhoto.fileName, 'cover_123.png');
 });
 
+test('bookModel resolves legacy cover path without leading slash on uploads prefix', () => {
+  const normalized = bookModel.normalizeStoredBook({
+    id: 'BK002',
+    orgId: '42',
+    title: 'Legacy Relative Upload Path',
+    authors: [],
+    tableOfContents: '[]',
+    coverPhoto: JSON.stringify({
+      fileName: 'cover_456.png',
+      path: 'uploads/GLOBAL/school/books/BK002/cover_456.png',
+      url: ''
+    })
+  });
+
+  assert.equal(
+    normalized.coverPhoto.url,
+    '/uploads/GLOBAL/school/books/BK002/cover_456.png'
+  );
+});
+
 test('book cover uploads resolve to the configured School book cover folder', () => {
   uploadCategoryResolverService.resetUploadCategoryResolvers();
   registerSchoolUploadCategoryResolvers();
 
-  const category = coreFilesService.resolveUploadCategory('school-books', true, {
+  const category = uploadStorageService.resolveUploadCategory('school-books', true, {
     body: { bookId: 'BK 123' }
   });
 

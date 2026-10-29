@@ -24,7 +24,7 @@ function loadDotEnv() {
 loadDotEnv();
 
 const { connectMongo, disconnectMongo, getMongoCollection } = require('../../../MVC/infrastructure/mongo/mongoConnection');
-const fileAssetStorage = require('../../../MVC/services/fileAssetStorageService');
+const uploadStorage = require('../../../MVC/services/uploadStorageService');
 const reportPdfRenderService = require('../../../packages/school/MVC/services/school/reportPdfRenderService');
 const { PDFDocument } = require('pdf-lib');
 
@@ -81,7 +81,7 @@ async function main() {
   }
   const templateBuffer = Buffer.from(await pdfDoc.save());
 
-  const stored = await fileAssetStorage.saveBuffer({
+  const stored = await uploadStorage.saveBuffer({
     scopeKey: ORG_ID,
     relativeDir: 'school-reports',
     fileName: DEST_FILE_NAME,

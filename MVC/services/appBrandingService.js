@@ -6,6 +6,7 @@ const DEFAULT_BRAND = Object.freeze({
   appShortName: 'Website',
   tagline: 'Learn, work, and thrive in new places.',
   logoUrl: '/uploads/GLOBAL/logo/Logo1.png',
+  faviconUrl: '',
   iconSvgUrl: '/uploads/GLOBAL/logo/icon.svg',
   appleTouchIconUrl: '/uploads/GLOBAL/logo/Logo1.png',
   themeColor: '#ffffff',
@@ -133,6 +134,25 @@ function cleanUrl(value, fallback = '') {
   if (/[\t\r\n"'`<>\\]/.test(token)) return fallback || '';
   if (/^(https?:)?\/\//i.test(token) || token.startsWith('/')) return token.replace(/ /g, '%20');
   return fallback || '';
+}
+
+function resolveBrowserTabIconUrl(merged = {}) {
+  const explicit = cleanUrl(merged.faviconUrl, '');
+  if (explicit) return explicit;
+  if (cleanText(merged.iconSvgUrl, { max: 1200, fallback: '' })) {
+    return cleanUrl(merged.iconSvgUrl, DEFAULT_BRAND.iconSvgUrl);
+  }
+  if (cleanText(merged.logoUrl, { max: 1200, fallback: '' })) {
+    return cleanUrl(merged.logoUrl, DEFAULT_BRAND.logoUrl);
+  }
+  return DEFAULT_BRAND.iconSvgUrl;
+}
+
+function faviconMimeTypeFromUrl(url = '') {
+  const lower = String(url || '').trim().toLowerCase().split('?')[0];
+  if (lower.endsWith('.svg')) return 'image/svg+xml';
+  if (lower.endsWith('.ico')) return 'image/x-icon';
+  return 'image/png';
 }
 
 function normalizeContactRows(rows, valueKey, legacyRows = [], fallbackTitle = '') {
@@ -287,13 +307,17 @@ function getRawPublicMenuSettings() {
 function getBrand() {
   const raw = getRawBrandSettings();
   const merged = { ...DEFAULT_BRAND, ...raw };
+  const browserTabIconUrl = resolveBrowserTabIconUrl(merged);
 
   return {
     appName: cleanText(merged.appName, { max: 180, fallback: DEFAULT_BRAND.appName }),
     appShortName: cleanText(merged.appShortName, { max: 80, fallback: DEFAULT_BRAND.appShortName }),
     tagline: cleanText(merged.tagline, { max: 240, fallback: DEFAULT_BRAND.tagline }),
     logoUrl: cleanUrl(merged.logoUrl, DEFAULT_BRAND.logoUrl),
+    faviconUrl: cleanUrl(merged.faviconUrl, ''),
     iconSvgUrl: cleanUrl(merged.iconSvgUrl, DEFAULT_BRAND.iconSvgUrl),
+    browserTabIconUrl,
+    browserTabIconType: faviconMimeTypeFromUrl(browserTabIconUrl),
     appleTouchIconUrl: cleanUrl(merged.appleTouchIconUrl, DEFAULT_BRAND.appleTouchIconUrl),
     themeColor: cleanColor(merged.themeColor, DEFAULT_BRAND.themeColor),
     ownerDisplayName: cleanText(merged.ownerDisplayName, { max: 180, fallback: DEFAULT_BRAND.ownerDisplayName }),
@@ -518,17 +542,20 @@ function getPublicMenuEndpointOptions() {
 
 function getManifest() {
   const brand = getBrand();
+  const manifestIconSrc = /\.png($|\?)/i.test(String(brand.browserTabIconUrl || ''))
+    ? brand.browserTabIconUrl
+    : brand.appleTouchIconUrl;
   return {
     name: brand.appName,
     short_name: brand.appShortName,
     icons: [
       {
-        src: brand.appleTouchIconUrl,
+        src: manifestIconSrc,
         sizes: '192x192',
         type: 'image/png'
       },
       {
-        src: brand.appleTouchIconUrl,
+        src: manifestIconSrc,
         sizes: '512x512',
         type: 'image/png'
       }
@@ -551,5 +578,7 @@ module.exports = {
   getPublicMenu,
   getPublicDefaultHomePath,
   getPublicMenuEndpointOptions,
-  getManifest
+  getManifest,
+  resolveBrowserTabIconUrl,
+  faviconMimeTypeFromUrl
 };
