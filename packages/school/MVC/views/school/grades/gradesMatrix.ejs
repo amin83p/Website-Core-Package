@@ -371,6 +371,24 @@ document.addEventListener('DOMContentLoaded', () => {
   let gmOpenCalcPersonId = '';
   let gmRollupRecalcTimer = null;
 
+  function resolveGmActionStateToken() {
+    const input = document.querySelector('input[name="actionStateId"]');
+    const fromInput = String(input?.value || '').trim();
+    if (fromInput) return fromInput;
+    const ref = document.getElementById('actionStateIdRef');
+    return String(ref?.dataset?.id || ref?.getAttribute('data-id') || '').trim();
+  }
+
+  function syncGmActionStateTokenFromResponse(res) {
+    if (!res || typeof res.headers?.get !== 'function') return;
+    const next = String(res.headers.get('x-action-state-id') || res.headers.get('X-Action-State-Id') || '').trim();
+    if (!next) return;
+    const ref = document.getElementById('actionStateIdRef');
+    if (ref) ref.setAttribute('data-id', next);
+    const input = document.querySelector('input[name="actionStateId"]');
+    if (input) input.value = next;
+  }
+
   function gmIncludedColumns(columns) {
     return (Array.isArray(columns) ? columns : []).filter((col) => col && col.includeInGradeCalculation !== false);
   }
@@ -511,13 +529,25 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
     }
     try {
+      const actionStateId = resolveGmActionStateToken();
       const res = await fetch('/school/grades-matrix/api/save-activity-weights', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
-        body: JSON.stringify({ classId: data.classId, updates })
+        headers: {
+          'Content-Type': 'application/json',
+          'X-AJAX-Request': 'true',
+          ...(actionStateId ? { 'X-Action-State-Id': actionStateId } : {})
+        },
+        body: JSON.stringify({
+          classId: data.classId,
+          updates,
+          ...(actionStateId ? { actionStateId } : {})
+        })
       });
-      const result = await res.json();
-      if (result.status !== 'success') throw new Error(result.message || 'Save failed');
+      const result = await res.json().catch(() => ({}));
+      syncGmActionStateTokenFromResponse(res);
+      if (!res.ok || result.status !== 'success') {
+        throw new Error(result.message || result.error || 'Save failed');
+      }
       (data.columns || []).forEach((col) => {
         col._savedWeight = Number(col.weight);
       });
@@ -1113,6 +1143,7 @@ document.addEventListener('DOMContentLoaded', () => {
         })
       });
       const result = await res.json();
+      syncGmActionStateTokenFromResponse(res);
       if (result.status !== 'success') return;
       const rollups = result.rollups || {};
       data.matrix.forEach((row) => {

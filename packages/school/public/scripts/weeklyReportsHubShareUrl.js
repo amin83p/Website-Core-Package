@@ -2,6 +2,7 @@
   'use strict';
 
   const SECTION_WEEKLY_REPORTS = 'weekly-reports';
+  const SECTION_STUDENT_PROGRESS = 'student-progress';
 
   function trimString(value) {
     return String(value == null ? '' : value).trim();
@@ -78,6 +79,24 @@
     return state;
   }
 
+  /**
+   * @param {{ filtersSnapshot?: object, viewState?: object }} input
+   * @returns {object}
+   */
+  function buildStudentProgressShareState(input) {
+    const opts = input || {};
+    const filters = opts.filtersSnapshot || {};
+    const viewState = opts.viewState || {};
+    const studentIds = selectionIds(filters.studentSelections);
+    return {
+      section: SECTION_STUDENT_PROGRESS,
+      startDate: trimString(filters.startDate),
+      endDate: trimString(filters.endDate),
+      studentIds: studentIds.join(','),
+      progressView: viewState.viewMode === 'table' ? 'table' : 'analytics'
+    };
+  }
+
   function setParamIfPresent(params, key, value) {
     const normalized = trimString(value);
     if (!normalized) return;
@@ -117,6 +136,12 @@
     }
     setParamIfPresent(params, 'studentDetailId', src.studentDetailId);
     setParamIfPresent(params, 'studentDetailName', src.studentDetailName);
+    if (src.section === SECTION_STUDENT_PROGRESS) {
+      setParamIfPresent(params, 'studentIds', src.studentIds);
+      if (src.progressView === 'table') {
+        setParamIfPresent(params, 'progressView', 'table');
+      }
+    }
     return params;
   }
 
@@ -135,6 +160,22 @@
     }
 
     const section = trimString(params.get('section')).toLowerCase();
+    if (section === SECTION_STUDENT_PROGRESS) {
+      const studentSelections = selectionsFromIds(params.get('studentIds'), '');
+      const progressViewRaw = trimString(params.get('progressView')).toLowerCase();
+      return {
+        section: SECTION_STUDENT_PROGRESS,
+        filtersSnapshot: {
+          startDate: trimString(params.get('startDate')),
+          endDate: trimString(params.get('endDate')),
+          studentSelections: studentSelections
+        },
+        viewState: {
+          viewMode: progressViewRaw === 'table' ? 'table' : 'analytics'
+        },
+        tab: { type: 'student-progress' }
+      };
+    }
     if (section !== SECTION_WEEKLY_REPORTS) {
       return {
         section: section,
@@ -200,7 +241,9 @@
 
   const api = {
     SECTION_WEEKLY_REPORTS: SECTION_WEEKLY_REPORTS,
+    SECTION_STUDENT_PROGRESS: SECTION_STUDENT_PROGRESS,
     buildWeeklyReportsShareState: buildWeeklyReportsShareState,
+    buildStudentProgressShareState: buildStudentProgressShareState,
     stateToSearchParams: stateToSearchParams,
     searchParamsToState: searchParamsToState,
     buildShareUrl: buildShareUrl,

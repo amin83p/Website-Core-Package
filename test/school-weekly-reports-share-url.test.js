@@ -75,3 +75,21 @@ test('buildShareUrl produces absolute path with query', () => {
   assert.ok(url.includes('section=weekly-reports'));
   assert.ok(url.includes('startDate=2026-03-01'));
 });
+
+test('buildStudentProgressShareState and searchParamsToState round-trip analytics view', () => {
+  const built = shareUrl.buildStudentProgressShareState({
+    filtersSnapshot: {
+      startDate: '2026-04-07',
+      endDate: '2026-04-13',
+      studentSelections: [{ id: 'STU-9', name: 'Sam' }]
+    },
+    viewState: { viewMode: 'analytics' }
+  });
+  assert.equal(built.section, 'student-progress');
+  assert.equal(built.progressView, 'analytics');
+  const restored = shareUrl.searchParamsToState(shareUrl.stateToSearchParams(built));
+  assert.equal(restored.section, 'student-progress');
+  assert.equal(restored.filtersSnapshot.startDate, '2026-04-07');
+  assert.equal(restored.filtersSnapshot.studentSelections[0].id, 'STU-9');
+  assert.equal(restored.viewState.viewMode, 'analytics');
+});

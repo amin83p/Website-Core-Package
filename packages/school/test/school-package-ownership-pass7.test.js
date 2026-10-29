@@ -36,6 +36,8 @@ test('school package pass7 owns gradesMatrixRoutes implementation', () => {
   assert.match(routeSource, /trackActionState\(SECTIONS\.SCHOOL_GRADEBOOK,\s*OPERATIONS\.READ_ALL\)/);
   assert.match(routeSource, /ctrl\.showGradesMatrixPage/);
   assert.match(routeSource, /ctrl\.getGradesMatrixData/);
+  assert.match(routeSource, /save-activity-weights[\s\S]*allowOperationTokenFallback:\s*true/);
+  assert.match(routeSource, /save-activity-weights[\s\S]*allowInactiveTokenFallback:\s*true/);
 });
 
 test('school package pass7 owns sessionRoutes implementation', () => {

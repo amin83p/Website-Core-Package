@@ -932,6 +932,136 @@
     margin-top: 0.1rem;
   }
 
+  .school-master-hub .hub-wr-deck-metric-col--pie {
+    min-width: 4.35rem;
+  }
+
+  .school-master-hub .hub-wr-attendance-pie-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.2rem;
+  }
+
+  .school-master-hub .hub-wr-attendance-pie-svg {
+    width: 48px;
+    height: 48px;
+    display: block;
+  }
+
+  .school-master-hub .hub-wr-attendance-pie-svg .hub-wr-attendance-pie-empty {
+    font-size: 11px;
+    font-weight: 700;
+    fill: #94a3b8;
+  }
+
+  .school-master-hub .hub-wr-attendance-pie-legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.35rem 0.5rem;
+    font-size: 0.62rem;
+    font-weight: 600;
+    color: #64748b;
+    line-height: 1.15;
+    max-width: 5.5rem;
+  }
+
+  .school-master-hub .hub-wr-attendance-pie-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    white-space: nowrap;
+  }
+
+  .school-master-hub .hub-wr-attendance-pie-swatch {
+    width: 0.45rem;
+    height: 0.45rem;
+    border-radius: 999px;
+    flex-shrink: 0;
+  }
+
+  .school-master-hub .hub-wr-deck-metric-section.hub-wr-col-attendance .hub-wr-deck-metric-section-cols {
+    gap: 0.35rem 0.55rem;
+  }
+
+  .school-master-hub .hub-wr-deck-metric-section-pie-row {
+    margin-top: 0.45rem;
+    padding-top: 0.45rem;
+    border-top: 1px solid rgba(15, 23, 42, 0.06);
+  }
+
+  .school-master-hub .hub-wr-deck-metric-section-pie-cols {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    justify-items: stretch;
+    align-items: start;
+    gap: 0.35rem 0.35rem;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .school-master-hub .hub-wr-deck-metric-section-pie-cols .hub-wr-deck-metric-col--pie {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 0;
+    width: 100%;
+    max-width: none;
+  }
+
+  .school-master-hub .hub-wr-deck-metric-section-pie-cols .hub-wr-deck-metric-col-label {
+    white-space: nowrap;
+    font-size: 0.66rem;
+    line-height: 1.15;
+    min-height: 1.15rem;
+    max-width: none;
+    text-align: center;
+    width: 100%;
+  }
+
+  .school-master-hub .hub-wr-deck-metric-section-pie-cols .hub-wr-deck-metric-col-value {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+  }
+
+  .school-master-hub .hub-wr-deck-metric-section-pie-cols .hub-wr-attendance-pie-wrap {
+    width: 100%;
+    max-width: 7.5rem;
+  }
+
+  .school-master-hub .hub-wr-deck-metric-section-pie-cols .hub-wr-attendance-pie-legend {
+    flex-wrap: nowrap;
+    justify-content: center;
+    max-width: none;
+    width: 100%;
+    font-size: 0.58rem;
+    gap: 0.2rem 0.35rem;
+  }
+
+  .school-master-hub .hub-wr-deck-metric-section-pie-cols .hub-wr-deck-metric-col--pie:first-child {
+    align-items: flex-start;
+  }
+
+  .school-master-hub .hub-wr-deck-metric-section-pie-cols .hub-wr-deck-metric-col--pie:first-child .hub-wr-deck-metric-col-label,
+  .school-master-hub .hub-wr-deck-metric-section-pie-cols .hub-wr-deck-metric-col--pie:first-child .hub-wr-deck-metric-col-value {
+    align-items: flex-start;
+    justify-content: flex-start;
+  }
+
+  .school-master-hub .hub-wr-deck-metric-section-pie-cols .hub-wr-deck-metric-col--pie:first-child .hub-wr-attendance-pie-wrap {
+    align-items: flex-start;
+  }
+
+  .school-master-hub .hub-wr-attendance-pie-loading {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
   .school-master-hub .hub-wr-deck-metric-section {
     padding: 0.5rem 0.6rem;
   }
@@ -8499,6 +8629,7 @@
       el.innerHTML = buildWeeklyReportsEngagementRingInner(entry);
       el.classList.add('hub-weekly-reports-engagement-ring--compact');
     });
+    refreshWeeklyReportsAbsencePresencePies(panel);
   }
 
   function weeklyReportsClassEngagementReadyForRows(rows, snapshot) {
@@ -8884,6 +9015,205 @@
     );
   }
 
+  const HUB_WR_LATE_PIE_COLOR = '#d97706';
+  const HUB_WR_EARLY_PIE_COLOR = '#7c3aed';
+  const HUB_WR_ABSENCE_PIE_COLOR = '#dc3545';
+  const HUB_WR_PRESENCE_PIE_COLOR = '#198754';
+
+  function weeklyReportsPiePolarToCartesian(cx, cy, radius, angleDeg) {
+    const rad = ((angleDeg - 90) * Math.PI) / 180;
+    return {
+      x: cx + radius * Math.cos(rad),
+      y: cy + radius * Math.sin(rad)
+    };
+  }
+
+  function weeklyReportsPieWedgePath(cx, cy, radius, startAngle, endAngle) {
+    const span = endAngle - startAngle;
+    if (span >= 359.999) {
+      return '';
+    }
+    const start = weeklyReportsPiePolarToCartesian(cx, cy, radius, endAngle);
+    const end = weeklyReportsPiePolarToCartesian(cx, cy, radius, startAngle);
+    const largeArc = span > 180 ? 1 : 0;
+    return [
+      'M', cx, cy,
+      'L', start.x, start.y,
+      'A', radius, radius, 0, largeArc, 0, end.x, end.y,
+      'Z'
+    ].join(' ');
+  }
+
+  function buildWeeklyReportsTwoSlicePieSvg(sliceA, sliceB, options) {
+    const opts = options || {};
+    const valueA = Math.max(0, Number(sliceA) || 0);
+    const valueB = Math.max(0, Number(sliceB) || 0);
+    const total = valueA + valueB;
+    const colorA = opts.colorA || HUB_WR_LATE_PIE_COLOR;
+    const colorB = opts.colorB || HUB_WR_EARLY_PIE_COLOR;
+    const labelA = opts.labelA || 'Late';
+    const labelB = opts.labelB || 'Early leave';
+    const cx = 18;
+    const cy = 18;
+    const radius = 14;
+    const unit = opts.unit === 'minutes' ? 'minutes' : 'count';
+    const formatValue = function (value) {
+      if (unit === 'minutes') {
+        return String(Math.max(0, Math.round(Number(value) || 0))) + ' min';
+      }
+      return String(Math.max(0, Math.round(Number(value) || 0)));
+    };
+    const emptyAria = String(opts.emptyAria || 'No data').trim() || 'No data';
+    if (total <= 0) {
+      return [
+        '<svg class="hub-wr-attendance-pie-svg" viewBox="0 0 36 36" role="img" aria-label="', escapeHtml(emptyAria), '">',
+        '<title>', escapeHtml(emptyAria), '</title>',
+        '<circle cx="', String(cx), '" cy="', String(cy), '" r="', String(radius), '" fill="#e2e8f0"></circle>',
+        '<text class="hub-wr-attendance-pie-empty" x="', String(cx), '" y="', String(cy), '" text-anchor="middle" dominant-baseline="central">—</text>',
+        '</svg>'
+      ].join('');
+    }
+    const titleText = labelA + ' ' + formatValue(valueA) + ', ' + labelB + ' ' + formatValue(valueB);
+    const ariaLabel = titleText;
+    let body = '';
+    if (valueA > 0 && valueB <= 0) {
+      body = '<circle cx="' + String(cx) + '" cy="' + String(cy) + '" r="' + String(radius) + '" fill="' + escapeHtml(colorA) + '"></circle>';
+    } else if (valueB > 0 && valueA <= 0) {
+      body = '<circle cx="' + String(cx) + '" cy="' + String(cy) + '" r="' + String(radius) + '" fill="' + escapeHtml(colorB) + '"></circle>';
+    } else {
+      const angleA = (valueA / total) * 360;
+      const pathA = weeklyReportsPieWedgePath(cx, cy, radius, 0, angleA);
+      const pathB = weeklyReportsPieWedgePath(cx, cy, radius, angleA, 360);
+      body = [
+        pathA ? '<path fill="' + escapeHtml(colorA) + '" d="' + pathA + '"></path>' : '',
+        pathB ? '<path fill="' + escapeHtml(colorB) + '" d="' + pathB + '"></path>' : ''
+      ].join('');
+    }
+    return [
+      '<svg class="hub-wr-attendance-pie-svg" viewBox="0 0 36 36" role="img" aria-label="', escapeHtml(ariaLabel), '">',
+      '<title>', escapeHtml(titleText), '</title>',
+      body,
+      '</svg>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsAttendancePieLegendItems(items) {
+    const list = Array.isArray(items) ? items : [];
+    if (!list.length) return '';
+    return [
+      '<div class="hub-wr-attendance-pie-legend" aria-hidden="true">',
+      list.map(function (item) {
+        return [
+          '<span class="hub-wr-attendance-pie-legend-item">',
+          '<span class="hub-wr-attendance-pie-swatch" style="background:', escapeHtml(item.color || '#94a3b8'), ';"></span>',
+          escapeHtml(String(item.label || '')),
+          '</span>'
+        ].join('');
+      }).join(''),
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsLateEarlyPieLegend() {
+    return renderWeeklyReportsAttendancePieLegendItems([
+      { color: HUB_WR_LATE_PIE_COLOR, label: 'Late' },
+      { color: HUB_WR_EARLY_PIE_COLOR, label: 'Early' }
+    ]);
+  }
+
+  function renderWeeklyReportsAbsencePresencePieLegend() {
+    return renderWeeklyReportsAttendancePieLegendItems([
+      { color: HUB_WR_ABSENCE_PIE_COLOR, label: 'Abs' },
+      { color: HUB_WR_PRESENCE_PIE_COLOR, label: 'Pres' }
+    ]);
+  }
+
+  function renderWeeklyReportsAttendancePieColumn(label, sliceA, sliceB, options) {
+    const opts = options || {};
+    const unit = opts.unit === 'minutes' ? 'minutes' : 'count';
+    const pieSvg = buildWeeklyReportsTwoSlicePieSvg(sliceA, sliceB, {
+      unit: unit,
+      labelA: opts.labelA || 'Late',
+      labelB: opts.labelB || 'Early leave',
+      colorA: opts.colorA || HUB_WR_LATE_PIE_COLOR,
+      colorB: opts.colorB || HUB_WR_EARLY_PIE_COLOR,
+      emptyAria: opts.emptyAria || 'No late or early leave'
+    });
+    const legendHtml = typeof opts.legendHtml === 'string'
+      ? opts.legendHtml
+      : renderWeeklyReportsLateEarlyPieLegend();
+    const pieHtml = [
+      '<div class="hub-wr-attendance-pie-wrap">',
+      pieSvg,
+      legendHtml,
+      '</div>'
+    ].join('');
+    const extraAttrs = String(opts.extraAttrs || '');
+    return [
+      '<div class="hub-wr-deck-metric-col hub-wr-deck-metric-col--pie"', extraAttrs, '>',
+      '<div class="hub-wr-deck-metric-col-label">', escapeHtml(label), '</div>',
+      '<div class="hub-wr-deck-metric-col-value">', pieHtml, '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function buildWeeklyReportsAbsencePresencePieInner(classId, absenceMinutes) {
+    const entry = getWeeklyReportsClassEngagementEntry(classId);
+    if (entry.loading) {
+      return '<div class="hub-wr-attendance-pie-loading"><span class="spinner-border spinner-border-sm"></span></div>';
+    }
+    const presenceMinutes = Math.max(0, Math.round(Number(entry.presentMinutes) || 0));
+    const absence = Math.max(0, Math.round(Number(absenceMinutes) || 0));
+    return [
+      '<div class="hub-wr-attendance-pie-wrap">',
+      buildWeeklyReportsTwoSlicePieSvg(absence, presenceMinutes, {
+        unit: 'minutes',
+        labelA: 'Absence',
+        labelB: 'Presence',
+        colorA: HUB_WR_ABSENCE_PIE_COLOR,
+        colorB: HUB_WR_PRESENCE_PIE_COLOR,
+        emptyAria: 'No absence or presence time'
+      }),
+      renderWeeklyReportsAbsencePresencePieLegend(),
+      '</div>'
+    ].join('');
+  }
+
+  function renderWeeklyReportsAbsencePresencePieColumn(classId, absenceMinutes) {
+    const absence = Math.max(0, Math.round(Number(absenceMinutes) || 0));
+    const inner = buildWeeklyReportsAbsencePresencePieInner(classId, absence);
+    return [
+      '<div class="hub-wr-deck-metric-col hub-wr-deck-metric-col--pie" data-hub-wr-attendance-pie="absence-presence" data-hub-wr-class-id="',
+      escapeHtml(classId || ''), '" data-absence-minutes="', escapeHtml(String(absence)), '">',
+      '<div class="hub-wr-deck-metric-col-label">', escapeHtml('Abs vs presence'), '</div>',
+      '<div class="hub-wr-deck-metric-col-value hub-wr-absence-presence-pie-value">', inner, '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function refreshWeeklyReportsAbsencePresencePies(root) {
+    const scope = root && typeof root.querySelectorAll === 'function' ? root : document;
+    scope.querySelectorAll('[data-hub-wr-attendance-pie="absence-presence"]').forEach(function (colEl) {
+      const classId = colEl.getAttribute('data-hub-wr-class-id') || '';
+      const absenceMinutes = colEl.getAttribute('data-absence-minutes') || '0';
+      const valueEl = colEl.querySelector('.hub-wr-absence-presence-pie-value');
+      if (!valueEl) return;
+      valueEl.innerHTML = buildWeeklyReportsAbsencePresencePieInner(classId, absenceMinutes);
+    });
+  }
+
+  function renderWeeklyReportsBoardAttendancePieRow(classId, attendance) {
+    const att = attendance && typeof attendance === 'object' ? attendance : {};
+    const late = readWeeklyReportsAttendanceBucketValues(att.late);
+    const early = readWeeklyReportsAttendanceBucketValues(att.early);
+    const absence = readWeeklyReportsAttendanceBucketValues(att.absence);
+    return [
+      renderWeeklyReportsAttendancePieColumn('Occurrences', late.count, early.count, { unit: 'count' }),
+      renderWeeklyReportsAttendancePieColumn('Minutes', late.minutes, early.minutes, { unit: 'minutes' }),
+      renderWeeklyReportsAbsencePresencePieColumn(classId, absence.minutes)
+    ].join('');
+  }
+
   function renderWeeklyReportsBoardMetricColumn(label, valueHtml) {
     return [
       '<div class="hub-wr-deck-metric-col">',
@@ -8893,13 +9223,21 @@
     ].join('');
   }
 
-  function renderWeeklyReportsBoardMetricSection(title, bandClass, columnsHtml) {
+  function renderWeeklyReportsBoardMetricSection(title, bandClass, columnsHtml, pieRowHtml) {
+    const pieRow = pieRowHtml
+      ? [
+        '<div class="hub-wr-deck-metric-section-pie-row">',
+        '<div class="hub-wr-deck-metric-section-pie-cols">', pieRowHtml, '</div>',
+        '</div>'
+      ].join('')
+      : '';
     return [
       '<div class="hub-wr-deck-metric-section hub-wr-col-', escapeHtml(bandClass), '">',
       '<div class="hub-wr-deck-metric-section-row">',
       '<div class="hub-wr-deck-metric-section-title">', escapeHtml(title), '</div>',
       '<div class="hub-wr-deck-metric-section-cols">', columnsHtml, '</div>',
       '</div>',
+      pieRow,
       '</div>'
     ].join('');
   }
@@ -8940,7 +9278,7 @@
         renderWeeklyReportsBoardMetricColumn('Absence', renderWeeklyReportsAttendanceDrillRatio(classId, 'attendanceAbsence', m.attendance.absence, 'danger')),
         renderWeeklyReportsBoardMetricColumn('Late', renderWeeklyReportsAttendanceDrillRatio(classId, 'attendanceLate', m.attendance.late, 'warning')),
         renderWeeklyReportsBoardMetricColumn('Early', renderWeeklyReportsAttendanceDrillRatio(classId, 'attendanceEarly', m.attendance.early, 'early'))
-      ].join('')),
+      ].join(''), renderWeeklyReportsBoardAttendancePieRow(classId, m.attendance)),
       '</div>'
     ].join('');
   }
@@ -12979,7 +13317,7 @@
 
   let hubStudentProgressSelections = [];
   let hubStudentProgressLoading = false;
-  let hubStudentProgressViewMode = 'table';
+  let hubStudentProgressViewMode = 'analytics';
   let hubStudentProgressPayload = null;
   let hubStudentProgressCharts = [];
   let hubStudentProgressPrintInProgress = false;
@@ -13179,11 +13517,106 @@
   }
 
   function renderStudentProgressViewToggle() {
-    const tableActive = hubStudentProgressViewMode !== 'analytics';
+    const analyticsActive = hubStudentProgressViewMode !== 'table';
     return [
       '<div class="btn-group btn-group-sm" role="group" aria-label="Student progress view mode">',
-      '<button type="button" class="btn ' + (tableActive ? 'btn-primary' : 'btn-outline-secondary') + '" data-hub-student-progress-view="table"><i class="bi bi-table me-1"></i>Table</button>',
-      '<button type="button" class="btn ' + (!tableActive ? 'btn-primary' : 'btn-outline-secondary') + '" data-hub-student-progress-view="analytics"><i class="bi bi-bar-chart me-1"></i>Analytics</button>',
+      '<button type="button" class="btn ' + (analyticsActive ? 'btn-primary' : 'btn-outline-secondary') + '" data-hub-student-progress-view="analytics"><i class="bi bi-bar-chart me-1"></i>Analytics</button>',
+      '<button type="button" class="btn ' + (!analyticsActive ? 'btn-primary' : 'btn-outline-secondary') + '" data-hub-student-progress-view="table"><i class="bi bi-table me-1"></i>Table</button>',
+      '</div>'
+    ].join('');
+  }
+
+  function captureStudentProgressFiltersSnapshot() {
+    snapHubStudentProgressDateInputs();
+    return {
+      startDate: hubInputValue('hubStudentProgressStartDate'),
+      endDate: hubInputValue('hubStudentProgressEndDate'),
+      studentSelections: hubStudentProgressSelections.slice()
+    };
+  }
+
+  function getStudentProgressShareStateFromUi() {
+    const api = weeklyReportsShareApi();
+    if (!api || typeof api.buildStudentProgressShareState !== 'function') return null;
+    return api.buildStudentProgressShareState({
+      filtersSnapshot: captureStudentProgressFiltersSnapshot(),
+      viewState: { viewMode: hubStudentProgressViewMode }
+    });
+  }
+
+  function syncStudentProgressShareUrl() {
+    if (String(workspaceState.currentSection || '').trim().toLowerCase() !== 'student-progress') return;
+    const api = weeklyReportsShareApi();
+    if (!api) return;
+    const state = getStudentProgressShareStateFromUi();
+    if (!state) return;
+    const nextUrl = api.buildShareUrl(window.location.origin, window.location.pathname, state);
+    if (window.location.href !== nextUrl) {
+      window.history.replaceState(null, '', nextUrl);
+    }
+  }
+
+  async function copyStudentProgressShareLink() {
+    const state = getStudentProgressShareStateFromUi();
+    if (!state) {
+      void showHubMessage({ title: 'Share link', icon: 'warning', message: 'Unable to build share link.' });
+      return;
+    }
+    const api = weeklyReportsShareApi();
+    const url = api.buildShareUrl(window.location.origin, window.location.pathname, state);
+    try {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(url);
+      } else {
+        window.prompt('Copy this link:', url);
+      }
+      void showHubMessage({ title: 'Link copied', icon: 'success', message: 'Student progress link copied to clipboard.' });
+    } catch (error) {
+      void showHubMessage({ title: 'Link copied', icon: 'info', message: 'Copy the link from the prompt if needed.' });
+      window.prompt('Copy this link:', url);
+    }
+  }
+
+  function renderStudentProgressSharePrintButtons() {
+    const shareDisabled = !hubStudentProgressPayload;
+    const shareDisabledAttr = shareDisabled ? ' disabled' : '';
+    const printDisabledAttr = shareDisabled ? ' disabled' : '';
+    return [
+      '<div class="d-flex gap-2 hub-no-print">',
+      '<button type="button" class="btn btn-outline-secondary btn-sm"' + shareDisabledAttr + ' data-hub-student-progress-share><i class="bi bi-link-45deg me-1"></i>Share</button>',
+      '<button type="button" class="btn btn-outline-secondary btn-sm"' + printDisabledAttr + ' data-hub-student-progress-print><i class="bi bi-printer me-1"></i>Print</button>',
+      '</div>'
+    ].join('');
+  }
+
+  function bindStudentProgressSharePrintControls(rootEl) {
+    const root = rootEl || document;
+    root.querySelectorAll('[data-hub-student-progress-share]').forEach(function (button) {
+      button.onclick = function () {
+        void copyStudentProgressShareLink();
+      };
+    });
+    root.querySelectorAll('[data-hub-student-progress-print]').forEach(function (button) {
+      button.onclick = function () {
+        void printStudentProgressHub();
+      };
+    });
+  }
+
+  function renderStudentProgressResultsToolbar(payload) {
+    const students = Array.isArray(payload && payload.students) ? payload.students : [];
+    const range = payload && payload.range ? payload.range : {};
+    const rangeLabel = formatStudentProgressWeekLabel(range.startDate, range.endDate);
+    const countLabel = '<span class="fw-semibold text-dark">' + escapeHtml(String(students.length)) + '</span> student(s)';
+    return [
+      '<div class="hub-weekly-reports-toolbar">',
+      '<div class="small text-muted d-flex align-items-center flex-wrap gap-1">',
+      '<span>', countLabel, ' <span class="mx-1">|</span> ', escapeHtml(rangeLabel), '</span>',
+      '</div>',
+      '<div class="d-flex align-items-center gap-2 flex-wrap">',
+      renderStudentProgressSharePrintButtons(),
+      renderStudentProgressViewToggle(),
+      '</div>',
       '</div>'
     ].join('');
   }
@@ -13272,7 +13705,6 @@
       return renderStudentProgressWaitingState();
     }
     const range = payload.range || {};
-    const rangeLabel = formatStudentProgressWeekLabel(range.startDate, range.endDate);
     const analytics = hubStudentProgressViewMode === 'analytics';
     const chartsMissing = analytics && !window.Chart;
     const emptyMessage = studentProgressEmptyClassMessage(payload);
@@ -13293,26 +13725,18 @@
         : '<div class="p-3 text-muted small">' + escapeHtml(emptyMessage) + '</div>';
       return [
         '<section class="hub-student-progress-student">',
-        '<div class="hub-student-progress-student-title" data-hub-student-progress-toggle="student" role="button" tabindex="0" aria-expanded="true">',
+        '<div class="hub-student-progress-student-title" data-hub-student-progress-toggle="student" role="button" tabindex="0" aria-expanded="false">',
         '<span>' + hubStudentNameHtml(studentProgressDisplayName(student), student.studentId) + '</span>',
-        '<i class="bi bi-chevron-up hub-student-progress-chevron" aria-hidden="true"></i>',
+        '<i class="bi bi-chevron-down hub-student-progress-chevron" aria-hidden="true"></i>',
         '</div>',
-        '<div class="hub-student-progress-student-body" data-hub-student-progress-panel="student">',
+        '<div class="hub-student-progress-student-body d-none" data-hub-student-progress-panel="student">',
         classHtml,
         '</div>',
         '</section>'
       ].join('');
     }).join('');
     return [
-      '<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">',
-      '<div class="small text-muted">',
-      '<span class="fw-semibold text-dark">' + escapeHtml(String(students.length)) + '</span> student(s)',
-      ' <span class="mx-1">|</span> ',
-      escapeHtml(rangeLabel),
-      '</div>',
-      renderStudentProgressViewToggle(),
-      '<button type="button" class="btn btn-outline-secondary btn-sm" id="hubStudentProgressPrint"><i class="bi bi-printer me-1"></i>Print</button>',
-      '</div>',
+      renderStudentProgressResultsToolbar(payload),
       chartsMissing
         ? '<div class="alert alert-warning py-2 small">Charts are not available on this page yet.</div>'
         : '',
@@ -13487,6 +13911,7 @@
     destroyStudentProgressCharts();
     target.innerHTML = renderStudentProgressResults(payload);
     mountStudentProgressCharts();
+    bindStudentProgressSharePrintControls(target);
   }
 
   function renderStudentProgressMessage(message) {
@@ -13536,6 +13961,7 @@
       }
       hubStudentProgressPayload = payload;
       paintStudentProgressResults(payload);
+      syncStudentProgressShareUrl();
     } catch (error) {
       hubStudentProgressPayload = null;
       destroyStudentProgressCharts();
@@ -13580,12 +14006,13 @@
       reset.addEventListener('click', function () {
         hubStudentProgressSelections = [];
         hubStudentProgressPayload = null;
-        hubStudentProgressViewMode = 'table';
+        hubStudentProgressViewMode = 'analytics';
         syncStudentProgressStudentInputs();
         setHubStudentProgressRange('thisWeek');
         destroyStudentProgressCharts();
         const target = studentProgressResultsEl();
         if (target) target.innerHTML = renderStudentProgressWaitingState();
+        syncStudentProgressShareUrl();
       });
     }
     if (startEl) startEl.addEventListener('change', snapHubStudentProgressDateInputs);
@@ -13608,18 +14035,15 @@
       });
     }
     if (results) {
+      bindStudentProgressSharePrintControls(results);
       results.addEventListener('click', function (event) {
-        const printButton = event.target.closest('#hubStudentProgressPrint');
-        if (printButton && results.contains(printButton)) {
-          void printStudentProgressHub();
-          return;
-        }
         const viewButton = event.target.closest('[data-hub-student-progress-view]');
         if (viewButton && results.contains(viewButton) && hubStudentProgressPayload) {
           const nextMode = viewButton.getAttribute('data-hub-student-progress-view') === 'analytics' ? 'analytics' : 'table';
           if (nextMode !== hubStudentProgressViewMode) {
             hubStudentProgressViewMode = nextMode;
             paintStudentProgressResults(hubStudentProgressPayload);
+            syncStudentProgressShareUrl();
           }
           return;
         }
@@ -13708,6 +14132,7 @@
     setHubStudentProgressRange('thisWeek');
     syncStudentProgressStudentInputs();
     bindStudentProgressControls();
+    syncStudentProgressShareUrl();
   }
 
   const hubWorkspaceNodeCache = new Map();
@@ -13975,6 +14400,25 @@
     const api = weeklyReportsShareApi();
     if (!api) return;
     const parsed = api.searchParamsToState(new URLSearchParams(window.location.search));
+    if (parsed.section === api.SECTION_STUDENT_PROGRESS) {
+      openWorkspaceSection('student-progress');
+      const filters = parsed.filtersSnapshot || {};
+      hubStudentProgressSelections = Array.isArray(filters.studentSelections)
+        ? filters.studentSelections.slice()
+        : [];
+      hubStudentProgressViewMode = parsed.viewState && parsed.viewState.viewMode === 'table' ? 'table' : 'analytics';
+      syncStudentProgressStudentInputs();
+      const startEl = document.getElementById('hubStudentProgressStartDate');
+      const endEl = document.getElementById('hubStudentProgressEndDate');
+      if (startEl && filters.startDate) startEl.value = filters.startDate;
+      if (endEl && filters.endDate) endEl.value = filters.endDate;
+      if (hubStudentProgressSelections.length && filters.startDate && filters.endDate) {
+        await loadStudentProgressReport();
+      } else {
+        syncStudentProgressShareUrl();
+      }
+      return;
+    }
     if (parsed.section !== api.SECTION_WEEKLY_REPORTS) return;
 
     hubWeeklyReportsSuppressUrlSync = true;

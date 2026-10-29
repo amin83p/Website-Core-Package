@@ -14,7 +14,7 @@ router.use(requireAuth);
 router.get(
   '/',
   requireAccess(SECTIONS.SCHOOL_GRADEBOOK, OPERATIONS.READ_ALL),
-  trackActionState(SECTIONS.SCHOOL_GRADEBOOK, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_GRADEBOOK, OPERATIONS.READ_ALL, { keepActive: true }),
   ctrl.showGradesMatrixPage
 );
 
@@ -35,7 +35,12 @@ router.post(
 router.post(
   '/api/save-activity-weights',
   requireAccess(SECTIONS.SCHOOL_GRADEBOOK, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_GRADEBOOK, OPERATIONS.UPDATE, { keepActive: true }),
+  trackActionState(SECTIONS.SCHOOL_GRADEBOOK, OPERATIONS.UPDATE, {
+    keepActive: true,
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   ctrl.postSaveActivityWeights
 );
 

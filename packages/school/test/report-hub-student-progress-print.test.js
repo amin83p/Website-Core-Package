@@ -25,3 +25,18 @@ test('student progress analytics includes punctuality chart metric', () => {
   assert.match(reportHubView, /chartCard\('punctuality', 'Punctuality'\)/);
   assert.match(reportHubView, /metric === 'punctuality'/);
 });
+
+test('student progress results toolbar matches weekly reports share and view layout', () => {
+  assert.match(reportHubView, /function renderStudentProgressResultsToolbar\(/);
+  assert.match(reportHubView, /hub-weekly-reports-toolbar/);
+  assert.match(reportHubView, /data-hub-student-progress-share/);
+  assert.match(reportHubView, /data-hub-student-progress-view="analytics"/);
+  assert.match(reportHubView, /let hubStudentProgressViewMode = 'analytics'/);
+});
+
+test('student progress results render with each student section collapsed by default', () => {
+  assert.match(
+    reportHubView,
+    /hub-student-progress-student-title[\s\S]*aria-expanded="false"[\s\S]*bi-chevron-down hub-student-progress-chevron[\s\S]*hub-student-progress-student-body d-none/
+  );
+});
