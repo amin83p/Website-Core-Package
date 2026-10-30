@@ -1029,6 +1029,7 @@ async function postSemiMonthlyProgramCount(req, res) {
     const data = await semiMonthlyReportAssignmentWizardService.countProgramClasses({
       reportScope: req.body?.reportScope,
       programId: req.body?.programId,
+      classCapacityTarget: req.body?.classCapacityTarget,
       reqUser: req.user
     });
     return res.json({ status: 'success', data });
@@ -1042,6 +1043,7 @@ async function postSemiMonthlyResolveDates(req, res) {
     const data = await semiMonthlyReportAssignmentWizardService.resolveDates({
       reportScope: req.body?.reportScope,
       programIds: req.body?.programIds,
+      classCapacityTarget: req.body?.classCapacityTarget,
       startDate: req.body?.startDate,
       endDate: req.body?.endDate,
       reqUser: req.user
@@ -1057,9 +1059,10 @@ async function postSemiMonthlyPreview(req, res) {
     const data = await semiMonthlyReportAssignmentWizardService.previewTiles({
       reportScope: req.body?.reportScope,
       programIds: req.body?.programIds,
+      classCapacityTarget: req.body?.classCapacityTarget,
       startDate: req.body?.startDate,
+      endDate: req.body?.endDate || req.body?.verifiedEndDate,
       verifiedEndDate: req.body?.verifiedEndDate,
-      hoursBeforeEnd: req.body?.hoursBeforeEnd,
       reqUser: req.user
     });
     return res.json({ status: 'success', data });
@@ -1089,11 +1092,11 @@ async function postSemiMonthlyApply(req, res) {
       reportScope: req.body?.reportScope,
       reportStartDate: req.body?.reportStartDate,
       verifiedEndDate: req.body?.verifiedEndDate,
-      hoursBeforeEnd: req.body?.hoursBeforeEnd,
       conflictPermitted: req.body?.conflictPermitted,
       timesheetReflection: req.body?.timesheetReflection,
       conductRequiredBeforeFill: req.body?.conductRequiredBeforeFill,
       allocatedHours: req.body?.allocatedHours,
+      reopenCompletedSession: req.body?.reopenCompletedSession !== false,
       targetStudentIds: req.body?.targetStudentIds,
       reqUser: req.user
     });

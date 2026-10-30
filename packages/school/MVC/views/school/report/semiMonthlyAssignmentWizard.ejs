@@ -75,6 +75,60 @@
     font-weight: 600;
     color: #17324d;
   }
+  #smmrClassTableWrap select[data-smmr-class-template] {
+    min-width: 9rem;
+    max-width: 14rem;
+  }
+  #smmrClassTableWrap .smmr-sortable-th {
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  #smmrClassTableWrap .smmr-sortable-th.smmr-sort-active {
+    color: #17324d;
+    background-color: #e8edf3;
+  }
+  #smmrClassTableWrap .smmr-sort-icon {
+    font-size: 0.75rem;
+    opacity: 0.65;
+  }
+  #smmrClassTableWrap .smmr-sort-active .smmr-sort-icon {
+    opacity: 1;
+  }
+  .smmr-summary-overview {
+    background: #f8fafc;
+    border: 1px solid #d5dee8;
+    border-radius: 0.75rem;
+    padding: 1rem 1.25rem;
+  }
+  .smmr-summary-label {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    color: #5a6a7a;
+    margin-bottom: 0.25rem;
+  }
+  .smmr-summary-totals .badge {
+    font-size: 0.85rem;
+    font-weight: 600;
+  }
+  #smmrSummaryClasses {
+    max-height: 24rem;
+    overflow: auto;
+    border: 1px solid #d5dee8;
+    border-radius: 0.5rem;
+  }
+  #smmrSummaryClasses thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: #f8fafc;
+  }
+  #smmrSummaryClasses .smmr-summary-class-name {
+    font-weight: 600;
+    color: #17324d;
+  }
 </style>
 
 <div class="card border-0 shadow-sm mb-3" id="smmrWizardGuide">
@@ -103,7 +157,7 @@
 <div class="card border-0 shadow-sm">
   <div class="card-body">
     <div data-smmr-step="scope">
-      <div class="row g-3">
+      <div class="row g-3 align-items-end">
         <div class="col-md-4">
           <label class="form-label" for="smmrReportScope">Report scope</label>
           <select class="form-select" id="smmrReportScope">
@@ -112,10 +166,20 @@
             <% }) %>
           </select>
         </div>
-        <div class="col-md-8 d-flex align-items-end">
-          <button type="button" class="btn btn-outline-primary" id="btn_smmrAddProgram">Add program</button>
+        <div class="col-md-4">
+          <label class="form-label" for="smmrClassCapacityTarget">Class capacity</label>
+          <select class="form-select" id="smmrClassCapacityTarget">
+            <option value="all">All classes</option>
+            <option value="group">Group classes (max capacity more than 1)</option>
+            <option value="one_on_one">One-on-one (max capacity 1)</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="btn_smmrAddProgram">Programs</label>
+          <button type="button" class="btn btn-outline-primary w-100" id="btn_smmrAddProgram">Select program</button>
         </div>
       </div>
+      <p class="form-text mb-0 mt-2">Class capacity limits which classes appear from the programs you add. Uses each class’s max student capacity.</p>
       <div class="table-responsive border rounded mt-3">
         <table class="table table-sm align-middle mb-0">
           <thead class="table-light">
@@ -150,22 +214,21 @@
     <div class="d-none" data-smmr-step="task">
       <div class="row g-3">
         <div class="col-md-4">
-          <label class="form-label" for="smmrHoursBeforeEnd">Hours before the session ends</label>
-          <input type="number" class="form-control" id="smmrHoursBeforeEnd" min="0.25" step="0.25" value="1">
-          <div class="form-text">1 hour assigns the report to the last hour of the session.</div>
-        </div>
-        <div class="col-md-4">
           <label class="form-label" for="smmrAllocatedHours">Allocated hours</label>
           <input type="number" class="form-control" id="smmrAllocatedHours" min="0" step="0.25" value="1">
         </div>
       </div>
       <div class="form-check mt-3">
-        <input class="form-check-input" type="checkbox" id="smmrConflictPermitted">
+        <input class="form-check-input" type="checkbox" id="smmrConflictPermitted" checked>
         <label class="form-check-label" for="smmrConflictPermitted">Conflict (intentional overlap permitted)</label>
       </div>
       <div class="form-check">
-        <input class="form-check-input" type="checkbox" id="smmrTimesheetReflection">
+        <input class="form-check-input" type="checkbox" id="smmrTimesheetReflection" checked>
         <label class="form-check-label" for="smmrTimesheetReflection">Timesheet (reflect on timesheet)</label>
+      </div>
+      <div class="form-check">
+        <input class="form-check-input" type="checkbox" id="smmrReopenCompletedSession" checked>
+        <label class="form-check-label" for="smmrReopenCompletedSession">If the matched session is completed, change its status to scheduled before assigning</label>
       </div>
       <div class="form-check">
         <input class="form-check-input" type="checkbox" id="smmrConductRequired" checked>
@@ -183,9 +246,14 @@
         <select class="form-select form-select-sm" id="smmrClassSort" style="width: auto; min-width: 11rem;" aria-label="Sort classes">
           <option value="title-asc">Name (A–Z)</option>
           <option value="title-desc">Name (Z–A)</option>
+          <option value="assignment-asc">Report assignment (existing first)</option>
+          <option value="assignment-desc">Report assignment (new first)</option>
           <option value="session-asc">Session date (earliest)</option>
           <option value="session-desc">Session date (latest)</option>
+          <option value="task-asc">Task window (earliest)</option>
+          <option value="task-desc">Task window (latest)</option>
           <option value="status-asc">Status (ready first)</option>
+          <option value="status-desc">Status (blocked first)</option>
         </select>
         <div class="btn-group btn-group-sm">
           <button type="button" class="btn btn-outline-primary" id="btn_smmrSelectAllClasses">Select all</button>
@@ -198,11 +266,22 @@
           <thead class="table-light">
             <tr>
               <th scope="col" style="width:2.5rem;"><span class="visually-hidden">Include</span></th>
-              <th scope="col">Class</th>
-              <th scope="col">Report assignment</th>
-              <th scope="col">Session</th>
-              <th scope="col">Task window</th>
-              <th scope="col" style="width:6rem;">Status</th>
+              <th scope="col" class="smmr-sortable-th" data-smmr-sort-key="title" role="button" tabindex="0" aria-sort="ascending">
+                Class <i class="bi bi-sort-down-alt smmr-sort-icon ms-1" aria-hidden="true"></i>
+              </th>
+              <th scope="col">Report template</th>
+              <th scope="col" class="smmr-sortable-th" data-smmr-sort-key="assignment" role="button" tabindex="0" aria-sort="none">
+                Report assignment <i class="bi bi-arrow-down-up smmr-sort-icon ms-1" aria-hidden="true"></i>
+              </th>
+              <th scope="col" class="smmr-sortable-th" data-smmr-sort-key="session" role="button" tabindex="0" aria-sort="none">
+                Session <i class="bi bi-arrow-down-up smmr-sort-icon ms-1" aria-hidden="true"></i>
+              </th>
+              <th scope="col" class="smmr-sortable-th" data-smmr-sort-key="task" role="button" tabindex="0" aria-sort="none">
+                Task window <i class="bi bi-arrow-down-up smmr-sort-icon ms-1" aria-hidden="true"></i>
+              </th>
+              <th scope="col" class="smmr-sortable-th" style="width:6rem;" data-smmr-sort-key="status" role="button" tabindex="0" aria-sort="none">
+                Status <i class="bi bi-arrow-down-up smmr-sort-icon ms-1" aria-hidden="true"></i>
+              </th>
               <th scope="col" style="width:7rem;"></th>
             </tr>
           </thead>
