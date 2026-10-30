@@ -580,11 +580,34 @@
 
   function syncClassSelectionDefaults(preview) {
     const readyIds = (preview?.classes || [])
-      .filter((row) => row.taskWindowOk !== false)
+      .filter((row) => row.taskWindowOk !== false && !row.hasExistingSessionTargetRow)
       .map((row) => row.classId)
       .filter(Boolean);
     const fallbackIds = (preview?.classes || []).map((row) => row.classId).filter(Boolean);
     state.selectedClassIds = new Set(readyIds.length ? readyIds : fallbackIds);
+  }
+
+  function renderSessionAssignmentCell(row, studentScope) {
+    if (!row?.hasExistingSessionTargetRow) {
+      return '<span class="text-muted small">None on this session</span>';
+    }
+    const rows = Array.isArray(row.existingSessionTargetRows) ? row.existingSessionTargetRows : [];
+    const items = rows.map((entry) => {
+      const period = entry.reportStartDate && entry.reportDueDate
+        ? `${entry.reportStartDate} – ${entry.reportDueDate}`
+        : '—';
+      const task = entry.taskStartTime && entry.taskEndTime
+        ? `${entry.taskStartTime}–${entry.taskEndTime}`
+        : '';
+      const studentNote = studentScope && Number(entry.targetStudentCount) > 0
+        ? ` · ${Number(entry.targetStudentCount)} student(s)`
+        : '';
+      return `<div class="mb-1"><span class="badge bg-info-subtle text-info-emphasis border border-info-subtle">Assigned</span> `
+        + `${escapeHtml(period)}`
+        + (task ? `<br><span class="text-muted">${escapeHtml(task)}${escapeHtml(studentNote)}</span>` : '')
+        + `</div>`;
+    }).join('');
+    return `<div class="small">${items}<span class="d-block text-muted mt-1" style="font-size:0.75rem">Already assigned on this session (unchecked by default)</span></div>`;
   }
 
   function updateClassSelectionCount() {
@@ -637,7 +660,7 @@
     const rows = visiblePreviewClasses();
     if (emptyFilter) emptyFilter.classList.toggle('d-none', rows.length > 0);
     if (!rows.length) {
-      host.innerHTML = '<tr><td colspan="8" class="text-muted small py-3 text-center">No classes match your search.</td></tr>';
+      host.innerHTML = '<tr><td colspan="9" class="text-muted small py-3 text-center">No classes match your search.</td></tr>';
       updateClassSelectionCount();
       return;
     }
@@ -670,6 +693,7 @@
         <td class="small">${renderTemplateCell(row, preview)}</td>
         <td class="small">${assignmentBadge}</td>
         <td class="small">${sessionCell}</td>
+        <td class="small">${renderSessionAssignmentCell(row, studentScope)}</td>
         <td class="small">${row.taskWindowOk ? escapeHtml(task) : task}</td>
         <td>${statusBadge}</td>
         <td class="text-end">${manage}</td>
@@ -927,6 +951,83 @@
     });
   }
 
+  function parseApplyFailureOutcome(message) {
+    const raw = clean(message);
+    if (raw.startsWith('INACTIVE_ENROLLMENT_ROW|')) {
+      const detailsHtml = global.ReportMessaging?.buildInactiveEnrollmentSaveFailureModalHtml
+        ? global.ReportMessaging.buildInactiveEnrollmentSaveFailureModalHtml(raw)
+        : escapeHtml(raw);
+      return {
+        resultLabel: 'Not assigned',
+        summary: 'No report assignment changes were saved. The students listed are not actively enrolled for the full report period.',
+        detailsHtml: detailsHtml || escapeHtml(raw)
+      };
+    }
+    if (/No students with active enrollment for any target row/i.test(raw)) {
+      return {
+        resultLabel: 'Not assigned',
+        summary: 'No eligible students with active enrollment for this period; nothing was saved.',
+        detailsHtml: escapeHtml(raw)
+      };
+    }
+    return {
+      resultLabel: 'Not assigned',
+      summary: 'No report assignment changes were saved for this class.',
+      detailsHtml: escapeHtml(raw)
+    };
+  }
+
+  function formatSuccessOutcome(result, preview) {
+    const summary = clean(result?.outcomeSummary) || 'Report assignment saved.';
+    if (preview && preview.reportScope !== 'class' && Number(result?.studentsIncluded) > 0) {
+      return `${summary} ${Number(result.studentsIncluded)} student(s) included in the target row.`;
+    }
+    return summary;
+  }
+
+  function renderOperationResults(preview, resultState) {
+    const successes = Array.isArray(resultState?.succeeded) ? resultState.succeeded : [];
+    const failures = Array.isArray(resultState?.failed) ? resultState.failed : [];
+    const successRows = successes.map((row) => `
+      <tr>
+        <td class="smmr-summary-class-name">${escapeHtml(row.title)}</td>
+        <td><span class="badge bg-success-subtle text-success border border-success-subtle">Success</span></td>
+        <td class="small">${escapeHtml(row.summary)}</td>
+        <td class="small text-muted">—</td>
+      </tr>
+    `).join('');
+    const failureRows = failures.map((row) => `
+      <tr>
+        <td class="smmr-summary-class-name">${escapeHtml(row.title)}</td>
+        <td><span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">${escapeHtml(row.resultLabel || 'Not assigned')}</span></td>
+        <td class="small">${escapeHtml(row.summary)}</td>
+        <td class="small">${row.detailsHtml || ''}</td>
+      </tr>
+    `).join('');
+    const body = successRows + failureRows;
+    return `
+      <div class="smmr-operation-results">
+        <div class="d-flex flex-wrap gap-2 mb-2">
+          <span class="badge bg-success-subtle text-success border border-success-subtle">${successes.length} succeeded</span>
+          <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">${failures.length} not assigned</span>
+        </div>
+        <div class="table-responsive border rounded">
+          <table class="table table-sm align-middle mb-0">
+            <thead class="table-light">
+              <tr>
+                <th scope="col">Class</th>
+                <th scope="col" style="width:7rem;">Result</th>
+                <th scope="col">What happened</th>
+                <th scope="col">Details</th>
+              </tr>
+            </thead>
+            <tbody>${body || '<tr><td colspan="4" class="text-muted small py-3 text-center">No results.</td></tr>'}</tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
   async function runOperation() {
     const preview = state.preview;
     if (!preview || state.operationRunning) return;
@@ -936,7 +1037,7 @@
     setWizardNavigationLocked(true);
     updateOperationProgress(0, '0%');
     openWizardOperationWaitModal(jobs.length);
-    const created = [];
+    const succeeded = [];
     const failed = [];
     const task = taskPayload();
     try {
@@ -961,20 +1062,31 @@
             reopenCompletedSession: task.reopenCompletedSession,
             targetStudentIds: state.selectedStudents[job.classRow.classId] || []
           });
-          const actionLabel = result.createdAssignment ? 'assignment created' : 'target row added';
-          created.push(`${job.classRow.title} (${actionLabel})`);
+          succeeded.push({
+            title: job.classRow.title,
+            summary: formatSuccessOutcome(result, preview),
+            operation: result.operation
+          });
         } catch (error) {
-          failed.push(`${job.classRow.title}: ${error.message}`);
+          failed.push({
+            title: job.classRow.title,
+            ...parseApplyFailureOutcome(error.message)
+          });
         }
       }
       updateOperationProgress(100, '100% · complete');
-      state.result = { created, failed };
+      state.result = { succeeded, failed };
       if (resultHost) {
         resultHost.classList.remove('d-none');
-        resultHost.innerHTML = `
-          <div class="alert alert-success py-2 small">${created.length} assignment(s) created.</div>
-          ${failed.length ? `<div class="alert alert-warning py-2 small">${failed.map((row) => `<div>${escapeHtml(row)}</div>`).join('')}</div>` : ''}
-        `;
+        resultHost.innerHTML = renderOperationResults(preview, state.result);
+      }
+      if (failed.length && global.ReportMessaging?.showReportMessage) {
+        void global.ReportMessaging.showReportMessage({
+          title: 'Semi-Monthly Report Wizard',
+          icon: 'warning',
+          message: `${failed.length} class(es) were not assigned. Review the results table for details.`,
+          html: false
+        });
       }
     } finally {
       state.operationRunning = false;

@@ -8,6 +8,7 @@ const {
   uploadStorageService
 } = require('../services/pte/pteCoreContracts');
 const pteUploadStorageHelper = require('../services/pte/pteUploadStorageHelper');
+const pteQuestionBankDataService = require('../services/pte/pteQuestionBankDataService');
 const questionBankAiAutofillService = require('../services/pte/questionBankAiAutofillService');
 const pteQuestionScoringProfileService = require('../services/pte/pteQuestionScoringProfileService');
 

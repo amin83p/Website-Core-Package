@@ -576,6 +576,12 @@ async function previewTiles({
         endDate: periodEnd,
         reqUser
       });
+    const sessionIdToken = toPublicId(session?.sessionId || session?.id);
+    const activeSessionTargetRows = sessionIdToken && assignment
+      ? dependencies.sessionReportAssignmentService.findActiveTargetRowsForSession(assignment, sessionIdToken)
+      : [];
+    const existingSessionTargetRows = dependencies.sessionReportAssignmentService
+      .summarizeSessionTargetRowsForPreview(activeSessionTargetRows);
     classes.push({
       classId,
       title: String(classRow.title || classId).trim(),
@@ -599,6 +605,8 @@ async function previewTiles({
       href: session
         ? `/school/classes/${encodeURIComponent(classId)}/sessions/${encodeURIComponent(toPublicId(session.sessionId || session.id))}`
         : '',
+      hasExistingSessionTargetRow: existingSessionTargetRows.length > 0,
+      existingSessionTargetRows,
       students
     });
   }
@@ -681,6 +689,10 @@ async function applyClassTemplate({
     requestedTemplateId: templateId
   });
 
+  const incomingRowId = String(incomingRow?.rowId || '').trim();
+  const hadSamePeriodRow = Boolean(existing?.id) && (Array.isArray(existing.targetRows) ? existing.targetRows : [])
+    .some((row) => String(row?.rowId || '').trim() === incomingRowId);
+
   const result = await dependencies.sessionReportAssignmentService.upsertSessionTargetRowForAssignment({
     classData,
     session,
@@ -701,9 +713,34 @@ async function applyClassTemplate({
       notes: incomingRow.notes
     }
   });
+
+  const createdAssignment = Boolean(result?.createdAssignment);
+  let operation = 'target_row_added';
+  if (createdAssignment) operation = 'assignment_created';
+  else if (hadSamePeriodRow) operation = 'target_row_updated';
+
+  const studentScoped = scope === 'each_student' || scope === 'selected_students';
+  const rowStudentIds = Array.isArray(incomingRow?.targetStudentIds)
+    ? incomingRow.targetStudentIds
+    : resolveWizardRowStudentIds(scope, targetStudentIds, sessionRoster);
+  const studentsIncluded = studentScoped ? rowStudentIds.length : undefined;
+
+  const outcomeSummary = (() => {
+    if (operation === 'assignment_created') {
+      return 'New report assignment created; target row added for this session and period.';
+    }
+    if (operation === 'target_row_updated') {
+      return 'Existing target row on this session was updated (same report period start).';
+    }
+    return 'Target row added to the existing report assignment.';
+  })();
+
   return {
     assignmentId: toPublicId(result?.assignment?.id),
-    createdAssignment: Boolean(result?.createdAssignment),
+    createdAssignment,
+    operation,
+    outcomeSummary,
+    studentsIncluded,
     message: result?.message || 'Report assignment saved.'
   };
 }

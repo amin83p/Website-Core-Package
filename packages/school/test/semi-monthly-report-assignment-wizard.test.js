@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const wizard = require('../MVC/services/school/semiMonthlyReportAssignmentWizardService');
+const sessionReportAssignmentService = require('../MVC/services/school/sessionReportAssignmentService');
 
 const classes = [
   { id: 'CLS_1', title: 'Morning', orgId: 'ORG', allowedProgramTerms: [{ programId: 'PRG_1' }] },
@@ -185,6 +186,76 @@ test('countClassesForProgram respects class capacity target', () => {
   assert.equal(wizard.countClassesForProgram({ classes: rows, programId: 'PRG_1', classCapacityTarget: 'one_on_one' }), 1);
   assert.equal(wizard.classMatchesCapacityTarget(rows[1], 'one_on_one'), true);
   assert.equal(wizard.classMatchesCapacityTarget(rows[0], 'group'), true);
+});
+
+test('findActiveTargetRowsForSession returns active rows for matched session only', () => {
+  const assignment = {
+    targetRows: [
+      { sessionId: 'S1', status: 'active', reportStartDate: '2026-06-01' },
+      { sessionId: 'S2', status: 'active', reportStartDate: '2026-06-01' },
+      { sessionId: 'S1', status: 'inactive', reportStartDate: '2026-05-01' }
+    ]
+  };
+  const rows = sessionReportAssignmentService.findActiveTargetRowsForSession(assignment, 'S1');
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].reportStartDate, '2026-06-01');
+  const summary = sessionReportAssignmentService.summarizeSessionTargetRowsForPreview(rows);
+  assert.equal(summary[0].reportStartDate, '2026-06-01');
+});
+
+test('previewTiles flags classes with existing session target rows', async (t) => {
+  wizard.__setDependenciesForTest({
+    schoolDataService: {
+      getClassSessions: async () => ([
+        { sessionId: 'S1', date: '2026-06-05', startTime: '09:00', endTime: '11:00', status: 'scheduled' }
+      ]),
+      fetchAllData: async (type) => {
+        if (type === 'classes') return [classes[0]];
+        if (type === 'reportAssignments') {
+          return [{
+            id: 'ASG_1',
+            classId: 'CLS_1',
+            orgId: 'ORG',
+            reportScope: 'class',
+            targetRows: [{
+              sessionId: 'S1',
+              status: 'active',
+              reportStartDate: '2026-06-01',
+              reportDueDate: '2026-06-05',
+              taskStartTime: '09:00',
+              taskEndTime: '11:00'
+            }]
+          }];
+        }
+        return [];
+      },
+      getDataById: async (type, id) => {
+        if (type === 'reportTemplates') {
+          return { id: 'TPL_1', title: 'Template', allowedReportScopes: ['class', 'each_student'] };
+        }
+        return null;
+      }
+    },
+    reportViewService: { buildPersonNameMap: async () => ({}) },
+    reportAssignmentStudentEligibilityService: {
+      resolveEligibleStudentsForAssignment: async () => []
+    },
+    semiMonthlyReportPolicyModel: {
+      getPolicyForOrg: async () => ({ reportTemplateIds: ['TPL_1'] })
+    }
+  });
+  t.after(() => wizard.__resetDependenciesForTest());
+
+  const preview = await wizard.previewTiles({
+    reportScope: 'class',
+    programIds: ['PRG_1'],
+    startDate: '2026-06-01',
+    endDate: '2026-06-05',
+    reqUser: { activeOrgId: 'ORG' }
+  });
+  assert.equal(preview.classes[0].hasExistingSessionTargetRow, true);
+  assert.equal(preview.classes[0].existingSessionTargetRows.length, 1);
+  assert.equal(preview.classes[0].existingSessionTargetRows[0].taskStartTime, '09:00');
 });
 
 test('previewTiles filters templates by report scope', async (t) => {
@@ -369,6 +440,8 @@ test('apply creates one assignment for the latest session on the verified date',
   });
 
   assert.equal(result.assignmentId, 'ASG_NEW');
+  assert.equal(result.operation, 'assignment_created');
+  assert.match(result.outcomeSummary, /New report assignment created/);
   assert.equal(created.length, 1);
   assert.equal(created[0].session.sessionId, 'LATE');
   assert.equal(created[0].input.taskStartTime, '13:00');
@@ -457,7 +530,13 @@ test('semi-monthly wizard is linked from report assignments', () => {
   assert.match(page, /id="smmrConflictPermitted" checked/);
   assert.doesNotMatch(page, /smmrHoursBeforeEnd/);
   assert.match(page, /Report template/);
-  assert.match(script, /openWizardOperationWaitModal/);
+  assert.match(page, /Session assignment/);
+  assert.match(page, /partials\/reportMessageHelpers/);
+  assert.match(script, /renderOperationResults/);
+  assert.match(script, /parseApplyFailureOutcome/);
+  assert.match(script, /hasExistingSessionTargetRow/);
+  assert.match(script, /renderSessionAssignmentCell/);
+  assert.match(script, /buildInactiveEnrollmentSaveFailureModalHtml/);
   assert.match(script, /updateOperationProgress/);
   assert.match(script, /operationRunning/);
   assert.match(script, /wizardScopePayload/);

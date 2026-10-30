@@ -566,11 +566,35 @@ async function createAssignmentForSession({
   };
 }
 
+function isActiveTargetRow(row = {}) {
+  const status = String(row?.status || 'active').trim().toLowerCase();
+  return status !== 'inactive' && status !== 'deleted' && status !== 'void';
+}
+
+function findActiveTargetRowsForSession(assignment = null, sessionId = '') {
+  const targetSessionId = toPublicId(sessionId);
+  if (!assignment || !targetSessionId) return [];
+  const rows = Array.isArray(assignment.targetRows) ? assignment.targetRows : [];
+  return rows.filter((row) => isActiveTargetRow(row) && idsEqual(row?.sessionId, targetSessionId));
+}
+
+function summarizeSessionTargetRowsForPreview(rows = []) {
+  return (Array.isArray(rows) ? rows : []).map((row) => ({
+    reportStartDate: normalizeDate(row?.reportStartDate),
+    reportDueDate: normalizeDate(row?.reportDueDate || row?.dueDate || row?.sessionDate),
+    taskStartTime: clean(row?.taskStartTime),
+    taskEndTime: clean(row?.taskEndTime),
+    targetStudentCount: Array.isArray(row?.targetStudentIds) ? row.targetStudentIds.length : 0
+  }));
+}
+
 module.exports = {
   addMinutes,
   buildSessionTargetRow,
   createAssignmentForSession,
   findReportAssignmentForClass,
+  findActiveTargetRowsForSession,
+  summarizeSessionTargetRowsForPreview,
   mergeTargetRows,
   resolveAllocatedHours,
   resolveTeacherId,
