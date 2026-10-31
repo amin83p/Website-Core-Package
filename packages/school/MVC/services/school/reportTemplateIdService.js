@@ -1,5 +1,6 @@
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { allocateWithRetry } = require('./schoolEntityIdAllocationService');
 
 const REPORT_TEMPLATE_KIND = 'rpt';
 const OVERALL_REPORT_TEMPLATE_KIND = 'ovr';
@@ -101,18 +102,13 @@ async function allocateNextOrgKindTemplateId(orgId, kind, options = {}) {
     ? options.reservedIds
     : new Set(Array.isArray(options.reservedIds) ? options.reservedIds : []);
 
-  for (let attempt = 0; attempt < 1000; attempt += 1) {
-    const candidate = formatOrgKindTemplateId(orgToken, kindToken, maxSeq + 1 + attempt);
-    if (reserved.has(candidate)) continue;
-    if (options.collection) {
-      // eslint-disable-next-line no-await-in-loop
-      const exists = await options.collection.findOne({ id: candidate }, { projection: { _id: 1 } });
-      if (exists) continue;
-    }
-    return candidate;
-  }
-
-  throw new Error('Unable to allocate a unique template id.');
+  return allocateWithRetry({
+    collection: options.collection || null,
+    existingIds: reserved,
+    reservedIds: null,
+    maxAttempts: options.maxAttempts || 1000,
+    generateCandidate: (attempt) => formatOrgKindTemplateId(orgToken, kindToken, maxSeq + 1 + attempt)
+  });
 }
 
 function allocateNextReportTemplateId(orgId, options = {}) {

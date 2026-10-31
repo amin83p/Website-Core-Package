@@ -4,6 +4,8 @@ const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const reportInstanceIdService = require('../../services/school/reportInstanceIdService');
+const { resolveReportCreateId } = require('../../services/school/reportEntityCreateIdService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/overallReportInstances.json');
 if (!fsSync.existsSync(dataPath)) fsSync.writeFileSync(dataPath, '[]');
@@ -299,22 +301,16 @@ async function getInstanceById(id) {
   return (await getAllInstances()).find((row) => idsEqual(row?.id, id)) || null;
 }
 
-function generateId(existingIds) {
-  const year = new Date().getFullYear();
-  for (let i = 0; i < 50; i += 1) {
-    const id = `OVRINS-${year}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
-    if (!existingIds.has(id)) return id;
-  }
-  return `OVRINS-${Date.now()}`;
-}
-
 async function addInstance(input) {
   return queueWrite(async () => {
     const rows = await getAllInstances();
     const record = sanitizeInstance(input);
     const ids = new Set(rows.map((row) => toPublicId(row?.id)).filter(Boolean));
-    record.id = record.id || generateId(ids);
-    if (ids.has(record.id)) throw new Error('Overall report instance id already exists.');
+    record.id = await resolveReportCreateId({
+      requestedId: record.id,
+      reservedIds: ids,
+      allocateNext: () => reportInstanceIdService.allocateUniqueOverallReportInstanceId({ reservedIds: ids })
+    });
     rows.push(record);
     await fs.writeFile(dataPath, JSON.stringify(rows, null, 2));
     return record;

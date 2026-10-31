@@ -37,6 +37,11 @@ const reportTemplateModel = require('../../models/school/reportTemplateModel');
 const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
 const reportAssignmentIdService = require('../../services/school/reportAssignmentIdService');
 const reportTemplateIdService = require('../../services/school/reportTemplateIdService');
+const reportEntityCreateIdService = require('../../services/school/reportEntityCreateIdService');
+const reportInstanceIdService = require('../../services/school/reportInstanceIdService');
+const { resolveReportCreateId } = reportEntityCreateIdService;
+const bookCatalogIdService = require('../../services/school/bookCatalogIdService');
+const libraryClassEntityIdService = require('../../services/school/libraryClassEntityIdService');
 const reportInstanceModel = require('../../models/school/reportInstanceModel');
 const overallReportTemplateModel = require('../../models/school/overallReportTemplateModel');
 const overallReportInstanceModel = require('../../models/school/overallReportInstanceModel');
@@ -1063,13 +1068,11 @@ const schoolRepositories = {
     replaceObjectFields: ['placeholderMap', 'pdfFieldMap'],
     defaultSearchFields: ['id', 'orgId', 'title', 'type', 'status', 'description'],
     assignmentScopeKind: 'catalog',
-    generateMongoCreateId: async (collection, payload) => {
-      const requested = toPublicId(payload?.id);
-      if (requested) {
-        return generateUniqueStringId(collection, requested);
-      }
-      return reportTemplateIdService.allocateNextReportTemplateId(payload?.orgId, { collection });
-    }
+    generateMongoCreateId: async (collection, payload) => resolveReportCreateId({
+      requestedId: payload?.id,
+      collection,
+      allocateNext: () => reportTemplateIdService.allocateNextReportTemplateId(payload?.orgId, { collection })
+    })
   }),
   reportAssignments: createSchoolRepository({
     entityName: 'reportAssignments',
@@ -1079,13 +1082,11 @@ const schoolRepositories = {
     create: reportAssignmentModel.addAssignment,
     update: reportAssignmentModel.updateAssignment,
     remove: reportAssignmentModel.deleteAssignment,
-    generateMongoCreateId: async (collection, payload) => {
-      const requested = toPublicId(payload?.id);
-      if (requested) {
-        return generateUniqueStringId(collection, requested);
-      }
-      return reportAssignmentIdService.allocateNextReportAssignmentId(payload?.classId, { collection });
-    },
+    generateMongoCreateId: async (collection, payload) => resolveReportCreateId({
+      requestedId: payload?.id,
+      collection,
+      allocateNext: () => reportAssignmentIdService.allocateNextReportAssignmentId(payload?.classId, { collection })
+    }),
     defaultSearchFields: ['id', 'orgId', 'classId', 'templateId', 'status', 'targetType', 'sessionDate', 'dueDate'],
     assignmentScopeKind: 'teacherIds'
   }),
@@ -1097,7 +1098,12 @@ const schoolRepositories = {
     create: reportInstanceModel.addInstance,
     update: reportInstanceModel.updateInstance,
     remove: reportInstanceModel.deleteInstance,
-    defaultSearchFields: ['id', 'orgId', 'assignmentId', 'classId', 'templateId', 'teacherId', 'studentId', 'status', 'sessionDate']
+    defaultSearchFields: ['id', 'orgId', 'assignmentId', 'classId', 'templateId', 'teacherId', 'studentId', 'status', 'sessionDate'],
+    generateMongoCreateId: async (collection, payload) => resolveReportCreateId({
+      requestedId: payload?.id,
+      collection,
+      allocateNext: () => reportInstanceIdService.allocateUniqueReportInstanceId({ collection })
+    })
   }),
   overallReportTemplates: createSchoolRepository({
     entityName: 'overallReportTemplates',
@@ -1109,13 +1115,11 @@ const schoolRepositories = {
     remove: overallReportTemplateModel.deleteTemplate,
     replaceObjectFields: ['placeholderMap', 'pdfFieldMap'],
     defaultSearchFields: ['id', 'orgId', 'title', 'status', 'description'],
-    generateMongoCreateId: async (collection, payload) => {
-      const requested = toPublicId(payload?.id);
-      if (requested) {
-        return generateUniqueStringId(collection, requested);
-      }
-      return reportTemplateIdService.allocateNextOverallReportTemplateId(payload?.orgId, { collection });
-    }
+    generateMongoCreateId: async (collection, payload) => resolveReportCreateId({
+      requestedId: payload?.id,
+      collection,
+      allocateNext: () => reportTemplateIdService.allocateNextOverallReportTemplateId(payload?.orgId, { collection })
+    })
   }),
   overallReportInstances: createSchoolRepository({
     entityName: 'overallReportInstances',
@@ -1125,7 +1129,12 @@ const schoolRepositories = {
     create: overallReportInstanceModel.addInstance,
     update: overallReportInstanceModel.updateInstance,
     remove: overallReportInstanceModel.deleteInstance,
-    defaultSearchFields: ['id', 'orgId', 'overallTemplateId', 'title', 'status']
+    defaultSearchFields: ['id', 'orgId', 'overallTemplateId', 'title', 'status'],
+    generateMongoCreateId: async (collection, payload) => resolveReportCreateId({
+      requestedId: payload?.id,
+      collection,
+      allocateNext: () => reportInstanceIdService.allocateUniqueOverallReportInstanceId({ collection })
+    })
   }),
   overallReportManagementSessions: createSchoolRepository({
     entityName: 'overallReportManagementSessions',
@@ -1135,7 +1144,12 @@ const schoolRepositories = {
     create: overallReportManagementSessionModel.addSession,
     update: overallReportManagementSessionModel.updateSession,
     remove: overallReportManagementSessionModel.deleteSession,
-    defaultSearchFields: ['id', 'orgId', 'title', 'status', 'startDate', 'endDate']
+    defaultSearchFields: ['id', 'orgId', 'title', 'status', 'startDate', 'endDate'],
+    generateMongoCreateId: async (collection, payload) => resolveReportCreateId({
+      requestedId: payload?.id,
+      collection,
+      allocateNext: () => reportInstanceIdService.allocateUniqueOverallReportManagementSessionId({ collection })
+    })
   }),
   examTemplates: createSchoolRepository({
     entityName: 'examTemplates',
@@ -1379,7 +1393,14 @@ const schoolRepositories = {
     defaultSearchFields: ['id', 'orgId', 'title', 'subtitle', 'authors', 'publisher', 'isbn', 'subjectArea'],
     transformList: (rows) => normalizeRows(rows).map((row) => bookModel.normalizeStoredBook(row)),
     transformItem: (row) => bookModel.normalizeStoredBook(row),
-    allowSystemFallback: false
+    allowSystemFallback: false,
+    generateMongoCreateId: async (collection, payload) => {
+      const requested = toPublicId(payload?.id);
+      if (requested) {
+        return generateUniqueStringId(collection, requested);
+      }
+      return bookCatalogIdService.allocateUniqueBookCatalogId({ collection });
+    }
   }),
   libraryCopies: createSchoolRepository({
     entityName: 'libraryCopies',
@@ -1447,7 +1468,18 @@ const schoolRepositories = {
     update: bookAssignmentModel.updateBookAssignment,
     remove: bookAssignmentModel.deleteBookAssignment,
     defaultSearchFields: ['id', 'orgId', 'classId', 'status', 'notes'],
-    allowSystemFallback: false
+    allowSystemFallback: false,
+    generateMongoCreateId: async (collection, payload) => {
+      const requested = toPublicId(payload?.id);
+      if (requested) {
+        return generateUniqueStringId(collection, requested);
+      }
+      return libraryClassEntityIdService.allocateNextClassKindId(
+        payload?.classId,
+        libraryClassEntityIdService.LIBRARY_CLASS_KINDS.BOOK_ASSIGNMENT,
+        { collection }
+      );
+    }
   }),
   bookCoveringReports: createSchoolRepository({
     entityName: 'bookCoveringReports',
@@ -1460,7 +1492,18 @@ const schoolRepositories = {
     defaultSearchFields: ['id', 'orgId', 'classId', 'teacherId', 'sessionId', 'periodType', 'status', 'notes'],
     dateFields: ['periodStartDate', 'periodEndDate', 'audit.createDateTime', 'audit.lastUpdateDateTime'],
     allowSystemFallback: false,
-    assignmentScopeKind: 'teacherId'
+    assignmentScopeKind: 'teacherId',
+    generateMongoCreateId: async (collection, payload) => {
+      const requested = toPublicId(payload?.id);
+      if (requested) {
+        return generateUniqueStringId(collection, requested);
+      }
+      return libraryClassEntityIdService.allocateNextClassKindId(
+        payload?.classId,
+        libraryClassEntityIdService.LIBRARY_CLASS_KINDS.BOOK_COVERING,
+        { collection }
+      );
+    }
   }),
   teachingOutlineLevels: createSchoolRepository({
     entityName: 'teachingOutlineLevels',

@@ -53,10 +53,28 @@ async function listForOrg(orgId, reqUser) {
   return (Array.isArray(rows) ? rows : []).filter((row) => idsEqual(row.orgId, orgId));
 }
 
-async function getForClass(classId, orgId, reqUser) {
+function pickCanonicalAssignment(rows = []) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (!list.length) return null;
+  if (list.length === 1) return list[0];
+  const active = list.filter((row) => normalizeStatus(row.status) === ASSIGNMENT_STATUSES.ACTIVE);
+  const pool = active.length ? active : list;
+  return pool.slice().sort((a, b) => {
+    const ta = String(a?.audit?.lastUpdateDateTime || a?.audit?.createDateTime || '');
+    const tb = String(b?.audit?.lastUpdateDateTime || b?.audit?.createDateTime || '');
+    return tb.localeCompare(ta);
+  })[0];
+}
+
+async function listAssignmentsForClass(classId, orgId, reqUser) {
   const id = clean(classId);
   const rows = await listForOrg(orgId, reqUser);
-  return rows.find((row) => String(row.classId) === id) || null;
+  return rows.filter((row) => String(row.classId) === id);
+}
+
+async function getForClass(classId, orgId, reqUser) {
+  const matches = await listAssignmentsForClass(classId, orgId, reqUser);
+  return pickCanonicalAssignment(matches);
 }
 
 function expandBooksFromAssignment(assignment, { activeOnly = false } = {}) {
@@ -207,6 +225,7 @@ async function listForClass(classId, orgId, reqUser, { activeOnly = false } = {}
 
 module.exports = {
   listForOrg,
+  listAssignmentsForClass,
   getForClass,
   expandBooksFromAssignment,
   expandAssignedBooksForClass,

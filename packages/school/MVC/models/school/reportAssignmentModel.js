@@ -6,6 +6,7 @@ const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const reportScopePolicy = require('../../services/school/reportScopePolicy');
 const reportAssignmentIdService = require('../../services/school/reportAssignmentIdService');
+const { resolveReportCreateId } = require('../../services/school/reportEntityCreateIdService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/reportAssignments.json');
 
@@ -567,11 +568,14 @@ async function addAssignment(input) {
       .filter((row) => idsEqual(row.classId, sanitized.classId))
       .map((row) => toPublicId(row.id))
       .filter(Boolean);
-    const id = sanitized.id || await reportAssignmentIdService.allocateNextReportAssignmentId(
-      sanitized.classId,
-      { existingIds: classScopedIds, reservedIds: existingIds }
-    );
-    if (existingIds.has(id)) throw new Error('Assignment id already exists.');
+    const id = await resolveReportCreateId({
+      requestedId: sanitized.id,
+      reservedIds: existingIds,
+      allocateNext: () => reportAssignmentIdService.allocateNextReportAssignmentId(
+        sanitized.classId,
+        { existingIds: classScopedIds, reservedIds: existingIds }
+      )
+    });
 
     const record = {
       ...sanitized,

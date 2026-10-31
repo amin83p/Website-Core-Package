@@ -5,6 +5,7 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
+const bookCatalogIdService = require('../../services/school/bookCatalogIdService');
 const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
 const uploadPathUtils = requireCoreModule('MVC/utils/uploadPathUtils');
 
@@ -72,9 +73,7 @@ function normalizeAuthors(value) {
 }
 
 function generateBookId() {
-  const year = new Date().getFullYear();
-  const random = Math.random().toString(36).slice(2, 8).toUpperCase();
-  return `BK-${year}-${random}`;
+  return bookCatalogIdService.formatBookCatalogId();
 }
 
 function generateTocEntryId() {
@@ -451,9 +450,16 @@ async function addBook(payload) {
   return queueWrite(async () => {
     const rows = await getAllBooks();
     const sanitized = sanitizeInput(payload, { isUpdate: false });
+    const existingIds = rows.map((row) => String(row.id || '')).filter(Boolean);
+    let id = sanitized.id;
+    if (!id) {
+      id = await bookCatalogIdService.allocateUniqueBookCatalogId({ existingIds });
+    } else if (existingIds.includes(String(id))) {
+      throw new Error('Book id already exists.');
+    }
     const now = new Date().toISOString();
     const created = {
-      id: sanitized.id || generateBookId(),
+      id,
       ...sanitized,
       audit: {
         createUser: String(payload?.audit?.createUser || 'SYSTEM'),

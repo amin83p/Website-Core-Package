@@ -34,3 +34,13 @@ test('allocateNextOverallReportTemplateId increments within org', async () => {
   });
   assert.equal(id, '900000-ovr-6');
 });
+
+test('allocateNextReportTemplateId skips ids found in mongo', async () => {
+  const taken = new Set(['900000-rpt-1']);
+  const collection = {
+    find: () => ({ toArray: async () => [] }),
+    findOne: async (query) => (taken.has(String(query?.id || '')) ? { _id: 'x' } : null)
+  };
+  const id = await reportTemplateIdService.allocateNextReportTemplateId('900000', { collection });
+  assert.equal(id, '900000-rpt-2');
+});

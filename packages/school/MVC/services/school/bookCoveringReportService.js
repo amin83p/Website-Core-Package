@@ -19,6 +19,19 @@ function clean(value) {
   return String(value || '').trim();
 }
 
+function normalizeEntriesBookAssignmentId(entries, assignmentId) {
+  const token = clean(assignmentId);
+  return (Array.isArray(entries) ? entries : []).map((entry) => ({
+    ...entry,
+    bookAssignmentId: token
+  }));
+}
+
+async function resolveClassAssignmentId(classId, orgId, reqUser) {
+  const assignment = await bookAssignmentService.getForClass(classId, orgId, reqUser);
+  return assignment ? String(assignment.id || '') : '';
+}
+
 function normalizeDate(value) {
   const token = clean(value);
   if (/^\d{4}-\d{2}-\d{2}$/.test(token)) return token;
@@ -391,6 +404,11 @@ async function createReport(payload, reqUser, accessContext = {}) {
     status: payload.status || REPORT_STATUSES.DRAFT
   };
 
+  if (Array.isArray(fullPayload.entries) && fullPayload.entries.length) {
+    const assignmentId = await resolveClassAssignmentId(classId, orgId, reqUser);
+    fullPayload.entries = normalizeEntriesBookAssignmentId(fullPayload.entries, assignmentId);
+  }
+
   await validateEntriesAgainstBooks(fullPayload.entries || [], orgId, reqUser, accessContext);
   return schoolDataService.addData('bookCoveringReports', fullPayload, reqUser, buildWriteOptions(accessContext));
 }
@@ -438,6 +456,11 @@ async function updateReport(id, payload, reqUser, accessContext = {}) {
     periodEndDate,
     teacherId
   };
+
+  if (Array.isArray(fullPayload.entries) && fullPayload.entries.length) {
+    const assignmentId = await resolveClassAssignmentId(existing.classId, orgId, reqUser);
+    fullPayload.entries = normalizeEntriesBookAssignmentId(fullPayload.entries, assignmentId);
+  }
 
   if (fullPayload.entries) {
     await validateEntriesAgainstBooks(fullPayload.entries, orgId, reqUser, accessContext);
@@ -648,6 +671,8 @@ async function upsertSessionReportEntry({
   const orgId = clean(report.orgId || classData.orgId);
   const periodType = normalizePeriodType(report.periodType);
   const sanitizedEntry = sanitizeEntry(entryPayload, periodType, 0);
+  const assignmentId = await resolveClassAssignmentId(report.classId, orgId, reqUser);
+  sanitizedEntry.bookAssignmentId = assignmentId;
   await validateEntriesAgainstBooks([sanitizedEntry], orgId, reqUser, accessContext);
 
   const entries = Array.isArray(report.entries) ? report.entries.slice() : [];
@@ -699,6 +724,8 @@ async function removeSessionReportEntry({
 }
 
 module.exports = {
+  normalizeEntriesBookAssignmentId,
+  resolveClassAssignmentId,
   createReport,
   updateReport,
   submitReport,

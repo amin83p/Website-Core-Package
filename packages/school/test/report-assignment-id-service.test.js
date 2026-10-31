@@ -37,3 +37,13 @@ test('allocateNextReportAssignmentId skips reserved ids', async () => {
   });
   assert.equal(id, '646148-3');
 });
+
+test('allocateNextReportAssignmentId skips ids found in mongo', async () => {
+  const taken = new Set(['646148-1']);
+  const collection = {
+    find: () => ({ toArray: async () => [] }),
+    findOne: async (query) => (taken.has(String(query?.id || '')) ? { _id: 'x' } : null)
+  };
+  const id = await reportAssignmentIdService.allocateNextReportAssignmentId('646148', { collection });
+  assert.equal(id, '646148-2');
+});

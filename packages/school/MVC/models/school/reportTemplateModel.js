@@ -8,6 +8,7 @@ const reportRuleEngineService = require('../../services/school/reportRuleEngineS
 const { normalizePrefillKey } = require('../../services/school/reportPrefillKeyUtils');
 const reportScopePolicy = require('../../services/school/reportScopePolicy');
 const reportTemplateIdService = require('../../services/school/reportTemplateIdService');
+const { resolveReportCreateId } = require('../../services/school/reportEntityCreateIdService');
 const reportTargetDepartmentPolicy = require('../../services/school/reportTargetDepartmentPolicy');
 const gradebookSkillCatalogService = require('../../services/school/gradebookSkillCatalogService');
 
@@ -606,11 +607,14 @@ async function addTemplate(input) {
       .filter((row) => idsEqual(row.orgId, sanitized.orgId))
       .map((row) => toPublicId(row.id))
       .filter(Boolean);
-    const id = sanitized.id || await reportTemplateIdService.allocateNextReportTemplateId(
-      sanitized.orgId,
-      { existingIds: orgScopedIds, reservedIds: existingIds }
-    );
-    if (existingIds.has(id)) throw new Error('Template id already exists.');
+    const id = await resolveReportCreateId({
+      requestedId: sanitized.id,
+      reservedIds: existingIds,
+      allocateNext: () => reportTemplateIdService.allocateNextReportTemplateId(
+        sanitized.orgId,
+        { existingIds: orgScopedIds, reservedIds: existingIds }
+      )
+    });
 
     const record = {
       ...sanitized,

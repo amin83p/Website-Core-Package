@@ -4,6 +4,8 @@ const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const reportInstanceIdService = require('../../services/school/reportInstanceIdService');
+const { resolveReportCreateId } = require('../../services/school/reportEntityCreateIdService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/reportInstances.json');
 
@@ -175,15 +177,6 @@ function sanitizeInstance(input, { isUpdate = false, existing = null } = {}) {
   return out;
 }
 
-function generateInstanceId(existingIds) {
-  const year = new Date().getFullYear();
-  for (let i = 0; i < 50; i++) {
-    const candidate = `RPTINS-${year}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
-    if (!existingIds.has(candidate)) return candidate;
-  }
-  return `RPTINS-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
-}
-
 async function getAllInstances() {
   try {
     const raw = await fs.readFile(dataPath, 'utf8');
@@ -232,8 +225,11 @@ async function addInstance(input) {
     assertUnique(all, sanitized);
 
     const existingIds = new Set(all.map((row) => toPublicId(row.id)).filter(Boolean));
-    const id = sanitized.id || generateInstanceId(existingIds);
-    if (existingIds.has(id)) throw new Error('Instance id already exists.');
+    const id = await resolveReportCreateId({
+      requestedId: sanitized.id,
+      reservedIds: existingIds,
+      allocateNext: () => reportInstanceIdService.allocateUniqueReportInstanceId({ reservedIds: existingIds })
+    });
 
     const record = {
       ...sanitized,

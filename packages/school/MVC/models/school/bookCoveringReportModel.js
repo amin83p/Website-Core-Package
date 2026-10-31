@@ -5,6 +5,8 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
+const libraryClassEntityIdService = require('../../services/school/libraryClassEntityIdService');
+const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const {
   cleanString,
   cleanId,
@@ -366,8 +368,23 @@ async function addBookCoveringReport(payload) {
   return queueWrite(async () => {
     const rows = await getAllBookCoveringReports();
     const sanitized = sanitizeInput(payload, { isUpdate: false });
+    const existingIds = new Set(rows.map((row) => toPublicId(row.id)).filter(Boolean));
+    const classScopedIds = rows
+      .filter((row) => String(row.classId) === String(sanitized.classId))
+      .map((row) => toPublicId(row.id))
+      .filter(Boolean);
+    let id = sanitized.id;
+    if (!id) {
+      id = await libraryClassEntityIdService.allocateNextClassKindId(
+        sanitized.classId,
+        libraryClassEntityIdService.LIBRARY_CLASS_KINDS.BOOK_COVERING,
+        { existingIds: classScopedIds, reservedIds: existingIds }
+      );
+    } else if (existingIds.has(String(id))) {
+      throw new Error('Book coverage report id already exists.');
+    }
     const created = {
-      id: sanitized.id || generateEntityId('BKCOV'),
+      id,
       ...sanitized,
       audit: buildAudit(payload?.audit, payload?.audit?.createUser || 'SYSTEM')
     };
