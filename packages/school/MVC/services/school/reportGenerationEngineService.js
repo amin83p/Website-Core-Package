@@ -505,9 +505,10 @@ function assessGenerationWarnings(template, assignment, instance, mergedAnswers 
     ? mergedAnswers
     : reportService.mergeTemplateData(template, instance, assignment, mergeOptions);
   const studentTargeted = reportService.isStudentTargetedScope(assignment?.reportScope);
-  const sharedRaw = assignment?.sharedAnswers && typeof assignment.sharedAnswers === 'object'
-    ? assignment.sharedAnswers
-    : {};
+  const sharedRaw = reportAssignmentModel.resolveSharedAnswersForRow(
+    assignment,
+    instance?.assignmentRowId || assignment?.assignmentRowId || assignment?.rowId || ''
+  );
   const prefill = instance?.prefillSnapshot && typeof instance.prefillSnapshot === 'object'
     ? instance.prefillSnapshot
     : {};
@@ -766,7 +767,10 @@ async function generateReportOutput(request = {}, options = {}, reqUser) {
     teacherId,
     reportStartDate: assignment?.reportStartDate || '',
     reportDueDate: assignment?.reportDueDate || '',
-    assignmentSharedAnswers: assignment?.sharedAnswers || {},
+    assignmentSharedAnswers: reportAssignmentModel.resolveSharedAnswersForRow(
+      assignment,
+      assignment?.assignmentRowId || assignment?.rowId || ''
+    ),
     rows,
     warnings: rows.flatMap((row) => row.payload?.warnings || [])
   };

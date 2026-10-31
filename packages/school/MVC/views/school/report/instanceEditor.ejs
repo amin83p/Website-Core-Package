@@ -791,7 +791,12 @@
                       <span class="badge <%= String(row.status || '').toLowerCase() === 'locked' ? 'bg-dark' : (String(row.status || '').toLowerCase() === 'submitted' ? 'bg-success' : 'bg-warning text-dark') %>"><%= row.status || '-' %></span>
                       <% if (row.isCurrent) { %><span class="badge bg-primary ms-1">Current</span><% } %>
                     </td>
-                    <td class="font-monospace small"><%= row.teacherId || '-' %></td>
+                    <td>
+                      <div class="fw-semibold"><%= row.teacherName || row.teacherId || '-' %></div>
+                      <% if (row.teacherId && row.teacherName && row.teacherName !== row.teacherId) { %>
+                        <div class="x-small text-muted font-monospace"><%= row.teacherId %></div>
+                      <% } %>
+                    </td>
                     <td class="text-end">
                       <% if (row.isCurrent) { %>
                         <button type="button" class="btn btn-outline-secondary btn-sm" disabled>Current</button>

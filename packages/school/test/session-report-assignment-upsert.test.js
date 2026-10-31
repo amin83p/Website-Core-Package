@@ -85,7 +85,7 @@ test('buildSessionTargetRow defaults conflictPermitted from input and honors rep
   assert.deepEqual(row.targetStudentIds, ['STU_1', 'STU_2']);
 });
 
-test('upsert merges into existing class assignment instead of creating a new one', async (t) => {
+test('upsert merges a new session row into the class assignment when one already exists', async (t) => {
   const existingAssignment = {
     id: 'ASG_EXISTING',
     orgId: 'ORG',
@@ -152,6 +152,78 @@ test('upsert merges into existing class assignment instead of creating a new one
       reportScope: 'class',
       conflictPermitted: true
     }
+  });
+
+  assert.equal(result.createdAssignment, false);
+  assert.equal(result.assignment.id, 'ASG_EXISTING');
+  assert.equal(addCalls, 0);
+  assert.equal(updateCalls, 1);
+});
+
+test('upsert updates existing assignment when the same session row is assigned again', async (t) => {
+  const existingAssignment = {
+    id: 'ASG_EXISTING',
+    orgId: 'ORG',
+    classId: 'CLS_1',
+    reportScope: 'each_student',
+    templateId: 'TPL_1',
+    targetRows: [{
+      rowId: 'session:SES_1:2026-06-01',
+      targetType: 'session',
+      sessionId: 'SES_1',
+      status: 'active',
+      teacherId: 'TCH_1'
+    }],
+    status: 'active',
+    audit: { createUser: 'USER_0', createDateTime: '2026-01-01T00:00:00.000Z' }
+  };
+
+  const originalFetch = schoolDataService.fetchAllData;
+  const originalAdd = schoolDataService.addData;
+  const originalUpdate = schoolDataService.updateData;
+  const originalValidate = reportIntegrityService.validateAssignmentCrossEntityContext;
+  const originalCleanup = classReferenceSyncService.cleanupReportInstancesForRemovedTargetRows;
+  const originalNotify = classReferenceSyncService.notifyClassReferencesChanged;
+
+  let addCalls = 0;
+  let updateCalls = 0;
+
+  schoolDataService.fetchAllData = async () => [existingAssignment];
+  schoolDataService.addData = async () => {
+    addCalls += 1;
+    return { id: 'ASG_NEW' };
+  };
+  schoolDataService.updateData = async (collection, id, payload) => {
+    updateCalls += 1;
+    assert.equal(collection, 'reportAssignments');
+    assert.equal(id, 'ASG_EXISTING');
+    assert.equal(payload.targetRows.length, 1);
+    assert.equal(payload.targetRows[0].rowId, 'session:SES_1:2026-06-01');
+    return { id, ...payload };
+  };
+  reportIntegrityService.validateAssignmentCrossEntityContext = async ({ targetRows }) => ({
+    template: { id: 'TPL_1', version: 1 },
+    effectiveTargetRows: targetRows,
+    persistedTargetStudentIds: []
+  });
+  classReferenceSyncService.cleanupReportInstancesForRemovedTargetRows = async () => {};
+  classReferenceSyncService.notifyClassReferencesChanged = async () => {};
+
+  restoreAfter(t, [
+    { target: schoolDataService, key: 'fetchAllData', value: originalFetch },
+    { target: schoolDataService, key: 'addData', value: originalAdd },
+    { target: schoolDataService, key: 'updateData', value: originalUpdate },
+    { target: reportIntegrityService, key: 'validateAssignmentCrossEntityContext', value: originalValidate },
+    { target: classReferenceSyncService, key: 'cleanupReportInstancesForRemovedTargetRows', value: originalCleanup },
+    { target: classReferenceSyncService, key: 'notifyClassReferencesChanged', value: originalNotify }
+  ]);
+
+  const result = await sessionReportAssignmentService.upsertSessionTargetRowForAssignment({
+    classData,
+    session,
+    sessionRoster,
+    reqUser,
+    input: baseInput
   });
 
   assert.equal(result.createdAssignment, false);

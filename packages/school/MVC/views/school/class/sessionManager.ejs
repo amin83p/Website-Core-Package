@@ -3208,6 +3208,7 @@
                                 <button type="button" class="btn btn-outline-primary btn-sm" id="btnOpenSessionReportAssignmentModal"><i class="bi bi-file-earmark-plus me-1"></i>Assign Report</button>
                             <% } %>
                             <button type="button" class="btn btn-outline-secondary btn-sm" id="btnRefreshSessionReportInstances"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnCheckReportGradebookSkills"><i class="bi bi-bullseye me-1"></i>Check gradebook skills</button>
                         </div>
                         <% } %>
                     </div>
@@ -3242,6 +3243,7 @@
                         <% } %>
 
                         <div class="session-panel-cta-zone session-panel-cta-zone--primary d-none" id="sessionReportFillReportsZone">
+                            <div id="sessionReportSkillCoverageHost" class="mb-2"></div>
                             <div class="session-report-step-actions" id="sessionReportFillReportsActions"></div>
                         </div>
 
@@ -3804,6 +3806,13 @@
                     <input class="form-check-input" type="checkbox" id="gbModalInclude" checked>
                     <label class="form-check-label" for="gbModalInclude">Include in grade calculation</label>
                 </div>
+                <div class="form-check mt-2" id="gbModalPeriodPerformanceLogWrap">
+                    <input class="form-check-input" type="checkbox" id="gbModalPeriodPerformanceLog">
+                    <label class="form-check-label" for="gbModalPeriodPerformanceLog">Log period performance (not a real activity)</label>
+                </div>
+                <div class="alert alert-info border small mb-0 mt-2 d-none" id="gbModalPeriodPerformanceLogHelp" role="note">
+                    This activity is for logging student performance over a period, not for a real in-class activity. Use it to save scores, points, or grades for reports—especially when you have not had scored activities for some skills in the report period and those inputs would otherwise be zero or N/A. You can record performance as you see it for that period. This activity cannot be used for make-up.
+                </div>
             </div>
             <div class="modal-footer bg-light">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -3821,7 +3830,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p class="small text-muted mb-3">Choose an original activity from an earlier session in this class (within the last <strong id="gbMakeupPickerLookbackDays">15</strong> days before this session). Make-up copies are not listed here.</p>
+                <p class="small text-muted mb-3">Choose an original activity from an earlier session in this class (within the last <strong id="gbMakeupPickerLookbackDays">15</strong> days before this session). Make-up copies are not listed here. Period performance log activities are not listed.</p>
                 <div id="gbMakeupPickerLoading" class="text-muted small d-none">Loading activities…</div>
                 <div id="gbMakeupPickerEmpty" class="alert alert-light border small d-none mb-0">No gradebook activities were found in the last 15 days before this session.</div>
                 <div class="table-responsive" id="gbMakeupPickerTableWrap">
@@ -5544,6 +5553,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const CONDUCT_SCALE_FALLBACK_LEVELS = <%- jsonForScript(conductScaleDefaultLevels) %>;
     const CONDUCT_NA_LEVEL = <%- jsonForScript(conductNaLevel) %>;
     let sessionConductReadyForReports = <%- jsonForScript(Boolean(conductReadyForReports)) %>;
+    let sessionGradebookSkillCoverageGateActive = false;
+    let sessionGradebookSkillCoverageReady = true;
+    let sessionGradebookSkillCoverageMissing = [];
+    let sessionGradebookSkillCoveragePeriod = { startDate: '', endDate: '' };
+    let sessionGradebookSkillCoverageMessage = '';
     let sessionHasConductRequiredReports = <%- jsonForScript(Boolean(sessionHasConductRequiredReportsResolved)) %>;
     let hasSessionReportsAssigned = <%- jsonForScript(Boolean(hasSessionReportsAssignedFlag)) %>;
     const REPORT_CONDUCT_TABLE_SELECTOR = '#sessionReportConductDataHost #conductTable';
@@ -6389,6 +6403,31 @@ document.addEventListener('DOMContentLoaded', () => {
         showConductRequiredModal();
     }, true);
 
+    document.addEventListener('click', function (event) {
+        const gated = event.target.closest('.js-report-action-requires-gradebook-skills');
+        if (!gated) return;
+        if (!isReportSkillCoverageLocked()) return;
+        event.preventDefault();
+        event.stopPropagation();
+        showGradebookSkillsRequiredModal();
+    }, true);
+
+    document.getElementById('btnCheckReportGradebookSkills')?.addEventListener('click', () => {
+        void fetchSessionGradebookSkillCoverage({ renderAlert: true }).catch((error) => {
+            showStudentCaseMessage('Check Failed', error.message || 'Unable to check gradebook skills.', 'error');
+        });
+    });
+
+    document.getElementById('sessionReportSkillCoverageHost')?.addEventListener('click', (event) => {
+        if (event.target.closest('#btnGoToGradebookForSkills')) {
+            goToGradebookForMissingSkills({ openModal: false });
+            return;
+        }
+        if (event.target.closest('#btnAddActivityForMissingSkills')) {
+            goToGradebookForMissingSkills({ openModal: true });
+        }
+    });
+
     function getConductTableCell(personId, dimensionKey, rootSelector = '#conductTable') {
         const row = document.querySelector(`${rootSelector} .conduct-row[data-personid="${CSS.escape(String(personId || ''))}"]`);
         return row?.querySelector(`.conduct-rating-cell[data-dimension="${dimensionKey}"]`) || null;
@@ -6858,21 +6897,135 @@ document.addEventListener('DOMContentLoaded', () => {
         return options;
     }
 
+    function applySessionGradebookSkillCoverageSummary(summary = {}) {
+        sessionGradebookSkillCoverageGateActive = Boolean(summary.skillCoverageGateActive ?? summary.gateActive);
+        sessionGradebookSkillCoverageReady = summary.skillCoverageReady !== false && summary.ready !== false;
+        if (Array.isArray(summary.missingSkills)) {
+            sessionGradebookSkillCoverageMissing = summary.missingSkills;
+        } else if (typeof summary.skillCoverageMissingCount === 'number' && summary.skillCoverageMissingCount === 0) {
+            sessionGradebookSkillCoverageMissing = [];
+        }
+        if (summary.period && typeof summary.period === 'object') {
+            sessionGradebookSkillCoveragePeriod = {
+                startDate: String(summary.period.startDate || '').trim(),
+                endDate: String(summary.period.endDate || '').trim()
+            };
+        }
+        if (summary.message) sessionGradebookSkillCoverageMessage = String(summary.message);
+        renderSessionReportSkillCoverageAlert();
+        updateSessionReportInstancesSummaryUi();
+        renderSessionReportInstances();
+        syncSessionReportsNavBadge();
+    }
+
+    function isReportSkillCoverageLocked() {
+        return sessionGradebookSkillCoverageGateActive && !sessionGradebookSkillCoverageReady;
+    }
+
+    function getReportFillBlockReason(row = {}) {
+        if (Boolean(row?.conductRequiredBeforeFill) && sessionHasConductRequiredReports && !sessionConductReadyForReports) {
+            return 'conduct';
+        }
+        if (isReportSkillCoverageLocked()) return 'skills';
+        return '';
+    }
+
+    async function fetchSessionGradebookSkillCoverage({ renderAlert = true } = {}) {
+        const res = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/report-gradebook-skill-coverage`, {
+            headers: { 'x-ajax-request': 'true', Accept: 'application/json' }
+        });
+        const result = await res.json().catch(() => ({}));
+        if (!res.ok || result.status !== 'success') {
+            throw new Error(result.message || 'Unable to check gradebook skill coverage.');
+        }
+        applySessionGradebookSkillCoverageSummary(result);
+        if (renderAlert) renderSessionReportSkillCoverageAlert(result);
+        return result;
+    }
+
+    function renderSessionReportSkillCoverageAlert(payload = null) {
+        const host = document.getElementById('sessionReportSkillCoverageHost');
+        if (!host) return;
+        const data = payload || {
+            ready: sessionGradebookSkillCoverageReady,
+            gateActive: sessionGradebookSkillCoverageGateActive,
+            missingSkills: sessionGradebookSkillCoverageMissing,
+            period: sessionGradebookSkillCoveragePeriod,
+            message: sessionGradebookSkillCoverageMessage
+        };
+        if (!data.gateActive && (!data.missingSkills || !data.missingSkills.length) && data.ready !== false) {
+            if (payload && data.message) {
+                host.innerHTML = `<div class="alert alert-light border small mb-0" role="status">${scEscapeHtml(data.message)}</div>`;
+                return;
+            }
+            host.innerHTML = '';
+            return;
+        }
+        const periodLabel = [data.period?.startDate, data.period?.endDate].filter(Boolean).join(' – ') || '—';
+        const missing = Array.isArray(data.missingSkills) ? data.missingSkills : [];
+        const missingList = missing.length
+            ? `<ul class="mb-2 ps-3">${missing.map((row) => `<li>${scEscapeHtml(row.label || row.id || 'Skill')}</li>`).join('')}</ul>`
+            : '';
+        const alertClass = data.ready ? 'alert-success' : 'alert-warning';
+        const title = data.ready
+            ? 'Gradebook skills ready for reports'
+            : 'Gradebook skills needed before Fill Reports';
+        const help = data.ready
+            ? scEscapeHtml(data.message || 'Each required skill has at least one gradebook activity in the report period.')
+            : `<p class="mb-2">Report period: <strong>${scEscapeHtml(periodLabel)}</strong>. Add gradebook activities (you can use a period performance log activity) tagged with these skills:</p>${missingList}<p class="mb-0 small text-muted">One activity can cover multiple skills.</p>`;
+        host.innerHTML = `<div class="alert ${alertClass} border small mb-0" role="alert">
+            <div class="fw-semibold mb-1">${title}</div>
+            ${help}
+            ${!data.ready && missing.length ? `<div class="d-flex flex-wrap gap-2 mt-2">
+                <button type="button" class="btn btn-sm btn-outline-primary" id="btnGoToGradebookForSkills"><i class="bi bi-journal-check me-1"></i>Go to Gradebook</button>
+                <button type="button" class="btn btn-sm btn-primary" id="btnAddActivityForMissingSkills"><i class="bi bi-journal-plus me-1"></i>Add activity for missing skills</button>
+            </div>` : ''}
+        </div>`;
+    }
+
+    function goToGradebookForMissingSkills({ openModal = false, skillIds = null } = {}) {
+        const ids = Array.isArray(skillIds) && skillIds.length
+            ? skillIds
+            : (sessionGradebookSkillCoverageMissing || []).map((row) => String(row.id || '').trim()).filter(Boolean);
+        setActivePanel('gradebook');
+        if (openModal && typeof gbOpenModal === 'function') {
+            gbOpenModal(null, { skillIds: ids, periodPerformanceLog: true });
+        }
+    }
+
+    function showGradebookSkillsRequiredModal() {
+        const missing = (sessionGradebookSkillCoverageMissing || [])
+            .map((row) => scEscapeHtml(row.label || row.id || 'Skill'))
+            .join(', ');
+        return sessionMessageBox({
+            title: 'Gradebook skills required',
+            icon: 'warning',
+            html: true,
+            message: `<p class="mb-2">Before filling reports, each required skill needs at least one gradebook activity in the report period.</p>${missing ? `<p class="mb-0"><strong>Still missing:</strong> ${missing}</p>` : ''}<p class="mb-0 mt-2 small text-muted">Use <strong>Check gradebook skills</strong> on this tab for details, or open the Gradebook tab to add a period performance log activity.</p>`
+        });
+    }
+
     function isReportMatrixHrefLocked(matrixHref = '') {
         const href = String(matrixHref || '').trim();
         if (!href) return false;
+        if (isReportSkillCoverageLocked()) return true;
         return (Array.isArray(sessionReportInstancesState) ? sessionReportInstancesState : []).some((row) => {
             if (String(row?.matrixHref || '').trim() !== href) return false;
-            return Boolean(row?.conductRequiredBeforeFill) && sessionHasConductRequiredReports && !sessionConductReadyForReports;
+            return getReportFillBlockReason(row) === 'conduct';
         });
     }
 
     function buildSessionFillReportsButtonHtml(option = {}) {
         const href = String(option?.href || '').trim();
         if (!href) return '';
-        const locked = isReportMatrixHrefLocked(href);
-        if (locked) {
+        const lockedConduct = (Array.isArray(sessionReportInstancesState) ? sessionReportInstancesState : []).some((row) => (
+            String(row?.matrixHref || '').trim() === href && getReportFillBlockReason(row) === 'conduct'
+        ));
+        if (lockedConduct) {
             return `<button type="button" class="btn btn-outline-primary session-panel-open-btn w-100 js-report-action-requires-conduct" id="btnSessionFillReports" title="Complete class conduct first"><i class="bi bi-table me-2"></i>Fill Reports</button>`;
+        }
+        if (isReportSkillCoverageLocked()) {
+            return `<button type="button" class="btn btn-outline-primary session-panel-open-btn w-100 js-report-action-requires-gradebook-skills" id="btnSessionFillReports" title="Log gradebook activities for required skills first"><i class="bi bi-table me-2"></i>Fill Reports</button>`;
         }
         return `<a href="${scEscapeHtml(href)}" class="btn btn-outline-primary session-panel-open-btn w-100" id="btnSessionFillReports" target="_blank" rel="noopener noreferrer" title="Open Fill Reports in a new tab"><i class="bi bi-table me-2"></i>Fill Reports</a>`;
     }
@@ -7028,7 +7181,8 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         body.innerHTML = Array.from(groups.values()).map((groupRows) => {
             const first = groupRows[0] || {};
-            const reportActionsLocked = Boolean(first.conductRequiredBeforeFill) && sessionHasConductRequiredReports && !sessionConductReadyForReports;
+            const blockReason = getReportFillBlockReason(first);
+            const reportActionsLocked = blockReason === 'conduct' || blockReason === 'skills';
             const groupHeader = `
                 <tr class="table-primary-subtle border-top">
                     <td colspan="5" class="px-4 py-3">
@@ -7044,9 +7198,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 const studentSub = row.studentId
                     ? `<div class="small text-muted font-monospace">${scEscapeHtml(row.studentId)}</div>`
                     : '';
-                const actionBtn = reportActionsLocked
+                const actionBtn = blockReason === 'conduct'
                     ? `<button type="button" class="btn btn-sm btn-outline-primary js-report-action-requires-conduct" title="Complete class conduct first"><i class="bi bi-box-arrow-up-right me-1"></i>${scEscapeHtml(actionLabel)}</button>`
-                    : `<a href="${scEscapeHtml(href)}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer"><i class="bi bi-box-arrow-up-right me-1"></i>${scEscapeHtml(actionLabel)}</a>`;
+                    : (blockReason === 'skills'
+                        ? `<button type="button" class="btn btn-sm btn-outline-primary js-report-action-requires-gradebook-skills" title="Log gradebook activities for required skills first"><i class="bi bi-box-arrow-up-right me-1"></i>${scEscapeHtml(actionLabel)}</button>`
+                        : `<a href="${scEscapeHtml(href)}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer"><i class="bi bi-box-arrow-up-right me-1"></i>${scEscapeHtml(actionLabel)}</a>`);
                 return `
                     <tr data-report-instance-id="${scEscapeHtml(row.id)}">
                         <td class="ps-4"><span class="text-muted small">Individual report</span></td>
@@ -7075,6 +7231,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Failed to load report instances.');
             sessionReportInstancesState = result.rows || [];
             sessionRosterReconciliationState = result.rosterReconciliation || [];
+            applySessionGradebookSkillCoverageSummary(result);
             renderSessionReportInstances();
             renderSessionStatusButtons();
         } finally {
@@ -7281,6 +7438,9 @@ document.addEventListener('DOMContentLoaded', () => {
     renderStudentCases();
     syncReportWorkflowStepUi();
     renderSessionReportInstances();
+    if (hasSessionReportsAssigned) {
+        void fetchSessionGradebookSkillCoverage({ renderAlert: false }).catch(() => {});
+    }
     document.getElementById('btnRefreshSessionReportInstances')?.addEventListener('click', () => {
         refreshSessionReportInstances().catch((error) => showStudentCaseMessage('Refresh Failed', error.message, 'error'));
     });
@@ -8055,9 +8215,13 @@ document.addEventListener('DOMContentLoaded', () => {
         badge.classList.add(allSubmitted ? 'bg-success' : 'bg-danger');
         badge.textContent = String(total);
         badge.setAttribute('aria-hidden', 'false');
-        badge.title = allSubmitted
-            ? `${total} report instance(s) — all submitted`
-            : `${total} report instance(s) — ${pending} pending`;
+        let title = allSubmitted ? 'All report instances submitted' : `${pending} report(s) still pending submission`;
+        if (sessionGradebookSkillCoverageGateActive && !sessionGradebookSkillCoverageReady) {
+            const miss = Array.isArray(sessionGradebookSkillCoverageMissing) ? sessionGradebookSkillCoverageMissing.length : 0;
+            title = `${title}${miss ? ` · ${miss} skill(s) need gradebook activities` : ' · gradebook skills incomplete'}`;
+        }
+        badge.setAttribute('title', title);
+        badge.title = title;
     }
     function syncSessionNotesNavBadge() {
         const badge = document.getElementById('sessionNotesNavBadge');
@@ -10197,6 +10361,18 @@ document.addEventListener('DOMContentLoaded', () => {
         return gbIsPersonAttendanceUnmarked(personId) || gbIsPersonAbsent(personId);
     }
 
+    function gbIsPersonGradeBlockedForActivity(gb, personId) {
+        if (gb && gb.periodPerformanceLog) return false;
+        return gbIsPersonGradeBlocked(personId);
+    }
+
+    function gbUpdatePeriodPerformanceLogHelpVisibility() {
+        const cb = document.getElementById('gbModalPeriodPerformanceLog');
+        const help = document.getElementById('gbModalPeriodPerformanceLogHelp');
+        if (!help) return;
+        help.classList.toggle('d-none', !(cb && cb.checked));
+    }
+
     function gbNormalizeSkillToken(value) {
         return String(value || '')
             .trim()
@@ -10456,6 +10632,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 totalScore: Number.isFinite(totalScore) && totalScore > 0 ? totalScore : 10,
                 activityContent: String(gb.activityContent || ''),
                 includeInGradeCalculation: gb.includeInGradeCalculation !== false,
+                periodPerformanceLog: Boolean(gb.periodPerformanceLog),
                 scores,
                 scoreComments,
                 attachments,
@@ -10607,8 +10784,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 const pid = String(personId);
                 const makeupRole = gb.makeupRoles && gb.makeupRoles[pid] ? String(gb.makeupRoles[pid]).trim() : '';
                 if (makeupRole === 'done') return;
-                const blockedByMakeup = makeupRole === 'blocked' || (makeupRole === 'makeup' && gbIsPersonGradeBlocked(pid));
-                if (blockedByMakeup || (!makeupRole && gbIsPersonGradeBlocked(pid))) {
+                const blockedByMakeup = makeupRole === 'blocked' || (makeupRole === 'makeup' && gbIsPersonGradeBlockedForActivity(gb, pid));
+                if (blockedByMakeup || (!makeupRole && gbIsPersonGradeBlockedForActivity(gb, pid))) {
                     gb.scores[pid] = null;
                     if (gb.scoreComments && typeof gb.scoreComments === 'object') delete gb.scoreComments[pid];
                     return;
@@ -10680,6 +10857,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const makeupHeader = gb.makeupSource && String(gb.makeupSource.sessionDate || gb.makeupSource.sessionId || '').trim()
                 ? `<span class="badge bg-warning text-dark me-2">Make-up</span><span class="small text-muted">From ${gbEscapeHtml(String(gb.makeupSource.sessionDate || ''))}: ${gbEscapeHtml(String(gb.name || ''))}</span>`
                 : '';
+            const periodLogHeader = gb.periodPerformanceLog
+                ? '<span class="badge bg-info text-dark me-2">Period log</span>'
+                : '';
             const gradeHeader = `Grade/${Number.isFinite(total) && total > 0 ? total : '—'}`;
             const headActions = gbReadOnly ? '' : `
                 <button type="button" class="btn btn-outline-primary btn-sm gb-edit" data-gb-id="${gbEscapeHtml(gb.id)}" title="Edit"><i class="bi bi-pencil"></i></button>
@@ -10702,8 +10882,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     </tr>`;
                     }
                     const unmarked = gbIsPersonAttendanceUnmarked(pid);
-                    const blockedByMakeup = makeupRole === 'blocked' || (makeupRole === 'makeup' && gbIsPersonGradeBlocked(pid));
-                    if (blockedByMakeup || (!makeupRole && gbIsPersonGradeBlocked(pid))) {
+                    const blockedByMakeup = makeupRole === 'blocked' || (makeupRole === 'makeup' && gbIsPersonGradeBlockedForActivity(gb, pid));
+                    if (blockedByMakeup || (!makeupRole && gbIsPersonGradeBlockedForActivity(gb, pid))) {
                         const attendanceStatus = gbAttendanceStatus(pid);
                         let blockedLabel = 'Absent';
                         let rowClass = 'gb-row-attendance-blocked';
@@ -10746,7 +10926,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         </button>
                         <div class="flex-grow-1 min-w-0">
                             <div class="fw-bold text-primary">${gbEscapeHtml(gb.name || 'Untitled')}</div>
-                            ${makeupHeader ? `<div class="small mt-1">${makeupHeader}</div>` : ''}
+                            ${periodLogHeader}${makeupHeader ? `<div class="small mt-1">${makeupHeader}</div>` : ''}
                             <div class="small text-muted mt-1">${gb.skills && gb.skills.length ? `<span class="me-2 d-inline-flex align-items-start gap-1"><i class="bi bi-bullseye me-1 flex-shrink-0 mt-1"></i>${gbRenderSkillChips(gb.skills)}</span>` : ''}
                                 ${weightBadge}<span class="me-2"><i class="bi bi-calculator me-1"></i>Total: <strong>${total}</strong> pts</span>${incl}
                                 ${gbRenderAttachmentLinks(gb.attachments)}
@@ -10766,11 +10946,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>`);
         });
 
-        const showAttendanceFootnote = gradebookRoster.some(({ personId }) => gbIsPersonAttendanceUnmarked(String(personId)));
+        const hasNonPeriodLogActivity = gradebooksState.some((g) => !g.periodPerformanceLog);
+        const showAttendanceFootnote = hasNonPeriodLogActivity && gradebookRoster.some(({ personId }) => gbIsPersonAttendanceUnmarked(String(personId)));
         host.innerHTML = parts.join('') + (showAttendanceFootnote
             ? `<div class="gb-attendance-footnote small mt-3" role="note">
                 <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
-                Highlighted rows are students without attendance marked. Mark attendance on the Attendance tab before entering grades; scores entered without attendance are not saved.
+                Highlighted rows are students without attendance marked. Mark attendance on the Attendance tab before entering grades for regular activities; scores entered without attendance are not saved. Period log activities allow scores regardless of attendance.
             </div>`
             : '');
 
@@ -10926,15 +11107,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
     document.getElementById('gbCommentModalSaveBtn')?.addEventListener('click', gbApplyCommentModalSave);
 
-    function gbOpenModal(editId) {
+    function gbOpenModal(editId, options = {}) {
+        const modalOptions = options && typeof options === 'object' ? options : {};
         const isEdit = !!editId;
         document.getElementById('gradebookActivityModalTitle').innerHTML = isEdit
             ? '<i class="bi bi-pencil-square me-2"></i>Edit activity'
             : '<i class="bi bi-journal-plus me-2"></i>Add activity';
         document.getElementById('gbModalEditId').value = isEdit ? editId : '';
+        const periodLogWrap = document.getElementById('gbModalPeriodPerformanceLogWrap');
+        const periodLogCb = document.getElementById('gbModalPeriodPerformanceLog');
+        let hidePeriodLogOption = false;
         if (isEdit) {
             const gb = gradebooksState.find((g) => String(g.id) === String(editId));
             if (!gb) return;
+            hidePeriodLogOption = Boolean(gb.makeupSource && String(gb.makeupSource.sessionId || gb.makeupSource.gradebookId || '').trim());
             document.getElementById('gbModalName').value = gb.name || '';
             gbSetModalSkills(gb.skills || []);
             document.getElementById('gbModalTotal').value = gb.totalScore || '';
@@ -10942,6 +11128,7 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('gbModalWeight').value = explicitWeight != null ? explicitWeight : '';
             document.getElementById('gbModalContent').value = gb.activityContent || '';
             document.getElementById('gbModalInclude').checked = gb.includeInGradeCalculation !== false;
+            if (periodLogCb) periodLogCb.checked = Boolean(gb.periodPerformanceLog);
             gbModalAttachmentsState = Array.isArray(gb.attachments)
                 ? gb.attachments.map((row) => gbNormalizeModalAttachment(row, row.role))
                     .filter(Boolean)
@@ -10953,8 +11140,19 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById('gbModalWeight').value = '';
             document.getElementById('gbModalContent').value = '';
             document.getElementById('gbModalInclude').checked = true;
+            if (periodLogCb) periodLogCb.checked = false;
             gbModalAttachmentsState = [];
         }
+        if (!isEdit) {
+            if (Array.isArray(modalOptions.skillIds) && modalOptions.skillIds.length) {
+                gbSetModalSkills(modalOptions.skillIds);
+            }
+            if (modalOptions.periodPerformanceLog === true && periodLogCb) {
+                periodLogCb.checked = true;
+            }
+        }
+        if (periodLogWrap) periodLogWrap.classList.toggle('d-none', hidePeriodLogOption);
+        gbUpdatePeriodPerformanceLogHelpVisibility();
         gbRenderModalAttachmentsList();
         gbUpdateModalWeightPreview();
         if (gradebookModalInstance) gradebookModalInstance.show();
@@ -10977,6 +11175,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 void gbUploadModalAttachment(inputEl, role);
             });
         });
+        document.getElementById('gbModalPeriodPerformanceLog')?.addEventListener('change', gbUpdatePeriodPerformanceLogHelpVisibility);
     }
 
     function gbApplyModalSave() {
@@ -10995,6 +11194,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const activityContent = document.getElementById('gbModalContent').value;
         const includeInGradeCalculation = document.getElementById('gbModalInclude').checked;
+        const periodPerformanceLog = document.getElementById('gbModalPeriodPerformanceLog')?.checked === true;
 
         if (!name) {
             void sessionMessageBox({
@@ -11024,6 +11224,7 @@ document.addEventListener('DOMContentLoaded', () => {
             gb.totalScore = totalScore;
             gb.activityContent = activityContent;
             gb.includeInGradeCalculation = includeInGradeCalculation;
+            gb.periodPerformanceLog = periodPerformanceLog;
             gb.attachments = gbModalAttachmentsState.map((row) => ({ ...row }));
             if (oldTotal !== totalScore) {
                 gradebookRoster.forEach(({ personId }) => {
@@ -11047,6 +11248,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 totalScore,
                 activityContent,
                 includeInGradeCalculation,
+                periodPerformanceLog,
                 scores,
                 scoreComments,
                 attachments: gbModalAttachmentsState.map((row) => ({ ...row }))
@@ -11195,6 +11397,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function gbOnAttendanceChanged() {
         gbSyncScoresFromInputs();
         gradebooksState.forEach((gb) => {
+            if (gb.periodPerformanceLog) return;
             gradebookRoster.forEach(({ personId }) => {
                 const pid = String(personId);
                 if (gbIsPersonGradeBlocked(pid)) {
@@ -11369,12 +11572,14 @@ document.addEventListener('DOMContentLoaded', () => {
         const gbModalTotal = document.getElementById('gbModalTotal');
         const gbModalContent = document.getElementById('gbModalContent');
         const gbModalInclude = document.getElementById('gbModalInclude');
+        const gbModalPeriodPerformanceLog = document.getElementById('gbModalPeriodPerformanceLog');
         if (gbModalName) gbModalName.disabled = true;
         document.querySelectorAll('#gbModalSkillsPicker .gb-skill-checkbox').forEach((el) => { el.disabled = true; });
         if (gbModalWeight) gbModalWeight.disabled = true;
         if (gbModalTotal) gbModalTotal.disabled = true;
         if (gbModalContent) gbModalContent.disabled = true;
         if (gbModalInclude) gbModalInclude.disabled = true;
+        if (gbModalPeriodPerformanceLog) gbModalPeriodPerformanceLog.disabled = true;
         if (gbModalSaveBtn) gbModalSaveBtn.disabled = true;
         document.querySelectorAll('#gradebookActivityModal input[data-gb-attach-role]').forEach((el) => { el.disabled = true; });
         document.querySelectorAll('#gradebookActivityModal label[for^="gbModalAttach"]').forEach((el) => { el.classList.add('disabled'); });
@@ -11606,6 +11811,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const payload = (isAutosave && usePartialPayload)
             ? buildSessionAutosavePayload()
             : buildSessionSavePayload();
+        const hadGradebookInPayload = Boolean(payload.gradebooks);
         const status = payload.status;
 
         if (btn && !isAutosave) {
@@ -11759,6 +11965,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (result.status === 'success') {
                 resetSessionAutosaveBaseline();
+                if (hadGradebookInPayload && hasSessionReportsAssigned) {
+                    void refreshSessionReportInstances();
+                }
                 if (isAutosave) {
                     return { ok: true, message: result.message };
                 }

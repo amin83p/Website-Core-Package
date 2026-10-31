@@ -3,6 +3,7 @@ const reportService = require('./reportService');
 const reportViewService = require('./reportViewService');
 const reportRuleEngineService = require('./reportRuleEngineService');
 const reportGenerationEngineService = require('./reportGenerationEngineService');
+const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
 const { getPrefillValue, isAutoRefreshPrefillKey } = require('./reportPrefillKeyUtils');
 
 function isVisualOnlyField(field = {}) {
@@ -91,13 +92,17 @@ async function persistInstanceAnswers({
   let sharedAnswersSkipped = false;
   let sharedAnswersSkipReason = '';
   if (studentTargeted && sharedFieldIds.length > 0 && assignment?.id) {
-    const siblingInstances = await reportViewService.loadAssignmentInstancesForSharedGate(assignment.id, reqUser);
+    const assignmentRowIdForGate = instance.assignmentRowId || '';
+    const siblingInstances = await reportViewService.loadAssignmentInstancesForSharedGate(assignment.id, reqUser, {
+      assignmentRowId: assignmentRowIdForGate
+    });
     const allowAdminOverride = await reportViewService.isReportInstanceAdminEditor(reqUser);
     const sharedGate = reportViewService.evaluateSharedFieldsEditability({
       assignment,
       template,
       instances: siblingInstances,
       currentInstanceId: instance.id,
+      assignmentRowId: assignmentRowIdForGate,
       allowAdminOverride
     });
     if (!sharedGate.sharedFieldsEditable) {
@@ -106,10 +111,13 @@ async function persistInstanceAnswers({
     }
   }
 
+  const assignmentRowIdForSave = String(instance?.assignmentRowId || assignment?.assignmentRowId || '').trim();
+  const rowSharedBaseline = reportAssignmentModel.resolveSharedAnswersForRow(assignment, assignmentRowIdForSave);
+
   const effectiveSharedForValidation = sharedAnswersSkipped
-    ? ((assignment?.sharedAnswers && typeof assignment.sharedAnswers === 'object') ? assignment.sharedAnswers : {})
+    ? rowSharedBaseline
     : {
-        ...((assignment?.sharedAnswers && typeof assignment.sharedAnswers === 'object') ? assignment.sharedAnswers : {}),
+        ...rowSharedBaseline,
         ...nextShared
       };
   const assignmentForValidation = studentTargeted
@@ -146,9 +154,12 @@ async function persistInstanceAnswers({
 
   if (studentTargeted && sharedFieldIds.length > 0 && assignment?.id) {
     if (!sharedAnswersSkipped) {
-      await schoolDataService.updateData('reportAssignments', assignment.id, {
-        sharedAnswers: nextShared
-      }, reqUser);
+      const sharedUpdate = reportAssignmentModel.buildSharedAnswersByRowUpdate(
+        assignment,
+        assignmentRowIdForSave,
+        nextShared
+      );
+      await schoolDataService.updateData('reportAssignments', assignment.id, sharedUpdate, reqUser);
     }
   }
 
@@ -170,8 +181,8 @@ async function persistInstanceAnswers({
     nextStatus,
     studentAnswers,
     sharedAnswers: sharedAnswersSkipped
-      ? ((assignment?.sharedAnswers && typeof assignment.sharedAnswers === 'object') ? assignment.sharedAnswers : {})
-      : nextShared,
+      ? rowSharedBaseline
+      : { ...rowSharedBaseline, ...nextShared },
     sharedAnswersSkipped,
     sharedAnswersSkipReason,
     validationSummary,

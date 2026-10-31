@@ -12,6 +12,7 @@ const reportDocxRenderService = require('../../services/school/reportDocxRenderS
 const reportPdfRenderService = require('../../services/school/reportPdfRenderService');
 const reportIntegrityService = require('../../services/school/reportIntegrityService');
 const reportViewService = require('../../services/school/reportViewService');
+const gradebookSkillCatalogService = require('../../services/school/gradebookSkillCatalogService');
 const reportAssignmentBulkRowService = require('../../services/school/reportAssignmentBulkRowService');
 const reportAssignmentStudentEligibilityService = require('../../services/school/reportAssignmentStudentEligibilityService');
 const semiMonthlyReportAssignmentWizardService = require('../../services/school/semiMonthlyReportAssignmentWizardService');
@@ -1683,21 +1684,26 @@ async function buildInstanceEditorRenderContext(req) {
   });
   const canUnlockReportInstance = await reportViewService.canUnlockReportInstance(req.user);
   const canReopenReportInstanceToDraft = await reportViewService.canReopenReportInstanceToDraft(req.user);
+  const assignmentRowIdForGate = latestInstance?.assignmentRowId || '';
   const assignmentInstances = latestInstance?.assignmentId
-    ? await reportViewService.loadAssignmentInstancesForSharedGate(latestInstance.assignmentId, req.user)
+    ? await reportViewService.loadAssignmentInstancesForSharedGate(latestInstance.assignmentId, req.user, {
+      assignmentRowId: assignmentRowIdForGate
+    })
     : [];
   const sharedFieldsGate = reportViewService.evaluateSharedFieldsEditability({
     assignment: effectiveAssignment || assignment,
     template,
     instances: assignmentInstances,
     currentInstanceId: latestInstance?.id || '',
+    assignmentRowId: assignmentRowIdForGate,
     allowAdminOverride: isAdminEditor
   });
   const sharedFieldsLockAfterReopen = reportViewService.evaluateSharedFieldsLockAfterReopen({
     assignment: effectiveAssignment || assignment,
     template,
     instances: assignmentInstances,
-    reopeningInstanceId: latestInstance?.id || ''
+    reopeningInstanceId: latestInstance?.id || '',
+    assignmentRowId: assignmentRowIdForGate
   });
 
   return {
@@ -2241,7 +2247,9 @@ async function reopenInstance(req, res) {
     const [template, assignment, siblingInstances] = await Promise.all([
       schoolDataService.getDataById('reportTemplates', instance.templateId, req.user),
       schoolDataService.getDataById('reportAssignments', instance.assignmentId, req.user),
-      reportViewService.loadAssignmentInstancesForSharedGate(instance.assignmentId, req.user)
+      reportViewService.loadAssignmentInstancesForSharedGate(instance.assignmentId, req.user, {
+        assignmentRowId: instance.assignmentRowId || ''
+      })
     ]);
     const effectiveAssignment = reportViewService.applyAssignmentRow(
       assignment,
@@ -2251,7 +2259,8 @@ async function reopenInstance(req, res) {
       assignment: effectiveAssignment || assignment,
       template,
       instances: siblingInstances,
-      reopeningInstanceId: instance.id
+      reopeningInstanceId: instance.id,
+      assignmentRowId: instance.assignmentRowId || ''
     });
 
     await schoolDataService.updateData('reportInstances', instance.id, {

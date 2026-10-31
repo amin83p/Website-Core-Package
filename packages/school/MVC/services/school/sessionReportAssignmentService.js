@@ -2,6 +2,7 @@ const schoolDataService = require('./schoolDataService');
 const reportIntegrityService = require('./reportIntegrityService');
 const classReferenceSyncService = require('./classReferenceSyncService');
 const reportScopePolicy = require('./reportScopePolicy');
+const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -105,6 +106,36 @@ function assignmentScope(assignment = {}) {
 }
 
 function findReportAssignmentForClass(assignments = [], classId = '', reportScope = 'class') {
+  const scope = reportScopePolicy.normalizeReportScope(reportScope);
+  const classToken = toPublicId(classId);
+  if (!classToken) return null;
+  return (Array.isArray(assignments) ? assignments : []).find((row) => (
+    idsEqual(row?.classId, classToken) && assignmentScope(row) === scope
+  )) || null;
+}
+
+function assignmentHasTargetRow(assignment = {}, rowId = '') {
+  const targetRowId = clean(rowId);
+  if (!targetRowId) return false;
+  const rows = reportAssignmentModel.getEffectiveTargetRows(assignment);
+  if (rows.some((row) => clean(row?.rowId) === targetRowId)) return true;
+  const legacyRowId = clean(assignment?.assignmentRowId || assignment?.rowId);
+  return legacyRowId === targetRowId;
+}
+
+function findReportAssignmentForTargetRow(assignments = [], classId = '', reportScope = 'class', rowId = '') {
+  const scope = reportScopePolicy.normalizeReportScope(reportScope);
+  const classToken = toPublicId(classId);
+  const targetRowId = clean(rowId);
+  if (!classToken || !targetRowId) return null;
+  return (Array.isArray(assignments) ? assignments : []).find((row) => (
+    idsEqual(row?.classId, classToken)
+    && assignmentScope(row) === scope
+    && assignmentHasTargetRow(row, targetRowId)
+  )) || null;
+}
+
+function classHasReportAssignmentForScope(assignments = [], classId = '', reportScope = 'class') {
   const scope = reportScopePolicy.normalizeReportScope(reportScope);
   const classToken = toPublicId(classId);
   if (!classToken) return null;
@@ -284,7 +315,18 @@ async function updateExistingAssignmentWithMergedRow({
   const resolvedTemplateId = toPublicId(existing?.templateId || parsed.templateId);
   if (!resolvedTemplateId) throw new Error('Template is required.');
 
-  const mergedRows = mergeTargetRows(existing.targetRows, incomingRow);
+  const incomingRowId = clean(incomingRow?.rowId);
+  const priorRow = reportAssignmentModel.findEffectiveTargetRow(existing, incomingRowId) || {};
+  const mergedRow = {
+    ...priorRow,
+    ...incomingRow,
+    rowId: incomingRowId || clean(priorRow?.rowId),
+    status: clean(priorRow?.status) || 'active'
+  };
+  const mergedTargetRows = mergeTargetRows(
+    reportAssignmentModel.getEffectiveTargetRows(existing),
+    mergedRow
+  );
   const rowStudentIds = resolveWizardRowStudentIds(
     parsed.reportScope,
     parsed.selectedTargetStudentIds,
@@ -309,15 +351,16 @@ async function updateExistingAssignmentWithMergedRow({
     requestedReportStartDate: parsed.reportStartDate,
     requestedReportDueDate: parsed.reportDueDate,
     selectedTargetStudentIds: rowStudentIds,
-    targetRows: mergedRows,
+    targetRows: mergedTargetRows,
     excludeAssignmentId: toPublicId(existing.id)
   });
 
+  const activeRow = effectiveTargetRows.find((row) => clean(row?.rowId) === incomingRowId)
+    || effectiveTargetRows[0]
+    || mergedRow;
   const firstActiveRow = effectiveTargetRows.find((row) => String(row?.status || '').toLowerCase() === 'active')
-    || effectiveTargetRows[0];
-  const rowTeacherIds = [...new Set(effectiveTargetRows
-    .map((row) => toPublicId(row?.teacherId))
-    .filter(Boolean))];
+    || effectiveTargetRows[0]
+    || activeRow;
   const resolvedConductRequired = parsed.conductRequiredBeforeFill !== undefined
     ? parsed.conductRequiredBeforeFill
     : parseBoolean(template?.conductRequiredBeforeFill, true);
@@ -329,10 +372,12 @@ async function updateExistingAssignmentWithMergedRow({
     targetStudentIds: persistedTargetStudentIds,
     templateId: template.id,
     templateVersion: Number(template.version || 1),
-    teacherIds: rowTeacherIds.length ? rowTeacherIds : [parsed.teacherId],
+    teacherIds: [...new Set(effectiveTargetRows.map((row) => toPublicId(row?.teacherId)).filter(Boolean))],
     targetRows: effectiveTargetRows.map((row) => ({
       ...row,
-      conductRequiredBeforeFill: resolvedConductRequired
+      conductRequiredBeforeFill: row?.conductRequiredBeforeFill !== undefined
+        ? Boolean(row.conductRequiredBeforeFill)
+        : resolvedConductRequired
     })),
     targetType: firstActiveRow.targetType,
     sessionId: firstActiveRow.sessionId,
@@ -376,7 +421,7 @@ async function updateExistingAssignmentWithMergedRow({
     teacherName: parsed.teacherName,
     targetRows: basePayload.targetRows,
     createdAssignment: false,
-    message: 'Report target row added to the existing report assignment.'
+    message: 'Report assignment updated for this session and report period.'
   };
 }
 
@@ -411,7 +456,16 @@ async function upsertSessionTargetRowForAssignment({
   });
 
   const assignments = await loadScopedReportAssignments(reqUser);
-  const existing = findReportAssignmentForClass(assignments, parsed.classId, parsed.reportScope);
+  const incomingRowId = clean(incomingRow?.rowId);
+  let existing = findReportAssignmentForTargetRow(
+    assignments,
+    parsed.classId,
+    parsed.reportScope,
+    incomingRowId
+  );
+  if (!existing?.id) {
+    existing = findReportAssignmentForClass(assignments, parsed.classId, parsed.reportScope);
+  }
 
   if (existing?.id) {
     return updateExistingAssignmentWithMergedRow({
@@ -593,6 +647,9 @@ module.exports = {
   buildSessionTargetRow,
   createAssignmentForSession,
   findReportAssignmentForClass,
+  findReportAssignmentForTargetRow,
+  classHasReportAssignmentForScope,
+  assignmentHasTargetRow,
   findActiveTargetRowsForSession,
   summarizeSessionTargetRowsForPreview,
   mergeTargetRows,

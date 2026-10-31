@@ -626,11 +626,14 @@ router.get('/:id/sessions/:sessionId',
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
   classCtrl.manageSession);
 router.get('/:id/sessions/:sessionId/cases',
-  requireStudentCaseOperation(OPERATIONS.READ_ALL),
+  requireCaseSectionOperationAny([OPERATIONS.READ_ALL, OPERATIONS.READ]),
   classCtrl.listSessionStudentCases);
 router.get('/:id/sessions/:sessionId/report-instances',
   requireClassSessionManagePageAccess(),
   classCtrl.listSessionReportInstances);
+router.get('/:id/sessions/:sessionId/report-gradebook-skill-coverage',
+  requireClassSessionManagePageAccess(),
+  classCtrl.getSessionReportGradebookSkillCoverage);
 router.post('/:id/sessions/:sessionId/report-assignments',
   requireAccess(SECTIONS.SCHOOL_REPORTS_ASSIGNMENT, OPERATIONS.CREATE),
   trackActionState(SECTIONS.SCHOOL_REPORTS_ASSIGNMENT, OPERATIONS.CREATE, sessionReportAssignmentActionState),

@@ -158,6 +158,104 @@ test('previewTiles picks nearest session per class near period end', async (t) =
   assert.equal(preview.sessionLookbackDays, wizard.MAX_SESSION_LOOKBACK_DAYS);
 });
 
+test('previewTiles resolves assignment by target row for period and session', async (t) => {
+  const session = {
+    sessionId: 'S1',
+    date: '2026-06-05',
+    startTime: '09:00',
+    endTime: '11:00',
+    status: 'scheduled',
+    deliveredBy: 'TCH_1'
+  };
+  const rowForJunePeriod = sessionReportAssignmentService.buildSessionTargetRow({
+    session,
+    reportStartDate: '2026-06-01',
+    reportDueDate: '2026-06-05',
+    taskStartTime: '09:00',
+    taskEndTime: '11:00',
+    conflictPermitted: true,
+    timesheetReflection: true,
+    allocatedHours: 1,
+    conductRequiredBeforeFill: true,
+    teacherId: 'TCH_1',
+    reportScope: 'class',
+    targetStudentIds: [],
+    sessionRoster: []
+  });
+  const rowForMidMonth = sessionReportAssignmentService.buildSessionTargetRow({
+    session,
+    reportStartDate: '2026-06-15',
+    reportDueDate: '2026-06-05',
+    taskStartTime: '09:00',
+    taskEndTime: '11:00',
+    conflictPermitted: true,
+    timesheetReflection: true,
+    allocatedHours: 1,
+    conductRequiredBeforeFill: true,
+    teacherId: 'TCH_1',
+    reportScope: 'class',
+    targetStudentIds: [],
+    sessionRoster: []
+  });
+  wizard.__setDependenciesForTest({
+    schoolDataService: {
+      getClassSessions: async () => ([session]),
+      fetchAllData: async (type) => {
+        if (type === 'classes') return [classes[0]];
+        if (type === 'reportAssignments') {
+          return [
+            {
+              id: 'ASG_JUNE',
+              classId: 'CLS_1',
+              orgId: 'ORG',
+              reportScope: 'class',
+              templateId: 'TPL_JUNE',
+              targetRows: [rowForJunePeriod]
+            },
+            {
+              id: 'ASG_MID',
+              classId: 'CLS_1',
+              orgId: 'ORG',
+              reportScope: 'class',
+              templateId: 'TPL_MID',
+              targetRows: [rowForMidMonth]
+            }
+          ];
+        }
+        return [];
+      },
+      getDataById: async (type, id) => {
+        if (type === 'reportTemplates') {
+          return { id, title: 'Template', allowedReportScopes: ['class', 'each_student', 'selected_students'] };
+        }
+        return null;
+      }
+    },
+    reportViewService: { buildPersonNameMap: async () => ({}) },
+    reportAssignmentStudentEligibilityService: {
+      resolveEligibleStudentsForAssignment: async () => []
+    },
+    semiMonthlyReportPolicyModel: {
+      getPolicyForOrg: async () => ({ reportTemplateIds: ['TPL_1'] })
+    }
+  });
+  t.after(() => wizard.__resetDependenciesForTest());
+
+  const preview = await wizard.previewTiles({
+    reportScope: 'class',
+    programIds: ['PRG_1'],
+    startDate: '2026-06-01',
+    endDate: '2026-06-05',
+    verifiedEndDate: '2026-06-05',
+    reqUser: { activeOrgId: 'ORG' }
+  });
+
+  assert.equal(preview.classes.length, 1);
+  assert.equal(preview.classes[0].assignmentId, 'ASG_JUNE');
+  assert.equal(preview.classes[0].hasReportAssignmentForPeriod, true);
+  assert.equal(preview.classes[0].defaultTemplateId, 'TPL_JUNE');
+});
+
 test('resolveTemplateIdForClass prefers existing assignment template', () => {
   const templates = [{ id: 'TPL_A', title: 'A' }, { id: 'TPL_B', title: 'B' }];
   assert.equal(wizard.resolveTemplateIdForClass({
@@ -218,6 +316,7 @@ test('previewTiles flags classes with existing session target rows', async (t) =
             orgId: 'ORG',
             reportScope: 'class',
             targetRows: [{
+              rowId: 'session:S1:2026-06-01',
               sessionId: 'S1',
               status: 'active',
               reportStartDate: '2026-06-01',

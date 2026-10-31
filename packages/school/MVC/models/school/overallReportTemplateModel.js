@@ -6,6 +6,7 @@ const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const reportTemplateModel = require('./reportTemplateModel');
 const reportRuleEngineService = require('../../services/school/reportRuleEngineService');
+const reportTemplateIdService = require('../../services/school/reportTemplateIdService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/overallReportTemplates.json');
 if (!fsSync.existsSync(dataPath)) fsSync.writeFileSync(dataPath, '[]');

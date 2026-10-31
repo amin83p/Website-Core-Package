@@ -5,6 +5,7 @@ const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const reportScopePolicy = require('../../services/school/reportScopePolicy');
+const reportAssignmentIdService = require('../../services/school/reportAssignmentIdService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/reportAssignments.json');
 
@@ -147,6 +148,78 @@ function cleanSharedAnswersObject(v) {
       return;
     }
     out[safeKey] = String(value);
+  });
+  return out;
+}
+
+function getSharedAnswersByRowMap(assignment = {}) {
+  const raw = assignment?.sharedAnswersByRowId;
+  if (!isPlainObject(raw)) return {};
+  const out = {};
+  Object.keys(raw).forEach((key) => {
+    const rowId = cleanString(key, { max: 80, allowEmpty: false });
+    if (!rowId) return;
+    out[rowId] = cleanSharedAnswersObject(raw[key]);
+  });
+  return out;
+}
+
+function hasSharedAnswerKeys(sharedObj = {}) {
+  return isPlainObject(sharedObj) && Object.keys(sharedObj).length > 0;
+}
+
+function resolveSharedAnswersForRow(assignment = {}, assignmentRowId = '') {
+  const rowId = cleanString(assignmentRowId, { max: 80, allowEmpty: true })
+    || cleanString(assignment?.assignmentRowId || assignment?.rowId, { max: 80, allowEmpty: true });
+  const byRow = getSharedAnswersByRowMap(assignment);
+  if (rowId && hasSharedAnswerKeys(byRow[rowId])) {
+    return byRow[rowId];
+  }
+  const rowCount = getEffectiveTargetRows(assignment).length;
+  if (rowCount <= 1) {
+    return cleanSharedAnswersObject(assignment?.sharedAnswers);
+  }
+  return {};
+}
+
+function buildSharedAnswersByRowUpdate(assignment = {}, assignmentRowId = '', nextSharedSlice = {}) {
+  const rowId = cleanString(assignmentRowId, { max: 80, allowEmpty: false });
+  if (!rowId) {
+    return { sharedAnswers: cleanSharedAnswersObject(nextSharedSlice) };
+  }
+  const byRow = getSharedAnswersByRowMap(assignment);
+  let rowSlice = { ...(byRow[rowId] || {}) };
+  const nextSlice = cleanSharedAnswersObject(nextSharedSlice);
+  const rowCount = getEffectiveTargetRows(assignment).length;
+  const legacyFlat = cleanSharedAnswersObject(assignment?.sharedAnswers);
+  if (
+    rowCount > 1
+    && !hasSharedAnswerKeys(byRow[rowId])
+    && hasSharedAnswerKeys(legacyFlat)
+    && hasSharedAnswerKeys(nextSlice)
+  ) {
+    rowSlice = { ...legacyFlat, ...rowSlice };
+  }
+  rowSlice = { ...rowSlice, ...nextSlice };
+  const mergedByRow = { ...byRow, [rowId]: rowSlice };
+  const payload = { sharedAnswersByRowId: mergedByRow };
+  if (rowCount > 1 && hasSharedAnswerKeys(rowSlice)) {
+    payload.sharedAnswers = {};
+  }
+  return payload;
+}
+
+function sanitizeSharedAnswersByRowId(input = {}, existing = null) {
+  const existingMap = getSharedAnswersByRowMap(existing || {});
+  if (input?.sharedAnswersByRowId === undefined) {
+    return existingMap;
+  }
+  if (!isPlainObject(input.sharedAnswersByRowId)) return {};
+  const out = { ...existingMap };
+  Object.keys(input.sharedAnswersByRowId).forEach((key) => {
+    const rowId = cleanString(key, { max: 80, allowEmpty: false });
+    if (!rowId) return;
+    out[rowId] = cleanSharedAnswersObject(input.sharedAnswersByRowId[key]);
   });
   return out;
 }
@@ -414,6 +487,7 @@ function sanitizeAssignment(input, { isUpdate = false, existing = null } = {}) {
     sharedAnswers: cleanSharedAnswersObject(
       input.sharedAnswers !== undefined ? input.sharedAnswers : (existing?.sharedAnswers || {})
     ),
+    sharedAnswersByRowId: sanitizeSharedAnswersByRowId(input, existing),
     notes: cleanString(input.notes, { max: 1500, allowEmpty: true }),
     audit: sanitizeAudit(input.audit, existing?.audit || {})
   };
@@ -489,7 +563,14 @@ async function addAssignment(input) {
     assertUniqueInOrg(all, sanitized);
 
     const existingIds = new Set(all.map((row) => toPublicId(row.id)).filter(Boolean));
-    const id = sanitized.id || generateAssignmentId(existingIds);
+    const classScopedIds = all
+      .filter((row) => idsEqual(row.classId, sanitized.classId))
+      .map((row) => toPublicId(row.id))
+      .filter(Boolean);
+    const id = sanitized.id || await reportAssignmentIdService.allocateNextReportAssignmentId(
+      sanitized.classId,
+      { existingIds: classScopedIds, reservedIds: existingIds }
+    );
     if (existingIds.has(id)) throw new Error('Assignment id already exists.');
 
     const record = {
@@ -562,6 +643,9 @@ module.exports = {
   getEffectiveTargetRows,
   findEffectiveTargetRow,
   applyTargetRowToAssignment,
+  getSharedAnswersByRowMap,
+  resolveSharedAnswersForRow,
+  buildSharedAnswersByRowUpdate,
   sanitizeAssignment,
   getAllAssignments,
   getAssignmentById,

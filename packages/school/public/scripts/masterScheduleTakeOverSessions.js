@@ -152,6 +152,42 @@
       if (next) next.textContent = step === 'review' ? 'Take Over' : 'Next';
     }
 
+    function sessionSelectionKey(classId, sessionId) {
+      return `${clean(classId)}::${clean(sessionId)}`;
+    }
+
+    function normalizeAllowPreviousTeacherEdit(value) {
+      if (value === undefined || value === null || value === '') return true;
+      if (value === true) return true;
+      if (value === false) return false;
+      const token = clean(value).toLowerCase();
+      if (['false', '0', 'no', 'off'].includes(token)) return false;
+      return true;
+    }
+
+    function syncStateSessionsEditFlags() {
+      state.sessions = (Array.isArray(state.sessions) ? state.sessions : []).map((row) => ({
+        ...row,
+        allowPreviousTeacherEdit: normalizeAllowPreviousTeacherEdit(row?.allowPreviousTeacherEdit)
+      }));
+    }
+
+    function updateStateSessionEditFlag(classId, sessionId, allowEdit) {
+      const key = sessionSelectionKey(classId, sessionId);
+      state.sessions = state.sessions.map((row) => (
+        sessionSelectionKey(row.classId, row.sessionId) === key
+          ? { ...row, allowPreviousTeacherEdit: allowEdit === true }
+          : row
+      ));
+    }
+
+    function resolveRowAllowPreviousTeacherEdit(previewRow) {
+      const key = sessionSelectionKey(previewRow?.classId, previewRow?.sessionId);
+      const stateRow = state.sessions.find((row) => sessionSelectionKey(row.classId, row.sessionId) === key);
+      if (stateRow) return normalizeAllowPreviousTeacherEdit(stateRow.allowPreviousTeacherEdit);
+      return normalizeAllowPreviousTeacherEdit(previewRow?.allowPreviousTeacherEdit);
+    }
+
     function selectionContext() {
       const savedCount = typeof deps.countActiveScheduleSelectedSessions === 'function'
         ? deps.countActiveScheduleSelectedSessions()
@@ -170,7 +206,8 @@
         sessionId: clean(ev?.sessionId || ev?.id),
         date: clean(ev?.date),
         start: clean(ev?.start),
-        end: clean(ev?.end)
+        end: clean(ev?.end),
+        allowPreviousTeacherEdit: true
       })).filter((row) => row.classId && row.sessionId);
       if (!sessions.length) return { error: 'insufficient' };
       return { sessions };
@@ -198,12 +235,49 @@
         tbody.innerHTML = rows.length
           ? rows.map((row) => {
             const when = formatSessionListItem(row);
-            return `<tr><td>${escapeHtml(when)}</td><td>${escapeHtml(row.previousTeacherName || row.previousTeacherId || '')}</td><td>${escapeHtml(row.teacherName || preview?.teacherName || '')}</td></tr>`;
+            const classId = clean(row.classId);
+            const sessionId = clean(row.sessionId);
+            const allowEdit = resolveRowAllowPreviousTeacherEdit(row);
+            const switchId = `takeover_prev_edit_${classId}_${sessionId}`.replace(/[^a-zA-Z0-9_-]/g, '_');
+            return `<tr>`
+              + `<td>${escapeHtml(when)}</td>`
+              + `<td>${escapeHtml(row.previousTeacherName || row.previousTeacherId || '')}</td>`
+              + `<td>${escapeHtml(row.teacherName || preview?.teacherName || '')}</td>`
+              + `<td class="text-center">`
+              + `<div class="form-check form-switch d-inline-flex justify-content-center mb-0">`
+              + `<input class="form-check-input" type="checkbox" role="switch" id="${escapeHtml(switchId)}"`
+              + ` data-takeover-previous-edit="1" data-class-id="${escapeHtml(classId)}" data-session-id="${escapeHtml(sessionId)}"`
+              + `${allowEdit ? ' checked' : ''} aria-label="Allow previous teacher to edit this session">`
+              + `</div></td></tr>`;
           }).join('')
-          : '<tr><td colspan="3" class="text-muted">No sessions to take over.</td></tr>';
+          : '<tr><td colspan="4" class="text-muted">No sessions to take over.</td></tr>';
       }
       setAlert('scheduleTakeOverReviewBlockers', preview?.blockers || []);
     }
+
+    async function handlePreviousEditSwitchChange(input) {
+      if (!input || state.step !== 'review') return;
+      const classId = clean(input.getAttribute('data-class-id'));
+      const sessionId = clean(input.getAttribute('data-session-id'));
+      if (!classId || !sessionId) return;
+      updateStateSessionEditFlag(classId, sessionId, input.checked === true);
+      const next = document.getElementById('btn_scheduleTakeOverNext');
+      if (next) next.disabled = true;
+      try {
+        const preview = await refreshPreview();
+        renderReviewStep(preview);
+      } catch (error) {
+        await deps.uiAlert?.(error.message || 'Unable to refresh take over preview.', 'Take Over', { icon: 'warning' });
+      } finally {
+        if (next) next.disabled = false;
+      }
+    }
+
+    document.getElementById('scheduleTakeOverReviewTbody')?.addEventListener('change', (changeEvent) => {
+      const target = changeEvent.target;
+      if (!target || !target.matches('[data-takeover-previous-edit]')) return;
+      void handlePreviousEditSwitchChange(target);
+    });
 
     function openTeacherPicker() {
       if (!global.GenericPicker || typeof global.GenericPicker.open !== 'function' || !global.GenericPickerPresets?.teacher) {
@@ -249,6 +323,7 @@
             await deps.uiAlert?.('Choose a teacher.', 'Take Over', { icon: 'info' });
             return;
           }
+          syncStateSessionsEditFlags();
           const preview = await refreshPreview();
           renderTeacherStep(preview);
           if (preview?.blockers?.length) return;
@@ -309,7 +384,10 @@
         );
         return;
       }
-      state.sessions = ctx.sessions;
+      state.sessions = (ctx.sessions || []).map((row) => ({
+        ...row,
+        allowPreviousTeacherEdit: true
+      }));
       state.teacherId = '';
       state.teacherName = '';
       state.preview = null;

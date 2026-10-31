@@ -89,11 +89,24 @@ function templateHasSharedStudentFields(template) {
  * Shared assignment answers may be written only when every other instance
  * on the assignment is draft (or there are no siblings / no shared fields).
  */
+function cleanAssignmentRowId(value) {
+  return String(value || '').trim();
+}
+
+function filterInstancesForAssignmentRow(instances = [], assignmentRowId = '') {
+  const rowScope = cleanAssignmentRowId(assignmentRowId);
+  if (!rowScope) return Array.isArray(instances) ? instances : [];
+  return (Array.isArray(instances) ? instances : []).filter(
+    (inst) => cleanAssignmentRowId(inst?.assignmentRowId) === rowScope
+  );
+}
+
 function evaluateSharedFieldsEditability({
   assignment,
   template,
   instances,
   currentInstanceId = '',
+  assignmentRowId = '',
   allowAdminOverride = false
 } = {}) {
   const reportService = require('./reportService');
@@ -120,8 +133,9 @@ function evaluateSharedFieldsEditability({
     }
     return true;
   });
+  const scopedSiblings = filterInstancesForAssignmentRow(siblings, assignmentRowId);
 
-  const blockingSiblings = siblings
+  const blockingSiblings = scopedSiblings
     .filter((inst) => !isTeacherModifiableInstanceStatus(inst?.status))
     .map((inst) => ({
       id: String(inst.id || '').trim(),
@@ -164,7 +178,7 @@ function evaluateSharedFieldsEditability({
   };
 }
 
-async function loadAssignmentInstancesForSharedGate(assignmentId, reqUser) {
+async function loadAssignmentInstancesForSharedGate(assignmentId, reqUser, options = {}) {
   const id = toPublicId(assignmentId);
   if (!id) return [];
   const rows = await schoolDataService.fetchData('reportInstances', {
@@ -172,7 +186,8 @@ async function loadAssignmentInstancesForSharedGate(assignmentId, reqUser) {
     page: 1,
     limit: 10000
   }, reqUser);
-  return Array.isArray(rows) ? rows : [];
+  const list = Array.isArray(rows) ? rows : [];
+  return filterInstancesForAssignmentRow(list, options?.assignmentRowId);
 }
 
 /**
@@ -182,13 +197,15 @@ function evaluateSharedFieldsLockAfterReopen({
   assignment,
   template,
   instances,
-  reopeningInstanceId = ''
+  reopeningInstanceId = '',
+  assignmentRowId = ''
 } = {}) {
   const evaluation = evaluateSharedFieldsEditability({
     assignment,
     template,
     instances,
-    currentInstanceId: reopeningInstanceId
+    currentInstanceId: reopeningInstanceId,
+    assignmentRowId
   });
   return {
     ...evaluation,
@@ -277,6 +294,24 @@ function parseBooleanFlag(rawValue, fallback = false) {
   if (['1', 'true', 'yes', 'on'].includes(value)) return true;
   if (['0', 'false', 'no', 'off'].includes(value)) return false;
   return Boolean(fallback);
+}
+
+function parseRequiredGradebookSkillsFromBody(body = {}, existingTemplate = null) {
+  const raw = body.requiredGradebookSkillsJson;
+  if (raw === undefined || raw === null || raw === '') {
+    return Array.isArray(existingTemplate?.requiredGradebookSkills)
+      ? [...existingTemplate.requiredGradebookSkills]
+      : [];
+  }
+  let parsed = raw;
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      parsed = String(parsed).split(/[,|\n]/).map((item) => String(item || '').trim()).filter(Boolean);
+    }
+  }
+  return Array.isArray(parsed) ? parsed : [];
 }
 
 function parseTargetRowsField(rawValue) {
@@ -1032,6 +1067,12 @@ function buildTemplateSavePayload({
       : (existingTemplate?.conductRequiredBeforeFill !== undefined
         ? parseBooleanFlag(existingTemplate.conductRequiredBeforeFill, true)
         : true),
+    requiredGradebookSkills: parseRequiredGradebookSkillsFromBody(body, existingTemplate),
+    requireGradebookSkillsBeforeFill: String(body.requireGradebookSkillsBeforeFillPresent || '').trim()
+      ? parseBooleanFlag(body.requireGradebookSkillsBeforeFill, false)
+      : (existingTemplate?.requireGradebookSkillsBeforeFill !== undefined
+        ? parseBooleanFlag(existingTemplate.requireGradebookSkillsBeforeFill, true)
+        : true),
     schema: buildSchemaFromBuilderPayload(body),
     placeholderMap: buildPlaceholderMapFromPayload(body),
     audit: {
@@ -1782,7 +1823,8 @@ async function buildInstanceListRows({
         assignment,
         template,
         instances: assignmentInstances,
-        reopeningInstanceId: row?.id || ''
+        reopeningInstanceId: row?.id || '',
+        assignmentRowId: row?.assignmentRowId || ''
       });
       return {
         ...row,
@@ -1924,9 +1966,11 @@ async function buildReportReviewNavigator({ currentInstance, reqUser, participan
     return { rows: [], currentIndex: -1, olderCount: 0, olderHref: '', newerHref: '' };
   }
 
-  const [allInstances, allAssignments] = await Promise.all([
+  const [allInstances, allAssignments, teachers, students] = await Promise.all([
     listAllReportInstances(reqUser),
-    listAllReportAssignments(reqUser)
+    listAllReportAssignments(reqUser),
+    schoolDataService.fetchAllData('teachers', {}, reqUser),
+    schoolDataService.fetchAllData('students', {}, reqUser)
   ]);
   const assignmentMap = new Map(
     (Array.isArray(allAssignments) ? allAssignments : [])
@@ -1935,7 +1979,7 @@ async function buildReportReviewNavigator({ currentInstance, reqUser, participan
   );
   const viewerPersonId = toPublicId(reqUser?.personId || reqUser?.id || '');
 
-  const rows = filterRecordsByOrg(allInstances, reqUser)
+  const matchedInstances = filterRecordsByOrg(allInstances, reqUser)
     .filter(isActiveReportInstance)
     .filter((row) => idsEqual(row?.orgId, currentInstance?.orgId))
     .filter((row) => idsEqual(row?.classId, currentInstance?.classId))
@@ -1945,17 +1989,35 @@ async function buildReportReviewNavigator({ currentInstance, reqUser, participan
       const assignment = assignmentMap.get(toPublicId(row?.assignmentId)) || null;
       return isReportInstanceAssignmentConsistent(row, assignment);
     })
-    .filter((row) => !participantOnly || canParticipantReviewInstance(row, viewerPersonId))
+    .filter((row) => !participantOnly || canParticipantReviewInstance(row, viewerPersonId));
+
+  const participantTokens = [];
+  matchedInstances.forEach((row) => {
+    const teacherId = toPublicId(row?.teacherId);
+    const studentId = toPublicId(row?.studentId);
+    if (teacherId) participantTokens.push(teacherId);
+    if (studentId) participantTokens.push(studentId);
+  });
+  const participantNames = await buildReportParticipantNameContext({
+    reqUser,
+    students,
+    teachers,
+    participantTokens
+  });
+
+  const rows = matchedInstances
     .map((row) => {
       const assignment = assignmentMap.get(toPublicId(row?.assignmentId)) || null;
       const sortDate = resolveReviewNavigatorSortDate(row, assignment);
       const id = toPublicId(row?.id);
+      const participants = mapReportInstanceParticipantFields({ row, participantNames });
       return {
         id,
         href: `/school/reports/instances/edit-v2/${encodeURIComponent(id)}`,
         sessionDate: sortDate,
         status: String(row?.status || '').trim(),
-        teacherId: toPublicId(row?.teacherId) || String(row?.teacherId || '').trim(),
+        teacherId: participants.teacherId,
+        teacherName: participants.teacherName,
         isCurrent: idsEqual(id, currentId),
         _sortDate: sortDate,
         _createdAt: String(row?.audit?.createDateTime || '').trim()

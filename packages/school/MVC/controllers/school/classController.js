@@ -35,6 +35,7 @@ const sessionMergeService = require('../../services/school/sessionMergeService')
 const skillCatalogService = require('../../services/school/skillCatalogService');
 const { normalizeSkillCode } = require('../../../config/skillDefinitions');
 const sessionDeliveryTeamService = require('../../services/school/sessionDeliveryTeamService');
+const sessionDeliveryEscalatedAccessService = require('../../services/school/sessionDeliveryEscalatedAccessService');
 const idempotencyGuardService = require('../../services/school/idempotencyGuardService');
 const registrationIntegrityService = require('../../services/school/registrationIntegrityService');
 const schoolDependencyService = require('../../services/school/schoolDependencyService');
@@ -108,6 +109,7 @@ const gradebookSkillCatalogService = require('../../services/school/gradebookSki
 const gradebookWeightService = require('../../services/school/gradebookWeightService');
 const sessionGradebookService = require('../../services/school/sessionGradebookService');
 const sessionGradebookMakeupService = require('../../services/school/sessionGradebookMakeupService');
+const reportPeriodGradebookSkillCoverageService = require('../../services/school/reportPeriodGradebookSkillCoverageService');
 const teachingOutlineSuggestionService = require('../../services/school/teachingOutlineSuggestionService');
 const teachingOutlineCatalogService = require('../../services/school/teachingOutlineCatalogService');
 const sessionConflictDetectionService = require('../../services/school/sessionConflictDetectionService');
@@ -1286,66 +1288,27 @@ async function getClassByIdWithOrgCheck(classId, reqUser, accessContext = {}) {
 }
 
 async function getClassByIdForSessionManage(classId, req, { sessionId = '', sessionDate = '' } = {}) {
-    const accessContext = buildRouteAccessContext(req);
-    const activeOrgId = getActiveOrgIdOrThrow(req.user);
-    let classData = await schoolDataService.getDataById('classes', classId, req.user, accessContext);
-    if (classData) {
-        assertClassOrgAccess(classData, activeOrgId, req.user);
-        return { classData, activeOrgId };
-    }
-
-    const normalizedSessionId = String(sessionId || '').trim();
-    if (!normalizedSessionId) {
-        throw schoolRecordAccessService.createAccessDeniedError(schoolRecordAccessService.CLASS_ACCESS_DENIED);
-    }
-
-    const orgAccessContext = { scopeId: 'SCP_ORG' };
-    classData = await schoolDataService.getDataById('classes', classId, req.user, orgAccessContext);
-    if (!classData) {
-        throw schoolRecordAccessService.createAccessDeniedError(schoolRecordAccessService.CLASS_ACCESS_DENIED);
-    }
-    assertClassOrgAccess(classData, activeOrgId, req.user);
-    const sessions = Array.isArray(classData.sessions) ? classData.sessions : [];
-    const { session } = findSessionInList(sessions, normalizedSessionId, sessionDate);
-    if (!session) {
-        throw schoolRecordAccessService.createAccessDeniedError(schoolRecordAccessService.CLASS_ACCESS_DENIED);
-    }
-
-    const sessionAccess = schoolRecordAccessService.resolveAccessFromRequest(req);
-    try {
-        schoolRecordAccessService.assertSessionAccessible({
-            classRow: classData,
-            session,
-            access: sessionAccess,
-            context: 'manageSession'
-        });
-    } catch (_) {
-        schoolRecordAccessService.assertSessionAccessible({
-            classRow: classData,
-            session,
-            access: sessionAccess,
-            context: 'viewSession'
-        });
-    }
-
-    return { classData, activeOrgId };
-}
-
-const SESSION_MANAGE_ORG_ACCESS_CONTEXT = { scopeId: 'SCP_ORG' };
-
-async function loadSessionManageScope(classId, req, { sessionId = '', sessionDate = '' } = {}) {
-    const routeAccessContext = buildRouteAccessContext(req);
-    const { classData, activeOrgId } = await getClassByIdForSessionManage(classId, req, {
+    const { classData, activeOrgId } = await sessionDeliveryEscalatedAccessService.loadClassForSessionManage(req, classId, {
         sessionId,
         sessionDate
     });
-    const scopedClassRow = await schoolDataService.getDataById('classes', classId, req.user, routeAccessContext);
-    const persistAccessContext = scopedClassRow ? routeAccessContext : SESSION_MANAGE_ORG_ACCESS_CONTEXT;
-    let sessions = await schoolDataService.getClassSessions(classId, req.user, persistAccessContext);
-    if (!sessions.length && Array.isArray(classData?.sessions) && classData.sessions.length) {
-        sessions = classData.sessions;
-    }
-    return { classData, activeOrgId, sessions, persistAccessContext };
+    return { classData, activeOrgId };
+}
+
+const SESSION_MANAGE_ORG_ACCESS_CONTEXT = sessionDeliveryEscalatedAccessService.SESSION_DELIVERY_ORG_ACCESS_CONTEXT;
+
+async function loadSessionManageScope(classId, req, { sessionId = '', sessionDate = '' } = {}) {
+    const ctx = await sessionDeliveryEscalatedAccessService.loadSessionManageContext(req, {
+        classId,
+        sessionId,
+        sessionDate
+    });
+    return {
+        classData: ctx.classData,
+        activeOrgId: ctx.activeOrgId,
+        sessions: ctx.sessions,
+        persistAccessContext: ctx.persistAccessContext
+    };
 }
 
 function normalizeDateOnlyValue(value) {
@@ -2761,24 +2724,20 @@ function isMergedSessionRequiredSessionByMap(statusMap, session = {}) {
 }
 
 async function assertSessionInstructionalActiveForRequest(classId, sessionId, req) {
-    const reqUser = req?.user || req;
-    const accessContext = req?.user ? buildRouteAccessContext(req) : {};
-    const { classData } = await getClassByIdWithOrgCheck(classId, reqUser, accessContext);
-    const sessions = await schoolDataService.getClassSessions(classId, reqUser);
-    const sessionIndex = (Array.isArray(sessions) ? sessions : [])
-        .findIndex((row) => idsEqual(row?.sessionId || row?.id, sessionId));
-    if (sessionIndex < 0) throw new Error('Session not found.');
-    const session = sessions[sessionIndex];
-    if (req?.user) {
-        assertSessionScopeForRequest(req, classData, session, 'manageSession');
-    }
-    const statusMap = await sessionStatusPolicyService.getStatusMap(classData?.orgId || getActiveOrgIdOrThrow(reqUser), {
-        includeInactive: true
+    const sessionDate = resolveSessionDateFromRequest(req);
+    const result = await sessionDeliveryEscalatedAccessService.assertSessionInstructionalActive(req, {
+        classId,
+        sessionId,
+        sessionDate
     });
-    if (isMakeUpRequiredSessionByMap(statusMap, session)) {
-        throw new Error('This original session is inactive because its status requires a make-up session. Attendance, gradebook, content, cases, and files are not available for this session. Create or open the make-up session instead.');
-    }
-    return { classData, sessions, sessionIndex, session, statusMap };
+    return {
+        classData: result.classData,
+        sessions: result.sessions,
+        sessionIndex: result.sessionIndex,
+        session: result.session,
+        statusMap: result.statusMap,
+        persistAccessContext: result.persistAccessContext
+    };
 }
 
 function normalizePostedSkillIds(value) {
@@ -5047,13 +5006,7 @@ async function assignReportToSession(req, res) {
 
 async function getBookCoveringSummaryForSession(req, res) {
     try {
-        const { id: classId, sessionId } = req.params;
-        const accessContext = bookCoveringAccessService.buildRouteAccessContext(req);
-        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, accessContext);
-        const sessions = await schoolDataService.getClassSessions(classId, req.user);
-        const { session } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
-        if (!session) throw new Error('Session not found.');
-        assertSessionScopeForRequest(req, classData, session);
+        const { classData, session, accessContext } = await resolveSessionBookCoveringContext(req);
 
         const summary = await bookCoveringReportService.getSessionBookCoveringSummary(
             classData,
@@ -5075,12 +5028,12 @@ async function getBookCoveringSummaryForSession(req, res) {
 async function deleteBookCoveringForSession(req, res) {
     try {
         const { id: classId, sessionId, reportId } = req.params;
-        const accessContext = bookCoveringAccessService.buildRouteAccessContext(req);
-        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, accessContext);
-        const sessions = await schoolDataService.getClassSessions(classId, req.user);
-        const { session } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
-        if (!session) throw new Error('Session not found.');
-        assertSessionScopeForRequest(req, classData, session);
+        const {
+            classData,
+            session,
+            accessContext,
+            sessionDeliveryContext
+        } = await resolveSessionBookCoveringContext(req);
 
         const report = await schoolDataService.getDataById('bookCoveringReports', reportId, req.user, accessContext);
         if (!report) throw new Error('Book coverage report not found.');
@@ -5090,7 +5043,7 @@ async function deleteBookCoveringForSession(req, res) {
         if (String(report.sessionId || '').trim() && !idsEqual(report.sessionId, sessionId)) {
             throw new Error('Book coverage report is not linked to this session.');
         }
-        bookCoveringAccessService.assertCanMutateReport(req, report, accessContext);
+        bookCoveringAccessService.assertCanMutateReport(req, report, accessContext, null, sessionDeliveryContext);
 
         await bookCoveringReportService.deleteReport(reportId, req.user, accessContext);
 
@@ -5107,13 +5060,21 @@ async function deleteBookCoveringForSession(req, res) {
 
 async function createBookCoveringForSession(req, res) {
     try {
-        const { id: classId, sessionId } = req.params;
-        const accessContext = bookCoveringAccessService.buildRouteAccessContext(req);
-        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, accessContext);
-        const sessions = await schoolDataService.getClassSessions(classId, req.user);
-        const { session } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
-        if (!session) throw new Error('Session not found.');
-        assertSessionScopeForRequest(req, classData, session);
+        const {
+            classData,
+            session,
+            accessContext,
+            sessionDeliveryContext
+        } = await resolveSessionBookCoveringContext(req);
+        const teacherId = sessionReportAssignmentService.resolveTeacherId(session, classData);
+        if (teacherId) {
+            bookCoveringAccessService.assertCanCreateForTeacher(
+                req,
+                teacherId,
+                accessContext,
+                sessionDeliveryContext
+            );
+        }
 
         const result = await bookCoveringReportService.createDraftForSession({
             classData,
@@ -5144,13 +5105,28 @@ async function createBookCoveringForSession(req, res) {
 
 async function resolveSessionBookCoveringContext(req) {
     const { id: classId, sessionId } = req.params;
-    const accessContext = bookCoveringAccessService.buildRouteAccessContext(req);
-    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, accessContext);
-    const sessions = await schoolDataService.getClassSessions(classId, req.user);
-    const { session } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
+    const sessionDate = resolveSessionDateFromRequest(req);
+    const ctx = await sessionDeliveryEscalatedAccessService.loadSessionManageContext(req, {
+        classId,
+        sessionId,
+        sessionDate
+    });
+    const { session } = findSessionInList(ctx.sessions, sessionId, sessionDate);
     if (!session) throw new Error('Session not found.');
-    assertSessionScopeForRequest(req, classData, session);
-    return { classData, session, accessContext };
+    assertSessionScopeForRequest(req, ctx.classData, session);
+    const routeAccessContext = bookCoveringAccessService.buildRouteAccessContext(req);
+    const accessContext = ctx.persistAccessContext || routeAccessContext;
+    const sessionDeliveryContext = {
+        accessCategory: sessionDeliveryEscalatedAccessService.ACCESS_CHECK_CATEGORY,
+        session,
+        classData: ctx.classData
+    };
+    return {
+        classData: ctx.classData,
+        session,
+        accessContext,
+        sessionDeliveryContext
+    };
 }
 
 async function listSessionBookCoveringAssignedBooks(req, res) {
@@ -5271,15 +5247,125 @@ async function listSessionReportInstances(req, res) {
             sessionRoster: enrichedRoster,
             reqUser: req.user
         });
+        const skillCoverage = await buildSessionReportGradebookSkillCoveragePayload(req, {
+            classId,
+            sessionId,
+            session,
+            sessions,
+            viewerContext,
+            instanceRows: rows
+        });
         return res.json({
             status: 'success',
             rows,
             rosterReconciliation,
+            skillCoverageReady: skillCoverage.ready !== false,
+            skillCoverageGateActive: Boolean(skillCoverage.gateActive),
+            skillCoverageMissingCount: Array.isArray(skillCoverage.missingSkills) ? skillCoverage.missingSkills.length : 0,
             refreshedAt: new Date().toISOString()
         });
     } catch (error) {
         return res.status(400).json({ status: 'error', message: error.message });
     }
+}
+
+async function getSessionReportGradebookSkillCoverage(req, res) {
+    try {
+        const { id: classId, sessionId } = req.params;
+        const sessionDate = resolveSessionDateFromRequest(req);
+        const { classData, sessions } = await loadSessionManageScope(classId, req, {
+            sessionId,
+            sessionDate
+        });
+        const { session } = findSessionInList(sessions, sessionId, sessionDate);
+        if (!session) throw new Error('Session not found.');
+        assertSessionScopeForRequest(req, classData, session);
+
+        const enrichedRoster = await buildEnrichedSessionRosterForMutation({
+            classData,
+            session,
+            reqUser: req.user
+        });
+        const isReportAdminViewer = isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_REPORTS_INSTANCES, OPERATIONS.READ_ALL);
+        const viewerContext = await sessionReportInstanceService.buildSessionReportViewerContext({
+            classId,
+            sessionRoster: enrichedRoster,
+            reqUser: req.user,
+            isReportAdminViewer
+        });
+        const rows = await sessionReportInstanceService.buildSessionReportInstanceRows({
+            classId,
+            sessionId,
+            sessionDate: session?.date,
+            reqUser: req.user,
+            viewerContext,
+            sessionRoster: enrichedRoster
+        });
+        const skillCoverage = await buildSessionReportGradebookSkillCoveragePayload(req, {
+            classId,
+            sessionId,
+            session,
+            sessions,
+            viewerContext,
+            instanceRows: rows
+        });
+        return res.json({
+            status: 'success',
+            ...skillCoverage
+        });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
+async function buildSessionReportGradebookSkillCoveragePayload(req, {
+    classId,
+    sessionId,
+    session,
+    sessions,
+    viewerContext,
+    instanceRows = []
+} = {}) {
+    const sessionContext = {
+        classId: String(classId || '').trim(),
+        sessionId: String(sessionId || '').trim(),
+        sessionDate: session?.date
+    };
+    const assignments = [...(viewerContext?.assignmentMap instanceof Map
+        ? viewerContext.assignmentMap.values()
+        : [])]
+        .filter((assignment) => reportAssignmentSessionUtils.reportAssignmentMatchesSession(assignment, sessionContext));
+
+    const templateIds = new Set();
+    assignments.forEach((assignment) => {
+        const templateId = toPublicId(assignment?.templateId);
+        if (templateId) templateIds.add(templateId);
+    });
+    (Array.isArray(instanceRows) ? instanceRows : []).forEach((row) => {
+        const templateId = toPublicId(row?.templateId);
+        if (templateId) templateIds.add(templateId);
+    });
+
+    const templatesById = new Map();
+    await Promise.all([...templateIds].map(async (templateId) => {
+        const template = await schoolDataService.getDataById('reportTemplates', templateId, req.user);
+        if (template) templatesById.set(toPublicId(template.id), template);
+    }));
+
+    const period = sessionConductService.resolveReportPeriodForSession(
+        viewerContext?.assignmentMap,
+        sessionId
+    );
+
+    return reportPeriodGradebookSkillCoverageService.buildSessionSkillCoveragePayload({
+        assignments,
+        sessionContext,
+        templatesById,
+        instanceRows,
+        sessions,
+        periodStart: period.startDate,
+        periodDue: period.dueDate
+    });
 }
 
 async function listSessionStudentCases(req, res) {
@@ -7003,11 +7089,7 @@ async function getGradebookMakeupSources(req, res) {
 async function getGradebookMakeupActivities(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
-        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
-        const sessions = await schoolDataService.getClassSessions(classId, req.user);
-        const { session } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
-        if (!session) throw new Error('Session not found.');
-        assertSessionScopeForRequest(req, classData, session, 'manageSession');
+        const { session } = await assertSessionInstructionalActiveForRequest(classId, sessionId, req);
         const { makeupLinked } = sessionGradebookMakeupService.partitionGradebooksForSessionManagerClient(
             session.gradebooks
         );
@@ -7498,7 +7580,7 @@ module.exports = {
   getClassTemplate,
   checkConflicts,
   previewTeacherAssignmentImpact,
-  saveSession, saveSessionGradebooks, getGradebookMakeupSources, getGradebookMakeupActivities, postGradebookMakeupFrom, manageSession, previewClassSessionDelete, uploadSessionFile, createMakeupSession, deleteLinkedMakeupSession, listMergeEligibleTeachers, previewSessionMerge, executeSessionMerge, unmergeSession, assignReportToSession, getBookCoveringSummaryForSession, createBookCoveringForSession, deleteBookCoveringForSession, listSessionBookCoveringAssignedBooks, getSessionBookCoveringAssignedBookDetail, upsertSessionBookCoveringEntry, deleteSessionBookCoveringEntry, listSessionReportInstances, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
+  saveSession, saveSessionGradebooks, getGradebookMakeupSources, getGradebookMakeupActivities, postGradebookMakeupFrom, manageSession, previewClassSessionDelete, uploadSessionFile, createMakeupSession, deleteLinkedMakeupSession, listMergeEligibleTeachers, previewSessionMerge, executeSessionMerge, unmergeSession, assignReportToSession, getBookCoveringSummaryForSession, createBookCoveringForSession, deleteBookCoveringForSession, listSessionBookCoveringAssignedBooks, getSessionBookCoveringAssignedBookDetail, upsertSessionBookCoveringEntry, deleteSessionBookCoveringEntry, listSessionReportInstances, getSessionReportGradebookSkillCoverage, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
   saveSessionConduct,
   setSessionLock,
   showFinalGradesPage,

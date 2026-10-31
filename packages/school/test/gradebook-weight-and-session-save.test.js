@@ -169,6 +169,33 @@ test('normalizeSessionGradebooksFromRequest clears scoreComments for absent stud
   assert.equal(normalized[0].scoreComments.p2, 'Keep me');
 });
 
+test('normalizeSessionGradebooksFromRequest keeps scores and comments for absent students when periodPerformanceLog', () => {
+  const normalized = sessionGradebookService.normalizeSessionGradebooksFromRequest([
+    {
+      id: 'gb1',
+      name: 'Period summary',
+      weight: 10,
+      totalScore: 10,
+      includeInGradeCalculation: true,
+      periodPerformanceLog: true,
+      scores: { p1: 7, p2: 9 },
+      scoreComments: { p1: 'Teacher estimate', p2: 'Keep me' }
+    }
+  ], {
+    personIds: ['p1', 'p2'],
+    attendanceByPerson: new Map([['p1', 'absent'], ['p2', 'present']]),
+    existingGradebookById: new Map(),
+    sessionSkillPolicy: { selectableIds: [], catalog: [] },
+    mergeHistoricalGradebookSkills: (_incoming, _existing, _ids) => []
+  });
+
+  assert.equal(normalized[0].periodPerformanceLog, true);
+  assert.equal(normalized[0].scores.p1, 7);
+  assert.equal(normalized[0].scores.p2, 9);
+  assert.equal(normalized[0].scoreComments.p1, 'Teacher estimate');
+  assert.equal(normalized[0].scoreComments.p2, 'Keep me');
+});
+
 test('normalizeSessionGradebooksFromRequest truncates scoreComments to 2000 chars', () => {
   const longComment = 'x'.repeat(2500);
   const normalized = sessionGradebookService.normalizeSessionGradebooksFromRequest([
@@ -197,4 +224,10 @@ test('sessionManager gradebook supports per-student activity comments', () => {
   assert.match(sessionManagerSource, /scoreComments/);
   assert.match(sessionManagerSource, /gbOpenCommentModal/);
   assert.match(sessionManagerSource, /gbCommentModalText/);
+});
+
+test('sessionManager supports period performance log activity modal and persistence', () => {
+  assert.match(sessionManagerSource, /gbModalPeriodPerformanceLog/);
+  assert.match(sessionManagerSource, /periodPerformanceLog/);
+  assert.match(sessionManagerSource, /gbIsPersonGradeBlockedForActivity/);
 });

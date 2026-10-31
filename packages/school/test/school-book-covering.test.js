@@ -593,3 +593,46 @@ test('bookCoveringReports repository uses teacherId assignment scope', () => {
   const block = repoSource.split('bookCoveringReports: createSchoolRepository')[1]?.split('teachingOutlineLevels:')[0] || '';
   assert.match(block, /assignmentScopeKind:\s*'teacherId'/);
 });
+
+test('canAccessSessionLinkedReport grants session editor access to prior teacher reports', () => {
+  const bookCoveringAccessService = require('../MVC/services/school/bookCoveringAccessService');
+  const { SCOPE_MODES } = require('../MVC/services/school/schoolDataScopeBuilder');
+  const { ACCESS_CHECK_CATEGORY } = require('../MVC/services/school/sessionDeliveryEscalatedAccessService');
+
+  const report = {
+    id: 'RPT-1',
+    classId: 'CLS-1',
+    sessionId: 'SES-1',
+    teacherId: 'TCH_OLD'
+  };
+  const session = {
+    sessionId: 'SES-1',
+    delivery: { deliveredBy: 'TCH_NEW', coTeachers: [] }
+  };
+  const classData = { id: 'CLS-1' };
+  const assignmentAccess = { scopeMode: SCOPE_MODES.ASSIGNMENT, personId: 'TCH_NEW' };
+
+  assert.equal(bookCoveringAccessService.canAccessReport(report, assignmentAccess), false);
+  assert.equal(bookCoveringAccessService.canAccessSessionLinkedReport(report, {
+    session,
+    classData,
+    personId: 'TCH_NEW'
+  }), true);
+
+  const req = { user: { id: 'U1', personId: 'TCH_NEW' } };
+  const sessionDeliveryContext = {
+    accessCategory: ACCESS_CHECK_CATEGORY,
+    session,
+    classData
+  };
+  bookCoveringAccessService.assertCanMutateReport(req, report, { scopeId: 'SCP_ASSIGNMENT' }, null, sessionDeliveryContext);
+});
+
+test('canAccessReport without session delivery context still requires teacher ownership', () => {
+  const bookCoveringAccessService = require('../MVC/services/school/bookCoveringAccessService');
+  const { SCOPE_MODES } = require('../MVC/services/school/schoolDataScopeBuilder');
+
+  const report = { classId: 'CLS-1', sessionId: 'SES-1', teacherId: 'TCH_OLD' };
+  const assignmentAccess = { scopeMode: SCOPE_MODES.ASSIGNMENT, personId: 'TCH_NEW' };
+  assert.equal(bookCoveringAccessService.canAccessReport(report, assignmentAccess), false);
+});

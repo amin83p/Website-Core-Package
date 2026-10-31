@@ -140,10 +140,49 @@ test('take over makes the new teacher the main teacher and the previous teacher 
   const coach = updated.delivery.coTeachers.find((row) => row.personId === 'TCH_CO');
   assert.equal(previous.paid, false);
   assert.equal(previous.paidHours, 0);
-  assert.equal(previous.canEdit, false);
+  assert.equal(previous.canEdit, true);
   assert.equal(previous.roleLabel, 'Previous Teacher');
   assert.ok(coach);
   assert.equal(updated.delivery.coTeachers.some((row) => row.personId === 'TCH_NEW'), false);
+});
+
+test('applyTakeOverToSession sets previous teacher canEdit false when allowPreviousTeacherEdit is false', () => {
+  const updated = scheduleTakeOverSessionsService.applyTakeOverToSession(sessionRow({ status: 'scheduled' }), {
+    teacherId: 'TCH_NEW',
+    teacherName: 'Noah',
+    allowPreviousTeacherEdit: false
+  });
+  const previous = updated.delivery.coTeachers.find((row) => row.personId === 'TCH_OLD');
+  assert.equal(previous.canEdit, false);
+});
+
+test('parseSelectedSessions carries allowPreviousTeacherEdit with default true', () => {
+  const defaulted = scheduleTakeOverSessionsService.parseSelectedSessions({
+    sessions: [{ classId: 'CLS_A', sessionId: 'SES_1' }]
+  });
+  assert.equal(defaulted[0].allowPreviousTeacherEdit, true);
+  const disabled = scheduleTakeOverSessionsService.parseSelectedSessions({
+    sessions: [{ classId: 'CLS_A', sessionId: 'SES_1', allowPreviousTeacherEdit: 'off' }]
+  });
+  assert.equal(disabled[0].allowPreviousTeacherEdit, false);
+});
+
+test('take over preview hash changes when per-session edit flags differ', () => {
+  const base = {
+    teacherId: 'TCH_NEW',
+    classId: 'CLS_A',
+    sessionKeys: ['CLS_A::SES_1'],
+    previousKeys: ['SES_1::TCH_OLD']
+  };
+  const allowOn = scheduleTakeOverSessionsService.buildTakeOverPreviewHash({
+    ...base,
+    editBySessionKey: [{ key: 'CLS_A::SES_1', allow: true }]
+  });
+  const allowOff = scheduleTakeOverSessionsService.buildTakeOverPreviewHash({
+    ...base,
+    editBySessionKey: [{ key: 'CLS_A::SES_1', allow: false }]
+  });
+  assert.notEqual(allowOn, allowOff);
 });
 
 test('collectAffectedPersonIdsFromSessions includes the new main teacher and previous co-teachers', () => {
@@ -236,16 +275,20 @@ test('a conflicting teacher schedule blocks take over and a clear schedule is sa
 
 test('take over is wired beside merge on the schedule rail', () => {
   const view = fs.readFileSync(path.join(__dirname, '../MVC/views/school/schedule/personScheduleAdmin.ejs'), 'utf8');
+  const calendarShell = fs.readFileSync(path.join(__dirname, '../MVC/views/school/schedule/partials/personScheduleCalendarShell.ejs'), 'utf8');
+  const modal = fs.readFileSync(path.join(__dirname, '../MVC/views/school/schedule/partials/scheduleTakeOverSessionsModal.ejs'), 'utf8');
+  const contextMenu = fs.readFileSync(path.join(__dirname, '../MVC/views/school/schedule/partials/personScheduleSessionContextMenuAdmin.ejs'), 'utf8');
+  const adminScripts = fs.readFileSync(path.join(__dirname, '../MVC/views/school/schedule/partials/personScheduleScriptsAdmin.ejs'), 'utf8');
   const routes = fs.readFileSync(path.join(__dirname, '../MVC/routes/scheduleRoutes.js'), 'utf8');
   const viewer = fs.readFileSync(path.join(__dirname, '../public/scripts/masterScheduleViewer.js'), 'utf8');
   const script = fs.readFileSync(path.join(__dirname, '../public/scripts/masterScheduleTakeOverSessions.js'), 'utf8');
-  assert.match(view, /data-schedule-admin-action="merge-sessions"/);
-  assert.match(view, /Merge Sessions/);
-  assert.match(view, /data-schedule-admin-action="take-over-sessions"/);
-  assert.match(view, /Take Over \/ Undo Take Over/);
-  assert.match(view, /btn_scheduleSessionContextUndoTakeOver/);
-  assert.match(view, /Undo Take Over/);
-  assert.match(view, /masterScheduleTakeOverSessions\.js/);
+  assert.match(calendarShell, /data-schedule-admin-action="merge-sessions"/);
+  assert.match(calendarShell, /data-schedule-admin-action="take-over-sessions"/);
+  assert.match(modal, /Previous can edit/);
+  assert.match(view, /scheduleTakeOverSessionsModal/);
+  assert.match(contextMenu, /btn_scheduleSessionContextUndoTakeOver/);
+  assert.match(contextMenu, /Undo Take Over/);
+  assert.match(adminScripts, /masterScheduleTakeOverSessions\.js/);
   assert.match(routes, /\/api\/take-over-sessions\/preview/);
   assert.match(routes, /\/api\/take-over-sessions\/apply/);
   assert.match(routes, /\/api\/take-over-sessions\/undo-preview/);
@@ -263,6 +306,8 @@ test('take over is wired beside merge on the schedule rail', () => {
   assert.match(script, /undoTakeOverForSessions/);
   assert.match(script, /allUndoable/);
   assert.match(script, /not all in the same take-over state/);
+  assert.match(script, /allowPreviousTeacherEdit/);
+  assert.match(script, /data-takeover-previous-edit/);
   assert.match(script, /row\.sessions/);
   assert.match(script, /<ul/);
 });

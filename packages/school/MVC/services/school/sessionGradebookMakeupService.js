@@ -20,6 +20,12 @@ function isOriginalGradebookActivity(gb) {
   return !srcSession && !srcGb;
 }
 
+function isMakeupSourceEligibleActivity(gb) {
+  if (!isOriginalGradebookActivity(gb)) return false;
+  if (Boolean(gb.periodPerformanceLog)) return false;
+  return true;
+}
+
 function isMakeupLinkedGradebookActivity(gb) {
   if (!gb || typeof gb !== 'object') return false;
   const srcSession = cleanId(gb.makeupSource?.sessionId);
@@ -342,6 +348,13 @@ function previewMakeupGradebook({
   if (!sourceGradebook || !isOriginalGradebookActivity(sourceGradebook)) {
     return { status: 'blocked', messages: ['Source activity was not found or is not an original activity.'], cohort: null };
   }
+  if (Boolean(sourceGradebook.periodPerformanceLog)) {
+    return {
+      status: 'blocked',
+      messages: ['Period performance log activities cannot be used as make-up sources.'],
+      cohort: null
+    };
+  }
   if (hasDuplicateMakeupLink(currentSession, srcSid, srcGb)) {
     return {
       status: 'blocked',
@@ -474,6 +487,7 @@ function normalizeMakeupGradebookOnSave(gb, context = {}) {
 module.exports = {
   MAKEUP_SOURCE_LOOKBACK_DAYS,
   isOriginalGradebookActivity,
+  isMakeupSourceEligibleActivity,
   isMakeupLinkedGradebookActivity,
   partitionGradebooksForSessionManagerClient,
   isMissedSessionAttendance,

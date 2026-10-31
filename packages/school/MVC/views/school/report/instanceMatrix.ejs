@@ -1801,7 +1801,7 @@
         if (remainingBlocking.length) {
           confirmMessage += '\n\nImportant: shared fields will stay read-only after this reopen because ' + remainingBlocking.length + ' other student report(s) remain submitted/locked/archived. Only private fields will be editable until those reports are also reopened to draft.';
         } else if (rows.length > 1) {
-          confirmMessage += '\n\nAfter reopen, shared fields become editable because all student reports in this matrix will be draft.';
+          confirmMessage += '\n\nAfter reopen, shared fields become editable because all student reports on this assignment will be draft.';
         }
       }
       const confirmed = await confirmFn(confirmMessage);

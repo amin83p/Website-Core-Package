@@ -10,6 +10,7 @@ const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { getPrefillValue } = require('./reportPrefillKeyUtils');
 const matrixWindowService = require('./matrixWindowService');
+const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
 
 const VISUAL_TYPES = new Set(['section', 'subheader', 'row_break']);
 const STUDENT_NAME_KEYS = new Set([
@@ -374,9 +375,10 @@ function classifyMatrixFields(template, rows, assignment, contextHints = {}) {
     }
   });
 
-  const sharedAnswers = assignment?.sharedAnswers && typeof assignment.sharedAnswers === 'object'
-    ? assignment.sharedAnswers
-    : {};
+  const sharedAnswers = reportAssignmentModel.resolveSharedAnswersForRow(
+    assignment,
+    contextHints?.assignmentRowId || assignment?.assignmentRowId || assignment?.rowId || ''
+  );
   const sharedFieldDtos = sharedFields.map((field) => {
     const hasSavedValue = Object.prototype.hasOwnProperty.call(sharedAnswers, field.id);
     const rowValues = rows.map((row) => row.answers?.[field.id]);
@@ -492,7 +494,8 @@ async function buildMatrixContext({
     reportDate: clean(allRows[0]?.answers?.report_date),
     reportStartDate,
     reportDueDate,
-    sessionDate
+    sessionDate,
+    assignmentRowId: assignmentRowKey
   });
   const progress = buildProgress(allRows);
   const parsedWindow = windowParams || matrixWindowService.parseMatrixWindowQuery({});
@@ -502,6 +505,7 @@ async function buildMatrixContext({
     template,
     instances,
     currentInstanceId: '',
+    assignmentRowId: assignmentRowKey,
     allowAdminOverride: isAdminEditor
   });
 
@@ -971,8 +975,14 @@ async function buildMatrixExportPayload({ assignmentId, assignmentRowId = '', te
     teacherId: matrix.teacherId,
     reportStartDate: matrix.reportStartDate,
     reportDueDate: matrix.reportDueDate,
-    assignmentSharedAnswers: source.assignment.sharedAnswers || {},
-    sharedAnswers: source.assignment.sharedAnswers || {},
+    assignmentSharedAnswers: reportAssignmentModel.resolveSharedAnswersForRow(
+      source.assignment,
+      source.assignmentRowId || source.assignment?.assignmentRowId || ''
+    ),
+    sharedAnswers: reportAssignmentModel.resolveSharedAnswersForRow(
+      source.assignment,
+      source.assignmentRowId || source.assignment?.assignmentRowId || ''
+    ),
     commonFields: matrix.commonFields,
     sharedFields: matrix.sharedFields,
     rows

@@ -287,6 +287,48 @@
             <input type="number" class="form-control" name="reportPeriodOffset" id="reportPeriodOffset" min="1" max="999" step="1" value="<%= initialReportPeriodOffset %>">
             <div class="form-text">For Days, Weeks, or Months.</div>
           </div>
+          <%
+            const gradebookSkillsCatalog = (typeof gradebookSkills !== 'undefined' && Array.isArray(gradebookSkills))
+              ? gradebookSkills
+              : [];
+            const initialRequiredGradebookSkills = Array.isArray(template?.requiredGradebookSkills)
+              ? template.requiredGradebookSkills.map((id) => String(id || '').trim()).filter(Boolean)
+              : [];
+            const initialRequireGradebookSkillsBeforeFill = template?.requireGradebookSkillsBeforeFill !== false;
+          %>
+          <div class="col-12">
+            <div class="template-file-subsection">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
+                <div>
+                  <div class="fw-bold">Gradebook skills for reports</div>
+                  <div class="small text-muted">Skills that must have at least one gradebook activity in the report period before Fill Reports (when gating is enabled).</div>
+                </div>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnExtractRequiredGradebookSkills">
+                  <i class="bi bi-magic me-1"></i>Extract skills from template fields
+                </button>
+              </div>
+              <input type="hidden" name="requiredGradebookSkillsJson" id="requiredGradebookSkillsJson" value="">
+              <input type="hidden" name="requireGradebookSkillsBeforeFillPresent" value="true">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" name="requireGradebookSkillsBeforeFill" id="requireGradebookSkillsBeforeFill" value="true" <%= initialRequireGradebookSkillsBeforeFill ? 'checked' : '' %>>
+                <label class="form-check-label fw-semibold" for="requireGradebookSkillsBeforeFill">Require skill coverage before Fill Reports</label>
+              </div>
+              <div class="row g-2" id="requiredGradebookSkillsPicker">
+                <% if (!gradebookSkillsCatalog.length) { %>
+                  <div class="col-12 small text-muted">No gradebook skills are configured for this organization.</div>
+                <% } else { %>
+                  <% gradebookSkillsCatalog.forEach((skill) => { %>
+                    <div class="col-md-4 col-lg-3">
+                      <div class="form-check">
+                        <input class="form-check-input js-required-gradebook-skill" type="checkbox" value="<%= skill.id %>" id="requiredGbSkill_<%= skill.id %>" <%= initialRequiredGradebookSkills.includes(skill.id) ? 'checked' : '' %>>
+                        <label class="form-check-label" for="requiredGbSkill_<%= skill.id %>"><%= skill.label || skill.id %></label>
+                      </div>
+                    </div>
+                  <% }); %>
+                <% } %>
+              </div>
+            </div>
+          </div>
           <div class="col-12">
             <input type="hidden" name="targetDepartmentIdsPresent" value="true">
             <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
@@ -1161,6 +1203,41 @@
   }
   baseEl?.addEventListener('change', syncReportPeriodOffsetUi);
   syncReportPeriodOffsetUi();
+})();
+(function initRequiredGradebookSkillsUi() {
+  const jsonInput = document.getElementById('requiredGradebookSkillsJson');
+  const STUDENT_GRADEBOOK_SKILL_SUFFIXES = ['activity_count', 'avg_percent', 'min_percent', 'max_percent', 'points_earned', 'points_possible'];
+  function skillIdFromStudentGradebookPrefillKey(rawKey) {
+    const normalized = String(rawKey || '').trim().toLowerCase();
+    if (!normalized.startsWith('student_gradebook_skill_')) return '';
+    const rest = normalized.slice('student_gradebook_skill_'.length);
+    for (const suffix of STUDENT_GRADEBOOK_SKILL_SUFFIXES) {
+      const token = `_${suffix}`;
+      if (rest.endsWith(token)) return rest.slice(0, -token.length);
+    }
+    return '';
+  }
+  window.__extractGradebookSkillIdsFromPrefillKeys = function extractFromKeys(keys) {
+    const out = new Set();
+    (Array.isArray(keys) ? keys : []).forEach((raw) => {
+      const skillId = skillIdFromStudentGradebookPrefillKey(raw);
+      if (skillId) out.add(skillId);
+    });
+    return [...out];
+  };
+  function getSelectedRequiredGradebookSkills() {
+    return Array.from(document.querySelectorAll('.js-required-gradebook-skill:checked'))
+      .map((el) => String(el.value || '').trim())
+      .filter(Boolean);
+  }
+  function syncRequiredGradebookSkillsJson() {
+    if (jsonInput) jsonInput.value = JSON.stringify(getSelectedRequiredGradebookSkills());
+  }
+  document.querySelectorAll('.js-required-gradebook-skill').forEach((el) => {
+    el.addEventListener('change', syncRequiredGradebookSkillsJson);
+  });
+  syncRequiredGradebookSkillsJson();
+  window.__syncRequiredGradebookSkillsJson = syncRequiredGradebookSkillsJson;
 })();
 (function initTargetDepartmentsUi() {
   const tbody = document.getElementById('targetDepartmentsTbody');
@@ -3635,6 +3712,9 @@ num(value) <= 95</code></pre>
         return;
       }
       schemaJsonInput.value = JSON.stringify(finalPayload.schema);
+      if (typeof window.__syncRequiredGradebookSkillsJson === 'function') {
+        window.__syncRequiredGradebookSkillsJson();
+      }
       placeholderMapJsonInput.value = JSON.stringify(finalPayload.placeholderMap);
       if (snapshotKeysJsonInput) snapshotKeysJsonInput.value = JSON.stringify(snapshotKeysState);
       const labelsOut = {};
@@ -3860,6 +3940,32 @@ num(value) <= 95</code></pre>
     });
 
     syncFunderPdfPickerDisabled();
+
+    window.__collectTemplateFieldPrefillKeys = () => (
+      Array.isArray(fieldsState) ? fieldsState : []
+    ).map((field) => String(field?.prefillKey || '').trim()).filter(Boolean);
+
+    document.getElementById('btnExtractRequiredGradebookSkills')?.addEventListener('click', () => {
+      const keys = window.__collectTemplateFieldPrefillKeys();
+      const extracted = typeof window.__extractGradebookSkillIdsFromPrefillKeys === 'function'
+        ? window.__extractGradebookSkillIdsFromPrefillKeys(keys)
+        : [];
+      if (!extracted.length) {
+        void showReportModal({
+          title: 'No skills found',
+          icon: 'info',
+          message: 'No student_gradebook_skill_* prefill keys were found on template fields.'
+        });
+        return;
+      }
+      extracted.forEach((skillId) => {
+        const cb = document.getElementById(`requiredGbSkill_${skillId}`);
+        if (cb) cb.checked = true;
+      });
+      if (typeof window.__syncRequiredGradebookSkillsJson === 'function') {
+        window.__syncRequiredGradebookSkillsJson();
+      }
+    });
 
     initializeState();
     renderFieldRows();

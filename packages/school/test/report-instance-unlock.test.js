@@ -218,6 +218,38 @@ test('evaluateSharedFieldsEditability locks shared fields when siblings are not 
   assert.equal(adminOverride.blockingSiblingCount, 1);
 });
 
+test('evaluateSharedFieldsEditability scopes sibling gate by assignmentRowId when provided', () => {
+  const assignment = { id: 'ASN-1', reportScope: 'each_student' };
+  const template = {
+    schema: {
+      fields: [{ id: 'shared_note', type: 'textarea', sharedAcrossStudents: true }]
+    }
+  };
+  const instances = [
+    { id: 'RI-1', assignmentId: 'ASN-1', assignmentRowId: 'row-a', status: 'draft', studentId: 'S1' },
+    { id: 'RI-2', assignmentId: 'ASN-1', assignmentRowId: 'row-b', status: 'submitted', studentId: 'S2' }
+  ];
+
+  const rowScoped = reportViewService.evaluateSharedFieldsEditability({
+    assignment,
+    template,
+    instances,
+    currentInstanceId: 'RI-1',
+    assignmentRowId: 'row-a'
+  });
+  assert.equal(rowScoped.sharedFieldsEditable, true);
+  assert.equal(rowScoped.blockingSiblingCount, 0);
+
+  const assignmentWide = reportViewService.evaluateSharedFieldsEditability({
+    assignment,
+    template,
+    instances,
+    currentInstanceId: 'RI-1'
+  });
+  assert.equal(assignmentWide.sharedFieldsEditable, false);
+  assert.equal(assignmentWide.blockingSiblingCount, 1);
+});
+
 test('evaluateSharedFieldsLockAfterReopen warns when other instances remain non-draft', () => {
   const assignment = { id: 'ASN-1', reportScope: 'each_student' };
   const template = {

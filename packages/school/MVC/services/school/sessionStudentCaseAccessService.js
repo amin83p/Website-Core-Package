@@ -87,6 +87,14 @@ async function resolveCaseCapabilities(req, { classData = null, session = null, 
 
   let capabilities = mapAccessToCapabilities(sectionAccess, sessionMutationOk);
 
+  if (sessionMutationOk && (sectionAccess.canOpenList || sectionAccess.canViewCases || sectionAccess.canCreateCases || sectionAccess.canUpdateCases)) {
+    capabilities = {
+      ...capabilities,
+      canRead: true,
+      canReadAll: true
+    };
+  }
+
   if (caseRow) {
     capabilities = await applyRoutedCaseCapabilityOverrides(req, capabilities, caseRow, sectionAccess);
     capabilities.readOnly = (capabilities.canRead || capabilities.canReadAll) && !capabilities.canUpdate;

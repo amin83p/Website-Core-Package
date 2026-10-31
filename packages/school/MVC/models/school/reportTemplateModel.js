@@ -7,7 +7,9 @@ const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const reportRuleEngineService = require('../../services/school/reportRuleEngineService');
 const { normalizePrefillKey } = require('../../services/school/reportPrefillKeyUtils');
 const reportScopePolicy = require('../../services/school/reportScopePolicy');
+const reportTemplateIdService = require('../../services/school/reportTemplateIdService');
 const reportTargetDepartmentPolicy = require('../../services/school/reportTargetDepartmentPolicy');
+const gradebookSkillCatalogService = require('../../services/school/gradebookSkillCatalogService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/reportTemplates.json');
 
@@ -468,6 +470,20 @@ function sanitizeSnapshotKeyDocxAliases(rawAliases, snapshotKeys = []) {
   return out;
 }
 
+function sanitizeRequiredGradebookSkills(rawList) {
+  const rows = Array.isArray(rawList) ? rawList : [];
+  const out = [];
+  rows.forEach((row) => {
+    const raw = String(row || '').trim();
+    if (!raw) return;
+    const normalized = gradebookSkillCatalogService.normalizeGradebookSkillIds([raw]);
+    if (!normalized.length) throw new Error(`Invalid gradebook skill id "${raw}".`);
+    const id = normalized[0];
+    if (!out.includes(id)) out.push(id);
+  });
+  return out.slice(0, 30);
+}
+
 function sanitizeTemplate(input, { isUpdate = false, existing = null } = {}) {
   if (!isPlainObject(input)) throw new Error('Invalid report template payload.');
 
@@ -510,6 +526,15 @@ function sanitizeTemplate(input, { isUpdate = false, existing = null } = {}) {
       input.conductRequiredBeforeFill,
       existing?.conductRequiredBeforeFill !== undefined
         ? cleanBoolean(existing.conductRequiredBeforeFill, true)
+        : true
+    ),
+    requiredGradebookSkills: sanitizeRequiredGradebookSkills(
+      input.requiredGradebookSkills !== undefined ? input.requiredGradebookSkills : existing?.requiredGradebookSkills
+    ),
+    requireGradebookSkillsBeforeFill: cleanBoolean(
+      input.requireGradebookSkillsBeforeFill,
+      existing?.requireGradebookSkillsBeforeFill !== undefined
+        ? cleanBoolean(existing.requireGradebookSkillsBeforeFill, true)
         : true
     ),
     schema,
@@ -577,7 +602,14 @@ async function addTemplate(input) {
     assertUniqueInOrg(all, sanitized);
 
     const existingIds = new Set(all.map((row) => toPublicId(row.id)).filter(Boolean));
-    const id = sanitized.id || generateTemplateId(existingIds);
+    const orgScopedIds = all
+      .filter((row) => idsEqual(row.orgId, sanitized.orgId))
+      .map((row) => toPublicId(row.id))
+      .filter(Boolean);
+    const id = sanitized.id || await reportTemplateIdService.allocateNextReportTemplateId(
+      sanitized.orgId,
+      { existingIds: orgScopedIds, reservedIds: existingIds }
+    );
     if (existingIds.has(id)) throw new Error('Template id already exists.');
 
     const record = {

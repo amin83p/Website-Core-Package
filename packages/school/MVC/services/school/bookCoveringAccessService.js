@@ -11,6 +11,9 @@ const {
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
 const accessService = requireCoreModule('MVC/services/security/index');
+const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
+const { ACCESS_CHECK_CATEGORY } = require('./sessionDeliveryEscalatedAccessService');
+const { resolveTeacherId } = require('./sessionReportAssignmentService');
 
 const BOOK_COVERING_SECTION = SECTIONS.SCHOOL_LIBRARY_BOOK_COVERING;
 
@@ -76,6 +79,32 @@ function canAccessReport(report = {}, access = {}) {
   return false;
 }
 
+function canAccessSessionLinkedReport(report = {}, { session = null, classData = null, personId = '' } = {}) {
+  if (!report || !session) return false;
+  const viewerId = toPublicId(personId);
+  if (!viewerId) return false;
+  if (classData?.id && report.classId && !idsEqual(report.classId, classData.id)) return false;
+  const reportSessionId = toPublicId(report.sessionId);
+  const targetSessionId = toPublicId(session?.sessionId || session?.id);
+  if (reportSessionId && targetSessionId && !idsEqual(reportSessionId, targetSessionId)) return false;
+  return sessionDeliveryTeamService.isPersonSessionEditor(session, viewerId);
+}
+
+function isSessionDeliveryEscalatedContext(sessionDeliveryContext = null) {
+  return sessionDeliveryContext?.accessCategory === ACCESS_CHECK_CATEGORY && sessionDeliveryContext?.session;
+}
+
+function canAccessReportWithSessionDelivery(req, report, accessContext, sessionDeliveryContext = null) {
+  const access = resolveAccessFromRequest(req, accessContext);
+  if (canAccessReport(report, access)) return true;
+  if (!isSessionDeliveryEscalatedContext(sessionDeliveryContext)) return false;
+  return canAccessSessionLinkedReport(report, {
+    session: sessionDeliveryContext.session,
+    classData: sessionDeliveryContext.classData,
+    personId: access.personId
+  });
+}
+
 async function evaluateOperation(req, operationId) {
   try {
     const evaluation = await accessService.evaluateAccess({
@@ -121,35 +150,45 @@ function resolveScopedTeacherIdForCreate(req, accessContext = null) {
   return '';
 }
 
-function assertCanReadReport(req, report, accessContext = null, capabilities = null) {
+function assertCanReadReport(req, report, accessContext = null, capabilities = null, sessionDeliveryContext = null) {
   const resolvedCapabilities = capabilities || null;
   if (resolvedCapabilities && !hasViewCapability(resolvedCapabilities)) {
     throw createDeniedError('You do not have permission to view book coverage reports.');
   }
   const access = resolveAccessFromRequest(req, accessContext);
-  if (canAccessReport(report, access)) return access;
+  if (canAccessReportWithSessionDelivery(req, report, accessContext, sessionDeliveryContext)) return access;
   throw createDeniedError('You do not have permission to view this book coverage report.');
 }
 
-function assertCanMutateReport(req, report, accessContext = null, capabilities = null) {
+function assertCanMutateReport(req, report, accessContext = null, capabilities = null, sessionDeliveryContext = null) {
   if (capabilities && !capabilities?.canUpdate) {
     throw createDeniedError('You do not have permission to modify book coverage reports.');
   }
   const access = resolveAccessFromRequest(req, accessContext);
-  if (canAccessReport(report, access)) return access;
+  if (canAccessReportWithSessionDelivery(req, report, accessContext, sessionDeliveryContext)) return access;
   throw createDeniedError('You do not have permission to modify this book coverage report.');
 }
 
-function assertCanDeleteReport(req, report, accessContext = null, capabilities = null) {
+function assertCanDeleteReport(req, report, accessContext = null, capabilities = null, sessionDeliveryContext = null) {
   if (capabilities && !capabilities?.canDelete) {
     throw createDeniedError('You do not have permission to delete book coverage reports.');
   }
-  return assertCanMutateReport(req, report, accessContext, null);
+  return assertCanMutateReport(req, report, accessContext, null, sessionDeliveryContext);
 }
 
-function assertCanCreateForTeacher(req, teacherId, accessContext = null) {
+function assertCanCreateForTeacher(req, teacherId, accessContext = null, sessionDeliveryContext = null) {
   const access = resolveAccessFromRequest(req, accessContext);
   if (isOrgWideAccess(access)) return access;
+  if (isSessionDeliveryEscalatedContext(sessionDeliveryContext)) {
+    const resolvedTeacher = resolveTeacherId(sessionDeliveryContext.session, sessionDeliveryContext.classData);
+    if (
+      resolvedTeacher
+      && idsEqual(teacherId, resolvedTeacher)
+      && sessionDeliveryTeamService.isPersonSessionEditor(sessionDeliveryContext.session, access.personId)
+    ) {
+      return access;
+    }
+  }
   const scopedTeacherId = resolveScopedTeacherIdForCreate(req, accessContext);
   if (!scopedTeacherId) {
     throw createDeniedError('You do not have permission to create book coverage reports for this teacher.');
@@ -176,6 +215,7 @@ module.exports = {
   isOrgWideAccess,
   isReportOwnedByViewer,
   canAccessReport,
+  canAccessSessionLinkedReport,
   assertCanReadReport,
   assertCanMutateReport,
   assertCanDeleteReport,

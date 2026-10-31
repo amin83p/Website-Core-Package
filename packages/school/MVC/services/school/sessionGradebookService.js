@@ -49,6 +49,9 @@ function normalizeSessionGradebooksFromRequest(rawList, context = {}) {
     const isMakeupLinked = Boolean(String(gb?.makeupSource?.sessionId || '').trim()
       && String(gb?.makeupSource?.gradebookId || '').trim());
     if (isMakeupLinked) {
+      if (Boolean(gb.periodPerformanceLog)) {
+        throw new Error('Make-up activities cannot be marked as period performance logs.');
+      }
       const totalScore = Number(gb.totalScore);
       if (!Number.isFinite(totalScore) || totalScore <= 0) {
         throw new Error('Each activity must have a positive total score.');
@@ -99,6 +102,7 @@ function normalizeSessionGradebooksFromRequest(rawList, context = {}) {
     }
 
     const gbId = String(gb.id || '').trim() || `gb_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    const periodPerformanceLog = Boolean(gb.periodPerformanceLog);
     const rawScores = gb.scores && typeof gb.scores === 'object' ? gb.scores : {};
     const rawScoreComments = gb.scoreComments && typeof gb.scoreComments === 'object' ? gb.scoreComments : {};
     const scores = {};
@@ -106,9 +110,11 @@ function normalizeSessionGradebooksFromRequest(rawList, context = {}) {
 
     for (const pid of personIds) {
       const att = attendanceByPerson.has(pid) ? attendanceByPerson.get(pid) : '';
-      const isGradeBlocked = attendanceMatrixMetricsService.isUnmarkedAttendanceStatus(att)
+      const isGradeBlocked = !periodPerformanceLog && (
+        attendanceMatrixMetricsService.isUnmarkedAttendanceStatus(att)
         || attendanceMatrixMetricsService.isAbsentLikeStatus(att)
-        || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
+        || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
+      );
       let v = rawScores[pid];
       if (v === undefined) v = rawScores[String(pid)];
       if (v === '' || v === undefined) v = null;
@@ -151,6 +157,7 @@ function normalizeSessionGradebooksFromRequest(rawList, context = {}) {
       totalScore,
       activityContent: String(gb.activityContent || ''),
       includeInGradeCalculation: Boolean(gb.includeInGradeCalculation),
+      periodPerformanceLog,
       scores,
       scoreComments,
       attachments: sanitizeGradebookAttachments(gb.attachments)

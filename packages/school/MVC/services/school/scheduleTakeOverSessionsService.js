@@ -25,6 +25,16 @@ function cleanText(value) {
   return String(value || '').trim();
 }
 
+function normalizeAllowPreviousTeacherEdit(value) {
+  if (value === undefined || value === null || value === '') return true;
+  if (value === true) return true;
+  if (value === false) return false;
+  const token = cleanText(value).toLowerCase();
+  if (['false', '0', 'no', 'off'].includes(token)) return false;
+  if (['true', '1', 'yes', 'on'].includes(token)) return true;
+  return true;
+}
+
 function parseSelectedSessions(body = {}) {
   const rows = Array.isArray(body.sessions) ? body.sessions : [];
   const seen = new Set();
@@ -36,9 +46,23 @@ function parseSelectedSessions(body = {}) {
     const key = `${classId}::${sessionId}`;
     if (seen.has(key)) return;
     seen.add(key);
-    sessions.push({ classId, sessionId });
+    sessions.push({
+      classId,
+      sessionId,
+      allowPreviousTeacherEdit: normalizeAllowPreviousTeacherEdit(row?.allowPreviousTeacherEdit)
+    });
   });
   return sessions;
+}
+
+function buildEditBySessionKeyPayload(sessions = []) {
+  return (Array.isArray(sessions) ? sessions : [])
+    .map((row) => ({
+      key: `${toPublicId(row.classId)}::${toPublicId(row.sessionId)}`,
+      allow: normalizeAllowPreviousTeacherEdit(row?.allowPreviousTeacherEdit)
+    }))
+    .filter((row) => row.key && row.key !== '::')
+    .sort((left, right) => left.key.localeCompare(right.key));
 }
 
 function buildTakeOverPreviewHash(payload) {
@@ -269,10 +293,15 @@ function collectAffectedPersonIdsFromSessions(sessions = [], selectedIds = new S
   return [...personIds];
 }
 
-function applyTakeOverToSession(session = {}, { teacherId = '', teacherName = '' } = {}) {
+function applyTakeOverToSession(session = {}, {
+  teacherId = '',
+  teacherName = '',
+  allowPreviousTeacherEdit = true
+} = {}) {
   const nextTeacherId = toPublicId(teacherId);
   const previousTeacherId = toPublicId(session?.delivery?.deliveredBy);
   const previousTeacherName = cleanText(session?.delivery?.deliveredByName) || previousTeacherId;
+  const previousCanEdit = normalizeAllowPreviousTeacherEdit(allowPreviousTeacherEdit);
   const keptCoTeachers = dependencies.sessionDeliveryTeamService.getSessionCoTeachers(session)
     .filter((row) => !idsEqual(row?.personId, nextTeacherId) && !idsEqual(row?.personId, previousTeacherId));
   const coTeachers = previousTeacherId && !idsEqual(previousTeacherId, nextTeacherId)
@@ -284,7 +313,7 @@ function applyTakeOverToSession(session = {}, { teacherId = '', teacherName = ''
         roleLabel: 'Previous Teacher',
         paid: false,
         paidHours: 0,
-        canEdit: false
+        canEdit: previousCanEdit
       }
     ]
     : keptCoTeachers;
@@ -454,18 +483,32 @@ async function buildTakeOverPreview({
   }
 
   const teacherName = await resolveTeacherName(teacher, reqUser);
-  const review = rows.map((row) => ({
-    ...sessionRef(row.classId, row.session),
-    previousTeacherId: toPublicId(row.session?.delivery?.deliveredBy),
-    previousTeacherName: cleanText(row.session?.delivery?.deliveredByName),
-    teacherId: teacher,
-    teacherName
-  }));
+  const editByKey = new Map(
+    selected.map((row) => [
+      `${toPublicId(row.classId)}::${toPublicId(row.sessionId)}`,
+      normalizeAllowPreviousTeacherEdit(row?.allowPreviousTeacherEdit)
+    ])
+  );
+  const review = rows.map((row) => {
+    const ref = sessionRef(row.classId, row.session);
+    const selectionKey = `${toPublicId(row.classId)}::${toPublicId(ref.sessionId)}`;
+    return {
+      ...ref,
+      previousTeacherId: toPublicId(row.session?.delivery?.deliveredBy),
+      previousTeacherName: cleanText(row.session?.delivery?.deliveredByName),
+      teacherId: teacher,
+      teacherName,
+      allowPreviousTeacherEdit: editByKey.has(selectionKey)
+        ? editByKey.get(selectionKey)
+        : true
+    };
+  });
   const hashPayload = {
     teacherId: teacher,
     classId: loadedClass.classIds.length === 1 ? loadedClass.classIds[0] : '',
     sessionKeys: selected.map((row) => `${row.classId}::${row.sessionId}`).sort(),
-    previousKeys: review.map((row) => `${row.sessionId}::${row.previousTeacherId}`).sort()
+    previousKeys: review.map((row) => `${row.sessionId}::${row.previousTeacherId}`).sort(),
+    editBySessionKey: buildEditBySessionKeyPayload(selected)
   };
   return {
     canContinue: blocked.length === 0 && loadedClass.classIds.length === 1 && review.length === selected.length,
@@ -503,6 +546,12 @@ async function applyTakeOverSessions({
   const loadedClass = await loadTakeOverClass({ sessions, reqUser, accessContext });
   const bucket = loadedClass.buckets.get(preview.classId);
   const selectedIds = new Set(sessions.map((row) => toPublicId(row.sessionId)));
+  const editBySessionId = new Map(
+    sessions.map((row) => [
+      toPublicId(row.sessionId),
+      normalizeAllowPreviousTeacherEdit(row?.allowPreviousTeacherEdit)
+    ])
+  );
   const now = new Date().toISOString();
   const actorId = toPublicId(reqUser?.id || reqUser?.username || '');
   const nextSessions = (bucket?.sessions || []).map((session) => {
@@ -510,7 +559,8 @@ async function applyTakeOverSessions({
     if (!selectedIds.has(sessionId)) return session;
     const updated = applyTakeOverToSession(session, {
       teacherId: preview.teacherId,
-      teacherName: preview.teacherName
+      teacherName: preview.teacherName,
+      allowPreviousTeacherEdit: editBySessionId.get(sessionId)
     });
     updated.audit = {
       ...(session.audit || {}),
@@ -666,6 +716,8 @@ function __resetDependenciesForTest() {
 
 module.exports = {
   parseSelectedSessions,
+  normalizeAllowPreviousTeacherEdit,
+  buildEditBySessionKeyPayload,
   buildTakeOverPreviewHash,
   collectTakeOverBlockers,
   collectUndoTakeOverBlockers,

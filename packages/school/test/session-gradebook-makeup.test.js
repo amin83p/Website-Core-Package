@@ -88,6 +88,53 @@ test('listMakeupPickerRows excludes sessions older than lookback window', () => 
   assert.equal(rows[0].gradebookId, 'GB1');
 });
 
+test('listMakeupPickerRows excludes period performance log activities', () => {
+  const sessions = [
+    {
+      ...SESSION_A,
+      gradebooks: [
+        SESSION_A.gradebooks[0],
+        {
+          id: 'GB_LOG',
+          name: 'Period log',
+          totalScore: 10,
+          weight: 10,
+          periodPerformanceLog: true,
+          scores: {}
+        }
+      ]
+    },
+    SESSION_B
+  ];
+  const rows = makeupService.listMakeupPickerRows({ allSessions: sessions, currentSession: SESSION_B });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].gradebookId, 'GB1');
+  assert.equal(makeupService.isMakeupSourceEligibleActivity({ id: 'GB_LOG', periodPerformanceLog: true }), false);
+});
+
+test('preview blocks period performance log source activity', () => {
+  const sessionWithLog = {
+    ...SESSION_A,
+    gradebooks: [{
+      id: 'GB_LOG',
+      name: 'Period log',
+      totalScore: 10,
+      weight: 10,
+      periodPerformanceLog: true,
+      scores: { P2: null }
+    }]
+  };
+  const preview = makeupService.previewMakeupGradebook({
+    allSessions: [sessionWithLog, SESSION_B],
+    currentSession: SESSION_B,
+    sourceSessionId: 'SES_A',
+    sourceGradebookId: 'GB_LOG',
+    currentPersonIds: ['P2']
+  });
+  assert.equal(preview.status, 'blocked');
+  assert.match(preview.messages.join(' '), /period performance log/i);
+});
+
 test('preview blocks when no students missed source session', () => {
   const onlyPresent = {
     ...SESSION_A,
@@ -169,4 +216,14 @@ test('sessionManager includes make-up CTA and picker modal hooks', () => {
   assert.match(sessionManagerSource, /gradebooks\/makeup-activities/);
   assert.match(sessionManagerSource, /sessionGradebooksInline/);
   assert.match(sessionManagerSource, /gbLoadMakeupActivitiesIfNeeded/);
+});
+
+test('getGradebookMakeupActivities uses session manage access not assignment-only class load', () => {
+  const controllerSource = fs.readFileSync(
+    path.join(__dirname, '../MVC/controllers/school/classController.js'),
+    'utf8'
+  );
+  const fnBlock = controllerSource.split('async function getGradebookMakeupActivities')[1]?.split('async function postGradebookMakeupFrom')[0] || '';
+  assert.match(fnBlock, /assertSessionInstructionalActiveForRequest/);
+  assert.doesNotMatch(fnBlock, /getClassByIdWithOrgCheck/);
 });

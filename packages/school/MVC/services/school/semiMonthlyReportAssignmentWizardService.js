@@ -160,6 +160,8 @@ function classesForPrograms({
 }
 
 const findReportAssignmentForClass = sessionReportAssignmentService.findReportAssignmentForClass;
+const findReportAssignmentForTargetRow = sessionReportAssignmentService.findReportAssignmentForTargetRow;
+const classHasReportAssignmentForScope = sessionReportAssignmentService.classHasReportAssignmentForScope;
 const mergeTargetRows = sessionReportAssignmentService.mergeTargetRows;
 const resolveWizardRowStudentIds = sessionReportAssignmentService.resolveWizardRowStudentIds;
 
@@ -548,25 +550,50 @@ async function previewTiles({
   const classes = [];
   for (const classRow of matched) {
     const classId = toPublicId(classRow.id);
-    const assignment = findReportAssignmentForClass(context.assignments, classId, scope);
-    const templateOptions = await buildClassTemplateOptions({
-      assignment,
-      policyTemplates: templates,
-      reqUser
-    });
-    const defaultTemplateId = resolveTemplateIdForClass({
-      existingAssignment: assignment,
-      templates,
-      requestedTemplateId: ''
-    });
-    const templateTitle = templateTitleFromList(templateOptions, defaultTemplateId)
-      || templateTitleFromList(templates, defaultTemplateId);
+    const scopeAssignment = classHasReportAssignmentForScope(context.assignments, classId, scope);
     const sessions = await dependencies.schoolDataService.getClassSessions(classId, reqUser);
     const pick = pickClosestSessionNearPeriodEnd(sessions, periodStart, periodEnd);
     const session = pick?.session || null;
     const window = session
       ? taskWindowForFullSession(session)
       : { ok: false, message: noSessionNearEndMessage };
+    let assignment = null;
+    let previewRow = null;
+    if (session && window.ok) {
+      previewRow = buildSemiMonthlyTargetRow({
+        session,
+        reportStartDate: periodStart,
+        reportDueDate: periodEnd || sessionDate(session),
+        taskStartTime: window.taskStartTime,
+        taskEndTime: window.taskEndTime,
+        conflictPermitted: true,
+        timesheetReflection: true,
+        conductRequiredBeforeFill: true,
+        allocatedHours: 1,
+        teacherId: dependencies.sessionReportAssignmentService.resolveTeacherId(session, classRow),
+        reportScope: scope,
+        targetStudentIds: [],
+        sessionRoster: session.roster || []
+      });
+      assignment = findReportAssignmentForTargetRow(
+        context.assignments,
+        classId,
+        scope,
+        previewRow.rowId
+      );
+    }
+    const templateOptions = await buildClassTemplateOptions({
+      assignment: assignment || scopeAssignment,
+      policyTemplates: templates,
+      reqUser
+    });
+    const defaultTemplateId = resolveTemplateIdForClass({
+      existingAssignment: assignment || scopeAssignment,
+      templates,
+      requestedTemplateId: ''
+    });
+    const templateTitle = templateTitleFromList(templateOptions, defaultTemplateId)
+      || templateTitleFromList(templates, defaultTemplateId);
     const students = scope === 'class' || !session
       ? []
       : await studentsForClass({
@@ -586,13 +613,14 @@ async function previewTiles({
       classId,
       title: String(classRow.title || classId).trim(),
       maxCapacity: classSessionCapacityService.resolveClassMaxCapacity(classRow),
-      hasReportAssignment: Boolean(assignment),
+      hasReportAssignment: Boolean(scopeAssignment),
+      hasReportAssignmentForPeriod: Boolean(assignment),
       assignmentId: toPublicId(assignment?.id),
       assignmentLabel: assignment ? String(assignment.templateId || assignment.id).trim() : '',
       templateOptions,
       defaultTemplateId,
       templateTitle,
-      templateLocked: Boolean(assignment?.id),
+      templateLocked: Boolean(assignment?.id || scopeAssignment?.id),
       sessionId: toPublicId(session?.sessionId || session?.id),
       sessionDate: session ? sessionDate(session) : '',
       sessionMatchDaysFromEnd: pick ? pick.daysFromEnd : null,
@@ -681,7 +709,7 @@ async function applyClassTemplate({
   });
 
   const context = await loadScopeContext(reqUser);
-  const existing = findReportAssignmentForClass(context.assignments, classId, scope);
+  const existing = findReportAssignmentForTargetRow(context.assignments, classId, scope, incomingRow?.rowId || '');
   const templates = await loadTemplates(reqUser, scope);
   const resolvedTemplateId = resolveTemplateIdForClass({
     existingAssignment: existing,
@@ -690,8 +718,7 @@ async function applyClassTemplate({
   });
 
   const incomingRowId = String(incomingRow?.rowId || '').trim();
-  const hadSamePeriodRow = Boolean(existing?.id) && (Array.isArray(existing.targetRows) ? existing.targetRows : [])
-    .some((row) => String(row?.rowId || '').trim() === incomingRowId);
+  const hadSamePeriodRow = Boolean(existing?.id);
 
   const result = await dependencies.sessionReportAssignmentService.upsertSessionTargetRowForAssignment({
     classData,
@@ -758,7 +785,7 @@ async function summarizeAssignmentAvailability({
     const classToken = toPublicId(classId);
     if (!classToken) return;
     const classRow = context.classes.find((row) => idsEqual(row?.id, classToken));
-    const assignment = findReportAssignmentForClass(context.assignments, classToken, scope);
+    const assignment = classHasReportAssignmentForScope(context.assignments, classToken, scope);
     const title = String(classRow?.title || classToken).trim();
     if (assignment) {
       withAssignment.push({ classId: classToken, title, assignmentId: toPublicId(assignment.id) });

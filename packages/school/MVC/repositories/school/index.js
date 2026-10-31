@@ -35,6 +35,8 @@ const academicLedgerModel = require('../../models/school/academicLedgerModel');
 const academicSnapshotModel = require('../../models/school/academicSnapshotModel');
 const reportTemplateModel = require('../../models/school/reportTemplateModel');
 const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
+const reportAssignmentIdService = require('../../services/school/reportAssignmentIdService');
+const reportTemplateIdService = require('../../services/school/reportTemplateIdService');
 const reportInstanceModel = require('../../models/school/reportInstanceModel');
 const overallReportTemplateModel = require('../../models/school/overallReportTemplateModel');
 const overallReportInstanceModel = require('../../models/school/overallReportInstanceModel');
@@ -1060,7 +1062,14 @@ const schoolRepositories = {
     }),
     replaceObjectFields: ['placeholderMap', 'pdfFieldMap'],
     defaultSearchFields: ['id', 'orgId', 'title', 'type', 'status', 'description'],
-    assignmentScopeKind: 'catalog'
+    assignmentScopeKind: 'catalog',
+    generateMongoCreateId: async (collection, payload) => {
+      const requested = toPublicId(payload?.id);
+      if (requested) {
+        return generateUniqueStringId(collection, requested);
+      }
+      return reportTemplateIdService.allocateNextReportTemplateId(payload?.orgId, { collection });
+    }
   }),
   reportAssignments: createSchoolRepository({
     entityName: 'reportAssignments',
@@ -1070,6 +1079,13 @@ const schoolRepositories = {
     create: reportAssignmentModel.addAssignment,
     update: reportAssignmentModel.updateAssignment,
     remove: reportAssignmentModel.deleteAssignment,
+    generateMongoCreateId: async (collection, payload) => {
+      const requested = toPublicId(payload?.id);
+      if (requested) {
+        return generateUniqueStringId(collection, requested);
+      }
+      return reportAssignmentIdService.allocateNextReportAssignmentId(payload?.classId, { collection });
+    },
     defaultSearchFields: ['id', 'orgId', 'classId', 'templateId', 'status', 'targetType', 'sessionDate', 'dueDate'],
     assignmentScopeKind: 'teacherIds'
   }),
@@ -1092,7 +1108,14 @@ const schoolRepositories = {
     update: overallReportTemplateModel.updateTemplate,
     remove: overallReportTemplateModel.deleteTemplate,
     replaceObjectFields: ['placeholderMap', 'pdfFieldMap'],
-    defaultSearchFields: ['id', 'orgId', 'title', 'status', 'description']
+    defaultSearchFields: ['id', 'orgId', 'title', 'status', 'description'],
+    generateMongoCreateId: async (collection, payload) => {
+      const requested = toPublicId(payload?.id);
+      if (requested) {
+        return generateUniqueStringId(collection, requested);
+      }
+      return reportTemplateIdService.allocateNextOverallReportTemplateId(payload?.orgId, { collection });
+    }
   }),
   overallReportInstances: createSchoolRepository({
     entityName: 'overallReportInstances',

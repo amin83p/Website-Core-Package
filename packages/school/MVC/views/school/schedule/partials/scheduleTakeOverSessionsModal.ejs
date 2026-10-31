@@ -21,7 +21,7 @@
         </div>
 
         <div class="d-none" data-takeover-step="review">
-          <p class="small text-muted">The chosen teacher becomes the main teacher. The previous teacher stays on the session as an unpaid co-teacher, so it remains on their schedule and is left off their timesheet.</p>
+          <p class="small text-muted">The chosen teacher becomes the main teacher. The previous teacher stays on the session as an unpaid co-teacher (still on their schedule, excluded from timesheet). Use the switch on each row to allow or deny Manage Session edit access for the previous teacher.</p>
           <div class="table-responsive border rounded">
             <table class="table table-sm align-middle mb-0">
               <thead class="table-light">
@@ -29,6 +29,7 @@
                   <th>Session</th>
                   <th>Previous teacher</th>
                   <th>New teacher</th>
+                  <th class="text-center" style="min-width: 9rem;">Previous can edit</th>
                 </tr>
               </thead>
               <tbody id="scheduleTakeOverReviewTbody"></tbody>

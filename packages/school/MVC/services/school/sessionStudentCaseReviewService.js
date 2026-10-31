@@ -5,7 +5,7 @@ const sessionStudentCaseAccessService = require('./sessionStudentCaseAccessServi
 const { buildSessionStudentCaseRosterEntries } = require('./studentListSearchService');
 const { getPresetConfig } = require('./sessionStudentCasePresetService');
 const sessionStudentCaseResultVisibilityService = require('./sessionStudentCaseResultVisibilityService');
-const schoolIdentityLookupService = require('./schoolIdentityLookupService');
+const sessionDeliveryEscalatedAccessService = require('./sessionDeliveryEscalatedAccessService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -38,11 +38,20 @@ async function loadCaseForRequest(req, caseId) {
 
 async function loadClassSessionContext(req, classId, sessionId) {
   const classData = await schoolDataService.getDataById('classes', classId, req.user);
-  if (!classData) throw sessionStudentCaseAccessService.createDeniedError('Class not found.', 404);
-  const sessions = await schoolDataService.getClassSessions(classId, req.user);
-  const session = (Array.isArray(sessions) ? sessions : []).find((row) => toPublicId(row?.sessionId || row?.id) === toPublicId(sessionId)) || null;
+  if (classData) {
+    const sessions = await schoolDataService.getClassSessions(classId, req.user);
+    const session = (Array.isArray(sessions) ? sessions : []).find((row) => toPublicId(row?.sessionId || row?.id) === toPublicId(sessionId)) || null;
+    if (!session) throw sessionStudentCaseAccessService.createDeniedError('Session not found.', 404);
+    return { classData, session };
+  }
+
+  const ctx = await sessionDeliveryEscalatedAccessService.loadSessionManageContext(req, {
+    classId,
+    sessionId
+  });
+  const session = (Array.isArray(ctx.sessions) ? ctx.sessions : []).find((row) => toPublicId(row?.sessionId || row?.id) === toPublicId(sessionId)) || null;
   if (!session) throw sessionStudentCaseAccessService.createDeniedError('Session not found.', 404);
-  return { classData, session };
+  return { classData: ctx.classData, session };
 }
 
 function buildSessionLabel(session = {}) {

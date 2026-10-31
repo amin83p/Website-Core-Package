@@ -22,6 +22,7 @@ const reportFunderDocxService = require('./reportFunderDocxService');
 const sessionGradebookMakeupService = require('./sessionGradebookMakeupService');
 const reportExportBatchCacheService = require('./reportExportBatchCacheService');
 const studentPunctualityMetricsService = require('./studentPunctualityMetricsService');
+const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
 
 const STUDENT_PHONE_TYPES = Object.freeze(['mobile', 'home', 'work', 'other']);
 const STUDENT_PHONE_TYPE_LABELS = Object.freeze({
@@ -3367,7 +3368,10 @@ function mergeTemplateData(template, instance, assignment = null, options = {}) 
   const derivedOverrides = instance?.derivedOverrides && typeof instance.derivedOverrides === 'object'
     ? instance.derivedOverrides
     : {};
-  const sharedRaw = assignment?.sharedAnswers && typeof assignment.sharedAnswers === 'object' ? assignment.sharedAnswers : {};
+  const sharedRaw = reportAssignmentModel.resolveSharedAnswersForRow(
+    assignment,
+    instance?.assignmentRowId || assignment?.assignmentRowId || assignment?.rowId || ''
+  );
   const studentTargeted = isStudentTargetedScope(assignment?.reportScope);
 
   const merged = { ...prefill, ...answers };
@@ -4116,7 +4120,10 @@ async function buildReportInstanceExportPayload({
     mergedAnswers,
     conversionDiagnostics: placeholderBundle.conversionDiagnostics || [],
     collectionDiagnostics,
-    assignmentSharedAnswers: assignment?.sharedAnswers || {},
+    assignmentSharedAnswers: reportAssignmentModel.resolveSharedAnswersForRow(
+      assignment,
+      instance?.assignmentRowId || assignment?.assignmentRowId || assignment?.rowId || ''
+    ),
     prefillSnapshot
   };
 }
