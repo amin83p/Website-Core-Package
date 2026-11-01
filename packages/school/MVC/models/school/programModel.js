@@ -1,4 +1,4 @@
-﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
+const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 // MVC/models/school/programModel.js
 const fs = require('fs').promises;
 const fsSync = require('fs');
@@ -7,6 +7,8 @@ const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { FEE_CATEGORIES, ALL_FEE_CATEGORIES_KEY } = require('./feeCategoryCatalog');
 const { TERM_STATUSES, OPTIONAL_DATE_FIELDS } = require('./termModel');
 const { normalizePostingPolicyRows } = require('./postingPolicyModel');
+const schoolCatalogEntityIdService = require('../../services/school/schoolCatalogEntityIdService');
+const { resolveSchoolCreateId } = require('../../services/school/schoolEntityIdAllocationService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/programs.json');
 

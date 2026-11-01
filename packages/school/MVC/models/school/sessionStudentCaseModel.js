@@ -4,6 +4,8 @@ const path = require('path');
 const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const schoolCatalogEntityIdService = require('../../services/school/schoolCatalogEntityIdService');
+const { resolveJsonEntityCreateId } = require('../../services/school/schoolJsonEntityCreateIdService');
 const { deriveCaseSummary } = require('../../services/school/sessionStudentCasePresetService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/sessionStudentCases.json');
@@ -174,9 +176,14 @@ async function addSessionStudentCase(input) {
     const existingIds = new Set(rows.map((row) => String(row?.id || '')).filter(Boolean));
     const sanitized = sanitizeCaseInput(input);
     const now = new Date().toISOString();
+    const id = await resolveJsonEntityCreateId({
+      requestedId: sanitized.id,
+      existingIds,
+      allocate: (opts) => schoolCatalogEntityIdService.allocateUniqueSessionStudentCaseId(opts)
+    });
     const row = {
       ...sanitized,
-      id: sanitized.id || generateCaseId(existingIds),
+      id,
       audit: {
         createDateTime: now,
         lastUpdateDateTime: now,

@@ -4,6 +4,8 @@ const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const schoolCatalogEntityIdService = require('../../services/school/schoolCatalogEntityIdService');
+const { resolveJsonEntityCreateId } = require('../../services/school/schoolJsonEntityCreateIdService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/taskRoutingRules.json');
 

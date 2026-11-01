@@ -1,4 +1,4 @@
-﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
+const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
@@ -11,6 +11,8 @@ if (!fsSync.existsSync(dataPath)) {
 
 const TERM_STATUSES = new Set(['draft', 'planned', 'active', 'started', 'finished', 'cancelled', 'archived', 'void']);
 const { applyVoidMetadata } = require('./voidRecordMetadata');
+const schoolCatalogEntityIdService = require('../../services/school/schoolCatalogEntityIdService');
+const { resolveJsonEntityCreateId } = require('../../services/school/schoolJsonEntityCreateIdService');
 
 const OPTIONAL_DATE_FIELDS = [
   'registrationOpenDate',
@@ -172,7 +174,12 @@ async function addTerm(input) {
   return await queueWrite(async () => {
     const list = await getAllTerms();
     const item = sanitizeTermInput(input);
-    item.id = item.id || generateTermId(new Set(list.map((term) => String(term.id || ''))));
+    const existingIds = list.map((term) => String(term.id || '')).filter(Boolean);
+    item.id = await resolveJsonEntityCreateId({
+      requestedId: item.id,
+      existingIds,
+      allocate: (opts) => schoolCatalogEntityIdService.allocateUniqueTermId(opts)
+    });
     assertUniqueInOrg(list, item);
     list.push(item);
     await fs.writeFile(dataPath, JSON.stringify(list, null, 2));

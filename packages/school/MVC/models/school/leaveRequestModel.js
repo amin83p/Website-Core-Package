@@ -4,6 +4,8 @@ const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const schoolCatalogEntityIdService = require('../../services/school/schoolCatalogEntityIdService');
+const { resolveJsonEntityCreateId } = require('../../services/school/schoolJsonEntityCreateIdService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/leaveRequests.json');
 
@@ -302,9 +304,14 @@ async function addLeaveRequest(input) {
   const existingIds = new Set(all.map((row) => String(row?.id || '').trim()).filter(Boolean));
   const sanitized = sanitizeLeaveRequestInput(input, { isUpdate: false });
   const now = new Date().toISOString();
+  const id = await resolveJsonEntityCreateId({
+    requestedId: sanitized.id,
+    existingIds,
+    allocate: (opts) => schoolCatalogEntityIdService.allocateUniqueLeaveRequestId(opts)
+  });
   const row = {
     ...sanitized,
-    id: sanitized.id || generateLeaveRequestId(existingIds),
+    id,
     audit: {
       createDateTime: now,
       lastUpdateDateTime: now,

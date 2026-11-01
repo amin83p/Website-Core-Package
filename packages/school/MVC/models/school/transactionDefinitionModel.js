@@ -1,10 +1,12 @@
-﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
+const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 // MVC/models/school/transactionDefinitionModel.js
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const schoolAccountModel = require('./schoolAccountModel');
+const schoolCatalogEntityIdService = require('../../services/school/schoolCatalogEntityIdService');
+const { resolveSchoolCreateId } = require('../../services/school/schoolEntityIdAllocationService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/transactionDefinitions.json');
 const legacyDataPath = path.join(resolveCoreRoot(), 'data/school/feeDefinitions.json');

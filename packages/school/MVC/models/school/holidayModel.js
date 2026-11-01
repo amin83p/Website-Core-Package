@@ -1,8 +1,10 @@
-﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
+const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 // MVC/models/school/holidayModel.js
 const fs = require('fs').promises;
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
+const schoolCatalogEntityIdService = require('../../services/school/schoolCatalogEntityIdService');
+const { resolveJsonEntityCreateId } = require('../../services/school/schoolJsonEntityCreateIdService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/holidays.json');
 
@@ -120,7 +122,11 @@ async function addHoliday(holidayData) {
         const existingIds = new Set(holidays.map((row) => String(row?.id || '').trim()).filter(Boolean));
 
         newHoliday = {
-            id: generateId(existingIds),
+            id: await resolveJsonEntityCreateId({
+              requestedId: sanitized.id,
+              existingIds: [...existingIds],
+              allocate: (opts) => schoolCatalogEntityIdService.allocateUniqueHolidayId(opts)
+            }),
             ...sanitized
         };
         holidays.push(newHoliday);

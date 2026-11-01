@@ -4,6 +4,8 @@ const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const schoolCatalogEntityIdService = require('../../services/school/schoolCatalogEntityIdService');
+const { resolveJsonEntityCreateId } = require('../../services/school/schoolJsonEntityCreateIdService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/tasks.json');
 
@@ -82,19 +84,12 @@ function normalizeTaskStatus(value, fallback = 'open') {
 }
 
 function generateTaskAssignmentId(existingIds = new Set()) {
+  const { candidateTaskId } = require('../../services/school/schoolCatalogIdGenerators');
   for (let i = 0; i < 50; i++) {
-    const candidate = `ST-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const candidate = candidateTaskId();
     if (!existingIds.has(candidate)) return candidate;
   }
-  return `ST-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-}
-
-function generateTaskAssignmentId(existingIds = new Set()) {
-  for (let i = 0; i < 50; i++) {
-    const candidate = `STA-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
-    if (!existingIds.has(candidate)) return candidate;
-  }
-  return `STA-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+  return candidateTaskId();
 }
 
 function sanitizeLifecycleEvents(events) {
@@ -229,9 +224,14 @@ async function addTask(input) {
   const existingIds = new Set(all.map((row) => cleanString(row?.id, { max: 120, allowEmpty: true })).filter(Boolean));
   const sanitized = sanitizeTaskInput(input, { isUpdate: false });
   const now = new Date().toISOString();
+  const id = await resolveJsonEntityCreateId({
+    requestedId: sanitized.id,
+    existingIds,
+    allocate: (opts) => schoolCatalogEntityIdService.allocateUniqueTaskId(opts)
+  });
   const row = {
     ...sanitized,
-    id: sanitized.id || generateTaskAssignmentId(existingIds),
+    id,
     audit: {
       createDateTime: now,
       lastUpdateDateTime: now,

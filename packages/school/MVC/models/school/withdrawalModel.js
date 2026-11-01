@@ -1,9 +1,10 @@
-﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
+const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 // MVC/models/school/withdrawalModel.js
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
+const { resolveWithdrawalCreateId } = require('../../services/school/withdrawalEntityIdService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/withdrawals.json');
 
@@ -225,8 +226,12 @@ async function addWithdrawal(input) {
   return queueWrite(async () => {
     const all = await getAllWithdrawals();
     const sanitized = sanitizeWithdrawalInput(input, { isUpdate: false });
-    
-    sanitized.id = sanitized.id || generateWithdrawalId(sanitized.type);
+    const existingIds = all.map((row) => String(row.id || '')).filter(Boolean);
+    sanitized.id = await resolveWithdrawalCreateId({
+      requestedId: sanitized.id,
+      reservedIds: existingIds,
+      payload: sanitized
+    });
     sanitized.audit = {
       createDateTime: new Date().toISOString(),
       createUser: input.audit?.createUser || ''

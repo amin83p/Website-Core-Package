@@ -13,6 +13,8 @@ const {
   generateEntityId,
   buildAudit
 } = require('./libraryEntityCommon');
+const libraryCatalogEntityIdService = require('../../services/school/libraryCatalogEntityIdService');
+const { resolveSchoolCreateId } = require('../../services/school/schoolEntityIdAllocationService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/libraryLocations.json');
 

@@ -3,6 +3,8 @@ const fsSync = require('fs');
 const path = require('path');
 const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
+const activityIdService = require('../../services/school/activityIdService');
+const { resolveSchoolCreateId } = require('../../services/school/schoolEntityIdAllocationService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/activityCategories.json');
 

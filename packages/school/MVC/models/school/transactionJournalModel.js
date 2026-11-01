@@ -1,8 +1,10 @@
-﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
+const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
+const schoolCatalogEntityIdService = require('../../services/school/schoolCatalogEntityIdService');
+const { resolveSchoolCreateId } = require('../../services/school/schoolEntityIdAllocationService');
 
 const dataDir = path.join(resolveCoreRoot(), 'data/school');
 const dataPath = path.join(dataDir, 'transactionJournals.json');

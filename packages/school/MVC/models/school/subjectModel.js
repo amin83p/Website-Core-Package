@@ -6,6 +6,8 @@ const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { isValidFeeCategory } = require('./feeCategoryCatalog');
 const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
 const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
+const schoolCatalogEntityIdService = require('../../services/school/schoolCatalogEntityIdService');
+const { resolveJsonEntityCreateId } = require('../../services/school/schoolJsonEntityCreateIdService');
 const { parseLowerClbBandFromText } = require('../../utils/clbSubjectBandParser');
 
 const CLB_SKILLS = ['listening', 'speaking', 'reading', 'writing'];
@@ -256,10 +258,18 @@ function assertUniqueInOrg(allSubjects, candidate, { excludeId = null } = {}) {
 async function addSubject(item) {
   return await queueWrite(async () => {
     const list = await getAllSubjects();
-    
-    // Generate the academic-aware ID using the linked Department Code
+    const existingIds = list.map((row) => String(row.id || '')).filter(Boolean);
     const dCode = item.academicUnit?.departmentCode;
-    item.id = generateSubjectId(dCode);
+    item.id = await resolveJsonEntityCreateId({
+      requestedId: item.id,
+      existingIds,
+      context: { deptCode: dCode, payload: item },
+      allocate: (opts) => schoolCatalogEntityIdService.allocateUniqueSubjectId({
+        ...opts,
+        deptCode: dCode,
+        payload: item
+      })
+    });
     item.feeRules = normalizeFeeRules(item.feeRules);
     item.defaultScoreRules = normalizeDefaultScoreRules(item.defaultScoreRules);
     item.configuration = normalizeConfiguration(item.configuration, { code: item.code, title: item.title });

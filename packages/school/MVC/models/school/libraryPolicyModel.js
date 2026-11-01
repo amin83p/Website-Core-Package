@@ -13,6 +13,8 @@ const {
   generateEntityId,
   buildAudit
 } = require('./libraryEntityCommon');
+const libraryCatalogEntityIdService = require('../../services/school/libraryCatalogEntityIdService');
+const { resolveSchoolCreateId } = require('../../services/school/schoolEntityIdAllocationService');
 const { normalizePatronRole, PATRON_ROLES } = require('./libraryPatronModel');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/libraryPolicies.json');
@@ -126,8 +128,17 @@ async function addLibraryPolicy(payload) {
       && String(row.patronRole) === String(sanitized.patronRole)
     ));
     if (duplicate) throw new Error(`A policy for role "${sanitized.patronRole}" already exists.`);
+    const existingIds = rows.map((row) => String(row.id || '')).filter(Boolean);
+    const id = await resolveSchoolCreateId({
+      requestedId: sanitized.id,
+      reservedIds: existingIds,
+      allocateNext: () => libraryCatalogEntityIdService.allocateUniqueLibraryPolicyId({
+        existingIds,
+        reservedIds: existingIds
+      })
+    });
     const created = {
-      id: sanitized.id || generateEntityId('LPLY'),
+      id,
       ...sanitized,
       audit: buildAudit(payload?.audit, payload?.audit?.createUser || 'SYSTEM')
     };

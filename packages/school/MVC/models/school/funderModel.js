@@ -3,6 +3,8 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
+const schoolCatalogEntityIdService = require('../../services/school/schoolCatalogEntityIdService');
+const { resolveSchoolCreateId } = require('../../services/school/schoolEntityIdAllocationService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/funders.json');
 if (!fsSync.existsSync(dataPath)) fsSync.writeFileSync(dataPath, '[]');
@@ -80,7 +82,15 @@ async function addFunder(input, options = {}) {
     if (all.some((item) => String(item.orgId) === row.orgId && String(item.personId) === row.personId && item.status !== 'archived')) {
       throw new Error('This Person is already registered as a Funder in the active organization.');
     }
-    const id = row.id || generateFunderId(new Set(all.map((item) => String(item.id))));
+    const existingIds = all.map((item) => String(item.id)).filter(Boolean);
+    const id = await resolveSchoolCreateId({
+      requestedId: row.id,
+      reservedIds: existingIds,
+      allocateNext: () => schoolCatalogEntityIdService.allocateUniqueFunderId({
+        existingIds,
+        reservedIds: existingIds
+      })
+    });
     const created = { ...row, id, audit: { createDateTime: new Date().toISOString() } };
     all.push(created);
     await fs.writeFile(dataPath, JSON.stringify(all, null, 2));

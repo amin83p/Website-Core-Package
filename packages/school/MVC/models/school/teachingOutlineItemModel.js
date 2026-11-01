@@ -5,6 +5,8 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
+const schoolCatalogEntityIdService = require('../../services/school/schoolCatalogEntityIdService');
+const { resolveJsonEntityCreateId } = require('../../services/school/schoolJsonEntityCreateIdService');
 const { CLB_SKILLS } = require('./studentModel');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/teachingOutlineItems.json');
@@ -153,9 +155,14 @@ async function addTeachingOutlineItem(payload) {
   return queueWrite(async () => {
     const rows = await getAllTeachingOutlineItems();
     const sanitized = sanitizeInput(payload, { isUpdate: false });
+    const existingIds = rows.map((row) => String(row.id || '')).filter(Boolean);
     const now = new Date().toISOString();
     const created = {
-      id: sanitized.id || generateItemId(),
+      id: await resolveJsonEntityCreateId({
+        requestedId: sanitized.id,
+        existingIds,
+        allocate: (opts) => schoolCatalogEntityIdService.allocateUniqueTeachingOutlineItemId(opts)
+      }),
       ...sanitized,
       audit: {
         createUser: String(payload?.audit?.createUser || 'SYSTEM'),

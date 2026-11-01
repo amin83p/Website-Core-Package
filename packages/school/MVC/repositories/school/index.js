@@ -37,11 +37,18 @@ const reportTemplateModel = require('../../models/school/reportTemplateModel');
 const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
 const reportAssignmentIdService = require('../../services/school/reportAssignmentIdService');
 const reportTemplateIdService = require('../../services/school/reportTemplateIdService');
-const reportEntityCreateIdService = require('../../services/school/reportEntityCreateIdService');
 const reportInstanceIdService = require('../../services/school/reportInstanceIdService');
-const { resolveReportCreateId } = reportEntityCreateIdService;
 const bookCatalogIdService = require('../../services/school/bookCatalogIdService');
 const libraryClassEntityIdService = require('../../services/school/libraryClassEntityIdService');
+const activityIdService = require('../../services/school/activityIdService');
+const examEntityIdService = require('../../services/school/examEntityIdService');
+const roleEntityIdService = require('../../services/school/roleEntityIdService');
+const notificationEntityIdService = require('../../services/school/notificationEntityIdService');
+const schoolCatalogEntityIdService = require('../../services/school/schoolCatalogEntityIdService');
+const libraryCatalogEntityIdService = require('../../services/school/libraryCatalogEntityIdService');
+const { resolveSchoolCreateId } = require('../../services/school/schoolEntityIdAllocationService');
+const reportEntityCreateIdService = require('../../services/school/reportEntityCreateIdService');
+const { resolveReportCreateId } = reportEntityCreateIdService;
 const reportInstanceModel = require('../../models/school/reportInstanceModel');
 const overallReportTemplateModel = require('../../models/school/overallReportTemplateModel');
 const overallReportInstanceModel = require('../../models/school/overallReportInstanceModel');
@@ -69,8 +76,6 @@ const attendanceChangeLogModel = require('../../models/school/attendanceChangeLo
 const { normalizeSkillCode } = require('../../../config/skillDefinitions');
 const { SCOPE_MODES } = require('../../services/school/schoolDataScopeBuilder');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
-const { generateStudentSystemIdCandidate } = require('../../services/school/studentSystemIdGenerator');
-const { generateRoleSystemIdCandidate } = require('../../services/school/roleSystemIdGenerator');
 const { applyGenericFilter } = requireCoreModule('MVC/utils/queryEngine');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const { getEntityQueryExecutor } = requireCoreModule('MVC/models/queryExecutionBridge');
@@ -96,6 +101,58 @@ const DEFAULT_DATE_FIELDS = ['audit.createDateTime', 'audit.lastUpdateDateTime',
 
 function normalizeRows(rows) {
   return Array.isArray(rows) ? rows : [];
+}
+
+function mongoCreateIdResolver(allocateNext) {
+  return (collection, payload) => resolveSchoolCreateId({
+    requestedId: payload?.id,
+    collection,
+    allocateNext: () => allocateNext({ collection, payload })
+  });
+}
+
+function mongoCreateIdFromAllocator(allocateFn) {
+  return (collection, payload) => resolveSchoolCreateId({
+    requestedId: payload?.id,
+    collection,
+    allocateNext: () => allocateFn({ collection, payload })
+  });
+}
+
+function mongoCreateIdRejectDuplicateOnRequested(allocateFn) {
+  return async (collection, payload) => {
+    const requested = toPublicId(payload?.id);
+    if (requested) {
+      const exists = await collection.findOne({ id: requested }, { projection: { _id: 1 } });
+      if (exists) throw new Error('Record id already exists.');
+      return requested;
+    }
+    return resolveSchoolCreateId({
+      requestedId: null,
+      collection,
+      allocateNext: () => allocateFn({ collection, payload })
+    });
+  };
+}
+
+function mongoCreateIdDeterministicAcademicSnapshot() {
+  return async (collection, payload) => {
+    const studentId = String(payload?.studentId || '').trim();
+    const programId = String(payload?.programId || '').trim();
+    const id = toPublicId(payload?.id) || (studentId && programId ? `ASNP-${studentId}-${programId}` : '');
+    if (!id) throw new Error('Academic snapshot id could not be determined.');
+    const exists = await collection.findOne({ id }, { projection: { _id: 1 } });
+    if (exists) throw new Error('Academic snapshot id already exists.');
+    return id;
+  };
+}
+
+function examMongoCreateId(entityKey) {
+  return (collection, payload) => resolveSchoolCreateId({
+    requestedId: payload?.id,
+    collection,
+    allocateNext: () => examEntityIdService.allocateUniqueExamEntityId(entityKey, { collection })
+  });
 }
 
 function stripPaginationFromQuery(query = {}) {
@@ -933,6 +990,7 @@ const schoolRepositories = {
     create: funderModel.addFunder,
     update: funderModel.updateFunder,
     remove: funderModel.deleteFunder,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueFunderId),
     defaultSearchFields: ['id', 'personId', 'externalReference', 'status', 'notes'],
     assignmentScopeKind: 'personId'
   }),
@@ -944,10 +1002,7 @@ const schoolRepositories = {
     create: studentModel.addStudent,
     update: studentModel.updateStudent,
     remove: studentModel.deleteStudent,
-    generateMongoCreateId: async (collection) => {
-      const rows = await collection.find({}, { projection: { id: 1 } }).toArray();
-      return generateStudentSystemIdCandidate(new Set(rows.map((row) => String(row.id || ''))));
-    },
+    generateMongoCreateId: mongoCreateIdFromAllocator(roleEntityIdService.allocateUniqueStudentSystemId),
     defaultSearchFields: ['id', 'customStudentId', 'personId', 'studentCode', 'status', 'claimNumbers.number', 'claimNumbers.label'],
     assignmentScopeKind: 'personId'
   }),
@@ -959,6 +1014,7 @@ const schoolRepositories = {
     create: programModel.addProgram,
     update: programModel.updateProgram,
     remove: programModel.deleteProgram,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueProgramId),
     defaultSearchFields: ['id', 'name', 'programCode', 'status', 'description']
   }),
   transactionDefinitions: createSchoolRepository({
@@ -969,6 +1025,7 @@ const schoolRepositories = {
     create: transactionDefinitionModel.addTransactionDefinition,
     update: transactionDefinitionModel.updateTransactionDefinition,
     remove: transactionDefinitionModel.deleteTransactionDefinition,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueTransactionDefinitionId),
     defaultSearchFields: ['id', 'name', 'code', 'status', 'description'],
     allowSystemFallback: true
   }),
@@ -980,6 +1037,7 @@ const schoolRepositories = {
     create: schoolAccountModel.addAccount,
     update: schoolAccountModel.updateAccount,
     remove: schoolAccountModel.deleteAccount,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueSchoolAccountId),
     defaultSearchFields: ['id', 'name', 'partyId', 'status', 'category'],
     assignmentScopeKind: 'partyAccounts'
   }),
@@ -997,7 +1055,10 @@ const schoolRepositories = {
     },
     mongoRemoveUnsupported: true,
     mongoRemoveMessage: 'Global transactions are immutable. Use status/void/reversal operations.',
-    defaultSearchFields: ['id', 'orgId', 'accountId', 'direction', 'status', 'memo']
+    defaultSearchFields: ['id', 'orgId', 'accountId', 'direction', 'status', 'memo'],
+    generateMongoCreateId: mongoCreateIdRejectDuplicateOnRequested(
+      schoolCatalogEntityIdService.allocateUniqueGlobalTransactionId
+    )
   }),
   transactionJournals: createSchoolRepository({
     entityName: 'transactionJournals',
@@ -1007,6 +1068,7 @@ const schoolRepositories = {
     create: transactionJournalModel.addJournal,
     update: transactionJournalModel.updateJournal,
     remove: transactionJournalModel.deleteJournal,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueTransactionJournalId),
     defaultSearchFields: ['id', 'orgId', 'journalType', 'status', 'description']
   }),
   academicLedger: createSchoolRepository({
@@ -1023,7 +1085,10 @@ const schoolRepositories = {
     },
     mongoRemoveUnsupported: true,
     mongoRemoveMessage: 'Academic ledger is append-only. Use status/void operations.',
-    defaultSearchFields: ['id', 'orgId', 'studentId', 'programId', 'termId', 'classId', 'status']
+    defaultSearchFields: ['id', 'orgId', 'studentId', 'programId', 'termId', 'classId', 'status'],
+    generateMongoCreateId: mongoCreateIdRejectDuplicateOnRequested(
+      schoolCatalogEntityIdService.allocateUniqueAcademicLedgerEntryId
+    )
   }),
   academicSnapshots: createSchoolRepository({
     entityName: 'academicSnapshots',
@@ -1040,7 +1105,8 @@ const schoolRepositories = {
     },
     mongoRemoveUnsupported: true,
     mongoRemoveMessage: 'Academic snapshots are derived records and cannot be deleted here.',
-    defaultSearchFields: ['id', 'orgId', 'studentId', 'programId', 'termId', 'classId']
+    defaultSearchFields: ['id', 'orgId', 'studentId', 'programId', 'termId', 'classId'],
+    generateMongoCreateId: mongoCreateIdDeterministicAcademicSnapshot()
   }),
   reportTemplates: createSchoolRepository({
     entityName: 'reportTemplates',
@@ -1159,6 +1225,7 @@ const schoolRepositories = {
     create: examTemplateModel.addTemplate,
     update: examTemplateModel.updateTemplate,
     remove: examTemplateModel.deleteTemplate,
+    generateMongoCreateId: examMongoCreateId('examTemplates'),
     defaultSearchFields: ['id', 'orgId', 'code', 'title', 'status', 'subjectId', 'ownerTeacherId']
   }),
   examRevisions: createSchoolRepository({
@@ -1169,6 +1236,7 @@ const schoolRepositories = {
     create: examRevisionModel.addRevision,
     update: examRevisionModel.updateRevision,
     remove: examRevisionModel.deleteRevision,
+    generateMongoCreateId: examMongoCreateId('examRevisions'),
     defaultSearchFields: ['id', 'orgId', 'templateId', 'title', 'status', 'revisionNo']
   }),
   examQuestions: createSchoolRepository({
@@ -1179,6 +1247,7 @@ const schoolRepositories = {
     create: examQuestionModel.addQuestion,
     update: examQuestionModel.updateQuestion,
     remove: examQuestionModel.deleteQuestion,
+    generateMongoCreateId: examMongoCreateId('examQuestions'),
     defaultSearchFields: ['id', 'orgId', 'templateId', 'revisionId', 'questionType', 'status', 'promptText']
   }),
   examAllocations: createSchoolRepository({
@@ -1189,6 +1258,7 @@ const schoolRepositories = {
     create: examAllocationModel.addAllocation,
     update: examAllocationModel.updateAllocation,
     remove: examAllocationModel.deleteAllocation,
+    generateMongoCreateId: examMongoCreateId('examAllocations'),
     defaultSearchFields: ['id', 'orgId', 'classId', 'templateId', 'revisionId', 'allocationName', 'status']
   }),
   examAssignments: createSchoolRepository({
@@ -1199,6 +1269,7 @@ const schoolRepositories = {
     create: examAssignmentModel.addAssignment,
     update: examAssignmentModel.updateAssignment,
     remove: examAssignmentModel.deleteAssignment,
+    generateMongoCreateId: examMongoCreateId('examAssignments'),
     defaultSearchFields: ['id', 'orgId', 'allocationId', 'classId', 'studentId', 'status', 'revisionId']
   }),
   examAttempts: createSchoolRepository({
@@ -1209,6 +1280,7 @@ const schoolRepositories = {
     create: examAttemptModel.addAttempt,
     update: examAttemptModel.updateAttempt,
     remove: examAttemptModel.deleteAttempt,
+    generateMongoCreateId: examMongoCreateId('examAttempts'),
     defaultSearchFields: ['id', 'orgId', 'assignmentId', 'allocationId', 'studentId', 'status', 'revisionId']
   }),
   examAnswers: createSchoolRepository({
@@ -1219,6 +1291,7 @@ const schoolRepositories = {
     create: examAnswerModel.addAnswer,
     update: examAnswerModel.updateAnswer,
     remove: examAnswerModel.deleteAnswer,
+    generateMongoCreateId: examMongoCreateId('examAnswers'),
     defaultSearchFields: ['id', 'orgId', 'attemptId', 'assignmentId', 'studentId', 'questionId', 'status']
   }),
   subjects: createSchoolRepository({
@@ -1239,7 +1312,12 @@ const schoolRepositories = {
         { code: payload.code, title: payload.title }
       );
       return payload;
-    }
+    },
+    generateMongoCreateId: mongoCreateIdResolver(({ collection, payload }) => schoolCatalogEntityIdService.allocateUniqueSubjectId({
+      collection,
+      payload,
+      deptCode: payload?.academicUnit?.departmentCode
+    }))
   }),
   classes: createSchoolRepository({
     entityName: 'classes',
@@ -1249,6 +1327,7 @@ const schoolRepositories = {
     create: classModel.addClass,
     update: classModel.updateClass,
     remove: classModel.deleteClass,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueClassId),
     defaultSearchFields: ['id', 'title', 'code', 'description', 'status'],
     assignmentScopeKind: 'instructor',
     transformList: (rows) => normalizeRows(rows).map((row) => normalizeClassDataContract(row)),
@@ -1262,6 +1341,7 @@ const schoolRepositories = {
     create: classTemplateModel.addClassTemplate,
     update: classTemplateModel.updateClassTemplate,
     remove: classTemplateModel.deleteClassTemplate,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueClassTemplateId),
     defaultSearchFields: ['id', 'orgId', 'code', 'name', 'titlePattern', 'status'],
     assignmentScopeKind: 'catalog'
   }),
@@ -1273,6 +1353,7 @@ const schoolRepositories = {
     create: holidayModel.addHoliday,
     update: holidayModel.updateHoliday,
     remove: holidayModel.deleteHoliday,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueHolidayId),
     defaultSearchFields: ['id', 'title', 'type', 'description'],
     assignmentScopeKind: 'catalog'
   }),
@@ -1284,6 +1365,7 @@ const schoolRepositories = {
     create: termModel.addTerm,
     update: termModel.updateTerm,
     remove: termModel.deleteTerm,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueTermId),
     defaultSearchFields: ['id', 'name', 'status', 'description'],
     assignmentScopeKind: 'catalog'
   }),
@@ -1295,6 +1377,7 @@ const schoolRepositories = {
     create: departmentModel.addDepartment,
     update: departmentModel.updateDepartment,
     remove: departmentModel.deleteDepartment,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueDepartmentId),
     defaultSearchFields: ['id', 'name', 'code', 'description'],
     assignmentScopeKind: 'catalog'
   }),
@@ -1306,6 +1389,7 @@ const schoolRepositories = {
     create: activityCategoryModel.addCategory,
     update: activityCategoryModel.updateCategory,
     remove: activityCategoryModel.deleteCategory,
+    generateMongoCreateId: mongoCreateIdFromAllocator(activityIdService.allocateUniqueActivityCategoryId),
     defaultSearchFields: ['id', 'orgId', 'code', 'name', 'description'],
     assignmentScopeKind: 'catalog'
   }),
@@ -1317,6 +1401,7 @@ const schoolRepositories = {
     create: activityModel.addActivity,
     update: activityModel.updateActivity,
     remove: activityModel.deleteActivity,
+    generateMongoCreateId: mongoCreateIdFromAllocator(activityIdService.allocateUniqueActivityId),
     defaultSearchFields: ['id', 'orgId', 'title', 'categoryId', 'departmentId', 'status', 'location'],
     assignmentScopeKind: 'activityEntryAssignees'
   }),
@@ -1328,10 +1413,7 @@ const schoolRepositories = {
     create: teacherModel.addTeacher,
     update: teacherModel.updateTeacher,
     remove: teacherModel.deleteTeacher,
-    generateMongoCreateId: async (collection) => {
-      const rows = await collection.find({}, { projection: { id: 1 } }).toArray();
-      return generateRoleSystemIdCandidate('teacher', new Set(rows.map((row) => String(row.id || ''))));
-    },
+    generateMongoCreateId: mongoCreateIdFromAllocator(roleEntityIdService.allocateUniqueTeacherSystemId),
     defaultSearchFields: ['id', 'personId', 'status', 'employmentType'],
     assignmentScopeKind: 'personId'
   }),
@@ -1343,10 +1425,7 @@ const schoolRepositories = {
     create: staffModel.addStaff,
     update: staffModel.updateStaff,
     remove: staffModel.deleteStaff,
-    generateMongoCreateId: async (collection) => {
-      const rows = await collection.find({}, { projection: { id: 1 } }).toArray();
-      return generateRoleSystemIdCandidate('staff', new Set(rows.map((row) => String(row.id || ''))));
-    },
+    generateMongoCreateId: mongoCreateIdFromAllocator(roleEntityIdService.allocateUniqueStaffSystemId),
     defaultSearchFields: ['id', 'personId', 'status', 'employmentType'],
     assignmentScopeKind: 'personId'
   }),
@@ -1358,6 +1437,7 @@ const schoolRepositories = {
     create: payRateModel.addPayRate,
     update: payRateModel.updatePayRate,
     remove: payRateModel.deletePayRate,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniquePayRateId),
     defaultSearchFields: ['id', 'personId', 'orgId', 'compensationMethod', 'status']
   }),
   sessionStatuses: createSchoolRepository({
@@ -1368,6 +1448,7 @@ const schoolRepositories = {
     create: sessionStatusModel.addSessionStatus,
     update: sessionStatusModel.updateSessionStatus,
     remove: sessionStatusModel.deleteSessionStatus,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueSessionStatusId),
     defaultSearchFields: ['id', 'orgId', 'code', 'label', 'description', 'timesheetFormula'],
     allowSystemFallback: true
   }),
@@ -1379,6 +1460,7 @@ const schoolRepositories = {
     create: skillModel.addSkill,
     update: skillModel.updateSkill,
     remove: skillModel.deleteSkill,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueSkillId),
     defaultSearchFields: ['id', 'orgId', 'code', 'label', 'kind'],
     allowSystemFallback: false
   }),
@@ -1394,13 +1476,7 @@ const schoolRepositories = {
     transformList: (rows) => normalizeRows(rows).map((row) => bookModel.normalizeStoredBook(row)),
     transformItem: (row) => bookModel.normalizeStoredBook(row),
     allowSystemFallback: false,
-    generateMongoCreateId: async (collection, payload) => {
-      const requested = toPublicId(payload?.id);
-      if (requested) {
-        return generateUniqueStringId(collection, requested);
-      }
-      return bookCatalogIdService.allocateUniqueBookCatalogId({ collection });
-    }
+    generateMongoCreateId: mongoCreateIdFromAllocator(bookCatalogIdService.allocateUniqueBookCatalogId)
   }),
   libraryCopies: createSchoolRepository({
     entityName: 'libraryCopies',
@@ -1410,6 +1486,7 @@ const schoolRepositories = {
     create: libraryCopyModel.addLibraryCopy,
     update: libraryCopyModel.updateLibraryCopy,
     remove: libraryCopyModel.deleteLibraryCopy,
+    generateMongoCreateId: mongoCreateIdFromAllocator(libraryCatalogEntityIdService.allocateUniqueLibraryCopyId),
     defaultSearchFields: ['id', 'orgId', 'bookId', 'copyCode', 'copyType', 'status', 'location'],
     allowSystemFallback: false
   }),
@@ -1421,6 +1498,7 @@ const schoolRepositories = {
     create: libraryPatronModel.addLibraryPatron,
     update: libraryPatronModel.updateLibraryPatron,
     remove: libraryPatronModel.deleteLibraryPatron,
+    generateMongoCreateId: mongoCreateIdFromAllocator(libraryCatalogEntityIdService.allocateUniqueLibraryPatronId),
     defaultSearchFields: ['id', 'orgId', 'personId', 'patronRole', 'libraryCardNumber', 'status'],
     allowSystemFallback: false
   }),
@@ -1432,6 +1510,7 @@ const schoolRepositories = {
     create: libraryPolicyModel.addLibraryPolicy,
     update: libraryPolicyModel.updateLibraryPolicy,
     remove: libraryPolicyModel.deleteLibraryPolicy,
+    generateMongoCreateId: mongoCreateIdFromAllocator(libraryCatalogEntityIdService.allocateUniqueLibraryPolicyId),
     defaultSearchFields: ['id', 'orgId', 'patronRole'],
     allowSystemFallback: false
   }),
@@ -1443,6 +1522,7 @@ const schoolRepositories = {
     create: libraryLoanModel.addLibraryLoan,
     update: libraryLoanModel.updateLibraryLoan,
     remove: libraryLoanModel.deleteLibraryLoan,
+    generateMongoCreateId: mongoCreateIdFromAllocator(libraryCatalogEntityIdService.allocateUniqueLibraryLoanId),
     defaultSearchFields: ['id', 'orgId', 'patronId', 'personId', 'copyId', 'bookId', 'status', 'copyType'],
     dateFields: ['checkoutAt', 'returnedAt', 'dueAt', 'audit.createDateTime', 'audit.lastUpdateDateTime'],
     allowSystemFallback: false
@@ -1457,7 +1537,8 @@ const schoolRepositories = {
     remove: libraryLocationModel.deleteLibraryLocation,
     defaultSearchFields: ['id', 'orgId', 'parentId', 'locationType', 'name', 'code'],
     allowSystemFallback: false,
-    normalizePayload: normalizeLibraryLocationPayload
+    normalizePayload: normalizeLibraryLocationPayload,
+    generateMongoCreateId: mongoCreateIdFromAllocator(libraryCatalogEntityIdService.allocateUniqueLibraryLocationId)
   }),
   bookAssignments: createSchoolRepository({
     entityName: 'bookAssignments',
@@ -1469,17 +1550,11 @@ const schoolRepositories = {
     remove: bookAssignmentModel.deleteBookAssignment,
     defaultSearchFields: ['id', 'orgId', 'classId', 'status', 'notes'],
     allowSystemFallback: false,
-    generateMongoCreateId: async (collection, payload) => {
-      const requested = toPublicId(payload?.id);
-      if (requested) {
-        return generateUniqueStringId(collection, requested);
-      }
-      return libraryClassEntityIdService.allocateNextClassKindId(
-        payload?.classId,
-        libraryClassEntityIdService.LIBRARY_CLASS_KINDS.BOOK_ASSIGNMENT,
-        { collection }
-      );
-    }
+    generateMongoCreateId: mongoCreateIdResolver(({ collection, payload }) => libraryClassEntityIdService.allocateNextClassKindId(
+      payload?.classId,
+      libraryClassEntityIdService.LIBRARY_CLASS_KINDS.BOOK_ASSIGNMENT,
+      { collection }
+    ))
   }),
   bookCoveringReports: createSchoolRepository({
     entityName: 'bookCoveringReports',
@@ -1493,17 +1568,11 @@ const schoolRepositories = {
     dateFields: ['periodStartDate', 'periodEndDate', 'audit.createDateTime', 'audit.lastUpdateDateTime'],
     allowSystemFallback: false,
     assignmentScopeKind: 'teacherId',
-    generateMongoCreateId: async (collection, payload) => {
-      const requested = toPublicId(payload?.id);
-      if (requested) {
-        return generateUniqueStringId(collection, requested);
-      }
-      return libraryClassEntityIdService.allocateNextClassKindId(
-        payload?.classId,
-        libraryClassEntityIdService.LIBRARY_CLASS_KINDS.BOOK_COVERING,
-        { collection }
-      );
-    }
+    generateMongoCreateId: mongoCreateIdResolver(({ collection, payload }) => libraryClassEntityIdService.allocateNextClassKindId(
+      payload?.classId,
+      libraryClassEntityIdService.LIBRARY_CLASS_KINDS.BOOK_COVERING,
+      { collection }
+    ))
   }),
   teachingOutlineLevels: createSchoolRepository({
     entityName: 'teachingOutlineLevels',
@@ -1513,6 +1582,7 @@ const schoolRepositories = {
     create: teachingOutlineLevelModel.addTeachingOutlineLevel,
     update: teachingOutlineLevelModel.updateTeachingOutlineLevel,
     remove: teachingOutlineLevelModel.deleteTeachingOutlineLevel,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueTeachingOutlineLevelId),
     defaultSearchFields: ['id', 'orgId', 'code', 'title', 'shortTitle', 'description'],
     allowSystemFallback: true
   }),
@@ -1524,6 +1594,11 @@ const schoolRepositories = {
     create: teachingOutlineSectionTemplateModel.addTeachingOutlineSectionTemplate,
     update: teachingOutlineSectionTemplateModel.updateTeachingOutlineSectionTemplate,
     remove: teachingOutlineSectionTemplateModel.deleteTeachingOutlineSectionTemplate,
+    generateMongoCreateId: mongoCreateIdResolver(({ collection, payload }) => schoolCatalogEntityIdService.allocateUniqueTeachingOutlineTemplateId({
+      collection,
+      payload,
+      skillId: payload?.skillId
+    })),
     defaultSearchFields: ['id', 'orgId', 'skillId'],
     allowSystemFallback: true
   }),
@@ -1535,6 +1610,7 @@ const schoolRepositories = {
     create: teachingOutlineItemModel.addTeachingOutlineItem,
     update: teachingOutlineItemModel.updateTeachingOutlineItem,
     remove: teachingOutlineItemModel.deleteTeachingOutlineItem,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueTeachingOutlineItemId),
     defaultSearchFields: ['id', 'orgId', 'skillId', 'levelId', 'sectionKey', 'label', 'description'],
     allowSystemFallback: true
   }),
@@ -1546,6 +1622,7 @@ const schoolRepositories = {
     create: timesheetPeriodModel.addTimesheetPeriod,
     update: timesheetPeriodModel.updateTimesheetPeriod,
     remove: timesheetPeriodModel.deleteTimesheetPeriod,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueTimesheetPeriodId),
     defaultSearchFields: ['id', 'name', 'status', 'orgId', 'description']
   }),
   timesheets: createSchoolRepository({
@@ -1561,6 +1638,7 @@ const schoolRepositories = {
     mongoRemoveUnsupported: true,
     mongoRemoveMessage: 'Timesheets cannot be deleted from this service.',
     normalizePayload: (data) => timesheetModel.sanitizeTimesheetPayload(data),
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueTimesheetId),
     defaultSearchFields: ['id', 'periodId', 'teacherId', 'status', 'orgId'],
     transformList: enrichTimesheetsWithOrg,
     transformItem: enrichTimesheetItem,
@@ -1585,6 +1663,7 @@ const schoolRepositories = {
     }) : payload,
     mongoRemoveUnsupported: true,
     mongoRemoveMessage: 'Student program registrations cannot be deleted from this service.',
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueStudentProgramRegistrationId),
     defaultSearchFields: ['id', 'orgId', 'studentId', 'personId', 'programId', 'status', 'registrationDate']
   }),
   studentTermRegistrations: createSchoolRepository({
@@ -1605,6 +1684,7 @@ const schoolRepositories = {
     }) : payload,
     mongoRemoveUnsupported: true,
     mongoRemoveMessage: 'Student term registrations cannot be deleted from this service.',
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueStudentTermRegistrationId),
     defaultSearchFields: ['id', 'orgId', 'studentId', 'personId', 'programId', 'termId', 'status', 'registrationDate']
   }),
   studentProgramPriorSubjects: createSchoolRepository({
@@ -1615,6 +1695,7 @@ const schoolRepositories = {
     create: studentProgramPriorSubjectModel.addRecord,
     update: studentProgramPriorSubjectModel.updateRecord,
     remove: studentProgramPriorSubjectModel.deleteRecord,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueStudentProgramPriorSubjectId),
     defaultSearchFields: [
       'id',
       'orgId',
@@ -1640,6 +1721,7 @@ const schoolRepositories = {
         registrationType: 'class', registrationId: id || payload?.id
       })
     }) : payload,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueClassEnrollmentPeriodId),
     defaultSearchFields: [
       'id',
       'orgId',
@@ -1663,6 +1745,7 @@ const schoolRepositories = {
     create: leaveRequestModel.addLeaveRequest,
     update: leaveRequestModel.updateLeaveRequest,
     remove: leaveRequestModel.deleteLeaveRequest,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueLeaveRequestId),
     defaultSearchFields: [
       'id',
       'orgId',
@@ -1691,6 +1774,7 @@ const schoolRepositories = {
     },
     mongoRemoveUnsupported: true,
     mongoRemoveMessage: 'Attendance change logs are append-only.',
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueAttendanceChangeLogId),
     defaultSearchFields: [
       'id',
       'orgId',
@@ -1715,6 +1799,7 @@ const schoolRepositories = {
     create: sessionStudentCaseModel.addSessionStudentCase,
     update: sessionStudentCaseModel.updateSessionStudentCase,
     remove: sessionStudentCaseModel.deleteSessionStudentCase,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueSessionStudentCaseId),
     defaultSearchFields: [
       'id',
       'orgId',
@@ -1741,6 +1826,7 @@ const schoolRepositories = {
     create: taskModel.addTask,
     update: taskModel.updateTask,
     remove: taskModel.deleteTask,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueTaskId),
     defaultSearchFields: [
       'id',
       'orgId',
@@ -1764,6 +1850,7 @@ const schoolRepositories = {
     create: taskRoutingRuleModel.addTaskRoutingRule,
     update: taskRoutingRuleModel.updateTaskRoutingRule,
     remove: taskRoutingRuleModel.deleteTaskRoutingRule,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueTaskRoutingRuleId),
     defaultSearchFields: [
       'id',
       'orgId',
@@ -1787,11 +1874,7 @@ const schoolRepositories = {
       id ? { ...(data || {}), id } : (data || {}),
       { isUpdate: Boolean(id) }
     ),
-    generateMongoCreateId: async (collection) => {
-      const rows = await collection.find({}, { projection: { id: 1 } }).toArray();
-      const existingIds = new Set(rows.map((row) => String(row.id || '')));
-      return notificationRuleModel.generateRuleId(existingIds);
-    },
+    generateMongoCreateId: mongoCreateIdFromAllocator(notificationEntityIdService.allocateUniqueNotificationRuleId),
     defaultSearchFields: ['id', 'orgId', 'label', 'ruleType', 'legacyKey'],
     dateFields: ['audit.createDateTime', 'audit.lastUpdateDateTime']
   }),
@@ -1811,11 +1894,7 @@ const schoolRepositories = {
       }
       return patch;
     },
-    generateMongoCreateId: async (collection) => {
-      const rows = await collection.find({}, { projection: { id: 1 } }).toArray();
-      const existingIds = new Set(rows.map((row) => String(row.id || '')));
-      return notificationRunModel.generateRunId(existingIds);
-    },
+    generateMongoCreateId: mongoCreateIdFromAllocator(notificationEntityIdService.allocateUniqueNotificationRunId),
     defaultSearchFields: ['id', 'orgId', 'ruleId', 'ruleType', 'status', 'trigger'],
     dateFields: ['startedAt', 'completedAt', 'audit.createDateTime']
   })
@@ -2026,7 +2105,7 @@ schoolRepositories.globalTransactions.reverseTransaction = async (transactionId,
       const existingReverse = await collection.findOne({ reversalOfTransactionId: original.id });
       if (existingReverse) throw new Error('This transaction is already reversed.');
 
-      const newId = await generateUniqueStringId(collection, null);
+      const newId = await schoolCatalogEntityIdService.allocateUniqueGlobalTransactionId({ collection });
       const reversedDirection = String(original?.amount?.direction || '').toLowerCase() === 'debit' ? 'credit' : 'debit';
       const nowIso = new Date().toISOString();
 

@@ -1,9 +1,11 @@
-﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
+const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 // MVC/models/school/payRateModel.js
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
+const schoolCatalogEntityIdService = require('../../services/school/schoolCatalogEntityIdService');
+const { resolveJsonEntityCreateId } = require('../../services/school/schoolJsonEntityCreateIdService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/payRates.json');
 
@@ -184,8 +186,13 @@ async function addPayRate(data) {
       return merged;
     }
 
+    const existingIds = all.map((row) => String(row.id || '')).filter(Boolean);
     const newRate = {
-      id: sanitized.id || `PR_${Date.now()}`,
+      id: await resolveJsonEntityCreateId({
+        requestedId: sanitized.id,
+        existingIds,
+        allocate: (opts) => schoolCatalogEntityIdService.allocateUniquePayRateId(opts)
+      }),
       ...sanitized,
       ratePeriods: [{ ...newPeriod, createdAt: new Date().toISOString() }],
       createdAt: new Date().toISOString()

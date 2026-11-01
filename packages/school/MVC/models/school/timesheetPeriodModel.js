@@ -4,6 +4,8 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
+const schoolCatalogEntityIdService = require('../../services/school/schoolCatalogEntityIdService');
+const { resolveJsonEntityCreateId } = require('../../services/school/schoolJsonEntityCreateIdService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/timesheetPeriods.json');
 
@@ -145,8 +147,13 @@ async function addTimesheetPeriod(data) {
         const sanitized = sanitizeTimesheetPeriodInput(data, { isUpdate: false });
         assertUniqueInOrg(all, sanitized);
 
+        const existingIds = all.map((row) => String(row.id || '')).filter(Boolean);
         const newPeriod = {
-            id: sanitized.id || `TSP_${Date.now()}`,
+            id: await resolveJsonEntityCreateId({
+              requestedId: sanitized.id,
+              existingIds,
+              allocate: (opts) => schoolCatalogEntityIdService.allocateUniqueTimesheetPeriodId(opts)
+            }),
             ...sanitized,
             audit: {
                 createDateTime: new Date().toISOString()

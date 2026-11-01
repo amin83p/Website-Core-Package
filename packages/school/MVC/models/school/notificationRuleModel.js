@@ -4,6 +4,8 @@ const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const notificationEntityIdService = require('../../services/school/notificationEntityIdService');
+const { resolveSchoolCreateId } = require('../../services/school/schoolEntityIdAllocationService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/notificationRules.json');
 
@@ -419,9 +421,17 @@ async function addNotificationRule(input, auditUserIdOrOptions = '') {
   const all = await getAllNotificationRules();
   const existingIds = new Set(all.map((row) => String(row?.id || '')));
   const now = new Date().toISOString();
+  const id = await resolveSchoolCreateId({
+    requestedId: input?.id,
+    reservedIds: existingIds,
+    allocateNext: () => notificationEntityIdService.allocateUniqueNotificationRuleId({
+      existingIds,
+      reservedIds: existingIds
+    })
+  });
   const row = {
     ...sanitized,
-    id: generateRuleId(existingIds),
+    id,
     audit: {
       createDateTime: now,
       createUserId: cleanString(auditUserId, { max: 120 }),

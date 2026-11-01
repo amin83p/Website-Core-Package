@@ -5,6 +5,8 @@ const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { stripForbiddenSnapshotFields } = require('../../services/school/classTemplateSnapshotService');
 const { assertTitlePatternAllowsNoDeliveryPlaceholder } = require('../../services/school/classTemplateNamingService');
+const schoolCatalogEntityIdService = require('../../services/school/schoolCatalogEntityIdService');
+const { resolveJsonEntityCreateId } = require('../../services/school/schoolJsonEntityCreateIdService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/classTemplates.json');
 

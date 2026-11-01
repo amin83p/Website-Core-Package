@@ -1,10 +1,12 @@
-﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
+const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 // MVC/models/school/staffModel.js
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { generateRoleSystemIdCandidate } = require('../../services/school/roleSystemIdGenerator');
+const roleEntityIdService = require('../../services/school/roleEntityIdService');
+const { resolveSchoolCreateId } = require('../../services/school/schoolEntityIdAllocationService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/staff.json');
 
@@ -209,8 +211,14 @@ async function addStaff(data, options = {}) {
     }
 
     const existingIds = new Set(all.map((s) => String(s.id)));
-    const finalId = sanitized.id ? String(sanitized.id) : generateStaffId(existingIds);
-    if (existingIds.has(finalId)) throw new Error('Staff id already exists.');
+    const finalId = await resolveSchoolCreateId({
+      requestedId: sanitized.id,
+      reservedIds: existingIds,
+      allocateNext: () => roleEntityIdService.allocateUniqueStaffSystemId({
+        existingIds,
+        reservedIds: existingIds
+      })
+    });
 
     const record = {
       ...sanitized,

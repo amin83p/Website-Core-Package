@@ -5,6 +5,8 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
+const schoolCatalogEntityIdService = require('../../services/school/schoolCatalogEntityIdService');
+const { resolveJsonEntityCreateId } = require('../../services/school/schoolJsonEntityCreateIdService');
 const { CLB_SKILLS } = require('./studentModel');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/teachingOutlineSectionTemplates.json');
@@ -146,9 +148,19 @@ async function addTeachingOutlineSectionTemplate(payload) {
       String(row.orgId) === String(sanitized.orgId) && row.skillId === sanitized.skillId
     ));
     if (duplicate) throw new Error(`Section template for skill "${sanitized.skillId}" already exists.`);
+    const existingIds = rows.map((row) => String(row.id || '')).filter(Boolean);
     const now = new Date().toISOString();
     const created = {
-      id: sanitized.id || generateTemplateId(sanitized.skillId),
+      id: await resolveJsonEntityCreateId({
+        requestedId: sanitized.id,
+        existingIds,
+        context: { skillId: sanitized.skillId },
+        allocate: (opts) => schoolCatalogEntityIdService.allocateUniqueTeachingOutlineTemplateId({
+          ...opts,
+          skillId: sanitized.skillId,
+          payload: sanitized
+        })
+      }),
       ...sanitized,
       audit: {
         createUser: String(payload?.audit?.createUser || 'SYSTEM'),

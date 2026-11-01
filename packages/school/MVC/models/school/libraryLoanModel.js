@@ -12,6 +12,8 @@ const {
   generateEntityId,
   buildAudit
 } = require('./libraryEntityCommon');
+const libraryCatalogEntityIdService = require('../../services/school/libraryCatalogEntityIdService');
+const { resolveSchoolCreateId } = require('../../services/school/schoolEntityIdAllocationService');
 const { normalizePatronRole } = require('./libraryPatronModel');
 const { normalizeCopyType, COPY_TYPES } = require('./libraryCopyModel');
 

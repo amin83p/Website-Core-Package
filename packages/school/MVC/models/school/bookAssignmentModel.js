@@ -6,6 +6,7 @@ const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const libraryClassEntityIdService = require('../../services/school/libraryClassEntityIdService');
+const { resolveSchoolCreateId } = require('../../services/school/schoolEntityIdAllocationService');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const {
   cleanString,
@@ -205,16 +206,15 @@ async function addBookAssignment(payload) {
       .filter((row) => String(row.classId) === String(sanitized.classId))
       .map((row) => toPublicId(row.id))
       .filter(Boolean);
-    let id = sanitized.id;
-    if (!id) {
-      id = await libraryClassEntityIdService.allocateNextClassKindId(
+    const id = await resolveSchoolCreateId({
+      requestedId: sanitized.id,
+      reservedIds: existingIds,
+      allocateNext: () => libraryClassEntityIdService.allocateNextClassKindId(
         sanitized.classId,
         libraryClassEntityIdService.LIBRARY_CLASS_KINDS.BOOK_ASSIGNMENT,
         { existingIds: classScopedIds, reservedIds: existingIds }
-      );
-    } else if (existingIds.has(String(id))) {
-      throw new Error('Book assignment id already exists.');
-    }
+      )
+    });
     const created = {
       id,
       ...sanitized,

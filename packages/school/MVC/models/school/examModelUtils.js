@@ -1,8 +1,12 @@
-﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
+const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const {
+  resolveSchoolCreateId,
+  allocateWithRetry
+} = require('../../services/school/schoolEntityIdAllocationService');
 
 function ensureJsonArrayFile(dataPath) {
   if (!fsSync.existsSync(dataPath)) {
@@ -171,10 +175,14 @@ function createJsonEntityModel({
       const rows = await getAll();
       const sanitized = sanitizeInput(input, { isUpdate: false, existing: null });
       const existingIds = new Set(rows.map((row) => toPublicId(row?.id)).filter(Boolean));
-      const generatedId = sanitized.id || generateEntityId(idPrefix, existingIds);
-      if (existingIds.has(generatedId)) {
-        throw new Error(`${entityLabel} id already exists.`);
-      }
+      const generatedId = await resolveSchoolCreateId({
+        requestedId: sanitized.id,
+        reservedIds: existingIds,
+        allocateNext: () => allocateWithRetry({
+          existingIds,
+          generateCandidate: () => generateEntityId(idPrefix, existingIds)
+        })
+      });
       const next = {
         ...sanitized,
         id: generatedId,

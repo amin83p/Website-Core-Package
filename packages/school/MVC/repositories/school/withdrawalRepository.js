@@ -12,9 +12,9 @@ const {
   normalizeMongoDocument,
   combineMongoFilters,
   resolveMongoIdFilter,
-  generateUniqueStringId,
   deepMerge
 } = requireCoreModule('MVC/repositories/backend/mongoRepositoryUtils');
+const { resolveWithdrawalCreateId } = require('../../services/school/withdrawalEntityIdService');
 
 function stripPaginationFromQuery(query = {}) {
   if (!query || typeof query !== 'object') return {};
@@ -110,7 +110,11 @@ const withdrawalRepository = {
       mongo: async () => {
         const collection = getMongoCollection('schoolWithdrawals');
         const payload = { ...(data || {}) };
-        payload.id = await generateUniqueStringId(collection, payload.id);
+        payload.id = await resolveWithdrawalCreateId({
+          collection,
+          payload,
+          requestedId: payload.id
+        });
         await collection.insertOne(payload);
         return normalizeMongoDocument(payload);
       }

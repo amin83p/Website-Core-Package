@@ -1,11 +1,12 @@
-﻿const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
+const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 // MVC/models/school/studentModel.js
 const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue'); 
 const { FEE_CATEGORIES, FEE_CATEGORY_SET } = require('./feeCategoryCatalog');
-const { generateStudentSystemIdCandidate } = require('../../services/school/studentSystemIdGenerator');
+const roleEntityIdService = require('../../services/school/roleEntityIdService');
+const { resolveSchoolCreateId } = require('../../services/school/schoolEntityIdAllocationService');
 const { CLB_SKILL_CODES } = require('../../../config/skillDefinitions');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/students.json');

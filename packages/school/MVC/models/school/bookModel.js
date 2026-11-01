@@ -6,6 +6,7 @@ const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const bookCatalogIdService = require('../../services/school/bookCatalogIdService');
+const { resolveSchoolCreateId } = require('../../services/school/schoolEntityIdAllocationService');
 const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
 const uploadPathUtils = requireCoreModule('MVC/utils/uploadPathUtils');
 
@@ -451,12 +452,11 @@ async function addBook(payload) {
     const rows = await getAllBooks();
     const sanitized = sanitizeInput(payload, { isUpdate: false });
     const existingIds = rows.map((row) => String(row.id || '')).filter(Boolean);
-    let id = sanitized.id;
-    if (!id) {
-      id = await bookCatalogIdService.allocateUniqueBookCatalogId({ existingIds });
-    } else if (existingIds.includes(String(id))) {
-      throw new Error('Book id already exists.');
-    }
+    const id = await resolveSchoolCreateId({
+      requestedId: sanitized.id,
+      reservedIds: existingIds,
+      allocateNext: () => bookCatalogIdService.allocateUniqueBookCatalogId({ existingIds })
+    });
     const now = new Date().toISOString();
     const created = {
       id,

@@ -12,6 +12,8 @@ const {
   generateEntityId,
   buildAudit
 } = require('./libraryEntityCommon');
+const libraryCatalogEntityIdService = require('../../services/school/libraryCatalogEntityIdService');
+const { resolveSchoolCreateId } = require('../../services/school/schoolEntityIdAllocationService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/libraryCopies.json');
 
@@ -149,8 +151,17 @@ async function addLibraryCopy(payload) {
     const rows = await getAllLibraryCopies();
     const sanitized = sanitizeInput(payload, { isUpdate: false });
     assertUniqueCopyCode(rows, sanitized);
+    const existingIds = rows.map((row) => String(row.id || '')).filter(Boolean);
+    const id = await resolveSchoolCreateId({
+      requestedId: sanitized.id,
+      reservedIds: existingIds,
+      allocateNext: () => libraryCatalogEntityIdService.allocateUniqueLibraryCopyId({
+        existingIds,
+        reservedIds: existingIds
+      })
+    });
     const created = {
-      id: sanitized.id || generateEntityId('LC'),
+      id,
       ...sanitized,
       audit: buildAudit(payload?.audit, payload?.audit?.createUser || 'SYSTEM')
     };

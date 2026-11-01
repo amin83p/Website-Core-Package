@@ -8,6 +8,8 @@ const dataPath = path.join(resolveCoreRoot(), 'data/school/activities.json');
 const ACTIVITY_STATUSES = new Set(['draft', 'posted', 'cancelled', 'void']);
 const { applyVoidMetadata } = require('./voidRecordMetadata');
 const activityAssigneeTimingService = require('../../services/school/activityAssigneeTimingService');
+const activityIdService = require('../../services/school/activityIdService');
+const { resolveSchoolCreateId } = require('../../services/school/schoolEntityIdAllocationService');
 const ATTENDANCE_STATUSES = new Set(['attended', 'absent', 'excused']);
 const COMPLETION_STATUSES = new Set(['pending', 'completed']);
 const EVALUATION_TYPES = new Set(['attendance', 'completion']);
@@ -427,8 +429,17 @@ async function addActivity(payload) {
   return queueWrite(async () => {
     const rows = await getAllActivities();
     const sanitized = sanitizeActivityPayload(payload);
+    const existingIds = rows.map((row) => String(row.id || '')).filter(Boolean);
+    const id = await resolveSchoolCreateId({
+      requestedId: sanitized.id,
+      reservedIds: existingIds,
+      allocateNext: () => activityIdService.allocateUniqueActivityId({
+        existingIds,
+        reservedIds: existingIds
+      })
+    });
     const row = {
-      id: generateId(),
+      id,
       ...sanitized,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()

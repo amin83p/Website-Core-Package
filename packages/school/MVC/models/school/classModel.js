@@ -8,6 +8,8 @@ const finalGradesWorkflowService = require('../../services/school/finalGradesWor
 const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
 const uploadFolderSettingsService = requireCoreModule('MVC/services/uploadFolderSettingsService');
 const { normalizeSkillCode } = require('../../../config/skillDefinitions');
+const schoolCatalogEntityIdService = require('../../services/school/schoolCatalogEntityIdService');
+const { resolveJsonEntityCreateId } = require('../../services/school/schoolJsonEntityCreateIdService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/classes.json');
 const legacyStorageBasePath = path.join(resolveCoreRoot(), 'data/school/classes_storage');
@@ -432,7 +434,7 @@ async function clearEnrollmentsByOrg(orgId, options = {}) {
 }
 
 /**
- * Deletes classes_storage/<classId>/ for each id (ENOENT ignored). Does not use fileQueue — safe to call from mongo cleanup.
+ * Deletes classes_storage/<classId>/ for each id (ENOENT ignored). Does not use fileQueue Â— safe to call from mongo cleanup.
  */
 async function removePhysicalClassStorageByClassIds(classIds) {
   const ids = (Array.isArray(classIds) ? classIds : [])

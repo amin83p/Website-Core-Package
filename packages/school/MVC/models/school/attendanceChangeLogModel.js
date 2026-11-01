@@ -4,6 +4,8 @@ const path = require('path');
 const { requireCoreModule, resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const schoolCatalogEntityIdService = require('../../services/school/schoolCatalogEntityIdService');
+const { resolveJsonEntityCreateId } = require('../../services/school/schoolJsonEntityCreateIdService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/attendanceChangeLogs.json');
 const LOG_SOURCES = Object.freeze(['matrix_cell', 'session_save']);
@@ -124,15 +126,18 @@ async function addAttendanceChangeLogs(entries) {
     const rows = await getAllAttendanceChangeLogs();
     const existingIds = new Set(rows.map((row) => String(row?.id || '')).filter(Boolean));
     const normalizedEntries = (Array.isArray(entries) ? entries : [entries]).map((entry) => sanitizeLogInput(entry));
-    const created = normalizedEntries.map((entry) => {
-      const row = {
-        ...entry,
-        id: entry.id || generateLogId(existingIds)
-      };
+    const created = [];
+    for (const entry of normalizedEntries) {
+      const id = await resolveJsonEntityCreateId({
+        requestedId: entry.id,
+        existingIds,
+        allocate: (opts) => schoolCatalogEntityIdService.allocateUniqueAttendanceChangeLogId(opts)
+      });
+      const row = { ...entry, id };
       existingIds.add(row.id);
       rows.push(row);
-      return row;
-    });
+      created.push(row);
+    }
     await saveAll(rows);
     return created;
   });

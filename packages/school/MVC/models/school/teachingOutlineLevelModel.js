@@ -5,6 +5,8 @@ const fs = require('fs').promises;
 const fsSync = require('fs');
 const path = require('path');
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
+const schoolCatalogEntityIdService = require('../../services/school/schoolCatalogEntityIdService');
+const { resolveJsonEntityCreateId } = require('../../services/school/schoolJsonEntityCreateIdService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/teachingOutlineLevels.json');
 
@@ -165,9 +167,14 @@ async function addTeachingOutlineLevel(payload) {
     const rows = await getAllTeachingOutlineLevels();
     const sanitized = sanitizeInput(payload, { isUpdate: false });
     assertUniqueCode(rows, sanitized);
+    const existingIds = rows.map((row) => String(row.id || '')).filter(Boolean);
     const now = new Date().toISOString();
     const created = {
-      id: sanitized.id || generateLevelId(),
+      id: await resolveJsonEntityCreateId({
+        requestedId: sanitized.id,
+        existingIds,
+        allocate: (opts) => schoolCatalogEntityIdService.allocateUniqueTeachingOutlineLevelId(opts)
+      }),
       ...sanitized,
       audit: {
         createUser: String(payload?.audit?.createUser || 'SYSTEM'),

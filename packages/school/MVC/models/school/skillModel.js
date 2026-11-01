@@ -10,6 +10,8 @@ const {
   DEFAULT_SKILL_DEFINITIONS,
   normalizeSkillCode
 } = require('../../../config/skillDefinitions');
+const schoolCatalogEntityIdService = require('../../services/school/schoolCatalogEntityIdService');
+const { resolveJsonEntityCreateId } = require('../../services/school/schoolJsonEntityCreateIdService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/skills.json');
 const VALID_KINDS = new Set(Object.values(SKILL_KINDS));
@@ -163,9 +165,14 @@ async function addSkill(payload) {
     const rows = await getAllSkills();
     const sanitized = sanitizeInput(payload, { isUpdate: false });
     assertUniqueCode(rows, sanitized);
+    const existingIds = rows.map((row) => String(row.id || '')).filter(Boolean);
     const now = new Date().toISOString();
     const created = {
-      id: sanitized.id || generateSkillId(),
+      id: await resolveJsonEntityCreateId({
+        requestedId: sanitized.id,
+        existingIds,
+        allocate: (opts) => schoolCatalogEntityIdService.allocateUniqueSkillId(opts)
+      }),
       ...sanitized,
       audit: {
         createUser: String(payload?.audit?.createUser || 'SYSTEM'),
