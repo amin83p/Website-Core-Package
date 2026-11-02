@@ -573,10 +573,25 @@
   }
 </style>
 
+<div id="trackActivityLocalArchiveBanner" class="alert alert-info border-0 shadow-sm mb-3 d-none" role="status">
+  <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+    <div>
+      <div class="fw-bold mb-1"><i class="bi bi-hdd-stack me-1"></i>Local archive review</div>
+      <p class="small mb-2 mb-md-1">Timeline and event details use data loaded in your browser from the Local Archive Analyzer — not the live database.</p>
+      <div id="trackActivityLocalArchiveBannerMeta" class="small text-muted"></div>
+      <div id="trackActivityLocalArchiveUserScope" class="d-flex flex-wrap gap-1 mt-2"></div>
+    </div>
+    <div class="d-flex flex-wrap gap-2 align-items-start">
+      <a href="/logs/archive/analyze" class="btn btn-sm btn-outline-primary">Back to Local Analyzer</a>
+      <button type="button" id="trackActivityClearLocalSessionBtn" class="btn btn-sm btn-outline-secondary">Clear local session</button>
+    </div>
+  </div>
+</div>
+
 <div class="card border-0 shadow-sm mb-3">
   <div class="card-header bg-white py-2 px-3 d-flex align-items-center justify-content-between">
     <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Timeline Filters</div>
-    <div class="small text-muted">Hourly timeline - max range: <%= timelineMaxRangeDays %> days</div>
+    <div id="trackActivityFilterRangeHint" class="small text-muted">Hourly timeline - max range: <%= timelineMaxRangeDays %> days</div>
   </div>
   <div class="card-body p-3">
     <form id="trackActivityFilterForm" method="GET" action="/security/track-activity">
@@ -945,10 +960,17 @@
   </div>
 </div>
 
+<script src="/scripts/logArchiveAnalyzerRange.js"></script>
+<script src="/scripts/logArchiveStagingCore.browser.js"></script>
+<script src="/scripts/logArchiveStaging.js"></script>
+<script src="/scripts/logArchiveLocalSession.js"></script>
+<script src="/scripts/trackActivityCore.browser.js"></script>
+<script src="/scripts/trackActivityArchiveLocal.js"></script>
 <script>
   window.__trackActivityConfig = {
     maxRangeDays: <%= timelineMaxRangeDays %>,
     canPickUsers: <%= allowUserPicker ? 'true' : 'false' %>,
+    logArchiveAnalyzerUrl: '/logs/archive/analyze',
     defaultUserId: <%- JSON.stringify(defaultUserId) %>,
     defaultUserLabel: <%- JSON.stringify(defaultUserLabel) %>,
     filters: {

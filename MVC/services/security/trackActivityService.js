@@ -1,6 +1,8 @@
 const settingService = require('../settingService');
 const dataService = require('../dataService');
 const adminAuthorityService = require('../adminAuthorityService');
+const trackActivityCore = require('./trackActivityCore');
+const { buildHourlyTimelineFromLogs } = require('./trackActivityHourlyTimeline');
 const { toPublicId } = require('../../utils/idAdapter');
 const { resolveOrganizationTimezoneFromRow, getDateTimePartsInTimezone, getDateKeyInTimezone, getDayBoundsMs, toUtcMsFromTimezoneLocal, formatMsToDateTimeLocalInput } = require('../../utils/timezoneUtils');
 
@@ -1400,29 +1402,20 @@ async function loadCanonicalEvents(rawQuery = {}, requestUser = null, options = 
   });
 
   const users = await fetchUsersByIds(userIds, requestUser);
-  const lookupMaps = {
-    sectionMap: buildLookupMap(lookups.sections),
-    operationMap: buildLookupMap(lookups.operations),
-    orgMap: buildLookupMap(lookups.organizations),
-    userMap: buildLookupMap(users)
-  };
-
-  const actionEvents = (Array.isArray(actionStates) ? actionStates : [])
-    .map((row) => buildActionStateProjection(row, lookupMaps, timezone));
-
-  const logEvents = (Array.isArray(logs) ? logs : [])
-    .map((row) => buildLogEvent(row, lookupMaps, timezone));
-
-  const enrichedEvents = attachActionEnrichment(logEvents, actionEvents);
-
-  const filteredEvents = applyEventFilters(enrichedEvents, filters)
-    .sort((a, b) => Number(b.occurredAtMs || 0) - Number(a.occurredAtMs || 0));
-
-  return {
+  const built = trackActivityCore.buildEventsFromSourceRecords({
+    logs,
+    actionStates,
     filters,
     timezone,
     lookups,
-    events: filteredEvents
+    userRows: users
+  });
+
+  return {
+    filters: built.filters,
+    timezone: built.timezone,
+    lookups,
+    events: built.events
   };
 }
 
@@ -1647,31 +1640,11 @@ async function fetchTrackActivityHourlyTimeline(rawQuery = {}, requestUser = nul
   const timezone = await resolveTimelineTimezone(rawQuery, requestUser, lookups);
   const filters = parseTimelineFilters(rawQuery, timezone);
   filters.userId = resolveScopedUserId(requestUser, filters.userId);
-  const requestedZoomLevel = normalizeTrackTimelineZoomLevel(rawQuery?.zoomLevel);
-  const focusDay = cleanText(rawQuery?.focusDay, 20);
-  const focusHour = normalizeHourIndex(rawQuery?.focusHour);
-  const focusFiveMinute = normalizeFiveMinuteIndex(rawQuery?.focusFiveMinute);
 
   const dayWindows = resolveDayWindowsForRange(filters.startAtMs, filters.endAtMs, timezone);
-
-  const dateTokens = buildDateTokensForQuery(filters.startAtMs, filters.endAtMs, timezone);
-  const rangeStartDateKey = cleanText(dateTokens.startDate, 20)
-    || cleanText(dayWindows[0]?.dateKey, 20)
-    || toDateKeyInTimezone(filters.startAtMs, timezone);
-  const rangeEndDateKey = cleanText(dateTokens.endDate, 20)
-    || cleanText(dayWindows[dayWindows.length - 1]?.dateKey, 20)
-    || toDateKeyInTimezone(filters.endAtMs, timezone);
   const sectionIds = parseIdList(filters.sectionIds || filters.sectionId, 120, 200);
   const operationIds = parseIdList(filters.operationIds || filters.operationId, 120, 200);
   const orgIds = parseIdList(filters.orgIds || filters.orgId, 120, 200);
-  const dayWindowMap = new Map();
-  const dayHourCounters = new Map();
-  dayWindows.forEach((window) => {
-    const key = cleanText(window?.dateKey, 20);
-    if (!key) return;
-    dayWindowMap.set(key, window);
-    dayHourCounters.set(key, buildEmptyMetricSlots(24));
-  });
 
   const logs = await fetchHourlyTimelineLogs({
     dayWindows,
@@ -1682,195 +1655,14 @@ async function fetchTrackActivityHourlyTimeline(rawQuery = {}, requestUser = nul
     orgIds,
     requestUser
   });
-  const sectionMap = buildLookupMap(lookups.sections);
-  const operationMap = buildLookupMap(lookups.operations);
-  const fiveMinuteCounters = new Map();
-  const fifteenSecondCounters = new Map();
 
-  const ensureFiveMinuteSlots = (key) => {
-    if (!fiveMinuteCounters.has(key)) fiveMinuteCounters.set(key, buildEmptyMetricSlots(12));
-    return fiveMinuteCounters.get(key);
-  };
-  const ensureFifteenSecondSlots = (key) => {
-    if (!fifteenSecondCounters.has(key)) fifteenSecondCounters.set(key, buildEmptyMetricSlots(20));
-    return fifteenSecondCounters.get(key);
-  };
-
-  (Array.isArray(logs) ? logs : []).forEach((log) => {
-    const timestampToken = resolveLogTimestamp(log);
-    if (!timestampToken) return;
-    const occurredAtMs = new Date(timestampToken).getTime();
-    if (!Number.isFinite(occurredAtMs)) return;
-    if (occurredAtMs < filters.startAtMs || occurredAtMs > filters.endAtMs) return;
-
-    const dayKey = resolveTimelineDayKey(occurredAtMs, timezone);
-    const daySlots = dayHourCounters.get(dayKey);
-    if (!Array.isArray(daySlots)) return;
-
-    const hourParts = resolveTimelineTimeParts(occurredAtMs, timezone);
-    const hour = clamp(Number(hourParts?.hour || 0), 0, 23);
-    const minute = clamp(Number(hourParts?.minute || 0), 0, 59);
-    const second = clamp(Number(hourParts?.second || 0), 0, 59);
-    const slot = daySlots[hour];
-    if (!slot) return;
-
-    const sectionInfo = resolveSectionInfo(log.sectionId, sectionMap);
-    const operationInfo = resolveOperationInfo(log.operationId, operationMap);
-    slot.requestCount += 1;
-    const fiveMinuteIndex = clamp(Math.floor(minute / 5), 0, 11);
-    const fiveMinuteKey = `${dayKey}|${hour}`;
-    const fiveSlots = ensureFiveMinuteSlots(fiveMinuteKey);
-    fiveSlots[fiveMinuteIndex].requestCount += 1;
-
-    const secondOffset = ((minute % 5) * 60) + second;
-    const fifteenSecondIndex = clamp(Math.floor(secondOffset / 15), 0, 19);
-    const fifteenSecondKey = `${dayKey}|${hour}|${fiveMinuteIndex}`;
-    const fifteenSlots = ensureFifteenSecondSlots(fifteenSecondKey);
-    fifteenSlots[fifteenSecondIndex].requestCount += 1;
-
-    if (isAttemptLikeLog(log, sectionInfo?.name, operationInfo?.name)) {
-      slot.attemptCount += 1;
-      fiveSlots[fiveMinuteIndex].attemptCount += 1;
-      fifteenSlots[fifteenSecondIndex].attemptCount += 1;
-    }
-  });
-
-  const dayTimelines = dayWindows.map((window) => {
-    const key = cleanText(window?.dateKey, 20);
-    const dayStartMs = Number(window?.dayStartMs || 0);
-    const dayEndMs = Number(window?.dayEndMs || (dayStartMs + (24 * 60 * 60 * 1000) - 1));
-    const daySlots = dayHourCounters.get(key) || buildEmptyMetricSlots(24);
-    const chunks = Array.from({ length: 24 }, (_, hour) => {
-      const slot = daySlots[hour] || { requestCount: 0, attemptCount: 0 };
-      const hourWindow = toHourIsoWindow(dayStartMs, hour * 60 * 60 * 1000);
-      return {
-        hour,
-        label: toHourLabel(hour),
-        requestCount: Number(slot.requestCount || 0),
-        attemptCount: Number(slot.attemptCount || 0),
-        ...hourWindow,
-        colorWeight: 0
-      };
-    });
-    const busiest = applyColorWeights(chunks);
-    const totalRequests = chunks.reduce((sum, chunk) => sum + Number(chunk.requestCount || 0), 0);
-    const totalAttempts = chunks.reduce((sum, chunk) => sum + Number(chunk.attemptCount || 0), 0);
-    return {
-      dateKey: key,
-      label: formatDateInTimezone(dayStartMs, timezone),
-      startAt: new Date(dayStartMs).toISOString(),
-      endAt: new Date(dayEndMs).toISOString(),
-      startAtDisplay: formatDateTimeInTimezone(dayStartMs, timezone),
-      endAtDisplay: formatDateTimeInTimezone(dayEndMs, timezone),
-      totalRequests,
-      totalAttempts,
-      busiestChunkRequests: busiest,
-      chunks
-    };
-  });
-
-  const totalRequests = dayTimelines.reduce((sum, day) => sum + Number(day.totalRequests || 0), 0);
-  const totalAttempts = dayTimelines.reduce((sum, day) => sum + Number(day.totalAttempts || 0), 0);
-  const globalBusiestHour = dayTimelines.reduce((max, day) => Math.max(max, Number(day.busiestChunkRequests || 0)), 0);
-
-  let zoomLevel = requestedZoomLevel;
-  let focusTimeline = null;
-
-  if (requestedZoomLevel === '5m') {
-    const focusWindow = dayWindowMap.get(focusDay);
-    if (focusWindow && focusHour >= 0) {
-      const fiveKey = `${focusDay}|${focusHour}`;
-      const fiveSlots = fiveMinuteCounters.get(fiveKey) || buildEmptyMetricSlots(12);
-      const hourWindow = toHourIsoWindow(focusWindow.dayStartMs, focusHour * 60 * 60 * 1000);
-      const chunks = Array.from({ length: 12 }, (_, index) => {
-        const startMs = Number(hourWindow.startAtMs) + (index * 5 * 60 * 1000);
-        const endMs = startMs + (5 * 60 * 1000) - 1;
-        const slot = fiveSlots[index] || { requestCount: 0, attemptCount: 0 };
-        return {
-          index,
-          label: toFiveMinuteLabel(focusHour, index),
-          requestCount: Number(slot.requestCount || 0),
-          attemptCount: Number(slot.attemptCount || 0),
-          startAtMs: startMs,
-          endAtMs: endMs,
-          startAt: new Date(startMs).toISOString(),
-          endAt: new Date(endMs).toISOString(),
-          startAtDisplay: formatDateTimeInTimezone(startMs, timezone),
-          endAtDisplay: formatDateTimeInTimezone(endMs, timezone),
-          colorWeight: 0
-        };
-      });
-      applyColorWeights(chunks);
-      focusTimeline = {
-        zoomLevel: '5m',
-        dateKey: focusDay,
-        hour: focusHour,
-        title: `${formatDateInTimezone(focusWindow.dayStartMs, timezone)} • ${toHourLabel(focusHour)}`,
-        subtitle: '5-minute chunks',
-        chunks
-      };
-    } else {
-      zoomLevel = 'hourly';
-    }
-  } else if (requestedZoomLevel === '15s') {
-    const focusWindow = dayWindowMap.get(focusDay);
-    if (focusWindow && focusHour >= 0 && focusFiveMinute >= 0) {
-      const fifteenKey = `${focusDay}|${focusHour}|${focusFiveMinute}`;
-      const fifteenSlots = fifteenSecondCounters.get(fifteenKey) || buildEmptyMetricSlots(20);
-      const hourWindow = toHourIsoWindow(focusWindow.dayStartMs, focusHour * 60 * 60 * 1000);
-      const focusFiveStartMs = Number(hourWindow.startAtMs) + (focusFiveMinute * 5 * 60 * 1000);
-      const chunks = Array.from({ length: 20 }, (_, index) => {
-        const startMs = focusFiveStartMs + (index * 15 * 1000);
-        const endMs = startMs + (15 * 1000) - 1;
-        const slot = fifteenSlots[index] || { requestCount: 0, attemptCount: 0 };
-        return {
-          index,
-          label: toFifteenSecondLabel(focusHour, focusFiveMinute, index),
-          requestCount: Number(slot.requestCount || 0),
-          attemptCount: Number(slot.attemptCount || 0),
-          startAtMs: startMs,
-          endAtMs: endMs,
-          startAt: new Date(startMs).toISOString(),
-          endAt: new Date(endMs).toISOString(),
-          startAtDisplay: formatDateTimeInTimezone(startMs, timezone),
-          endAtDisplay: formatDateTimeInTimezone(endMs, timezone),
-          colorWeight: 0
-        };
-      });
-      applyColorWeights(chunks);
-      focusTimeline = {
-        zoomLevel: '15s',
-        dateKey: focusDay,
-        hour: focusHour,
-        fiveMinute: focusFiveMinute,
-        title: `${formatDateInTimezone(focusWindow.dayStartMs, timezone)} • ${toFiveMinuteLabel(focusHour, focusFiveMinute)}`,
-        subtitle: '15-second chunks',
-        chunks
-      };
-    } else {
-      zoomLevel = 'hourly';
-    }
-  }
-
-  return {
+  return buildHourlyTimelineFromLogs({
+    logs,
+    rawQuery,
     timezone,
-    filters: buildSafeFiltersForResponse(filters),
-    range: mapRangeMeta(filters, timezone),
-    zoomLevel,
-    focus: {
-      day: focusDay,
-      hour: focusHour,
-      fiveMinute: focusFiveMinute
-    },
-    summary: {
-      totalRequests,
-      totalAttempts,
-      busiestChunkRequests: globalBusiestHour,
-      daysCount: dayTimelines.length
-    },
-    dayTimelines,
-    focusTimeline
-  };
+    lookups,
+    presetFilters: filters
+  });
 }
 
 async function fetchTrackActivityTimeline(rawQuery = {}, requestUser = null) {

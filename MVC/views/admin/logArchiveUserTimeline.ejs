@@ -1,0 +1,178 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl: 'logs',
+  newLabel: null,
+  user,
+  tableName: null,
+  print: false,
+  headerManageBtns: [
+    '<a href="/logs/archive/analyze" class="btn btn-filled btn-secondary btn-md"><i class="bi bi-folder2-open me-1"></i> Local Analyzer</a>',
+    '<a href="/logs" class="btn btn-filled btn-secondary btn-md"><i class="bi bi-list-ul me-1"></i> Activity Logs</a>'
+  ]
+}) %>
+
+<link rel="stylesheet" href="/styles/logArchiveAnalyzer.css">
+<link rel="stylesheet" href="/styles/logArchiveUserTimeline.css">
+
+<div class="log-archive-page w-100">
+  <div id="logArchiveUserTimelineBanner" class="alert alert-info border-0 shadow-sm mb-3 d-none" role="status">
+    <div class="d-flex flex-wrap align-items-start justify-content-between gap-2">
+      <div>
+        <div class="fw-bold mb-1"><i class="bi bi-person-lines-fill me-1"></i>Local user activity timeline</div>
+        <p class="small mb-2 mb-md-1">Data comes from your staged local archive only — not the live database. Re-opening the Local Analyzer clears staged data; keep this tab open or reload from Step 3 after a new load.</p>
+        <div id="logArchiveUserTimelineBannerMeta" class="small text-muted"></div>
+      </div>
+      <div class="d-flex flex-wrap gap-2">
+        <a href="/logs/archive/analyze" class="btn btn-sm btn-outline-primary">Back to Local Analyzer</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white py-2 px-3">
+      <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filters</div>
+    </div>
+    <div class="card-body pt-2">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-6 col-lg-3">
+          <label class="form-label small fw-bold text-muted text-uppercase mb-1" for="logArchiveUserTimelineUserSelect">User</label>
+          <select id="logArchiveUserTimelineUserSelect" class="form-select size-md" disabled>
+            <option value="">Load session first…</option>
+          </select>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <label class="form-label small fw-bold text-muted text-uppercase mb-1" for="logArchiveUserTimelineSectionSelect">Section</label>
+          <select id="logArchiveUserTimelineSectionSelect" class="form-select size-md" disabled>
+            <option value="">Select user first…</option>
+          </select>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <label class="form-label small fw-bold text-muted text-uppercase mb-1" for="logArchiveUserTimelineOperationSelect">Operation</label>
+          <select id="logArchiveUserTimelineOperationSelect" class="form-select size-md" disabled>
+            <option value="">Select section first…</option>
+          </select>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <label class="form-label small fw-bold text-muted text-uppercase mb-1" for="logArchiveUserTimelineStartDate">Start date</label>
+          <input type="date" id="logArchiveUserTimelineStartDate" class="form-control size-md" disabled>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <label class="form-label small fw-bold text-muted text-uppercase mb-1" for="logArchiveUserTimelineEndDate">End date</label>
+          <input type="date" id="logArchiveUserTimelineEndDate" class="form-control size-md" disabled>
+        </div>
+        <div class="col-md-6 col-lg-3">
+          <button type="button" class="btn btn-primary btn-md w-100" id="logArchiveUserTimelineApplyBtn" disabled>
+            <i class="bi bi-search me-1"></i> Apply
+          </button>
+        </div>
+        <div class="col-12">
+          <span id="logArchiveUserTimelineStatus" class="small text-muted">Waiting for local session…</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3 d-none" id="logArchiveUserTimelineResultsCard">
+    <div class="card-header bg-white py-2 px-3">
+      <ul class="nav nav-tabs card-header-tabs" id="logArchiveUserTimelineResultsTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" id="logArchiveUserTimelineTabTable" data-bs-toggle="tab"
+            data-bs-target="#logArchiveUserTimelinePaneTable" type="button" role="tab"
+            aria-controls="logArchiveUserTimelinePaneTable" aria-selected="true">
+            <i class="bi bi-table me-1"></i> Table
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" id="logArchiveUserTimelineTabTimeline" data-bs-toggle="tab"
+            data-bs-target="#logArchiveUserTimelinePaneTimeline" type="button" role="tab"
+            aria-controls="logArchiveUserTimelinePaneTimeline" aria-selected="false">
+            <i class="bi bi-diagram-3 me-1"></i> Timelines
+          </button>
+        </li>
+      </ul>
+    </div>
+    <div class="card-body p-0">
+      <div class="tab-content" id="logArchiveUserTimelineResultsTabContent">
+        <div class="tab-pane fade show active" id="logArchiveUserTimelinePaneTable" role="tabpanel"
+          aria-labelledby="logArchiveUserTimelineTabTable" tabindex="0">
+          <div class="table-responsive">
+            <table class="table table-sm table-hover align-middle mb-0" id="logArchiveUserTimelineResultsTable">
+              <thead class="table-light">
+                <tr>
+                  <th>When</th>
+                  <th>Section</th>
+                  <th>Operation</th>
+                  <th>Status</th>
+                  <th>Summary</th>
+                  <th class="text-center" style="width: 6rem;">Action state</th>
+                </tr>
+              </thead>
+              <tbody id="logArchiveUserTimelineResultsTbody">
+                <tr><td colspan="6" class="text-muted small px-3 py-3">Apply filters to load occurrences.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div class="tab-pane fade" id="logArchiveUserTimelinePaneTimeline" role="tabpanel"
+          aria-labelledby="logArchiveUserTimelineTabTimeline" tabindex="0">
+          <div class="p-3">
+            <p class="small text-muted mb-3"><%= Number(windowDays || 3) %>-day batches; each day is the same size with equal-spaced events (first→last). Click a day card to enlarge; click a circle for log detail.</p>
+            <div id="logArchiveUserTimelineBatches"></div>
+          </div>
+        </div>
+      </div>
+      <div id="logArchiveUserTimelineTooltip" class="log-archive-user-timeline-tooltip d-none" role="tooltip"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="logArchiveUserTimelineDetailModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="logArchiveUserTimelineDetailTitle">Activity detail</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="logArchiveUserTimelineDetailSummary" class="mb-2"></div>
+        <div id="logArchiveUserTimelineDetailTableHost"></div>
+        <div id="logArchiveUserTimelineDetailActionBlock" class="d-none mt-3">
+          <h6 class="small fw-bold text-muted text-uppercase mb-2">Linked action state</h6>
+          <div id="logArchiveUserTimelineDetailActionTableHost"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="logArchiveUserTimelineEnlargeModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable log-archive-user-timeline-enlarge-dialog">
+    <div class="modal-content">
+      <div class="modal-header flex-shrink-0">
+        <h5 class="modal-title" id="logArchiveUserTimelineEnlargeTitle">Timeline</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body log-archive-user-timeline-enlarge-body pt-2">
+        <p class="small text-muted mb-2 flex-shrink-0">Click a circle to open log detail. Scroll when this day has many logs.</p>
+        <div id="logArchiveUserTimelineEnlargeChartHost"
+          class="log-archive-user-timeline-chart log-archive-user-timeline-chart-enlarged"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.__LOG_ARCHIVE_USER_TIMELINE__ = {
+    windowDays: <%= Number(windowDays || 3) %>,
+    timezone: <%- JSON.stringify(timezone || 'UTC') %>
+  };
+</script>
+<script src="/scripts/logArchiveAnalyzerRange.js"></script>
+<script src="/scripts/logArchiveStagingCore.browser.js"></script>
+<script src="/scripts/logArchiveStaging.js"></script>
+<script src="/scripts/logArchiveLocalSession.js"></script>
+<script src="/scripts/logArchiveUserTimelineCore.browser.js"></script>
+<script src="/scripts/trackActivityCore.browser.js"></script>
+<script src="/scripts/trackActivityArchiveLocal.js"></script>
+<script src="/scripts/logArchiveUserTimeline.js"></script>
+<%- include('../partials/tablePages-end') %>

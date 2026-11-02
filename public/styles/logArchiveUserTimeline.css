@@ -1,0 +1,234 @@
+.log-archive-user-timeline-chart {
+  border: 1px solid var(--bs-border-color);
+  border-radius: 12px;
+  background: var(--bs-body-bg);
+  padding: 0.5rem;
+  cursor: default;
+}
+
+.log-archive-user-timeline-chart-fixed {
+  height: 320px;
+  overflow: hidden;
+}
+
+.log-archive-user-timeline-day-panel {
+  width: 100%;
+  min-height: 320px;
+}
+
+.log-archive-user-timeline-day-panel-clickable {
+  cursor: zoom-in;
+}
+
+.log-archive-user-timeline-day-panel-clickable:hover {
+  border-color: var(--bs-primary);
+  box-shadow: 0 0 0 1px rgba(var(--bs-primary-rgb, 13, 110, 253), 0.25);
+}
+
+.log-archive-user-timeline-enlarge-dialog {
+  width: calc(100% - 2rem);
+  max-width: 640px;
+  height: calc(100vh - 2rem);
+  margin: 1rem auto;
+}
+
+.log-archive-user-timeline-enlarge-dialog .modal-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.log-archive-user-timeline-enlarge-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.log-archive-user-timeline-chart-enlarged {
+  width: 100%;
+  height: auto;
+  min-height: 0;
+  overflow: visible;
+  flex: 0 0 auto;
+  border: none;
+  padding: 0;
+  background: transparent;
+}
+
+.log-archive-user-timeline-enlarge-svg-wrap svg.log-archive-user-timeline-svg-enlarged {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+}
+
+.log-archive-user-timeline-event-label-enlarged {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.log-archive-user-timeline-detail-table th.log-archive-user-timeline-detail-th {
+  width: 34%;
+  font-weight: 600;
+  color: var(--bs-secondary-color, #6c757d);
+  vertical-align: top;
+  white-space: nowrap;
+}
+
+.log-archive-user-timeline-detail-table td.log-archive-user-timeline-detail-td {
+  word-break: break-word;
+}
+
+.log-archive-user-timeline-detail-nested {
+  max-height: 200px;
+  overflow: auto;
+  background: var(--bs-light, #f8f9fa);
+  padding: 0.35rem 0.5rem;
+  border-radius: 6px;
+}
+
+.log-archive-user-timeline-day-col {
+  flex: 0 0 auto;
+}
+
+@media (min-width: 768px) {
+  .log-archive-user-timeline-day-row {
+    display: flex;
+    flex-wrap: nowrap;
+  }
+
+  .log-archive-user-timeline-day-col {
+    flex: 1 1 0;
+    max-width: 33.333%;
+  }
+}
+
+.log-archive-user-timeline-chart:focus-visible {
+  outline: 2px solid var(--bs-primary);
+  outline-offset: 2px;
+}
+
+.log-archive-user-timeline-chart svg.log-archive-user-timeline-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.log-archive-user-timeline-batch:last-child {
+  margin-bottom: 0 !important;
+}
+
+.log-archive-user-timeline-batch-header {
+  border-bottom: 1px solid var(--bs-border-color);
+  padding-bottom: 0.5rem;
+}
+
+.log-archive-user-timeline-batch-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--bs-body-color);
+}
+
+.log-archive-user-timeline-day-heading {
+  font-size: 12px;
+  font-weight: 700;
+  fill: var(--bs-body-color, #212529);
+}
+
+.log-archive-user-timeline-day-subheading {
+  font-size: 10px;
+  fill: #6c757d;
+}
+
+.log-archive-user-timeline-empty-label {
+  font-size: 11px;
+  fill: #adb5bd;
+}
+
+.log-archive-user-timeline-end-label {
+  font-size: 10px;
+  font-weight: 500;
+  fill: #495057;
+}
+
+.log-archive-user-timeline-spine {
+  stroke: #6ea8fe;
+  stroke-width: 5;
+  stroke-linecap: round;
+}
+
+.log-archive-user-timeline-spine-muted {
+  stroke: #dee2e6;
+  stroke-width: 4;
+  stroke-dasharray: 6 6;
+}
+
+.log-archive-user-timeline-branch {
+  stroke: #4d96ff;
+  stroke-width: 3;
+}
+
+.log-archive-user-timeline-branch.action-state {
+  stroke: #20c997;
+}
+
+.log-archive-user-timeline-node {
+  fill: #0d6efd;
+  stroke: #fff;
+  stroke-width: 2.5;
+  cursor: pointer;
+}
+
+.log-archive-user-timeline-node.has-action-state {
+  fill: #198754;
+}
+
+.log-archive-user-timeline-node:hover {
+  fill: #0a58ca;
+}
+
+.log-archive-user-timeline-event-label {
+  font-size: 11px;
+  font-weight: 600;
+  fill: var(--bs-body-color, #212529);
+}
+
+.log-archive-user-timeline-row {
+  cursor: pointer;
+}
+
+.log-archive-user-timeline-row:hover {
+  background-color: rgba(var(--bs-primary-rgb, 13, 110, 253), 0.06);
+}
+
+#logArchiveUserTimelineResultsTabs .nav-link {
+  font-weight: 500;
+}
+
+#logArchiveUserTimelineDetailModal {
+  --bs-modal-zindex: 1075;
+}
+
+#logArchiveUserTimelineEnlargeModal {
+  --bs-modal-zindex: 1065;
+}
+
+.log-archive-user-timeline-tooltip {
+  position: fixed;
+  z-index: 13000;
+  max-width: 280px;
+  padding: 0.5rem 0.65rem;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #fff;
+  background: rgba(33, 37, 41, 0.94);
+  border-radius: 8px;
+  pointer-events: none;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+}
+
+.log-archive-ready-actions .col-md-4 {
+  display: flex;
+}

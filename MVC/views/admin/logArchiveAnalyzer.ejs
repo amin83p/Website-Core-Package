@@ -1,0 +1,227 @@
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl: 'logs',
+  newLabel: null,
+  user,
+  tableName: null,
+  print: false,
+  headerManageBtns: [
+    '<a href="/logs/archive" class="btn btn-filled btn-secondary btn-md"><i class="bi bi-archive me-1"></i> Archive Extractor</a>',
+    '<a href="/logs" class="btn btn-filled btn-secondary btn-md"><i class="bi bi-list-ul me-1"></i> Activity Logs</a>'
+  ]
+}) %>
+
+<link rel="stylesheet" href="/styles/logArchiveAnalyzer.css">
+
+<div class="log-archive-page w-100">
+  <div class="dash-hero mb-3 p-3 p-md-4">
+    <div class="d-flex flex-wrap align-items-start justify-content-between gap-3">
+      <div class="flex-grow-1 min-w-0">
+        <p class="small text-muted mb-0">Set your report period, then open an export ZIP or folder. Analysis runs entirely in your browser — nothing is uploaded.</p>
+        <button type="button" class="btn btn-link btn-sm px-0 mt-1" id="logArchiveLocalInfoBtn">Local processing &amp; privacy</button>
+      </div>
+      <div class="log-archive-hero-limit">
+        <label class="form-label small fw-bold text-muted text-uppercase mb-1" for="logArchiveRecordLimit">Table view cap</label>
+        <input type="number" class="form-control size-md" id="logArchiveRecordLimit" name="recordLimit"
+          min="1" max="<%= Number(maxMergeLimit || 50000) %>" step="1" value="5000"
+          aria-describedby="logArchiveRecordLimitHelp">
+        <div id="logArchiveRecordLimitHelp" class="form-text">Max rows for Step 3 table (all records still staged)</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="logArchiveTruncationNotice" class="alert alert-warning log-archive-truncation-notice d-none mb-3" role="status"></div>
+
+  <div class="log-archive-wizard row g-3 mb-3">
+    <div class="col-12">
+      <div class="card border-0 shadow-sm wizard-step" id="logArchiveStep1Card">
+        <div class="card-header bg-white py-2 px-3 d-flex align-items-center justify-content-between border-bottom-0">
+          <div class="d-flex align-items-center gap-2">
+            <span class="wizard-step-num">1</span>
+            <span class="fw-bold text-dark"><i class="bi bi-calendar3 me-2"></i>Report period</span>
+          </div>
+          <span class="badge text-bg-light border" id="logArchiveTimezoneBadge"><%= timezone || 'UTC' %></span>
+        </div>
+        <div class="card-body pt-2">
+          <p class="small text-muted mb-3">Required before choosing archives. All matching records are staged locally; the activity table uses your view cap from the <strong>start</strong> of the range. Effective dates reflect staged data.</p>
+          <form id="logArchiveReportSetupForm" class="log-archive-setup-form" autocomplete="off">
+            <div class="row g-3 align-items-end">
+              <div class="col-md-6 col-lg-4">
+                <label class="form-label small fw-bold text-muted text-uppercase mb-1" for="logArchiveReportStart">Start date</label>
+                <input type="date" class="form-control size-md" id="logArchiveReportStart" name="reportStart" required>
+              </div>
+              <div class="col-md-6 col-lg-4">
+                <label class="form-label small fw-bold text-muted text-uppercase mb-1" for="logArchiveReportEnd">End date</label>
+                <input type="date" class="form-control size-md" id="logArchiveReportEnd" name="reportEnd" required>
+              </div>
+              <div class="col-md-12 col-lg-4">
+                <label class="form-label small fw-bold text-muted text-uppercase mb-1">Users (optional)</label>
+                <div class="input-group">
+                  <input type="text" id="logArchiveUserSummary" class="form-control size-md" value="All users in range" readonly aria-label="Selected users summary">
+                  <button type="button" class="btn btn-outline-primary" id="logArchivePickUsersBtn" aria-label="Pick users">
+                    <i class="bi bi-person-plus"></i>
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary" id="logArchiveClearUsersBtn" aria-label="Clear user filter">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div id="logArchiveSelectedUsers" class="log-archive-user-chips mt-2 d-none" aria-live="polite"></div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12">
+      <div class="card border-0 shadow-sm wizard-step is-disabled" id="logArchiveStep2Card">
+        <div class="card-header bg-white py-2 px-3 border-bottom-0">
+          <div class="d-flex align-items-center gap-2">
+            <span class="wizard-step-num">2</span>
+            <span class="fw-bold text-dark"><i class="bi bi-folder2-open me-2"></i>Archive source</span>
+          </div>
+        </div>
+        <div class="card-body pt-2">
+          <p class="small text-muted mb-3">Open one export ZIP, or a folder with <code>activity-archive_*.zip</code> files (or extracted <code>manifest.json</code> + NDJSON) that overlap your report period.</p>
+          <div class="d-flex flex-wrap gap-2 align-items-center">
+            <button type="button" class="btn btn-filled btn-primary btn-md mb-0 disabled" id="logArchiveOpenZipBtn" disabled>
+              <i class="bi bi-file-earmark-zip me-1"></i> Open ZIP
+            </button>
+            <input type="file" id="logArchiveZipInput" accept=".zip,application/zip" hidden disabled>
+            <button type="button" class="btn btn-filled btn-secondary btn-md mb-0 disabled" id="logArchiveOpenFolderBtn" disabled>
+              <i class="bi bi-folder2-open me-1"></i> Open folder
+            </button>
+            <input type="file" id="logArchiveFolderInput" webkitdirectory directory multiple hidden disabled>
+            <button type="button" class="btn btn-outline-secondary btn-md mb-0" id="logArchiveMirrorFolderBtn" title="Optional writable folder mirror">
+              <i class="bi bi-folder-symlink me-1"></i> Save staging copy to folder
+            </button>
+          </div>
+          <div id="logArchiveLoadMeta" class="small text-muted mt-2"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12 d-none" id="logArchiveStep3Card">
+      <div class="card border-0 shadow-sm wizard-step log-archive-step-ready">
+        <div class="card-header bg-white py-2 px-3 border-bottom-0">
+          <div class="d-flex align-items-center gap-2">
+            <span class="wizard-step-num">3</span>
+            <span class="fw-bold text-dark"><i class="bi bi-check-circle me-2 text-success"></i>Report ready</span>
+          </div>
+        </div>
+        <div class="card-body pt-2">
+          <div id="logArchiveStep3Summary" class="mb-3"></div>
+          <div class="row g-3 log-archive-ready-actions">
+            <div class="col-md-6 col-lg-4">
+              <button type="button" class="log-archive-action-tile w-100 text-start" id="logArchiveOpenPanelBtn">
+                <span class="log-archive-action-icon text-primary"><i class="bi bi-table"></i></span>
+                <span class="log-archive-action-body">
+                  <span class="log-archive-action-title">View activity table</span>
+                  <span class="log-archive-action-desc">Browse, filter, and export CSV on this page</span>
+                </span>
+                <i class="bi bi-chevron-right log-archive-action-chevron"></i>
+              </button>
+            </div>
+            <div class="col-md-6 col-lg-4">
+              <a class="log-archive-action-tile w-100 text-start" id="logArchiveReviewTrackBtn"
+                href="/security/track-activity?local=1" target="_blank" rel="noopener noreferrer">
+                <span class="log-archive-action-icon text-info"><i class="bi bi-clock-history"></i></span>
+                <span class="log-archive-action-body">
+                  <span class="log-archive-action-title">Review in Track Activity</span>
+                  <span class="log-archive-action-desc">Opens in a new tab — hourly timeline from your staged archive</span>
+                </span>
+                <i class="bi bi-chevron-right log-archive-action-chevron"></i>
+              </a>
+            </div>
+            <div class="col-md-12 col-lg-4">
+              <a class="log-archive-action-tile w-100 text-start" id="logArchiveUserTimelineBtn"
+                href="/logs/archive/user-timeline?local=1" target="_blank" rel="noopener noreferrer">
+                <span class="log-archive-action-icon text-success"><i class="bi bi-person-lines-fill"></i></span>
+                <span class="log-archive-action-body">
+                  <span class="log-archive-action-title">User activity timeline</span>
+                  <span class="log-archive-action-desc">Opens in a new tab — filter by user, section, operation, and dates; table plus batched equal-spaced timeline</span>
+                </span>
+                <i class="bi bi-chevron-right log-archive-action-chevron"></i>
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="logArchiveAnalyzerPanel" class="d-none log-archive-wizard">
+    <div class="card border-0 shadow-sm wizard-step mb-3">
+      <div class="card-header bg-white py-2 px-3 border-bottom-0">
+        <div class="d-flex align-items-center gap-2">
+          <span class="wizard-step-num wizard-step-num-muted">3</span>
+          <span class="fw-bold text-dark"><i class="bi bi-table me-2"></i>Activity table</span>
+        </div>
+      </div>
+    </div>
+    <div class="row g-3 mb-3" id="logArchiveSummaryRow"></div>
+    <div class="card border-0 shadow-sm mb-3">
+      <div class="card-header bg-white py-2 px-3 d-flex align-items-center justify-content-between">
+        <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Table filters</div>
+      </div>
+      <div class="card-body p-3">
+        <form id="logArchiveAnalyzerFilterForm" class="log-archive-horizontal-form" action="#" method="get" autocomplete="off">
+          <div class="log-archive-input-row log-archive-filter-row">
+            <input type="datetime-local" name="startAt" class="form-control form-control-sm log-archive-filter-control" aria-label="Filter start">
+            <input type="datetime-local" name="endAt" class="form-control form-control-sm log-archive-filter-control" aria-label="Filter end">
+            <input type="text" name="userId" class="form-control form-control-sm log-archive-filter-control" placeholder="User ID" aria-label="User ID">
+            <input type="text" name="q" class="form-control form-control-sm log-archive-filter-control" placeholder="Search" aria-label="Search">
+            <select name="source" class="form-select form-select-sm log-archive-filter-control" aria-label="Source">
+              <option value="">All sources</option>
+              <option value="log">Logs</option>
+              <option value="action_state">Action state linked</option>
+            </select>
+            <div class="d-flex align-items-center gap-1 flex-shrink-0">
+              <button type="submit" class="btn btn-sm btn-primary btn-filled">Apply</button>
+              <button type="button" id="logArchiveCsvBtn" class="btn btn-sm btn-outline-secondary">CSV</button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover align-middle" id="logArchiveEventsTable">
+        <thead class="table-light">
+          <tr>
+            <th>When</th>
+            <th>User</th>
+            <th>Section</th>
+            <th>Operation</th>
+            <th>Status</th>
+            <th>Summary</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="d-flex justify-content-between align-items-center mt-2">
+      <span id="logArchivePageMeta" class="small text-muted"></span>
+      <div class="btn-group btn-group-sm">
+        <button type="button" class="btn btn-outline-secondary" id="logArchivePrevPage">Prev</button>
+        <button type="button" class="btn btn-outline-secondary" id="logArchiveNextPage">Next</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  window.__LOG_ARCHIVE_ANALYZER__ = {
+    maxMergeLimit: <%= Number(maxMergeLimit || 50000) %>,
+    defaultRecordLimit: 5000,
+    timezone: <%- JSON.stringify(timezone || 'UTC') %>
+  };
+</script>
+<script src="/scripts/vendor/pizzip.min.js"></script>
+<script src="/scripts/logArchiveAnalyzerRange.js"></script>
+<script src="/scripts/logArchiveStagingCore.browser.js"></script>
+<script src="/scripts/logArchiveStaging.js"></script>
+<script src="/scripts/logArchiveLocalSession.js"></script>
+<script src="/scripts/logArchiveAnalyzerCore.browser.js"></script>
+<script src="/scripts/logArchiveAnalyzer.js"></script>
+<%- include('../partials/modal_GenericPicker') %>
+<%- include('../partials/tablePages-end') %>

@@ -65,7 +65,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const config = window.__trackActivityConfig || {};
   const canPickUsers = config.canPickUsers === true;
-  const maxRangeDays = Number(config.maxRangeDays || 7);
+  let maxRangeDays = Number(config.maxRangeDays || 7);
+  const localBannerEl = document.getElementById('trackActivityLocalArchiveBanner');
+  const localBannerMetaEl = document.getElementById('trackActivityLocalArchiveBannerMeta');
+  const localUserScopeEl = document.getElementById('trackActivityLocalArchiveUserScope');
+  const clearLocalSessionBtn = document.getElementById('trackActivityClearLocalSessionBtn');
+  const filterRangeHintEl = document.getElementById('trackActivityFilterRangeHint');
+  const ArchiveLocal = window.TrackActivityArchiveLocal || null;
+  const LocalSession = window.LogArchiveLocalSession || null;
+  const Range = window.LogArchiveAnalyzerRange || {};
   const defaultUserId = String(config.defaultUserId || '').trim();
   const defaultUserLabel = String(config.defaultUserLabel || '').trim() || defaultUserId || '-';
   const chunkModal = (chunkModalEl && window.bootstrap?.Modal)
@@ -208,7 +216,9 @@ document.addEventListener('DOMContentLoaded', () => {
       sections: [],
       operations: [],
       orgs: []
-    }
+    },
+    localMode: false,
+    localSession: null
   };
 
   function escapeHtml(value) {
@@ -1440,6 +1450,24 @@ document.addEventListener('DOMContentLoaded', () => {
     eventModalActionSummaryEl.innerHTML = `Loading full Action State record for <span class="font-monospace">${escapeHtml(token)}</span>...`;
 
     try {
+      let record = {};
+      let meta = {};
+      let changeEvents = [];
+      let decryptedPayload = null;
+
+      if (state.localMode && state.localSession && ArchiveLocal) {
+        const row = ArchiveLocal.resolveLocalActionState(state.localSession, token);
+        if (!row) throw new Error('Action State not found in loaded archive.');
+        record = row;
+        meta = {
+          userName: String(row?.userId || '').trim(),
+          requestId: String(row?.requestId || '').trim(),
+          sectionName: String(row?.sectionId || '').trim(),
+          opName: String(row?.operationId || '').trim()
+        };
+        changeEvents = [];
+        decryptedPayload = row?.details || row;
+      } else {
       const response = await fetch(`/actionStates/details/${encodeURIComponent(token)}`, {
         method: 'GET',
         headers: {
@@ -1453,19 +1481,24 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error(payload.message || 'Failed to load Action State details.');
       }
 
-      const record = payload?.record || {};
-      const meta = payload?.meta || {};
+      record = payload?.record || {};
+      meta = payload?.meta || {};
+      changeEvents = Array.isArray(payload?.changeEvents) ? payload.changeEvents : [];
+      decryptedPayload = payload?.decryptedPayload || null;
+      }
+
+      const recordSafe = record || {};
       const snapshot = {
         record: {
-          id: record?.id || token,
-          status: record?.status || '',
-          sectionId: record?.sectionId || '',
-          operationId: record?.operationId || '',
-          targetKey: record?.targetKey || '',
-          startedAt: record?.startedAt || '',
-          updatedAt: record?.updatedAt || '',
-          attemptCount: Number(record?.attemptCount || 0),
-          volumeUsageKB: Number(record?.volumeUsageKB || 0)
+          id: recordSafe?.id || token,
+          status: recordSafe?.status || '',
+          sectionId: recordSafe?.sectionId || '',
+          operationId: recordSafe?.operationId || '',
+          targetKey: recordSafe?.targetKey || '',
+          startedAt: recordSafe?.startedAt || '',
+          updatedAt: recordSafe?.updatedAt || '',
+          attemptCount: Number(recordSafe?.attemptCount || 0),
+          volumeUsageKB: Number(recordSafe?.volumeUsageKB || 0)
         },
         meta: {
           userName: meta?.userName || '',
@@ -1474,8 +1507,8 @@ document.addEventListener('DOMContentLoaded', () => {
           sectionName: meta?.sectionName || '',
           opName: meta?.opName || ''
         },
-        changeEvents: Array.isArray(payload?.changeEvents) ? payload.changeEvents : [],
-        decryptedPayload: payload?.decryptedPayload || null
+        changeEvents,
+        decryptedPayload
       };
 
       eventModalActionSummaryEl.innerHTML = `
@@ -1519,6 +1552,15 @@ document.addEventListener('DOMContentLoaded', () => {
       params.delete('page');
       params.set('kind', 'event');
       params.set('eventId', eventToken);
+      if (state.localMode && state.localSession && ArchiveLocal) {
+        const query = Object.fromEntries(params.entries());
+        const payload = ArchiveLocal.resolveLocalDetails(state.localSession, query, config, {
+          canReveal: canPickUsers,
+          reveal: false
+        });
+        if (!payload.found) throw new Error('Event not found in loaded archive.');
+        renderEventModal(payload);
+      } else {
       const response = await fetch(`/security/track-activity/details?${params.toString()}`, {
         method: 'GET',
         headers: {
@@ -1532,6 +1574,7 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error(payload.message || 'Failed to load event details.');
       }
       renderEventModal(payload);
+      }
       if (autoLoadActionState) {
         const actionStateId = preferredActionStateId || state.currentActionStateId;
         if (actionStateId) {
@@ -1558,6 +1601,14 @@ document.addEventListener('DOMContentLoaded', () => {
       params.set('kind', 'interval');
       params.set('bucketStartAt', startAt);
       params.set('bucketEndAt', endAt);
+      if (state.localMode && state.localSession && ArchiveLocal) {
+        const query = Object.fromEntries(params.entries());
+        const payload = ArchiveLocal.resolveLocalDetails(state.localSession, query, config, {
+          canReveal: canPickUsers,
+          reveal: false
+        });
+        renderChunkModalRows(payload, row);
+      } else {
       const response = await fetch(`/security/track-activity/details?${params.toString()}`, {
         method: 'GET',
         headers: {
@@ -1571,6 +1622,7 @@ document.addEventListener('DOMContentLoaded', () => {
         throw new Error(payload.message || 'Failed to load chunk details.');
       }
       renderChunkModalRows(payload, row);
+      }
     } catch (error) {
       renderChunkModalError(error.message || 'Failed to load chunk details.');
     }
@@ -1804,7 +1856,171 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!Number.isFinite(startMs) || !Number.isFinite(endMs) || endMs <= startMs) return;
     const days = (endMs - startMs) / (24 * 60 * 60 * 1000);
     if (days > maxRangeDays) {
-      showAlert(`Selected range is over ${maxRangeDays} days. The server will trim it.`, 'info');
+      const msg = state.localMode
+        ? `Selected range is over ${maxRangeDays} days for this loaded archive. Narrow the dates.`
+        : `Selected range is over ${maxRangeDays} days. The server will trim it.`;
+      showAlert(msg, 'info');
+    }
+  }
+
+  function formatSessionLoadedAt(iso) {
+    const ms = Date.parse(String(iso || ''));
+    if (!Number.isFinite(ms)) return '-';
+    try {
+      return new Date(ms).toLocaleString();
+    } catch (_) {
+      return String(iso || '-');
+    }
+  }
+
+  function renderLocalUserScope(session) {
+    if (!localUserScopeEl) return;
+    const users = ArchiveLocal?.deriveLocalUserPickerItems
+      ? ArchiveLocal.deriveLocalUserPickerItems(session)
+      : [];
+    const limited = session?.reportSetup?.userIds?.length;
+    if (!limited) {
+      localUserScopeEl.innerHTML = '<span class="badge text-bg-light border">Users: all in loaded archive</span>';
+      return;
+    }
+    if (!users.length) {
+      localUserScopeEl.innerHTML = '<span class="badge text-bg-light border">Users: scoped selection (no labels)</span>';
+      return;
+    }
+    localUserScopeEl.innerHTML = users.map((u) => (
+      `<span class="badge text-bg-light border">${escapeHtml(u.label || u.id)}</span>`
+    )).join('');
+  }
+
+  function applyLocalSessionClamps(session) {
+    if (!session || !ArchiveLocal || !Range.resolveArchiveRangeBoundsMs) return;
+    const report = session.reportSetup || {};
+    const tz = ArchiveLocal.sessionTimezone(session);
+    const bounds = Range.resolveArchiveRangeBoundsMs(report.startDate, report.endDate, tz);
+    if (!Number.isFinite(bounds.dayStartMs) || !Number.isFinite(bounds.dayEndMs)) return;
+    const minToken = formatMsToLocalInput(bounds.dayStartMs);
+    const maxToken = formatMsToLocalInput(bounds.dayEndMs);
+    if (startInputEl) {
+      startInputEl.min = minToken;
+      startInputEl.max = maxToken;
+      if (!startInputEl.value) startInputEl.value = minToken;
+    }
+    if (endInputEl) {
+      endInputEl.min = minToken;
+      endInputEl.max = maxToken;
+      if (!endInputEl.value) endInputEl.value = maxToken;
+    }
+    maxRangeDays = ArchiveLocal.sessionMaxRangeDays(session);
+    if (filterRangeHintEl) {
+      filterRangeHintEl.textContent = `Local archive — max range: ${maxRangeDays} day(s) (loaded data)`;
+    }
+  }
+
+  function formatMsToLocalInput(ms) {
+    const date = new Date(Number(ms || 0));
+    if (Number.isNaN(date.getTime())) return '';
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
+  function showLocalArchiveBanner(session) {
+    if (!localBannerEl) return;
+    localBannerEl.classList.remove('d-none');
+    const manifest = session?.manifest || {};
+    const report = manifest.reportRange || session?.reportSetup || {};
+    const exportId = String(manifest.exportId || 'archive').trim();
+    const loadedAt = formatSessionLoadedAt(session?.meta?.loadedAt || session?.savedAt);
+    if (localBannerMetaEl) {
+      let metaLine = `Report ${report.startDate || '—'} to ${report.endDate || '—'} · Export ${exportId} · Loaded ${loadedAt}`;
+      const meta = session?.meta || {};
+      const totalLogs = Number(manifest.counts?.logs || meta.logCount || session.logs?.length || 0);
+      if (totalLogs) {
+        metaLine += ` · ${totalLogs.toLocaleString()} log(s) staged`;
+      }
+      if (meta.viewCappedInAnalyzer) {
+        metaLine += ' (analyzer table was view-capped; timeline uses full staging)';
+      } else if (meta.truncated && !session.staging) {
+        const req = meta.requestedReportRange || manifest.requestedReportRange || {};
+        const matched = Number(meta.matchedLogCount || 0);
+        const limit = Number(meta.recordLimit || 0);
+        metaLine += `. Partial load: ${matched.toLocaleString()} matched; first ${limit.toLocaleString()} shown`;
+        if (req.endDate && req.endDate !== report.endDate) {
+          metaLine += ` (requested through ${req.endDate})`;
+        }
+      }
+      localBannerMetaEl.textContent = metaLine;
+    }
+    renderLocalUserScope(session);
+  }
+
+  function loadTimelineFromLocalSession() {
+    if (!state.localSession || !ArchiveLocal) {
+      throw new Error('Local archive session is not available.');
+    }
+    const params = getFormParams();
+    const payload = ArchiveLocal.buildLocalTimelinePayload(state.localSession, params, config);
+    applyPayload(payload);
+  }
+
+  function resolveLocalSessionIdFromPage() {
+    const params = new URLSearchParams(window.location.search);
+    const fromUrl = String(
+      params.get('localSession')
+      || params.get('session')
+      || params.get('sessionId')
+      || ''
+    ).trim();
+    if (fromUrl) return fromUrl;
+    return LocalSession?.getActiveSessionId?.() || '';
+  }
+
+  async function initLocalArchiveMode() {
+    const params = new URLSearchParams(window.location.search);
+    const wantsLocal = params.get('local') === '1'
+      || Boolean(LocalSession?.getActiveSessionId?.());
+    if (!wantsLocal || !LocalSession || !ArchiveLocal) return;
+
+    try {
+      const sessionId = resolveLocalSessionIdFromPage();
+      let session = await LocalSession.loadSession(sessionId || undefined);
+      if (!session && typeof LocalSession.loadLatestSession === 'function') {
+        session = await LocalSession.loadLatestSession();
+      }
+      const stagedCount = Number(session?.manifest?.counts?.logs || session?.meta?.logCount || 0);
+      const legacyLogs = Array.isArray(session?.logs) ? session.logs.length : 0;
+      const hasData = Boolean(session) && (
+        session.staging
+        || stagedCount > 0
+        || legacyLogs > 0
+      );
+      if (!hasData) {
+        if (localBannerEl) {
+          localBannerEl.classList.remove('d-none');
+          localBannerEl.classList.replace('alert-info', 'alert-warning');
+          if (localBannerMetaEl) {
+            localBannerMetaEl.textContent = 'No local archive session found. Load an archive in the Local Analyzer first.';
+          }
+        }
+        return;
+      }
+      state.localMode = true;
+      if (localBannerEl) {
+        localBannerEl.classList.remove('d-none');
+        if (localBannerMetaEl && session.staging) {
+          localBannerMetaEl.textContent = 'Loading staged archive from local storage…';
+        }
+      }
+      if (typeof LocalSession.loadSessionWithData === 'function' && session.staging) {
+        session = await LocalSession.loadSessionWithData(session.id);
+      } else if (typeof LocalSession.hydrateSessionFromStaging === 'function' && session.staging) {
+        session = await LocalSession.hydrateSessionFromStaging(session);
+      }
+      state.localSession = session;
+      showLocalArchiveBanner(session);
+      applyLocalSessionClamps(session);
+      loadTimelineFromLocalSession();
+    } catch (error) {
+      showAlert(error.message || 'Failed to load local archive session.', 'danger');
     }
   }
 
@@ -1814,6 +2030,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (modeEl) modeEl.textContent = 'Loading timeline...';
     renderEmpty('Loading activity timeline...');
+
+    if (state.localMode && state.localSession) {
+      try {
+        loadTimelineFromLocalSession();
+      } catch (error) {
+        renderEmpty(error.message || 'Failed to load local timeline.');
+        showAlert(error.message || 'Failed to load local timeline.', 'danger');
+      }
+      return;
+    }
 
     try {
       const params = getFormParams();
@@ -1860,8 +2086,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!pickUserBtn || !userIdInput || !userSummaryInput) return;
 
     pickUserBtn.addEventListener('click', () => {
-      window.GenericPicker.open(window.GenericPickerPresets.user({
-        title: 'Select Target User',
+      const localItems = (state.localMode && state.localSession && ArchiveLocal)
+        ? ArchiveLocal.deriveLocalUserPickerItems(state.localSession)
+        : null;
+      const pickerConfig = window.GenericPickerPresets.user({
+        title: state.localMode ? 'Select User (loaded archive)' : 'Select Target User',
         icon: 'bi-people',
         apiEndpoint: '/security/track-activity/users',
         searchFields: 'id,username,email,name',
@@ -1872,10 +2101,19 @@ document.addEventListener('DOMContentLoaded', () => {
           const id = String(item.id || '').trim();
           const label = String(item.name || item.username || item.email || id).trim() || id;
           if (!id) return;
+          const allowed = (state.localMode && state.localSession && ArchiveLocal)
+            ? ArchiveLocal.allowedUserIdSet(state.localSession)
+            : null;
+          if (allowed && !allowed.has(id)) return;
           userIdInput.value = id;
           userSummaryInput.value = label;
         }
-      }));
+      });
+      if (localItems && localItems.length) {
+        pickerConfig.sourceMode = 'local';
+        pickerConfig.localItems = localItems;
+      }
+      window.GenericPicker.open(pickerConfig);
     });
 
     if (resetUserBtn) {
@@ -2008,5 +2246,18 @@ document.addEventListener('DOMContentLoaded', () => {
   initSummaryBadgeClick();
   initChunkModalRowClick();
   initChunkTableCellClick();
+
+  if (clearLocalSessionBtn) {
+    clearLocalSessionBtn.addEventListener('click', async () => {
+      if (LocalSession && typeof LocalSession.clearSession === 'function') {
+        await LocalSession.clearSession();
+      }
+      const url = new URL(window.location.href);
+      url.searchParams.delete('local');
+      window.location.href = url.pathname + (url.searchParams.toString() ? `?${url.searchParams.toString()}` : '');
+    });
+  }
+
   renderIdleState();
+  void initLocalArchiveMode();
 });

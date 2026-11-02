@@ -57,7 +57,8 @@ function mergeWithDefaults(settings) {
     organization: { ...(settingsModel.DEFAULTS.organization || {}), ...(parsed.organization || {}) },
     access: { ...(settingsModel.DEFAULTS.access || {}), ...(parsed.access || {}) },
     app: mergeAppSettings(settingsModel.DEFAULTS.app || {}, parsed.app || {}),
-    audit: parsed.audit || {}
+    audit: parsed.audit || {},
+    logArchive: parsed.logArchive && typeof parsed.logArchive === 'object' ? parsed.logArchive : {}
   };
 }
 

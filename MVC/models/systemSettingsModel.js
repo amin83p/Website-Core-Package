@@ -227,7 +227,8 @@ async function getSettings() {
       contact: { ...DEFAULTS.contact, ...(parsed.contact || {}) },
       organization: { ...DEFAULTS.organization, ...(parsed.organization || {}) },
       access: { ...DEFAULTS.access, ...(parsed.access || {}) },
-      app: mergeAppSettings(DEFAULTS.app, parsed.app || {})
+      app: mergeAppSettings(DEFAULTS.app, parsed.app || {}),
+      logArchive: parsed.logArchive && typeof parsed.logArchive === 'object' ? parsed.logArchive : {}
     };
   } catch (error) {
     if (error.code === 'ENOENT') {
@@ -247,7 +248,8 @@ function getSettingsSync() {
       contact: { ...DEFAULTS.contact, ...(parsed.contact || {}) },
       organization: { ...DEFAULTS.organization, ...(parsed.organization || {}) },
       access: { ...DEFAULTS.access, ...(parsed.access || {}) },
-      app: mergeAppSettings(DEFAULTS.app, parsed.app || {})
+      app: mergeAppSettings(DEFAULTS.app, parsed.app || {}),
+      logArchive: parsed.logArchive && typeof parsed.logArchive === 'object' ? parsed.logArchive : {}
     };
   } catch (_) {
     return { ...DEFAULTS };
@@ -269,6 +271,9 @@ async function updateSettings(newSettings, auditUser) {
       organization: { ...current.organization, ...(newSettings.organization || {}) },
       access: { ...current.access, ...(newSettings.access || {}) },
       app: mergeAppSettings(current.app, newSettings.app || {}),
+      logArchive: newSettings.logArchive && typeof newSettings.logArchive === 'object'
+        ? { ...(current.logArchive || {}), ...newSettings.logArchive }
+        : (current.logArchive || {}),
       audit: {
         lastUpdateUser: auditUser ? auditUser.id : 'system',
         lastUpdateDateTime: new Date().toISOString()

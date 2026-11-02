@@ -2,6 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/logReportController');
+const logArchiveRoutes = require('./logArchiveRoutes');
 const { requireAuth } = require('../middleware/authMiddleware');
 const { requireAccess } = require('../middleware/accessMiddleware'); // ✅ Added
 const { trackActionState } = require('../middleware/actionStateMiddleware'); // ✅ Added
@@ -10,6 +11,8 @@ const generalExportCtrl = require('../controllers/generalExportController');
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants'); // ✅ Added
 
 // ...
+router.use('/archive', logArchiveRoutes);
+
 // Route: GET /logs
 router.get('/', 
             requireAuth, 
