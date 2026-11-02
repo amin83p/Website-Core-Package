@@ -4733,7 +4733,7 @@ async function manageSession(req, res) {
 
         const sessionConductReportPeriod = sessionConductService.resolveReportPeriodForSession(
             sessionReportViewerContext.assignmentMap,
-            sessionId
+            sessionContext
         );
         const reportConductPersonIds = sessionConductService.resolveSessionReportConductPersonIds({
             assignments: sessionMatchedAssignments,
@@ -5354,7 +5354,7 @@ async function buildSessionReportGradebookSkillCoveragePayload(req, {
 
     const period = sessionConductService.resolveReportPeriodForSession(
         viewerContext?.assignmentMap,
-        sessionId
+        sessionContext
     );
 
     return reportPeriodGradebookSkillCoverageService.buildSessionSkillCoveragePayload({

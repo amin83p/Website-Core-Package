@@ -349,12 +349,69 @@ test('sessionConductService prefills from session or period ratings and defaults
   assert.equal(forP3.classParticipationPercent, null);
 
   const period = sessionConductService.resolveReportPeriodForSession([{
+    status: 'active',
+    classId: 'class-1',
     sessionId: 'sess-2',
     reportStartDate: '2026-02-01',
     reportDueDate: '2026-02-28'
-  }], 'sess-2');
+  }], { classId: 'class-1', sessionId: 'sess-2', sessionDate: '2026-02-15' });
   assert.equal(period.startDate, '2026-02-01');
   assert.equal(period.dueDate, '2026-02-28');
+});
+
+test('resolveReportPeriodForSession uses matching target row dates, not assignment-level dates from other rows', () => {
+  const assignment = {
+    status: 'active',
+    classId: '646148',
+    reportStartDate: '2026-09-01',
+    reportDueDate: '2026-09-15',
+    targetRows: [
+      {
+        rowId: 'row-sep',
+        targetType: 'session',
+        status: 'active',
+        sessionId: 'SES-646148-0036',
+        reportStartDate: '2026-09-01',
+        reportDueDate: '2026-09-15'
+      },
+      {
+        rowId: 'row-oct',
+        targetType: 'session',
+        status: 'active',
+        sessionId: 'SES-646148-0037',
+        reportStartDate: '2026-10-16',
+        reportDueDate: '2026-10-31'
+      }
+    ]
+  };
+  const octSessionContext = {
+    classId: '646148',
+    sessionId: 'SES-646148-0037',
+    sessionDate: '2026-10-20'
+  };
+  const octPeriod = sessionConductService.resolveReportPeriodForSession([assignment], octSessionContext);
+  assert.equal(octPeriod.startDate, '2026-10-16');
+  assert.equal(octPeriod.dueDate, '2026-10-31');
+
+  const sepPeriod = sessionConductService.resolveReportPeriodForSession([assignment], {
+    classId: '646148',
+    sessionId: 'SES-646148-0036',
+    sessionDate: '2026-09-10'
+  });
+  assert.equal(sepPeriod.startDate, '2026-09-01');
+  assert.equal(sepPeriod.dueDate, '2026-09-15');
+});
+
+test('resolveReportPeriodForSession accepts sessionId string for backward compatibility', () => {
+  const period = sessionConductService.resolveReportPeriodForSession([{
+    status: 'active',
+    classId: 'class-1',
+    sessionId: 'sess-legacy',
+    reportStartDate: '2026-04-01',
+    reportDueDate: '2026-04-15'
+  }], 'sess-legacy');
+  assert.equal(period.startDate, '2026-04-01');
+  assert.equal(period.dueDate, '2026-04-15');
 });
 
 test('reportService skips null/empty conduct percents in session rating rollups', () => {

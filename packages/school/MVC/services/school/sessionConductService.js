@@ -89,34 +89,100 @@ function parseDateOnly(value) {
 }
 
 /**
- * Union report period dates from session-scoped assignments.
+ * Report period dates for the current session (gradebook skill gate, conduct prefill).
+ * Uses only target rows that match sessionContext—not assignment-level dates from other rows.
  * @param {Iterable<object>|Map} assignments
- * @param {string} sessionId
+ * @param {{ classId?: string, sessionId?: string, sessionDate?: string }|string} sessionContextOrSessionId
  * @returns {{ startDate: string, dueDate: string }}
  */
-function resolveReportPeriodForSession(assignments, sessionId) {
-  const cleanSessionId = String(sessionId || '').trim();
+function normalizeSessionContextForReportPeriod(sessionContextOrSessionId) {
+  if (typeof sessionContextOrSessionId === 'string') {
+    return {
+      classId: '',
+      sessionId: String(sessionContextOrSessionId || '').trim(),
+      sessionDate: ''
+    };
+  }
+  const ctx = sessionContextOrSessionId && typeof sessionContextOrSessionId === 'object'
+    ? sessionContextOrSessionId
+    : {};
+  return {
+    classId: String(ctx.classId || '').trim(),
+    sessionId: String(ctx.sessionId || '').trim(),
+    sessionDate: parseDateOnly(ctx.sessionDate)
+  };
+}
+
+function reportPeriodFromTargetRow(row = {}) {
+  const startDate = parseDateOnly(row?.reportStartDate);
+  const dueDate = parseDateOnly(row?.reportDueDate || row?.dueDate || row?.sessionDate);
+  if (!startDate || !dueDate) return null;
+  return { startDate, dueDate };
+}
+
+function reportPeriodContainsSessionDate(period, sessionDate) {
+  const day = parseDateOnly(sessionDate);
+  if (!day || !period) return false;
+  return period.startDate <= day && day <= period.dueDate;
+}
+
+function unionReportPeriods(periods = []) {
+  let startDate = '';
+  let dueDate = '';
+  (Array.isArray(periods) ? periods : []).forEach((period) => {
+    if (!period) return;
+    if (period.startDate && (!startDate || period.startDate < startDate)) startDate = period.startDate;
+    if (period.dueDate && (!dueDate || period.dueDate > dueDate)) dueDate = period.dueDate;
+  });
+  return { startDate, dueDate };
+}
+
+function resolveReportPeriodFromMatchingTargetRows(matchingRows = [], sessionDate = '') {
+  const periods = (Array.isArray(matchingRows) ? matchingRows : [])
+    .map((row) => reportPeriodFromTargetRow(row))
+    .filter(Boolean);
+  if (!periods.length) return { startDate: '', dueDate: '' };
+  if (periods.length === 1) return periods[0];
+
+  const day = parseDateOnly(sessionDate);
+  if (day) {
+    const containing = periods.filter((period) => reportPeriodContainsSessionDate(period, day));
+    if (containing.length === 1) return containing[0];
+    if (containing.length > 1) return unionReportPeriods(containing);
+  }
+  return unionReportPeriods(periods);
+}
+
+function assignmentMatchesSessionForReportPeriod(assignment, sessionContext = {}) {
+  const status = String(assignment?.status || 'active').trim().toLowerCase();
+  if (status !== 'active') return false;
+  if (String(sessionContext.classId || '').trim()) {
+    return reportAssignmentSessionUtils.reportAssignmentMatchesSession(assignment, sessionContext);
+  }
+  const cleanSessionId = String(sessionContext.sessionId || '').trim();
+  if (!cleanSessionId) return false;
+  const topSessionId = String(assignment?.sessionId || '').trim();
+  if (idsEqual(topSessionId, cleanSessionId)) return true;
+  return reportAssignmentSessionUtils.getEffectiveTargetRows(assignment).some((row) => (
+    String(row?.status || 'active').trim().toLowerCase() === 'active'
+    && idsEqual(row?.sessionId, cleanSessionId)
+  ));
+}
+
+function resolveReportPeriodForSession(assignments, sessionContextOrSessionId) {
+  const sessionContext = normalizeSessionContextForReportPeriod(sessionContextOrSessionId);
   const list = assignments instanceof Map
     ? Array.from(assignments.values())
     : (Array.isArray(assignments) ? assignments : []);
-  let startDate = '';
-  let dueDate = '';
+  const matchingRows = [];
   list.forEach((assignment) => {
-    if (!cleanSessionId) return;
-    const topSessionId = String(assignment?.sessionId || '').trim();
-    const rows = Array.isArray(assignment?.targetRows) ? assignment.targetRows : [];
-    const matches = idsEqual(topSessionId, cleanSessionId)
-      || rows.some((row) => idsEqual(row?.sessionId, cleanSessionId));
-    if (!matches) return;
-    const start = parseDateOnly(assignment?.reportStartDate)
-      || parseDateOnly(rows.find((row) => idsEqual(row?.sessionId, cleanSessionId))?.reportStartDate);
-    const due = parseDateOnly(assignment?.reportDueDate || assignment?.dueDate)
-      || parseDateOnly(rows.find((row) => idsEqual(row?.sessionId, cleanSessionId))?.reportDueDate
-        || rows.find((row) => idsEqual(row?.sessionId, cleanSessionId))?.dueDate);
-    if (start && (!startDate || start < startDate)) startDate = start;
-    if (due && (!dueDate || due > dueDate)) dueDate = due;
+    if (!assignmentMatchesSessionForReportPeriod(assignment, sessionContext)) return;
+    reportAssignmentSessionUtils.getEffectiveTargetRows(assignment)
+      .filter((row) => String(row?.status || 'active').trim().toLowerCase() === 'active')
+      .filter((row) => targetRowMatchesSessionContext(row, sessionContext))
+      .forEach((row) => matchingRows.push(row));
   });
-  return { startDate, dueDate };
+  return resolveReportPeriodFromMatchingTargetRows(matchingRows, sessionContext.sessionDate);
 }
 
 /**
@@ -536,7 +602,7 @@ function buildSessionReportConductUiPayload({
     };
   }
 
-  const sessionConductReportPeriod = resolveReportPeriodForSession(assignmentMap, sessionId);
+  const sessionConductReportPeriod = resolveReportPeriodForSession(assignmentMap, sessionContext);
   const reportConductPersonIds = resolveSessionReportConductPersonIds({
     assignments: sessionMatchedAssignments,
     sessionContext
