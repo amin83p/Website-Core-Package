@@ -136,6 +136,152 @@
     return typeof window.showMessageModal === 'function' && document.getElementById('messageModal');
   }
 
+  function buildAttendanceEligibilitySaveFailureModalHtml(message = '') {
+    const raw = String(message || '').trim();
+    if (!raw.startsWith('ATTENDANCE_ELIGIBILITY_ROW|')) return null;
+    const parts = raw.split('|');
+    if (parts.length < 5) return null;
+    const rowId = parts[1] || '';
+    const rowLabel = parts[2] || '';
+    const periodHint = parts[3] || '';
+    const names = parts.slice(4).join('|').split('\n').map((row) => row.trim()).filter(Boolean);
+    if (!names.length) return null;
+    const listItems = names.map((name) => (
+      `<li class="mb-1 d-flex align-items-start gap-2">`
+      + `<i class="bi bi-person-x text-danger mt-1" aria-hidden="true"></i>`
+      + `<span>${escapeReportMessage(name)}</span>`
+      + `</li>`
+    )).join('');
+    const rowLine = rowLabel
+      ? `<div class="border rounded p-3 mb-3 bg-light-subtle"><div class="small text-muted text-uppercase fw-semibold mb-1">Target row</div><div class="fw-semibold">${escapeReportMessage(rowLabel)}</div>${periodHint ? `<div class="small text-muted mt-1">Attendance is required on at least one session between <strong>${escapeReportMessage(periodHint)}</strong>.</div>` : ''}</div>`
+      : '';
+    const rowIdAttr = rowId ? ` data-assignment-target-row-id="${escapeReportMessage(rowId)}"` : '';
+    return (
+      '<div class="text-start report-attendance-eligibility-error"'
+      + rowIdAttr
+      + '>'
+      + '<p class="mb-2">These students are on the target row but have <strong>no attendance status</strong> (N/A) during that report period. They cannot stay selected for an Each Student report.</p>'
+      + rowLine
+      + `<ul class="list-unstyled mb-0 ps-0" style="max-height:min(14rem,38vh);overflow-y:auto;border:1px solid rgba(15,23,42,.12);border-radius:.375rem;padding:.5rem .75rem;background:#fff;">${listItems}</ul>`
+      + '<p class="small text-muted mt-3 mb-0">Open <strong>Edit</strong> on this target row, uncheck the students listed above (or adjust the report period), then save the assignment again.</p>'
+      + '</div>'
+    );
+  }
+
+  function buildRemovedTargetStudentInstancesConfirmHtml(rows = []) {
+    const items = Array.isArray(rows) ? rows : [];
+    if (!items.length) return '';
+    const grouped = new Map();
+    items.forEach((row) => {
+      const key = String(row?.assignmentRowId || row?.rowLabel || 'row');
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          rowLabel: String(row?.rowLabel || 'Target row').trim(),
+          templateTitle: String(row?.templateTitle || 'Report').trim(),
+          students: []
+        });
+      }
+      grouped.get(key).students.push({
+        name: String(row?.studentName || row?.studentId || 'Student').trim(),
+        status: String(row?.status || '').trim()
+      });
+    });
+    const blocks = [...grouped.values()].map((group) => {
+      const studentRows = group.students.map((student) => (
+        `<li class="mb-1 d-flex align-items-start gap-2">`
+        + `<i class="bi bi-person-x text-danger mt-1" aria-hidden="true"></i>`
+        + `<span>${escapeReportMessage(student.name)}`
+        + (student.status ? `<span class="text-muted small"> (${escapeReportMessage(student.status)})</span>` : '')
+        + `</span></li>`
+      )).join('');
+      return `<div class="border rounded p-3 mb-2 bg-light-subtle">`
+        + `<div class="small text-muted text-uppercase fw-semibold mb-1">Target row</div>`
+        + `<div class="fw-semibold mb-1">${escapeReportMessage(group.rowLabel)}</div>`
+        + `<div class="small text-muted mb-2">${escapeReportMessage(group.templateTitle)}</div>`
+        + `<ul class="list-unstyled mb-0">${studentRows}</ul>`
+        + `</div>`;
+    }).join('');
+    return (
+      '<div class="text-start report-removed-student-instance-confirm">'
+      + '<p class="mb-2">Saving will remove these students from the assignment target row(s). Matching report instances still exist and will be deleted if you continue.</p>'
+      + blocks
+      + '<p class="small text-muted mb-0 mt-2">Choose <strong>Delete instances</strong> to save the assignment and remove these report instances, or <strong>Cancel</strong> to keep editing.</p>'
+      + '</div>'
+    );
+  }
+
+  function buildVerifyAllRowsResultModalHtml(result = {}) {
+    const payload = result && typeof result === 'object' ? result : {};
+    const rowCount = Number(payload.validatedRowCount || 0);
+    const stale = Array.isArray(payload.staleInstances) ? payload.staleInstances : [];
+    const intro = payload.ok
+      ? `<p class="mb-2">All <strong>${escapeReportMessage(String(rowCount || 'target'))}</strong> target row${rowCount === 1 ? '' : 's'} passed enrollment, attendance, schedule, and template checks.</p>`
+      : `<p class="mb-2">${escapeReportMessage(String(payload.message || 'Some issues were found.'))}</p>`;
+    if (!stale.length) {
+      return (
+        '<div class="text-start report-verify-all-rows-result">'
+        + intro
+        + '<p class="small text-muted mb-0">No stale or orphaned report instances were found for this assignment preview.</p>'
+        + '</div>'
+      );
+    }
+    const grouped = new Map();
+    stale.forEach((row) => {
+      const key = String(row?.assignmentRowId || row?.rowLabel || 'row');
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          rowLabel: String(row?.rowLabel || 'Target row').trim(),
+          templateTitle: String(row?.templateTitle || 'Report').trim(),
+          students: []
+        });
+      }
+      grouped.get(key).students.push({
+        name: String(row?.studentName || row?.studentId || 'Student').trim(),
+        status: String(row?.status || row?.reason || '').trim()
+      });
+    });
+    const blocks = [...grouped.values()].map((group) => {
+      const studentRows = group.students.map((student) => (
+        `<li class="mb-1 d-flex align-items-start gap-2">`
+        + `<i class="bi bi-exclamation-triangle text-warning mt-1" aria-hidden="true"></i>`
+        + `<span>${escapeReportMessage(student.name)}`
+        + (student.status ? `<span class="text-muted small"> (${escapeReportMessage(student.status)})</span>` : '')
+        + `</span></li>`
+      )).join('');
+      return `<div class="border rounded p-3 mb-2 bg-light-subtle">`
+        + `<div class="small text-muted text-uppercase fw-semibold mb-1">Target row</div>`
+        + `<div class="fw-semibold mb-1">${escapeReportMessage(group.rowLabel)}</div>`
+        + `<div class="small text-muted mb-2">${escapeReportMessage(group.templateTitle)}</div>`
+        + `<ul class="list-unstyled mb-0">${studentRows}</ul>`
+        + `</div>`;
+    }).join('');
+    return (
+      '<div class="text-start report-verify-all-rows-result">'
+      + intro
+      + `<p class="small text-muted mb-2">These report instances do not match the current target rows on this form. You can delete them here without saving the assignment. Use <strong>Save Assignment</strong> afterward to persist target row changes.</p>`
+      + blocks
+      + '</div>'
+    );
+  }
+
+  function buildVerifyAllRowsDeleteConfirmHtml(result = {}) {
+    const payload = result && typeof result === 'object' ? result : {};
+    const instanceRows = Array.isArray(payload.staleInstances) ? payload.staleInstances : [];
+    const removedHtml = buildRemovedTargetStudentInstancesConfirmHtml(instanceRows);
+    if (removedHtml) {
+      return (
+        '<div class="text-start report-verify-delete-confirm">'
+        + '<p class="mb-2">Verification found report instances that should be removed for the current form state.</p>'
+        + removedHtml.replace(
+          'Choose <strong>Delete instances</strong> to save the assignment and remove these report instances, or <strong>Cancel</strong> to keep editing.',
+          'Choose <strong>Delete instances</strong> to remove these report instances only (the assignment is not saved until you click Save Assignment), or <strong>Cancel</strong> to keep editing.'
+        )
+        + '</div>'
+      );
+    }
+    return buildVerifyAllRowsResultModalHtml(payload);
+  }
+
   function buildInactiveEnrollmentSaveFailureModalHtml(message = '') {
     const raw = String(message || '').trim();
     if (!raw.startsWith('INACTIVE_ENROLLMENT_ROW|')) return null;
@@ -217,17 +363,24 @@
     let resolvedMessage = message;
     let resolvedSize = size;
     if (!resolvedHtml && icon === 'error') {
-      const inactiveEnrollmentHtml = buildInactiveEnrollmentSaveFailureModalHtml(message);
-      if (inactiveEnrollmentHtml) {
-        resolvedMessage = inactiveEnrollmentHtml;
+      const attendanceEligibilityHtml = buildAttendanceEligibilitySaveFailureModalHtml(message);
+      if (attendanceEligibilityHtml) {
+        resolvedMessage = attendanceEligibilityHtml;
         resolvedHtml = true;
         resolvedSize = 'lg';
       } else {
-        const docxHtml = buildDocxExportCancelledModalHtml(plainReportMessage(message));
-        if (docxHtml) {
-          resolvedMessage = docxHtml;
+        const inactiveEnrollmentHtml = buildInactiveEnrollmentSaveFailureModalHtml(message);
+        if (inactiveEnrollmentHtml) {
+          resolvedMessage = inactiveEnrollmentHtml;
           resolvedHtml = true;
           resolvedSize = 'lg';
+        } else {
+          const docxHtml = buildDocxExportCancelledModalHtml(plainReportMessage(message));
+          if (docxHtml) {
+            resolvedMessage = docxHtml;
+            resolvedHtml = true;
+            resolvedSize = 'lg';
+          }
         }
       }
     }
@@ -275,6 +428,10 @@
     buildTemplateFileComplianceModalHtml,
     buildSnapshotComplianceSaveFailureModalHtml,
     buildDocxExportCancelledModalHtml,
+    buildRemovedTargetStudentInstancesConfirmHtml,
+    buildVerifyAllRowsResultModalHtml,
+    buildVerifyAllRowsDeleteConfirmHtml,
+    buildAttendanceEligibilitySaveFailureModalHtml,
     buildInactiveEnrollmentSaveFailureModalHtml,
     formatPdfAcroFieldType,
     showReportMessage,

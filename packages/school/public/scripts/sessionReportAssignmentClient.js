@@ -383,7 +383,12 @@
       return Array.isArray(payload.rows) ? payload.rows : [];
     }
 
+    function getStudentPickerUi() {
+      return global.ReportAssignmentStudentPickerUi || null;
+    }
+
     function renderStudentPickerTable() {
+      const pickerUi = getStudentPickerUi();
       const rows = Array.isArray(pickerEligibleStudents) ? pickerEligibleStudents : [];
       const body = document.getElementById('sessionReportStudentPickerBody');
       const emptyEl = document.getElementById('sessionReportStudentPickerEmpty');
@@ -394,16 +399,27 @@
         if (body) body.innerHTML = '';
         emptyEl?.classList.remove('d-none');
         if (summary) summary.textContent = '';
-        if (selectAll) selectAll.checked = false;
+        if (selectAll) {
+          selectAll.checked = false;
+          selectAll.disabled = true;
+        }
         return;
       }
       emptyEl?.classList.add('d-none');
       if (body) {
         body.innerHTML = rows.map((student) => {
           const id = String(student?.id || student?.personId || '').trim();
+          const checked = selectedSet.has(id);
+          if (pickerUi?.buildPickerRowHtml) {
+            return pickerUi.buildPickerRowHtml({
+              student,
+              checked,
+              checkboxClass: 'js-session-report-student-picker-check',
+              escapeHtml
+            });
+          }
           const name = String(student?.name || id).trim();
           const count = Number(student?.eligibleSessionCount || 0);
-          const checked = selectedSet.has(id);
           return `<tr>
             <td><input type="checkbox" class="form-check-input js-session-report-student-picker-check" data-student-id="${escapeHtml(id)}" ${checked ? 'checked' : ''}></td>
             <td>${escapeHtml(name)}</td>
@@ -411,9 +427,14 @@
           </tr>`;
         }).join('');
       }
-      const selectedCount = rows.filter((student) => selectedSet.has(String(student?.id || student?.personId || '').trim())).length;
-      if (summary) summary.textContent = `${selectedCount} of ${rows.length} selected`;
-      if (selectAll) selectAll.checked = selectedCount === rows.length && rows.length > 0;
+      if (pickerUi?.updateSelectAllState) {
+        pickerUi.updateSelectAllState({
+          students: rows,
+          selectedIds: pickerSelectedIds,
+          selectAllEl: selectAll,
+          summaryEl: summary
+        });
+      }
     }
 
     function buildTargetRowDraft(modal) {
@@ -486,16 +507,31 @@
         id: String(student?.id || student?.personId || '').trim(),
         personId: String(student?.id || student?.personId || '').trim(),
         name: String(student?.name || '').trim(),
-        eligibleSessionCount: Number(student?.eligibleSessionCount || 0)
+        eligibleSessionCount: Number(student?.eligibleSessionCount || 0),
+        selectable: student?.selectable !== false && Number(student?.eligibleSessionCount || 0) > 0,
+        ineligibleNote: String(student?.ineligibleNote || '').trim()
       })).filter((student) => Boolean(student.id));
-      const eligibleIds = pickerEligibleStudents.map((student) => student.id);
-      const previousSelection = new Set(pickerSelectedIds.length
+      const pickerUi = getStudentPickerUi();
+      const modalScope = String(modal.querySelector('#sessionReportScope')?.value || 'class').trim();
+      const previousSelection = pickerSelectedIds.length
         ? pickerSelectedIds
-        : Array.from(selectedStudents.keys()));
-      if (autoSelectAll || !previousSelection.size) {
-        pickerSelectedIds = [...eligibleIds];
+        : Array.from(selectedStudents.keys());
+      if (pickerUi?.syncSelectionAfterFetch) {
+        const synced = pickerUi.syncSelectionAfterFetch({
+          students: pickerEligibleStudents,
+          selectedIds: previousSelection,
+          autoSelectAll,
+          reportScope: modalScope
+        });
+        pickerSelectedIds = synced.selectedIds;
       } else {
-        pickerSelectedIds = eligibleIds.filter((id) => previousSelection.has(id));
+        const eligibleIds = pickerEligibleStudents.map((student) => student.id);
+        const previousSet = new Set(previousSelection);
+        if (autoSelectAll || !previousSet.size) {
+          pickerSelectedIds = [...eligibleIds];
+        } else {
+          pickerSelectedIds = eligibleIds.filter((id) => previousSet.has(id));
+        }
       }
       renderStudentPickerTable();
       return pickerEligibleStudents;
@@ -724,9 +760,14 @@
       document.getElementById('sessionReportStudentPickerSelectAll')?.addEventListener('change', (event) => {
         const checked = Boolean(event.target?.checked);
         const rows = Array.isArray(pickerEligibleStudents) ? pickerEligibleStudents : [];
-        pickerSelectedIds = checked
-          ? rows.map((student) => String(student?.id || student?.personId || '').trim()).filter(Boolean)
-          : [];
+        const pickerUi = getStudentPickerUi();
+        if (pickerUi?.applySelectAllToggle) {
+          pickerSelectedIds = pickerUi.applySelectAllToggle({ students: rows, checked });
+        } else {
+          pickerSelectedIds = checked
+            ? rows.map((student) => String(student?.id || student?.personId || '').trim()).filter(Boolean)
+            : [];
+        }
         renderStudentPickerTable();
       });
       document.getElementById('btnConfirmSessionReportStudentPicker')?.addEventListener('click', () => {

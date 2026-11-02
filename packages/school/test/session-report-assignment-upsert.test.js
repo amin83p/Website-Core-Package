@@ -5,6 +5,7 @@ const schoolDataService = require('../MVC/services/school/schoolDataService');
 const reportIntegrityService = require('../MVC/services/school/reportIntegrityService');
 const classReferenceSyncService = require('../MVC/services/school/classReferenceSyncService');
 const sessionReportAssignmentService = require('../MVC/services/school/sessionReportAssignmentService');
+const schoolRepositories = require('../MVC/repositories/school');
 
 const classData = {
   id: 'CLS_1',
@@ -41,6 +42,16 @@ function restoreAfter(t, restores) {
   });
 }
 
+function stubTemplateRepository(t) {
+  const original = schoolRepositories.reportTemplates.getById;
+  schoolRepositories.reportTemplates.getById = async (id) => ({
+    id: String(id || 'TPL_1'),
+    version: 1,
+    allowedReportScopes: ['class', 'each_student', 'selected_students']
+  });
+  restoreAfter(t, [{ target: schoolRepositories.reportTemplates, key: 'getById', value: original }]);
+}
+
 test('mergeTargetRows updates an existing session row by rowId', () => {
   const existing = [{
     rowId: 'session:SES_1:2026-06-01',
@@ -59,9 +70,9 @@ test('mergeTargetRows updates an existing session row by rowId', () => {
   assert.equal(merged[0].conflictPermitted, true);
 });
 
-test('resolveWizardRowStudentIds uses session roster for each_student when none selected', () => {
+test('resolveWizardRowStudentIds leaves each_student empty when none selected', () => {
   const ids = sessionReportAssignmentService.resolveWizardRowStudentIds('each_student', [], sessionRoster);
-  assert.deepEqual(ids, ['STU_1', 'STU_2']);
+  assert.deepEqual(ids, []);
 });
 
 test('buildSessionTargetRow defaults conflictPermitted from input and honors report due date', () => {
@@ -82,10 +93,11 @@ test('buildSessionTargetRow defaults conflictPermitted from input and honors rep
   });
   assert.equal(row.reportDueDate, '2026-06-10');
   assert.equal(row.conflictPermitted, true);
-  assert.deepEqual(row.targetStudentIds, ['STU_1', 'STU_2']);
+  assert.equal(row.targetStudentIds, undefined);
 });
 
 test('upsert merges a new session row into the class assignment when one already exists', async (t) => {
+  stubTemplateRepository(t);
   const existingAssignment = {
     id: 'ASG_EXISTING',
     orgId: 'ORG',
@@ -125,11 +137,14 @@ test('upsert merges a new session row into the class assignment when one already
     assert.equal(payload.targetRows.length, 2);
     return { id, ...payload };
   };
-  reportIntegrityService.validateAssignmentCrossEntityContext = async ({ targetRows }) => ({
-    template: { id: 'TPL_1', version: 1 },
-    effectiveTargetRows: targetRows,
-    persistedTargetStudentIds: []
-  });
+  reportIntegrityService.validateAssignmentCrossEntityContext = async ({ targetRows, validateOnlyRowIds }) => {
+    assert.deepEqual(validateOnlyRowIds, ['session:SES_1:2026-06-01']);
+    return {
+      template: { id: 'TPL_1', version: 1 },
+      effectiveTargetRows: targetRows,
+      persistedTargetStudentIds: []
+    };
+  };
   classReferenceSyncService.cleanupReportInstancesForRemovedTargetRows = async () => {};
   classReferenceSyncService.notifyClassReferencesChanged = async () => {};
 
@@ -161,6 +176,7 @@ test('upsert merges a new session row into the class assignment when one already
 });
 
 test('upsert updates existing assignment when the same session row is assigned again', async (t) => {
+  stubTemplateRepository(t);
   const existingAssignment = {
     id: 'ASG_EXISTING',
     orgId: 'ORG',
@@ -233,6 +249,7 @@ test('upsert updates existing assignment when the same session row is assigned a
 });
 
 test('upsert creates a new assignment when none exists for class and scope', async (t) => {
+  stubTemplateRepository(t);
   const originalFetch = schoolDataService.fetchAllData;
   const originalAdd = schoolDataService.addData;
   const originalUpdate = schoolDataService.updateData;

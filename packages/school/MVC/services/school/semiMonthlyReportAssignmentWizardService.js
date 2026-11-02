@@ -519,7 +519,9 @@ async function studentsForClass({
   return (Array.isArray(students) ? students : []).map((row) => ({
     personId: toPublicId(row.personId || row.id),
     name: String(row.name || row.personId || '').trim(),
-    eligibleSessionCount: Number(row.eligibleSessionCount || 0)
+    eligibleSessionCount: Number(row.eligibleSessionCount || 0),
+    selectable: row.selectable !== false && Number(row.eligibleSessionCount || 0) > 0,
+    ineligibleNote: String(row.ineligibleNote || '').trim()
   })).filter((row) => row.personId);
 }
 

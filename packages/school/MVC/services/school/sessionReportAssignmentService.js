@@ -3,6 +3,7 @@ const reportIntegrityService = require('./reportIntegrityService');
 const classReferenceSyncService = require('./classReferenceSyncService');
 const reportScopePolicy = require('./reportScopePolicy');
 const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
+const schoolRepositories = require('../../repositories/school');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -152,9 +153,7 @@ function resolveWizardRowStudentIds(reportScope = 'class', targetStudentIds = []
   if (scope === 'selected_students') return selected;
   if (scope === 'each_student') {
     if (selected.length) return selected;
-    return (Array.isArray(sessionRoster) ? sessionRoster : [])
-      .map((row) => toPublicId(row?.personId))
-      .filter(Boolean);
+    return [];
   }
   return [];
 }
@@ -173,14 +172,16 @@ function buildSessionTargetRow({
   reportScope,
   targetStudentIds,
   sessionRoster,
-  notes = ''
+  notes = '',
+  templateId = '',
+  templateVersion = null
 } = {}) {
   const sessionId = toPublicId(session?.sessionId);
   const sessionDateValue = normalizeDate(session?.date || session?.sessionDate);
   const scope = reportScopePolicy.normalizeReportScope(reportScope);
   const studentScoped = scope === 'each_student' || scope === 'selected_students';
   const rowStudentIds = resolveWizardRowStudentIds(scope, targetStudentIds, sessionRoster);
-  return {
+  const payload = {
     rowId: `session:${sessionId}:${normalizeDate(reportStartDate)}`,
     targetType: 'session',
     sessionId,
@@ -198,6 +199,27 @@ function buildSessionTargetRow({
     status: 'active',
     notes: clean(notes),
     ...(studentScoped && rowStudentIds.length ? { targetStudentIds: rowStudentIds } : {})
+  };
+  const stampedTemplateId = toPublicId(templateId);
+  if (stampedTemplateId) {
+    payload.templateId = stampedTemplateId;
+    if (templateVersion != null && templateVersion !== '') {
+      payload.templateVersion = Math.max(1, Number(templateVersion) || 1);
+    }
+  }
+  return payload;
+}
+
+async function resolveTemplateStampFields(templateId, reqUser) {
+  const id = toPublicId(templateId);
+  if (!id) throw new Error('Template is required.');
+  const template = typeof schoolRepositories.reportTemplates?.getById === 'function'
+    ? await schoolRepositories.reportTemplates.getById(id, reqUser)
+    : null;
+  if (!template) throw new Error('Template not found.');
+  return {
+    templateId: id,
+    templateVersion: Math.max(1, Number(template.version || 1) || 1)
   };
 }
 
@@ -312,8 +334,9 @@ async function updateExistingAssignmentWithMergedRow({
   incomingRow,
   reqUser
 }) {
-  const resolvedTemplateId = toPublicId(existing?.templateId || parsed.templateId);
+  const resolvedTemplateId = toPublicId(parsed.templateId || existing?.templateId);
   if (!resolvedTemplateId) throw new Error('Template is required.');
+  const templateStamp = await resolveTemplateStampFields(resolvedTemplateId, reqUser);
 
   const incomingRowId = clean(incomingRow?.rowId);
   const priorRow = reportAssignmentModel.findEffectiveTargetRow(existing, incomingRowId) || {};
@@ -323,6 +346,10 @@ async function updateExistingAssignmentWithMergedRow({
     rowId: incomingRowId || clean(priorRow?.rowId),
     status: clean(priorRow?.status) || 'active'
   };
+  if (!clean(mergedRow?.templateId)) {
+    mergedRow.templateId = templateStamp.templateId;
+    mergedRow.templateVersion = templateStamp.templateVersion;
+  }
   const mergedTargetRows = mergeTargetRows(
     reportAssignmentModel.getEffectiveTargetRows(existing),
     mergedRow
@@ -332,6 +359,10 @@ async function updateExistingAssignmentWithMergedRow({
     parsed.selectedTargetStudentIds,
     sessionRoster
   );
+  const validateTemplateId = reportAssignmentModel.resolveTargetRowTemplateFields(
+    existing,
+    mergedRow
+  ).templateId || resolvedTemplateId;
 
   const {
     template,
@@ -339,7 +370,7 @@ async function updateExistingAssignmentWithMergedRow({
     persistedTargetStudentIds
   } = await reportIntegrityService.validateAssignmentCrossEntityContext({
     classId: toPublicId(classId),
-    templateId: resolvedTemplateId,
+    templateId: validateTemplateId,
     reqUser,
     reportScope: parsed.reportScope,
     hasSessionTargets: true,
@@ -352,7 +383,8 @@ async function updateExistingAssignmentWithMergedRow({
     requestedReportDueDate: parsed.reportDueDate,
     selectedTargetStudentIds: rowStudentIds,
     targetRows: mergedTargetRows,
-    excludeAssignmentId: toPublicId(existing.id)
+    excludeAssignmentId: toPublicId(existing.id),
+    validateOnlyRowIds: incomingRowId ? [incomingRowId] : null
   });
 
   const activeRow = effectiveTargetRows.find((row) => clean(row?.rowId) === incomingRowId)
@@ -370,8 +402,8 @@ async function updateExistingAssignmentWithMergedRow({
     classId: toPublicId(classId),
     reportScope: parsed.reportScope,
     targetStudentIds: persistedTargetStudentIds,
-    templateId: template.id,
-    templateVersion: Number(template.version || 1),
+    templateId: toPublicId(existing.templateId || template.id),
+    templateVersion: Number(existing.templateVersion || template.version || 1),
     teacherIds: [...new Set(effectiveTargetRows.map((row) => toPublicId(row?.teacherId)).filter(Boolean))],
     targetRows: effectiveTargetRows.map((row) => ({
       ...row,
@@ -437,6 +469,7 @@ async function upsertSessionTargetRowForAssignment({
 
   const parsed = parseSessionAssignmentInput({ classData, session, sessionRoster, input });
   validateSessionAssignmentParsed(parsed, sessionRoster);
+  const templateStamp = await resolveTemplateStampFields(parsed.templateId, reqUser);
 
   const incomingRow = buildSessionTargetRow({
     session,
@@ -452,7 +485,9 @@ async function upsertSessionTargetRowForAssignment({
     reportScope: parsed.reportScope,
     targetStudentIds: parsed.selectedTargetStudentIds,
     sessionRoster,
-    notes: parsed.notes
+    notes: parsed.notes,
+    templateId: templateStamp.templateId,
+    templateVersion: templateStamp.templateVersion
   });
 
   const assignments = await loadScopedReportAssignments(reqUser);
@@ -509,6 +544,7 @@ async function createAssignmentForSession({
 
   const parsed = parsedOverride || parseSessionAssignmentInput({ classData, session, sessionRoster, input });
   if (!parsedOverride) validateSessionAssignmentParsed(parsed, sessionRoster);
+  const templateStamp = await resolveTemplateStampFields(parsed.templateId, reqUser);
 
   const {
     classId,
@@ -544,7 +580,9 @@ async function createAssignmentForSession({
     reportScope,
     targetStudentIds: selectedTargetStudentIds,
     sessionRoster,
-    notes
+    notes,
+    templateId: templateStamp.templateId,
+    templateVersion: templateStamp.templateVersion
   })];
 
   const {

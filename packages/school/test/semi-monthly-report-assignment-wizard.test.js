@@ -652,5 +652,6 @@ test('semi-monthly wizard is linked from report assignments', () => {
   assert.doesNotMatch(script, /student\(s\`\)\.join\('; '\)/);
   const service = fs.readFileSync(path.join(__dirname, '../MVC/services/school/semiMonthlyReportAssignmentWizardService.js'), 'utf8');
   assert.match(service, /eligibleSessionCount/);
+  assert.match(service, /selectable/);
   assert.match(service, /resolveTemplateIdForClass/);
 });

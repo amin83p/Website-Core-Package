@@ -688,6 +688,16 @@ router.post('/assignments/new',
   trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE, reportAssignmentMutationActionState),
   ctrl.saveAssignment);
 
+router.post('/assignments/new/verify-all-rows',
+  requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE),
+  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE, reportAssignmentBulkActionState),
+  ctrl.verifyAssignmentRows);
+
+router.post('/assignments/new/verify-all-rows/delete-instances',
+  requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE),
+  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE, reportAssignmentMutationActionState),
+  ctrl.deleteVerifyAssignmentInstances);
+
 router.post('/assignments/generate-target-rows',
   requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE),
   trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE, reportAssignmentBulkActionState),
@@ -703,6 +713,11 @@ router.post('/assignments/eligible-students',
   trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE, reportAssignmentBulkActionState),
   ctrl.getAssignmentEligibleStudents);
 
+router.post('/assignments/consolidate-ron-duplicates',
+  requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE),
+  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE, reportAssignmentMutationActionState),
+  ctrl.consolidateRonReportAssignments);
+
 router.post('/assignments/suggested-report-start',
   requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.CREATE),
   ctrl.getSuggestedReportStartDate);
@@ -716,6 +731,16 @@ router.post('/assignments/edit/:id',
   requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE),
   trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE, reportAssignmentMutationActionState),
   ctrl.saveAssignment);
+
+router.post('/assignments/edit/:id/verify-all-rows',
+  requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE),
+  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE, reportAssignmentBulkActionState),
+  ctrl.verifyAssignmentRows);
+
+router.post('/assignments/edit/:id/verify-all-rows/delete-instances',
+  requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE),
+  trackActionState(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE, reportAssignmentMutationActionState),
+  ctrl.deleteVerifyAssignmentInstances);
 
 router.post('/assignments/edit/:id/preview-target-rows',
   requireAccess(REPORT_ASSIGNMENT_SECTION, OPERATIONS.UPDATE),

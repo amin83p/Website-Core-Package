@@ -6,6 +6,24 @@ const leaveRequestService = require('./leaveRequestService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
+const NO_ATTENDANCE_STATUS_NOTE = 'No attendance status during this report period.';
+
+function isSelectableStudentRow(student = {}) {
+  if (student && student.selectable === false) return false;
+  if (student && student.selectable === true) return true;
+  return Number(student?.eligibleSessionCount || 0) > 0;
+}
+
+function filterSelectableStudents(students = []) {
+  return (Array.isArray(students) ? students : []).filter((row) => isSelectableStudentRow(row));
+}
+
+function selectablePersonIds(students = []) {
+  return filterSelectableStudents(students)
+    .map((row) => toPublicId(row?.personId || row?.id))
+    .filter(Boolean);
+}
+
 function normalizeDateOnly(value) {
   const token = String(value || '').trim();
   if (!token) return '';
@@ -258,20 +276,52 @@ async function resolveEligibleStudentsForAssignment({
       forceNotApplicableSessionKeys,
       applicability: rollingApplicability
     });
+    const selectable = eligibleSessionCount > 0;
     results.push({
       personId,
       id: personId,
       name: personMap.get(personId) || studentRecord?.name || personId,
-      eligibleSessionCount
+      eligibleSessionCount,
+      selectable,
+      ineligibleNote: selectable ? '' : NO_ATTENDANCE_STATUS_NOTE
     });
   }
 
   return results.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
 }
 
+async function resolveSelectablePersonIdsForTargetRow({
+  classData,
+  sessions = [],
+  reqUser,
+  targetRow = {},
+  personMap = new Map()
+} = {}) {
+  const startDate = normalizeDateOnly(targetRow?.reportStartDate);
+  const endDate = normalizeDateOnly(
+    targetRow?.reportDueDate || targetRow?.dueDate || targetRow?.sessionDate
+  );
+  const students = await resolveEligibleStudentsForAssignment({
+    classData,
+    sessions,
+    reqUser,
+    startDate,
+    endDate,
+    targetSessionIds: [],
+    targetRows: [targetRow],
+    personMap
+  });
+  return selectablePersonIds(students);
+}
+
 module.exports = {
+  NO_ATTENDANCE_STATUS_NOTE,
   normalizeDateOnly,
   resolveAssignmentDurationFromTargetRows,
   resolveScopedSessions,
-  resolveEligibleStudentsForAssignment
+  isSelectableStudentRow,
+  filterSelectableStudents,
+  selectablePersonIds,
+  resolveEligibleStudentsForAssignment,
+  resolveSelectablePersonIdsForTargetRow
 };

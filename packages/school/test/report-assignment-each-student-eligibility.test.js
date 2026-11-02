@@ -38,6 +38,50 @@ function buildSessionTargetRow(overrides = {}) {
   };
 }
 
+function stubAttendanceEligibleStudentMetrics(t) {
+  const originals = {
+    getClassEnrollmentPeriodsByClassId: schoolDataService.getClassEnrollmentPeriodsByClassId,
+    getStatusMap: sessionStatusPolicyService.getStatusMap,
+    findApprovedLeaveConflicts: leaveRequestService.findApprovedLeaveConflicts
+  };
+  schoolDataService.getClassEnrollmentPeriodsByClassId = async () => ([
+    {
+      id: 'PER-1',
+      orgId: '900000',
+      classId: 'CLS-1',
+      studentId: 'REG-1',
+      status: 'active',
+      startDate: '2026-01-01',
+      endDate: '2026-12-31'
+    },
+    {
+      id: 'PER-2',
+      orgId: '900000',
+      classId: 'CLS-1',
+      studentId: 'REG-2',
+      status: 'active',
+      startDate: '2026-01-01',
+      endDate: '2026-12-31'
+    },
+    {
+      id: 'PER-3',
+      orgId: '900000',
+      classId: 'CLS-1',
+      studentId: 'REG-3',
+      status: 'active',
+      startDate: '2026-01-01',
+      endDate: '2026-12-31'
+    }
+  ]);
+  sessionStatusPolicyService.getStatusMap = async () => new Map();
+  leaveRequestService.findApprovedLeaveConflicts = async () => [];
+  t.after(() => {
+    schoolDataService.getClassEnrollmentPeriodsByClassId = originals.getClassEnrollmentPeriodsByClassId;
+    sessionStatusPolicyService.getStatusMap = originals.getStatusMap;
+    leaveRequestService.findApprovedLeaveConflicts = originals.findApprovedLeaveConflicts;
+  });
+}
+
 test('resolveEachStudentTargetPersonIds prefers stored targetStudentIds over session roster', async () => {
   const personIds = await reportRosterService.resolveEachStudentTargetPersonIds({
     assignment: {
@@ -76,7 +120,8 @@ test('resolveEachStudentTargetPersonIds falls back to enrollment when targetStud
   assert.deepEqual(personIds, ['STU-ENROLLMENT']);
 });
 
-test('validateAssignmentCrossEntityContext succeeds for each_student when enrollment exists but session roster is empty', async () => {
+test('validateAssignmentCrossEntityContext succeeds for each_student when enrollment exists but session roster is empty', async (t) => {
+  stubAttendanceEligibleStudentMetrics(t);
   const originals = {
     getDataById: schoolDataService.getDataById,
     getClassSessions: schoolDataService.getClassSessions,
@@ -204,7 +249,8 @@ test('resolveEachStudentTargetPersonIds prefers targetRow targetStudentIds over 
   assert.deepEqual(personIds, ['STU-ROW-1', 'STU-ROW-2']);
 });
 
-test('validateAssignmentCrossEntityContext allows different student sets per row', async () => {
+test('validateAssignmentCrossEntityContext allows different student sets per row', async (t) => {
+  stubAttendanceEligibleStudentMetrics(t);
   const originals = {
     getDataById: schoolDataService.getDataById,
     getClassSessions: schoolDataService.getClassSessions,
@@ -294,7 +340,8 @@ test('validateAssignmentCrossEntityContext allows different student sets per row
   }
 });
 
-test('validateAssignmentCrossEntityContext stores per-row targetStudentIds for each_student', async () => {
+test('validateAssignmentCrossEntityContext stores per-row targetStudentIds for each_student', async (t) => {
+  stubAttendanceEligibleStudentMetrics(t);
   const originals = {
     getDataById: schoolDataService.getDataById,
     getClassSessions: schoolDataService.getClassSessions,
@@ -355,7 +402,8 @@ test('validateAssignmentCrossEntityContext stores per-row targetStudentIds for e
   }
 });
 
-test('validateAssignmentCrossEntityContext validates only per-row students when target rows are provided', async () => {
+test('validateAssignmentCrossEntityContext validates only per-row students when target rows are provided', async (t) => {
+  stubAttendanceEligibleStudentMetrics(t);
   const originals = {
     getDataById: schoolDataService.getDataById,
     getClassSessions: schoolDataService.getClassSessions,
@@ -520,6 +568,99 @@ test('validateAssignmentCrossEntityContext lists students not enrolled for targe
   }
 });
 
+test('validateAssignmentCrossEntityContext skips enrollment on unchanged rows when validateOnlyRowIds is set', async (t) => {
+  stubAttendanceEligibleStudentMetrics(t);
+  const originals = {
+    getDataById: schoolDataService.getDataById,
+    getClassSessions: schoolDataService.getClassSessions,
+    fetchAllData: schoolDataService.fetchAllData,
+    getTemplateById: schoolRepositories.reportTemplates.getById,
+    listActiveStudentIdsForClass: classEnrollmentReadService.listActiveStudentIdsForClass
+  };
+  try {
+    schoolDataService.getDataById = async (entityType, id) => {
+      if (entityType === 'classes' && id === 'CLS-1') return classData;
+      return null;
+    };
+    schoolDataService.getClassSessions = async () => ([{
+      sessionId: 'SES-1',
+      date: '2026-10-29',
+      startTime: '09:00',
+      endTime: '10:00',
+      roster: []
+    }, {
+      sessionId: 'SES-2',
+      date: '2026-09-15',
+      startTime: '09:00',
+      endTime: '10:00',
+      roster: []
+    }]);
+    schoolDataService.fetchAllData = async (entityType) => {
+      if (entityType === 'students') {
+        return [
+          { id: 'REG-1', personId: 'STU-1', displayName: 'Ada Active' },
+          { id: 'REG-2', personId: 'STU-2', displayName: 'Ben Inactive' }
+        ];
+      }
+      return [];
+    };
+    schoolRepositories.reportTemplates.getById = async () => template;
+    classEnrollmentReadService.listActiveStudentIdsForClass = async ({ startDate, endDate } = {}) => {
+      const start = String(startDate || '').trim();
+      const end = String(endDate || '').trim();
+      if (start === '2026-09-15' && end === '2026-09-15') {
+        return { source: 'canonical', studentIds: new Set(['REG-1']), usedFallback: false };
+      }
+      if (start === '2026-10-16' && end === '2026-10-29') {
+        return { source: 'canonical', studentIds: new Set(['REG-1']), usedFallback: false };
+      }
+      return { source: 'canonical', studentIds: new Set(['REG-1']), usedFallback: false };
+    };
+
+    const result = await reportIntegrityService.validateAssignmentCrossEntityContext({
+      classId: 'CLS-1',
+      templateId: 'TPL-1',
+      reqUser,
+      reportScope: 'each_student',
+      hasSessionTargets: true,
+      selectedSessionIds: ['SES-1'],
+      teacherIds: ['TCH-1'],
+      requestedReportStartDate: '2026-10-16',
+      requestedReportDueDate: '2026-10-29',
+      selectedTargetStudentIds: [],
+      validateOnlyRowIds: ['session:SES-1:2026-10-16'],
+      targetRows: [
+        buildSessionTargetRow({
+          rowId: 'row-stale-sep',
+          sessionId: 'SES-2',
+          sessionDate: '2026-09-15',
+          reportStartDate: '2026-09-15',
+          reportDueDate: '2026-09-15',
+          targetStudentIds: ['STU-1', 'STU-2']
+        }),
+        buildSessionTargetRow({
+          rowId: 'session:SES-1:2026-10-16',
+          sessionId: 'SES-1',
+          sessionDate: '2026-10-29',
+          reportStartDate: '2026-10-16',
+          reportDueDate: '2026-10-29',
+          targetStudentIds: ['STU-1']
+        })
+      ]
+    });
+
+    assert.deepEqual(result.effectiveTargetRows[0].targetStudentIds, ['STU-1', 'STU-2']);
+    assert.deepEqual(result.effectiveTargetRows[1].targetStudentIds, ['STU-1']);
+    assert.deepEqual(result.persistedTargetStudentIds.sort(), ['STU-1', 'STU-2']);
+  } finally {
+    schoolDataService.getDataById = originals.getDataById;
+    schoolDataService.getClassSessions = originals.getClassSessions;
+    schoolDataService.fetchAllData = originals.fetchAllData;
+    schoolRepositories.reportTemplates.getById = originals.getTemplateById;
+    classEnrollmentReadService.listActiveStudentIdsForClass = originals.listActiveStudentIdsForClass;
+  }
+});
+
 test('validateAssignmentCrossEntityContext fails selected_students when a row has no students', async () => {
   const originals = {
     getDataById: schoolDataService.getDataById,
@@ -675,11 +816,231 @@ test('resolveEligibleStudentsForAssignment returns eligible session counts for t
     assert.equal(students.length, 1);
     assert.equal(students[0].personId, 'STU-1');
     assert.equal(students[0].eligibleSessionCount, 2);
+    assert.equal(students[0].selectable, true);
+    assert.equal(students[0].ineligibleNote, '');
   } finally {
     schoolDataService.fetchAllData = originals.fetchAllData;
     schoolDataService.getClassEnrollmentPeriodsByClassId = originals.getClassEnrollmentPeriodsByClassId;
     classEnrollmentReadService.listActiveStudentIdsForClass = originals.listActiveStudentIdsForClass;
     sessionStatusPolicyService.getStatusMap = originals.getStatusMap;
     leaveRequestService.findApprovedLeaveConflicts = originals.findApprovedLeaveConflicts;
+  }
+});
+
+test('resolveEligibleStudentsForAssignment marks students without eligible sessions as not selectable', async () => {
+  const originals = {
+    fetchAllData: schoolDataService.fetchAllData,
+    getClassEnrollmentPeriodsByClassId: schoolDataService.getClassEnrollmentPeriodsByClassId,
+    listActiveStudentIdsForClass: classEnrollmentReadService.listActiveStudentIdsForClass,
+    getStatusMap: sessionStatusPolicyService.getStatusMap,
+    findApprovedLeaveConflicts: leaveRequestService.findApprovedLeaveConflicts
+  };
+  try {
+    schoolDataService.fetchAllData = async (entityType) => {
+      if (entityType === 'students') {
+        return [{ id: 'REG-1', personId: 'STU-1', name: 'Student One' }];
+      }
+      return [];
+    };
+    schoolDataService.getClassEnrollmentPeriodsByClassId = async () => ([{
+      id: 'PER-1',
+      orgId: '900000',
+      classId: 'CLS-1',
+      studentId: 'REG-1',
+      status: 'active',
+      startDate: '2026-11-01',
+      endDate: '2026-12-31'
+    }]);
+    classEnrollmentReadService.listActiveStudentIdsForClass = async () => ({
+      source: 'canonical',
+      studentIds: new Set(['REG-1']),
+      usedFallback: false
+    });
+    sessionStatusPolicyService.getStatusMap = async () => new Map();
+    leaveRequestService.findApprovedLeaveConflicts = async () => [];
+
+    const students = await reportAssignmentStudentEligibilityService.resolveEligibleStudentsForAssignment({
+      classData,
+      sessions: [{ sessionId: 'SES-1', date: '2026-09-15', startTime: '09:00', endTime: '10:00' }],
+      reqUser,
+      startDate: '2026-09-15',
+      endDate: '2026-09-15',
+      targetRows: [buildSessionTargetRow()],
+      personMap: new Map([['STU-1', 'Student One']])
+    });
+
+    assert.equal(students.length, 1);
+    assert.equal(students[0].eligibleSessionCount, 0);
+    assert.equal(students[0].selectable, false);
+    assert.match(students[0].ineligibleNote, /No attendance status during this report period/i);
+  } finally {
+    schoolDataService.fetchAllData = originals.fetchAllData;
+    schoolDataService.getClassEnrollmentPeriodsByClassId = originals.getClassEnrollmentPeriodsByClassId;
+    classEnrollmentReadService.listActiveStudentIdsForClass = originals.listActiveStudentIdsForClass;
+    sessionStatusPolicyService.getStatusMap = originals.getStatusMap;
+    leaveRequestService.findApprovedLeaveConflicts = originals.findApprovedLeaveConflicts;
+  }
+});
+
+test('validateAssignmentCrossEntityContext rejects students without attendance status in report period', async (t) => {
+  stubAttendanceEligibleStudentMetrics(t);
+  const originals = {
+    getDataById: schoolDataService.getDataById,
+    getClassSessions: schoolDataService.getClassSessions,
+    fetchAllData: schoolDataService.fetchAllData,
+    getTemplateById: schoolRepositories.reportTemplates.getById,
+    listActiveStudentIdsForClass: classEnrollmentReadService.listActiveStudentIdsForClass
+  };
+  try {
+    schoolDataService.getDataById = async (entityType, id) => {
+      if (entityType === 'classes' && id === 'CLS-1') return classData;
+      return null;
+    };
+    schoolDataService.getClassSessions = async () => ([{
+      sessionId: 'SES-1',
+      date: '2026-09-15',
+      startTime: '09:00',
+      endTime: '10:00',
+      roster: []
+    }]);
+    schoolDataService.fetchAllData = async (entityType) => {
+      if (entityType === 'students') {
+        return [
+          { id: 'REG-1', personId: 'STU-1', displayName: 'Ada Active' },
+          { id: 'REG-2', personId: 'STU-2', displayName: 'Ben N/A' }
+        ];
+      }
+      return [];
+    };
+    schoolRepositories.reportTemplates.getById = async () => template;
+    classEnrollmentReadService.listActiveStudentIdsForClass = async () => ({
+      source: 'canonical',
+      studentIds: new Set(['REG-1', 'REG-2']),
+      usedFallback: false
+    });
+    schoolDataService.getClassEnrollmentPeriodsByClassId = async () => ([
+      {
+        id: 'PER-1',
+        orgId: '900000',
+        classId: 'CLS-1',
+        studentId: 'REG-1',
+        status: 'active',
+        startDate: '2026-01-01',
+        endDate: '2026-12-31'
+      },
+      {
+        id: 'PER-2',
+        orgId: '900000',
+        classId: 'CLS-1',
+        studentId: 'REG-2',
+        status: 'active',
+        startDate: '2026-11-01',
+        endDate: '2026-12-31'
+      }
+    ]);
+
+    await assert.rejects(
+      () => reportIntegrityService.validateAssignmentCrossEntityContext({
+        classId: 'CLS-1',
+        templateId: 'TPL-1',
+        reqUser,
+        reportScope: 'selected_students',
+        hasSessionTargets: true,
+        selectedSessionIds: ['SES-1'],
+        teacherIds: ['TCH-1'],
+        requestedReportStartDate: '2026-09-15',
+        requestedReportDueDate: '2026-09-15',
+        selectedTargetStudentIds: [],
+        targetRows: [buildSessionTargetRow({ targetStudentIds: ['STU-2'] })]
+      }),
+      /ATTENDANCE_ELIGIBILITY_ROW\|/
+    );
+  } finally {
+    schoolDataService.getDataById = originals.getDataById;
+    schoolDataService.getClassSessions = originals.getClassSessions;
+    schoolDataService.fetchAllData = originals.fetchAllData;
+    schoolRepositories.reportTemplates.getById = originals.getTemplateById;
+    classEnrollmentReadService.listActiveStudentIdsForClass = originals.listActiveStudentIdsForClass;
+  }
+});
+
+test('validateAssignmentCrossEntityContext strips ineligible students for each_student rows on save', async (t) => {
+  stubAttendanceEligibleStudentMetrics(t);
+  const originals = {
+    getDataById: schoolDataService.getDataById,
+    getClassSessions: schoolDataService.getClassSessions,
+    fetchAllData: schoolDataService.fetchAllData,
+    getTemplateById: schoolRepositories.reportTemplates.getById,
+    listActiveStudentIdsForClass: classEnrollmentReadService.listActiveStudentIdsForClass
+  };
+  try {
+    schoolDataService.getDataById = async (entityType, id) => {
+      if (entityType === 'classes' && id === 'CLS-1') return classData;
+      return null;
+    };
+    schoolDataService.getClassSessions = async () => ([{
+      sessionId: 'SES-1',
+      date: '2026-09-15',
+      startTime: '09:00',
+      endTime: '10:00',
+      roster: []
+    }]);
+    schoolDataService.fetchAllData = async (entityType) => {
+      if (entityType === 'students') {
+        return [
+          { id: 'REG-1', personId: 'STU-1', displayName: 'Ada Active' },
+          { id: 'REG-2', personId: 'STU-2', displayName: 'Ben N/A' }
+        ];
+      }
+      return [];
+    };
+    schoolRepositories.reportTemplates.getById = async () => template;
+    classEnrollmentReadService.listActiveStudentIdsForClass = async () => ({
+      source: 'canonical',
+      studentIds: new Set(['REG-1', 'REG-2']),
+      usedFallback: false
+    });
+    schoolDataService.getClassEnrollmentPeriodsByClassId = async () => ([
+      {
+        id: 'PER-1',
+        orgId: '900000',
+        classId: 'CLS-1',
+        studentId: 'REG-1',
+        status: 'active',
+        startDate: '2026-01-01',
+        endDate: '2026-12-31'
+      },
+      {
+        id: 'PER-2',
+        orgId: '900000',
+        classId: 'CLS-1',
+        studentId: 'REG-2',
+        status: 'active',
+        startDate: '2026-11-01',
+        endDate: '2026-12-31'
+      }
+    ]);
+
+    const result = await reportIntegrityService.validateAssignmentCrossEntityContext({
+      classId: 'CLS-1',
+      templateId: 'TPL-1',
+      reqUser,
+      reportScope: 'each_student',
+      hasSessionTargets: true,
+      selectedSessionIds: ['SES-1'],
+      teacherIds: ['TCH-1'],
+      requestedReportStartDate: '2026-09-15',
+      requestedReportDueDate: '2026-09-15',
+      selectedTargetStudentIds: [],
+      targetRows: [buildSessionTargetRow({ targetStudentIds: ['STU-1', 'STU-2'] })]
+    });
+    const rowIds = result.effectiveTargetRows[0]?.targetStudentIds || [];
+    assert.deepEqual(rowIds, ['STU-1']);
+  } finally {
+    schoolDataService.getDataById = originals.getDataById;
+    schoolDataService.getClassSessions = originals.getClassSessions;
+    schoolDataService.fetchAllData = originals.fetchAllData;
+    schoolRepositories.reportTemplates.getById = originals.getTemplateById;
+    classEnrollmentReadService.listActiveStudentIdsForClass = originals.listActiveStudentIdsForClass;
   }
 });

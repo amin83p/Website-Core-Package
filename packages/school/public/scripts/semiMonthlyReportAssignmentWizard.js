@@ -472,8 +472,25 @@
     return allPreviewClasses().filter((row) => state.selectedClassIds.has(row.classId));
   }
 
-  function studentPersonIdsForRow(row) {
-    return (Array.isArray(row?.students) ? row.students : [])
+  function getStudentPickerUi() {
+    return global.ReportAssignmentStudentPickerUi || null;
+  }
+
+  function selectableStudentPersonIdsForRow(row) {
+    const pickerUi = getStudentPickerUi();
+    const students = Array.isArray(row?.students) ? row.students : [];
+    if (pickerUi?.selectableIds) {
+      return pickerUi.selectableIds(students.map((student) => ({
+        id: clean(student.personId || student.id),
+        personId: clean(student.personId || student.id),
+        name: student.name,
+        eligibleSessionCount: student.eligibleSessionCount,
+        selectable: student.selectable,
+        ineligibleNote: student.ineligibleNote
+      })));
+    }
+    return students
+      .filter((student) => student.selectable !== false && Number(student.eligibleSessionCount || 0) > 0)
       .map((student) => clean(student.personId || student.id))
       .filter(Boolean);
   }
@@ -486,13 +503,13 @@
     if (!usesPerStudentSelection(state.preview)) return;
     const row = allPreviewClasses().find((item) => item.classId === classId);
     if (!row) return;
-    state.selectedStudents[classId] = studentPersonIdsForRow(row);
+    state.selectedStudents[classId] = selectableStudentPersonIdsForRow(row);
   }
 
   function ensureDefaultStudentsForSelectedClasses(preview) {
     if (!usesPerStudentSelection(preview)) return;
     selectedPreviewClasses().forEach((row) => {
-      const defaults = studentPersonIdsForRow(row);
+      const defaults = selectableStudentPersonIdsForRow(row);
       if (!defaults.length) {
         state.selectedStudents[row.classId] = [];
         return;
@@ -500,6 +517,9 @@
       const current = state.selectedStudents[row.classId];
       if (!Array.isArray(current) || !current.length) {
         state.selectedStudents[row.classId] = defaults;
+      } else {
+        const selectableSet = new Set(defaults);
+        state.selectedStudents[row.classId] = current.filter((id) => selectableSet.has(id));
       }
     });
   }
@@ -513,7 +533,7 @@
     }
     (preview?.classes || []).forEach((row) => {
       if (state.selectedClassIds.has(row.classId)) {
-        state.selectedStudents[row.classId] = studentPersonIdsForRow(row);
+        state.selectedStudents[row.classId] = selectableStudentPersonIdsForRow(row);
       } else if (!state.selectedStudents[row.classId]) {
         state.selectedStudents[row.classId] = [];
       }
@@ -740,7 +760,11 @@
     const preview = state.preview;
     const row = (preview?.classes || []).find((item) => item.classId === classId);
     if (!row) return;
-    const selected = new Set(state.selectedStudents[classId] || []);
+    const pickerUi = getStudentPickerUi();
+    const selectableSet = new Set(selectableStudentPersonIdsForRow(row));
+    const selected = new Set(
+      (state.selectedStudents[classId] || []).filter((id) => selectableSet.has(id))
+    );
     qs('smmrStudentModalTitle').textContent = row.title;
     const body = qs('smmrStudentModalBody');
     const students = Array.isArray(row.students) ? row.students : [];
@@ -748,13 +772,37 @@
       ? `<table class="table table-sm align-middle mb-0">
           <thead class="table-light"><tr><th></th><th>Student</th><th class="text-end">Eligible Sessions</th></tr></thead>
           <tbody>
-            ${students.map((student) => `
-              <tr>
-                <td style="width:2rem;"><input class="form-check-input" type="checkbox" data-smmr-student="${escapeHtml(classId)}" value="${escapeHtml(student.personId)}" ${selected.has(student.personId) ? 'checked' : ''}></td>
-                <td>${escapeHtml(student.name || student.personId)}</td>
+            ${students.map((student) => {
+              const personId = clean(student.personId || student.id);
+              const studentRow = {
+                id: personId,
+                personId,
+                name: student.name || personId,
+                eligibleSessionCount: student.eligibleSessionCount,
+                selectable: student.selectable,
+                ineligibleNote: student.ineligibleNote
+              };
+              if (pickerUi?.buildPickerRowHtml) {
+                return pickerUi.buildPickerRowHtml({
+                  student: studentRow,
+                  checked: selected.has(personId),
+                  checkboxClass: 'form-check-input',
+                  checkboxExtraAttrs: `data-smmr-student="${escapeHtml(classId)}" value="${escapeHtml(personId)}"`,
+                  escapeHtml
+                }).replace('<td>', '<td style="width:2rem;">');
+              }
+              const selectable = selectableSet.has(personId);
+              const note = pickerUi?.ineligibleNoteForStudent
+                ? pickerUi.ineligibleNoteForStudent(studentRow)
+                : '';
+              const noteHtml = note ? `<div class="small text-muted">${escapeHtml(note)}</div>` : '';
+              return `
+              <tr${selectable ? '' : ' class="text-muted"'}>
+                <td style="width:2rem;"><input class="form-check-input" type="checkbox" data-smmr-student="${escapeHtml(classId)}" value="${escapeHtml(personId)}" ${selected.has(personId) ? 'checked' : ''}${selectable ? '' : ' disabled'}></td>
+                <td><div>${escapeHtml(student.name || personId)}</div>${noteHtml}</td>
                 <td class="text-end">${Number(student.eligibleSessionCount || 0)}</td>
-              </tr>
-            `).join('')}
+              </tr>`;
+            }).join('')}
           </tbody>
         </table>`
       : '<p class="text-muted mb-0">No students are enrolled for this session.</p>';
@@ -945,7 +993,7 @@
     if (!usesPerStudentSelection(preview)) return true;
     ensureDefaultStudentsForSelectedClasses(preview);
     return selectedPreviewClasses().every((row) => {
-      const eligible = studentPersonIdsForRow(row);
+      const eligible = selectableStudentPersonIdsForRow(row);
       if (!eligible.length) return true;
       return (state.selectedStudents[row.classId] || []).length > 0;
     });

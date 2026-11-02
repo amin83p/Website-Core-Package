@@ -338,7 +338,13 @@ function parseTargetRowsField(rawValue) {
       })(),
       teacherId: String(row.teacherId || '').trim(),
       status: String(row.status || 'active').trim().toLowerCase() || 'active',
-      notes: String(row.notes || '').trim()
+      notes: String(row.notes || '').trim(),
+      targetStudentIds: [...new Set(parseStringArrayField(row.targetStudentIds))],
+      templateId: String(row.templateId || '').trim(),
+      templateVersion: (() => {
+        const n = Number(row.templateVersion);
+        return Number.isFinite(n) && n >= 1 ? Math.min(1000, Math.floor(n)) : 0;
+      })()
     }));
 }
 
@@ -1291,6 +1297,7 @@ function parseAssignmentSaveRequest(body) {
       const n = parseFloat(body.allocatedHours);
       return Number.isFinite(n) ? n : 0;
     })(),
+    clientDirtyRowIds: [...new Set(parseStringArrayField(body.dirtyRowIdsJson))],
     targetRows
   };
 }
@@ -2334,6 +2341,7 @@ async function buildAssignmentDeletePreview({ reqUser, activeOrgId, assignmentId
 }
 
 module.exports = {
+  parseBooleanFlag,
   parseDateOnlyValue,
   parseDateOnlyList,
   parseStringArrayField,

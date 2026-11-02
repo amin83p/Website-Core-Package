@@ -35,6 +35,8 @@ const { getPrefillValue } = require('../../services/school/reportPrefillKeyUtils
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const reportTemplateModel = require('../../models/school/reportTemplateModel');
 const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
+const reportAssignmentConsolidationService = require('../../services/school/reportAssignmentConsolidationService');
+const sessionReportAssignmentService = require('../../services/school/sessionReportAssignmentService');
 const reportInstanceModel = require('../../models/school/reportInstanceModel');
 const {
   getActiveOrgIdOrThrow: getActiveOrgIdOrThrowShared,
@@ -1145,6 +1147,29 @@ async function getSuggestedReportStartDate(req, res) {
   }
 }
 
+async function consolidateRonReportAssignments(req, res) {
+  try {
+    const dryRun = !['0', 'false', 'no'].includes(String(req.body?.dryRun ?? req.query?.dryRun ?? 'true').trim().toLowerCase());
+    let classId = String(req.body?.classId || req.query?.classId || '').trim();
+    if (!classId) {
+      classId = await reportAssignmentConsolidationService.resolveClassIdByRepairTitle(req.user);
+    }
+    if (!classId) {
+      throw new Error(`Class not found for title "${reportAssignmentConsolidationService.REPAIR_CLASS_TITLE}".`);
+    }
+    const reportScope = String(req.body?.reportScope || req.query?.reportScope || 'each_student').trim();
+    const result = await reportAssignmentConsolidationService.consolidateReportAssignmentsForClass({
+      classId,
+      reportScope,
+      reqUser: req.user,
+      dryRun
+    });
+    return res.json({ status: 'success', ...result });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
 async function getAssignmentEligibleStudents(req, res) {
   try {
     const classId = String(req.body?.classId || '').trim();
@@ -1182,19 +1207,188 @@ async function getAssignmentEligibleStudents(req, res) {
   }
 }
 
+async function prepareAssignmentMutationContext(req, { assignmentId = '' } = {}) {
+  const id = String(assignmentId || req.params?.id || '').trim();
+  const isEdit = Boolean(id);
+  const activeOrgId = isEdit ? getActiveOrgIdOrThrow(req.user) : await assertCreateOrgContextOrThrow(req.user);
+  let existing = null;
+
+  if (isEdit) {
+    existing = await reportIntegrityService.assertAssignmentAccessible(id, req.user);
+  }
+
+  const requestPayload = reportViewService.parseAssignmentSaveRequest(req.body);
+  const rawBodyReportScope = String(req.body?.reportScope ?? '').trim();
+  const {
+    classId,
+    templateId,
+    selectedSessionIds,
+    selectedDateTargets,
+    requestedReportStartDate,
+    requestedReportDueDate,
+    requestedTaskStartTime,
+    requestedTaskEndTime,
+    conflictPermitted,
+    selectedTargetStudentIds,
+    reportScope: parsedReportScope,
+    status,
+    notes,
+    targetRows
+  } = requestPayload;
+  const reportScope = (!rawBodyReportScope && existing?.reportScope)
+    ? String(existing.reportScope).trim().toLowerCase()
+    : parsedReportScope;
+  const hasSessionTargets = selectedSessionIds.length > 0;
+  const effectiveConflictPermitted = hasSessionTargets ? true : Boolean(conflictPermitted);
+
+  let rowsForValidate = targetRows;
+  let rowDiff = null;
+  let rowValidationMode = 'all';
+  let upsertExistingId = '';
+
+  if (!isEdit) {
+    const allAssignments = await schoolDataService.fetchAllData('reportAssignments', {}, req.user);
+    const scopeMatch = sessionReportAssignmentService.findReportAssignmentForClass(
+      allAssignments,
+      classId,
+      reportScope
+    );
+    if (scopeMatch?.id) {
+      upsertExistingId = String(scopeMatch.id).trim();
+      existing = await reportIntegrityService.assertAssignmentAccessible(upsertExistingId, req.user);
+      rowDiff = reportAssignmentModel.diffTargetRows(existing, targetRows);
+      rowsForValidate = rowDiff.mergedRows;
+      rowValidationMode = reportAssignmentModel.resolveSaveRowValidationMode({
+        hasExistingAssignment: true,
+        validateRowIds: rowDiff.validateRowIds
+      });
+    }
+  }
+
+  if (isEdit && existing) {
+    const existingRows = reportAssignmentModel.getEffectiveTargetRows(existing);
+    if (existingRows.length > 0) {
+      if (!idsEqual(classId, existing.classId)) {
+        throw new Error('Class cannot be changed while target rows exist on this report assignment.');
+      }
+      const existingScope = String(existing.reportScope || '').trim().toLowerCase();
+      const incomingScope = String(reportScope || '').trim().toLowerCase();
+      if (incomingScope && existingScope && incomingScope !== existingScope) {
+        throw new Error('Report scope cannot be changed while target rows exist on this report assignment.');
+      }
+    }
+    rowDiff = reportAssignmentModel.diffTargetRows(existing, targetRows);
+    rowsForValidate = rowDiff.mergedRows;
+    rowValidationMode = reportAssignmentModel.resolveSaveRowValidationMode({
+      hasExistingAssignment: true,
+      validateRowIds: rowDiff.validateRowIds
+    });
+  }
+
+  const persistedAssignmentId = isEdit ? id : upsertExistingId;
+  const excludeAssignmentId = isEdit ? id : upsertExistingId;
+
+  return {
+    id,
+    isEdit,
+    existing,
+    upsertExistingId,
+    persistedAssignmentId,
+    excludeAssignmentId,
+    activeOrgId,
+    requestPayload,
+    classId,
+    templateId,
+    selectedSessionIds,
+    selectedDateTargets,
+    requestedReportStartDate,
+    requestedReportDueDate,
+    requestedTaskStartTime,
+    requestedTaskEndTime,
+    conflictPermitted,
+    selectedTargetStudentIds,
+    reportScope,
+    status,
+    notes,
+    targetRows,
+    hasSessionTargets,
+    effectiveConflictPermitted,
+    rowsForValidate,
+    rowDiff,
+    rowValidationMode
+  };
+}
+
+async function listInstancesPendingDeletionForAssignmentSave({
+  assignmentId,
+  previousAssignment,
+  nextAssignment,
+  reqUser
+} = {}) {
+  const normalizedAssignmentId = String(assignmentId || '').trim();
+  if (!normalizedAssignmentId || !previousAssignment || !nextAssignment) {
+    return [];
+  }
+  const removed = await classReferenceSyncService.listReportInstancesForRemovedTargetStudents({
+    assignmentId: normalizedAssignmentId,
+    previousAssignment,
+    nextAssignment,
+    reqUser
+  });
+  const stale = await classReferenceSyncService.listStaleReportInstancesForAssignmentTargetRows({
+    assignmentId: normalizedAssignmentId,
+    assignment: nextAssignment,
+    reqUser
+  });
+  const unique = new Map();
+  [...removed, ...stale].forEach((row) => {
+    const instanceId = String(row?.instanceId || '').trim();
+    if (instanceId) unique.set(instanceId, row);
+  });
+  return [...unique.values()];
+}
+
+async function deleteConfirmedAssignmentReportInstances({
+  assignmentId,
+  previousAssignment,
+  nextAssignment,
+  reqUser,
+  instanceRows = []
+} = {}) {
+  const normalizedAssignmentId = String(assignmentId || '').trim();
+  const instanceIds = [...new Set(
+    (Array.isArray(instanceRows) ? instanceRows : [])
+      .map((row) => String(row?.instanceId || '').trim())
+      .filter(Boolean)
+  )];
+  if (!normalizedAssignmentId || !instanceIds.length) {
+    return { deletedCount: 0, errors: [] };
+  }
+  for (const instanceId of instanceIds) {
+    // eslint-disable-next-line no-await-in-loop
+    await reportIntegrityService.assertInstanceDeletable(instanceId, reqUser);
+  }
+  return classReferenceSyncService.deleteReportInstancesByIds({
+    instanceIds,
+    reqUser,
+    orgId: nextAssignment?.orgId || previousAssignment?.orgId || reqUser?.activeOrgId,
+    classId: nextAssignment?.classId || previousAssignment?.classId,
+    reason: `report_assignment_save_confirmed:${normalizedAssignmentId}`
+  });
+}
+
 async function saveAssignment(req, res) {
   try {
-    const id = String(req.params.id || '').trim();
-    const isEdit = Boolean(id);
-    const activeOrgId = isEdit ? getActiveOrgIdOrThrow(req.user) : await assertCreateOrgContextOrThrow(req.user);
-    let existing = null;
-
-    if (isEdit) {
-      existing = await reportIntegrityService.assertAssignmentAccessible(id, req.user);
-    }
-
-    const requestPayload = reportViewService.parseAssignmentSaveRequest(req.body);
+    const ctx = await prepareAssignmentMutationContext(req, { assignmentId: req.params?.id });
     const {
+      id,
+      isEdit,
+      existing,
+      upsertExistingId,
+      persistedAssignmentId,
+      excludeAssignmentId,
+      activeOrgId,
+      requestPayload,
       classId,
       templateId,
       selectedSessionIds,
@@ -1203,15 +1397,42 @@ async function saveAssignment(req, res) {
       requestedReportDueDate,
       requestedTaskStartTime,
       requestedTaskEndTime,
-      conflictPermitted,
       selectedTargetStudentIds,
       reportScope,
       status,
       notes,
+      hasSessionTargets,
+      effectiveConflictPermitted,
+      rowsForValidate,
+      rowDiff,
       targetRows
-    } = requestPayload;
-    const hasSessionTargets = selectedSessionIds.length > 0;
-    const effectiveConflictPermitted = hasSessionTargets ? true : Boolean(conflictPermitted);
+    } = ctx;
+
+    const validateRowIds = [...new Set([
+      ...(rowDiff?.validateRowIds || []),
+      ...(requestPayload.clientDirtyRowIds || [])
+    ])];
+    const hasExistingAssignment = Boolean((isEdit && existing) || upsertExistingId);
+    const rowValidationModeEffective = reportAssignmentModel.resolveSaveRowValidationMode({
+      hasExistingAssignment,
+      validateRowIds
+    });
+
+    const saveValidationNote = (() => {
+      if (!validateRowIds.length) return '';
+      if (rowValidationModeEffective === 'all') {
+        return ` Validated all ${validateRowIds.length} target row${validateRowIds.length === 1 ? '' : 's'}.`;
+      }
+      return ` Re-validated ${validateRowIds.length} updated target row${validateRowIds.length === 1 ? '' : 's'}.`;
+    })();
+
+    const rowsForValidateEffective = reportAssignmentModel.mergeIncomingTargetRowsForRowIds(
+      rowsForValidate,
+      targetRows,
+      validateRowIds
+    );
+
+    const rowsForValidation = (rowsForValidateEffective || []).map((row) => ({ ...row, targetStudentIds: [...(row?.targetStudentIds || [])] }));
 
     const {
       template,
@@ -1225,8 +1446,8 @@ async function saveAssignment(req, res) {
       hasSessionTargets,
       selectedDateTargets,
       selectedSessionIds,
-      teacherIds: targetRows.length
-        ? targetRows.map((row) => row.teacherId).filter(Boolean)
+      teacherIds: rowsForValidation.length
+        ? rowsForValidation.map((row) => row.teacherId).filter(Boolean)
         : requestPayload.teacherIds,
       requestedTaskStartTime,
       requestedTaskEndTime,
@@ -1234,8 +1455,10 @@ async function saveAssignment(req, res) {
       requestedReportStartDate,
       requestedReportDueDate,
       selectedTargetStudentIds,
-      targetRows,
-      excludeAssignmentId: isEdit ? id : ''
+      targetRows: rowsForValidation,
+      excludeAssignmentId,
+      rowValidationMode: rowValidationModeEffective,
+      validateOnlyRowIds: validateRowIds
     });
 
     const firstActiveRow = effectiveTargetRows.find((row) => String(row?.status || '').toLowerCase() === 'active') || effectiveTargetRows[0];
@@ -1276,6 +1499,29 @@ async function saveAssignment(req, res) {
       }
     };
 
+    const nextAssignmentPreview = persistedAssignmentId && existing
+      ? { ...existing, ...basePayload, id: persistedAssignmentId }
+      : null;
+    let removedStudentInstances = nextAssignmentPreview
+      ? await listInstancesPendingDeletionForAssignmentSave({
+        assignmentId: persistedAssignmentId,
+        previousAssignment: existing,
+        nextAssignment: nextAssignmentPreview,
+        reqUser: req.user
+      })
+      : [];
+    const confirmRemovedStudentInstances = reportViewService.parseBooleanFlag(
+      req.body?.confirmRemovedStudentInstances,
+      false
+    );
+    if (removedStudentInstances.length && !confirmRemovedStudentInstances) {
+      return res.status(409).json({
+        status: 'confirm_required',
+        message: `${removedStudentInstances.length} report instance(s) must be removed for the validated assignment.`,
+        removedStudentInstances
+      });
+    }
+
     if (isEdit) {
       await schoolDataService.updateData('reportAssignments', id, basePayload, req.user);
       await classReferenceSyncService.cleanupReportInstancesForRemovedTargetRows({
@@ -1289,23 +1535,202 @@ async function saveAssignment(req, res) {
         reason: `report_assignment_saved:${id}`,
         reqUser: req.user
       });
+    } else if (upsertExistingId) {
+      await schoolDataService.updateData('reportAssignments', upsertExistingId, basePayload, req.user);
+      await classReferenceSyncService.cleanupReportInstancesForRemovedTargetRows({
+        assignmentId: upsertExistingId,
+        previousAssignment: existing,
+        nextAssignment: { ...existing, ...basePayload, id: upsertExistingId },
+        reqUser: req.user
+      });
+      await classReferenceSyncService.notifyClassReferencesChanged({
+        classId,
+        reason: `report_assignment_saved:${upsertExistingId}`,
+        reqUser: req.user
+      });
     } else {
       await schoolDataService.addData('reportAssignments', basePayload, req.user);
 
       if (isAjax(req)) {
         return res.json({
           status: 'success',
-          message: `Assignment saved with ${effectiveTargetRows.length} target row${effectiveTargetRows.length === 1 ? '' : 's'}.`
+          validatedRowCount: validateRowIds.length,
+          message: `Assignment saved with ${effectiveTargetRows.length} target row${effectiveTargetRows.length === 1 ? '' : 's'}.${saveValidationNote}`
         });
       }
       return res.redirect('/school/reports/assignments');
     }
 
-    if (isAjax(req)) return res.json({ status: 'success', message: 'Assignment saved successfully.' });
-    res.redirect('/school/reports/assignments');
+    let removedStudentInstanceCleanup = { deletedCount: 0, errors: [] };
+    const savedAssignmentSnapshot = { ...existing, ...basePayload, id: persistedAssignmentId };
+    if (confirmRemovedStudentInstances && removedStudentInstances.length) {
+      removedStudentInstanceCleanup = await deleteConfirmedAssignmentReportInstances({
+        assignmentId: persistedAssignmentId,
+        previousAssignment: existing,
+        nextAssignment: savedAssignmentSnapshot,
+        reqUser: req.user,
+        instanceRows: removedStudentInstances
+      });
+      if (removedStudentInstanceCleanup.errors.length) {
+        throw new Error(removedStudentInstanceCleanup.errors.join('; '));
+      }
+    }
+
+    if (isAjax(req)) {
+      if (isEdit) {
+        const cleanupNote = removedStudentInstanceCleanup.deletedCount
+          ? ` Removed ${removedStudentInstanceCleanup.deletedCount} report instance(s) for unassigned students.`
+          : '';
+        return res.json({ status: 'success', validatedRowCount: validateRowIds.length, message: `Assignment saved successfully.${saveValidationNote}${cleanupNote}` });
+      }
+      const upsertMessage = upsertExistingId
+        ? `Existing assignment updated with ${effectiveTargetRows.length} target row${effectiveTargetRows.length === 1 ? '' : 's'}.`
+        : `Assignment saved with ${effectiveTargetRows.length} target row${effectiveTargetRows.length === 1 ? '' : 's'}.`;
+      const cleanupNote = removedStudentInstanceCleanup.deletedCount
+        ? ` Removed ${removedStudentInstanceCleanup.deletedCount} report instance(s) for unassigned students.`
+        : '';
+      return res.json({
+        status: 'success',
+        validatedRowCount: validateRowIds.length,
+        assignmentId: upsertExistingId || undefined,
+        message: `${upsertMessage}${saveValidationNote}${cleanupNote}`
+      });
+    }
+    return res.redirect('/school/reports/assignments');
   } catch (error) {
     if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
     res.status(400).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+}
+
+async function runVerifyAssignmentRowsRequest(req, { assignmentId = '' } = {}) {
+  const ctx = await prepareAssignmentMutationContext(req, { assignmentId: assignmentId || req.params?.id });
+  const {
+    existing,
+    persistedAssignmentId,
+    excludeAssignmentId,
+    classId,
+    templateId,
+    selectedSessionIds,
+    selectedDateTargets,
+    requestedReportStartDate,
+    requestedReportDueDate,
+    requestedTaskStartTime,
+    requestedTaskEndTime,
+    selectedTargetStudentIds,
+    reportScope,
+    hasSessionTargets,
+    effectiveConflictPermitted,
+    rowsForValidate,
+    requestPayload,
+    targetRows
+  } = ctx;
+
+  const rowsForValidation = (targetRows || []).map((row) => ({
+    ...row,
+    targetStudentIds: [...(row?.targetStudentIds || [])]
+  }));
+
+  const result = await reportIntegrityService.verifyReportAssignmentContext({
+    assignmentId: persistedAssignmentId,
+    previousAssignment: existing,
+    nextAssignmentPreview: existing ? {
+      ...existing,
+      classId,
+      reportScope,
+      templateId
+    } : null,
+    validationInput: {
+      classId,
+      templateId,
+      reqUser: req.user,
+      reportScope,
+      hasSessionTargets,
+      selectedDateTargets,
+      selectedSessionIds,
+      teacherIds: rowsForValidation.length
+        ? rowsForValidation.map((row) => row.teacherId).filter(Boolean)
+        : requestPayload.teacherIds,
+      requestedTaskStartTime,
+      requestedTaskEndTime,
+      conflictPermitted: effectiveConflictPermitted,
+      requestedReportStartDate,
+      requestedReportDueDate,
+      selectedTargetStudentIds,
+      targetRows: rowsForValidation,
+      excludeAssignmentId
+    }
+  });
+
+  return { ctx, result };
+}
+
+async function verifyAssignmentRows(req, res) {
+  try {
+    const { result } = await runVerifyAssignmentRowsRequest(req, { assignmentId: req.params?.id });
+
+    if (String(result?.status || '').toLowerCase() === 'error') {
+      return res.status(400).json(result);
+    }
+    return res.json(result);
+  } catch (error) {
+    return res.status(400).json({ status: 'error', ok: false, message: error.message });
+  }
+}
+
+async function deleteVerifyAssignmentInstances(req, res) {
+  try {
+    const { ctx, result } = await runVerifyAssignmentRowsRequest(req, { assignmentId: req.params?.id });
+    const { existing, persistedAssignmentId, classId } = ctx;
+
+    if (String(result?.status || '').toLowerCase() === 'error') {
+      return res.status(400).json(result);
+    }
+    if (!persistedAssignmentId) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Save the assignment first before deleting report instances.'
+      });
+    }
+
+    const instanceIds = [...new Set(
+      (Array.isArray(result?.deletableInstanceIds) ? result.deletableInstanceIds : [])
+        .map((id) => String(id || '').trim())
+        .filter(Boolean)
+    )];
+    if (!instanceIds.length) {
+      return res.json({
+        status: 'success',
+        deletedCount: 0,
+        message: 'No report instances need to be deleted.'
+      });
+    }
+
+    for (const instanceId of instanceIds) {
+      // eslint-disable-next-line no-await-in-loop
+      await reportIntegrityService.assertInstanceDeletable(instanceId, req.user);
+    }
+
+    const cleanup = await classReferenceSyncService.deleteReportInstancesByIds({
+      instanceIds,
+      reqUser: req.user,
+      orgId: existing?.orgId || req.user?.activeOrgId,
+      classId,
+      reason: `report_assignment_verify_delete:${persistedAssignmentId}`
+    });
+    if (cleanup.errors.length) {
+      throw new Error(cleanup.errors.join('; '));
+    }
+
+    return res.json({
+      status: 'success',
+      deletedCount: cleanup.deletedCount,
+      message: cleanup.deletedCount
+        ? `Removed ${cleanup.deletedCount} report instance(s). Save the assignment to persist any target row changes.`
+        : 'No report instances were deleted.'
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
   }
 }
 
@@ -2823,6 +3248,7 @@ module.exports = {
   generateAssignmentTargetRows,
   previewAssignmentTargetRows,
   getAssignmentEligibleStudents,
+  consolidateRonReportAssignments,
   getSuggestedReportStartDate,
   showSemiMonthlyAssignmentWizard,
   postSemiMonthlyProgramCount,
@@ -2831,6 +3257,8 @@ module.exports = {
   postSemiMonthlyAssignmentStatus,
   postSemiMonthlyApply,
   saveAssignment,
+  verifyAssignmentRows,
+  deleteVerifyAssignmentInstances,
   deleteAssignment,
   getAssignmentDeletePreview,
   listInstances,

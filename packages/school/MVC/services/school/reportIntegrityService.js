@@ -12,9 +12,45 @@ const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const reportScopePolicy = require('./reportScopePolicy');
 const reportTargetDepartmentPolicy = require('./reportTargetDepartmentPolicy');
 const reportRosterService = require('./reportRosterService');
+const reportAssignmentStudentEligibilityService = require('./reportAssignmentStudentEligibilityService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
 const classEnrollmentDeleteService = require('./classEnrollmentDeleteService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+
+function resolveRowValidationScope({
+  rowValidationMode = '',
+  validateOnlyRowIds = null,
+  enrollmentValidationRowIds = null
+} = {}) {
+  const explicit = String(rowValidationMode || '').trim().toLowerCase();
+  let mode = explicit;
+  if (!['all', 'listed', 'none'].includes(mode)) {
+    if (validateOnlyRowIds != null) {
+      mode = Array.isArray(validateOnlyRowIds) && validateOnlyRowIds.length ? 'listed' : 'none';
+    } else if (Array.isArray(enrollmentValidationRowIds) && enrollmentValidationRowIds.length) {
+      mode = 'listed';
+    } else {
+      mode = 'all';
+    }
+  }
+  if (mode === 'none') {
+    return { mode, skipAllRowValidation: true, validateRowIdFilter: new Set() };
+  }
+  if (mode === 'all') {
+    return { mode, skipAllRowValidation: false, validateRowIdFilter: null };
+  }
+  const idSource = Array.isArray(validateOnlyRowIds) && validateOnlyRowIds.length
+    ? validateOnlyRowIds
+    : (Array.isArray(enrollmentValidationRowIds) ? enrollmentValidationRowIds : []);
+  const validateRowIdFilter = new Set(
+    idSource.map((id) => String(id || '').trim()).filter(Boolean)
+  );
+  return {
+    mode: 'listed',
+    skipAllRowValidation: validateRowIdFilter.size === 0,
+    validateRowIdFilter
+  };
+}
 
 function inferAssignmentReportScope(row) {
   try {
@@ -128,6 +164,41 @@ async function formatInvalidTargetStudentLabels(personIds = [], reqUser) {
     labels.push(await resolveTargetPersonDisplayName(personId, reqUser, studentRowByPersonId, personById));
   }
   return labels;
+}
+
+function buildTargetRowDisplayLabel(targetRow, rowIndex, rowStart, rowEnd) {
+  const sessionId = String(targetRow?.sessionId || '').trim();
+  const sessionDate = normalizeDateOnly(targetRow?.sessionDate);
+  const period = rowStart && rowEnd ? `${rowStart} – ${rowEnd}` : `Row ${Number(rowIndex) + 1}`;
+  if (sessionId) {
+    return `Session ${sessionId}${sessionDate ? ` (${sessionDate})` : ''} · Report period ${period}`;
+  }
+  return `Report period ${period}`;
+}
+
+function buildAttendanceEligibilityForRowError({
+  rowId,
+  targetRow,
+  rowIndex,
+  rowStart,
+  rowEnd,
+  invalidLabels
+}) {
+  const names = (Array.isArray(invalidLabels) ? invalidLabels : [])
+    .map((name) => String(name || '').trim())
+    .filter(Boolean);
+  const listed = names.join('\n');
+  const rowLabel = buildTargetRowDisplayLabel(targetRow, rowIndex, rowStart, rowEnd);
+  const periodHint = rowStart && rowEnd
+    ? `${rowStart} through ${rowEnd}`
+    : '';
+  return [
+    'ATTENDANCE_ELIGIBILITY_ROW',
+    String(rowId || targetRow?.rowId || '').trim(),
+    rowLabel,
+    periodHint,
+    listed
+  ].join('|');
 }
 
 function buildInactiveEnrollmentForRowError({
@@ -653,12 +724,23 @@ const reportIntegrityService = {
     requestedReportDueDate = '',
     selectedTargetStudentIds = [],
     targetRows = [],
-    excludeAssignmentId = ''
+    excludeAssignmentId = '',
+    validateOnlyRowIds = null,
+    enrollmentValidationRowIds = null,
+    rowValidationMode = ''
   }) {
-    const [classData, sessions, template] = await Promise.all([
+    const {
+      skipAllRowValidation,
+      validateRowIdFilter
+    } = resolveRowValidationScope({
+      rowValidationMode,
+      validateOnlyRowIds,
+      enrollmentValidationRowIds
+    });
+
+    const [classData, sessions] = await Promise.all([
       schoolDataService.getDataById('classes', classId, reqUser),
-      schoolDataService.getClassSessions(classId, reqUser),
-      assertTemplateAccessible(templateId, reqUser, { notFoundMessage: 'Template not found.' })
+      schoolDataService.getClassSessions(classId, reqUser)
     ]);
 
     if (!classData) throw new Error('Class not found or inaccessible.');
@@ -666,14 +748,6 @@ const reportIntegrityService = {
     if (!reportScopePolicy.REPORT_SCOPES.includes(String(reportScope || ''))) {
       throw new Error('Invalid report scope.');
     }
-    const allowedReportScopes = reportScopePolicy.resolveAllowedReportScopes(template);
-    if (!allowedReportScopes.includes(String(reportScope || ''))) {
-      throw new Error(
-        `"${reportScopePolicy.getReportScopeLabel(reportScope)}" is not approved for the selected report template.`
-      );
-    }
-
-    reportTargetDepartmentPolicy.assertTemplateMatchesClass(template, classData);
 
     const effectiveTargetRows = Array.isArray(targetRows) && targetRows.length
       ? targetRows
@@ -691,7 +765,54 @@ const reportIntegrityService = {
       });
 
     const targetRowsProvided = Array.isArray(targetRows) && targetRows.length > 0;
-    validateAssignmentTargetRowsAgainstSessions({ targetRows: effectiveTargetRows, sessions, requireTeacher: targetRowsProvided });
+    const rowsToValidate = skipAllRowValidation
+      ? []
+      : (validateRowIdFilter && validateRowIdFilter.size
+        ? effectiveTargetRows.filter((row) => validateRowIdFilter.has(String(row?.rowId || '').trim()))
+        : effectiveTargetRows);
+
+    const assignmentTemplateStub = { templateId, templateVersion: null };
+    let template = null;
+    if (!skipAllRowValidation) {
+      const templateRows = rowsToValidate.length ? rowsToValidate : effectiveTargetRows;
+      for (let index = 0; index < templateRows.length; index += 1) {
+        const targetRow = templateRows[index];
+        const rowTemplateFields = reportAssignmentModel.resolveTargetRowTemplateFields(assignmentTemplateStub, targetRow);
+        const rowTemplateId = String(rowTemplateFields.templateId || templateId || '').trim();
+        if (!rowTemplateId) throw new Error('Template is required for each target row.');
+        // eslint-disable-next-line no-await-in-loop
+        const loadedTemplate = await assertTemplateAccessible(rowTemplateId, reqUser, {
+          notFoundMessage: 'Template not found.'
+        });
+        const allowedReportScopes = reportScopePolicy.resolveAllowedReportScopes(loadedTemplate);
+        if (!allowedReportScopes.includes(String(reportScope || ''))) {
+          throw new Error(
+            `"${reportScopePolicy.getReportScopeLabel(reportScope)}" is not approved for the report template on target row ${index + 1}.`
+          );
+        }
+        reportTargetDepartmentPolicy.assertTemplateMatchesClass(loadedTemplate, classData);
+        if (!template) template = loadedTemplate;
+      }
+    }
+
+    if (!template) {
+      template = await assertTemplateAccessible(templateId, reqUser, { notFoundMessage: 'Template not found.' });
+      const allowedReportScopes = reportScopePolicy.resolveAllowedReportScopes(template);
+      if (!allowedReportScopes.includes(String(reportScope || ''))) {
+        throw new Error(
+          `"${reportScopePolicy.getReportScopeLabel(reportScope)}" is not approved for the selected report template.`
+        );
+      }
+      reportTargetDepartmentPolicy.assertTemplateMatchesClass(template, classData);
+    }
+
+    if (targetRowsProvided && !skipAllRowValidation) {
+      validateAssignmentTargetRowsAgainstSessions({
+        targetRows: rowsToValidate.length ? rowsToValidate : effectiveTargetRows,
+        sessions,
+        requireTeacher: targetRowsProvided
+      });
+    }
 
     const effectiveDateTargets = targetRowsProvided
       ? [...new Set(effectiveTargetRows
@@ -719,11 +840,30 @@ const reportIntegrityService = {
     const persistedUnionStudentIds = new Set();
 
     if (studentScoped) {
-      for (let rowIndex = 0; rowIndex < effectiveTargetRows.length; rowIndex += 1) {
+      if (skipAllRowValidation) {
+        effectiveTargetRows.forEach((targetRow) => {
+          (Array.isArray(targetRow?.targetStudentIds) ? targetRow.targetStudentIds : [])
+            .map((id) => String(id || '').trim())
+            .filter(Boolean)
+            .forEach((studentId) => persistedUnionStudentIds.add(studentId));
+        });
+      } else for (let rowIndex = 0; rowIndex < effectiveTargetRows.length; rowIndex += 1) {
         const targetRow = effectiveTargetRows[rowIndex];
+        const rowIdToken = String(targetRow?.rowId || '').trim();
+        const skipEnrollmentValidation = validateRowIdFilter
+          && validateRowIdFilter.size > 0
+          && !validateRowIdFilter.has(rowIdToken);
+        if (skipEnrollmentValidation) {
+          (Array.isArray(targetRow?.targetStudentIds) ? targetRow.targetStudentIds : [])
+            .map((id) => String(id || '').trim())
+            .filter(Boolean)
+            .forEach((studentId) => persistedUnionStudentIds.add(studentId));
+          continue;
+        }
         const rowStart = normalizeDateOnly(targetRow?.reportStartDate);
         const rowEnd = normalizeDateOnly(targetRow?.reportDueDate || targetRow?.dueDate || targetRow?.sessionDate);
-        const rowLabel = rowStart && rowEnd ? `${rowStart} to ${rowEnd}` : `row ${rowIndex + 1}`;
+        const rowLabel = buildTargetRowDisplayLabel(targetRow, rowIndex, rowStart, rowEnd);
+        const rowPeriodLabel = rowStart && rowEnd ? `${rowStart} to ${rowEnd}` : `row ${rowIndex + 1}`;
         // eslint-disable-next-line no-await-in-loop
         const eligible = await resolveClassStudentIds({
           classData,
@@ -735,6 +875,14 @@ const reportIntegrityService = {
           strictCanonical: true
         });
         const eligibleSet = new Set(eligible);
+        // eslint-disable-next-line no-await-in-loop
+        const selectableForRow = await reportAssignmentStudentEligibilityService.resolveSelectablePersonIdsForTargetRow({
+          classData,
+          sessions,
+          reqUser,
+          targetRow
+        });
+        const selectableSet = new Set(selectableForRow);
         let rowStudentIds = Array.isArray(targetRow?.targetStudentIds)
           ? targetRow.targetStudentIds.map((id) => String(id || '').trim()).filter(Boolean)
           : [];
@@ -743,10 +891,10 @@ const reportIntegrityService = {
           rowStudentIds = selectedTargetStudentIds.map((id) => String(id || '').trim()).filter(Boolean);
         }
         if (reportScope === 'each_student' && !rowStudentIds.length) {
-          rowStudentIds = [...eligible];
+          rowStudentIds = [...selectableForRow];
         }
         if (reportScope === 'selected_students' && !rowStudentIds.length) {
-          throw new Error(`Select at least one student for target row (${rowLabel}).`);
+          throw new Error(`Select at least one student for target row (${rowPeriodLabel}).`);
         }
         const invalidIds = rowStudentIds.filter((studentId) => !eligibleSet.has(studentId));
         if (invalidIds.length) {
@@ -759,18 +907,43 @@ const reportIntegrityService = {
             invalidLabels
           }));
         }
+        const notAttendanceEligibleIds = rowStudentIds.filter((studentId) => !selectableSet.has(studentId));
+        if (notAttendanceEligibleIds.length) {
+          if (reportScope === 'each_student') {
+            rowStudentIds = rowStudentIds.filter((studentId) => selectableSet.has(studentId));
+          } else {
+          // eslint-disable-next-line no-await-in-loop
+          const invalidLabels = await formatInvalidTargetStudentLabels(notAttendanceEligibleIds, reqUser);
+          throw new Error(buildAttendanceEligibilityForRowError({
+            rowId: rowIdToken,
+            targetRow,
+            rowIndex,
+            rowStart,
+            rowEnd,
+            invalidLabels
+          }));
+          }
+        }
+        if (reportScope === 'each_student' && !rowStudentIds.length) {
+          rowStudentIds = [...selectableForRow];
+        }
         rowStudentIds.forEach((studentId) => persistedUnionStudentIds.add(studentId));
         effectiveTargetRows[rowIndex] = {
           ...targetRow,
           targetStudentIds: rowStudentIds
         };
       }
-      if (reportScope === 'each_student' && !persistedUnionStudentIds.size) {
+      if (!skipAllRowValidation && reportScope === 'each_student' && !persistedUnionStudentIds.size) {
         throw new Error('No students with active enrollment for any target row for "each student" scope.');
       }
     }
 
-    for (const targetRow of effectiveTargetRows) {
+    const conflictRows = skipAllRowValidation
+      ? []
+      : (validateRowIdFilter && validateRowIdFilter.size
+        ? effectiveTargetRows.filter((row) => validateRowIdFilter.has(String(row?.rowId || '').trim()))
+        : effectiveTargetRows);
+    for (const targetRow of conflictRows) {
       if (Boolean(targetRow?.conflictPermitted)) continue;
       // eslint-disable-next-line no-await-in-loop
       await assertNoAssignmentScheduleConflicts({
@@ -798,6 +971,88 @@ const reportIntegrityService = {
       effectiveTargetRows,
       persistedTargetStudentIds: studentScoped ? [...persistedUnionStudentIds] : []
     };
+  },
+
+  async verifyReportAssignmentContext({
+    assignmentId = '',
+    previousAssignment = null,
+    nextAssignmentPreview = null,
+    validationInput = {}
+  } = {}) {
+    try {
+      const validated = await this.validateAssignmentCrossEntityContext({
+        ...validationInput,
+        rowValidationMode: 'all',
+        validateOnlyRowIds: null
+      });
+      const classReferenceSyncService = require('./classReferenceSyncService');
+      const normalizedAssignmentId = String(
+        assignmentId || validationInput.excludeAssignmentId || ''
+      ).trim();
+      const preview = {
+        ...(previousAssignment || {}),
+        ...(nextAssignmentPreview && typeof nextAssignmentPreview === 'object' ? nextAssignmentPreview : {}),
+        targetRows: validated.effectiveTargetRows,
+        templateId: validated.template?.id || validationInput.templateId,
+        classId: validationInput.classId,
+        reportScope: validationInput.reportScope,
+        targetStudentIds: validated.persistedTargetStudentIds?.length
+          ? validated.persistedTargetStudentIds
+          : (nextAssignmentPreview?.targetStudentIds || previousAssignment?.targetStudentIds)
+      };
+      let staleInstances = [];
+      let removedStudentInstances = [];
+      if (normalizedAssignmentId && preview) {
+        staleInstances = await classReferenceSyncService.listStaleReportInstancesForAssignmentTargetRows({
+          assignmentId: normalizedAssignmentId,
+          assignment: preview,
+          reqUser: validationInput.reqUser
+        });
+        if (previousAssignment) {
+          removedStudentInstances = await classReferenceSyncService.listReportInstancesForRemovedTargetStudents({
+            assignmentId: normalizedAssignmentId,
+            previousAssignment,
+            nextAssignment: preview,
+            reqUser: validationInput.reqUser
+          });
+        }
+      }
+      const instanceIssues = [...removedStudentInstances, ...staleInstances];
+      const uniqueInstances = new Map();
+      instanceIssues.forEach((row) => {
+        if (row?.instanceId) uniqueInstances.set(row.instanceId, row);
+      });
+      const staleList = [...uniqueInstances.values()];
+      const deletableInstanceIds = staleList
+        .map((row) => String(row?.instanceId || '').trim())
+        .filter(Boolean);
+      const ok = staleList.length === 0;
+      const confirmRequired = Boolean(normalizedAssignmentId && deletableInstanceIds.length);
+      return {
+        status: 'success',
+        ok,
+        confirmRequired,
+        deletableInstanceIds,
+        message: ok
+          ? `All ${validated.effectiveTargetRows.length} target row(s) passed verification.`
+          : `${staleList.length} report instance issue(s) found across target rows.`,
+        validatedRowCount: validated.effectiveTargetRows.length,
+        staleInstances: staleList,
+        removedStudentInstances,
+        effectiveTargetRows: validated.effectiveTargetRows
+      };
+    } catch (error) {
+      return {
+        status: 'error',
+        ok: false,
+        confirmRequired: false,
+        deletableInstanceIds: [],
+        message: String(error?.message || 'Validation failed.'),
+        validatedRowCount: 0,
+        staleInstances: [],
+        removedStudentInstances: []
+      };
+    }
   },
 
   async previewAssignmentTargetRows({
@@ -876,7 +1131,8 @@ const reportIntegrityService = {
     const targetRow = reportAssignmentModel.findEffectiveTargetRow(baseAssignment, assignmentRowId);
     if (!targetRow) throw new Error('Report assignment target row not found.');
     const assignment = reportAssignmentModel.applyTargetRowToAssignment(baseAssignment, targetRow);
-    const template = await assertTemplateAccessible(assignment.templateId, reqUser, {
+    const rowTemplateFields = reportAssignmentModel.resolveTargetRowTemplateFields(baseAssignment, targetRow);
+    const template = await assertTemplateAccessible(rowTemplateFields.templateId || assignment.templateId, reqUser, {
       notFoundMessage: 'Template not found for this assignment.'
     });
 

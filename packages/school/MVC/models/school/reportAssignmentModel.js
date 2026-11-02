@@ -228,6 +228,11 @@ function sanitizeSharedAnswersByRowId(input = {}, existing = null) {
 function sanitizeAssignmentTargetRows(v, input = {}, existing = null) {
   const rows = Array.isArray(v) ? v : [];
   const existingRows = Array.isArray(existing?.targetRows) ? existing.targetRows : [];
+  const existingRowById = new Map(
+    existingRows
+      .map((row) => [cleanString(row?.rowId, { max: 80, allowEmpty: true }), row])
+      .filter(([id]) => Boolean(id))
+  );
   const existingRowIds = new Set(existingRows.map((row) => cleanString(row?.rowId, { max: 80, allowEmpty: true })).filter(Boolean));
   const seenRowIds = new Set();
 
@@ -288,6 +293,26 @@ function sanitizeAssignmentTargetRows(v, input = {}, existing = null) {
       row?.conductRequiredBeforeFill ?? input.conductRequiredBeforeFill,
       true
     );
+    const priorRow = rowId ? existingRowById.get(rowId) : null;
+    const assignmentTemplateId = cleanId(input.templateId, { max: 80, allowEmpty: true }) || '';
+    const assignmentTemplateVersion = cleanInteger(input.templateVersion, { min: 1, max: 1000, allowEmpty: true }) || 1;
+    let templateId = cleanId(row?.templateId, { max: 80, allowEmpty: true }) || '';
+    if (!templateId && priorRow) {
+      templateId = cleanId(priorRow?.templateId, { max: 80, allowEmpty: true }) || '';
+    }
+    if (!templateId) {
+      templateId = assignmentTemplateId;
+    }
+    if (!templateId) {
+      throw new Error('Select a report template before adding target rows.');
+    }
+    let templateVersion = cleanInteger(row?.templateVersion, { min: 1, max: 1000, allowEmpty: true });
+    if (!templateVersion && priorRow?.templateVersion) {
+      templateVersion = cleanInteger(priorRow.templateVersion, { min: 1, max: 1000, allowEmpty: true });
+    }
+    if (!templateVersion) {
+      templateVersion = assignmentTemplateVersion;
+    }
 
     return {
       rowId,
@@ -306,7 +331,9 @@ function sanitizeAssignmentTargetRows(v, input = {}, existing = null) {
       teacherId,
       status: rowStatus,
       notes: cleanString(row?.notes, { max: 1500, allowEmpty: true }),
-      targetStudentIds: sanitizeStudentIds(row?.targetStudentIds)
+      targetStudentIds: sanitizeStudentIds(row?.targetStudentIds),
+      templateId,
+      templateVersion
     };
   });
 }
@@ -317,6 +344,202 @@ function collectUnionStudentIdsFromRows(rows = []) {
     sanitizeStudentIds(row?.targetStudentIds).forEach((id) => union.add(id));
   });
   return [...union];
+}
+
+function resolveTargetRowTemplateFields(assignment = {}, targetRow = null) {
+  const row = targetRow && typeof targetRow === 'object' ? targetRow : {};
+  const assignmentTemplateId = cleanId(assignment?.templateId, { max: 80, allowEmpty: true }) || '';
+  const rowTemplateId = cleanId(row?.templateId, { max: 80, allowEmpty: true }) || '';
+  const templateId = rowTemplateId || assignmentTemplateId;
+  const assignmentVersion = cleanInteger(assignment?.templateVersion, { min: 1, max: 1000, allowEmpty: true }) || 1;
+  const rowVersionNum = Number(row?.templateVersion);
+  const templateVersion = Number.isFinite(rowVersionNum) && rowVersionNum >= 1
+    ? Math.min(1000, Math.floor(rowVersionNum))
+    : assignmentVersion;
+  return { templateId, templateVersion };
+}
+
+const TARGET_ROW_DIFF_FIELDS = [
+  'targetType',
+  'sessionId',
+  'sessionDate',
+  'dueDate',
+  'reportStartDate',
+  'reportDueDate',
+  'taskStartTime',
+  'taskEndTime',
+  'conflictPermitted',
+  'timesheetReflection',
+  'allocatedHours',
+  'conductRequiredBeforeFill',
+  'teacherId',
+  'status',
+  'notes',
+  'templateId',
+  'templateVersion'
+];
+
+function normalizeTargetRowForDiff(row = {}) {
+  const targetStudentIds = sanitizeStudentIds(row?.targetStudentIds).sort();
+  const out = {};
+  TARGET_ROW_DIFF_FIELDS.forEach((key) => {
+    if (key === 'conflictPermitted' || key === 'timesheetReflection' || key === 'conductRequiredBeforeFill') {
+      out[key] = cleanBoolean(row?.[key], key === 'conflictPermitted' ? false : key === 'timesheetReflection' ? false : true);
+      return;
+    }
+    if (key === 'allocatedHours') {
+      out[key] = Number(row?.allocatedHours || 0);
+      return;
+    }
+    if (key === 'templateVersion') {
+      out[key] = Number(row?.templateVersion || 0) || 0;
+      return;
+    }
+    out[key] = cleanString(row?.[key], { max: 1500, allowEmpty: true });
+  });
+  out.targetStudentIds = targetStudentIds;
+  return out;
+}
+
+function targetRowsDiffEqual(left = {}, right = {}, assignmentStub = {}) {
+  const a = normalizeTargetRowForDiff(left);
+  const b = normalizeTargetRowForDiff(right);
+  const leftResolved = resolveTargetRowTemplateFields(assignmentStub, left);
+  const rightResolved = resolveTargetRowTemplateFields(assignmentStub, right);
+  a.templateId = leftResolved.templateId;
+  a.templateVersion = leftResolved.templateVersion;
+  b.templateId = rightResolved.templateId;
+  b.templateVersion = rightResolved.templateVersion;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+function diffTargetRows(existingAssignment = {}, incomingRows = []) {
+  const assignmentTemplateStub = {
+    templateId: existingAssignment?.templateId,
+    templateVersion: existingAssignment?.templateVersion
+  };
+  const existingRows = getEffectiveTargetRows(existingAssignment);
+  const existingById = new Map(
+    existingRows
+      .map((row) => [cleanString(row?.rowId, { max: 80, allowEmpty: true }), row])
+      .filter(([id]) => Boolean(id))
+  );
+  const incoming = Array.isArray(incomingRows) ? incomingRows : [];
+  const addedRowIds = [];
+  const updatedRowIds = [];
+  const unchangedRows = [];
+  const mergedRows = [];
+
+  incoming.forEach((rawRow) => {
+    const rowId = cleanString(rawRow?.rowId, { max: 80, allowEmpty: true });
+    const prior = rowId ? existingById.get(rowId) : null;
+    if (!prior) {
+      if (rowId) addedRowIds.push(rowId);
+      mergedRows.push(rawRow);
+      return;
+    }
+    if (targetRowsDiffEqual(prior, rawRow, assignmentTemplateStub)) {
+      unchangedRows.push(prior);
+      mergedRows.push(prior);
+      return;
+    }
+    if (rowId) updatedRowIds.push(rowId);
+    mergedRows.push({ ...prior, ...rawRow, rowId });
+  });
+
+  const incomingRowIds = new Set(
+    incoming
+      .map((rawRow) => cleanString(rawRow?.rowId, { max: 80, allowEmpty: true }))
+      .filter(Boolean)
+  );
+  const removedRowIds = existingRows
+    .map((row) => cleanString(row?.rowId, { max: 80, allowEmpty: true }))
+    .filter((rowId) => rowId && !incomingRowIds.has(rowId));
+
+  return {
+    addedRowIds: [...new Set(addedRowIds)],
+    updatedRowIds: [...new Set(updatedRowIds)],
+    removedRowIds: [...new Set(removedRowIds)],
+    validateRowIds: [...new Set([...addedRowIds, ...updatedRowIds])],
+    unchangedRows,
+    mergedRows
+  };
+}
+
+function normalizeStudentIdSet(row = {}) {
+  return new Set(
+    (Array.isArray(row?.targetStudentIds) ? row.targetStudentIds : [])
+      .map((id) => String(id || '').trim())
+      .filter(Boolean)
+  );
+}
+
+function resolveSaveRowValidationMode({ hasExistingAssignment = false, validateRowIds = [] } = {}) {
+  if (!hasExistingAssignment) return 'all';
+  const ids = Array.isArray(validateRowIds) ? validateRowIds : [];
+  return ids.length ? 'listed' : 'none';
+}
+
+function assignmentSaveRequiresInstanceConfirm({
+  diff = {},
+  existingAssignment = {},
+  mergedRows = [],
+  incomingRows = []
+} = {}) {
+  const removedRowIds = Array.isArray(diff?.removedRowIds) ? diff.removedRowIds : [];
+  if (removedRowIds.length) return true;
+
+  const existingRows = getEffectiveTargetRows(existingAssignment);
+  const existingById = new Map(
+    existingRows
+      .map((row) => [cleanString(row?.rowId, { max: 80, allowEmpty: true }), row])
+      .filter(([rowId]) => Boolean(rowId))
+  );
+  const incomingById = new Map(
+    (Array.isArray(incomingRows) ? incomingRows : [])
+      .map((row) => [cleanString(row?.rowId, { max: 80, allowEmpty: true }), row])
+      .filter(([rowId]) => Boolean(rowId))
+  );
+  const validateRowIds = Array.isArray(diff?.validateRowIds) ? diff.validateRowIds : [];
+  for (const rowId of validateRowIds) {
+    const cleanRowId = cleanString(rowId, { max: 80, allowEmpty: true });
+    if (!cleanRowId) continue;
+    const prior = existingById.get(cleanRowId);
+    const incoming = incomingById.get(cleanRowId);
+    if (!prior || !incoming) continue;
+    const priorNorm = normalizeTargetRowForDiff(prior);
+    const incomingNorm = normalizeTargetRowForDiff(incoming);
+    if (JSON.stringify(priorNorm.targetStudentIds) === JSON.stringify(incomingNorm.targetStudentIds)) {
+      continue;
+    }
+    const priorIds = normalizeStudentIdSet(prior);
+    const incomingIds = normalizeStudentIdSet(incoming);
+    for (const studentId of priorIds) {
+      if (!incomingIds.has(studentId)) return true;
+    }
+  }
+  return false;
+}
+
+function mergeIncomingTargetRowsForRowIds(mergedRows = [], incomingRows = [], rowIds = []) {
+  const idSet = new Set(
+    (Array.isArray(rowIds) ? rowIds : [])
+      .map((id) => cleanString(id, { max: 80, allowEmpty: true }))
+      .filter(Boolean)
+  );
+  if (!idSet.size) return Array.isArray(mergedRows) ? mergedRows : [];
+  const incomingById = new Map(
+    (Array.isArray(incomingRows) ? incomingRows : [])
+      .map((row) => [cleanString(row?.rowId, { max: 80, allowEmpty: true }), row])
+      .filter(([rowId]) => Boolean(rowId))
+  );
+  return (Array.isArray(mergedRows) ? mergedRows : []).map((row) => {
+    const rowId = cleanString(row?.rowId, { max: 80, allowEmpty: true });
+    if (!rowId || !idSet.has(rowId)) return row;
+    const incoming = incomingById.get(rowId);
+    if (!incoming) return row;
+    return { ...row, ...incoming, rowId };
+  });
 }
 
 function getEffectiveTargetRows(assignment = {}) {
@@ -340,7 +563,9 @@ function getEffectiveTargetRows(assignment = {}) {
     teacherId: cleanString(row?.teacherId, { max: 80, allowEmpty: true }),
     status: cleanString(row?.status, { max: 20, allowEmpty: true }).toLowerCase() || String(assignment?.status || 'active').toLowerCase(),
     notes: cleanString(row?.notes, { max: 1500, allowEmpty: true }),
-    targetStudentIds: sanitizeStudentIds(row?.targetStudentIds)
+    targetStudentIds: sanitizeStudentIds(row?.targetStudentIds),
+    templateId: cleanString(row?.templateId, { max: 80, allowEmpty: true }),
+    templateVersion: Number(row?.templateVersion || 0) || 0
   }));
 
   const targetTypeRaw = cleanString(assignment?.targetType, { max: 20, allowEmpty: true }).toLowerCase();
@@ -382,10 +607,13 @@ function findEffectiveTargetRow(assignment = {}, rowId = '') {
 function applyTargetRowToAssignment(assignment = {}, row = null) {
   const effectiveRow = row || findEffectiveTargetRow(assignment);
   if (!effectiveRow) return assignment;
+  const rowTemplate = resolveTargetRowTemplateFields(assignment, effectiveRow);
   return {
     ...assignment,
     assignmentRowId: effectiveRow.rowId || '',
     rowId: effectiveRow.rowId || '',
+    templateId: rowTemplate.templateId || assignment.templateId,
+    templateVersion: rowTemplate.templateVersion || assignment.templateVersion,
     targetType: effectiveRow.targetType,
     sessionId: effectiveRow.sessionId,
     sessionDate: effectiveRow.sessionDate,
@@ -647,6 +875,12 @@ module.exports = {
   getEffectiveTargetRows,
   findEffectiveTargetRow,
   applyTargetRowToAssignment,
+  resolveTargetRowTemplateFields,
+  diffTargetRows,
+  mergeIncomingTargetRowsForRowIds,
+  resolveSaveRowValidationMode,
+  assignmentSaveRequiresInstanceConfirm,
+  normalizeTargetRowForDiff,
   getSharedAnswersByRowMap,
   resolveSharedAnswersForRow,
   buildSharedAnswersByRowUpdate,

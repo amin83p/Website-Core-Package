@@ -3939,6 +3939,7 @@
 <script src="/scripts/sessionAttendanceTimingDetailClient.js"></script>
 <% if (canAssignSessionReports) { %>
 <script src="/scripts/reportPeriodBasePolicy.js"></script>
+<script src="/scripts/reportAssignmentStudentPickerUi.js"></script>
 <script src="/scripts/sessionReportAssignmentClient.js"></script>
 <% } %>
 <%- include('school/sessionStudentCase/partials/sessionStudentCaseModalAssets') %>
@@ -7104,8 +7105,8 @@ document.addEventListener('DOMContentLoaded', () => {
             return `<div class="alert session-report-roster-alert mb-2" role="alert" data-reconciliation-key="${dismissKey}">
                 <div class="d-flex justify-content-between align-items-start gap-2">
                     <div>
-                        <div class="fw-semibold text-danger-emphasis"><i class="bi bi-exclamation-triangle me-1"></i>Students not on session roster</div>
-                        <div class="small mt-1">For <strong>${templateTitle}</strong>, these report instances belong to students who are not on this session&apos;s attendance roster. You can delete them or keep them.</div>
+                        <div class="fw-semibold text-danger-emphasis"><i class="bi bi-exclamation-triangle me-1"></i>Report instances no longer assigned</div>
+                        <div class="small mt-1">For <strong>${templateTitle}</strong>, these report instances belong to students who are no longer on this report target row. You can delete them or keep them.</div>
                     </div>
                     <button type="button" class="btn-close js-dismiss-roster-reconciliation" data-reconciliation-key="${dismissKey}" aria-label="Dismiss"></button>
                 </div>
@@ -7120,7 +7121,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!id) return;
         const confirmed = await sessionConfirmBox({
             title: 'Delete report instance?',
-            message: 'This will permanently delete the report instance for a student not on this session roster.',
+            message: 'This will permanently delete the report instance for a student no longer assigned to this report target row.',
             icon: 'warning',
             confirmText: 'Delete',
             confirmClass: 'btn-danger'

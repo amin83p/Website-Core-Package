@@ -50,6 +50,7 @@
     <input type="hidden" name="sessionIdsJson" id="sessionIdsJson" value="[]">
     <input type="hidden" name="dateTargetsJson" id="dateTargetsJson" value="[]">
     <input type="hidden" name="targetRowsJson" id="targetRowsJson" value='<%- JSON.stringify(initialTargetRows) %>'>
+    <input type="hidden" name="dirtyRowIdsJson" id="dirtyRowIdsJson" value="[]">
     <input type="hidden" name="targetStudentIdsJson" id="targetStudentIdsJson" value='<%- JSON.stringify(Array.isArray(selectedTargetStudentIds) ? selectedTargetStudentIds : []) %>'>
     <input type="hidden" name="reportStartDate" id="legacyReportStartDateInput" value="">
     <input type="hidden" name="reportDueDate" id="legacyReportDueDateInput" value="">
@@ -72,6 +73,7 @@
               <button type="button" class="btn btn-outline-primary" id="btnPickClass"><i class="bi bi-search"></i></button>
             </div>
             <div class="form-text">Selecting class reloads available sessions and students.</div>
+            <div class="form-text text-muted d-none" id="classLockHelp">Class cannot be changed while target rows exist on this assignment.</div>
           </div>
 
           <div class="col-md-4">
@@ -86,7 +88,7 @@
                 <% } %>
               <% } %>
             </select>
-            <div class="form-text" id="assignmentTemplateHelp">Active templates for this class delivery department.</div>
+            <div class="form-text" id="assignmentTemplateHelp">Default template for new target rows. Existing rows keep the template they were created with.</div>
           </div>
 
           <div class="col-md-4">
@@ -106,11 +108,12 @@
               <% }); %>
             </select>
             <div class="form-text" id="reportScopeHelp">Select a template to see its approved report scopes.</div>
+            <div class="form-text text-muted d-none" id="reportScopeLockHelp">Report scope is fixed while target rows exist on this assignment.</div>
           </div>
 
-          <div class="col-md-4">
-            <label class="form-label fw-bold">Assignment Notes</label>
-            <input type="text" class="form-control" name="notes" maxlength="1500" value="<%= assignment?.notes || '' %>" placeholder="Optional assignment notes">
+          <div class="col-12">
+            <label class="form-label fw-bold" for="assignmentNotesInput">Assignment Notes</label>
+            <textarea class="form-control" name="notes" id="assignmentNotesInput" rows="3" maxlength="1500" placeholder="Optional notes for this report assignment"><%= assignment?.notes || '' %></textarea>
           </div>
         </div>
       </div>
@@ -155,9 +158,10 @@
       </div>
     </div>
 
-    <div class="d-flex gap-2">
-      <button class="btn btn-primary" type="submit">Save Assignment</button>
+    <div class="d-flex gap-2 align-items-center w-100">
       <a href="/school/reports/assignments" class="btn btn-outline-secondary">Cancel</a>
+      <button class="btn btn-primary" type="submit">Save Assignment</button>
+      <button class="btn btn-outline-primary ms-auto" type="button" id="btnVerifyAllRows">Verify All Rows</button>
     </div>
   </form>
 </div>
@@ -175,6 +179,10 @@
         <input type="hidden" id="rowModalSessionId" value="">
         <input type="hidden" id="rowModalSessionDate" value="">
         <input type="hidden" id="rowModalTeacherId" value="">
+        <input type="hidden" id="rowModalTemplateId" value="">
+        <input type="hidden" id="rowModalTemplateVersion" value="">
+
+        <div class="col-12 d-none" id="rowModalTemplateSection"></div>
 
         <div class="row g-3">
           <div class="col-md-3">
@@ -470,6 +478,7 @@
 
 <%- include('partials/reportMessageHelpers') %>
 <script src="/scripts/reportPeriodBasePolicy.js"></script>
+<script src="/scripts/reportAssignmentStudentPickerUi.js"></script>
 <script src="/scripts/sessionReportAssignmentClient.js"></script>
 
 <script>
@@ -481,6 +490,7 @@
     const initialSelectedTemplateId = <%- JSON.stringify(selectedTemplateId || '') %>;
     let assignmentTemplateCatalog = new Map();
     const targetRowsInput = document.getElementById('targetRowsJson');
+    const dirtyRowIdsInput = document.getElementById('dirtyRowIdsJson');
     const sessionIdsInput = document.getElementById('sessionIdsJson');
     const dateTargetsInput = document.getElementById('dateTargetsJson');
     const targetStudentIdsInput = document.getElementById('targetStudentIdsJson');
@@ -516,7 +526,9 @@
       conductRequiredBeforeFill: document.getElementById('rowModalConductRequiredBeforeFill'),
       allocatedHours: document.getElementById('rowModalAllocatedHours'),
       status: document.getElementById('rowModalStatus'),
-      notes: document.getElementById('rowModalNotes')
+      notes: document.getElementById('rowModalNotes'),
+      templateId: document.getElementById('rowModalTemplateId'),
+      templateVersion: document.getElementById('rowModalTemplateVersion')
     };
 
     const allSessions = <%- JSON.stringify(sessions || []) %>;
@@ -546,6 +558,46 @@
 
     function getSelectedAssignmentTemplateId() {
       return String(templateSelect?.value || '').trim();
+    }
+
+    function getAssignmentTemplateStamp() {
+      const templateId = getSelectedAssignmentTemplateId();
+      const meta = assignmentTemplateCatalog.get(templateId);
+      return {
+        templateId,
+        templateVersion: meta?.version != null ? Math.max(1, Number(meta.version) || 1) : 1
+      };
+    }
+
+    function formatAssignmentTemplateLabel(templateId) {
+      const id = String(templateId || '').trim();
+      if (!id) return '';
+      const meta = assignmentTemplateCatalog.get(id);
+      return String(meta?.title || id).trim();
+    }
+
+    function syncAssignmentStructuralLocks() {
+      const locked = targetRows.length > 0;
+      const pickClassBtn = document.getElementById('btnPickClass');
+      if (pickClassBtn) pickClassBtn.disabled = locked;
+      if (reportScopeInput) reportScopeInput.disabled = locked || !getSelectedAssignmentTemplateId();
+      document.getElementById('classLockHelp')?.classList.toggle('d-none', !locked);
+      document.getElementById('reportScopeLockHelp')?.classList.toggle('d-none', !locked);
+    }
+
+    function updateRowModalTemplateSection() {
+      const section = document.getElementById('rowModalTemplateSection');
+      if (!section) return;
+      const rowTemplateId = String(modalFields.templateId?.value || '').trim();
+      const defaultTemplateId = getSelectedAssignmentTemplateId();
+      if (!rowTemplateId || !defaultTemplateId || rowTemplateId === defaultTemplateId) {
+        section.classList.add('d-none');
+        section.innerHTML = '';
+        return;
+      }
+      const rowVersion = String(modalFields.templateVersion?.value || '1').trim() || '1';
+      section.classList.remove('d-none');
+      section.innerHTML = `<div class="alert alert-secondary py-2 mb-0 small">This row uses template <strong>${escapeHtml(formatAssignmentTemplateLabel(rowTemplateId))}</strong> (v${escapeHtml(rowVersion)}). The assignment default is <strong>${escapeHtml(formatAssignmentTemplateLabel(defaultTemplateId))}</strong>.</div>`;
     }
 
     function applyAssignmentTemplateMetaFromSelection() {
@@ -640,14 +692,80 @@
     const isEditAssignment = <%= isEdit ? 'true' : 'false' %>;
     const assignmentId = <%- JSON.stringify(assignment?.id || '') %>;
     let targetRows = Array.isArray(<%- JSON.stringify(initialTargetRows) %>) ? <%- JSON.stringify(initialTargetRows) %> : [];
+    const dirtyRowIds = new Set();
+
+    function markTargetRowDirty(rowId) {
+      const clean = String(rowId || '').trim();
+      if (clean) dirtyRowIds.add(clean);
+    }
+
+    function clearTargetRowDirty(rowId) {
+      const clean = String(rowId || '').trim();
+      if (clean) dirtyRowIds.delete(clean);
+    }
+
+    function clearDirtyTargetRows() {
+      dirtyRowIds.clear();
+      if (dirtyRowIdsInput) dirtyRowIdsInput.value = '[]';
+    }
+
+    function getTargetRowIndicesForSaveValidation() {
+      if (!isEditAssignment) {
+        return targetRows.map((_, index) => index);
+      }
+      if (!dirtyRowIds.size) return [];
+      return targetRows
+        .map((row, index) => ({ index, rowId: String(row?.rowId || '').trim() }))
+        .filter(({ rowId }) => rowId && dirtyRowIds.has(rowId))
+        .map(({ index }) => index);
+    }
     let rowModalStudentIds = [];
     let rowPickerEligibleStudents = [];
     let rowPickerSelectedIds = [];
     let isLoadingRowPickerStudents = false;
 
-    function showReportModal({ title = 'Notice', message = '', icon = 'warning', buttonClass = 'btn-primary' } = {}) {
+    function showReportModal({ title = 'Notice', message = '', icon = 'warning', buttonClass = 'btn-primary', html = false, buttons = null, size = 'md' } = {}) {
       if (typeof hideLoading === 'function') hideLoading();
-      return window.ReportMessaging.showReportMessage({ title, message, icon, buttonClass });
+      return window.ReportMessaging.showReportMessage({ title, message, icon, buttonClass, html, buttons, size });
+    }
+
+    function openTargetRowEditorByRowId(rowId) {
+      const cleanRowId = String(rowId || '').trim();
+      if (!cleanRowId) return;
+      const index = targetRows.findIndex((row) => String(row?.rowId || '').trim() === cleanRowId);
+      if (index < 0) return;
+      populateRowModal(targetRows[index], String(index));
+      showTargetRowModal();
+      const rowEl = targetRowsBody?.querySelector(`tr[data-target-row-id="${CSS.escape(cleanRowId)}"]`);
+      rowEl?.classList.add('table-warning');
+      rowEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      window.setTimeout(() => rowEl?.classList.remove('table-warning'), 4000);
+    }
+
+    async function presentAssignmentSaveFailure(message) {
+      const raw = String(message || '').trim() || 'Unable to save assignment.';
+      if (raw.startsWith('ATTENDANCE_ELIGIBILITY_ROW|') && window.ReportMessaging?.buildAttendanceEligibilitySaveFailureModalHtml) {
+        const html = window.ReportMessaging.buildAttendanceEligibilitySaveFailureModalHtml(raw);
+        const rowId = String(raw.split('|')[1] || '').trim();
+        if (html) {
+          const buttons = rowId
+            ? [{ text: 'Edit Target Row', class: 'btn-primary' }, { text: 'Close', class: 'btn-secondary' }]
+            : null;
+          const choice = await showReportModal({
+            title: 'Students Not Eligible',
+            icon: 'error',
+            message: html,
+            html: true,
+            size: 'lg',
+            buttons
+          });
+          if (rowId && choice === 'Edit Target Row') {
+            openTargetRowEditorByRowId(rowId);
+          }
+          return;
+        }
+      }
+      await showReportModal({ title: 'Save Failed', icon: 'error', message: raw, buttonClass: 'btn-danger' });
     }
 
     function getTargetRowModalInstance() {
@@ -687,8 +805,8 @@
     }
 
     function setSubmitLock(isLocked, activeButton, loadingLabel) {
-      const submitButtons = Array.from(formEl?.querySelectorAll('button[type="submit"]') || []);
-      submitButtons.forEach((button) => {
+      const actionButtons = Array.from(formEl?.querySelectorAll('button[type="submit"], #btnVerifyAllRows') || []);
+      actionButtons.forEach((button) => {
         if (!button) return;
         if (!button.dataset.originalHtml) button.dataset.originalHtml = button.innerHTML;
         button.disabled = isLocked;
@@ -785,7 +903,16 @@
         teacherName: String(row.teacherName || getTeacherName(teacherId)).trim(),
         status: String(row.status || 'active').trim().toLowerCase(),
         notes: String(row.notes || '').trim(),
-        targetStudentIds: uniq(Array.isArray(row.targetStudentIds) ? row.targetStudentIds : [])
+        targetStudentIds: uniq(Array.isArray(row.targetStudentIds) ? row.targetStudentIds : []),
+        templateId: String(row.templateId || '').trim(),
+        templateVersion: (() => {
+          const rowV = Number(row.templateVersion);
+          if (Number.isFinite(rowV) && rowV >= 1) return Math.min(1000, Math.floor(rowV));
+          const rowTemplateId = String(row.templateId || getSelectedAssignmentTemplateId() || '').trim();
+          const meta = rowTemplateId ? assignmentTemplateCatalog.get(rowTemplateId) : null;
+          if (meta?.version != null) return Math.max(1, Number(meta.version) || 1);
+          return getAssignmentTemplateStamp().templateVersion;
+        })()
       };
     }
 
@@ -825,6 +952,7 @@
       sessionIdsInput.value = JSON.stringify(selectedSessionIds);
       dateTargetsInput.value = JSON.stringify(selectedDateTargets);
       targetStudentIdsInput.value = JSON.stringify(collectUnionStudentIdsFromRows());
+      if (dirtyRowIdsInput) dirtyRowIdsInput.value = JSON.stringify([...dirtyRowIds]);
       targetRowsInput.value = JSON.stringify(targetRows);
       document.getElementById('legacyReportStartDateInput').value = activeRow.reportStartDate || '';
       document.getElementById('legacyReportDueDateInput').value = activeRow.reportDueDate || '';
@@ -874,7 +1002,12 @@
       if (modalInstance) modalInstance.hide();
     }
 
+    function getStudentPickerUi() {
+      return window.ReportAssignmentStudentPickerUi || null;
+    }
+
     function renderRowStudentPicker() {
+      const pickerUi = getStudentPickerUi();
       const rows = Array.isArray(rowPickerEligibleStudents) ? rowPickerEligibleStudents : [];
       const emptyEl = document.getElementById('rowStudentPickerEmpty');
       const selectAll = document.getElementById('rowStudentPickerSelectAll');
@@ -884,16 +1017,27 @@
         if (rowStudentPickerBody) rowStudentPickerBody.innerHTML = '';
         emptyEl?.classList.remove('d-none');
         if (summary) summary.textContent = '';
-        if (selectAll) selectAll.checked = false;
+        if (selectAll) {
+          selectAll.checked = false;
+          selectAll.disabled = true;
+        }
         return;
       }
       emptyEl?.classList.add('d-none');
       if (rowStudentPickerBody) {
         rowStudentPickerBody.innerHTML = rows.map((student) => {
           const id = String(student?.id || student?.personId || '').trim();
+          const checked = selectedSet.has(id);
+          if (pickerUi?.buildPickerRowHtml) {
+            return pickerUi.buildPickerRowHtml({
+              student,
+              checked,
+              checkboxClass: 'js-row-student-picker-check',
+              escapeHtml
+            });
+          }
           const name = String(student?.name || id).trim();
           const count = Number(student?.eligibleSessionCount || 0);
-          const checked = selectedSet.has(id);
           return `<tr>
             <td><input type="checkbox" class="form-check-input js-row-student-picker-check" data-student-id="${escapeHtml(id)}" ${checked ? 'checked' : ''}></td>
             <td>${escapeHtml(name)}</td>
@@ -901,13 +1045,19 @@
           </tr>`;
         }).join('');
       }
-      const selectedCount = rows.filter((student) => selectedSet.has(String(student?.id || student?.personId || '').trim())).length;
-      if (summary) summary.textContent = `${selectedCount} of ${rows.length} selected`;
-      if (selectAll) selectAll.checked = selectedCount === rows.length && rows.length > 0;
+      if (pickerUi?.updateSelectAllState) {
+        pickerUi.updateSelectAllState({
+          students: rows,
+          selectedIds: rowPickerSelectedIds,
+          selectAllEl: selectAll,
+          summaryEl: summary
+        });
+      }
     }
 
     async function fetchEligibleStudentsForRowDraft(rowDraft, options = {}) {
       const { autoSelectAll = false } = options;
+      const pickerUi = getStudentPickerUi();
       const classId = String(classIdInput?.value || '').trim();
       if (!classId) throw new Error('Select a class first.');
       const startDate = toDateOnly(rowDraft?.reportStartDate);
@@ -936,22 +1086,56 @@
       allStudents = rowPickerEligibleStudents.map((student) => ({
         id: String(student?.id || student?.personId || '').trim(),
         name: String(student?.name || '').trim(),
-        eligibleSessionCount: Number(student?.eligibleSessionCount || 0)
+        eligibleSessionCount: Number(student?.eligibleSessionCount || 0),
+        selectable: student?.selectable !== false && Number(student?.eligibleSessionCount || 0) > 0,
+        ineligibleNote: String(student?.ineligibleNote || '').trim()
       })).filter((student) => Boolean(student.id));
-      const eligibleIds = allStudents.map((student) => student.id);
-      const previousSelection = new Set(rowPickerSelectedIds);
-      if (autoSelectAll || !rowPickerSelectedIds.length) {
-        rowPickerSelectedIds = [...eligibleIds];
+      if (pickerUi?.syncSelectionAfterFetch) {
+        const synced = pickerUi.syncSelectionAfterFetch({
+          students: rowPickerEligibleStudents,
+          selectedIds: rowPickerSelectedIds,
+          autoSelectAll,
+          reportScope: getCurrentReportScope()
+        });
+        rowPickerSelectedIds = synced.selectedIds;
       } else {
-        rowPickerSelectedIds = eligibleIds.filter((id) => previousSelection.has(id));
+        const eligibleIds = allStudents.map((student) => student.id);
+        const previousSelection = new Set(rowPickerSelectedIds);
+        if (autoSelectAll || !rowPickerSelectedIds.length) {
+          rowPickerSelectedIds = [...eligibleIds];
+        } else {
+          rowPickerSelectedIds = eligibleIds.filter((id) => previousSelection.has(id));
+        }
       }
       renderRowStudentPicker();
       return rowPickerEligibleStudents;
     }
 
+    async function pruneRowModalStudentIdsToSelectable() {
+      if (!isStudentScopedReport()) return { beforeIds: [], afterIds: [], removedCount: 0 };
+      const rowDraft = buildRowDraftFromModal();
+      const startDate = toDateOnly(rowDraft.reportStartDate);
+      const endDate = toDateOnly(rowDraft.reportDueDate);
+      if (!startDate || !endDate) {
+        return { beforeIds: [...rowModalStudentIds], afterIds: [...rowModalStudentIds], removedCount: 0 };
+      }
+      const beforeIds = uniq(rowModalStudentIds);
+      rowPickerSelectedIds = [...beforeIds];
+      await fetchEligibleStudentsForRowDraft(rowDraft, { autoSelectAll: false });
+      rowModalStudentIds = uniq(rowPickerSelectedIds);
+      renderRowModalStudentSummary();
+      const afterIds = uniq(rowModalStudentIds);
+      return {
+        beforeIds,
+        afterIds,
+        removedCount: Math.max(0, beforeIds.length - afterIds.length)
+      };
+    }
+
     function renderTargetRows() {
       targetRows = targetRows.map(normalizeTargetRow);
       updateHiddenFields();
+      syncAssignmentStructuralLocks();
       targetRowsEmpty?.classList.toggle('d-none', targetRows.length > 0);
       if (!targetRowsBody) return;
       if (!targetRows.length) {
@@ -970,7 +1154,7 @@
           ? (studentCount ? `${studentCount} student${studentCount === 1 ? '' : 's'}` : 'None')
           : '-';
         return `
-          <tr data-target-row-index="${index}">
+          <tr data-target-row-index="${index}" data-target-row-id="${escapeHtml(String(row.rowId || ''))}">
             <td>${escapeHtml(targetLabel)}</td>
             <td>${escapeHtml(periodLabel)}</td>
             <td>${escapeHtml(row.teacherName || row.teacherId || '-')}</td>
@@ -1012,7 +1196,7 @@
       if (rowModalStudentHint) {
         const scope = getCurrentReportScope();
         rowModalStudentHint.textContent = scope === 'each_student'
-          ? 'All enrollment-eligible students for this row are selected by default. Uncheck any you want to exclude.'
+          ? 'All attendance-eligible students are selected by default. Students with N/A attendance for this period are excluded automatically when you save this row.'
           : 'Pick one or more students enrolled for this row\'s report period.';
       }
     }
@@ -1077,15 +1261,27 @@
       modalFields.allocatedHours.value = normalized.allocatedHours || '';
       modalFields.status.value = normalized.status || 'active';
       modalFields.notes.value = normalized.notes || '';
+      modalFields.templateId.value = normalized.templateId || '';
+      modalFields.templateVersion.value = normalized.templateVersion !== '' && normalized.templateVersion != null
+        ? String(normalized.templateVersion)
+        : '';
       rowModalStudentIds = uniq(normalized.targetStudentIds || []);
       renderRowModalStudentSummary();
       setModalTargetMode();
+      updateRowModalTemplateSection();
       showTargetRowModal();
+      if (isStudentScopedReport() && rowModalStudentIds.length) {
+        pruneRowModalStudentIdsToSelectable().catch(() => {});
+      }
     }
 
     function rowFromModal() {
       const targetType = String(modalFields.targetType.value || 'session') === 'date' ? 'date' : 'session';
       const session = targetType === 'session' ? getSessionById(modalFields.sessionId.value) : null;
+      const existingTemplateId = String(modalFields.templateId?.value || '').trim();
+      const existingTemplateVersion = modalFields.templateVersion?.value;
+      const stamp = getAssignmentTemplateStamp();
+      const isNewRow = getModalTargetRowIndex() === null;
       return normalizeTargetRow({
         rowId: modalFields.rowId.value,
         targetType,
@@ -1104,7 +1300,13 @@
         allocatedHours: modalFields.allocatedHours.value,
         status: modalFields.status.value,
         notes: modalFields.notes.value,
-        targetStudentIds: [...rowModalStudentIds]
+        targetStudentIds: [...rowModalStudentIds],
+        templateId: existingTemplateId || (isNewRow ? stamp.templateId : ''),
+        templateVersion: existingTemplateId
+          ? (existingTemplateVersion !== '' && existingTemplateVersion != null
+            ? Math.max(1, Number(existingTemplateVersion) || 1)
+            : stamp.templateVersion)
+          : (isNewRow ? stamp.templateVersion : '')
       });
     }
 
@@ -1190,6 +1392,61 @@
         return `/school/reports/assignments/edit/${encodeURIComponent(assignmentId)}/${cleanSuffix}`;
       }
       return `/school/reports/assignments/${cleanSuffix}`;
+    }
+
+    function getVerifyAllRowsUrl() {
+      return getBulkApiUrl('verify-all-rows');
+    }
+
+    function getVerifyDeleteInstancesUrl() {
+      return getBulkApiUrl('verify-all-rows/delete-instances');
+    }
+
+    async function postAssignmentFormRequest({ url, useMutationActionState = false } = {}) {
+      updateHiddenFields();
+      const actionStateToken = String(formEl.querySelector('input[name="actionStateId"]')?.value || '').trim();
+      if (!actionStateToken) {
+        await showReportModal({
+          title: 'Session Expired',
+          icon: 'warning',
+          message: 'Action state is missing. Reload this form and try again.'
+        });
+        return { ok: false, payload: null };
+      }
+      const requestUrl = new URL(url, window.location.origin);
+      requestUrl.searchParams.set('actionStateId', actionStateToken);
+      const encodedBody = buildEncodedAssignmentFormBody();
+      const response = await fetch(requestUrl.toString(), {
+        method: 'POST',
+        body: encodedBody,
+        credentials: 'same-origin',
+        headers: {
+          'X-AJAX-Request': 'true',
+          'Accept': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+        }
+      });
+      const rawText = await response.text();
+      let payload = null;
+      try {
+        payload = rawText ? JSON.parse(rawText) : null;
+      } catch (parseError) {
+        payload = null;
+      }
+      return { ok: response.ok, payload, response };
+    }
+
+    function buildEncodedAssignmentFormBody({ confirmRemovedStudentInstances = false } = {}) {
+      const reportScope = String(reportScopeInput?.value || '').trim().toLowerCase();
+      const formData = new FormData(formEl);
+      const encodedBody = new URLSearchParams();
+      formData.forEach((value, key) => {
+        if (value instanceof File) return;
+        encodedBody.append(key, String(value ?? ''));
+      });
+      if (reportScope) encodedBody.set('reportScope', reportScope);
+      if (confirmRemovedStudentInstances) encodedBody.set('confirmRemovedStudentInstances', 'true');
+      return encodedBody;
     }
 
     function getBulkTargetRowModalInstance() {
@@ -1638,7 +1895,9 @@
       rowsToAdd.forEach((row) => {
         const clean = { ...row };
         delete clean.linkNote;
-        targetRows.push(normalizeTargetRow(clean));
+        const normalized = normalizeTargetRow(clean);
+        markTargetRowDirty(normalized.rowId);
+        targetRows.push(normalized);
       });
       renderTargetRows();
       hideBulkTargetRowsModal();
@@ -1684,10 +1943,12 @@
       } else if (event.target.closest('.js-duplicate-target-row')) {
         event.preventDefault();
         const copy = normalizeTargetRow({ ...targetRows[index], rowId: generateTargetRowId() });
+        markTargetRowDirty(copy.rowId);
         targetRows.splice(index + 1, 0, copy);
         renderTargetRows();
       } else if (event.target.closest('.js-remove-target-row')) {
         event.preventDefault();
+        clearTargetRowDirty(String(targetRows[index]?.rowId || '').trim());
         targetRows.splice(index, 1);
         renderTargetRows();
       }
@@ -1759,6 +2020,12 @@
     });
 
     document.getElementById('btnSaveTargetRow')?.addEventListener('click', async () => {
+      try {
+        await pruneRowModalStudentIdsToSelectable();
+      } catch (error) {
+        await showReportModal({ title: 'Students Unavailable', icon: 'warning', message: String(error?.message || 'Unable to refresh student selection for this row.') });
+        return;
+      }
       const row = rowFromModal();
       const issue = validateRow(row, 'Target row');
       if (issue) {
@@ -1766,6 +2033,7 @@
         return;
       }
       const index = getModalTargetRowIndex();
+      markTargetRowDirty(row.rowId);
       if (index !== null && targetRows[index]) targetRows[index] = row;
       else targetRows.push(row);
       renderTargetRows();
@@ -1798,7 +2066,7 @@
       const allowedScopes = hasTemplate
         ? normalizeTemplateAllowedScopes(selectedTemplateAllowedReportScopes)
         : [];
-      reportScopeInput.disabled = !hasTemplate;
+      reportScopeInput.disabled = targetRows.length > 0 || !hasTemplate;
 
       Array.from(reportScopeInput.options).forEach((option) => {
         const value = String(option.value || '').trim();
@@ -1889,11 +2157,16 @@
     });
 
     document.getElementById('rowStudentPickerSelectAll')?.addEventListener('change', function (event) {
+      const pickerUi = getStudentPickerUi();
       const checked = Boolean(event.target?.checked);
       const rows = Array.isArray(rowPickerEligibleStudents) ? rowPickerEligibleStudents : [];
-      rowPickerSelectedIds = checked
-        ? rows.map((student) => String(student?.id || student?.personId || '').trim()).filter(Boolean)
-        : [];
+      if (pickerUi?.applySelectAllToggle) {
+        rowPickerSelectedIds = pickerUi.applySelectAllToggle({ students: rows, checked });
+      } else {
+        rowPickerSelectedIds = checked
+          ? rows.map((student) => String(student?.id || student?.personId || '').trim()).filter(Boolean)
+          : [];
+      }
       renderRowStudentPicker();
     });
 
@@ -1903,6 +2176,207 @@
       renderRowModalStudentSummary();
       hideRowStudentPickerModal();
     });
+
+    async function submitAssignmentSave({ confirmRemovedStudentInstances = false, activeButton = null } = {}) {
+      const classId = String(classIdInput.value || '').trim();
+      const templateId = getSelectedAssignmentTemplateId();
+      const reportScope = String(reportScopeInput?.value || '').trim().toLowerCase();
+      if (!classId || !templateId || !reportScope) return false;
+      targetRows = targetRows.map(normalizeTargetRow);
+      updateHiddenFields();
+
+      const actionStateToken = String(formEl.querySelector('input[name="actionStateId"]')?.value || '').trim();
+      if (!actionStateToken) {
+        await showReportModal({
+          title: 'Session Expired',
+          icon: 'warning',
+          message: 'Action state is missing. Reload this form and try again.'
+        });
+        return false;
+      }
+
+      const requestUrl = new URL(formEl.action, window.location.origin);
+      requestUrl.searchParams.set('actionStateId', actionStateToken);
+
+      const encodedBody = buildEncodedAssignmentFormBody({ confirmRemovedStudentInstances });
+
+      const response = await fetch(requestUrl.toString(), {
+        method: 'POST',
+        body: encodedBody,
+        credentials: 'same-origin',
+        headers: {
+          'X-AJAX-Request': 'true',
+          'Accept': 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+        }
+      });
+
+      const rawText = await response.text();
+      let payload = null;
+      try {
+        payload = rawText ? JSON.parse(rawText) : null;
+      } catch (parseError) {
+        payload = null;
+      }
+
+      if (String(payload?.status || '').toLowerCase() === 'confirm_required'
+        && Array.isArray(payload?.removedStudentInstances)
+        && payload.removedStudentInstances.length) {
+        const html = window.ReportMessaging?.buildRemovedTargetStudentInstancesConfirmHtml
+          ? window.ReportMessaging.buildRemovedTargetStudentInstancesConfirmHtml(payload.removedStudentInstances)
+          : String(payload?.message || '');
+        const confirmed = window.ReportMessaging?.confirmReportAction
+          ? await window.ReportMessaging.confirmReportAction({
+            title: 'Delete report instances?',
+            message: html,
+            html: true,
+            confirmText: 'Delete instances',
+            cancelText: 'Cancel',
+            confirmClass: 'btn-danger',
+            icon: 'warning'
+          })
+          : false;
+        if (!confirmed) return false;
+        return submitAssignmentSave({ confirmRemovedStudentInstances: true, activeButton });
+      }
+
+      if (payload && typeof window.applyGuardedApiResult === 'function' && payload?.idempotency?.state) {
+        const guarded = await window.applyGuardedApiResult(payload, {
+          busyTitle: 'Save In Progress',
+          replayTitle: 'Save Already Processed'
+        });
+        if (guarded.stop) return false;
+        payload = guarded.result || payload;
+      }
+
+      if (!response.ok || String(payload?.status || '').toLowerCase() !== 'success') {
+        const message = String(payload?.message || '').trim() || 'Unable to save assignment.';
+        await presentAssignmentSaveFailure(message);
+        return false;
+      }
+
+      await showReportModal({
+        title: 'Saved',
+        icon: 'success',
+        message: String(payload?.message || '').trim() || 'Assignment saved successfully.',
+        buttonClass: 'btn-success'
+      });
+      clearDirtyTargetRows();
+      window.isFormSubmitting = true;
+      window.location.assign('/school/reports/assignments');
+      return true;
+    }
+
+    async function presentAssignmentVerifyFailure(message) {
+      await presentAssignmentSaveFailure(message);
+    }
+
+    async function submitVerifyAllRows({ activeButton = null } = {}) {
+      const classId = String(classIdInput.value || '').trim();
+      const templateId = getSelectedAssignmentTemplateId();
+      const reportScope = String(reportScopeInput?.value || '').trim().toLowerCase();
+      if (!classId) {
+        await showReportModal({ title: 'Class Required', icon: 'warning', message: 'Select a class.' });
+        return false;
+      }
+      if (!templateId) {
+        await showReportModal({ title: 'Template Required', icon: 'warning', message: 'Select a template.' });
+        return false;
+      }
+      if (!reportScope || !normalizeTemplateAllowedScopes(selectedTemplateAllowedReportScopes).includes(reportScope)) {
+        await showReportModal({
+          title: 'Report Scope Required',
+          icon: 'warning',
+          message: 'Select a report scope approved by the selected template.'
+        });
+        return false;
+      }
+      targetRows = targetRows.map(normalizeTargetRow);
+      if (!targetRows.length) {
+        await showReportModal({ title: 'Target Rows Required', icon: 'warning', message: 'Add at least one report target row.' });
+        return false;
+      }
+      for (let i = 0; i < targetRows.length; i += 1) {
+        const issue = validateRow(targetRows[i], `Target row ${i + 1}`);
+        if (issue) {
+          await showReportModal({ title: 'Row Incomplete', icon: 'warning', message: issue });
+          return false;
+        }
+      }
+
+      const verifyResult = await postAssignmentFormRequest({ url: getVerifyAllRowsUrl() });
+      const payload = verifyResult.payload;
+      if (!verifyResult.ok || String(payload?.status || '').toLowerCase() === 'error') {
+        const message = String(payload?.message || '').trim() || 'Unable to verify target rows.';
+        await presentAssignmentVerifyFailure(message);
+        return false;
+      }
+
+      if (payload?.ok) {
+        const html = window.ReportMessaging?.buildVerifyAllRowsResultModalHtml
+          ? window.ReportMessaging.buildVerifyAllRowsResultModalHtml(payload)
+          : String(payload?.message || '');
+        await showReportModal({
+          title: 'Verification Passed',
+          icon: 'success',
+          message: html || String(payload?.message || 'Verification complete.'),
+          html: Boolean(html),
+          size: 'lg',
+          buttonClass: 'btn-success'
+        });
+        return true;
+      }
+
+      const instanceRows = Array.isArray(payload?.staleInstances) ? payload.staleInstances : [];
+      if (!payload?.confirmRequired || !instanceRows.length) {
+        const html = window.ReportMessaging?.buildVerifyAllRowsResultModalHtml
+          ? window.ReportMessaging.buildVerifyAllRowsResultModalHtml(payload)
+          : String(payload?.message || '');
+        await showReportModal({
+          title: 'Verification Issues',
+          icon: 'warning',
+          message: html || String(payload?.message || 'Verification complete.'),
+          html: Boolean(html),
+          size: 'lg',
+          buttonClass: 'btn-warning'
+        });
+        return true;
+      }
+
+      const confirmHtml = window.ReportMessaging?.buildVerifyAllRowsDeleteConfirmHtml
+        ? window.ReportMessaging.buildVerifyAllRowsDeleteConfirmHtml(payload)
+        : (window.ReportMessaging?.buildRemovedTargetStudentInstancesConfirmHtml
+          ? window.ReportMessaging.buildRemovedTargetStudentInstancesConfirmHtml(instanceRows)
+          : String(payload?.message || ''));
+      const confirmed = window.ReportMessaging?.confirmReportAction
+        ? await window.ReportMessaging.confirmReportAction({
+          title: 'Delete report instances?',
+          message: confirmHtml,
+          html: true,
+          confirmText: 'Delete instances',
+          cancelText: 'Cancel',
+          confirmClass: 'btn-danger',
+          icon: 'warning'
+        })
+        : false;
+      if (!confirmed) return false;
+
+      const deleteResult = await postAssignmentFormRequest({ url: getVerifyDeleteInstancesUrl(), useMutationActionState: true });
+      const deletePayload = deleteResult.payload;
+      if (!deleteResult.ok || String(deletePayload?.status || '').toLowerCase() !== 'success') {
+        const message = String(deletePayload?.message || '').trim() || 'Unable to delete report instances.';
+        await presentAssignmentVerifyFailure(message);
+        return false;
+      }
+
+      await showReportModal({
+        title: 'Instances Removed',
+        icon: 'success',
+        message: String(deletePayload?.message || '').trim() || 'Report instances deleted.',
+        buttonClass: 'btn-success'
+      });
+      return true;
+    }
 
     let isSavingAssignment = false;
     formEl?.addEventListener('submit', async function (event) {
@@ -1933,90 +2407,40 @@
         await showReportModal({ title: 'Target Rows Required', icon: 'warning', message: 'Add at least one report target row.' });
         return;
       }
-      for (let i = 0; i < targetRows.length; i += 1) {
-        const issue = validateRow(targetRows[i], `Target row ${i + 1}`);
+      for (const rowIndex of getTargetRowIndicesForSaveValidation()) {
+        const issue = validateRow(targetRows[rowIndex], `Target row ${rowIndex + 1}`);
         if (issue) {
           await showReportModal({ title: 'Row Incomplete', icon: 'warning', message: issue });
           return;
         }
       }
-      updateHiddenFields();
 
       const activeButton = event.submitter || formEl.querySelector('button[type="submit"]');
       try {
         isSavingAssignment = true;
         setSubmitLock(true, activeButton, 'Saving...');
-
-        const actionStateToken = String(formEl.querySelector('input[name="actionStateId"]')?.value || '').trim();
-        if (!actionStateToken) {
-          await showReportModal({
-            title: 'Session Expired',
-            icon: 'warning',
-            message: 'Action state is missing. Reload this form and try again.'
-          });
-          return;
-        }
-
-        const requestUrl = new URL(formEl.action, window.location.origin);
-        requestUrl.searchParams.set('actionStateId', actionStateToken);
-
-        const formData = new FormData(formEl);
-        const encodedBody = new URLSearchParams();
-        formData.forEach((value, key) => {
-          if (value instanceof File) return;
-          encodedBody.append(key, String(value ?? ''));
-        });
-
-        const response = await fetch(requestUrl.toString(), {
-          method: 'POST',
-          body: encodedBody,
-          credentials: 'same-origin',
-          headers: {
-            'X-AJAX-Request': 'true',
-            'Accept': 'application/json',
-            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
-          }
-        });
-
-        const rawText = await response.text();
-        let payload = null;
-        try {
-          payload = rawText ? JSON.parse(rawText) : null;
-        } catch (parseError) {
-          payload = null;
-        }
-        if (payload && typeof window.applyGuardedApiResult === 'function' && payload?.idempotency?.state) {
-          const guarded = await window.applyGuardedApiResult(payload, {
-            busyTitle: 'Save In Progress',
-            replayTitle: 'Save Already Processed'
-          });
-          if (guarded.stop) return;
-        }
-
-        if (!response.ok || String(payload?.status || '').toLowerCase() !== 'success') {
-          const message = String(payload?.message || '').trim() || 'Unable to save assignment.';
-          await showReportModal({ title: 'Save Failed', icon: 'error', message, buttonClass: 'btn-danger' });
-          return;
-        }
-
-        await showReportModal({
-          title: 'Saved',
-          icon: 'success',
-          message: String(payload?.message || '').trim() || 'Assignment saved successfully.',
-          buttonClass: 'btn-success'
-        });
-        window.isFormSubmitting = true;
-        window.location.assign('/school/reports/assignments');
+        await submitAssignmentSave({ activeButton });
       } catch (error) {
-        await showReportModal({
-          title: 'Save Failed',
-          icon: 'error',
-          message: String(error?.message || 'Unexpected error while saving assignment.'),
-          buttonClass: 'btn-danger'
-        });
+        await presentAssignmentSaveFailure(String(error?.message || 'Unexpected error while saving assignment.'));
       } finally {
         isSavingAssignment = false;
         setSubmitLock(false, activeButton);
+      }
+    });
+
+    let isVerifyingAllRows = false;
+    document.getElementById('btnVerifyAllRows')?.addEventListener('click', async function () {
+      if (isVerifyingAllRows || isSavingAssignment) return;
+      const verifyButton = document.getElementById('btnVerifyAllRows');
+      try {
+        isVerifyingAllRows = true;
+        setSubmitLock(true, verifyButton, 'Verifying...');
+        await submitVerifyAllRows({ activeButton: verifyButton });
+      } catch (error) {
+        await presentAssignmentVerifyFailure(String(error?.message || 'Unexpected error while verifying rows.'));
+      } finally {
+        isVerifyingAllRows = false;
+        setSubmitLock(false, verifyButton);
       }
     });
 
