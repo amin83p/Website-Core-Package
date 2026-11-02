@@ -68,6 +68,35 @@ function resolveAuditUserId(auditUser) {
   return String(auditUser || 'system');
 }
 
+function hasLogArchiveState(logArchive = {}) {
+  const row = logArchive && typeof logArchive === 'object' ? logArchive : {};
+  const counts = row.lastExportCounts && typeof row.lastExportCounts === 'object' ? row.lastExportCounts : {};
+  return Boolean(
+    row.lastExportEndDate ||
+    row.lastExportAt ||
+    row.lastExportId ||
+    Object.keys(counts).length
+  );
+}
+
+async function maybeMigrateLogArchiveFromFile(collection, merged) {
+  const mongoLogArchive = merged.logArchive && typeof merged.logArchive === 'object' ? merged.logArchive : {};
+  if (hasLogArchiveState(mongoLogArchive)) {
+    return merged;
+  }
+  const legacy = settingsModel.readLogArchiveFromFileOnly();
+  if (!hasLogArchiveState(legacy)) {
+    return merged;
+  }
+  const next = mergeWithDefaults(deepMerge(merged, { logArchive: legacy }));
+  await collection.updateOne(
+    { id: SYSTEM_SETTINGS_SINGLETON_ID },
+    { $set: { logArchive: next.logArchive } },
+    { upsert: true }
+  );
+  return next;
+}
+
 const systemSettingsRepository = {
   async getSettings(options = {}) {
     return runByRepositoryBackend(options, {
@@ -79,10 +108,15 @@ const systemSettingsRepository = {
           await collection.findOne({ id: SYSTEM_SETTINGS_SINGLETON_ID })
         );
         if (row) {
-          return mergeWithDefaults(deepMerge(baseline, row));
+          const merged = mergeWithDefaults(deepMerge(baseline, row));
+          return maybeMigrateLogArchiveFromFile(collection, merged);
         }
 
         const payload = { ...baseline, id: SYSTEM_SETTINGS_SINGLETON_ID };
+        const legacy = settingsModel.readLogArchiveFromFileOnly();
+        if (hasLogArchiveState(legacy)) {
+          payload.logArchive = { ...(payload.logArchive || {}), ...legacy };
+        }
         await collection.insertOne(payload);
         return mergeWithDefaults(payload);
       }
@@ -114,7 +148,8 @@ const systemSettingsRepository = {
 
         // Keep bootstrap file in sync for non-runtime app settings.
         // Runtime backend selection is environment-only and stripped during merge.
-        await settingsModel.updateSettings(merged, auditUser);
+        const stripMongoOnlySettings = settingsModel.stripMongoOnlySettings || ((s) => s);
+        await settingsModel.updateSettings(stripMongoOnlySettings(merged), auditUser);
         return mergeWithDefaults(merged);
       }
     }, 'core.systemSettings.updateSettings');

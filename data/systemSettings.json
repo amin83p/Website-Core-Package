@@ -316,15 +316,7 @@
     "rollingWorkflowPilotOrgIds": "",
     "rollingWorkflowPilotProgramIds": ""
   },
-  "logArchive": {
-    "lastExportEndDate": "2026-10-31",
-    "lastExportAt": "2026-11-02T20:53:33.847Z",
-    "lastExportId": "EXP-1793652812805-075fjv",
-    "lastExportCounts": {
-      "logs": 59188,
-      "actionStates": 12329
-    }
-  },
+  "logArchive": {},
   "audit": {
     "lastUpdateUser": "ROOT_001",
     "lastUpdateDateTime": "2026-11-02T20:53:36.831Z"

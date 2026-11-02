@@ -5,6 +5,7 @@ const path = require('path');
 const { queueWrite } = require('./fileQueue'); 
 const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
 const packageSettingsDefaultsService = require('../services/packageSettingsDefaultsService');
+const { isMongoBackendActive } = require('../infrastructure/runtime/dataBackendRuntime');
 
 const settingsPath = path.join(__dirname, '../../data/systemSettings.json');
 
@@ -162,6 +163,31 @@ function stripRuntimeBackendSettings(app = {}) {
   return cleaned;
 }
 
+function stripMongoOnlySettings(settings = {}) {
+  const source = settings && typeof settings === 'object' ? settings : {};
+  const cleaned = { ...source };
+  delete cleaned.logArchive;
+  delete cleaned.id;
+  return cleaned;
+}
+
+function readLogArchiveFromFileOnly() {
+  try {
+    const data = fsSync.readFileSync(settingsPath, 'utf8');
+    const parsed = JSON.parse(data);
+    return parsed.logArchive && typeof parsed.logArchive === 'object' ? parsed.logArchive : {};
+  } catch (_) {
+    return {};
+  }
+}
+
+function resolveFileLogArchive(parsed = {}) {
+  if (isMongoBackendActive()) {
+    return {};
+  }
+  return parsed.logArchive && typeof parsed.logArchive === 'object' ? parsed.logArchive : {};
+}
+
 function mergeAppSettings(base = {}, incoming = {}) {
   const baseApp = stripRuntimeBackendSettings(base);
   const incomingApp = stripRuntimeBackendSettings(incoming);
@@ -228,7 +254,7 @@ async function getSettings() {
       organization: { ...DEFAULTS.organization, ...(parsed.organization || {}) },
       access: { ...DEFAULTS.access, ...(parsed.access || {}) },
       app: mergeAppSettings(DEFAULTS.app, parsed.app || {}),
-      logArchive: parsed.logArchive && typeof parsed.logArchive === 'object' ? parsed.logArchive : {}
+      logArchive: resolveFileLogArchive(parsed)
     };
   } catch (error) {
     if (error.code === 'ENOENT') {
@@ -249,7 +275,7 @@ function getSettingsSync() {
       organization: { ...DEFAULTS.organization, ...(parsed.organization || {}) },
       access: { ...DEFAULTS.access, ...(parsed.access || {}) },
       app: mergeAppSettings(DEFAULTS.app, parsed.app || {}),
-      logArchive: parsed.logArchive && typeof parsed.logArchive === 'object' ? parsed.logArchive : {}
+      logArchive: resolveFileLogArchive(parsed)
     };
   } catch (_) {
     return { ...DEFAULTS };
@@ -266,19 +292,25 @@ async function updateSettings(newSettings, auditUser) {
   await queueWrite(async () => {
     const current = await getSettings();
     
+    const mongoActive = isMongoBackendActive();
     const merged = {
       newsletter: { ...current.newsletter, ...(newSettings.newsletter || {}) },
       organization: { ...current.organization, ...(newSettings.organization || {}) },
       access: { ...current.access, ...(newSettings.access || {}) },
       app: mergeAppSettings(current.app, newSettings.app || {}),
-      logArchive: newSettings.logArchive && typeof newSettings.logArchive === 'object'
-        ? { ...(current.logArchive || {}), ...newSettings.logArchive }
-        : (current.logArchive || {}),
       audit: {
         lastUpdateUser: auditUser ? auditUser.id : 'system',
         lastUpdateDateTime: new Date().toISOString()
       }
     };
+
+    if (mongoActive) {
+      merged.logArchive = {};
+    } else {
+      merged.logArchive = newSettings.logArchive && typeof newSettings.logArchive === 'object'
+        ? { ...(current.logArchive || {}), ...newSettings.logArchive }
+        : (current.logArchive || {});
+    }
 
     await fs.writeFile(settingsPath, JSON.stringify(merged, null, 2));
   });
@@ -288,6 +320,8 @@ module.exports = {
   DEFAULTS,
   DEFAULT_PUBLIC_MENU_ITEMS,
   stripRuntimeBackendSettings,
+  stripMongoOnlySettings,
+  readLogArchiveFromFileOnly,
   getSettings,
   getSettingsSync,
   updateSettings
