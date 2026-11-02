@@ -16,7 +16,7 @@ const DEFAULT_APP_BRAND = {
   logoUrl: '/uploads/GLOBAL/logo/Logo1.png',
   faviconUrl: '',
   iconSvgUrl: '/uploads/GLOBAL/logo/icon.svg',
-  appleTouchIconUrl: '/uploads/GLOBAL/logo/Logo1.png',
+  appleTouchIconUrl: '',
   themeColor: '#ffffff',
   ownerDisplayName: 'Amin Paknejad',
   footerAboutTitle: 'About Amin Paknejad',

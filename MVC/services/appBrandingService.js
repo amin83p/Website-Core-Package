@@ -8,7 +8,7 @@ const DEFAULT_BRAND = Object.freeze({
   logoUrl: '/uploads/GLOBAL/logo/Logo1.png',
   faviconUrl: '',
   iconSvgUrl: '/uploads/GLOBAL/logo/icon.svg',
-  appleTouchIconUrl: '/uploads/GLOBAL/logo/Logo1.png',
+  appleTouchIconUrl: '',
   themeColor: '#ffffff',
   ownerDisplayName: 'Amin Paknejad',
   footerAboutTitle: 'About Amin Paknejad',
@@ -136,6 +136,8 @@ function cleanUrl(value, fallback = '') {
   return fallback || '';
 }
 
+const LEGACY_DEFAULT_APPLE_TOUCH_ICON_URL = '/uploads/GLOBAL/logo/Logo1.png';
+
 function resolveBrowserTabIconUrl(merged = {}) {
   const explicit = cleanUrl(merged.faviconUrl, '');
   if (explicit) return explicit;
@@ -146,6 +148,20 @@ function resolveBrowserTabIconUrl(merged = {}) {
     return cleanUrl(merged.logoUrl, DEFAULT_BRAND.logoUrl);
   }
   return DEFAULT_BRAND.iconSvgUrl;
+}
+
+function resolveHomeScreenIconUrl(merged = {}) {
+  const browserTab = resolveBrowserTabIconUrl(merged);
+  const override = cleanUrl(merged.appleTouchIconUrl, '');
+  const logo = cleanUrl(merged.logoUrl, DEFAULT_BRAND.logoUrl);
+  if (
+    !override
+    || override === logo
+    || override === LEGACY_DEFAULT_APPLE_TOUCH_ICON_URL
+  ) {
+    return browserTab;
+  }
+  return override;
 }
 
 function faviconMimeTypeFromUrl(url = '') {
@@ -308,6 +324,7 @@ function getBrand() {
   const raw = getRawBrandSettings();
   const merged = { ...DEFAULT_BRAND, ...raw };
   const browserTabIconUrl = resolveBrowserTabIconUrl(merged);
+  const homeScreenIconUrl = resolveHomeScreenIconUrl(merged);
 
   return {
     appName: cleanText(merged.appName, { max: 180, fallback: DEFAULT_BRAND.appName }),
@@ -318,7 +335,9 @@ function getBrand() {
     iconSvgUrl: cleanUrl(merged.iconSvgUrl, DEFAULT_BRAND.iconSvgUrl),
     browserTabIconUrl,
     browserTabIconType: faviconMimeTypeFromUrl(browserTabIconUrl),
-    appleTouchIconUrl: cleanUrl(merged.appleTouchIconUrl, DEFAULT_BRAND.appleTouchIconUrl),
+    homeScreenIconUrl,
+    homeScreenIconType: faviconMimeTypeFromUrl(homeScreenIconUrl),
+    appleTouchIconUrl: cleanUrl(merged.appleTouchIconUrl, ''),
     themeColor: cleanColor(merged.themeColor, DEFAULT_BRAND.themeColor),
     ownerDisplayName: cleanText(merged.ownerDisplayName, { max: 180, fallback: DEFAULT_BRAND.ownerDisplayName }),
     footerAboutTitle: cleanText(merged.footerAboutTitle, { max: 220, fallback: DEFAULT_BRAND.footerAboutTitle }),
@@ -542,9 +561,8 @@ function getPublicMenuEndpointOptions() {
 
 function getManifest() {
   const brand = getBrand();
-  const manifestIconSrc = /\.png($|\?)/i.test(String(brand.browserTabIconUrl || ''))
-    ? brand.browserTabIconUrl
-    : brand.appleTouchIconUrl;
+  const manifestIconSrc = brand.homeScreenIconUrl || brand.browserTabIconUrl;
+  const manifestIconType = brand.homeScreenIconType || faviconMimeTypeFromUrl(manifestIconSrc);
   return {
     name: brand.appName,
     short_name: brand.appShortName,
@@ -552,12 +570,12 @@ function getManifest() {
       {
         src: manifestIconSrc,
         sizes: '192x192',
-        type: 'image/png'
+        type: manifestIconType
       },
       {
         src: manifestIconSrc,
         sizes: '512x512',
-        type: 'image/png'
+        type: manifestIconType
       }
     ],
     theme_color: brand.themeColor,
@@ -580,5 +598,6 @@ module.exports = {
   getPublicMenuEndpointOptions,
   getManifest,
   resolveBrowserTabIconUrl,
+  resolveHomeScreenIconUrl,
   faviconMimeTypeFromUrl
 };

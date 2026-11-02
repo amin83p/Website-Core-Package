@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const {
   resolveBrowserTabIconUrl,
+  resolveHomeScreenIconUrl,
   faviconMimeTypeFromUrl,
   DEFAULT_BRAND
 } = require('../MVC/services/appBrandingService');
@@ -53,6 +54,33 @@ test('application defaults form includes browser tab icon field', () => {
   assert.match(view, /Browser tab icon \(favicon\)/);
 });
 
+test('resolveHomeScreenIconUrl uses browser tab icon instead of logo default', () => {
+  assert.equal(
+    resolveHomeScreenIconUrl({
+      faviconUrl: '/uploads/GLOBAL/logo/tabLogo.png',
+      logoUrl: '/uploads/GLOBAL/logo/Logo1.png',
+      appleTouchIconUrl: '/uploads/GLOBAL/logo/Logo1.png'
+    }),
+    '/uploads/GLOBAL/logo/tabLogo.png'
+  );
+  assert.equal(
+    resolveHomeScreenIconUrl({
+      faviconUrl: '/uploads/GLOBAL/logo/tabLogo.png',
+      appleTouchIconUrl: '/uploads/custom/home-only.png',
+      logoUrl: '/uploads/GLOBAL/logo/Logo1.png'
+    }),
+    '/uploads/custom/home-only.png'
+  );
+  assert.equal(
+    resolveHomeScreenIconUrl({
+      faviconUrl: '',
+      iconSvgUrl: '/uploads/GLOBAL/logo/icon.svg',
+      appleTouchIconUrl: ''
+    }),
+    '/uploads/GLOBAL/logo/icon.svg'
+  );
+});
+
 test('layout uses resolved browser tab icon links', () => {
   const layout = fs.readFileSync(
     path.join(__dirname, '../MVC/views/layouts/layout.ejs'),
@@ -62,4 +90,5 @@ test('layout uses resolved browser tab icon links', () => {
   assert.match(layout, /layoutBrowserTabIconType/);
   assert.doesNotMatch(layout, /layoutIconSvgUrl/);
   assert.doesNotMatch(layout, /rel="icon" type="image\/png" href="<%= layoutLogoUrl %>"/);
+  assert.match(layout, /layoutAppleIconUrl = layoutBrand\.homeScreenIconUrl/);
 });

@@ -1459,7 +1459,7 @@ async function appendReportEventsForPerson({
         const status = String(assignment?.status || '').trim().toLowerCase();
         if (status !== 'active') continue;
 
-        const isTeacherAssigned = isTeacherAssignedOnReportAssignment(assignment, normalizedPersonId, teacherPersonMap);
+        let isTeacherAssigned = isTeacherAssignedOnReportAssignment(assignment, normalizedPersonId, teacherPersonMap);
 
         const classId = normalizeId(assignment?.classId);
         const classRow = classMap.get(classId) || null;
@@ -1481,6 +1481,23 @@ async function appendReportEventsForPerson({
             }
         }
         if (!date || date < startDate || date > endDate) continue;
+
+        if (!isTeacherAssigned) {
+            const sourceSessionIdForEditor = normalizeId(assignment?.sessionId);
+            const matchedSessionForEditor = sourceSessionIdForEditor
+                ? classSessions.find((row) => normalizeId(row?.sessionId || row?.id) === sourceSessionIdForEditor)
+                : null;
+            if (
+                matchedSessionForEditor
+                && sessionDeliveryTeamService.isPersonSessionEditor(
+                    matchedSessionForEditor,
+                    normalizedPersonId,
+                    teacherPersonMap
+                )
+            ) {
+                isTeacherAssigned = true;
+            }
+        }
 
         let isStudentAssigned = false;
         if (reportScope === 'selected_students') {

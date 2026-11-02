@@ -158,8 +158,9 @@
               <div class="form-text">Used for the browser tab when Browser tab icon is empty.</div>
             </div>
             <div class="col-md-6">
-              <label class="form-label fw-bold">Apple Touch Icon URL</label>
-              <input type="text" name="appleTouchIconUrl" class="form-control font-monospace" value="<%= brand.appleTouchIconUrl || '' %>" placeholder="/uploads/GLOBAL/logo/Logo1.png">
+              <label class="form-label fw-bold">Home screen icon override (optional)</label>
+              <input type="text" name="appleTouchIconUrl" class="form-control font-monospace" value="<%= brand.appleTouchIconUrl || '' %>" placeholder="Leave empty to use Browser tab icon">
+              <div class="form-text">Used for Add to Home Screen on phones. When empty (or still set to the site logo), the Browser tab icon is used instead.</div>
             </div>
             <div class="col-md-6">
               <label class="form-label fw-bold">Theme Color</label>

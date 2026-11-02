@@ -1,5 +1,6 @@
 const schoolDataService = require('./schoolDataService');
 const reportViewService = require('./reportViewService');
+const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const sessionConductService = require('./sessionConductService');
 const reportRosterService = require('./reportRosterService');
 const { requireCoreModule } = require('./schoolCoreContracts');
@@ -129,10 +130,19 @@ function canViewerSeeSessionReportRow(row = {}, viewerContext = {}) {
     ownedStudentIds = new Set(),
     ownedStudentPersonIds = new Set(),
     rosterPersonIds = new Set(),
-    assignmentMap = new Map()
+    assignmentMap = new Map(),
+    session = null
   } = viewerContext;
 
   if (isReportAdminViewer) return true;
+
+  if (
+    session
+    && currentUserPersonId
+    && sessionDeliveryTeamService.isPersonSessionEditor(session, currentUserPersonId)
+  ) {
+    return true;
+  }
 
   const teacherId = toPublicId(row?.teacherId);
   if (teacherId && idsEqual(teacherId, currentUserPersonId)) return true;
@@ -329,13 +339,21 @@ async function buildSessionReportInstanceRows({
   const cleanSessionId = String(sessionId || '').trim();
   if (!cleanClassId || !cleanSessionId) return [];
 
-  const resolvedViewerContext = viewerContext || await buildSessionReportViewerContext({
+  const baseViewerContext = viewerContext || await buildSessionReportViewerContext({
     classId: cleanClassId,
     sessionRoster,
     reqUser,
     isReportAdminViewer: false,
     prefetchedStudents
   });
+  const sessionsForViewer = prefetchedClass?.sessions
+    || await schoolDataService.getClassSessions(cleanClassId, reqUser);
+  const sessionForViewer = (Array.isArray(sessionsForViewer) ? sessionsForViewer : [])
+    .find((row) => idsEqual(row?.sessionId || row?.id, cleanSessionId)) || null;
+  const resolvedViewerContext = {
+    ...baseViewerContext,
+    session: sessionForViewer
+  };
 
   const allRows = await reportViewService.buildInstanceListRows({
     reqUser,
@@ -347,9 +365,10 @@ async function buildSessionReportInstanceRows({
   });
   const sessionContext = { sessionId: cleanSessionId, sessionDate };
 
-  const visibleRows = (Array.isArray(allRows) ? allRows : [])
+  const sessionMatchedRows = (Array.isArray(allRows) ? allRows : [])
     .filter((row) => idsEqual(row?.classId, cleanClassId))
-    .filter((row) => instanceRowMatchesSession(row, sessionContext))
+    .filter((row) => instanceRowMatchesSession(row, sessionContext));
+  const visibleRows = sessionMatchedRows
     .filter((row) => canViewerSeeSessionReportRow(row, resolvedViewerContext));
 
   return visibleRows
