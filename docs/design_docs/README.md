@@ -32,6 +32,7 @@ Canonical design references for **access profiles**, architecture, and cross-cut
 | `SCHOOL_SESSION_STUDENT_CASES` | Session student cases | [matrix](student-case-operation-scope-capabilities-2026-09-06.md) | [docx](student-case-operation-scope-capabilities-2026-09-06.docx) | implemented | `node scripts/seed-school-student-cases-section.js` · `node scripts/school/verify-student-case-access-profiles.js` |
 | `SCHOOL_NOTIFICATION_CENTER` | Notification centre | [matrix](notification-center-operation-scope-capabilities-2026-09-16.md) | [docx](notification-center-operation-scope-capabilities-2026-09-16.docx) | target-spec | Mongo section **445586** — no dedicated seed script yet (see matrix doc) |
 | `SCHOOL_CLASSES` | Classes | [matrix](classes-operation-scope-capabilities-2026-09-24.md) | [docx](classes-operation-scope-capabilities-2026-09-24.docx) | implemented | Mongo section **442039** — no dedicated seed script yet (see matrix doc) |
+| `CHATS` | Chat | [matrix](chat-operation-scope-capabilities-2026-09-03.md) | [docx](chat-operation-scope-capabilities-2026-09-03.docx) | implemented | `node scripts/seed-chat-section.js` · architecture: [reference md](chat-access-architecture-reference-2026-09-03.md) / [docx](chat-access-architecture-reference-2026-09-03.docx) |
 
 ### Cross-cutting (not a section matrix)
 
@@ -43,6 +44,7 @@ Canonical design references for **access profiles**, architecture, and cross-cut
 
 | Document | Purpose |
 | --- | --- |
+| [chat-access-architecture-reference-2026-09-03.md](chat-access-architecture-reference-2026-09-03.md) | CHATS routes, sockets, security ([docx](chat-access-architecture-reference-2026-09-03.docx)) |
 | [ielts-micro-assessment-committee-reference-2026-09-06.md](ielts-micro-assessment-committee-reference-2026-09-06.md) | Committee / dissertation evidence |
 | [ielts-micro-assessment-plain-language-faq-2026-09-06.md](ielts-micro-assessment-plain-language-faq-2026-09-06.md) | Plain-language FAQ for committee questions |
 

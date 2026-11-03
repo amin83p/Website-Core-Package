@@ -236,11 +236,36 @@ test('disabled registered package roles remain package classifications', () => {
   assert.equal(plain.allowed, false);
 });
 
+test('organization scope allows messaging virtual Root system user without a Person record', () => {
+  const context = contextFor(person('PERSON-1', [
+    membership('ORG-1', ['member', 'school_teacher'])
+  ]));
+  const decision = evaluateTargetContact(
+    context,
+    user('ROOT_001', 'NO_PERSONID', { isVirtualSuperAdmin: true }),
+    null,
+    { scopeId: 'SCP_ORG' }
+  );
+  assert.equal(decision.allowed, true);
+});
+
+test('organization scope allows messaging ROOT_001 by account id even without isVirtualSuperAdmin flag', () => {
+  const context = contextFor(person('PERSON-1', [
+    membership('ORG-1', ['member', 'school_teacher'])
+  ]));
+  const decision = evaluateTargetContact(
+    context,
+    user('ROOT_001', 'NO_PERSONID'),
+    null,
+    { scopeId: 'SCP_ORG' }
+  );
+  assert.equal(decision.allowed, true);
+});
+
 test('only the virtual Root bypasses role and organization scope', () => {
   const rootContext = buildRequesterContext({
     requestingUser: {
       id: 'ROOT_001',
-      isVirtualSuperAdmin: true,
       activeOrgId: 'SYSTEM'
     },
     requesterPerson: null,

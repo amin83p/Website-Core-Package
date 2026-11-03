@@ -230,14 +230,6 @@ Category matters for category-admin resolution. School facade builds this via `b
 | `MVC/services/security/accessControl.js` | `evaluateAccess`, `isRequestAdmin` grant bypass, grantSource |
 | `MVC/services/security/effectiveAccessResolverService.js` | Scope modes, `isAdminScope`, `resolveEffectiveAccess` |
 | `packages/school/MVC/services/school/schoolAdminAccessService.js` | School wrappers with SCHOOL category defaults |
-| `docs/chat-access-architecture-report-2026-09-03.md` | Chat-specific access rules (cross-link; do not duplicate here) |
-
----
-
-## Related documents
-
-| Document | Relationship |
-| --- | --- |
-| `docs/attendance-operation-scope-capabilities-2026-09-04.docx` | Section operation matrix; should link here for admin behavior |
-| `docs/chat-operation-scope-capabilities-2026-09-03.docx` | Chat section matrix; chat participant rules are section-specific |
+| `docs/design_docs/chat-operation-scope-capabilities-2026-09-03.md` | Chat section matrix; chat participant rules are section-specific |
+| `docs/design_docs/chat-access-architecture-reference-2026-09-03.md` | Chat routes, sockets, and security (companion reference) |
 | `docs/manage-session-access-architecture-report-2026-09-04.md` | Manage Session access architecture |

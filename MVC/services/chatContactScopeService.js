@@ -1,5 +1,6 @@
 const userRepository = require('../repositories/userRepository');
 const personRepository = require('../repositories/personRepository');
+const adminAuthorityService = require('./adminAuthorityService');
 const roleRegistryService = require('./person/roleRegistryService');
 const {
   INACTIVE_STATUSES,
@@ -28,7 +29,21 @@ function createHttpError(message, statusCode = 403) {
 }
 
 function isVirtualRoot(user = {}) {
-  return user?.isVirtualSuperAdmin === true;
+  return adminAuthorityService.isVirtualSuperAdminAccount(user);
+}
+
+function resolveContactPerson(targetUser = null, targetPerson = null) {
+  if (targetPerson && isActivePerson(targetPerson)) {
+    return targetPerson;
+  }
+  const orgRows = Array.isArray(targetUser?.organizations) ? targetUser.organizations : [];
+  if (!orgRows.length) {
+    return null;
+  }
+  return {
+    active: true,
+    organizations: orgRows
+  };
 }
 
 function normalizeChatScopeMode(scopeId = '') {
@@ -236,7 +251,17 @@ function evaluateTargetContact(context = {}, targetUser = null, targetPerson = n
     };
   }
 
-  if (!targetPerson || !isActivePerson(targetPerson)) {
+  if (isVirtualRoot(targetUser)) {
+    return {
+      allowed: true,
+      reason: '',
+      matchingDomains: [],
+      targetRoleScope: summarizeRootPerson(targetPerson, context.registry)
+    };
+  }
+
+  const contactPerson = resolveContactPerson(targetUser, targetPerson);
+  if (!contactPerson) {
     return {
       allowed: false,
       reason: OUTSIDE_SCOPE_REASON,
@@ -246,7 +271,7 @@ function evaluateTargetContact(context = {}, targetUser = null, targetPerson = n
   }
 
   const targetRoleScope = analyzePersonRoleScope(
-    targetPerson,
+    contactPerson,
     context.activeOrgId,
     context.registry
   );
@@ -262,7 +287,7 @@ function evaluateTargetContact(context = {}, targetUser = null, targetPerson = n
   const scopeMode = normalizeChatScopeMode(options?.scopeId || options?.scopeMode || '');
   const targetRoleKeys = new Set((targetRoleScope.packageRoles || []).map((role) => role.key));
   if (scopeMode === 'organization' || scopeMode === 'admin') {
-    const hasRole = activeMemberships(targetPerson).some((membership) => (
+    const hasRole = activeMemberships(contactPerson).some((membership) => (
       idsEqual(membership?.orgId || membership?.organizationId, context.activeOrgId)
       && collectMembershipRoleTokens(membership).length > 0
     ));
@@ -571,6 +596,7 @@ module.exports = {
   MAX_CONTACT_LIMIT,
   OUTSIDE_SCOPE_REASON,
   READ_ONLY_REASON,
+  resolveContactPerson,
   isVirtualRoot,
   normalizeChatScopeMode,
   isActiveUser,

@@ -50,6 +50,14 @@
       "status": "implemented",
       "seedScript": "packages/school/scripts/maintenance/seedSchoolWorkSessionsSection.js",
       "mongoNote": "Section 555013; fallback section SCHOOL_ACTIVITIES on activity routes."
+    },
+    {
+      "sectionKeys": ["CHATS"],
+      "title": "Chat",
+      "markdown": "chat-operation-scope-capabilities-2026-09-03.md",
+      "docx": "chat-operation-scope-capabilities-2026-09-03.docx",
+      "status": "implemented",
+      "seedScript": "scripts/seed-chat-section.js"
     }
   ],
   "crossCutting": [
@@ -61,6 +69,13 @@
     }
   ],
   "otherReferences": [
+    {
+      "id": "chat-access-architecture",
+      "title": "Chat access architecture",
+      "markdown": "chat-access-architecture-reference-2026-09-03.md",
+      "docx": "chat-access-architecture-reference-2026-09-03.docx",
+      "note": "Routes, sockets, and security for CHATS — companion to the operation matrix"
+    },
     {
       "id": "ielts-micro-assessment-committee",
       "title": "IELTS micro-assessment committee reference",
