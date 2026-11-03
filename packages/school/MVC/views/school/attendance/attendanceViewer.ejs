@@ -1,4 +1,5 @@
 <%- include('_attendanceMarkAppearance') %>
+<link rel="stylesheet" href="/styles/attendance-hover-tip.css">
 <style>
     .att-cell { text-align: center; vertical-align: middle; min-width: 80px; position: relative; cursor: pointer; transition: background-color 0.2s; }
     .att-cell:hover { background-color: #f1f3f5; }
@@ -664,6 +665,7 @@
 <%- include('partials/tablePages-end') %>
 <script src="/scripts/sessionAttendanceTimingDetailClient.js"></script>
 <script src="/scripts/attendanceMarkAppearanceClient.js"></script>
+<script src="/scripts/attendanceCellHoverTip.js"></script>
 
 <script>
 // Store the loaded matrix globally so we can access it on clicks
@@ -2157,7 +2159,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const historyBtn = window.attendanceHistoryModeOn
             ? `<button type="button" class="btn btn-link btn-sm p-0 position-absolute top-0 start-0 ps-1 pt-1 attendance-cell-history-btn" title="View change history" aria-label="View change history" data-class-id="${attEscapeHtml(classId)}" data-session-id="${attEscapeHtml(rec.sessionId)}" data-session-date="${attEscapeHtml(rec.date || '')}" data-person-id="${attEscapeHtml(stu.personId)}" data-student-name="${attEscapeHtml(stu.name || '')}" onclick="event.stopPropagation(); openAttendanceCellHistory(this);"><i class="bi bi-info-circle" style="font-size:0.65rem;"></i></button>`
             : '';
-        return `<td class="att-cell" title="${tooltip} (Click for Details)" onclick="openInteractiveModal('${stu.personId}', '${rec.sessionId}')">${historyBtn}${icon}${noteBadge}</td>`;
+        const tipKey = `${String(stu.personId || '').trim()}|${String(rec.sessionId || '').trim()}`;
+        const ariaLabel = `${tooltip}. Click for details.`;
+        return `<td class="att-cell att-cell-tip-trigger" data-att-tip-key="${attEscapeHtml(tipKey)}" tabindex="0" aria-label="${attEscapeHtml(ariaLabel)}" onclick="openInteractiveModal('${stu.personId}', '${rec.sessionId}')">${historyBtn}${icon}${noteBadge}</td>`;
     }
 
     function formatAttendanceHistorySessionDate(ymd) {
@@ -2608,12 +2612,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 ...existing,
                 sessions: [...(existing.sessions || []), ...(chunk.sessions || [])],
                 matrix: mergedMatrix,
+                fieldVisibility: chunk.fieldVisibility || existing.fieldVisibility,
                 window: chunk.window || existing.window
             };
         }
         return {
             ...existing,
             matrix: [...(existing.matrix || []), ...(chunk.matrix || [])],
+            fieldVisibility: chunk.fieldVisibility || existing.fieldVisibility,
             window: chunk.window || existing.window
         };
     }
@@ -3755,6 +3761,58 @@ document.addEventListener('DOMContentLoaded', () => {
         applyAttendanceRangeSelection('thisWeek');
     }
     renderAttendanceMatrixLegend();
+
+    function resolveAttendanceMatrixTipContext(cellEl) {
+        const key = String(cellEl?.getAttribute('data-att-tip-key') || '').trim();
+        const pipeIndex = key.indexOf('|');
+        if (pipeIndex <= 0) return null;
+        const personId = key.slice(0, pipeIndex);
+        const sessionId = key.slice(pipeIndex + 1);
+        const cellContext = findAttendanceMatrixCellContext(personId, sessionId);
+        if (!cellContext) return null;
+        const record = cellContext.student?.records?.[cellContext.recordIndex];
+        if (!record) return null;
+        return {
+            personId,
+            sessionId,
+            classId: String(window.currentMatrixData?.classId || document.getElementById('filter_classId')?.value || '').trim(),
+            fieldVisibility: window.currentMatrixData?.fieldVisibility || null,
+            record
+        };
+    }
+
+    if (window.AttendanceCellHoverTip) {
+        window.AttendanceCellHoverTip.initAttendanceCellHoverTip({
+            root: document.getElementById('resultsContainer') || document,
+            cellSelector: '.att-cell[data-att-tip-key]',
+            resolveContext: resolveAttendanceMatrixTipContext,
+            resolveAccess: () => ({
+                canMarkExcused: window.CAN_MARK_ATTENDANCE_EXCUSED === true,
+                canEditRoster: window.CAN_EDIT_ATTENDANCE_ROSTER === true,
+                canOverrideSessionLock: window.CAN_OVERRIDE_SESSION_LOCK === true
+            }),
+            resolveActionStateId: resolveAttendanceActionStateId,
+            onApiResult: (res, result) => {
+                hydrateAttendanceBudgetFromApi(res, result, { estimateAttempt: true, source: 'tip-excuse' });
+            },
+            onApiError: async (result) => {
+                if (result && result.status !== 'success') {
+                    await handleAttendanceActionStateFailure(result);
+                }
+            },
+            onPatched: ({ context, payload, serverRecord }) => {
+                patchAttendanceMatrixCellAfterSave({
+                    studentPersonId: context.personId,
+                    sessionId: context.sessionId,
+                    payload,
+                    serverRecord
+                });
+            },
+            onOpenCellDetails: ({ context }) => {
+                openInteractiveModal(context.personId, context.sessionId);
+            }
+        });
+    }
 });
 
 // --- NEW: Global Function to handle Header Clicks ---

@@ -183,6 +183,10 @@ function buildClassDayCells(days = [], rollupRecords = []) {
       expectedForSession: record?.expectedForSession !== false,
       lateMinutes: Number(record?.lateMinutes) || 0,
       earlyLeaveMinutes: Number(record?.earlyLeaveMinutes) || 0,
+      attendanceArrivalTime: String(record?.attendanceArrivalTime || '').trim(),
+      attendanceLeaveTime: String(record?.attendanceLeaveTime || '').trim(),
+      breakLateMinutes: Math.max(0, Math.floor(Number(record?.breakLateMinutes) || 0)),
+      breakEarlyLeaveMinutes: Math.max(0, Math.floor(Number(record?.breakEarlyLeaveMinutes) || 0)),
       lateExcused: Boolean(record?.lateExcused),
       earlyLeaveExcused: Boolean(record?.earlyLeaveExcused),
       absenceExcused: Boolean(record?.absenceExcused),
@@ -190,6 +194,8 @@ function buildClassDayCells(days = [], rollupRecords = []) {
       excuseAttachment: serializeAttendanceAttachment(record?.excuseAttachment),
       rosterStudentNotes: String(record?.rosterStudentNotes || '').trim(),
       sessionLocked: Boolean(record?.sessionLocked),
+      attendanceEditLocked: Boolean(record?.attendanceEditLocked),
+      enrollmentNaLock: Boolean(record?.enrollmentNaLock),
       scheduledMinutes: Number(record?.scheduledMinutes) || 0,
       comments,
       notesExist: recordHasNotes(record)
@@ -425,6 +431,9 @@ async function buildStudentAttendanceReportPayload(req, options = {}) {
         teacherName: payload.teacherName || '',
         teacherId: String(classRow?.instructors?.[0]?.personId || classRow?.instructors?.[0]?.id || '').trim(),
         summary: classRollupSummary,
+        fieldVisibility: payload.fieldVisibility && typeof payload.fieldVisibility === 'object'
+          ? payload.fieldVisibility
+          : null,
         days: buildClassDayCells(days, rollupRecords)
       });
     });

@@ -1629,6 +1629,13 @@ async function showStudentAttendanceReportPage(req, res) {
         const reportAccess = await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip);
         const attendanceAccess = await resolveAttendanceAccessForRequest(req);
         const canExportAttendanceExcel = Boolean(attendanceAccess.canExportExcel);
+        const {
+            canEditRoster: canEditAttendanceRoster,
+            canMarkExcused: canMarkAttendanceExcused,
+            canEditStudentRosterNote,
+            canEditExcuseReference,
+            canOverrideSessionLock
+        } = attendanceAccess;
         const q = req.query || {};
         const initialStartDate = String(q.startDate || '').trim();
         const initialEndDate = String(q.endDate || '').trim();
@@ -1677,6 +1684,11 @@ async function showStudentAttendanceReportPage(req, res) {
             canExportReport: Boolean(reportAccess.canExportReport),
             canExportAttendanceExcel,
             canOpenReport: Boolean(reportAccess.canOpenReport),
+            canEditAttendanceRoster: Boolean(canEditAttendanceRoster),
+            canMarkAttendanceExcused: Boolean(canMarkAttendanceExcused),
+            canEditStudentRosterNote: Boolean(canEditStudentRosterNote),
+            canEditExcuseReference: Boolean(canEditExcuseReference),
+            canOverrideSessionLock: Boolean(canOverrideSessionLock),
             reportTemplateLabel: studentAttendanceReportPolicyService.formatTemplateLabel(
                 reportTemplate,
                 policy.reportTemplateId

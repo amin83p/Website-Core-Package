@@ -1,4 +1,5 @@
 <%- include('_attendanceMarkAppearance') %>
+<link rel="stylesheet" href="/styles/attendance-hover-tip.css">
 <style>
     .att-cell { text-align: center; vertical-align: middle; min-width: 64px; position: relative; }
     .att-cell[data-sar-cell-key] { cursor: pointer; }
@@ -722,6 +723,7 @@
 <%- include('partials/tablePages-end') %>
 <script src="/scripts/attendanceMarkAppearanceClient.js"></script>
 <script src="/scripts/reportByFunderModal.js"></script>
+<script src="/scripts/attendanceCellHoverTip.js"></script>
 
 <script>
 (() => {
@@ -734,6 +736,9 @@
     const canExportAttendanceExcel = <%= (typeof canExportAttendanceExcel !== 'undefined' && canExportAttendanceExcel) ? 'true' : 'false' %>;
     const canExportStudentMatrixExcel = canExportReport || canExportAttendanceExcel;
     const sarActionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
+    window.CAN_EDIT_ATTENDANCE_ROSTER = <%= (typeof canEditAttendanceRoster !== 'undefined' && canEditAttendanceRoster) ? 'true' : 'false' %>;
+    window.CAN_MARK_ATTENDANCE_EXCUSED = <%= (typeof canMarkAttendanceExcused !== 'undefined' && canMarkAttendanceExcused) ? 'true' : 'false' %>;
+    window.CAN_OVERRIDE_SESSION_LOCK = <%= (typeof canOverrideSessionLock !== 'undefined' && canOverrideSessionLock) ? 'true' : 'false' %>;
 
     let selectedStudents = [];
     const cellDetailByKey = new Map();
@@ -825,6 +830,7 @@
             : '';
         const cellKey = buildCellKey(personId, classId, dayCell.date);
         const cellTitle = buildStatusTooltip(dayCell);
+        const ariaLabel = `${cellTitle}. Click for details.`;
         const detail = {
             classId,
             sessionId: dayCell.sessionId,
@@ -833,7 +839,7 @@
             studentName
         };
         const historyBtn = window.sarAttendanceHistoryModeOn ? buildSarCellHistoryButton(detail) : '';
-        return `<td class="att-cell position-relative${boundaryClass}" data-sar-cell-key="${escapeHtml(cellKey)}" title="${escapeHtml(cellTitle)}">${historyBtn}${buildStatusIcon(dayCell)}${noteBadge}</td>`;
+        return `<td class="att-cell att-cell-tip-trigger position-relative${boundaryClass}" data-sar-cell-key="${escapeHtml(cellKey)}" tabindex="0" aria-label="${escapeHtml(ariaLabel)}">${historyBtn}${buildStatusIcon(dayCell)}${noteBadge}</td>`;
     }
 
     function formatAttendanceHistorySessionDate(ymd) {
@@ -1330,6 +1336,7 @@
                     const key = buildCellKey(personId, classId, date);
                     cellDetailByKey.set(key, {
                         ...day,
+                        fieldVisibility: classRow.fieldVisibility || null,
                         matrixUrl: matrixCellUrl,
                         personId,
                         studentName,
@@ -3350,6 +3357,72 @@
     if (sarOpenedFromUrlQuery) {
         runWhenReportMessageModalReady(() => {
             void promptLoadReportFromUrlLink();
+        });
+    }
+
+    function resolveSarTipContext(cellEl) {
+        const key = String(cellEl?.getAttribute('data-sar-cell-key') || '').trim();
+        if (!key) return null;
+        const detail = cellDetailByKey.get(key);
+        if (!detail?.hasSession) return null;
+        return {
+            cellKey: key,
+            personId: detail.personId,
+            sessionId: detail.sessionId,
+            classId: detail.classId,
+            studentName: detail.studentName,
+            fieldVisibility: detail.fieldVisibility || null,
+            record: detail
+        };
+    }
+
+    function patchSarCellAfterTipSave({ context, payload, serverRecord }) {
+        const key = String(context?.cellKey || '').trim();
+        const detail = cellDetailByKey.get(key);
+        if (!detail) return;
+        const server = serverRecord && typeof serverRecord === 'object' ? serverRecord : {};
+        if (payload?.lateExcused !== undefined) detail.lateExcused = Boolean(payload.lateExcused);
+        if (payload?.earlyLeaveExcused !== undefined) detail.earlyLeaveExcused = Boolean(payload.earlyLeaveExcused);
+        if (payload?.absenceExcused !== undefined) detail.absenceExcused = Boolean(payload.absenceExcused);
+        if (server.lateExcused !== undefined) detail.lateExcused = Boolean(server.lateExcused);
+        if (server.earlyLeaveExcused !== undefined) detail.earlyLeaveExcused = Boolean(server.earlyLeaveExcused);
+        if (server.absenceExcused !== undefined) detail.absenceExcused = Boolean(server.absenceExcused);
+        if (server.attendance !== undefined) detail.status = String(server.attendance || detail.status || '').trim();
+        const td = document.querySelector(`td[data-sar-cell-key="${CSS.escape(key)}"]`);
+        if (!td) return;
+        const weekBoundary = td.classList.contains('sar-week-boundary');
+        const html = buildSarAttendanceCellHtml(
+            detail,
+            detail.personId,
+            detail.classId,
+            detail.studentName,
+            weekBoundary
+        );
+        const replacement = document.createElement('template');
+        replacement.innerHTML = html.trim();
+        const nextCell = replacement.content.firstElementChild;
+        if (nextCell) td.replaceWith(nextCell);
+    }
+
+    if (window.AttendanceCellHoverTip) {
+        window.AttendanceCellHoverTip.initAttendanceCellHoverTip({
+            root: document.getElementById('studentReportSections') || document,
+            cellSelector: '.att-cell[data-sar-cell-key]',
+            resolveContext: resolveSarTipContext,
+            resolveAccess: () => ({
+                canMarkExcused: window.CAN_MARK_ATTENDANCE_EXCUSED === true,
+                canEditRoster: window.CAN_EDIT_ATTENDANCE_ROSTER === true,
+                canOverrideSessionLock: window.CAN_OVERRIDE_SESSION_LOCK === true
+            }),
+            resolveActionStateId: () => sarActionStateId,
+            onPatched: patchSarCellAfterTipSave,
+            onApiError: (result) => {
+                const message = String(result?.message || 'Could not update attendance.').trim();
+                if (message) showReportMessage({ icon: 'error', message });
+            },
+            onOpenCellDetails: ({ context }) => {
+                openCellDetailModal(context.cellKey);
+            }
         });
     }
 })();
