@@ -15,6 +15,14 @@ const {
   generateUniqueStringId,
   deepMerge
 } = require('./backend/mongoRepositoryUtils');
+const {
+  resolveArchiveRangeBoundsMs,
+  buildArchiveBoundsMongoFilter,
+  actionStateRowInArchiveRange,
+  ACTION_STATE_ARCHIVE_DATE_FIELDS
+} = require('../services/logArchive/logArchiveRangeUtils');
+
+const ARCHIVE_RANGE_PAGE_SIZE = 1000;
 
 const ACTION_STATE_LIMITS = Object.freeze({
   COUNT_WARNING: 2500,
@@ -1067,6 +1075,48 @@ const actionStateRepository = {
       json: async () => actionStateModel.deleteAllActionStates(),
       mongo: async () => getMongoCollection('actionStates').deleteMany({})
     }, 'core.actionStates.deleteAll');
+  },
+
+  async removeByArchiveRange({ startDate, endDate, timezone, requestUser: _requestUser }, options = {}) {
+    const bounds = resolveArchiveRangeBoundsMs(startDate, endDate, timezone);
+    const scope = { canViewAll: true };
+    return runByRepositoryBackend(options, {
+      json: async () => {
+        let deleted = 0;
+        let pass = 0;
+        for (;;) {
+          const rows = await this.list({
+            query: {
+              startDate,
+              endDate,
+              page: 1,
+              limit: ARCHIVE_RANGE_PAGE_SIZE,
+              sort: '-startedAt'
+            },
+            scope
+          });
+          const batch = Array.isArray(rows) ? rows : [];
+          const ids = batch
+            .filter((row) => actionStateRowInArchiveRange(row, bounds))
+            .map((row) => row.id)
+            .filter(Boolean);
+          if (!ids.length) break;
+          await Promise.all(ids.map((id) => this.remove(id, options)));
+          deleted += ids.length;
+          pass += 1;
+          if (pass > 2000) break;
+        }
+        return deleted;
+      },
+      mongo: async () => {
+        const collection = getMongoCollection('actionStates');
+        const scopeFilter = buildCanViewAllFilter(scope);
+        const boundsFilter = buildArchiveBoundsMongoFilter(bounds, ACTION_STATE_ARCHIVE_DATE_FIELDS);
+        const filter = combineMongoFilters(scopeFilter, boundsFilter);
+        const result = await collection.deleteMany(filter);
+        return Number(result?.deletedCount || 0);
+      }
+    }, 'core.actionStates.removeByArchiveRange');
   },
 
   async getSystemActionStateStats(options = {}) {

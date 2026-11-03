@@ -31,6 +31,21 @@ router.post('/export',
   ctrl.exportLogArchive
 );
 
+router.post('/delete/preview',
+  requireAuth,
+  requireAccess(SECTIONS.LOG_ARCHIVE_EXTRACTOR, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.LOG_ARCHIVE_EXTRACTOR, OPERATIONS.READ_ALL),
+  ctrl.previewLogArchiveDelete
+);
+
+router.post('/delete',
+  requireAuth,
+  requireAccess(SECTIONS.LOG_ARCHIVE_EXTRACTOR, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.LOG_ARCHIVE_EXTRACTOR, OPERATIONS.DELETE),
+  adminApproval,
+  ctrl.deleteLogArchiveRecords
+);
+
 // Analyzer shell only (HTML/JS). No POST/upload route — archives are parsed in the browser.
 router.get('/analyze',
   requireAuth,

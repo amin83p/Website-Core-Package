@@ -26,13 +26,6 @@
 <link rel="stylesheet" href="/styles/logArchiveAnalyzer.css">
 
 <div class="log-archive-page w-100">
-  <div class="dash-hero mb-3 p-3 p-md-4">
-    <p class="small text-muted mb-0">
-      <strong class="text-body">Privacy:</strong> Exported archives may contain user activity and operational details. Store ZIP files securely.
-      Records remain in the database after export until you delete them separately.
-    </p>
-  </div>
-
   <div class="row g-3 mb-3" id="logArchiveStatusCards">
     <div class="col-md-6">
       <div class="card border-0 shadow-sm h-100 border-start border-4 border-primary">
@@ -58,9 +51,17 @@
     </div>
   </div>
 
-  <div class="card border-0 shadow-sm mb-3">
+  <section id="logArchiveExportSection" class="log-archive-export-section" aria-labelledby="logArchiveExportHeading">
+    <div class="dash-hero mb-3 p-3 p-md-4">
+      <p class="small text-muted mb-0">
+        <strong class="text-body">Privacy:</strong> Exported archives may contain user activity and operational details. Store ZIP files securely.
+        Records remain in the database after export until you remove them in the delete section below.
+      </p>
+    </div>
+
+  <div class="card border-0 shadow-sm mb-0">
     <div class="card-header bg-white py-2 px-3 border-bottom-0">
-      <span class="fw-bold text-dark"><i class="bi bi-download me-2"></i>Export archive (ZIP download)</span>
+      <span class="fw-bold text-dark" id="logArchiveExportHeading"><i class="bi bi-download me-2"></i>Export archive (ZIP download)</span>
     </div>
     <div class="card-body pt-2">
       <form id="logArchiveExportForm">
@@ -106,7 +107,112 @@
       <% } %>
     </div>
   </div>
+  </section>
+
+  <section id="logArchiveDeleteSection" class="log-archive-delete-section mt-4 pt-4" aria-labelledby="logArchiveDeleteHeading">
+    <button
+      type="button"
+      class="log-archive-delete-toggle btn btn-link text-danger text-decoration-none p-0 border-0 d-flex align-items-center gap-2 mb-1"
+      id="logArchiveDeleteHeading"
+      data-bs-toggle="collapse"
+      data-bs-target="#logArchiveDeleteCollapse"
+      aria-expanded="false"
+      aria-controls="logArchiveDeleteCollapse"
+    >
+      <i class="bi bi-chevron-right log-archive-delete-chevron" aria-hidden="true"></i>
+      <span class="h5 fw-bold mb-0"><i class="bi bi-trash3 me-2"></i>Delete from database</span>
+    </button>
+
+    <div id="logArchiveDeleteCollapse" class="collapse">
+    <p class="small text-muted mb-3">
+      Separate from export: choose a local backup ZIP or folder, analyze it in your browser, then remove matching records from the database.
+      This cannot be undone.
+    </p>
+
+  <div class="card border-0 shadow-sm mb-3 border-start border-4 border-danger" id="logArchiveDeleteCard">
+    <div class="card-header bg-white py-2 px-3 border-bottom-0">
+      <span class="fw-bold text-danger">Step 1 — Local backup</span>
+    </div>
+    <div class="card-body pt-2">
+      <form id="logArchiveDeleteForm">
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+          <button type="button" class="btn btn-filled btn-secondary btn-md" id="logArchiveDeletePickZipBtn">
+            <i class="bi bi-file-earmark-zip me-1"></i> Choose ZIP file(s)
+          </button>
+          <button type="button" class="btn btn-filled btn-secondary btn-md" id="logArchiveDeletePickFolderBtn">
+            <i class="bi bi-folder2-open me-1"></i> Choose folder
+          </button>
+          <input type="file" id="logArchiveDeleteZipInput" accept=".zip,application/zip" multiple hidden>
+          <input type="file" id="logArchiveDeleteFolderInput" webkitdirectory directory multiple hidden>
+        </div>
+        <div id="logArchiveDeleteLocalMeta" class="small text-muted mb-3">No archive selected. Pick an export ZIP or extracted folder that contains <code>manifest.json</code>.</div>
+
+        <div class="mb-3">
+          <span class="form-label small fw-bold text-muted text-uppercase mb-1 d-block">Step 2 — Analyze</span>
+          <button type="button" class="btn btn-filled btn-primary btn-md" id="logArchiveDeleteAnalyzeBtn" disabled>
+            <i class="bi bi-search me-1"></i> Analyze archive
+          </button>
+        </div>
+
+        <div id="logArchiveDeleteAnalysisPanel" class="card bg-light border-0 mb-3 d-none">
+          <div class="card-body small py-3">
+            <div class="fw-semibold text-dark mb-2">What we checked</div>
+            <div id="logArchiveDeleteChecksList"></div>
+            <hr class="my-2">
+            <div id="logArchiveDeleteRangeSummary" class="mb-0"></div>
+          </div>
+        </div>
+
+        <input type="hidden" name="startDate" id="logArchiveDeleteStart" value="">
+        <input type="hidden" name="endDate" id="logArchiveDeleteEnd" value="">
+
+        <div id="logArchiveDeletePlanBlock" class="d-none">
+          <span class="form-label small fw-bold text-muted text-uppercase mb-1 d-block">Planned delete (from archive)</span>
+          <div class="row g-3 align-items-end mb-3">
+            <div class="col-md-6 col-lg-4">
+              <label class="form-label small text-muted mb-1">Date range</label>
+              <div class="form-control size-md bg-white" id="logArchiveDeleteRangeDisplay" readonly tabindex="-1">—</div>
+            </div>
+            <div class="col-12 col-lg-8">
+              <span class="form-label small text-muted mb-1 d-block">Collections to remove</span>
+              <div class="d-flex flex-wrap align-items-center gap-3">
+                <div class="form-check mb-0">
+                  <input class="form-check-input" type="checkbox" name="includeLogs" id="logArchiveDeleteIncludeLogs" disabled>
+                  <label class="form-check-label" for="logArchiveDeleteIncludeLogs">Logs</label>
+                </div>
+                <div class="form-check mb-0">
+                  <input class="form-check-input" type="checkbox" name="includeActionStates" id="logArchiveDeleteIncludeActionStates" disabled>
+                  <label class="form-check-label" for="logArchiveDeleteIncludeActionStates">Action states</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="logArchiveDeleteStep3Block" class="mt-4 pt-3 border-top">
+          <span class="form-label small fw-bold text-muted text-uppercase mb-2 d-block">Step 3 — Delete from database</span>
+          <div id="logArchiveDeleteMismatchPanel" class="alert alert-danger small mb-3 d-none" role="alert"></div>
+          <div id="logArchiveDeleteVerifyPanel" class="alert alert-secondary d-none small mb-3" role="status"></div>
+          <div class="d-flex flex-wrap align-items-start gap-3">
+            <div>
+              <button type="submit" class="btn btn-filled btn-danger btn-md" id="logArchiveDeleteBtn" disabled aria-describedby="logArchiveDeleteBtnHint">
+                <i class="bi bi-trash3 me-1"></i> Delete matching records
+              </button>
+              <span id="logArchiveDeleteBtnHint" class="small text-muted d-block mt-2">
+                Complete steps 1 and 2 first. Delete enables only when local backup and database counts align.
+              </span>
+            </div>
+            <span id="logArchiveDeleteMsg" class="small text-muted flex-grow-1"></span>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+  </div>
+  </section>
 </div>
 
+<script src="/scripts/logArchiveAnalyzerRange.js"></script>
+<script src="/scripts/vendor/pizzip.min.js"></script>
 <script src="/scripts/logArchiveExtractor.js"></script>
 <%- include('../partials/tablePages-end') %>

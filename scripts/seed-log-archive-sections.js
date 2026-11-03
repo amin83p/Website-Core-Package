@@ -14,14 +14,15 @@ const PARENT_SECTION = {
 
 const OP_READ_ALL = { id: 'OP1003', sessionAttempts: 5, sessionTime: 15, active: true };
 const OP_EXPORT = { id: 'OP1012', sessionAttempts: 5, sessionTime: 15, active: true };
+const OP_DELETE = { id: 'OP1004', sessionAttempts: 5, sessionTime: 15, active: true };
 
 const SECTIONS_TO_SEED = [
   {
     id: '920401',
     name: 'LOG_ARCHIVE_EXTRACTOR',
-    description: 'Export logs and action states into local ZIP archives for offline analysis.',
+    description: 'Export logs and action states into local ZIP archives; delete archived ranges after local backup verification.',
     homeURL: '/logs/archive',
-    operations: [OP_READ_ALL, OP_EXPORT],
+    operations: [OP_READ_ALL, OP_EXPORT, OP_DELETE],
     symbolId: 'SYM_SYSTEM_093',
     symbolClass: 'bi bi-archive'
   },

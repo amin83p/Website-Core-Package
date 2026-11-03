@@ -5,6 +5,43 @@
   box-sizing: border-box;
 }
 
+.log-archive-delete-section {
+  border-top: 2px solid rgba(var(--bs-danger-rgb, 220, 53, 69), 0.25);
+}
+
+.log-archive-delete-toggle {
+  text-align: left;
+}
+
+.log-archive-delete-toggle:hover,
+.log-archive-delete-toggle:focus-visible {
+  text-decoration: none;
+  opacity: 0.92;
+}
+
+.log-archive-delete-toggle:focus-visible {
+  outline: 2px solid rgba(var(--bs-danger-rgb, 220, 53, 69), 0.45);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.log-archive-delete-chevron {
+  transition: transform 0.2s ease;
+  font-size: 1rem;
+}
+
+.log-archive-delete-toggle[aria-expanded="true"] .log-archive-delete-chevron {
+  transform: rotate(90deg);
+}
+
+.log-archive-delete-section .log-archive-delete-check-ok {
+  color: var(--bs-success, #198754);
+}
+
+.log-archive-delete-section .log-archive-delete-check-fail {
+  color: var(--bs-danger, #dc3545);
+}
+
 .log-archive-hero-limit {
   min-width: 8.5rem;
   max-width: 10.5rem;

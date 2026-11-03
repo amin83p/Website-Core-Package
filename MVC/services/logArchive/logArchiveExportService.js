@@ -5,67 +5,20 @@ const PizZip = require('pizzip');
 const dataService = require('../dataService');
 const actionStateModel = require('../../models/actionStateModel');
 const logArchiveStateService = require('./logArchiveStateService');
+const { cleanDateKey, resolveArchiveRangeBoundsMs, timestampInArchiveRange } = require('./logArchiveRangeUtils');
 const {
-  cleanDateKey,
-  resolveArchiveRangeBoundsMs,
-  timestampInArchiveRange
-} = require('./logArchiveRangeUtils');
-const { normalizePersistedLogRecord } = require('../../utils/logRecordUtils');
+  BATCH_LIMIT,
+  fetchLogsForRange,
+  fetchActionStatesForRange
+} = require('./logArchiveRangeFetchService');
 const { SYSTEM_CONTEXT } = require('../../../config/constants');
 
 const ARCHIVE_SCHEMA_VERSION = 1;
-const BATCH_LIMIT = 1000;
 
 const exportJobsByUser = new Map();
 
 function sha256Buffer(buffer) {
   return crypto.createHash('sha256').update(buffer).digest('hex');
-}
-
-async function fetchAllPaged(entityType, baseQuery, requestUser) {
-  const pageSize = BATCH_LIMIT;
-  let page = 1;
-  const all = [];
-  for (;;) {
-    const rows = await dataService.fetchData(entityType, {
-      ...baseQuery,
-      page,
-      limit: pageSize
-    }, requestUser);
-    const batch = Array.isArray(rows) ? rows : [];
-    if (!batch.length) break;
-    all.push(...batch);
-    if (batch.length < pageSize) break;
-    page += 1;
-    if (page > 2000) break;
-  }
-  return all;
-}
-
-async function fetchLogsForRange({ startDate, endDate, timezone, requestUser }) {
-  const bounds = resolveArchiveRangeBoundsMs(startDate, endDate, timezone);
-  const rows = await fetchAllPaged('logs', {
-    startDate,
-    endDate,
-    sort: 'timestamp'
-  }, requestUser);
-  return rows
-    .map((row) => normalizePersistedLogRecord(row))
-    .filter(Boolean)
-    .filter((row) => timestampInArchiveRange(row.timestamp, bounds));
-}
-
-async function fetchActionStatesForRange({ startDate, endDate, timezone, requestUser }) {
-  const bounds = resolveArchiveRangeBoundsMs(startDate, endDate, timezone);
-  const rows = await fetchAllPaged('actionStates', {
-    startDate,
-    endDate,
-    sort: '-startedAt'
-  }, requestUser);
-  return rows.filter((row) => {
-    const ts = row.startedAt || row.createdAt || row.updatedAt;
-    return timestampInArchiveRange(ts, bounds);
-  });
 }
 
 function toNdjson(rows = []) {

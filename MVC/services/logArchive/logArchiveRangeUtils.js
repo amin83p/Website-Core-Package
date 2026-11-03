@@ -65,6 +65,54 @@ function timestampInArchiveRange(isoValue, bounds) {
   return ms >= bounds.dayStartMs && ms <= bounds.dayEndMs;
 }
 
+function buildArchiveBoundsMongoFieldClause(field, bounds) {
+  if (!field || !bounds) return null;
+  const startDate = new Date(bounds.dayStartMs);
+  const endDate = new Date(bounds.dayEndMs);
+  if (!Number.isFinite(startDate.getTime()) || !Number.isFinite(endDate.getTime())) return null;
+  const startIso = startDate.toISOString();
+  const endIso = endDate.toISOString();
+  return {
+    $or: [
+      { [field]: { $gte: startDate, $lte: endDate } },
+      { [field]: { $gte: startIso, $lte: endIso } }
+    ]
+  };
+}
+
+function buildArchiveBoundsMongoFilter(bounds, dateFields = []) {
+  const fields = (Array.isArray(dateFields) ? dateFields : [dateFields])
+    .map((f) => String(f || '').trim())
+    .filter(Boolean);
+  if (!fields.length) return {};
+  const clauses = fields
+    .map((field) => buildArchiveBoundsMongoFieldClause(field, bounds))
+    .filter(Boolean);
+  if (!clauses.length) return {};
+  if (clauses.length === 1) return clauses[0];
+  return { $or: clauses };
+}
+
+const ACTION_STATE_ARCHIVE_DATE_FIELDS = Object.freeze([
+  'startedAt',
+  'createdAt',
+  'updatedAt',
+  'lastActiveAt'
+]);
+
+function actionStateArchiveTimestamp(row) {
+  if (!row || typeof row !== 'object') return '';
+  return row.startedAt || row.createdAt || row.updatedAt || '';
+}
+
+/** Match Activity Tracking date filters: any canonical timestamp falls in org-timezone range. */
+function actionStateRowInArchiveRange(row, bounds) {
+  if (!row || typeof row !== 'object' || !bounds) return false;
+  return ACTION_STATE_ARCHIVE_DATE_FIELDS.some((field) => (
+    timestampInArchiveRange(row[field], bounds)
+  ));
+}
+
 function dateKeysOverlap(userStart, userEnd, arcStart, arcEnd) {
   const u0 = cleanDateKey(userStart);
   const u1 = cleanDateKey(userEnd);
@@ -105,6 +153,11 @@ module.exports = {
   resolveArchiveRangeBoundsMs,
   msToArchiveDateKey,
   timestampInArchiveRange,
+  buildArchiveBoundsMongoFieldClause,
+  buildArchiveBoundsMongoFilter,
+  actionStateArchiveTimestamp,
+  actionStateRowInArchiveRange,
+  ACTION_STATE_ARCHIVE_DATE_FIELDS,
   dateKeysOverlap,
   userRangeExtendsBeyondManifest,
   parseArchiveZipFileName,

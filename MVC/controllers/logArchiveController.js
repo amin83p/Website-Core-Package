@@ -2,6 +2,7 @@
 
 const logArchiveStatusService = require('../services/logArchive/logArchiveStatusService');
 const logArchiveExportService = require('../services/logArchive/logArchiveExportService');
+const logArchiveDeleteService = require('../services/logArchive/logArchiveDeleteService');
 
 function resolveTimezone(req) {
   return String(req.orgTimeZone || req.user?.activeOrgTimeZone || 'UTC').trim() || 'UTC';
@@ -73,6 +74,80 @@ async function exportLogArchive(req, res) {
   }
 }
 
+function parseArchiveDeleteBody(body = {}) {
+  const src = body && typeof body === 'object' ? body : {};
+  return {
+    startDate: src.startDate,
+    endDate: src.endDate,
+    includeLogs: src.includeLogs === true || src.includeLogs === 'true',
+    includeActionStates: src.includeActionStates === true || src.includeActionStates === 'true',
+    localVerification: src.localVerification && typeof src.localVerification === 'object'
+      ? src.localVerification
+      : null
+  };
+}
+
+function mapDeleteError(error, res) {
+  const code = error.code || 'DELETE_FAILED';
+  const status = code === 'INVALID_RANGE' || code === 'NO_COLLECTIONS'
+    ? 400
+    : (code === 'DELETE_BUSY' ? 429 : (String(code).startsWith('LOCAL_') ? 403 : 500));
+  return res.status(status).json({
+    status: 'error',
+    code,
+    message: error.message || 'Archive delete failed.',
+    verification: error.verification || undefined
+  });
+}
+
+async function previewLogArchiveDelete(req, res) {
+  try {
+    const timezone = resolveTimezone(req);
+    const body = parseArchiveDeleteBody(req.body);
+    const result = await logArchiveDeleteService.previewArchiveRangeDelete({
+      ...body,
+      timezone,
+      requestUser: req.user
+    });
+    return res.json({
+      status: 'success',
+      data: {
+        preview: result.preview,
+        verification: result.verification
+      }
+    });
+  } catch (error) {
+    console.error('Log archive delete preview error:', error);
+    return mapDeleteError(error, res);
+  }
+}
+
+async function deleteLogArchiveRecords(req, res) {
+  try {
+    const timezone = resolveTimezone(req);
+    const body = parseArchiveDeleteBody(req.body);
+    if (!body.localVerification) {
+      return res.status(400).json({
+        status: 'error',
+        code: 'LOCAL_PROOF_REQUIRED',
+        message: 'Local archive verification is required before deleting records.'
+      });
+    }
+    const result = await logArchiveDeleteService.deleteArchiveRangeRecords({
+      ...body,
+      timezone,
+      requestUser: req.user
+    });
+    return res.json({
+      status: 'success',
+      data: result
+    });
+  } catch (error) {
+    console.error('Log archive delete error:', error);
+    return mapDeleteError(error, res);
+  }
+}
+
 async function viewLogArchiveAnalyzer(req, res) {
   try {
     const timezone = resolveTimezone(req);
@@ -117,6 +192,8 @@ module.exports = {
   viewLogArchiveExtractor,
   fetchLogArchiveStatus,
   exportLogArchive,
+  previewLogArchiveDelete,
+  deleteLogArchiveRecords,
   viewLogArchiveAnalyzer,
   viewLogArchiveUserTimeline
 };
