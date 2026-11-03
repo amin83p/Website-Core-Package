@@ -861,24 +861,6 @@ body.modal-open #scheduleContainer .schedule-viewbar-sticky {
     font-weight: 800;
     white-space: nowrap;
 }
-.schedule-viewer-page .schedule-viewer-header-academia.btn-sm,
-.schedule-viewer-page .schedule-viewer-header-print.btn-sm {
-    font-size: 0.8125rem;
-    padding: 0.3125rem 0.5rem;
-    line-height: 1.25;
-    white-space: nowrap;
-}
-.schedule-viewer-page .schedule-viewer-header-academia.btn-sm .bi,
-.schedule-viewer-page .schedule-viewer-header-print.btn-sm .bi {
-    font-size: 0.85em;
-}
-@media (min-width: 992px) {
-    .schedule-viewer-page .schedule-viewer-header-academia.btn-sm,
-    .schedule-viewer-page .schedule-viewer-header-print.btn-sm {
-        font-size: 0.875rem;
-        padding: 0.375rem 0.625rem;
-    }
-}
 .schedule-viewbar-title-group {
     align-items: center;
     gap: 0.65rem;
@@ -1239,20 +1221,15 @@ button.schedule-active-class-chip.active {
     color: #084298;
 }
 .schedule-load-duration-chip .bi {
+    flex-shrink: 0;
     font-size: 0.85rem;
+    line-height: 1;
 }
-.schedule-viewbar-title-metrics {
-    display: inline-flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 0.45rem;
-    min-width: 0;
-    margin-left: auto;
-}
-.schedule-load-duration-chip--title-row {
-    min-width: 6.5rem;
+.schedule-load-duration-chip--chip-row {
+    flex-shrink: 0;
+    min-width: 8rem;
     justify-content: center;
-    padding: 0.34rem 0.9rem;
+    padding: 0.34rem 1rem;
 }
 .schedule-loaded-at-chip-shell {
     position: relative;
@@ -2096,10 +2073,16 @@ body.modal-open #scheduleContainer .schedule-admin-week-rail-inner {
         gap: 0.35rem;
     }
     .schedule-viewer-page > .d-flex.align-items-center.justify-content-between.mb-3.flex-wrap:not(.gap-2) > .d-flex.align-items-center.flex-wrap:first-child .btn-md,
-    .schedule-viewer-page > .d-flex.align-items-center.justify-content-between.mb-3.flex-wrap:not(.gap-2) > div:last-child .btn-md {
+    .schedule-viewer-page > .d-flex.align-items-center.justify-content-between.mb-3.flex-wrap:not(.gap-2) > div:last-child .btn-md,
+    .schedule-viewer-page .schedule-viewer-header-academia.btn-md,
+    .schedule-viewer-page .schedule-viewer-header-print.btn-md {
         font-size: 0.8125rem;
         padding: 0.3125rem 0.5rem;
         line-height: 1.25;
+    }
+    .schedule-viewer-page .schedule-viewer-header-academia.btn-md .bi,
+    .schedule-viewer-page .schedule-viewer-header-print.btn-md .bi {
+        font-size: 0.85em;
     }
     .schedule-viewbar-row {
         flex-direction: column;
@@ -2149,18 +2132,13 @@ body.modal-open #scheduleContainer .schedule-admin-week-rail-inner {
         width: 100%;
         align-items: center;
     }
-    .schedule-load-duration-chip--title-row:not(.is-active) {
-        display: none;
-    }
-    .schedule-viewbar-title-metrics {
-        margin-left: 0;
-        width: 100%;
+    .schedule-load-duration-chip--chip-row {
+        display: none !important;
     }
     .schedule-viewbar-chips .schedule-selected-count-pill,
     .schedule-viewbar-chips button.schedule-active-class-chip,
     .schedule-viewbar-chips .schedule-hours-chip,
     .schedule-viewbar-chips-primary .schedule-hours-chip,
-    .schedule-viewbar-title-metrics .schedule-load-duration-chip,
     .schedule-viewbar-chips button.schedule-loaded-at-chip {
         font-size: 0.72rem;
         padding: 0.26rem 0.5rem;

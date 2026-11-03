@@ -13,7 +13,7 @@
   const lockedPersonId = scheduleAccess.lockedPersonId || (typeof prefillId !== 'undefined' ? prefillId : '') || '';
   const lockedPersonName = scheduleAccess.lockedPersonName || (typeof prefillName !== 'undefined' ? prefillName : '') || '';
   const showCreateClassFromTemplateModal = typeof includeClassCreateFromTemplateModal !== 'undefined' && includeClassCreateFromTemplateModal === true;
-  const schedulePrintBtn = '<button type="button" id="btn_printSchedule" class="btn btn-filled btn-edit btn-sm schedule-viewer-header-print me-2 mb-2" disabled title="Load a schedule first">🖨 Print</button>';
+  const schedulePrintBtn = '<button type="button" id="btn_printSchedule" class="btn btn-filled btn-edit btn-md schedule-viewer-header-print me-2 mb-2" disabled title="Load a schedule first">🖨 Print</button>';
   const scheduleAdminManageBtns = canUseGlobalComparison ? [
     '<a href="/school/schedules/global" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-layers me-1"></i> Global Comparison</a>',
     '<a href="/school/classes" class="btn btn-outline-secondary btn-md mb-2"><i class="bi bi-collection me-1"></i> Classes</a>'
@@ -35,7 +35,7 @@
   print: false,
   optionalBtnsBeforePrint: [schedulePrintBtn],
   headerManageBtns: [
-    '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-sm schedule-viewer-header-academia mb-2"><i class="bi bi-journal-bookmark me-1"></i>Academia</a>'
+    '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md schedule-viewer-header-academia mb-2"><i class="bi bi-journal-bookmark me-1"></i>Academia</a>'
   ],
   manageBtns: scheduleAdminManageBtns
 }) %>

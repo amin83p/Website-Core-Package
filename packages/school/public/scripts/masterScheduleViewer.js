@@ -6056,14 +6056,14 @@
         if (pending?.personId === person.id) {
             const phaseLabel = scheduleState.loadingPersonId === person.id ? 'Loading…' : 'Rendering…';
             const title = 'Measuring time from schedule fetch to rendered calendar';
-            return `<span class="schedule-load-duration-chip schedule-load-duration-chip--title-row is-active" title="${escapeHtml(title)}" aria-live="polite"><i class="bi bi-stopwatch" aria-hidden="true"></i><span>${escapeHtml(phaseLabel)}</span></span>`;
+            return `<span class="schedule-load-duration-chip schedule-load-duration-chip--chip-row is-active" title="${escapeHtml(title)}" aria-live="polite"><i class="bi bi-stopwatch" aria-hidden="true"></i><span>${escapeHtml(phaseLabel)}</span></span>`;
         }
         if (!scheduleState.loadedPersonIds.has(person.id)) return '';
         const durationMs = scheduleState.loadDurationMsByPersonId[person.id];
         if (!Number.isFinite(durationMs)) return '';
         const label = `Loaded in ${formatScheduleLoadDuration(durationMs)}`;
         const title = 'Time from schedule fetch to rendered calendar';
-        return `<span class="schedule-load-duration-chip schedule-load-duration-chip--title-row" title="${escapeHtml(title)}" aria-label="${escapeHtml(label)}"><i class="bi bi-stopwatch" aria-hidden="true"></i><span>${escapeHtml(label)}</span></span>`;
+        return `<span class="schedule-load-duration-chip schedule-load-duration-chip--chip-row" title="${escapeHtml(title)}" aria-label="${escapeHtml(label)}"><i class="bi bi-stopwatch" aria-hidden="true"></i><span>${escapeHtml(label)}</span></span>`;
     }
 
     function syncScheduleAdminWeekRailVisibility() {
@@ -6618,20 +6618,13 @@
         const row2RightControls = showWeekGridControls
             ? `<div class="schedule-viewbar-grid-controls">${scheduleGridToolbarControlsHtml()}</div>`
             : '';
-        const loadDurationChip = buildScheduleLoadDurationChipHtml();
-        const loadRefreshChip = buildScheduleLoadedAtRefreshChipHtml();
-        const loadRefreshWrap = loadRefreshChip
-            ? `<div class="schedule-loaded-at-wrap">${loadRefreshChip}</div>`
-            : '';
+        const loadStatusChips = buildScheduleLoadStatusChipsHtml();
         legend.innerHTML = `
             <div class="schedule-viewbar">
                 <div class="schedule-viewbar-row">
                     <div class="schedule-viewbar-row-left schedule-viewbar-title-group">
                         <span class="schedule-view-name"><i class="bi bi-calendar-day me-1"></i>${escapeHtml(scheduleViewName(mode))}</span>
                         ${buildScheduleActiveClassChipHtml()}
-                        <div class="schedule-viewbar-title-metrics">
-                            ${loadDurationChip}
-                        </div>
                     </div>
                     <div class="schedule-viewbar-row-right schedule-viewbar-actions">
                     ${timeRangeControl}
@@ -6648,7 +6641,7 @@
                             ${buildScheduleSelectionChipHtml()}
                             <div id="lbl_totalHours" class="schedule-toolbar-hours">${renderCategoryHourTotals([])}</div>
                         </div>
-                        ${loadRefreshWrap}
+                        ${loadStatusChips}
                     </div>
                     <div class="schedule-viewbar-row-right is-controls-row">
                         ${row2RightControls}

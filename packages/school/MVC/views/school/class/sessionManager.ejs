@@ -360,10 +360,21 @@
     }
     #attendanceTable th.attendance-row-actions-col,
     #attendanceTable td.attendance-row-actions-cell {
-        width: 4.25rem;
-        min-width: 4.25rem;
-        max-width: 4.75rem;
+        width: 5.2rem;
+        min-width: 5.2rem;
+        max-width: 5.55rem;
         vertical-align: middle;
+    }
+    #attendanceTable .btn-check[value="present"] + .att-label,
+    #attendanceTable .btn-check[value="absent"] + .att-label {
+        padding-left: 0.28rem;
+        padding-right: 0.32rem;
+    }
+    #attendanceTable .btn-check[value="present"] + .att-label .bi.me-1 {
+        margin-right: 0.15rem !important;
+    }
+    #attendanceTable .btn-check[value="absent"] + .att-label .bi {
+        margin-right: 0.12rem !important;
     }
     #attendanceTable .sortable-att-name {
         cursor: pointer;
@@ -1522,6 +1533,17 @@
             padding-top: 0.3rem !important;
             padding-bottom: 0.3rem !important;
             padding-right: 0.25rem !important;
+        }
+        .session-manager-page #attendanceTable th.attendance-row-actions-col,
+        .session-manager-page #attendanceTable td.attendance-row-actions-cell {
+            width: 4.85rem !important;
+            min-width: 4.85rem !important;
+            max-width: 5.1rem !important;
+        }
+        .session-manager-page #attendanceTable .btn-check[value="present"] + .att-label,
+        .session-manager-page #attendanceTable .btn-check[value="absent"] + .att-label {
+            padding-left: 0.1rem !important;
+            padding-right: 0.14rem !important;
         }
         .session-manager-page #attendanceTable .d-flex.gap-2 {
             gap: 0.2rem !important;
