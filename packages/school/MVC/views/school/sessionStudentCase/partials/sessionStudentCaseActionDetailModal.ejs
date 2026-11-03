@@ -1,0 +1,39 @@
+<div class="modal fade" id="studentCaseActionDetailModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold" id="studentCaseActionDetailTitle">Activity detail</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="small text-muted mb-2" id="studentCaseActionDetailMeta"></div>
+                <div id="studentCaseActionDetailPrivateBadge" class="mb-2 d-none">
+                    <span class="badge text-bg-warning"><i class="bi bi-lock-fill me-1"></i>Private — resolve access only</span>
+                </div>
+                <div class="fw-semibold small text-uppercase text-muted mb-1">Summary</div>
+                <div class="mb-3" id="studentCaseActionDetailSummary"></div>
+                <div class="fw-semibold small text-uppercase text-muted mb-1">Details</div>
+                <div class="student-case-action-detail-body mb-3" id="studentCaseActionDetailBody"></div>
+                <div id="studentCaseActionDetailAttachmentWrap" class="d-none">
+                    <div class="fw-semibold small text-uppercase text-muted mb-1">Attachment</div>
+                    <a href="#" target="_blank" rel="noopener" class="small" id="studentCaseActionDetailAttachmentLink"></a>
+                </div>
+                <div id="studentCaseActionDetailInvolvedWrap" class="d-none mt-2">
+                    <div class="fw-semibold small text-uppercase text-muted mb-1">Notified / involved</div>
+                    <div class="small" id="studentCaseActionDetailInvolved"></div>
+                </div>
+            </div>
+            <div class="modal-footer d-flex justify-content-between flex-wrap gap-2">
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-primary d-none" id="btnStudentCaseActionDetailEdit">
+                        <i class="bi bi-pencil me-1"></i>Edit
+                    </button>
+                    <button type="button" class="btn btn-outline-danger d-none" id="btnStudentCaseActionDetailDelete">
+                        <i class="bi bi-trash me-1"></i>Delete
+                    </button>
+                </div>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>

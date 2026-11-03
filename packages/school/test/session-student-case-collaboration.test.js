@@ -222,6 +222,54 @@ test('shareCase dedupes collaborators and assignCase sets assignedTo', async () 
   }
 });
 
+test('unassignCase clears assignedTo and removeCollaborator drops collaborator row', async () => {
+  const reviewService = require('../MVC/services/school/sessionStudentCaseReviewService');
+  const schoolRepositories = require('../MVC/repositories/school');
+
+  const existing = {
+    id: 'SSC-REM',
+    orgId: 'ORG-1',
+    classId: 'CLS-1',
+    sessionId: 'SES-1',
+    category: 'behavior',
+    details: 'Issue',
+    summary: 'Issue',
+    assignedTo: { personId: 'PER-A', personName: 'Assignee' },
+    collaborators: [{ personId: 'PER-C', personName: 'Collab' }],
+    lifecycle: [],
+    revisionNo: 1
+  };
+
+  const originalLoad = reviewService.loadCaseForRequest;
+  const originalUpdate = schoolRepositories.sessionStudentCases.update;
+  const originalAssert = accessService.assertCanAssignOrShareCase;
+
+  reviewService.loadCaseForRequest = async () => ({ ...existing });
+  accessService.assertCanAssignOrShareCase = async () => {};
+  let lastUpdatePayload = null;
+  schoolRepositories.sessionStudentCases.update = async (_id, payload) => {
+    lastUpdatePayload = payload;
+    return { ...existing, ...payload };
+  };
+
+  const req = { user: { id: 'USR-ADMIN', personId: 'PER-ADMIN', activeOrgId: 'ORG-1' } };
+
+  try {
+    const unassign = await collaborationService.unassignCase(req, existing.id);
+    assert.equal(unassign.assignedTo, null);
+    assert.equal(lastUpdatePayload.assignedTo, null);
+    assert.equal(lastUpdatePayload.lifecycle.at(-1).action, 'unassigned');
+
+    const removed = await collaborationService.removeCollaborator(req, existing.id, { targetPersonId: 'PER-C' });
+    assert.equal(removed.collaborators.length, 0);
+    assert.equal(lastUpdatePayload.lifecycle.at(-1).action, 'collaborator_removed');
+  } finally {
+    reviewService.loadCaseForRequest = originalLoad;
+    schoolRepositories.sessionStudentCases.update = originalUpdate;
+    accessService.assertCanAssignOrShareCase = originalAssert;
+  }
+});
+
 test('assignCase blocks category routing assignees without persisting', async () => {
   const reviewService = require('../MVC/services/school/sessionStudentCaseReviewService');
   const schoolIdentityLookupService = require('../MVC/services/school/schoolIdentityLookupService');

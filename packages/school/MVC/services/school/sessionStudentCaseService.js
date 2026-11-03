@@ -467,6 +467,7 @@ async function saveCase({ classId, sessionId, caseId = '', input = {}, reqUser, 
     teacherName: cleanString(session?.delivery?.deliveredByName || classData?.instructors?.[0]?.name || await resolveActorName(reqUser), 180),
     status,
     lifecycle: [...(Array.isArray(existing?.lifecycle) ? existing.lifecycle : []), lifecycleEvent],
+    workActions: Array.isArray(existing?.workActions) ? existing.workActions : [],
     revisionNo: Math.max(1, Number(existing?.revisionNo || 0) + 1),
     audit: buildCaseAudit(existing, reqUser)
   };

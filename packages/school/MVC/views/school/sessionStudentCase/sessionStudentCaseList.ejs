@@ -219,7 +219,8 @@
         canResolve: <%= canResolveCases === true ? 'true' : 'false' %>,
         canDelete: <%= canDeleteCases === true ? 'true' : 'false' %>
       },
-      onSaved() {
+      onSaved(_caseRow, meta) {
+        if (meta && meta.collaborationOnly === true) return;
         window.location.reload();
       }
     });

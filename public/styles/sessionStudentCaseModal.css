@@ -225,3 +225,179 @@
     margin-left: -1rem;
     color: #6c757d;
 }
+
+.student-case-collab-remove-btn {
+    flex-shrink: 0;
+    line-height: 1;
+    padding: 0.2rem 0.45rem;
+}
+
+.student-case-activity-block {
+    background: #fff;
+    border-color: #e2e8f0 !important;
+}
+
+.student-case-compose {
+    background: linear-gradient(135deg, rgba(13, 110, 253, 0.06), rgba(111, 66, 193, 0.05));
+    border-color: rgba(13, 110, 253, 0.25) !important;
+}
+
+.student-case-timeline-empty {
+    padding: 1rem 1.25rem;
+    border-radius: 0.5rem;
+    background: rgba(108, 117, 125, 0.08);
+    border: 1px dashed #ced4da;
+}
+
+.student-case-timeline {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    position: relative;
+    padding: 0.35rem 0 0.35rem 1.35rem;
+    border-left: 4px solid transparent;
+    border-image: linear-gradient(180deg, #0d6efd 0%, #6f42c1 35%, #20c997 70%, #fd7e14 100%) 1;
+}
+
+.student-case-timeline--full {
+    max-height: min(50vh, 28rem);
+    overflow: auto;
+    padding-right: 0.25rem;
+}
+
+.student-case-timeline-item {
+    position: relative;
+    padding: 0.65rem 0.85rem 0.65rem 1rem;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    background: #fff;
+    text-align: left;
+    width: 100%;
+    cursor: pointer;
+    border-radius: 0.5rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+
+.student-case-timeline-item::before {
+    content: "";
+    position: absolute;
+    left: -1.55rem;
+    top: 1.05rem;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 999px;
+    background: #0d6efd;
+    border: 3px solid #fff;
+    box-shadow: 0 0 0 2px #0d6efd;
+}
+
+.student-case-timeline-item--work {
+    border-left: 4px solid #0d6efd;
+}
+
+.student-case-timeline-item--work::before {
+    background: #0d6efd;
+    box-shadow: 0 0 0 2px #0d6efd;
+}
+
+.student-case-timeline-item--work-private {
+    border-left: 4px solid #fd7e14;
+    background: linear-gradient(90deg, rgba(253, 126, 20, 0.08), #fff 45%);
+}
+
+.student-case-timeline-item--work-private::before {
+    background: #fd7e14;
+    box-shadow: 0 0 0 2px #fd7e14;
+}
+
+.student-case-timeline-item--system {
+    border-left: 4px solid #6f42c1;
+    background: linear-gradient(90deg, rgba(111, 66, 193, 0.07), #fff 50%);
+}
+
+.student-case-timeline-item--system::before {
+    background: #6f42c1;
+    box-shadow: 0 0 0 2px #6f42c1;
+}
+
+.student-case-timeline-item:hover,
+.student-case-timeline-item:focus {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(15, 23, 42, 0.1);
+    outline: none;
+}
+
+.student-case-timeline-item__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    margin-bottom: 0.25rem;
+}
+
+.student-case-timeline-item__type {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #495057;
+}
+
+.student-case-timeline-item--work .student-case-timeline-item__type {
+    color: #0d6efd;
+}
+
+.student-case-timeline-item--work-private .student-case-timeline-item__type {
+    color: #e8590c;
+}
+
+.student-case-timeline-item--system .student-case-timeline-item__type {
+    color: #6f42c1;
+}
+
+.student-case-timeline-item__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+}
+
+.student-case-timeline-item__badge--private {
+    color: #984c0c;
+    background: rgba(253, 126, 20, 0.18);
+}
+
+.student-case-timeline-item__meta {
+    font-size: 0.72rem;
+    color: #6c757d;
+    margin-bottom: 0.15rem;
+}
+
+.student-case-timeline-item__summary {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: #212529;
+    line-height: 1.35;
+}
+
+.student-case-timeline-item--system .student-case-timeline-item__summary {
+    font-weight: 500;
+    color: #495057;
+}
+
+.student-case-action-detail-body {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.student-case-notify-list {
+    max-height: min(40vh, 18rem);
+    overflow: auto;
+}
+
+.student-case-notify-row + .student-case-notify-row {
+    border-top: 1px dashed rgba(0, 0, 0, 0.08);
+}

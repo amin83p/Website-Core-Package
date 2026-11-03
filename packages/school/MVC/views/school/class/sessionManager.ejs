@@ -7462,7 +7462,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 else window.hideLoading({ force: true });
             }
         },
-        onSaved() {
+        onSaved(caseRow, meta) {
+            if (meta && meta.collaborationOnly === true) {
+                void refreshStudentCases();
+                return;
+            }
             return refreshStudentCases();
         }
     });

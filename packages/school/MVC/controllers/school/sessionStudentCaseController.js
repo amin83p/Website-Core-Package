@@ -7,6 +7,7 @@ const studentCaseAccessService = require('../../services/school/studentCaseAcces
 const sessionStudentCaseService = require('../../services/school/sessionStudentCaseService');
 const sessionStudentCaseRoutingService = require('../../services/school/sessionStudentCaseRoutingService');
 const sessionStudentCaseCollaborationService = require('../../services/school/sessionStudentCaseCollaborationService');
+const sessionStudentCaseWorkActionService = require('../../services/school/sessionStudentCaseWorkActionService');
 const sessionStudentCaseResultVisibilityService = require('../../services/school/sessionStudentCaseResultVisibilityService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const { getPresetConfig } = require('../../services/school/sessionStudentCasePresetService');
@@ -396,6 +397,50 @@ exports.shareCase = async (req, res) => {
   }
 };
 
+exports.unassignCase = async (req, res) => {
+  try {
+    getActiveOrgIdOrThrow(req.user);
+    const result = await sessionStudentCaseCollaborationService.unassignCase(req, req.params.caseId);
+    const redacted = sessionStudentCaseResultVisibilityService.redactCaseForViewer(result.case, {
+      reqUser: req.user,
+      capabilities: await sessionStudentCaseAccessService.resolveCaseCapabilities(req, { caseRow: result.case })
+    });
+    return res.json({
+      status: 'success',
+      message: result.unchanged ? 'No primary assignee to remove.' : 'Primary assignee removed.',
+      case: redacted,
+      assignedTo: result.assignedTo || null
+    });
+  } catch (error) {
+    const statusCode = Number(error.statusCode) || 400;
+    return res.status(statusCode).json({ status: 'error', message: error.message });
+  }
+};
+
+exports.removeCaseCollaborator = async (req, res) => {
+  try {
+    getActiveOrgIdOrThrow(req.user);
+    const result = await sessionStudentCaseCollaborationService.removeCollaborator(
+      req,
+      req.params.caseId,
+      req.body || {}
+    );
+    const redacted = sessionStudentCaseResultVisibilityService.redactCaseForViewer(result.case, {
+      reqUser: req.user,
+      capabilities: await sessionStudentCaseAccessService.resolveCaseCapabilities(req, { caseRow: result.case })
+    });
+    return res.json({
+      status: 'success',
+      message: 'Collaborator removed.',
+      case: redacted,
+      collaborators: result.collaborators || []
+    });
+  } catch (error) {
+    const statusCode = Number(error.statusCode) || 400;
+    return res.status(statusCode).json({ status: 'error', message: error.message });
+  }
+};
+
 exports.notifyCaseCollaboration = async (req, res) => {
   try {
     getActiveOrgIdOrThrow(req.user);
@@ -409,6 +454,103 @@ exports.notifyCaseCollaboration = async (req, res) => {
       message: 'Chat notification sent.',
       targetPersonId: result.targetPersonId,
       targetPersonName: result.targetPersonName
+    });
+  } catch (error) {
+    const statusCode = Number(error.statusCode) || 400;
+    return res.status(statusCode).json({ status: 'error', message: error.message });
+  }
+};
+
+exports.addCaseWorkAction = async (req, res) => {
+  try {
+    getActiveOrgIdOrThrow(req.user);
+    const result = await sessionStudentCaseWorkActionService.addWorkAction(req, req.params.caseId, {
+      body: req.body?.body || req.body?.text || '',
+      file: req.file || null,
+      isPrivate: req.body?.private
+    });
+    return res.json({
+      status: 'success',
+      message: 'Work log saved.',
+      case: result.case,
+      actionId: result.actionId,
+      timeline: result.timeline,
+      notifyCandidates: result.notifyCandidates || []
+    });
+  } catch (error) {
+    const statusCode = Number(error.statusCode) || 400;
+    return res.status(statusCode).json({ status: 'error', message: error.message });
+  }
+};
+
+exports.notifyCaseWorkAction = async (req, res) => {
+  try {
+    getActiveOrgIdOrThrow(req.user);
+    const personIds = Array.isArray(req.body?.personIds)
+      ? req.body.personIds
+      : (Array.isArray(req.body?.targetPersonIds) ? req.body.targetPersonIds : []);
+    const result = await sessionStudentCaseWorkActionService.notifyWorkActionInvolved(
+      req,
+      req.params.caseId,
+      req.params.actionId,
+      { personIds }
+    );
+    return res.json({
+      status: 'success',
+      message: `Sent ${result.notified} chat notification(s).`,
+      notified: result.notified,
+      skipped: result.skipped,
+      case: result.case,
+      timeline: result.timeline
+    });
+  } catch (error) {
+    const statusCode = Number(error.statusCode) || 400;
+    return res.status(statusCode).json({ status: 'error', message: error.message });
+  }
+};
+
+exports.updateCaseWorkAction = async (req, res) => {
+  try {
+    getActiveOrgIdOrThrow(req.user);
+    const result = await sessionStudentCaseWorkActionService.updateWorkAction(
+      req,
+      req.params.caseId,
+      req.params.actionId,
+      {
+        body: req.body?.body || req.body?.text || '',
+        file: req.file || null,
+        isPrivate: req.body?.private,
+        removeAttachment: req.body?.removeAttachment === true
+          || req.body?.removeAttachment === 'true'
+          || req.body?.removeAttachment === '1'
+      }
+    );
+    return res.json({
+      status: 'success',
+      message: 'Work log updated.',
+      actionId: result.actionId,
+      case: result.case,
+      timeline: result.timeline
+    });
+  } catch (error) {
+    const statusCode = Number(error.statusCode) || 400;
+    return res.status(statusCode).json({ status: 'error', message: error.message });
+  }
+};
+
+exports.deleteCaseWorkAction = async (req, res) => {
+  try {
+    getActiveOrgIdOrThrow(req.user);
+    const result = await sessionStudentCaseWorkActionService.deleteWorkAction(
+      req,
+      req.params.caseId,
+      req.params.actionId
+    );
+    return res.json({
+      status: 'success',
+      message: 'Work log deleted.',
+      case: result.case,
+      timeline: result.timeline
     });
   } catch (error) {
     const statusCode = Number(error.statusCode) || 400;

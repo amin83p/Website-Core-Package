@@ -139,6 +139,22 @@ When status becomes **resolved** or **cancelled**, the case is **locked**. **UPD
 
 ---
 
+## Case work log actions (activity timeline)
+
+Work log entries are stored on each case as `workActions[]`. They appear in the **Activity & history** modal (mixed with read-only system `lifecycle` events). Generic case save does **not** accept client-supplied `workActions`; entries are appended or changed only through dedicated work-action APIs.
+
+| Topic | Rule |
+| --- | --- |
+| **Add entry** | Actors with **contribute** access (case workers: UPDATE/RESOLVE, assignee/collaborator/handler, routing admin, etc.) may append entries on cases they can view, including **locked resolved** cases (work log only). Route gate: **UPDATE** (+ session mutation scope). Optional attachment ≤ 2 MB. |
+| **Private entry** | When marked private, the entry is visible in the timeline only to users with **resolve access** (result-field managers) and the **author**. Non-private entries are visible to anyone who can read the case (subject to private filter on API payloads). |
+| **Notify after add** | After a successful add, the UI offers a notify step: chat messages from the actor to selected people. Default list: primary assignee, collaborators, active category routing assignees, and case creator (excluding the actor). Only person IDs from that candidate list may be notified. Private entries use a generic chat body (no excerpt). |
+| **Edit entry** | Same authorization as **editing the case**: **UPDATE** at granted scope + session mutation + [`canEditCase`](../../packages/school/MVC/services/school/sessionStudentCaseResultVisibilityService.js) / locked-case rules. **Family A** bypass admins and **ADMIN scope override** (Family B) follow the UPDATE row. Route gate: **UPDATE**. |
+| **Delete entry** | Same authorization as **deleting the case**: **DELETE** at granted scope + session mutation + `canDeleteCase` / locked-case rules. **Family A** bypass and **ADMIN scope override** follow the DELETE row. Route gate: **DELETE**. |
+
+Review context (`GET .../review-context`) exposes `timeline`, `capabilities.canContributeWorkAction`, `capabilities.canEditWorkAction`, `capabilities.canDeleteWorkAction`, and (when the viewer may contribute) `notifyCandidates` for the notify UI.
+
+---
+
 ## Route mapping
 
 | Method and route | Section | Operation |
@@ -146,6 +162,10 @@ When status becomes **resolved** or **cancelled**, the case is **locked**. **UPD
 | `GET /school/session-student-cases` | `SCHOOL_SESSION_STUDENT_CASES` | READ (page); list **data** requires READ_ALL in controller/workspace |
 | `GET /school/session-student-cases/routing` | `SCHOOL_SESSION_STUDENT_CASES` | CONFIGURE (ADMIN or bypass admin) |
 | `POST /school/session-student-cases/api/routing` | `SCHOOL_SESSION_STUDENT_CASES` | CONFIGURE (ADMIN or bypass admin) |
+| `POST /school/session-student-cases/api/:caseId/work-actions` | `SCHOOL_SESSION_STUDENT_CASES` | UPDATE (add work log) |
+| `PATCH /school/session-student-cases/api/:caseId/work-actions/:actionId` | `SCHOOL_SESSION_STUDENT_CASES` | UPDATE (edit work log) |
+| `DELETE /school/session-student-cases/api/:caseId/work-actions/:actionId` | `SCHOOL_SESSION_STUDENT_CASES` | DELETE (remove work log) |
+| `POST /school/session-student-cases/api/:caseId/work-actions/:actionId/notify` | `SCHOOL_SESSION_STUDENT_CASES` | UPDATE (chat notify involved people) |
 | `GET /school/session-student-cases/:caseId/review-context` | `SCHOOL_SESSION_STUDENT_CASES` | READ_ALL |
 | `POST /school/session-student-cases/:caseId` | `SCHOOL_SESSION_STUDENT_CASES` | CREATE or UPDATE |
 | `POST /school/session-student-cases/:caseId/status` | `SCHOOL_SESSION_STUDENT_CASES` | RESOLVE or UPDATE |
@@ -169,6 +189,7 @@ When status becomes **resolved** or **cancelled**, the case is **locked**. **UPD
 | `sessionStudentCaseAccessService` | Capability mapping, routed-case overrides, session mutation checks |
 | `sessionStudentCaseWorkspaceService` | List filtering via student-case section scope; returns list data only when READ_ALL (`canViewCases`) |
 | `sessionStudentCaseResultVisibilityService` | Locked-case edit/delete rules; auto-lock on resolve/cancel; ADMIN scope override path |
+| `sessionStudentCaseWorkActionService` | Work log CRUD, private visibility filter, mixed timeline, notify candidates, chat notify orchestration |
 | `sessionStudentCaseRouteGuards` | Route operation gates; routing admin = CONFIGURE at ADMIN **or** bypass admin |
 
 **Explicit rule:** Session mutation scope for case writes uses `buildStudentCaseSectionAccessContext(user, builtAccess)` — **not** `resolveAccessFromRequest(req)` from Manage Session middleware.

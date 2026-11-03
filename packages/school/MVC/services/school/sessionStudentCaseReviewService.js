@@ -7,6 +7,7 @@ const { buildSessionStudentCaseRosterEntries } = require('./studentListSearchSer
 const { getPresetConfig } = require('./sessionStudentCasePresetService');
 const sessionStudentCaseResultVisibilityService = require('./sessionStudentCaseResultVisibilityService');
 const sessionStudentCaseRoutingService = require('./sessionStudentCaseRoutingService');
+const sessionStudentCaseWorkActionService = require('./sessionStudentCaseWorkActionService');
 const sessionDeliveryEscalatedAccessService = require('./sessionDeliveryEscalatedAccessService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -98,19 +99,45 @@ async function getReviewContext(req, caseId) {
   );
   const manageSessionHref = `/school/classes/${encodeURIComponent(classId)}/sessions/${encodeURIComponent(sessionId)}?caseId=${encodeURIComponent(caseId)}`;
   const routingReviewers = await listRoutingReviewersForCase(req, existing);
+  const canContributeWorkAction = await sessionStudentCaseWorkActionService.canContributeWorkAction(
+    req,
+    existing,
+    capabilities
+  );
+  const canEditWorkActionFlag = sessionStudentCaseWorkActionService.canEditWorkAction(existing, capabilities);
+  const canDeleteWorkActionFlag = sessionStudentCaseWorkActionService.canDeleteWorkAction(existing, capabilities);
+  const redactedCase = sessionStudentCaseResultVisibilityService.redactCaseForViewer(existing, {
+    reqUser: req.user,
+    capabilities
+  });
+  redactedCase.workActions = sessionStudentCaseWorkActionService.filterWorkActionsForViewer(
+    redactedCase.workActions,
+    { reqUser: req.user, capabilities }
+  );
+
+  const notifyCandidates = canContributeWorkAction
+    ? await sessionStudentCaseWorkActionService.buildWorkActionNotifyCandidates(req, existing)
+    : [];
 
   return {
-    case: sessionStudentCaseResultVisibilityService.redactCaseForViewer(existing, {
-      reqUser: req.user,
-      capabilities
-    }),
+    case: redactedCase,
     classId,
     sessionId,
     classTitle: normalizeText(existing.classTitle || classData.title || classData.name || classId),
     sessionLabel: buildSessionLabel(session),
     roster: await buildRoster(session, req.user),
     presets: getPresetConfig(),
-    capabilities,
+    capabilities: {
+      ...capabilities,
+      canContributeWorkAction,
+      canEditWorkAction: canEditWorkActionFlag,
+      canDeleteWorkAction: canDeleteWorkActionFlag
+    },
+    timeline: sessionStudentCaseWorkActionService.buildMixedTimeline(redactedCase, {
+      canEditWorkAction: canEditWorkActionFlag,
+      canDeleteWorkAction: canDeleteWorkActionFlag
+    }),
+    notifyCandidates,
     manageSessionHref,
     routingReviewers
   };

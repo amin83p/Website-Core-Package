@@ -24,6 +24,17 @@
   let busyToken = null;
   let wired = false;
   let collaborationModalInstance = null;
+  let collaborationWorkflowActive = false;
+  let preserveCollaborationWorkflow = false;
+  let actionsModalInstance = null;
+  let actionDetailModalInstance = null;
+  let timelineEntries = [];
+  let canContributeWorkAction = false;
+  let canEditWorkAction = false;
+  let canDeleteWorkAction = false;
+  let actionDetailEntry = null;
+  let pendingWorkActionNotify = { actionId: '', candidates: [] };
+  let workActionNotifyModalInstance = null;
   let collaborationSnapshot = {
     assignedTo: null,
     collaborators: [],
@@ -42,6 +53,11 @@
 
   function getPresetConfig() {
     return config?.detailPresets || global.__studentCaseDetailPresets || { labels: {}, presets: {} };
+  }
+
+  function notifyHostCaseUpdated(caseRow, meta = {}) {
+    if (typeof config?.onSaved !== 'function') return;
+    config.onSaved(caseRow || {}, meta);
   }
 
   function showMessage(title, message, icon = 'info') {
@@ -212,6 +228,420 @@
 
   function getSelectedPersonIds() {
     return [...selectedPersonIds].map((id) => String(id || '').trim()).filter(Boolean);
+  }
+
+  function formatTimelineWhen(at) {
+    const raw = String(at || '').trim();
+    if (!raw) return '—';
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) return raw;
+    return date.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  }
+
+  function getAttachmentOpenUrl(attachment) {
+    if (!attachment || typeof attachment !== 'object') return '';
+    return String(attachment.url || attachment.storagePath || attachment.path || '').trim();
+  }
+
+  function renderTimelineInto(host, entries) {
+    if (!host) return;
+    const rows = Array.isArray(entries) ? entries : [];
+    host.innerHTML = rows.map((entry) => {
+      const kind = entry.kind === 'system' ? 'system' : (entry.private === true ? 'work-private' : 'work');
+      const typeLabel = entry.kind === 'system'
+        ? 'System'
+        : (entry.private === true ? 'Private log' : 'Work log');
+      const meta = `${escapeHtml(formatTimelineWhen(entry.at))} · ${escapeHtml(entry.actorName || 'Staff')}`;
+      const summary = escapeHtml(entry.summary || entry.title || 'Activity');
+      const privateBadge = entry.private === true
+        ? '<span class="student-case-timeline-item__badge student-case-timeline-item__badge--private"><i class="bi bi-lock-fill"></i> Private</span>'
+        : '';
+      return `<button type="button" class="student-case-timeline-item student-case-timeline-item--${kind}" role="listitem" data-timeline-id="${escapeHtml(entry.id || '')}" data-timeline-kind="${kind}"><div class="student-case-timeline-item__head"><span class="student-case-timeline-item__type">${escapeHtml(typeLabel)}</span>${privateBadge}</div><div class="student-case-timeline-item__meta">${meta}</div><div class="student-case-timeline-item__summary">${summary}</div></button>`;
+    }).join('');
+  }
+
+  function findTimelineEntry(entryId) {
+    const key = String(entryId || '').trim();
+    if (!key) return null;
+    return (timelineEntries || []).find((row) => String(row.id || '') === key) || null;
+  }
+
+  function syncActivityButton() {
+    const caseId = String(document.getElementById('studentCaseId')?.value || '').trim();
+    const btn = document.getElementById('btnStudentCaseOpenActivity');
+    btn?.classList.toggle('d-none', !caseId);
+  }
+
+  function renderActionsModalTimeline() {
+    const host = document.getElementById('studentCaseActionsTimeline');
+    const emptyEl = document.getElementById('studentCaseActionsTimelineEmpty');
+    const compose = document.getElementById('studentCaseActionsCompose');
+    const entries = timelineEntries || [];
+    renderTimelineInto(host, entries);
+    emptyEl?.classList.toggle('d-none', entries.length > 0);
+    compose?.classList.toggle('d-none', !(canContributeWorkAction && !readOnly));
+  }
+
+  function setTimelineEntries(entries) {
+    timelineEntries = Array.isArray(entries) ? entries : [];
+    syncActivityButton();
+    renderActionsModalTimeline();
+  }
+
+  function mountModalElementToBody(modalEl) {
+    if (!modalEl || modalEl.parentElement === document.body) return modalEl;
+    document.body.appendChild(modalEl);
+    return modalEl;
+  }
+
+  function syncNestedStudentCaseModalStack(activeModalEl) {
+    const caseEl = getModalEl();
+    if (!activeModalEl || !activeModalEl.classList.contains('show')) return;
+    let caseZ = 1055;
+    if (caseEl?.classList.contains('show')) {
+      const parsed = Number.parseInt(window.getComputedStyle(caseEl).zIndex, 10);
+      if (Number.isFinite(parsed) && parsed > 0) caseZ = parsed;
+    }
+    const activeZ = caseZ + 20;
+    activeModalEl.style.setProperty('z-index', String(activeZ), 'important');
+    const backdrops = document.querySelectorAll('.modal-backdrop.show');
+    backdrops.forEach((backdrop, index) => {
+      if (backdrops.length <= 1) {
+        backdrop.style.setProperty('z-index', String(caseZ - 5), 'important');
+        return;
+      }
+      if (index === backdrops.length - 1) {
+        backdrop.style.setProperty('z-index', String(activeZ - 5), 'important');
+      } else {
+        backdrop.style.setProperty('z-index', String(caseZ - 5), 'important');
+      }
+    });
+  }
+
+  function getActionsModalEl() {
+    return document.getElementById('studentCaseActionsModal');
+  }
+
+  function getActionDetailModalEl() {
+    return document.getElementById('studentCaseActionDetailModal');
+  }
+
+  function ensureActionsModalInstance() {
+    const modalEl = mountModalElementToBody(getActionsModalEl());
+    if (!modalEl || !global.bootstrap) return null;
+    if (!actionsModalInstance) {
+      actionsModalInstance = new global.bootstrap.Modal(modalEl);
+      if (!modalEl.dataset.lifecycleWired) {
+        modalEl.dataset.lifecycleWired = '1';
+        modalEl.addEventListener('show.bs.modal', () => {
+          mountModalElementToBody(modalEl);
+          syncNestedStudentCaseModalStack(modalEl);
+          renderActionsModalTimeline();
+        });
+        modalEl.addEventListener('shown.bs.modal', () => syncNestedStudentCaseModalStack(modalEl));
+      }
+    }
+    return actionsModalInstance;
+  }
+
+  function ensureActionDetailModalInstance() {
+    const modalEl = mountModalElementToBody(getActionDetailModalEl());
+    if (!modalEl || !global.bootstrap) return null;
+    if (!actionDetailModalInstance) {
+      actionDetailModalInstance = new global.bootstrap.Modal(modalEl);
+      if (!modalEl.dataset.lifecycleWired) {
+        modalEl.dataset.lifecycleWired = '1';
+        modalEl.addEventListener('show.bs.modal', () => {
+          mountModalElementToBody(modalEl);
+          syncNestedStudentCaseModalStack(modalEl);
+        });
+        modalEl.addEventListener('shown.bs.modal', () => syncNestedStudentCaseModalStack(modalEl));
+      }
+    }
+    return actionDetailModalInstance;
+  }
+
+  function openActionDetailModal(entry) {
+    if (!entry) return;
+    actionDetailEntry = entry;
+    const titleEl = document.getElementById('studentCaseActionDetailTitle');
+    const metaEl = document.getElementById('studentCaseActionDetailMeta');
+    const summaryEl = document.getElementById('studentCaseActionDetailSummary');
+    const bodyEl = document.getElementById('studentCaseActionDetailBody');
+    const attachWrap = document.getElementById('studentCaseActionDetailAttachmentWrap');
+    const attachLink = document.getElementById('studentCaseActionDetailAttachmentLink');
+    const privateBadge = document.getElementById('studentCaseActionDetailPrivateBadge');
+    if (titleEl) {
+      titleEl.textContent = entry.kind === 'system' ? 'System activity' : 'Work log entry';
+    }
+    if (metaEl) {
+      metaEl.textContent = `${formatTimelineWhen(entry.at)} · ${entry.actorName || 'Staff'}`;
+    }
+    if (summaryEl) summaryEl.textContent = entry.summary || entry.title || '—';
+    if (bodyEl) bodyEl.textContent = entry.body || entry.summary || '—';
+    privateBadge?.classList.toggle('d-none', !(entry.private === true && entry.kind !== 'system'));
+    const involvedWrap = document.getElementById('studentCaseActionDetailInvolvedWrap');
+    const involvedEl = document.getElementById('studentCaseActionDetailInvolved');
+    const involvedIds = Array.isArray(entry.involvedPersonIds) ? entry.involvedPersonIds : [];
+    if (involvedWrap && involvedEl) {
+      involvedWrap.classList.toggle('d-none', !involvedIds.length || entry.kind === 'system');
+      involvedEl.textContent = involvedIds.join(', ');
+    }
+    const editBtn = document.getElementById('btnStudentCaseActionDetailEdit');
+    const deleteBtn = document.getElementById('btnStudentCaseActionDetailDelete');
+    const canEditEntry = entry.kind === 'work' && (entry.canEdit === true || canEditWorkAction);
+    const canDeleteEntry = entry.kind === 'work' && (entry.canDelete === true || canDeleteWorkAction);
+    editBtn?.classList.toggle('d-none', !canEditEntry || readOnly);
+    deleteBtn?.classList.toggle('d-none', !canDeleteEntry || readOnly);
+    const attachUrl = getAttachmentOpenUrl(entry.attachment);
+    if (attachWrap && attachLink) {
+      if (attachUrl) {
+        attachWrap.classList.remove('d-none');
+        attachLink.href = attachUrl;
+        attachLink.textContent = String(entry.attachment?.originalName || entry.attachment?.name || 'Download attachment');
+      } else {
+        attachWrap.classList.add('d-none');
+        attachLink.removeAttribute('href');
+        attachLink.textContent = '';
+      }
+    }
+    ensureActionDetailModalInstance()?.show();
+  }
+
+  function getWorkActionNotifyModalEl() {
+    return document.getElementById('studentCaseWorkActionNotifyModal');
+  }
+
+  function ensureWorkActionNotifyModalInstance() {
+    const modalEl = mountModalElementToBody(getWorkActionNotifyModalEl());
+    if (!modalEl || !global.bootstrap) return null;
+    if (!workActionNotifyModalInstance) {
+      workActionNotifyModalInstance = new global.bootstrap.Modal(modalEl);
+      if (!modalEl.dataset.lifecycleWired) {
+        modalEl.dataset.lifecycleWired = '1';
+        modalEl.addEventListener('show.bs.modal', () => {
+          mountModalElementToBody(modalEl);
+          syncNestedStudentCaseModalStack(modalEl);
+        });
+        modalEl.addEventListener('shown.bs.modal', () => syncNestedStudentCaseModalStack(modalEl));
+      }
+    }
+    return workActionNotifyModalInstance;
+  }
+
+  function renderWorkActionNotifyList(candidates = []) {
+    const host = document.getElementById('studentCaseWorkActionNotifyList');
+    const emptyEl = document.getElementById('studentCaseWorkActionNotifyEmpty');
+    const rows = Array.isArray(candidates) ? candidates : [];
+    if (!host) return;
+    host.innerHTML = rows.map((row) => {
+      const pid = escapeHtml(row.personId || '');
+      const name = escapeHtml(row.personName || row.personId || 'Person');
+      const hint = escapeHtml(row.roleHint || '');
+      return `<div class="form-check student-case-notify-row py-1"><input class="form-check-input student-case-notify-checkbox" type="checkbox" value="${pid}" id="studentCaseNotify_${pid}" checked><label class="form-check-label" for="studentCaseNotify_${pid}"><span class="fw-semibold">${name}</span>${hint ? `<span class="text-muted small ms-1">(${hint})</span>` : ''}</label></div>`;
+    }).join('');
+    host.classList.toggle('d-none', rows.length === 0);
+    emptyEl?.classList.toggle('d-none', rows.length > 0);
+    document.getElementById('btnStudentCaseWorkActionNotifySend')?.toggleAttribute('disabled', rows.length === 0);
+  }
+
+  function openWorkActionNotifyModal(actionId, candidates = []) {
+    pendingWorkActionNotify = {
+      actionId: String(actionId || '').trim(),
+      candidates: Array.isArray(candidates) ? candidates : []
+    };
+    if (!pendingWorkActionNotify.actionId || !pendingWorkActionNotify.candidates.length) {
+      return showMessage('Action Saved', 'Your work log entry was added to this case.', 'success');
+    }
+    renderWorkActionNotifyList(pendingWorkActionNotify.candidates);
+    ensureWorkActionNotifyModalInstance()?.show();
+    return Promise.resolve();
+  }
+
+  async function postWorkActionNotifications() {
+    const caseId = String(document.getElementById('studentCaseId')?.value || '').trim();
+    const actionId = pendingWorkActionNotify.actionId;
+    if (!caseId || !actionId) return;
+    const personIds = Array.from(document.querySelectorAll('.student-case-notify-checkbox:checked'))
+      .map((input) => String(input.value || '').trim())
+      .filter(Boolean);
+    if (!personIds.length) {
+      ensureWorkActionNotifyModalInstance()?.hide();
+      await showMessage('Action Saved', 'Work log saved. No chat notifications were sent.', 'success');
+      return;
+    }
+    showBusy('Sending Notifications', 'Delivering chat messages...');
+    try {
+      const res = await fetch(`/school/session-student-cases/api/${encodeURIComponent(caseId)}/work-actions/${encodeURIComponent(actionId)}/notify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: JSON.stringify({
+          personIds,
+          actionStateId: config?.actionStateId || ''
+        })
+      });
+      const result = await res.json().catch(() => ({}));
+      hideBusy();
+      if (!res.ok || result.status !== 'success') {
+        throw new Error(result.message || 'Failed to send notifications.');
+      }
+      if (Array.isArray(result.timeline)) setTimelineEntries(result.timeline);
+      if (result.case) syncCollaborationSection(result.case);
+      ensureWorkActionNotifyModalInstance()?.hide();
+      await showMessage('Notifications Sent', result.message || 'Chat notifications were sent.', 'success');
+    } catch (error) {
+      hideBusy();
+      await showMessage('Notify Failed', error.message, 'error');
+    }
+  }
+
+  function syncActionComposeMode(entry = null) {
+    const editIdEl = document.getElementById('studentCaseActionEditId');
+    const saveBtn = document.getElementById('btnStudentCaseActionSave');
+    const removeWrap = document.getElementById('studentCaseActionRemoveAttachmentWrap');
+    const isEdit = Boolean(entry && entry.kind === 'work' && entry.id);
+    if (editIdEl) editIdEl.value = isEdit ? String(entry.id) : '';
+    if (saveBtn) {
+      saveBtn.innerHTML = isEdit
+        ? '<i class="bi bi-check2-circle me-1"></i>Save changes'
+        : '<i class="bi bi-check2-circle me-1"></i>Save action';
+    }
+    removeWrap?.classList.toggle('d-none', !(isEdit && getAttachmentOpenUrl(entry.attachment)));
+  }
+
+  function beginEditWorkAction(entry) {
+    if (!entry || entry.kind !== 'work') return;
+    actionDetailModalInstance?.hide();
+    document.getElementById('studentCaseActionBody').value = entry.body || entry.summary || '';
+    document.getElementById('studentCaseActionPrivate').checked = entry.private === true;
+    document.getElementById('studentCaseActionFile').value = '';
+    document.getElementById('studentCaseActionRemoveAttachment').checked = false;
+    syncActionComposeMode(entry);
+    openActionsModal();
+    document.getElementById('studentCaseActionBody')?.focus();
+  }
+
+  async function deleteWorkActionEntry(entry) {
+    if (!entry || entry.kind !== 'work' || !entry.id) return;
+    const confirmed = typeof global.showMessageModal === 'function'
+      ? await global.showMessageModal({
+        title: 'Delete work log',
+        icon: 'warning',
+        message: 'Permanently delete this work log entry?',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary', value: false },
+          { text: 'Delete', class: 'btn-danger', value: true }
+        ]
+      })
+      : global.confirm('Delete this work log entry?');
+    if (confirmed !== true) return;
+    const caseId = String(document.getElementById('studentCaseId')?.value || '').trim();
+    if (!caseId) return;
+    showBusy('Deleting', 'Removing work log entry...');
+    try {
+      const res = await fetch(`/school/session-student-cases/api/${encodeURIComponent(caseId)}/work-actions/${encodeURIComponent(entry.id)}`, {
+        method: 'DELETE',
+        headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' }
+      });
+      const result = await res.json().catch(() => ({}));
+      hideBusy();
+      if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Delete failed.');
+      if (Array.isArray(result.timeline)) setTimelineEntries(result.timeline);
+      actionDetailModalInstance?.hide();
+      await showMessage('Deleted', result.message || 'Work log entry deleted.', 'success');
+    } catch (error) {
+      hideBusy();
+      await showMessage('Delete Failed', error.message, 'error');
+    }
+  }
+
+  function openActionsModal() {
+    renderActionsModalTimeline();
+    ensureActionsModalInstance()?.show();
+  }
+
+  function clearActionComposeForm() {
+    const bodyEl = document.getElementById('studentCaseActionBody');
+    const fileEl = document.getElementById('studentCaseActionFile');
+    const privateEl = document.getElementById('studentCaseActionPrivate');
+    const removeEl = document.getElementById('studentCaseActionRemoveAttachment');
+    if (bodyEl) bodyEl.value = '';
+    if (fileEl) fileEl.value = '';
+    if (privateEl) privateEl.checked = false;
+    if (removeEl) removeEl.checked = false;
+    syncActionComposeMode(null);
+  }
+
+  async function saveWorkActionFromModal() {
+    const caseId = String(document.getElementById('studentCaseId')?.value || '').trim();
+    if (!caseId) return;
+    const editId = String(document.getElementById('studentCaseActionEditId')?.value || '').trim();
+    const body = String(document.getElementById('studentCaseActionBody')?.value || '').trim();
+    if (!body) {
+      await showMessage('Action Required', 'Describe what you did before saving.', 'warning');
+      return;
+    }
+    const fileInput = document.getElementById('studentCaseActionFile');
+    const file = fileInput?.files?.[0] || null;
+    if (file && file.size > 2 * 1024 * 1024) {
+      await showMessage('File Too Large', 'Each attachment must be 2 MB or smaller.', 'warning');
+      return;
+    }
+    const formData = new FormData();
+    formData.append('body', body);
+    if (document.getElementById('studentCaseActionPrivate')?.checked) {
+      formData.append('private', 'true');
+    }
+    if (file) formData.append('file', file, file.name);
+    if (document.getElementById('studentCaseActionRemoveAttachment')?.checked) {
+      formData.append('removeAttachment', 'true');
+    }
+    if (config?.actionStateId) formData.append('actionStateId', config.actionStateId);
+    const isEdit = Boolean(editId);
+    showBusy(isEdit ? 'Updating Action' : 'Saving Action', isEdit ? 'Updating work log entry...' : 'Adding your work log entry...');
+    try {
+      const url = isEdit
+        ? `/school/session-student-cases/api/${encodeURIComponent(caseId)}/work-actions/${encodeURIComponent(editId)}`
+        : `/school/session-student-cases/api/${encodeURIComponent(caseId)}/work-actions`;
+      const res = await fetch(url, {
+        method: isEdit ? 'PATCH' : 'POST',
+        headers: { 'X-AJAX-Request': 'true' },
+        body: formData
+      });
+      const result = await res.json().catch(() => ({}));
+      hideBusy();
+      if (!res.ok || result.status !== 'success') {
+        throw new Error(result.message || 'Failed to save work log entry.');
+      }
+      if (Array.isArray(result.timeline)) {
+        setTimelineEntries(result.timeline);
+      }
+      if (result.case) {
+        syncCollaborationSection(result.case);
+      }
+      clearActionComposeForm();
+      if (isEdit) {
+        await showMessage('Action Updated', result.message || 'Work log entry updated.', 'success');
+        return;
+      }
+      await openWorkActionNotifyModal(result.actionId, result.notifyCandidates || []);
+    } catch (error) {
+      hideBusy();
+      await showMessage('Save Failed', error.message, 'error');
+    }
+  }
+
+  function handleTimelineClick(event) {
+    const btn = event.target.closest('[data-timeline-id]');
+    if (!btn) return;
+    event.preventDefault();
+    event.stopPropagation();
+    const entry = findTimelineEntry(btn.getAttribute('data-timeline-id'));
+    if (entry) openActionDetailModal(entry);
   }
 
   function syncResultSection() {
@@ -475,11 +905,15 @@
     canDelete = capabilities.canDelete === true;
     canViewResultNote = capabilities.canViewResultNote === true;
     canAssignOrShare = capabilities.canAssignOrShare === true;
+    canContributeWorkAction = capabilities.canContributeWorkAction === true;
+    canEditWorkAction = capabilities.canEditWorkAction === true;
+    canDeleteWorkAction = capabilities.canDeleteWorkAction === true;
     allowCreate = capabilities.canCreate === true;
     readOnly = capabilities.readOnly === true
       || (!canEditCase && (capabilities.canRead === true || capabilities.canReadAll === true));
     syncResultSection();
     syncCollaborationChrome();
+    syncActivityButton();
   }
 
   function displayPersonLabel(entry) {
@@ -588,7 +1022,9 @@
         });
         modalEl.addEventListener('hidden.bs.modal', () => {
           modalEl.style.removeProperty('z-index');
+          if (!preserveCollaborationWorkflow) collaborationWorkflowActive = false;
           syncStudentCaseModalStack();
+          repairBootstrapModalStackForStudentCase();
         });
       }
     }
@@ -600,6 +1036,7 @@
     const assignedEl = document.getElementById('studentCaseCollabAssignedDetail');
     const collaboratorsEl = document.getElementById('studentCaseCollabCollaboratorsList');
     const actionsEl = document.getElementById('studentCaseCollabActions');
+    const canManageCollab = canAssignOrShare && !readOnly;
     const reviewers = collaborationSnapshot.routingReviewers || [];
     if (routingEl) {
       routingEl.textContent = reviewers.length
@@ -612,16 +1049,28 @@
         assignedEl.textContent = '—';
       } else {
         const meta = formatCollabMeta(assignedTo);
-        assignedEl.innerHTML = meta
+        const removeBtn = canManageCollab
+          ? `<button type="button" class="btn btn-sm btn-outline-danger ms-2 student-case-collab-remove-btn" data-collab-remove="assign" title="Remove primary assignee"><i class="bi bi-x-lg"></i><span class="visually-hidden">Remove assignee</span></button>`
+          : '';
+        assignedEl.innerHTML = `<div class="student-case-collab-person-row d-flex align-items-start justify-content-between gap-2"><div>${meta
           ? `<strong>${escapeHtml(displayPersonLabel(assignedTo))}</strong><br><span class="text-muted">${escapeHtml(meta)}</span>`
-          : `<strong>${escapeHtml(displayPersonLabel(assignedTo))}</strong>`;
+          : `<strong>${escapeHtml(displayPersonLabel(assignedTo))}</strong>`}</div>${removeBtn}</div>`;
       }
     }
     if (collaboratorsEl) {
-      collaboratorsEl.innerHTML = (collaborationSnapshot.collaborators || []).map((entry) => {
-        const meta = formatCollabMeta(entry);
-        return `<li><strong>${escapeHtml(displayPersonLabel(entry))}</strong>${meta ? `<br><span class="text-muted">${escapeHtml(meta)}</span>` : ''}</li>`;
-      }).join('');
+      const rows = collaborationSnapshot.collaborators || [];
+      if (!rows.length) {
+        collaboratorsEl.innerHTML = '';
+      } else {
+        collaboratorsEl.innerHTML = rows.map((entry) => {
+          const meta = formatCollabMeta(entry);
+          const personId = escapeHtml(entry.personId || '');
+          const removeBtn = canManageCollab
+            ? `<button type="button" class="btn btn-sm btn-outline-danger student-case-collab-remove-btn" data-collab-remove="collaborator" data-person-id="${personId}" title="Remove collaborator"><i class="bi bi-x-lg"></i><span class="visually-hidden">Remove</span></button>`
+            : '';
+          return `<li class="student-case-collab-person-row d-flex align-items-start justify-content-between gap-2 mb-2"><div><strong>${escapeHtml(displayPersonLabel(entry))}</strong>${meta ? `<br><span class="text-muted">${escapeHtml(meta)}</span>` : ''}</div>${removeBtn}</li>`;
+        }).join('');
+      }
     }
     actionsEl?.classList.toggle('d-none', !(canAssignOrShare && !readOnly));
   }
@@ -629,9 +1078,74 @@
   function openCollaborationModal() {
     const caseId = String(document.getElementById('studentCaseId')?.value || '').trim();
     if (!caseId) return;
+    collaborationWorkflowActive = true;
+    showCollaborationFlash('');
     populateCollaborationModalContent();
     mountCollaborationModalToBody();
     ensureCollaborationModalInstance()?.show();
+  }
+
+  function shouldKeepCollaborationWorkflowOpen() {
+    return collaborationWorkflowActive === true;
+  }
+
+  function repairBootstrapModalStackForStudentCase() {
+    const caseEl = getModalEl();
+    const collabEl = getCollaborationModalEl();
+    const openModals = [];
+    if (caseEl?.classList.contains('show')) openModals.push(caseEl);
+    if (collabEl?.classList.contains('show')) openModals.push(collabEl);
+    if (!openModals.length) return;
+
+    document.body.classList.add('modal-open');
+    if (!document.body.style.overflow) document.body.style.overflow = 'hidden';
+
+    let backdrops = Array.from(document.querySelectorAll('.modal-backdrop'));
+    if (backdrops.length < openModals.length) {
+      const missing = openModals.length - backdrops.length;
+      for (let i = 0; i < missing; i += 1) {
+        const backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop fade show';
+        document.body.appendChild(backdrop);
+      }
+      backdrops = Array.from(document.querySelectorAll('.modal-backdrop'));
+    } else if (backdrops.length > openModals.length) {
+      for (let i = backdrops.length - 1; i >= openModals.length; i -= 1) {
+        backdrops[i]?.remove();
+      }
+    }
+    syncCollaborationModalStack();
+  }
+
+  function keepStudentCaseModalStackOpen() {
+    const caseId = String(document.getElementById('studentCaseId')?.value || '').trim();
+    if (!caseId) return;
+    preserveCollaborationWorkflow = true;
+    try {
+      const caseEl = getModalEl();
+      if (caseEl && !caseEl.classList.contains('show')) ensureModalInstance()?.show();
+      if (shouldKeepCollaborationWorkflowOpen()) {
+        const collabEl = getCollaborationModalEl();
+        if (collabEl && !collabEl.classList.contains('show')) ensureCollaborationModalInstance()?.show();
+      }
+      repairBootstrapModalStackForStudentCase();
+      syncStudentCaseModalStack();
+    } finally {
+      preserveCollaborationWorkflow = false;
+    }
+  }
+
+  function showCollaborationFlash(message) {
+    const host = document.getElementById('studentCaseCollabFlash');
+    if (!host) return;
+    const text = String(message || '').trim();
+    if (!text) {
+      host.classList.add('d-none');
+      host.textContent = '';
+      return;
+    }
+    host.textContent = text;
+    host.classList.remove('d-none');
   }
 
   function displayNameForPickerItem(item = {}) {
@@ -653,7 +1167,7 @@
           { text: 'Send chat notification', class: 'btn-primary', value: true }
         ]
       }).then((choice) => {
-        if (choice === true) return postNotifyCollaboration(targetPersonId);
+        if (choice === 'Send chat notification' || choice === true) return postNotifyCollaboration(targetPersonId);
         return false;
       });
     }
@@ -692,7 +1206,9 @@
     }
   }
 
-  async function postCollaborationAction(action, targetPersonId) {
+  async function postCollaborationAction(action, targetPersonId, options = {}) {
+    const keepCollaborationOpen = shouldKeepCollaborationWorkflowOpen() || options.keepCollaborationOpen === true;
+    if (keepCollaborationOpen) keepStudentCaseModalStackOpen();
     const caseId = String(document.getElementById('studentCaseId')?.value || '').trim();
     if (!caseId || !targetPersonId) return;
     const endpoint = action === 'assign' ? 'assign' : 'share';
@@ -723,16 +1239,109 @@
         syncCollaborationChrome();
         populateCollaborationModalContent();
       }
-      await showMessage(
-        action === 'assign' ? 'Case Assigned' : 'Case Shared',
-        result.message || 'Update complete.',
-        'success'
-      );
-      if (typeof config?.onSaved === 'function') config.onSaved(result.case || {});
+      if (keepCollaborationOpen) {
+        keepStudentCaseModalStackOpen();
+        showCollaborationFlash(result.message || 'Update complete.');
+      } else {
+        await showMessage(
+          action === 'assign' ? 'Case Assigned' : 'Case Shared',
+          result.message || 'Update complete.',
+          'success'
+        );
+      }
+      notifyHostCaseUpdated(result.case || {}, { collaborationOnly: keepCollaborationOpen });
     } catch (error) {
       hideBusy();
       await showMessage('Update Failed', error.message, 'error');
+      if (keepCollaborationOpen) keepStudentCaseModalStackOpen();
     }
+  }
+
+  async function postCollaborationRemoval(kind, targetPersonId = '', options = {}) {
+    const keepCollaborationOpen = shouldKeepCollaborationWorkflowOpen() || options.keepCollaborationOpen === true;
+    if (keepCollaborationOpen) keepStudentCaseModalStackOpen();
+    const caseId = String(document.getElementById('studentCaseId')?.value || '').trim();
+    if (!caseId) return;
+    const isUnassign = kind === 'assign';
+    if (!isUnassign && !targetPersonId) return;
+    const url = isUnassign
+      ? `/school/session-student-cases/api/${encodeURIComponent(caseId)}/unassign`
+      : `/school/session-student-cases/api/${encodeURIComponent(caseId)}/collaborators/remove`;
+    showBusy('Updating', isUnassign ? 'Removing primary assignee...' : 'Removing collaborator...');
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'x-ajax-request': 'true'
+        },
+        body: JSON.stringify(isUnassign ? {
+          actionStateId: config?.actionStateId || ''
+        } : {
+          targetPersonId,
+          actionStateId: config?.actionStateId || ''
+        })
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Request failed.');
+      hideBusy();
+      if (result.case) {
+        setCollaborationSnapshot(result.case, collaborationSnapshot.routingReviewers);
+        populateFromCaseRow(result.case);
+        syncCollaborationChrome();
+        populateCollaborationModalContent();
+      }
+      if (keepCollaborationOpen) {
+        keepStudentCaseModalStackOpen();
+        showCollaborationFlash(result.message || 'Update complete.');
+      } else {
+        await showMessage(
+          isUnassign ? 'Assignee Removed' : 'Collaborator Removed',
+          result.message || 'Update complete.',
+          'success'
+        );
+      }
+      notifyHostCaseUpdated(result.case || {}, { collaborationOnly: keepCollaborationOpen });
+    } catch (error) {
+      hideBusy();
+      await showMessage('Update Failed', error.message, 'error');
+      if (keepCollaborationOpen) keepStudentCaseModalStackOpen();
+    }
+  }
+
+  async function handleCollaborationRemoveClick(event) {
+    const btn = event.target.closest('[data-collab-remove]');
+    if (!btn) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (!canAssignOrShare || readOnly) return;
+    const keepCollaborationOpen = shouldKeepCollaborationWorkflowOpen();
+    const kind = String(btn.getAttribute('data-collab-remove') || '').trim();
+    const personId = String(btn.getAttribute('data-person-id') || '').trim();
+    const message = kind === 'assign'
+      ? 'Remove the primary assignee from this case? They will no longer be listed as the handler (category routing access is unchanged).'
+      : 'Remove this collaborator from the case?';
+    let confirmed = false;
+    const confirmButtonText = 'Remove';
+    if (typeof global.showMessageModal === 'function') {
+      const choice = await global.showMessageModal({
+        title: kind === 'assign' ? 'Remove assignee' : 'Remove collaborator',
+        icon: 'warning',
+        message,
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary', value: false },
+          { text: confirmButtonText, class: 'btn-danger', value: true }
+        ]
+      });
+      // showMessageModal resolves with button text, not btn.value (see masterScheduleViewer uiConfirm)
+      confirmed = choice === confirmButtonText || choice === true;
+    } else {
+      confirmed = global.confirm(message);
+    }
+    if (!confirmed) return;
+    if (keepCollaborationOpen) keepStudentCaseModalStackOpen();
+    await postCollaborationRemoval(kind, personId, { keepCollaborationOpen });
   }
 
   function openCollaborationPersonPicker(action) {
@@ -755,10 +1364,16 @@
           ).catch(() => {});
           return;
         }
-        postCollaborationAction(isAssign ? 'assign' : 'share', personId).catch(() => {});
+        postCollaborationAction(isAssign ? 'assign' : 'share', personId, {
+          keepCollaborationOpen: shouldKeepCollaborationWorkflowOpen()
+        }).catch(() => {});
       }
     });
+    preserveCollaborationWorkflow = true;
+    collaborationWorkflowActive = true;
     global.GenericPicker.open(pickerConfig);
+    preserveCollaborationWorkflow = false;
+    repairBootstrapModalStackForStudentCase();
   }
 
   function maybeOpenPendingCollaborationPicker() {
@@ -798,6 +1413,10 @@
     applyReadOnlyState();
     collaborationSnapshot = { assignedTo: null, collaborators: [], routingReviewers: [] };
     syncCollaborationChrome();
+    setTimelineEntries([]);
+    canContributeWorkAction = false;
+    canEditWorkAction = false;
+    canDeleteWorkAction = false;
   }
 
   function syncCollaborationSection(row) {
@@ -1044,11 +1663,15 @@
       manageSessionHref = config?.apiMode === 'session'
         ? ''
         : String(ctx.manageSessionHref || '').trim();
-      applyCapabilities(ctx.capabilities || {});
       allowCreate = false;
+      resolveMode = options.resolveMode === true;
+      pendingCollaborationAction = String(options.collaborationAction || '').trim();
       resetModal();
       setCollaborationSnapshot(ctx.case || {}, ctx.routingReviewers || []);
       populateFromCaseRow(ctx.case || {});
+      applyCapabilities(ctx.capabilities || {});
+      setTimelineEntries(ctx.timeline || []);
+      syncActivityButton();
       if (resolveMode && canResolve) {
         setResolveVisible(true);
         syncFooter('details');
@@ -1088,6 +1711,7 @@
     });
     modalEl.addEventListener('hidden.bs.modal', () => {
       clearStudentCaseModalStack();
+      collaborationWorkflowActive = false;
     });
   }
 
@@ -1179,6 +1803,34 @@
     document.getElementById('btnStudentCaseCollabShare')?.addEventListener('click', () => {
       openCollaborationPersonPicker('share');
     });
+    document.getElementById('studentCaseCollaborationModal')?.addEventListener('click', (event) => {
+      handleCollaborationRemoveClick(event).catch(() => {});
+    });
+    document.getElementById('btnStudentCaseOpenActivity')?.addEventListener('click', () => {
+      openActionsModal();
+    });
+    document.getElementById('btnStudentCaseActionSave')?.addEventListener('click', () => {
+      saveWorkActionFromModal().catch(() => {});
+    });
+    document.getElementById('btnStudentCaseActionClear')?.addEventListener('click', () => {
+      clearActionComposeForm();
+    });
+    document.getElementById('btnStudentCaseWorkActionNotifySend')?.addEventListener('click', () => {
+      postWorkActionNotifications().catch(() => {});
+    });
+    document.getElementById('btnStudentCaseNotifySelectAll')?.addEventListener('click', () => {
+      document.querySelectorAll('.student-case-notify-checkbox').forEach((input) => { input.checked = true; });
+    });
+    document.getElementById('btnStudentCaseNotifyClearAll')?.addEventListener('click', () => {
+      document.querySelectorAll('.student-case-notify-checkbox').forEach((input) => { input.checked = false; });
+    });
+    document.getElementById('btnStudentCaseActionDetailEdit')?.addEventListener('click', () => {
+      if (actionDetailEntry) beginEditWorkAction(actionDetailEntry);
+    });
+    document.getElementById('btnStudentCaseActionDetailDelete')?.addEventListener('click', () => {
+      if (actionDetailEntry) deleteWorkActionEntry(actionDetailEntry).catch(() => {});
+    });
+    document.getElementById('studentCaseActionsTimeline')?.addEventListener('click', handleTimelineClick);
     document.getElementById('studentCaseDetailsNoteWrap')?.addEventListener('show.bs.collapse', () => {
       const toggle = document.getElementById('studentCaseDetailsNoteToggle');
       const label = document.getElementById('studentCaseDetailsNoteToggleLabel');

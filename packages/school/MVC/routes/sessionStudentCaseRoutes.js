@@ -34,6 +34,10 @@ const {
 
 } = require('./sessionStudentCaseRouteGuards');
 
+const { requireCoreModule } = require('../services/school/schoolCoreContracts');
+const upload = requireCoreModule('MVC/middleware/upload');
+const caseWorkActionUpload = upload('school-class-workspace', true, false, { maxFileSizeMb: 2 });
+
 
 
 const mutationActionState = {
@@ -140,6 +144,16 @@ router.post('/api/:caseId/assign',
 
 
 
+router.post('/api/:caseId/unassign',
+
+  requireStudentCaseOperation(OPERATIONS.UPDATE),
+
+  trackActionState(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.UPDATE, mutationActionState),
+
+  ctrl.unassignCase);
+
+
+
 router.post('/api/:caseId/share',
 
   requireStudentCaseOperation(OPERATIONS.UPDATE),
@@ -150,6 +164,16 @@ router.post('/api/:caseId/share',
 
 
 
+router.post('/api/:caseId/collaborators/remove',
+
+  requireStudentCaseOperation(OPERATIONS.UPDATE),
+
+  trackActionState(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.UPDATE, mutationActionState),
+
+  ctrl.removeCaseCollaborator);
+
+
+
 router.post('/api/:caseId/notify',
 
   requireStudentCaseOperation(OPERATIONS.UPDATE),
@@ -157,6 +181,60 @@ router.post('/api/:caseId/notify',
   trackActionState(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.UPDATE, mutationActionState),
 
   ctrl.notifyCaseCollaboration);
+
+
+
+router.post('/api/:caseId/work-actions',
+
+  requireStudentCaseOperation(OPERATIONS.UPDATE),
+
+  trackActionState(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.UPDATE, mutationActionState),
+
+  caseWorkActionUpload.single('file'),
+
+  ctrl.addCaseWorkAction);
+
+
+
+router.post('/api/:caseId/work-actions/:actionId/notify',
+
+  requireStudentCaseOperation(OPERATIONS.UPDATE),
+
+  trackActionState(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.UPDATE, mutationActionState),
+
+  ctrl.notifyCaseWorkAction);
+
+
+
+router.patch('/api/:caseId/work-actions/:actionId',
+
+  requireStudentCaseOperation(OPERATIONS.UPDATE),
+
+  trackActionState(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.UPDATE, mutationActionState),
+
+  caseWorkActionUpload.single('file'),
+
+  ctrl.updateCaseWorkAction);
+
+
+
+router.delete('/api/:caseId/work-actions/:actionId',
+
+  requireStudentCaseOperation(OPERATIONS.DELETE),
+
+  trackActionState(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.DELETE, {
+
+    requireToken: false,
+
+    keepActive: true,
+
+    allowOperationTokenFallback: true,
+
+    allowInactiveTokenFallback: true
+
+  }),
+
+  ctrl.deleteCaseWorkAction);
 
 
 

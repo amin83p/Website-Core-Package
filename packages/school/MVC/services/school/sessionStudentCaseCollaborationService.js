@@ -84,7 +84,8 @@ async function sendCaseCollaborationChatMessage({
     assign: 'assigned you as the primary handler for',
     share: 'shared a student case with you:',
     reminder: 'sent you a reminder about',
-    new_case: 'registered a new student case that needs your review:'
+    new_case: 'registered a new student case that needs your review:',
+    work_log: 'logged new activity on'
   };
   const actionLabel = actionLabels[action] || actionLabels.reminder;
   const summary = escapeHtml(cleanString(caseRow?.summary || 'Student session case', 260));
@@ -99,9 +100,13 @@ async function sendCaseCollaborationChatMessage({
   const openHref = buildCaseOpenHref(caseRow);
   const introLine = action === 'new_case'
     ? 'A new <strong>session student case</strong> was registered and routed to you for review.'
-    : (action === 'reminder'
-      ? 'This is a reminder about a <strong>session student case</strong>.'
-      : `You were ${actionLabel} a <strong>session student case</strong>.`);
+    : (action === 'work_log'
+      ? (note
+        ? 'A team member added a <strong>work log entry</strong> on a session student case.'
+        : 'A team member added a <strong>private work log entry</strong> on a session student case (details are visible only to users with resolve access).')
+      : (action === 'reminder'
+        ? 'This is a reminder about a <strong>session student case</strong>.'
+        : `You were ${actionLabel} a <strong>session student case</strong>.`));
   const chatMsgContent = [
     '<i class="bi bi-folder-symlink-fill text-primary"></i> <strong>System Message:</strong>',
     introLine,
@@ -310,6 +315,48 @@ async function shareCase(req, caseId, input = {}) {
   };
 }
 
+async function unassignCase(req, caseId) {
+  const existing = await sessionStudentCaseReviewService.loadCaseForRequest(req, caseId);
+  await sessionStudentCaseAccessService.assertCanAssignOrShareCase(req, existing);
+  if (!existing?.assignedTo?.personId) {
+    return { case: existing, assignedTo: null, unchanged: true };
+  }
+  const removedName = cleanString(existing.assignedTo.personName, 180)
+    || existing.assignedTo.personId;
+  const note = `Removed primary assignee ${removedName}.`;
+  const updated = await persistCollaborationUpdate(req, existing, { assignedTo: null }, 'unassigned', note);
+  return {
+    case: updated,
+    assignedTo: null
+  };
+}
+
+async function removeCollaborator(req, caseId, input = {}) {
+  const existing = await sessionStudentCaseReviewService.loadCaseForRequest(req, caseId);
+  await sessionStudentCaseAccessService.assertCanAssignOrShareCase(req, existing);
+  const targetPersonId = toPublicId(input.targetPersonId);
+  if (!targetPersonId) {
+    const error = new Error('A valid person is required.');
+    error.statusCode = 400;
+    throw error;
+  }
+  const existingCollaborators = Array.isArray(existing.collaborators) ? existing.collaborators : [];
+  const match = existingCollaborators.find((row) => idsEqual(row?.personId, targetPersonId));
+  if (!match) {
+    const error = new Error('That person is not a collaborator on this case.');
+    error.statusCode = 404;
+    throw error;
+  }
+  const removedName = cleanString(match.personName, 180) || targetPersonId;
+  const collaborators = existingCollaborators.filter((row) => !idsEqual(row?.personId, targetPersonId));
+  const note = `Removed collaborator ${removedName}.`;
+  const updated = await persistCollaborationUpdate(req, existing, { collaborators }, 'collaborator_removed', note);
+  return {
+    case: updated,
+    collaborators: updated.collaborators || []
+  };
+}
+
 async function resendCaseCollaborationChat(req, caseId, input = {}) {
   const existing = await sessionStudentCaseReviewService.loadCaseForRequest(req, caseId);
   await sessionStudentCaseAccessService.assertCanAssignOrShareCase(req, existing);
@@ -426,15 +473,41 @@ async function listShareEligiblePersons(req, caseId, query = {}) {
   };
 }
 
+async function resolvePersonIdForUserId(reqUser, userId) {
+  const uid = toPublicId(userId);
+  if (!uid) return null;
+  const usersPayload = await schoolIdentityLookupService.listSchoolUsers({
+    reqUser,
+    q: uid,
+    query: { page: 1, limit: 100 }
+  });
+  const match = (usersPayload.allRows || usersPayload.rows || [])
+    .find((row) => idsEqual(row.userId, uid));
+  if (!match?.personId) return null;
+  const personId = toPublicId(match.personId);
+  const personName = await personDisplayNameService.resolvePersonDisplayName(personId, {
+    fallback: match.displayName || match.name || personId
+  });
+  return {
+    personId,
+    personName,
+    userId: uid
+  };
+}
+
 module.exports = {
   assignCase,
   shareCase,
+  unassignCase,
+  removeCollaborator,
   resendCaseCollaborationChat,
   notifyCategoryRoutingAssigneesOnCaseCreated,
   listRoutingReviewersForCase,
   listShareEligiblePersons,
   sendCaseCollaborationChatMessage,
   buildCaseOpenHref,
+  resolveUserIdForPerson,
+  resolvePersonIdForUserId,
   _private: {
     resolveTargetForChat,
     persistCollaborationUpdate,

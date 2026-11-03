@@ -187,6 +187,20 @@ test('session student cases list view contains table and row action menu wiring'
   assert.match(modalAssets, /sessionStudentCaseModalClient\.js/);
   assert.match(modalAssets, /modal_GenericPicker/);
   assert.match(modalAssets, /sessionStudentCaseCollaborationModal/);
+  assert.match(modalAssets, /sessionStudentCaseActionsModal/);
+  assert.match(modalAssets, /sessionStudentCaseActionDetailModal/);
+  assert.match(modalFooter, /btnStudentCaseOpenActivity/);
+  const actionsModal = read('packages/school/MVC/views/school/sessionStudentCase/partials/sessionStudentCaseActionsModal.ejs');
+  const reviewSource = read('packages/school/MVC/services/school/sessionStudentCaseReviewService.js');
+  assert.match(actionsModal, /studentCaseActionPrivate/);
+  assert.match(clientSource, /saveWorkActionFromModal/);
+  assert.match(clientSource, /canContributeWorkAction/);
+  assert.match(clientSource, /btnStudentCaseOpenActivity/);
+  assert.match(modalAssets, /sessionStudentCaseWorkActionNotifyModal/);
+  assert.match(clientSource, /postWorkActionNotifications/);
+  assert.match(clientSource, /canEditWorkAction/);
+  assert.match(clientSource, /deleteWorkActionEntry/);
+  assert.match(reviewSource, /canEditWorkAction/);
   assert.match(modalFooter, /btnStudentCaseOpenCollaboration/);
   assert.match(modalShell, /sessionStudentCaseModalBody/);
   assert.match(modalShell, /sessionStudentCaseModalFooter/);
@@ -460,7 +474,8 @@ test('student case policy and access builder do not reference SCHOOL_SESSIONS', 
 test('resolveCaseCapabilities maps READ without READ_ALL as page-only access', async () => {
   const originals = new Map();
   stubStudentCaseCapabilityDeps(originals, {
-    allowedOps: new Set(['READ'])
+    allowedOps: new Set(['READ']),
+    sessionMutationOk: false
   });
   const servicePath = require.resolve('../MVC/services/school/sessionStudentCaseAccessService');
   const service = require(servicePath);

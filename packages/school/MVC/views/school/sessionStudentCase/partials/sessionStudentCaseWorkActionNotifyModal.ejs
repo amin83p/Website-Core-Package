@@ -1,0 +1,25 @@
+<div class="modal fade" id="studentCaseWorkActionNotifyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold"><i class="bi bi-chat-dots me-2"></i>Notify involved people</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted">Your work log was saved. Choose who should receive a chat notification from you (all selected by default).</p>
+                <div class="d-flex flex-wrap gap-2 mb-2">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnStudentCaseNotifySelectAll">Select all</button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnStudentCaseNotifyClearAll">Clear all</button>
+                </div>
+                <div id="studentCaseWorkActionNotifyList" class="student-case-notify-list border rounded p-2 bg-light"></div>
+                <div id="studentCaseWorkActionNotifyEmpty" class="small text-muted d-none mt-2">No other people with chat accounts are linked to this case.</div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Skip</button>
+                <button type="button" class="btn btn-primary" id="btnStudentCaseWorkActionNotifySend">
+                    <i class="bi bi-send me-1"></i>Send notifications
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

@@ -95,6 +95,82 @@ function sanitizeStructuredFields(input = {}) {
 }
 
 const MAX_CASE_COLLABORATORS = 20;
+const MAX_WORK_ACTIONS = 200;
+const MAX_WORK_ACTION_INVOLVED = 20;
+const WORK_ACTION_BODY_MAX = 5000;
+const WORK_ACTION_SUMMARY_MAX = 160;
+
+function sanitizeWorkActionAttachment(value) {
+  if (value === null || value === undefined || value === '') return null;
+  if (!isPlainObject(value)) return null;
+  const url = cleanString(value.url || value.storagePath || value.path, { max: 600, allowEmpty: true });
+  if (!url) return null;
+  return {
+    id: cleanId(value.id, { max: 120, allowEmpty: true }) || '',
+    kind: cleanString(value.kind, { max: 80, allowEmpty: true }) || 'session_student_case_action',
+    name: cleanString(value.name || value.originalName || value.filename, { max: 260, allowEmpty: true }),
+    originalName: cleanString(value.originalName || value.name || value.filename, { max: 260, allowEmpty: true }),
+    filename: cleanString(value.filename || value.originalName || value.name, { max: 260, allowEmpty: true }),
+    mimeType: cleanString(value.mimeType || value.mimetype, { max: 120, allowEmpty: true }) || 'application/octet-stream',
+    size: Number.isFinite(Number(value.size)) ? Math.max(0, Math.floor(Number(value.size))) : 0,
+    url,
+    storagePath: url,
+    path: url,
+    uploadedAt: cleanString(value.uploadedAt, { max: 40, allowEmpty: true }) || new Date().toISOString(),
+    uploadedBy: cleanId(value.uploadedBy, { max: 120, allowEmpty: true }) || '',
+    classId: cleanId(value.classId, { max: 120, allowEmpty: true }) || '',
+    sessionId: cleanId(value.sessionId, { max: 120, allowEmpty: true }) || '',
+    subjectId: cleanId(value.subjectId, { max: 120, allowEmpty: true }) || ''
+  };
+}
+
+function sanitizeWorkActionInvolvedPersonIds(list) {
+  const seen = new Set();
+  const rows = [];
+  (Array.isArray(list) ? list : []).forEach((value) => {
+    const personId = cleanId(value, { max: 120, allowEmpty: false });
+    if (!personId || seen.has(personId)) return;
+    seen.add(personId);
+    rows.push(personId);
+  });
+  return rows.slice(0, MAX_WORK_ACTION_INVOLVED);
+}
+
+function sanitizeWorkActions(list) {
+  return (Array.isArray(list) ? list : [])
+    .map((entry) => {
+      if (!isPlainObject(entry)) return null;
+      const body = cleanString(entry.body, { max: WORK_ACTION_BODY_MAX, allowEmpty: true });
+      const summary = cleanString(entry.summary, { max: WORK_ACTION_SUMMARY_MAX, allowEmpty: true })
+        || body.slice(0, WORK_ACTION_SUMMARY_MAX);
+      if (!body && !summary) return null;
+      return {
+        id: cleanId(entry.id, { max: 120, allowEmpty: true }) || generateWorkActionId(new Set()),
+        at: cleanString(entry.at, { max: 40, allowEmpty: true }) || new Date().toISOString(),
+        actorUserId: cleanId(entry.actorUserId, { max: 120, allowEmpty: true }) || '',
+        actorPersonId: cleanId(entry.actorPersonId, { max: 120, allowEmpty: true }) || '',
+        actorName: cleanString(entry.actorName, { max: 180, allowEmpty: true }),
+        summary,
+        body: body || summary,
+        private: normalizeBoolean(entry.private),
+        involvedPersonIds: sanitizeWorkActionInvolvedPersonIds(entry.involvedPersonIds),
+        notifiedAt: cleanString(entry.notifiedAt, { max: 40, allowEmpty: true }) || '',
+        updatedAt: cleanString(entry.updatedAt, { max: 40, allowEmpty: true }) || '',
+        updatedByUserId: cleanId(entry.updatedByUserId, { max: 120, allowEmpty: true }) || '',
+        attachment: sanitizeWorkActionAttachment(entry.attachment)
+      };
+    })
+    .filter(Boolean)
+    .slice(-MAX_WORK_ACTIONS);
+}
+
+function generateWorkActionId(existingIds = new Set()) {
+  for (let i = 0; i < 50; i += 1) {
+    const candidate = `SCA-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    if (!existingIds.has(candidate)) return candidate;
+  }
+  return `SCA-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
+}
 
 function sanitizeAssignedTo(value) {
   if (value === null || value === undefined || value === '') return null;
@@ -193,6 +269,9 @@ function sanitizeCaseInput(input = {}, { isUpdate = false } = {}) {
     out.summary = deriveCaseSummary(out.category, out.details);
   }
   if (!out.summary) throw new Error('Case summary could not be derived from issue details.');
+  if (!isUpdate) {
+    out.workActions = [];
+  }
   if (input.id) out.id = cleanId(input.id, { max: 120, allowEmpty: false });
   return out;
 }
@@ -290,6 +369,13 @@ module.exports = {
   CASE_SEVERITIES,
   CASE_CATEGORIES,
   sanitizeCaseInput,
+  sanitizeWorkActions,
+  sanitizeWorkActionAttachment,
+  generateWorkActionId,
+  MAX_WORK_ACTIONS,
+  MAX_WORK_ACTION_INVOLVED,
+  WORK_ACTION_BODY_MAX,
+  WORK_ACTION_SUMMARY_MAX,
   getAllSessionStudentCases,
   getSessionStudentCaseById,
   addSessionStudentCase,
