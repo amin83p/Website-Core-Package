@@ -94,6 +94,43 @@ function sanitizeStructuredFields(input = {}) {
   };
 }
 
+const MAX_CASE_COLLABORATORS = 20;
+
+function sanitizeAssignedTo(value) {
+  if (value === null || value === undefined || value === '') return null;
+  if (!isPlainObject(value)) return null;
+  const personId = cleanId(value.personId, { max: 120, allowEmpty: false });
+  if (!personId) return null;
+  return {
+    personId,
+    personName: cleanString(value.personName, { max: 180, allowEmpty: true }) || personId,
+    assignedAt: cleanString(value.assignedAt, { max: 40, allowEmpty: true }) || new Date().toISOString(),
+    assignedByPersonId: cleanId(value.assignedByPersonId, { max: 120, allowEmpty: true }) || '',
+    assignedByUserId: cleanId(value.assignedByUserId, { max: 120, allowEmpty: true }) || '',
+    assignedByName: cleanString(value.assignedByName, { max: 180, allowEmpty: true })
+  };
+}
+
+function sanitizeCollaborators(list) {
+  const seen = new Set();
+  const rows = [];
+  (Array.isArray(list) ? list : []).forEach((entry) => {
+    if (!isPlainObject(entry)) return;
+    const personId = cleanId(entry.personId, { max: 120, allowEmpty: false });
+    if (!personId || seen.has(personId)) return;
+    seen.add(personId);
+    rows.push({
+      personId,
+      personName: cleanString(entry.personName, { max: 180, allowEmpty: true }) || personId,
+      addedAt: cleanString(entry.addedAt, { max: 40, allowEmpty: true }) || new Date().toISOString(),
+      addedByPersonId: cleanId(entry.addedByPersonId, { max: 120, allowEmpty: true }) || '',
+      addedByUserId: cleanId(entry.addedByUserId, { max: 120, allowEmpty: true }) || '',
+      addedByName: cleanString(entry.addedByName, { max: 180, allowEmpty: true })
+    });
+  });
+  return rows.slice(0, MAX_CASE_COLLABORATORS);
+}
+
 function sanitizeLifecycle(events) {
   return (Array.isArray(events) ? events : [])
     .map((event) => ({
@@ -136,6 +173,16 @@ function sanitizeCaseInput(input = {}, { isUpdate = false } = {}) {
     lifecycle: sanitizeLifecycle(input.lifecycle),
     revisionNo: Number.isFinite(Number(input.revisionNo)) ? Math.max(1, Math.floor(Number(input.revisionNo))) : 1
   };
+  if (Object.prototype.hasOwnProperty.call(input, 'assignedTo')) {
+    out.assignedTo = sanitizeAssignedTo(input.assignedTo);
+  } else if (!isUpdate) {
+    out.assignedTo = null;
+  }
+  if (Object.prototype.hasOwnProperty.call(input, 'collaborators')) {
+    out.collaborators = sanitizeCollaborators(input.collaborators);
+  } else if (!isUpdate) {
+    out.collaborators = [];
+  }
   if (!isUpdate) {
     if (!out.orgId) throw new Error('Organization is required.');
     if (!out.classId) throw new Error('Class is required.');

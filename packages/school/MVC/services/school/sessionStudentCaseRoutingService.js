@@ -148,6 +148,16 @@ function getActiveAssigneePersonIdsForCategory(policy = emptyPolicy(), category 
   return config.assignees.map((row) => row.personId).filter(Boolean);
 }
 
+function listActiveRoutingAssigneesForCaseCategory(policy = emptyPolicy(), caseRow = {}) {
+  const category = normalizeCategory(caseRow?.category || 'other');
+  const config = getCategoryConfig(policy, category);
+  if (!config) return [];
+  return config.assignees.map((row) => ({
+    personId: row.personId,
+    personName: row.personName || row.personId
+  }));
+}
+
 function isPersonAssignedToCategory(policy = emptyPolicy(), category = '', personId = '') {
   const targetPersonId = toPublicId(personId);
   if (!targetPersonId) return false;
@@ -205,7 +215,9 @@ module.exports = {
   normalizePolicyInput,
   getRoutingPolicyForOrg,
   saveRoutingPolicyForOrg,
+  getCategoryConfig,
   getActiveAssigneePersonIdsForCategory,
+  listActiveRoutingAssigneesForCaseCategory,
   isPersonAssignedToCategory,
   isCaseRoutedToPerson,
   getRoutedCategoriesForPerson,

@@ -1,10 +1,12 @@
 const schoolRepositories = require('../../repositories/school');
 const schoolDataService = require('./schoolDataService');
+const schoolIdentityLookupService = require('./schoolIdentityLookupService');
 const sessionStudentCaseWorkspaceService = require('./sessionStudentCaseWorkspaceService');
 const sessionStudentCaseAccessService = require('./sessionStudentCaseAccessService');
 const { buildSessionStudentCaseRosterEntries } = require('./studentListSearchService');
 const { getPresetConfig } = require('./sessionStudentCasePresetService');
 const sessionStudentCaseResultVisibilityService = require('./sessionStudentCaseResultVisibilityService');
+const sessionStudentCaseRoutingService = require('./sessionStudentCaseRoutingService');
 const sessionDeliveryEscalatedAccessService = require('./sessionDeliveryEscalatedAccessService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -76,6 +78,13 @@ async function buildRoster(session = {}, reqUser) {
   return buildSessionStudentCaseRosterEntries(rawRows, { students, persons });
 }
 
+async function listRoutingReviewersForCase(req, caseRow) {
+  const orgId = getActiveOrgId(req.user);
+  if (!orgId || !caseRow) return [];
+  const policy = await sessionStudentCaseRoutingService.getRoutingPolicyForOrg(orgId);
+  return sessionStudentCaseRoutingService.listActiveRoutingAssigneesForCaseCategory(policy, caseRow);
+}
+
 async function getReviewContext(req, caseId) {
   const existing = await loadCaseForRequest(req, caseId);
   const classId = toPublicId(existing.classId);
@@ -88,6 +97,7 @@ async function getReviewContext(req, caseId) {
     await sessionStudentCaseAccessService.resolveCaseCapabilities(req, { classData, session, caseRow: existing })
   );
   const manageSessionHref = `/school/classes/${encodeURIComponent(classId)}/sessions/${encodeURIComponent(sessionId)}?caseId=${encodeURIComponent(caseId)}`;
+  const routingReviewers = await listRoutingReviewersForCase(req, existing);
 
   return {
     case: sessionStudentCaseResultVisibilityService.redactCaseForViewer(existing, {
@@ -101,7 +111,8 @@ async function getReviewContext(req, caseId) {
     roster: await buildRoster(session, req.user),
     presets: getPresetConfig(),
     capabilities,
-    manageSessionHref
+    manageSessionHref,
+    routingReviewers
   };
 }
 

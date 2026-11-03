@@ -122,6 +122,44 @@ router.post('/api/routing',
 
 
 
+router.get('/api/:caseId/share-eligible-persons',
+
+  requireStudentCaseOperation(OPERATIONS.UPDATE),
+
+  ctrl.listShareEligiblePersons);
+
+
+
+router.post('/api/:caseId/assign',
+
+  requireStudentCaseOperation(OPERATIONS.UPDATE),
+
+  trackActionState(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.UPDATE, mutationActionState),
+
+  ctrl.assignCase);
+
+
+
+router.post('/api/:caseId/share',
+
+  requireStudentCaseOperation(OPERATIONS.UPDATE),
+
+  trackActionState(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.UPDATE, mutationActionState),
+
+  ctrl.shareCase);
+
+
+
+router.post('/api/:caseId/notify',
+
+  requireStudentCaseOperation(OPERATIONS.UPDATE),
+
+  trackActionState(SECTIONS.SCHOOL_SESSION_STUDENT_CASES, OPERATIONS.UPDATE, mutationActionState),
+
+  ctrl.notifyCaseCollaboration);
+
+
+
 router.get('/:caseId/review-context',
 
   requireCaseSectionOperationAny([OPERATIONS.READ_ALL]),

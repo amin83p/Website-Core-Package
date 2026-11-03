@@ -6,6 +6,7 @@ const sessionStudentCaseAccessService = require('../../services/school/sessionSt
 const studentCaseAccessService = require('../../services/school/studentCaseAccessService');
 const sessionStudentCaseService = require('../../services/school/sessionStudentCaseService');
 const sessionStudentCaseRoutingService = require('../../services/school/sessionStudentCaseRoutingService');
+const sessionStudentCaseCollaborationService = require('../../services/school/sessionStudentCaseCollaborationService');
 const sessionStudentCaseResultVisibilityService = require('../../services/school/sessionStudentCaseResultVisibilityService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const { getPresetConfig } = require('../../services/school/sessionStudentCasePresetService');
@@ -299,6 +300,119 @@ exports.listRoutingEligiblePersons = async (req, res) => {
     });
   } catch (error) {
     return res.status(400).json({ status: 'error', message: error.message });
+  }
+};
+
+exports.listShareEligiblePersons = async (req, res) => {
+  try {
+    getActiveOrgIdOrThrow(req.user);
+    const query = await buildDataServiceQuery(req.query);
+    const searchDefaultKeyword = settingService.getValue('app', 'searchDefaultKeyword') || 'aaa';
+    if (query.q === searchDefaultKeyword) query.q = '';
+
+    const payload = await sessionStudentCaseCollaborationService.listShareEligiblePersons(
+      req,
+      req.params.caseId,
+      query
+    );
+    const data = (payload.rows || []).map((row) => ({
+      ...row,
+      name: {
+        first: row.firstName || '',
+        last: row.lastName || '',
+        preferred: row.preferredName || ''
+      }
+    }));
+    return res.json({
+      status: 'success',
+      data,
+      results: data,
+      items: data,
+      pagination: payload.pagination || {}
+    });
+  } catch (error) {
+    const statusCode = Number(error.statusCode) || 400;
+    return res.status(statusCode).json({ status: 'error', message: error.message });
+  }
+};
+
+exports.assignCase = async (req, res) => {
+  try {
+    getActiveOrgIdOrThrow(req.user);
+    const result = await sessionStudentCaseCollaborationService.assignCase(req, req.params.caseId, req.body || {});
+    if (result.blocked) {
+      return res.json({
+        status: 'success',
+        blocked: true,
+        code: result.code,
+        message: result.message,
+        targetPersonId: result.targetPersonId,
+        targetPersonName: result.targetPersonName
+      });
+    }
+    const redacted = sessionStudentCaseResultVisibilityService.redactCaseForViewer(result.case, {
+      reqUser: req.user,
+      capabilities: await sessionStudentCaseAccessService.resolveCaseCapabilities(req, { caseRow: result.case })
+    });
+    return res.json({
+      status: 'success',
+      message: 'Student case assigned.',
+      case: redacted,
+      assignedTo: result.assignedTo || null
+    });
+  } catch (error) {
+    const statusCode = Number(error.statusCode) || 400;
+    return res.status(statusCode).json({ status: 'error', message: error.message });
+  }
+};
+
+exports.shareCase = async (req, res) => {
+  try {
+    getActiveOrgIdOrThrow(req.user);
+    const result = await sessionStudentCaseCollaborationService.shareCase(req, req.params.caseId, req.body || {});
+    if (result.blocked) {
+      return res.json({
+        status: 'success',
+        blocked: true,
+        code: result.code,
+        message: result.message,
+        targetPersonId: result.targetPersonId,
+        targetPersonName: result.targetPersonName
+      });
+    }
+    const redacted = sessionStudentCaseResultVisibilityService.redactCaseForViewer(result.case, {
+      reqUser: req.user,
+      capabilities: await sessionStudentCaseAccessService.resolveCaseCapabilities(req, { caseRow: result.case })
+    });
+    return res.json({
+      status: 'success',
+      message: 'Student case shared.',
+      case: redacted,
+      collaborators: result.collaborators || []
+    });
+  } catch (error) {
+    const statusCode = Number(error.statusCode) || 400;
+    return res.status(statusCode).json({ status: 'error', message: error.message });
+  }
+};
+
+exports.notifyCaseCollaboration = async (req, res) => {
+  try {
+    getActiveOrgIdOrThrow(req.user);
+    const result = await sessionStudentCaseCollaborationService.resendCaseCollaborationChat(
+      req,
+      req.params.caseId,
+      req.body || {}
+    );
+    return res.json({
+      status: 'success',
+      message: 'Chat notification sent.',
+      targetPersonId: result.targetPersonId,
+      targetPersonName: result.targetPersonName
+    });
+  } catch (error) {
+    const statusCode = Number(error.statusCode) || 400;
+    return res.status(statusCode).json({ status: 'error', message: error.message });
   }
 };
 

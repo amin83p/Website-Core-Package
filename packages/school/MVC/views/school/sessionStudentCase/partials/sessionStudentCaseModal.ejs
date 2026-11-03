@@ -1,9 +1,12 @@
 <div class="modal fade" id="studentCaseModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
-            <div class="modal-header bg-primary text-white">
-                <h5 class="modal-title fw-bold"><i class="bi bi-folder-plus me-2"></i><span id="studentCaseModalTitle">Student Case</span></h5>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-header bg-primary text-white d-flex align-items-start gap-2">
+                <div class="flex-grow-1 min-w-0">
+                    <h5 class="modal-title fw-bold mb-0"><i class="bi bi-folder-plus me-2"></i><span id="studentCaseModalTitle">Student Case</span></h5>
+                </div>
+                <div id="studentCaseCollaborationHeaderBadges" class="d-flex flex-wrap gap-1 align-items-center d-none"></div>
+                <button type="button" class="btn-close btn-close-white ms-1" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
                 <%- include('school/sessionStudentCase/partials/sessionStudentCaseModalBody') %>

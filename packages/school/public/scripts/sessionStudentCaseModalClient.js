@@ -13,6 +13,8 @@
   let canResolve = false;
   let showResolveButton = true;
   let canViewResultNote = false;
+  let canAssignOrShare = false;
+  let pendingCollaborationAction = '';
   let resolveMode = false;
   let classTitle = '';
   let sessionLabel = '';
@@ -21,6 +23,12 @@
   let manageSessionHref = '';
   let busyToken = null;
   let wired = false;
+  let collaborationModalInstance = null;
+  let collaborationSnapshot = {
+    assignedTo: null,
+    collaborators: [],
+    routingReviewers: []
+  };
 
   function escapeHtml(value) {
     return String(value || '').replace(/[&<>"']/g, (ch) => ({
@@ -244,27 +252,113 @@
     return document.getElementById('studentCaseDetails')?.value || '';
   }
 
-  function renderDetailOptions(category, selectedDetails = '') {
-    const presetsWrap = document.getElementById('studentCaseDetailPresetsWrap');
-    const presetsHost = document.getElementById('studentCaseDetailPresets');
-    const detailsInput = document.getElementById('studentCaseDetails');
-    const key = String(category || 'learning').trim().toLowerCase();
-    const presets = presetList(key);
-    const selected = String(selectedDetails || '').trim();
-    if (detailsInput) detailsInput.value = selected;
-    if (key === 'other' || !presets.length) {
-      presetsWrap?.classList.add('d-none');
-      if (presetsHost) presetsHost.innerHTML = '';
-      return;
-    }
-    presetsWrap?.classList.remove('d-none');
-    if (!presetsHost) return;
-    const matchedPreset = presets.includes(selected);
-    presetsHost.innerHTML = presets.map((label, index) => {
+  function buildPresetRadiosHtml(presets, selected) {
+    const matchedPreset = presets.includes(String(selected || '').trim());
+    return presets.map((label, index) => {
       const id = `studentCasePreset_${index}`;
       const checked = matchedPreset && label === selected;
       return `<div class="form-check student-case-preset-option"><input class="form-check-input student-case-preset-radio" type="radio" name="studentCasePreset" id="${id}" value="${escapeHtml(label)}"${checked ? ' checked' : ''}><label class="form-check-label" for="${id}">${escapeHtml(label)}</label></div>`;
     }).join('');
+  }
+
+  function setDisclosureToggleLabel(toggleEl, labelEl, expanded, { show = 'Show', hide = 'Hide' } = {}) {
+    const text = expanded ? hide : show;
+    if (labelEl) labelEl.textContent = text;
+    else if (toggleEl) toggleEl.textContent = text;
+  }
+
+  function setDisclosureShell(disclosureEl, mode = 'collapsible') {
+    if (!disclosureEl) return;
+    disclosureEl.classList.remove('student-case-disclosure--always-open', 'student-case-disclosure--hidden');
+    if (mode === 'always-open') disclosureEl.classList.add('student-case-disclosure--always-open');
+    if (mode === 'hidden') disclosureEl.classList.add('student-case-disclosure--hidden');
+  }
+
+  function renderDetailOptions(category, selectedDetails = '') {
+    const presetsWrap = document.getElementById('studentCaseDetailPresetsWrap');
+    const presetsHost = document.getElementById('studentCaseDetailPresets');
+    const presetsSelected = document.getElementById('studentCaseDetailPresetsSelected');
+    const presetsToggle = document.getElementById('studentCaseDetailPresetsToggle');
+    const presetsToggleLabel = document.getElementById('studentCaseDetailPresetsToggleLabel');
+    const presetsDisclosure = document.getElementById('studentCasePresetsDisclosure');
+    const noteDisclosure = document.getElementById('studentCaseNoteDisclosure');
+    const detailsInput = document.getElementById('studentCaseDetails');
+    const noteWrap = document.getElementById('studentCaseDetailsNoteWrap');
+    const noteToggle = document.getElementById('studentCaseDetailsNoteToggle');
+    const noteToggleLabel = document.getElementById('studentCaseDetailsNoteToggleLabel');
+    const detailsHint = document.getElementById('studentCaseDetailsHint');
+    const key = String(category || 'learning').trim().toLowerCase();
+    const presets = presetList(key);
+    const selected = String(selectedDetails || '').trim();
+    const listReview = config?.apiMode === 'list' && isEditMode();
+    if (detailsInput) detailsInput.value = selected;
+
+    setDisclosureShell(presetsDisclosure, 'collapsible');
+    setDisclosureShell(noteDisclosure, 'collapsible');
+    noteWrap?.classList.remove('d-none');
+    noteToggle?.classList.add('d-none');
+    noteToggle?.setAttribute('aria-expanded', 'false');
+    presetsToggle?.classList.add('d-none');
+    presetsToggle?.setAttribute('aria-expanded', 'false');
+    presetsSelected?.classList.add('d-none');
+    if (noteWrap && !noteWrap.classList.contains('collapse')) noteWrap.classList.add('collapse');
+    if (presetsWrap && !presetsWrap.classList.contains('collapse')) presetsWrap.classList.add('collapse');
+    noteWrap?.classList.remove('show');
+    presetsWrap?.classList.remove('show');
+    detailsHint?.classList.remove('d-none');
+    setDisclosureToggleLabel(noteToggle, noteToggleLabel, false, { show: 'Show full note', hide: 'Hide full note' });
+
+    if (key === 'other' || !presets.length) {
+      setDisclosureShell(presetsDisclosure, 'hidden');
+      if (presetsHost) presetsHost.innerHTML = '';
+      if (listReview) {
+        if (!selected) setDisclosureShell(noteDisclosure, 'hidden');
+        else {
+          setDisclosureShell(noteDisclosure, 'always-open');
+          noteWrap?.classList.add('show');
+        }
+      } else {
+        setDisclosureShell(noteDisclosure, 'always-open');
+        noteWrap?.classList.add('show');
+      }
+      return;
+    }
+
+    const matchedPreset = presets.includes(selected);
+    if (presetsHost) presetsHost.innerHTML = buildPresetRadiosHtml(presets, selected);
+
+    if (listReview) {
+      presetsWrap?.classList.remove('show');
+      presetsToggle?.classList.remove('d-none');
+      setDisclosureToggleLabel(presetsToggle, presetsToggleLabel, false, {
+        show: matchedPreset ? 'Change issue option' : 'Show issue options',
+        hide: 'Hide issue options'
+      });
+
+      if (matchedPreset) {
+        presetsSelected?.classList.remove('d-none');
+        if (presetsSelected) {
+          presetsSelected.innerHTML = `<i class="bi bi-check2-circle" aria-hidden="true"></i><span><strong>${escapeHtml(selected)}</strong></span>`;
+        }
+        noteWrap?.classList.remove('show');
+        noteToggle?.classList.remove('d-none');
+        setDisclosureShell(noteDisclosure, 'collapsible');
+        detailsHint?.classList.add('d-none');
+      } else {
+        if (!selected) {
+          setDisclosureShell(noteDisclosure, 'hidden');
+        } else {
+          setDisclosureShell(noteDisclosure, 'always-open');
+          noteWrap?.classList.add('show');
+        }
+      }
+      return;
+    }
+
+    setDisclosureShell(presetsDisclosure, 'always-open');
+    setDisclosureShell(noteDisclosure, 'always-open');
+    presetsWrap?.classList.add('show');
+    noteWrap?.classList.add('show');
   }
 
   function rosterRowMatchesSearch(row, query) {
@@ -368,10 +462,279 @@
     canResolve = capabilities.canResolve === true;
     canDelete = capabilities.canDelete === true;
     canViewResultNote = capabilities.canViewResultNote === true;
+    canAssignOrShare = capabilities.canAssignOrShare === true;
     allowCreate = capabilities.canCreate === true;
     readOnly = capabilities.readOnly === true
       || (!canEditCase && (capabilities.canRead === true || capabilities.canReadAll === true));
     syncResultSection();
+    syncCollaborationChrome();
+  }
+
+  function displayPersonLabel(entry) {
+    if (!entry || typeof entry !== 'object') return '';
+    return String(entry.personName || entry.personId || '').trim();
+  }
+
+  function formatCollabMeta(entry = {}) {
+    const by = String(entry.assignedByName || entry.addedByName || '').trim();
+    const at = String(entry.assignedAt || entry.addedAt || '').trim();
+    if (!by && !at) return '';
+    const parts = [];
+    if (by) parts.push(`by ${by}`);
+    if (at) parts.push(new Date(at).toLocaleString());
+    return parts.join(' · ');
+  }
+
+  function setCollaborationSnapshot(caseRow = {}, routingReviewers = []) {
+    collaborationSnapshot = {
+      assignedTo: caseRow?.assignedTo && typeof caseRow.assignedTo === 'object' ? caseRow.assignedTo : null,
+      collaborators: Array.isArray(caseRow?.collaborators) ? caseRow.collaborators : [],
+      routingReviewers: Array.isArray(routingReviewers) ? routingReviewers : collaborationSnapshot.routingReviewers
+    };
+  }
+
+  function syncCollaborationChrome(caseRow = null) {
+    const caseId = String(document.getElementById('studentCaseId')?.value || '').trim();
+    if (caseRow && typeof caseRow === 'object') {
+      setCollaborationSnapshot(caseRow, collaborationSnapshot.routingReviewers);
+    }
+    const assignedTo = collaborationSnapshot.assignedTo;
+    const collaborators = collaborationSnapshot.collaborators;
+    const hasAssigned = Boolean(assignedTo?.personId);
+    const hasCollaborators = collaborators.length > 0;
+
+    const footerBtn = document.getElementById('btnStudentCaseOpenCollaboration');
+    footerBtn?.classList.toggle('d-none', !caseId);
+
+    const badgeHost = document.getElementById('studentCaseCollaborationHeaderBadges');
+    if (badgeHost) {
+      if (!caseId || (!hasAssigned && !hasCollaborators)) {
+        badgeHost.classList.add('d-none');
+        badgeHost.innerHTML = '';
+      } else {
+        badgeHost.classList.remove('d-none');
+        const badges = [];
+        if (hasAssigned) {
+          badges.push('<button type="button" class="btn btn-sm student-case-collab-header-badge" data-open-collaboration="1" title="Assigned"><i class="bi bi-person-check"></i></button>');
+        }
+        if (hasCollaborators) {
+          badges.push('<button type="button" class="btn btn-sm student-case-collab-header-badge" data-open-collaboration="1" title="Shared with collaborators"><i class="bi bi-people"></i></button>');
+        }
+        badgeHost.innerHTML = badges.join('');
+      }
+    }
+  }
+
+  function getCollaborationModalEl() {
+    return document.getElementById('studentCaseCollaborationModal');
+  }
+
+  function syncCollaborationModalStack() {
+    const collabEl = getCollaborationModalEl();
+    const caseEl = getModalEl();
+    if (!collabEl) return;
+    let maxZ = 1050;
+    document.querySelectorAll('.modal.show').forEach((openModal) => {
+      if (openModal === collabEl) return;
+      const z = Number.parseInt(window.getComputedStyle(openModal).zIndex, 10);
+      if (Number.isFinite(z) && z > maxZ) maxZ = z;
+    });
+    const modalZ = Math.max(maxZ + 10, 1065);
+    collabEl.style.setProperty('z-index', String(modalZ), 'important');
+    const backdrops = document.querySelectorAll('.modal-backdrop.show');
+    const backdrop = backdrops[backdrops.length - 1];
+    if (backdrop) backdrop.style.setProperty('z-index', String(modalZ - 5), 'important');
+    if (caseEl?.classList.contains('show')) {
+      caseEl.style.setProperty('z-index', String(modalZ - 10), 'important');
+    }
+  }
+
+  function ensureCollaborationModalInstance() {
+    const modalEl = getCollaborationModalEl();
+    if (!modalEl || !global.bootstrap) return null;
+    if (!collaborationModalInstance) {
+      collaborationModalInstance = new global.bootstrap.Modal(modalEl);
+      if (!modalEl.dataset.lifecycleWired) {
+        modalEl.dataset.lifecycleWired = '1';
+        modalEl.addEventListener('shown.bs.modal', () => syncCollaborationModalStack());
+      }
+    }
+    return collaborationModalInstance;
+  }
+
+  function populateCollaborationModalContent() {
+    const routingEl = document.getElementById('studentCaseCollabRoutingList');
+    const assignedEl = document.getElementById('studentCaseCollabAssignedDetail');
+    const collaboratorsEl = document.getElementById('studentCaseCollabCollaboratorsList');
+    const actionsEl = document.getElementById('studentCaseCollabActions');
+    const reviewers = collaborationSnapshot.routingReviewers || [];
+    if (routingEl) {
+      routingEl.textContent = reviewers.length
+        ? reviewers.map((row) => displayPersonLabel(row)).filter(Boolean).join(', ')
+        : 'No category routing assignees for this case type.';
+    }
+    const assignedTo = collaborationSnapshot.assignedTo;
+    if (assignedEl) {
+      if (!assignedTo) {
+        assignedEl.textContent = '—';
+      } else {
+        const meta = formatCollabMeta(assignedTo);
+        assignedEl.innerHTML = meta
+          ? `<strong>${escapeHtml(displayPersonLabel(assignedTo))}</strong><br><span class="text-muted">${escapeHtml(meta)}</span>`
+          : `<strong>${escapeHtml(displayPersonLabel(assignedTo))}</strong>`;
+      }
+    }
+    if (collaboratorsEl) {
+      collaboratorsEl.innerHTML = (collaborationSnapshot.collaborators || []).map((entry) => {
+        const meta = formatCollabMeta(entry);
+        return `<li><strong>${escapeHtml(displayPersonLabel(entry))}</strong>${meta ? `<br><span class="text-muted">${escapeHtml(meta)}</span>` : ''}</li>`;
+      }).join('');
+    }
+    actionsEl?.classList.toggle('d-none', !(canAssignOrShare && !readOnly));
+  }
+
+  function openCollaborationModal() {
+    const caseId = String(document.getElementById('studentCaseId')?.value || '').trim();
+    if (!caseId) return;
+    populateCollaborationModalContent();
+    ensureCollaborationModalInstance()?.show();
+  }
+
+  function displayNameForPickerItem(item = {}) {
+    const preferred = String(item?.preferredName || item?.name?.preferred || '').trim();
+    const first = String(item?.firstName || item?.name?.first || '').trim();
+    const last = String(item?.lastName || item?.name?.last || '').trim();
+    const composed = [first, last].filter(Boolean).join(' ').trim();
+    return String(item?.displayName || item?.name || preferred || composed || item?.personId || item?.id || '').trim();
+  }
+
+  function confirmResendCollaborationChat(message, targetPersonId) {
+    if (typeof global.showMessageModal === 'function') {
+      return global.showMessageModal({
+        title: 'Already has access',
+        message: message || '',
+        icon: 'warning',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary', value: false },
+          { text: 'Send chat notification', class: 'btn-primary', value: true }
+        ]
+      }).then((choice) => {
+        if (choice === true) return postNotifyCollaboration(targetPersonId);
+        return false;
+      });
+    }
+    if (global.confirm(`${message}\n\nSend another chat notification?`)) {
+      return postNotifyCollaboration(targetPersonId);
+    }
+    return Promise.resolve(false);
+  }
+
+  async function postNotifyCollaboration(targetPersonId) {
+    const caseId = String(document.getElementById('studentCaseId')?.value || '').trim();
+    if (!caseId || !targetPersonId) return false;
+    showBusy('Sending Notification', 'Sending chat message...');
+    try {
+      const res = await fetch(`/school/session-student-cases/api/${encodeURIComponent(caseId)}/notify`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'x-ajax-request': 'true'
+        },
+        body: JSON.stringify({
+          targetPersonId,
+          actionStateId: config?.actionStateId || ''
+        })
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Notify failed.');
+      hideBusy();
+      await showMessage('Notification Sent', result.message || 'Chat notification sent.', 'success');
+      return true;
+    } catch (error) {
+      hideBusy();
+      await showMessage('Notify Failed', error.message, 'error');
+      return false;
+    }
+  }
+
+  async function postCollaborationAction(action, targetPersonId) {
+    const caseId = String(document.getElementById('studentCaseId')?.value || '').trim();
+    if (!caseId || !targetPersonId) return;
+    const endpoint = action === 'assign' ? 'assign' : 'share';
+    showBusy(action === 'assign' ? 'Assigning Case' : 'Sharing Case', 'Updating assignment and notifying the recipient...');
+    try {
+      const res = await fetch(`/school/session-student-cases/api/${encodeURIComponent(caseId)}/${endpoint}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'x-ajax-request': 'true'
+        },
+        body: JSON.stringify({
+          targetPersonId,
+          actionStateId: config?.actionStateId || ''
+        })
+      });
+      const result = await res.json().catch(() => ({}));
+      if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Request failed.');
+      hideBusy();
+      if (result.blocked === true) {
+        await confirmResendCollaborationChat(result.message, result.targetPersonId || targetPersonId);
+        return;
+      }
+      if (result.case) {
+        setCollaborationSnapshot(result.case, collaborationSnapshot.routingReviewers);
+        populateFromCaseRow(result.case);
+        syncCollaborationChrome();
+        populateCollaborationModalContent();
+      }
+      await showMessage(
+        action === 'assign' ? 'Case Assigned' : 'Case Shared',
+        result.message || 'Update complete.',
+        'success'
+      );
+      if (typeof config?.onSaved === 'function') config.onSaved(result.case || {});
+    } catch (error) {
+      hideBusy();
+      await showMessage('Update Failed', error.message, 'error');
+    }
+  }
+
+  function openCollaborationPersonPicker(action) {
+    const caseId = String(document.getElementById('studentCaseId')?.value || '').trim();
+    if (!caseId || typeof global.GenericPicker?.open !== 'function') {
+      return showMessage('Unavailable', 'Person picker is not available on this page.', 'error');
+    }
+    const isAssign = action === 'assign';
+    const pickerConfig = global.GenericPickerPresets?.person({
+      title: isAssign ? 'Assign case to…' : 'Share case with…',
+      apiEndpoint: `/school/session-student-cases/api/${encodeURIComponent(caseId)}/share-eligible-persons`,
+      onSelect(item) {
+        const personId = String(item?.personId || item?.id || '').trim();
+        if (!personId) return;
+        if (item?.isCategoryRoutingReviewer === true) {
+          const name = displayNameForPickerItem(item);
+          confirmResendCollaborationChat(
+            `${name} is already a category reviewer for this case type. Send a chat reminder instead?`,
+            personId
+          ).catch(() => {});
+          return;
+        }
+        postCollaborationAction(isAssign ? 'assign' : 'share', personId).catch(() => {});
+      }
+    });
+    global.GenericPicker.open(pickerConfig);
+  }
+
+  function maybeOpenPendingCollaborationPicker() {
+    const action = String(pendingCollaborationAction || '').trim();
+    pendingCollaborationAction = '';
+    if (!action) return;
+    openCollaborationModal();
+    if (canAssignOrShare && !readOnly) {
+      openCollaborationPersonPicker(action);
+    }
   }
 
   function setResolveVisible(visible) {
@@ -399,6 +762,13 @@
     setWizardStep('details');
     updateContextBanner();
     applyReadOnlyState();
+    collaborationSnapshot = { assignedTo: null, collaborators: [], routingReviewers: [] };
+    syncCollaborationChrome();
+  }
+
+  function syncCollaborationSection(row) {
+    if (row && typeof row === 'object') setCollaborationSnapshot(row, collaborationSnapshot.routingReviewers);
+    syncCollaborationChrome();
   }
 
   function populateFromCaseRow(row = {}) {
@@ -437,6 +807,7 @@
       setWizardStep('details');
     }
     applyReadOnlyState();
+    syncCollaborationSection(row);
   }
 
   function buildSaveUrl(caseRowId) {
@@ -621,6 +992,7 @@
     const token = String(caseId || '').trim();
     if (!token) return;
     resolveMode = options.resolveMode === true;
+    pendingCollaborationAction = String(options.collaborationAction || '').trim();
     showBusy('Loading Case', 'Fetching student case details...');
     try {
       const res = await fetch(`/school/session-student-cases/${encodeURIComponent(token)}/review-context`, {
@@ -641,6 +1013,7 @@
       applyCapabilities(ctx.capabilities || {});
       allowCreate = false;
       resetModal();
+      setCollaborationSnapshot(ctx.case || {}, ctx.routingReviewers || []);
       populateFromCaseRow(ctx.case || {});
       if (resolveMode && canResolve) {
         setResolveVisible(true);
@@ -648,6 +1021,7 @@
         document.getElementById('studentCaseResultNote')?.focus();
       }
       ensureModalInstance()?.show();
+      maybeOpenPendingCollaborationPicker();
     } catch (error) {
       hideBusy();
       await showMessage('Load Failed', error.message, 'error');
@@ -697,6 +1071,31 @@
       if (!radio) return;
       const detailsInput = document.getElementById('studentCaseDetails');
       if (detailsInput) detailsInput.value = radio.value;
+      if (config?.apiMode === 'list' && isEditMode()) {
+        renderDetailOptions(document.getElementById('studentCaseCategory')?.value || 'learning', radio.value);
+      }
+    });
+    document.getElementById('studentCaseDetailPresetsWrap')?.addEventListener('shown.bs.collapse', () => {
+      const toggle = document.getElementById('studentCaseDetailPresetsToggle');
+      const label = document.getElementById('studentCaseDetailPresetsToggleLabel');
+      toggle?.setAttribute('aria-expanded', 'true');
+      const category = document.getElementById('studentCaseCategory')?.value || 'learning';
+      const matched = presetList(category).includes(String(collectDetailsValue() || '').trim());
+      setDisclosureToggleLabel(toggle, label, true, {
+        show: matched ? 'Change issue option' : 'Show issue options',
+        hide: 'Hide issue options'
+      });
+    });
+    document.getElementById('studentCaseDetailPresetsWrap')?.addEventListener('hidden.bs.collapse', () => {
+      const toggle = document.getElementById('studentCaseDetailPresetsToggle');
+      const label = document.getElementById('studentCaseDetailPresetsToggleLabel');
+      toggle?.setAttribute('aria-expanded', 'false');
+      const matched = presetList(document.getElementById('studentCaseCategory')?.value || 'learning')
+        .includes(String(collectDetailsValue() || '').trim());
+      setDisclosureToggleLabel(toggle, label, false, {
+        show: matched ? 'Change issue option' : 'Show issue options',
+        hide: 'Hide issue options'
+      });
     });
     document.getElementById('studentCaseStudentPicker')?.addEventListener('change', (event) => {
       const checkbox = event.target.closest('.student-case-student-checkbox');
@@ -731,6 +1130,33 @@
     document.getElementById('btnResolveStudentCase')?.addEventListener('click', () => {
       saveCase({ resolve: true }).catch(() => {});
     });
+    document.getElementById('btnStudentCaseOpenCollaboration')?.addEventListener('click', () => {
+      openCollaborationModal();
+    });
+    document.getElementById('studentCaseCollaborationHeaderBadges')?.addEventListener('click', (event) => {
+      if (event.target.closest('[data-open-collaboration]')) {
+        event.preventDefault();
+        openCollaborationModal();
+      }
+    });
+    document.getElementById('btnStudentCaseCollabAssign')?.addEventListener('click', () => {
+      openCollaborationPersonPicker('assign');
+    });
+    document.getElementById('btnStudentCaseCollabShare')?.addEventListener('click', () => {
+      openCollaborationPersonPicker('share');
+    });
+    document.getElementById('studentCaseDetailsNoteWrap')?.addEventListener('show.bs.collapse', () => {
+      const toggle = document.getElementById('studentCaseDetailsNoteToggle');
+      const label = document.getElementById('studentCaseDetailsNoteToggleLabel');
+      toggle?.setAttribute('aria-expanded', 'true');
+      setDisclosureToggleLabel(toggle, label, true, { show: 'Show full note', hide: 'Hide full note' });
+    });
+    document.getElementById('studentCaseDetailsNoteWrap')?.addEventListener('hide.bs.collapse', () => {
+      const toggle = document.getElementById('studentCaseDetailsNoteToggle');
+      const label = document.getElementById('studentCaseDetailsNoteToggleLabel');
+      toggle?.setAttribute('aria-expanded', 'false');
+      setDisclosureToggleLabel(toggle, label, false, { show: 'Show full note', hide: 'Hide full note' });
+    });
   }
 
   function wireListRowActions(root = document) {
@@ -760,6 +1186,22 @@
         deleteRemote(caseId, {
           studentName: String(deleteBtn.dataset.studentName || '').trim()
         }).catch(() => {});
+        return;
+      }
+
+      const assignBtn = event.target.closest('.js-student-case-assign');
+      if (assignBtn) {
+        event.preventDefault();
+        const caseId = String(assignBtn.dataset.caseId || '').trim();
+        if (caseId) openRemote(caseId, { collaborationAction: 'assign' });
+        return;
+      }
+
+      const shareBtn = event.target.closest('.js-student-case-share');
+      if (shareBtn) {
+        event.preventDefault();
+        const caseId = String(shareBtn.dataset.caseId || '').trim();
+        if (caseId) openRemote(caseId, { collaborationAction: 'share' });
       }
     });
   }

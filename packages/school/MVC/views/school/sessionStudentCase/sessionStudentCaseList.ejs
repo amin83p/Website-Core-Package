@@ -225,5 +225,10 @@
     });
 
     window.SessionStudentCaseModal.wireListRowActions();
+
+    const deepLinkCaseId = String(new URLSearchParams(window.location.search).get('studentCaseId') || '').trim();
+    if (deepLinkCaseId) {
+      window.SessionStudentCaseModal.openRemote(deepLinkCaseId);
+    }
   }());
 </script>

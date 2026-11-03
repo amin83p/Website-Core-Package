@@ -3,6 +3,8 @@
 const schoolRecordAccessService = require('./schoolRecordAccessService');
 const sessionStudentCaseRoutingService = require('./sessionStudentCaseRoutingService');
 const studentCaseAccessService = require('./studentCaseAccessService');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 function createDeniedError(message = 'You do not have access to this student case.', statusCode = 403) {
   const error = new Error(message);
@@ -61,13 +63,53 @@ async function isCaseRoutedToViewer(req, caseRow = null) {
   return sessionStudentCaseRoutingService.isCaseRoutedToPerson(caseRow, personId, policy);
 }
 
+function isCaseAssignee(caseRow = null, personId = '') {
+  const assigneeId = toPublicId(caseRow?.assignedTo?.personId);
+  const viewerId = toPublicId(personId);
+  return Boolean(assigneeId && viewerId && idsEqual(assigneeId, viewerId));
+}
+
+function isCaseCollaborator(caseRow = null, personId = '') {
+  const viewerId = toPublicId(personId);
+  if (!viewerId) return false;
+  return (Array.isArray(caseRow?.collaborators) ? caseRow.collaborators : [])
+    .some((row) => idsEqual(row?.personId, viewerId));
+}
+
+async function isCaseHandler(req, caseRow = null) {
+  if (!caseRow) return false;
+  const personId = sessionStudentCaseRoutingService.getViewerPersonId(req.user);
+  if (!personId) return false;
+  if (isCaseAssignee(caseRow, personId)) return true;
+  const assignedTo = toPublicId(caseRow?.assignedTo?.personId);
+  if (assignedTo) return false;
+  return isCaseRoutedToViewer(req, caseRow);
+}
+
+async function canAssignOrShareCase(req, caseRow = null) {
+  if (!caseRow) return false;
+  if (sessionStudentCaseRoutingService.isRoutingAdminViewer(req.user)) return true;
+  return isCaseHandler(req, caseRow);
+}
+
+async function assertCanAssignOrShareCase(req, caseRow = null) {
+  if (await canAssignOrShareCase(req, caseRow)) return;
+  throw createDeniedError('You do not have permission to assign or share this case.');
+}
+
 async function applyRoutedCaseCapabilityOverrides(req, capabilities, caseRow = null, sectionAccess = null) {
   if (!caseRow) return capabilities;
   const access = sectionAccess || await loadStudentCaseAccess(req);
   if (!access.canViewCases) return capabilities;
 
+  const viewerPersonId = sessionStudentCaseRoutingService.getViewerPersonId(req.user);
+  const assignedTo = toPublicId(caseRow?.assignedTo?.personId);
+  const isAssigneeOrCollaborator = isCaseAssignee(caseRow, viewerPersonId)
+    || isCaseCollaborator(caseRow, viewerPersonId);
   const isRouted = await isCaseRoutedToViewer(req, caseRow);
-  if (!isRouted) return capabilities;
+  // When a primary assignee is set, only assignee/collaborator (or org/class scope) get handler boosts—not category routing alone.
+  const getsHandlerBoost = isAssigneeOrCollaborator || (isRouted && !assignedTo);
+  if (!getsHandlerBoost) return capabilities;
 
   const next = {
     ...capabilities,
@@ -97,6 +139,7 @@ async function resolveCaseCapabilities(req, { classData = null, session = null, 
 
   if (caseRow) {
     capabilities = await applyRoutedCaseCapabilityOverrides(req, capabilities, caseRow, sectionAccess);
+    capabilities.canAssignOrShare = await canAssignOrShareCase(req, caseRow);
     capabilities.readOnly = (capabilities.canRead || capabilities.canReadAll) && !capabilities.canUpdate;
     capabilities.canEdit = capabilities.canUpdate;
   }
@@ -175,6 +218,11 @@ module.exports = {
   assertCanSave,
   createDeniedError,
   isCaseRoutedToViewer,
+  isCaseAssignee,
+  isCaseCollaborator,
+  isCaseHandler,
+  canAssignOrShareCase,
+  assertCanAssignOrShareCase,
   applyRoutedCaseCapabilityOverrides,
   loadStudentCaseAccess
 };

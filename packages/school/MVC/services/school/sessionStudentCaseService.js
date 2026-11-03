@@ -5,6 +5,7 @@ const taskService = require('./taskService');
 const personDisplayNameService = require('./personDisplayNameService');
 const { deriveCaseSummary, categoryRequiresStudent } = require('./sessionStudentCasePresetService');
 const sessionStudentCaseResultVisibilityService = require('./sessionStudentCaseResultVisibilityService');
+const sessionStudentCaseCollaborationService = require('./sessionStudentCaseCollaborationService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -473,6 +474,17 @@ async function saveCase({ classId, sessionId, caseId = '', input = {}, reqUser, 
   const saved = existing
     ? await schoolRepositories.sessionStudentCases.update(existing.id, payload, normalizeScope(reqUser))
     : await schoolRepositories.sessionStudentCases.create(payload, normalizeScope(reqUser));
+
+  if (!existing) {
+    try {
+      await sessionStudentCaseCollaborationService.notifyCategoryRoutingAssigneesOnCaseCreated({
+        caseRow: saved,
+        reqUser
+      });
+    } catch (notifyError) {
+      console.error(`Failed to notify routing assignees for new case ${saved.id}:`, notifyError);
+    }
+  }
 
   if (status === 'resolved' || status === 'cancelled') {
     await taskService.resolveSourceTask({

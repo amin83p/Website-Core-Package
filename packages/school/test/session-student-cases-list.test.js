@@ -185,6 +185,9 @@ test('session student cases list view contains table and row action menu wiring'
   const modalAssets = read('packages/school/MVC/views/school/sessionStudentCase/partials/sessionStudentCaseModalAssets.ejs');
   assert.match(modalAssets, /sessionStudentCaseModal\.css/);
   assert.match(modalAssets, /sessionStudentCaseModalClient\.js/);
+  assert.match(modalAssets, /modal_GenericPicker/);
+  assert.match(modalAssets, /sessionStudentCaseCollaborationModal/);
+  assert.match(modalFooter, /btnStudentCaseOpenCollaboration/);
   assert.match(modalShell, /sessionStudentCaseModalBody/);
   assert.match(modalShell, /sessionStudentCaseModalFooter/);
   assert.match(modalShell, /id="studentCaseModal"/);

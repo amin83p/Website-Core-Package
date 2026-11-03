@@ -4,6 +4,7 @@ const schoolRecordAccessService = require('./schoolRecordAccessService');
 const schoolStudentProfileLinkService = require('./schoolStudentProfileLinkService');
 const sessionStudentCaseModel = require('../../models/school/sessionStudentCaseModel');
 const sessionStudentCaseRoutingService = require('./sessionStudentCaseRoutingService');
+const sessionStudentCaseAccessService = require('./sessionStudentCaseAccessService');
 const studentCaseAccessService = require('./studentCaseAccessService');
 const { SCOPE_MODES } = require('./schoolDataScopeBuilder');
 const { requireCoreModule } = require('./schoolCoreContracts');
@@ -202,7 +203,16 @@ async function filterCasesByAccessScope({ rows, req, accessContext = {}, applyAc
     return sessionStudentCaseRoutingService.isCaseRoutedToPerson(row, viewerPersonId, policy);
   });
 
-  return [...scoped, ...routedRows];
+  const merged = [...scoped, ...routedRows];
+  const mergedIds = new Set(merged.map((row) => normalizeText(row?.id)).filter(Boolean));
+  const collaborationRows = list.filter((row) => {
+    const rowId = normalizeText(row?.id);
+    if (!rowId || mergedIds.has(rowId)) return false;
+    return sessionStudentCaseAccessService.isCaseAssignee(row, viewerPersonId)
+      || sessionStudentCaseAccessService.isCaseCollaborator(row, viewerPersonId);
+  });
+
+  return [...merged, ...collaborationRows];
 }
 
 function buildClassFilterOptions(classes = []) {

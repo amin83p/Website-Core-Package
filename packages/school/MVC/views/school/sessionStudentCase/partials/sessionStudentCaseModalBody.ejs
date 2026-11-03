@@ -33,13 +33,36 @@
                 <label class="btn btn-sm btn-outline-danger student-case-severity-label student-case-severity-label--urgent" for="studentCaseSeverityUrgent">Urgent</label>
             </div>
         </div>
-        <div class="col-12">
+        <div class="col-12" id="studentCaseIssueDetailsBlock">
             <label class="form-label fw-bold" for="studentCaseDetails">Issue / support details</label>
-            <div id="studentCaseDetailPresetsWrap">
-                <div id="studentCaseDetailPresets" class="student-case-detail-presets"></div>
+            <div class="student-case-issue-layout">
+                <div id="studentCaseDetailPresetsSelected" class="student-case-issue-selected d-none"></div>
+                <div class="student-case-disclosure mb-2" id="studentCasePresetsDisclosure">
+                    <button type="button" class="student-case-disclosure-header d-none" id="studentCaseDetailPresetsToggle" data-bs-toggle="collapse" data-bs-target="#studentCaseDetailPresetsWrap" aria-expanded="false" aria-controls="studentCaseDetailPresetsWrap">
+                        <span class="student-case-disclosure-icon" aria-hidden="true"><i class="bi bi-ui-checks-grid"></i></span>
+                        <span class="student-case-disclosure-text" id="studentCaseDetailPresetsToggleLabel">Show issue options</span>
+                        <i class="bi bi-chevron-down student-case-disclosure-chevron" aria-hidden="true"></i>
+                    </button>
+                    <div class="collapse student-case-detail-presets-wrap" id="studentCaseDetailPresetsWrap">
+                        <div class="student-case-disclosure-panel">
+                            <div id="studentCaseDetailPresets" class="student-case-detail-presets"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="student-case-disclosure" id="studentCaseNoteDisclosure">
+                    <button type="button" class="student-case-disclosure-header d-none" id="studentCaseDetailsNoteToggle" data-bs-toggle="collapse" data-bs-target="#studentCaseDetailsNoteWrap" aria-expanded="false" aria-controls="studentCaseDetailsNoteWrap">
+                        <span class="student-case-disclosure-icon" aria-hidden="true"><i class="bi bi-card-text"></i></span>
+                        <span class="student-case-disclosure-text" id="studentCaseDetailsNoteToggleLabel">Show full note</span>
+                        <i class="bi bi-chevron-down student-case-disclosure-chevron" aria-hidden="true"></i>
+                    </button>
+                    <div class="collapse" id="studentCaseDetailsNoteWrap">
+                        <div class="student-case-disclosure-panel">
+                            <textarea class="form-control student-case-details-textarea" id="studentCaseDetails" rows="4" maxlength="5000" placeholder="Describe what happened, what support is needed, or what office/admin should know."></textarea>
+                            <div class="form-text mb-0" id="studentCaseDetailsHint">Pick a common issue below, then adjust the detail text if needed.</div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <textarea class="form-control student-case-details-textarea" id="studentCaseDetails" rows="4" maxlength="5000" placeholder="Describe what happened, what support is needed, or what office/admin should know."></textarea>
-            <div class="form-text">Pick a common issue below, then adjust the detail text if needed.</div>
         </div>
         <div class="col-12 d-none" id="studentCaseResultSection">
             <div class="border rounded p-3 bg-light" id="studentCaseResultEditable">
