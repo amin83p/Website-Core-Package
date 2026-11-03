@@ -534,6 +534,17 @@
         return `${start} – ${end}`;
     }
 
+    function buildScheduleEventTimeRangeHtml(startStr, endStr) {
+        const start = formatScheduleClockTime(startStr);
+        const end = formatScheduleClockTime(endStr);
+        const rangeLabel = formatScheduleClockRange(startStr, endStr);
+        const startHtml = escapeHtml(start || '-');
+        if (!end || end === start) {
+            return `<span class="schedule-event-time schedule-event-time-stacked" aria-label="${escapeHtml(rangeLabel)}"><span class="schedule-event-time-start">${startHtml}</span></span>`;
+        }
+        return `<span class="schedule-event-time schedule-event-time-stacked" aria-label="${escapeHtml(rangeLabel)}"><span class="schedule-event-time-start">${startHtml}</span><span class="schedule-event-time-end">${escapeHtml(end)}</span></span>`;
+    }
+
     function formatScheduleDateLabel(dateStr) {
         const raw = normalizeScheduleTooltipValue(dateStr);
         if (!raw) return '';
@@ -671,7 +682,9 @@
                 totals.set(label, (totals.get(label) || 0) + duration);
             });
         });
-        if (!totals.size) return '';
+        if (!totals.size) {
+            return `<span class="schedule-hours-chip hours-category-teacher schedule-hours-chip--empty"><span class="schedule-hours-dot"></span><span>Teacher: 0.00 h</span></span>`;
+        }
         const getCategoryClass = (label) => {
             const normalized = String(label || '').trim().toLowerCase();
             if (normalized.includes('leave')) return 'hours-category-leave';
@@ -3374,33 +3387,40 @@
             longPressOrigin = null;
         };
 
-        visualArea.addEventListener('pointerdown', (pointerEvent) => {
-            if (pointerEvent.pointerType === 'mouse' && pointerEvent.button !== 0) return;
-            if (!isScheduleSessionContextMenuTarget(pointerEvent.target)) return;
-            longPressOrigin = {
-                x: pointerEvent.clientX,
-                y: pointerEvent.clientY,
-                target: pointerEvent.target,
-                pointerId: pointerEvent.pointerId
+        const finishLongPress = (origin) => {
+            if (!origin) return;
+            const syntheticEvent = {
+                clientX: origin.x,
+                clientY: origin.y,
+                preventDefault() {},
+                stopPropagation() {}
             };
-            clearLongPressTimer();
+            const opened = openScheduleSessionContextMenuFromTarget(origin.target, syntheticEvent);
+            if (!opened) return;
+            scheduleLongPressSuppressContextMenuUntil = Date.now() + 450;
+            try { window.getSelection?.()?.removeAllRanges?.(); } catch (_) { /* ignore */ }
+            try { navigator.vibrate?.(10); } catch (_) { /* ignore */ }
+        };
+
+        const beginLongPressWatch = (target, x, y, pointerId, via = 'pointer') => {
+            if (!isScheduleSessionContextMenuTarget(target)) return false;
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+            longPressOrigin = { x, y, target, pointerId, via };
             longPressTimer = setTimeout(() => {
                 longPressTimer = null;
                 const origin = longPressOrigin;
                 longPressOrigin = null;
-                if (!origin) return;
-                const syntheticEvent = {
-                    clientX: origin.x,
-                    clientY: origin.y,
-                    preventDefault() {},
-                    stopPropagation() {}
-                };
-                const opened = openScheduleSessionContextMenuFromTarget(origin.target, syntheticEvent);
-                if (opened) {
-                    scheduleLongPressSuppressContextMenuUntil = Date.now() + 450;
-                    try { navigator.vibrate?.(10); } catch (_) { /* ignore */ }
-                }
+                finishLongPress(origin);
             }, SCHEDULE_LONG_PRESS_MS);
+            return true;
+        };
+
+        visualArea.addEventListener('pointerdown', (pointerEvent) => {
+            if (pointerEvent.pointerType === 'mouse' && pointerEvent.button !== 0) return;
+            beginLongPressWatch(pointerEvent.target, pointerEvent.clientX, pointerEvent.clientY, pointerEvent.pointerId, 'pointer');
         });
 
         visualArea.addEventListener('pointermove', (pointerEvent) => {
@@ -3413,6 +3433,26 @@
         visualArea.addEventListener('pointerup', clearLongPressTimer);
         visualArea.addEventListener('pointercancel', clearLongPressTimer);
         visualArea.addEventListener('lostpointercapture', clearLongPressTimer);
+
+        visualArea.addEventListener('touchstart', (touchEvent) => {
+            if (touchEvent.touches.length !== 1) return;
+            const touch = touchEvent.touches[0];
+            if (!beginLongPressWatch(touchEvent.target, touch.clientX, touch.clientY, touch.identifier, 'touch')) return;
+            touchEvent.preventDefault();
+        }, { passive: false });
+
+        visualArea.addEventListener('touchmove', (touchEvent) => {
+            if (!longPressOrigin) return;
+            const touch = Array.from(touchEvent.touches).find((row) => row.identifier === longPressOrigin.pointerId)
+                || touchEvent.touches[0];
+            if (!touch) return;
+            const dx = touch.clientX - longPressOrigin.x;
+            const dy = touch.clientY - longPressOrigin.y;
+            if (Math.hypot(dx, dy) > SCHEDULE_LONG_PRESS_MOVE_PX) clearLongPressTimer();
+        }, { passive: true });
+
+        visualArea.addEventListener('touchend', clearLongPressTimer);
+        visualArea.addEventListener('touchcancel', clearLongPressTimer);
     }
 
     function bindScheduleSessionContextMenu() {
@@ -5893,8 +5933,7 @@
         const el = container || document.getElementById('visualDisplayArea');
         const isVertical = mode === 'verticalTimeline';
         const narrowViewport = isScheduleNarrowViewport();
-        const mobileScrollDays = isVertical && narrowViewport;
-        const autoFit = isVertical && !scheduleState.verticalDayWidthUserAdjusted && !narrowViewport;
+        const autoFit = isVertical && !scheduleState.verticalDayWidthUserAdjusted;
         const scrollEl = el?.querySelector('.session-cal-vertical-scroll');
         const weekRows = scrollEl ? scrollEl.querySelectorAll('.session-cal-week-row') : [];
         const weekCount = options.weekCountOverride || weekRows.length || estimateScheduleWeekCountForRange();
@@ -5904,14 +5943,14 @@
         let dayWidth;
         if (autoFit && scheduleCalendarCore?.computeAutoDayWidth) {
             dayWidth = scheduleCalendarCore.computeAutoDayWidth(el, {
-                gutterWidth: 64,
+                gutterWidth: narrowViewport ? SCHEDULE_MOBILE_TIME_GUTTER_WIDTH : 64,
                 dayCount,
-                min: SCHEDULE_MIN_DAY_WIDTH,
-                max: 280,
-                padding: 24,
-                fallback: 120
+                min: narrowViewport ? 40 : SCHEDULE_MIN_DAY_WIDTH,
+                max: narrowViewport ? 480 : 280,
+                padding: narrowViewport ? 6 : 24,
+                fallback: narrowViewport ? SCHEDULE_MOBILE_DAY_WIDTH : 120
             });
-        } else if (mobileScrollDays || (isVertical && narrowViewport)) {
+        } else if (isVertical && narrowViewport) {
             dayWidth = SCHEDULE_MOBILE_DAY_WIDTH;
         } else {
             dayWidth = readScheduleVerticalDayWidth();
@@ -5921,13 +5960,15 @@
         const overheadPerWeek = SCHEDULE_GRID_WEEK_OVERHEAD;
         const availableForGrid = Math.max(220, scrollHeight - weekCount * overheadPerWeek);
         const hourSlots = getScheduleMaxHourSlotsForLayout();
-        const hourHeight = Math.max(34, Math.min(72, Math.floor(availableForGrid / (hourSlots * weekCount))));
+        const hourHeightMin = narrowViewport ? 22 : 34;
+        const hourHeightMax = narrowViewport ? 40 : 72;
+        const hourHeight = Math.max(hourHeightMin, Math.min(hourHeightMax, Math.floor(availableForGrid / (hourSlots * weekCount))));
         let trackStep = Math.max(76, Math.min(132, Math.round(hourHeight * 2.35)));
         if (mode === 'timeline' && scheduleState.horizontalSliderUserAdjusted) {
             trackStep = readScheduleTrackStepFromSlider(undefined, 'timeline');
         }
 
-        return { dayWidth, hourHeight, trackStep, autoFit, mobileScrollDays, gridHeight, dayCount, weekCount };
+        return { dayWidth, hourHeight, trackStep, autoFit, gridHeight, dayCount, weekCount, narrowViewport };
     }
 
     function applyScheduleWeekGridLayout(mode) {
@@ -5935,10 +5976,10 @@
         if (!container || !container.classList.contains('schedule-week-grid-host')) return null;
         const isVertical = mode === 'verticalTimeline';
         const narrowViewport = isScheduleNarrowViewport();
-        const mobileScrollDays = isVertical && narrowViewport;
-        container.classList.toggle('session-cal-auto-day-width', isVertical && !scheduleState.verticalDayWidthUserAdjusted && !narrowViewport);
+        container.classList.toggle('session-cal-auto-day-width', isVertical && !scheduleState.verticalDayWidthUserAdjusted);
+        container.classList.toggle('schedule-week-grid-narrow', narrowViewport && isVertical);
         container.classList.toggle('schedule-cal-horizontal-mode', mode === 'timeline');
-        container.classList.toggle('schedule-week-grid-manual-day-width', isVertical && (narrowViewport || scheduleState.verticalDayWidthUserAdjusted));
+        container.classList.toggle('schedule-week-grid-manual-day-width', isVertical && scheduleState.verticalDayWidthUserAdjusted);
         container.classList.toggle('schedule-week-grid-manual-track-height', mode === 'timeline' && scheduleState.horizontalSliderUserAdjusted);
         const layout = computeScheduleWeekGridLayout(mode, container);
         container.style.setProperty('--session-day-width', `${layout.dayWidth}px`);
@@ -6015,14 +6056,14 @@
         if (pending?.personId === person.id) {
             const phaseLabel = scheduleState.loadingPersonId === person.id ? 'Loading…' : 'Rendering…';
             const title = 'Measuring time from schedule fetch to rendered calendar';
-            return `<span class="schedule-load-duration-chip is-active" title="${escapeHtml(title)}" aria-live="polite"><i class="bi bi-stopwatch" aria-hidden="true"></i><span>${escapeHtml(phaseLabel)}</span></span>`;
+            return `<span class="schedule-load-duration-chip schedule-load-duration-chip--title-row is-active" title="${escapeHtml(title)}" aria-live="polite"><i class="bi bi-stopwatch" aria-hidden="true"></i><span>${escapeHtml(phaseLabel)}</span></span>`;
         }
         if (!scheduleState.loadedPersonIds.has(person.id)) return '';
         const durationMs = scheduleState.loadDurationMsByPersonId[person.id];
         if (!Number.isFinite(durationMs)) return '';
         const label = `Loaded in ${formatScheduleLoadDuration(durationMs)}`;
         const title = 'Time from schedule fetch to rendered calendar';
-        return `<span class="schedule-load-duration-chip" title="${escapeHtml(title)}" aria-label="${escapeHtml(label)}"><i class="bi bi-stopwatch" aria-hidden="true"></i><span>${escapeHtml(label)}</span></span>`;
+        return `<span class="schedule-load-duration-chip schedule-load-duration-chip--title-row" title="${escapeHtml(title)}" aria-label="${escapeHtml(label)}"><i class="bi bi-stopwatch" aria-hidden="true"></i><span>${escapeHtml(label)}</span></span>`;
     }
 
     function syncScheduleAdminWeekRailVisibility() {
@@ -6540,7 +6581,7 @@
         const toggleTitle = autoDetectOn
             ? 'Auto-detect schedule changes is on. Click to turn off.'
             : 'Auto-detect schedule changes is off. Click to turn on.';
-        return `<div class="schedule-loaded-at-chip-shell"><button type="button" class="schedule-loaded-at-chip${staleClass}" data-schedule-refresh-loaded title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i><span>${escapeHtml(label)}</span></button><button type="button" class="schedule-auto-detect-toggle ${toggleClass}" data-schedule-auto-detect-toggle aria-pressed="${autoDetectOn ? 'true' : 'false'}" title="${escapeHtml(toggleTitle)}" aria-label="${escapeHtml(toggleTitle)}">Auto ${escapeHtml(toggleLabel)}</button></div>`;
+        return `<div class="schedule-loaded-at-chip-shell"><button type="button" class="schedule-loaded-at-chip schedule-loaded-at-chip--icon-only${staleClass}" data-schedule-refresh-loaded title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i></button><button type="button" class="schedule-auto-detect-toggle ${toggleClass}" data-schedule-auto-detect-toggle aria-pressed="${autoDetectOn ? 'true' : 'false'}" title="${escapeHtml(toggleTitle)}" aria-label="${escapeHtml(toggleTitle)}">Auto ${escapeHtml(toggleLabel)}</button></div>`;
     }
 
     function markScheduleDataStaleAfterReturn() {
@@ -6577,13 +6618,20 @@
         const row2RightControls = showWeekGridControls
             ? `<div class="schedule-viewbar-grid-controls">${scheduleGridToolbarControlsHtml()}</div>`
             : '';
-        const loadedAtChip = buildScheduleLoadedAtChipHtml();
+        const loadDurationChip = buildScheduleLoadDurationChipHtml();
+        const loadRefreshChip = buildScheduleLoadedAtRefreshChipHtml();
+        const loadRefreshWrap = loadRefreshChip
+            ? `<div class="schedule-loaded-at-wrap">${loadRefreshChip}</div>`
+            : '';
         legend.innerHTML = `
             <div class="schedule-viewbar">
                 <div class="schedule-viewbar-row">
                     <div class="schedule-viewbar-row-left schedule-viewbar-title-group">
                         <span class="schedule-view-name"><i class="bi bi-calendar-day me-1"></i>${escapeHtml(scheduleViewName(mode))}</span>
                         ${buildScheduleActiveClassChipHtml()}
+                        <div class="schedule-viewbar-title-metrics">
+                            ${loadDurationChip}
+                        </div>
                     </div>
                     <div class="schedule-viewbar-row-right schedule-viewbar-actions">
                     ${timeRangeControl}
@@ -6596,9 +6644,11 @@
                 </div>
                 <div class="schedule-viewbar-row">
                     <div class="schedule-viewbar-row-left schedule-viewbar-chips">
-                        ${buildScheduleSelectionChipHtml()}
-                        <div id="lbl_totalHours" class="schedule-toolbar-hours"></div>
-                        ${loadedAtChip}
+                        <div class="schedule-viewbar-chips-primary">
+                            ${buildScheduleSelectionChipHtml()}
+                            <div id="lbl_totalHours" class="schedule-toolbar-hours">${renderCategoryHourTotals([])}</div>
+                        </div>
+                        ${loadRefreshWrap}
                     </div>
                     <div class="schedule-viewbar-row-right is-controls-row">
                         ${row2RightControls}
@@ -6608,6 +6658,10 @@
         `;
         syncScheduleWidthControlDisplay();
         updateScheduleSelectionControls();
+        const summaryPerson = activeSchedulePerson();
+        if (summaryPerson && scheduleState.loadedPersonIds.has(summaryPerson.id) && !scheduleState.errorByPersonId[summaryPerson.id]) {
+            refreshScheduleSummary(getScheduleEventsForPerson(summaryPerson.id));
+        }
     }
 
     function groupEventsByDate(events) {
@@ -7906,7 +7960,7 @@ if (canLoadAllSchedules) {
                              ${embeddedReportBadges}
                              ${caseBadge ? `<div class="mt-1">${caseBadge}</div>` : ''}
                              <div class="event-meta x-small">
-                    <span class="schedule-event-time text-truncate"><i class="bi bi-clock" aria-hidden="true"></i>${escapeHtml(formatScheduleClockRange(ev.start, ev.end))}</span>
+                    ${buildScheduleEventTimeRangeHtml(ev.start, ev.end)}
                                 ${makeupBadge}
                              </div>
                              ${soloStudentHtml}
@@ -7959,7 +8013,7 @@ if (canLoadAllSchedules) {
                          ${embeddedReportBadges}
                          ${caseBadge ? `<div class="mt-1">${caseBadge}</div>` : ''}
                          <div class="event-meta x-small">
-                    <span class="schedule-event-time text-truncate"><i class="bi bi-clock" aria-hidden="true"></i>${escapeHtml(formatScheduleClockRange(ev.start, ev.end))}</span>
+                    ${buildScheduleEventTimeRangeHtml(ev.start, ev.end)}
                             ${makeupBadge}
                          </div>
                          ${soloStudentHtml}

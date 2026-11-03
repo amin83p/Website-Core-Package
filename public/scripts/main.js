@@ -1302,6 +1302,12 @@ function initHeaderInteractions() {
         });
     }
 
+    const mobileNavCollapse = document.getElementById('navbarNav');
+    if (mobileNavCollapse) {
+        mobileNavCollapse.addEventListener('shown.bs.collapse', () => scheduleHeaderOffsetRefresh());
+        mobileNavCollapse.addEventListener('hidden.bs.collapse', () => scheduleHeaderOffsetRefresh());
+    }
+
     header.addEventListener('transitionend', (event) => {
         if (!event) return;
         const target = event.target;

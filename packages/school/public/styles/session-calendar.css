@@ -2327,13 +2327,18 @@ button.schedule-session-context-status-chip-toggle.is-picker-open.is-drop-up .sc
 
 @media (max-width: 767.98px) {
   .schedule-calendar-card-body {
-    min-height: min(72dvh, 720px);
+    min-height: min(58dvh, 560px);
+  }
+
+  .schedule-visual-area .session-cal-positioned-session .vertical-event-block,
+  .schedule-visual-area .session-cal-positioned-session .event-block {
+    min-height: 0;
   }
 
   .schedule-visual-area.schedule-week-grid-host {
-    min-height: min(70dvh, 640px);
-    height: min(72dvh, 680px);
-    max-height: min(calc(100dvh - 12rem), 720px);
+    min-height: min(52dvh, 520px);
+    height: min(58dvh, 580px);
+    max-height: min(calc(100dvh - 12rem), 620px);
   }
 
   .schedule-visual-area.schedule-week-grid-host .session-cal-vertical-scroll {

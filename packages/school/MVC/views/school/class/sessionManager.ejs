@@ -47,8 +47,10 @@
     .att-bulk-actions {
         display: inline-flex;
         align-items: center;
-        flex-wrap: wrap;
+        flex-wrap: nowrap;
         gap: 0.45rem;
+        flex: 1 1 auto;
+        min-width: 0;
     }
     .att-bulk-actions-group {
         border: 1px solid #dee2e6;
@@ -70,6 +72,9 @@
         transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
     }
     .att-bulk-actions-group .att-bulk-btn:last-child {
+        border-right: 0;
+    }
+    .att-bulk-actions-group:not(.att-bulk-actions-group--responsive) .att-bulk-btn:last-child {
         border-right: 0;
     }
     .att-bulk-actions-group .att-bulk-btn:hover {
@@ -346,6 +351,20 @@
         text-align: center;
         vertical-align: middle;
     }
+    #attendanceTable .attendance-row-actions {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.2rem;
+        flex-shrink: 0;
+    }
+    #attendanceTable th.attendance-row-actions-col,
+    #attendanceTable td.attendance-row-actions-cell {
+        width: 4.25rem;
+        min-width: 4.25rem;
+        max-width: 4.75rem;
+        vertical-align: middle;
+    }
     #attendanceTable .sortable-att-name {
         cursor: pointer;
         user-select: none;
@@ -541,7 +560,73 @@
     .session-summary-label { color: #6c757d; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em; }
     .session-summary-value { color: #1f2a37; font-size: 1.1rem; font-weight: 700; line-height: 1.1; }
 
-    /* Page header: title + session meta on left; dashboard on right; class nav on toolbar */
+    .attendance-roster-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.65rem;
+        flex-wrap: wrap;
+        width: 100%;
+    }
+    .attendance-roster-toolbar {
+        background: #fff;
+        border-bottom: 1px solid #dee2e6;
+        padding: 0.55rem 0.85rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+    }
+    .attendance-roster-toolbar-apply {
+        width: 100%;
+        min-width: 0;
+    }
+    .attendance-roster-toolbar-apply .att-bulk-actions-group--responsive {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(6.75rem, 1fr));
+        gap: 0.35rem;
+        width: 100%;
+        border: none;
+        border-radius: 0;
+        overflow: visible;
+        box-shadow: none;
+    }
+    .attendance-roster-toolbar-apply .att-bulk-actions-group--responsive .att-bulk-btn {
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        border-radius: 999px;
+        width: 100%;
+        justify-content: center;
+        font-size: clamp(0.62rem, 0.55rem + 0.45vw, 0.78rem);
+        padding: clamp(0.28rem, 0.22rem + 0.35vw, 0.35rem) clamp(0.45rem, 0.35rem + 0.5vw, 0.7rem);
+    }
+    .attendance-roster-toolbar-secondary {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.5rem;
+        width: 100%;
+        padding-top: 0.4rem;
+        border-top: 1px solid #eef2f7;
+    }
+    .attendance-roster-toolbar:not(:has(.attendance-roster-toolbar-apply)) .attendance-roster-toolbar-secondary {
+        padding-top: 0;
+        border-top: none;
+    }
+    .attendance-status-info-btn {
+        flex-shrink: 0;
+        width: 2.15rem;
+        height: 2.15rem;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+        border-radius: 999px;
+    }
+    .attendance-status-info-btn .bi {
+        font-size: 1.05rem;
+    }
+
+    /* Page header: title + session meta on left; class nav on toolbar */
     .session-manager-page-header {
         display: flex;
         align-items: flex-start;
@@ -824,6 +909,41 @@
         margin-top: 0;
         min-height: 2.35rem;
         font-size: 0.9rem;
+    }
+    @media (max-width: 767.98px) {
+        .session-manager-page .session-info-header {
+            flex-wrap: nowrap;
+            align-items: stretch;
+            gap: 0.4rem;
+            padding: 0.5rem 0.55rem;
+        }
+        .session-manager-page .session-info-details-toggle {
+            flex: 1 1 0;
+            min-width: 0;
+            padding: 0.45rem 0.55rem;
+        }
+        .session-manager-page .session-info-expand-label {
+            display: none;
+        }
+        .session-manager-page .session-info-status-slot {
+            flex: 0 0 auto;
+            width: auto;
+            min-width: 6.75rem;
+            max-width: 44%;
+            padding: 0.32rem 0.38rem;
+        }
+        .session-manager-page .session-info-status-slot-label {
+            font-size: 0.55rem;
+        }
+        .session-manager-page .session-info-status-slot .session-status-button {
+            min-height: 2rem;
+            font-size: 0.78rem;
+            padding: 0.28rem 0.4rem;
+        }
+        .session-manager-page .session-status-required-badge {
+            font-size: 0.52rem;
+            padding: 0.12em 0.32em;
+        }
     }
     .session-info-details-body {
         padding: 0 0.85rem 0.85rem;
@@ -2025,6 +2145,23 @@
                 : (current === 'absent_camera_off' ? 'acf' : current);
             return currentNorm === normalized;
         };
+        function renderAttendanceSummaryCards(colClass) {
+            const col = String(colClass || 'col-6 col-md');
+            const rosterLen = (session.roster || []).length;
+            let out = '';
+            out += '<div class="' + col + '"><div class="session-summary-card h-100"><div class="session-summary-label">Students</div><div class="session-summary-value" data-attendance-summary="total">' + rosterLen + '</div></div></div>';
+            out += '<div class="' + col + '"><div class="session-summary-card h-100"><div class="session-summary-label">Present</div><div class="session-summary-value text-success" data-attendance-summary="present">' + attendanceSummary.present + '</div></div></div>';
+            if (enabledAttendanceSet.has('late')) {
+                out += '<div class="' + col + '"><div class="session-summary-card h-100"><div class="session-summary-label">Late</div><div class="session-summary-value text-warning" data-attendance-summary="late">' + attendanceSummary.late + '</div></div></div>';
+            }
+            out += '<div class="' + col + '"><div class="session-summary-card h-100"><div class="session-summary-label">Excused</div><div class="session-summary-value text-info" data-attendance-summary="excused">' + attendanceSummary.excused + '</div></div></div>';
+            out += '<div class="' + col + '"><div class="session-summary-card h-100"><div class="session-summary-label">Absent</div><div class="session-summary-value text-danger" data-attendance-summary="absent">' + attendanceSummary.absent + '</div></div></div>';
+            if (enabledAttendanceSet.has('acf')) {
+                out += '<div class="' + col + '"><div class="session-summary-card h-100"><div class="session-summary-label">ACF</div><div class="session-summary-value" style="color:#b02a37;" data-attendance-summary="acf">' + attendanceSummary.acf + '</div></div></div>';
+            }
+            out += '<div class="' + col + '"><div class="session-summary-card h-100"><div class="session-summary-label">N/A</div><div class="session-summary-value text-secondary" data-attendance-summary="not_applicable">' + attendanceSummary.not_applicable + '</div></div></div>';
+            return out;
+        }
         const normalizedSessionStatus = normalizeStatusCode(session.status || fallbackStatusCode);
         const currentSessionStatus = displayStatusRows.some((row) => normalizeStatusCode(row?.code) === normalizedSessionStatus)
             ? normalizedSessionStatus
@@ -2172,9 +2309,6 @@
                     <span class="session-manager-page-meta-when-item" id="sessionInfoSummaryTime"><i class="bi bi-clock" aria-hidden="true"></i><%= session.startTime %>–<%= session.endTime %></span>
                 </div>
             </div>
-        </div>
-        <div class="session-manager-page-header-actions">
-            <a href="<%= schoolSectionDashboardHref %>" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md session-manager-nav-away" id="linkSessionDashboard" data-confirm-title="Go to dashboard?" data-confirm-message="Leave this page and go to the school dashboard? Unsaved changes will be lost unless you save first."><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>
         </div>
     </div>
 
@@ -2715,59 +2849,26 @@
                     You can open Manage Session, but attendance field visibility is not granted for this profile.
                 </div>
                 <% } else { %>
-                <div class="row g-2 mb-3" id="attendanceStatusSummary">
-                    <div class="col-6 col-md">
-                        <div class="session-summary-card h-100">
-                            <div class="session-summary-label">Students</div>
-                            <div class="session-summary-value" id="attendanceSummaryTotal"><%= (session.roster || []).length %></div>
-                        </div>
-                    </div>
-                    <div class="col-6 col-md">
-                        <div class="session-summary-card h-100">
-                            <div class="session-summary-label">Present</div>
-                            <div class="session-summary-value text-success" id="attendanceSummaryPresent"><%= attendanceSummary.present %></div>
-                        </div>
-                    </div>
-                    <% if (enabledAttendanceSet.has('late')) { %>
-                    <div class="col-6 col-md">
-                        <div class="session-summary-card h-100">
-                            <div class="session-summary-label">Late</div>
-                            <div class="session-summary-value text-warning" id="attendanceSummaryLate"><%= attendanceSummary.late %></div>
-                        </div>
-                    </div>
-                    <% } %>
-                    <div class="col-6 col-md">
-                        <div class="session-summary-card h-100">
-                            <div class="session-summary-label">Excused</div>
-                            <div class="session-summary-value text-info" id="attendanceSummaryExcused"><%= attendanceSummary.excused %></div>
-                        </div>
-                    </div>
-                    <div class="col-6 col-md">
-                        <div class="session-summary-card h-100">
-                            <div class="session-summary-label">Absent</div>
-                            <div class="session-summary-value text-danger" id="attendanceSummaryAbsent"><%= attendanceSummary.absent %></div>
-                        </div>
-                    </div>
-                    <% if (enabledAttendanceSet.has('acf')) { %>
-                    <div class="col-6 col-md">
-                        <div class="session-summary-card h-100">
-                            <div class="session-summary-label">ACF</div>
-                            <div class="session-summary-value" style="color:#b02a37;" id="attendanceSummaryAcf"><%= attendanceSummary.acf %></div>
-                        </div>
-                    </div>
-                    <% } %>
-                    <div class="col-6 col-md">
-                        <div class="session-summary-card h-100">
-                            <div class="session-summary-label">N/A</div>
-                            <div class="session-summary-value text-secondary" id="attendanceSummaryNotApplicable"><%= attendanceSummary.not_applicable %></div>
+                <div class="modal fade" id="attendanceStatusSummaryModal" tabindex="-1" aria-labelledby="attendanceStatusSummaryModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered">
+                        <div class="modal-content">
+                            <div class="modal-header py-2 px-3">
+                                <h5 class="modal-title fs-6 fw-bold" id="attendanceStatusSummaryModalLabel">Attendance status counts</h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body py-2 px-3">
+                                <div class="row g-2">
+                                    <%- renderAttendanceSummaryCards('col-6') %>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
 
                 <div class="card border-0 shadow-sm">
-                    <div class="card-header bg-white border-bottom py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                        <h5 class="m-0 fw-bold text-primary"><i class="bi bi-people-fill me-2"></i>Attendance roster</h5>
-                        <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+                    <div class="card-header bg-white border-bottom py-3">
+                        <div class="attendance-roster-header">
+                            <h5 class="m-0 fw-bold text-primary"><i class="bi bi-people-fill me-2"></i>Attendance roster</h5>
                             <% if (typeof canOpenAttendanceMatrix !== 'undefined' && canOpenAttendanceMatrix) { %>
                             <a href="<%= attendanceMatrixHref %>"
                                class="session-panel-matrix-link session-manager-nav-away"
@@ -2778,28 +2879,37 @@
                                 <i class="bi bi-grid-3x3" aria-hidden="true"></i>Attendance matrix
                             </a>
                             <% } %>
+                        </div>
+                    </div>
+                    <div class="attendance-roster-toolbar">
+                        <% if (!attendanceReadOnly && session.roster.length > 0) { %>
+                        <div class="attendance-roster-toolbar-apply">
+                            <div class="att-bulk-actions-group att-bulk-actions-group--responsive btn-group-sm" role="group" aria-label="Bulk attendance">
+                                <button type="button" class="btn att-bulk-btn att-bulk-btn-present" id="btnAllPresent" title="Mark all editable students present">
+                                    <i class="bi bi-check-lg" aria-hidden="true"></i><span class="att-bulk-btn-text">All Present</span>
+                                </button>
+                                <% if (enabledAttendanceSet.has('late')) { %>
+                                <button type="button" class="btn att-bulk-btn att-bulk-btn-late" id="btnAllLate" title="Mark all editable students late">
+                                    <i class="bi bi-clock" aria-hidden="true"></i><span class="att-bulk-btn-text">All Late</span>
+                                </button>
+                                <% } %>
+                                <button type="button" class="btn att-bulk-btn att-bulk-btn-absent" id="btnAllAbsent" title="Mark all editable students absent">
+                                    <i class="bi bi-x-lg" aria-hidden="true"></i><span class="att-bulk-btn-text">All Absent</span>
+                                </button>
+                                <button type="button" class="btn att-bulk-btn att-bulk-btn-na" id="btnAllNotApplicable" title="Mark all editable students N/A">
+                                    <i class="bi bi-dash-circle" aria-hidden="true"></i><span class="att-bulk-btn-text">All N/A</span>
+                                </button>
+                            </div>
+                        </div>
+                        <% } %>
+                        <div class="attendance-roster-toolbar-secondary">
+                            <button type="button" class="btn btn-outline-secondary btn-sm attendance-status-info-btn" id="btnOpenAttendanceStatusSummary" data-bs-toggle="modal" data-bs-target="#attendanceStatusSummaryModal" aria-controls="attendanceStatusSummaryModal" title="View attendance status counts" aria-label="View attendance status counts">
+                                <i class="bi bi-info-circle" aria-hidden="true"></i>
+                            </button>
                             <% if (!attendanceReadOnly && session.roster.length > 0) { %>
-                                <div class="att-bulk-actions" aria-label="Bulk attendance">
-                                    <div class="att-bulk-actions-group btn-group btn-group-sm" role="group">
-                                        <button type="button" class="btn att-bulk-btn att-bulk-btn-present" id="btnAllPresent" title="Mark all editable students present">
-                                            <i class="bi bi-check-lg" aria-hidden="true"></i>All Present
-                                        </button>
-                                        <% if (enabledAttendanceSet.has('late')) { %>
-                                        <button type="button" class="btn att-bulk-btn att-bulk-btn-late" id="btnAllLate" title="Mark all editable students late">
-                                            <i class="bi bi-clock" aria-hidden="true"></i>All Late
-                                        </button>
-                                        <% } %>
-                                        <button type="button" class="btn att-bulk-btn att-bulk-btn-absent" id="btnAllAbsent" title="Mark all editable students absent">
-                                            <i class="bi bi-x-lg" aria-hidden="true"></i>All Absent
-                                        </button>
-                                        <button type="button" class="btn att-bulk-btn att-bulk-btn-na" id="btnAllNotApplicable" title="Mark all editable students N/A">
-                                            <i class="bi bi-dash-circle" aria-hidden="true"></i>All N/A
-                                        </button>
-                                    </div>
-                                    <button type="button" class="btn att-bulk-btn-reset" id="btnAllResetAttendance" title="Clear attendance back to unmarked">
-                                        <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>Reset
-                                    </button>
-                                </div>
+                            <button type="button" class="btn att-bulk-btn-reset" id="btnAllResetAttendance" title="Clear attendance back to unmarked">
+                                <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>Reset
+                            </button>
                             <% } %>
                         </div>
                     </div>
@@ -2811,7 +2921,7 @@
                                         <th class="attendance-order-col ps-3" title="Row order">#</th>
                                         <th class="ps-2 sortable-att-name" id="attendanceSortName" title="Click to sort A–Z or Z–A">Student Name <i class="bi bi-arrow-down-up attendance-sort-icon" aria-hidden="true"></i></th>
                                         <th style="min-width: 280px;">Attendance Status</th>
-                                        <th class="text-center" style="width: 3rem;" aria-label="Enrollment info"></th>
+                                        <th class="text-center attendance-row-actions-col" aria-label="Enrollment info and session details"></th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -2864,13 +2974,6 @@
                                                             <% } %>
                                                             <% } %>
                                                         </div>
-                                                        <% const hasDetails = student.lateMinutes || student.earlyLeaveMinutes || student.excuseRef || student.excuseAttachment || (student.comments && student.comments.length > 0); %>
-                                                        <button type="button"
-                                                                class="btn btn-sm btn-details <%= hasDetails ? 'btn-warning text-dark' : 'btn-outline-secondary' %>"
-                                                                title="Notes / Excuses / Mentions"
-                                                                onclick="openDetailsModal('<%= student.personId %>', '<%= student.name.replace(/'/g, "\\'") %>')">
-                                                            <i class="bi <%= hasDetails ? 'bi-sticky-fill' : 'bi-three-dots' %>"></i>
-                                                        </button>
                                                     </div>
                                                     <input type="hidden" class="att-late" value="<%= student.lateMinutes || '' %>">
                                                     <input type="hidden" class="att-leave" value="<%= student.earlyLeaveMinutes || '' %>">
@@ -2885,7 +2988,9 @@
                                                     <input type="hidden" class="att-excuse-attachment" value="">
                                                     <input type="hidden" class="att-comments" value="">
                                                 </td>
-                                                <td class="text-center pe-3 align-middle">
+                                                <td class="text-center pe-3 align-middle attendance-row-actions-cell">
+                                                    <% const hasDetails = student.lateMinutes || student.earlyLeaveMinutes || student.excuseRef || student.excuseAttachment || (student.comments && student.comments.length > 0); %>
+                                                    <div class="attendance-row-actions">
                                                     <% const hasEnrollmentNote = String(student.enrollmentNotes || '').trim().length > 0; %>
                                                     <% const enrollmentFinishAlertActive = student.enrollmentFinishAlertActive === true; %>
                                                     <% const enrollmentAlertDetailsJson = encodeURIComponent(JSON.stringify(Array.isArray(student.enrollmentFinishAlertDetails) ? student.enrollmentFinishAlertDetails : [])); %>
@@ -2911,6 +3016,13 @@
                                                             data-enrollment-alert-details="<%= enrollmentAlertDetailsJson %>">
                                                         <i class="bi <%= (enrollmentFinishAlertActive || hasEnrollmentNote) ? 'bi-info-circle-fill' : 'bi-info-circle' %>"></i>
                                                     </button>
+                                                    <button type="button"
+                                                            class="btn btn-sm btn-details <%= hasDetails ? 'btn-warning text-dark' : 'btn-outline-secondary' %>"
+                                                            title="Notes / Excuses / Mentions"
+                                                            onclick="openDetailsModal('<%= student.personId %>', '<%= student.name.replace(/'/g, "\\'") %>')">
+                                                        <i class="bi <%= hasDetails ? 'bi-sticky-fill' : 'bi-three-dots' %>"></i>
+                                                    </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         <% }) %>
@@ -4661,11 +4773,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function leaveSessionManagerAfterDelete() {
-        const dashboardHref = String(
-            document.getElementById('linkSessionDashboard')?.getAttribute('href')
-            || sessionManagerSchoolDashboardHref
-            || '/dashboard/section-nav/SCHOOL'
-        ).trim();
+        const dashboardHref = String(sessionManagerSchoolDashboardHref || '/dashboard/section-nav/SCHOOL').trim();
         window.close();
         setTimeout(() => {
             window.location.href = dashboardHref || '/dashboard/section-nav/SCHOOL';
@@ -11469,17 +11577,18 @@ document.addEventListener('DOMContentLoaded', () => {
             if (Object.prototype.hasOwnProperty.call(counts, key)) counts[key] += 1;
         });
 
-        const setVal = (id, value) => {
-            const el = document.getElementById(id);
-            if (el) el.textContent = String(value);
+        const setVal = (key, value) => {
+            document.querySelectorAll(`[data-attendance-summary="${key}"]`).forEach((el) => {
+                el.textContent = String(value);
+            });
         };
-        setVal('attendanceSummaryTotal', rows.length);
-        setVal('attendanceSummaryPresent', counts.present);
-        setVal('attendanceSummaryLate', counts.late);
-        setVal('attendanceSummaryExcused', counts.excused);
-        setVal('attendanceSummaryAbsent', counts.absent);
-        setVal('attendanceSummaryAcf', counts.acf);
-        setVal('attendanceSummaryNotApplicable', counts.not_applicable);
+        setVal('total', rows.length);
+        setVal('present', counts.present);
+        setVal('late', counts.late);
+        setVal('excused', counts.excused);
+        setVal('absent', counts.absent);
+        setVal('acf', counts.acf);
+        setVal('not_applicable', counts.not_applicable);
     }
 
     const attendanceTableEl = document.getElementById('attendanceTable');

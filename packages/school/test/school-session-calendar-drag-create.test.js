@@ -67,7 +67,7 @@ test('personSchedule wires last-loaded refresh chip and stale detection', () => 
   const source = readMasterScheduleViewerJs();
   assert.match(source, /lastLoadedAtByPersonId/);
   assert.match(source, /data-schedule-refresh-loaded/);
-  assert.match(source, /schedule-loaded-at-chip/);
+  assert.match(source, /schedule-loaded-at-chip--icon-only/);
   assert.match(source, /schedule-load-duration-chip/);
   assert.match(source, /pendingLoadTiming/);
   assert.match(source, /schedule-event-info-btn/);

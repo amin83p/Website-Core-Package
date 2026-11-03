@@ -1659,13 +1659,35 @@ a.header-side-control-btn {
     display: inline-flex !important;
   }
 
-  #main-header.header-minimized .action-buttons > .navbar-nav.flex-row,
-  #main-header.header-minimized .action-buttons > .search-btn {
-    display: none !important;
+  /* Compact header hides .header-nav-row globally; mobile hamburger targets #navbarNav inside that row. */
+  #main-header.header-minimized .header-nav-row {
+    max-height: none;
+    opacity: 1;
+    pointer-events: auto;
+    overflow: visible;
   }
 
-  #main-header.header-minimized .action-buttons > .navbar-nav {
-    display: none !important;
+  #main-header #navbarNav.collapsing,
+  #main-header #navbarNav.show {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 0.45rem 0.65rem;
+    margin-top: 0.35rem;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+    z-index: 1060;
+  }
+
+  #main-header #navbarNav .navbar-nav {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.15rem;
+  }
+
+  #main-header #navbarNav .navbar-nav .nav-link,
+  #main-header #navbarNav .navbar-nav .dropdown-toggle {
+    padding: 0.45rem 0.5rem;
+    border-radius: 8px;
   }
 
   .header-utility-controls {

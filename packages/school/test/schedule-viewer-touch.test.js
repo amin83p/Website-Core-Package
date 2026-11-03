@@ -40,8 +40,20 @@ test('narrow viewport defaults hide empty days and uses compact grid sizing', ()
     source,
     /readScheduleHideEmptyDays[\s\S]*stored === '0'[\s\S]*max-width: 767\.98px/
   );
-  assert.match(source, /const mobileScrollDays = isVertical && narrowViewport;/);
-  assert.match(source, /verticalDayWidthUserAdjusted && !narrowViewport/);
+  assert.match(source, /const autoFit = isVertical && !scheduleState\.verticalDayWidthUserAdjusted;/);
+  assert.match(source, /schedule-week-grid-narrow/);
   assert.match(source, /function scheduleShouldFilterEmptyDays/);
   assert.match(source, /isScheduleNarrowViewport\(\)\) return true/);
+});
+
+test('master schedule long press uses touchstart for iOS context menu', () => {
+  const source = readMasterScheduleViewerJs();
+  assert.match(source, /addEventListener\('touchstart'/);
+  assert.match(source, /passive: false/);
+});
+
+test('week grid session blocks render stacked start and end times', () => {
+  const source = readMasterScheduleViewerJs();
+  assert.match(source, /function buildScheduleEventTimeRangeHtml/);
+  assert.match(source, /schedule-event-time-stacked/);
 });

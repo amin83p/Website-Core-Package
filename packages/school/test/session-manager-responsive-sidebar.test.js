@@ -65,3 +65,27 @@ test('session manager page heading uses fluid clamp sizing', () => {
     /\.session-manager-page \.page-heading\.size-md[\s\S]*font-size:\s*clamp\(/
   );
 });
+
+test('session manager places session status beside details toggle on small screens', () => {
+  assert.match(
+    source,
+    /@media\s*\(\s*max-width:\s*767\.98px\s*\)[\s\S]*\.session-info-header[\s\S]*flex-wrap:\s*nowrap/
+  );
+  assert.match(
+    source,
+    /@media\s*\(\s*max-width:\s*767\.98px\s*\)[\s\S]*\.session-info-status-slot[\s\S]*max-width:\s*44%/
+  );
+});
+
+test('session manager attendance toolbar uses info button for status counts modal', () => {
+  assert.match(source, /class="attendance-roster-toolbar"/);
+  assert.match(source, /class="attendance-roster-toolbar-secondary"/);
+  assert.match(source, /att-bulk-actions-group--responsive/);
+  assert.match(source, /class="attendance-roster-header"/);
+  assert.match(source, /id="btnOpenAttendanceStatusSummary"/);
+  assert.match(source, /attendance-status-info-btn/);
+  assert.match(source, /attendance-roster-toolbar-secondary[\s\S]*id="btnAllResetAttendance"/);
+  assert.match(source, /id="attendanceStatusSummaryModal"/);
+  assert.match(source, /data-attendance-summary="present"/);
+  assert.doesNotMatch(source, /id="attendanceStatusSummary"/);
+});
