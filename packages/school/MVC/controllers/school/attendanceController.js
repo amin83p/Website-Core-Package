@@ -1474,10 +1474,14 @@ async function updateAttendanceRosterCell(req, res) {
             )
         );
         if (canMarkAttendanceExcused) {
-            rosterRecord.lateExcused = attendanceMatrixMetricsService.normalizeAttendanceTimingExcuseFlag(req.body?.lateExcused);
-            rosterRecord.earlyLeaveExcused = attendanceMatrixMetricsService.normalizeAttendanceTimingExcuseFlag(req.body?.earlyLeaveExcused);
+            if (req.body?.lateExcused !== undefined) {
+                rosterRecord.lateExcused = attendanceMatrixMetricsService.normalizeAttendanceTimingExcuseFlag(req.body.lateExcused);
+            }
+            if (req.body?.earlyLeaveExcused !== undefined) {
+                rosterRecord.earlyLeaveExcused = attendanceMatrixMetricsService.normalizeAttendanceTimingExcuseFlag(req.body.earlyLeaveExcused);
+            }
             if (req.body?.absenceExcused !== undefined) {
-                rosterRecord.absenceExcused = attendanceMatrixMetricsService.normalizeAttendanceTimingExcuseFlag(req.body?.absenceExcused);
+                rosterRecord.absenceExcused = attendanceMatrixMetricsService.normalizeAttendanceTimingExcuseFlag(req.body.absenceExcused);
             }
         } else {
             rosterRecord.lateExcused = savedExcuseState.lateExcused;

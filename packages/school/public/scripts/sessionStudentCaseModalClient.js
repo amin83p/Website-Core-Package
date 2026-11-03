@@ -119,9 +119,21 @@
     return modalEl;
   }
 
+  function mountCollaborationModalToBody() {
+    const modalEl = getCollaborationModalEl();
+    if (!modalEl || modalEl.parentElement === document.body) return modalEl;
+    document.body.appendChild(modalEl);
+    return modalEl;
+  }
+
   function syncStudentCaseModalStack() {
     const modalEl = getModalEl();
     if (!modalEl) return;
+    const collabEl = getCollaborationModalEl();
+    if (collabEl?.classList.contains('show')) {
+      syncCollaborationModalStack();
+      return;
+    }
     let maxZ = 1050;
     document.querySelectorAll('.modal.show').forEach((openModal) => {
       if (openModal === modalEl) return;
@@ -530,33 +542,54 @@
   }
 
   function syncCollaborationModalStack() {
-    const collabEl = getCollaborationModalEl();
+    const collabEl = mountCollaborationModalToBody();
     const caseEl = getModalEl();
-    if (!collabEl) return;
-    let maxZ = 1050;
-    document.querySelectorAll('.modal.show').forEach((openModal) => {
-      if (openModal === collabEl) return;
-      const z = Number.parseInt(window.getComputedStyle(openModal).zIndex, 10);
-      if (Number.isFinite(z) && z > maxZ) maxZ = z;
-    });
-    const modalZ = Math.max(maxZ + 10, 1065);
-    collabEl.style.setProperty('z-index', String(modalZ), 'important');
-    const backdrops = document.querySelectorAll('.modal-backdrop.show');
-    const backdrop = backdrops[backdrops.length - 1];
-    if (backdrop) backdrop.style.setProperty('z-index', String(modalZ - 5), 'important');
+    if (!collabEl || !collabEl.classList.contains('show')) return;
+
+    let caseZ = 1055;
     if (caseEl?.classList.contains('show')) {
-      caseEl.style.setProperty('z-index', String(modalZ - 10), 'important');
+      const parsed = Number.parseInt(window.getComputedStyle(caseEl).zIndex, 10);
+      if (Number.isFinite(parsed) && parsed > 0) caseZ = parsed;
+      else caseEl.style.setProperty('z-index', String(caseZ), 'important');
     }
+    const collabZ = caseZ + 20;
+    collabEl.style.setProperty('z-index', String(collabZ), 'important');
+    if (caseEl?.classList.contains('show')) {
+      caseEl.style.setProperty('z-index', String(caseZ), 'important');
+    }
+
+    const backdrops = document.querySelectorAll('.modal-backdrop.show');
+    backdrops.forEach((backdrop, index) => {
+      if (backdrops.length <= 1) {
+        backdrop.style.setProperty('z-index', String(caseZ - 5), 'important');
+        return;
+      }
+      if (index === backdrops.length - 1) {
+        backdrop.style.setProperty('z-index', String(collabZ - 5), 'important');
+      } else {
+        backdrop.style.setProperty('z-index', String(caseZ - 5), 'important');
+      }
+    });
   }
 
   function ensureCollaborationModalInstance() {
-    const modalEl = getCollaborationModalEl();
+    const modalEl = mountCollaborationModalToBody();
     if (!modalEl || !global.bootstrap) return null;
     if (!collaborationModalInstance) {
-      collaborationModalInstance = new global.bootstrap.Modal(modalEl);
+      collaborationModalInstance = new global.bootstrap.Modal(modalEl, { backdrop: true, focus: true });
       if (!modalEl.dataset.lifecycleWired) {
         modalEl.dataset.lifecycleWired = '1';
-        modalEl.addEventListener('shown.bs.modal', () => syncCollaborationModalStack());
+        modalEl.addEventListener('show.bs.modal', () => {
+          mountCollaborationModalToBody();
+          syncCollaborationModalStack();
+        });
+        modalEl.addEventListener('shown.bs.modal', () => {
+          syncCollaborationModalStack();
+        });
+        modalEl.addEventListener('hidden.bs.modal', () => {
+          modalEl.style.removeProperty('z-index');
+          syncStudentCaseModalStack();
+        });
       }
     }
     return collaborationModalInstance;
@@ -597,6 +630,7 @@
     const caseId = String(document.getElementById('studentCaseId')?.value || '').trim();
     if (!caseId) return;
     populateCollaborationModalContent();
+    mountCollaborationModalToBody();
     ensureCollaborationModalInstance()?.show();
   }
 

@@ -88,10 +88,10 @@
     }).filter(Boolean);
   }
 
-  function cellEditBlocked(record, context) {
+  function cellRosterEditBlocked(record, context) {
     const rec = record || {};
     const ctx = context || {};
-    if (ctx.canEditRoster !== true || ctx.canMarkExcused !== true) return true;
+    if (ctx.canEditRoster !== true) return true;
     if (rec.withinEnrollmentWindow === false) return true;
     if (rec.applicability === 'makeup_required') return true;
     if (rec.attendanceEditLocked === true) return true;
@@ -102,6 +102,73 @@
     if (sessionLocked && !canOverride) return true;
     if (enrollmentNaLock && !canOverride) return true;
     return false;
+  }
+
+  function cellEditBlocked(record, context) {
+    if (cellRosterEditBlocked(record, context)) return true;
+    if (context?.canMarkExcused !== true) return true;
+    return false;
+  }
+
+  const QUICK_MARK_STATUSES = ['present', 'absent', 'acf'];
+
+  const QUICK_STATUS_LABELS = {
+    present: 'Mark present',
+    absent: 'Mark absent',
+    acf: 'Mark ACF'
+  };
+
+  function resolveCurrentQuickStatusKey(record) {
+    const status = String(record?.status || '').trim().toLowerCase();
+    if (!status) return '';
+    if (status === 'excused') return 'absent';
+    return status;
+  }
+
+  function resolveQuickStatusLabel(code) {
+    const key = String(code || '').trim().toLowerCase();
+    if (typeof global !== 'undefined' && global.AttendanceMarkAppearance?.getMark) {
+      const mark = global.AttendanceMarkAppearance.getMark(key);
+      const label = String(mark?.label || '').trim();
+      if (label) return `Mark ${label}`;
+    }
+    return QUICK_STATUS_LABELS[key] || `Mark ${key}`;
+  }
+
+  /**
+   * @param {object} record
+   * @param {string[]} enabledStatuses
+   * @param {object} context
+   * @returns {{ type: 'status', status: string, label: string }[]}
+   */
+  function buildQuickStatusMenuItems(record, enabledStatuses, context) {
+    if (cellRosterEditBlocked(record, context)) return [];
+    const enabled = new Set(
+      (Array.isArray(enabledStatuses) ? enabledStatuses : QUICK_MARK_STATUSES)
+        .map((s) => String(s || '').trim().toLowerCase())
+        .filter((s) => QUICK_MARK_STATUSES.includes(s))
+    );
+    const current = resolveCurrentQuickStatusKey(record);
+    return QUICK_MARK_STATUSES
+      .filter((code) => enabled.has(code) && code !== current)
+      .map((code) => ({
+        type: 'status',
+        status: code,
+        label: resolveQuickStatusLabel(code)
+      }));
+  }
+
+  function excuseToggleLabel(kind, isExcused) {
+    if (kind === 'late') {
+      return isExcused ? 'Unmark late excused' : 'Mark late excused';
+    }
+    if (kind === 'earlyLeave') {
+      return isExcused ? 'Unmark early leave excused' : 'Mark early leave excused';
+    }
+    if (kind === 'absence') {
+      return isExcused ? 'Unmark absence excused' : 'Mark absence excused';
+    }
+    return isExcused ? 'Unmark excused' : 'Mark excused';
   }
 
   /**
@@ -184,10 +251,11 @@
         });
       }
       if (canShowExcuseToggle(rec, ctx, 'late')) {
+        const lateExcused = flagIsTrue(rec.lateExcused);
         buttons.push({
           kind: 'late',
-          label: flagIsTrue(rec.lateExcused) ? 'Late excused' : 'Mark late excused',
-          excused: flagIsTrue(rec.lateExcused)
+          label: excuseToggleLabel('late', lateExcused),
+          excused: lateExcused
         });
       }
     }
@@ -202,21 +270,21 @@
         });
       }
       if (canShowExcuseToggle(rec, ctx, 'earlyLeave')) {
+        const earlyLeaveExcused = flagIsTrue(rec.earlyLeaveExcused);
         buttons.push({
           kind: 'earlyLeave',
-          label: flagIsTrue(rec.earlyLeaveExcused) ? 'Early leave excused' : 'Mark early leave excused',
-          excused: flagIsTrue(rec.earlyLeaveExcused)
+          label: excuseToggleLabel('earlyLeave', earlyLeaveExcused),
+          excused: earlyLeaveExcused
         });
       }
     }
 
     if (canShowExcuseToggle(rec, ctx, 'absence')) {
+      const absenceExcused = absenceIsExcused(rec) || String(rec.status || '').trim() === 'excused';
       buttons.push({
         kind: 'absence',
-        label: (absenceIsExcused(rec) || String(rec.status || '').trim() === 'excused')
-          ? 'Absence excused'
-          : 'Mark absence excused',
-        excused: absenceIsExcused(rec) || String(rec.status || '').trim() === 'excused'
+        label: excuseToggleLabel('absence', absenceExcused),
+        excused: absenceExcused
       });
     }
 
@@ -307,10 +375,41 @@
     return `<button type="button" class="${extraClass.trim()}" role="menuitem" data-att-excuse-kind="${kind}">${label}</button>`;
   }
 
-  function buildContextMenuHtml(model) {
-    const items = buildExcuseContextMenuItems(model);
-    if (items.length) {
-      return items.map((btn) => buildContextMenuItemHtml(btn)).join('');
+  function buildQuickStatusMenuItemHtml(item) {
+    const status = escapeHtml(item.status || '');
+    const label = escapeHtml(item.label || '');
+    return `<button type="button" class="att-cell-context-menu-item att-cell-context-menu-item--status att-cell-context-menu-item--status-${status}" role="menuitem" data-att-quick-status="${status}">${label}</button>`;
+  }
+
+  function buildContextMenuAccessContext(ctx) {
+    const access = resolveAccessFlags();
+    return {
+      fieldVisibility: ctx?.fieldVisibility,
+      canMarkExcused: access.canMarkExcused === true,
+      canEditRoster: access.canEditRoster === true,
+      canOverrideSessionLock: access.canOverrideSessionLock === true
+    };
+  }
+
+  function buildContextMenuHtml(model, ctx) {
+    const menuAccess = buildContextMenuAccessContext(ctx);
+    const enabledStatuses = typeof initOptions?.resolveEnabledStatuses === 'function'
+      ? initOptions.resolveEnabledStatuses(ctx)
+      : QUICK_MARK_STATUSES;
+    const quickItems = buildQuickStatusMenuItems(ctx?.record, enabledStatuses, menuAccess);
+    const excuseItems = buildExcuseContextMenuItems(model);
+    const parts = [];
+    quickItems.forEach((item) => parts.push(buildQuickStatusMenuItemHtml(item)));
+    if (quickItems.length && excuseItems.length) {
+      parts.push('<div class="att-cell-context-menu-divider" role="separator" aria-hidden="true"></div>');
+    }
+    if (excuseItems.length) {
+      excuseItems.forEach((btn) => parts.push(buildContextMenuItemHtml(btn)));
+    }
+    if (parts.length) {
+      parts.push('<div class="att-cell-context-menu-divider" role="separator" aria-hidden="true"></div>');
+      parts.push('<button type="button" class="att-cell-context-menu-item att-cell-context-menu-item--muted" role="menuitem" data-att-open-details="1">Open details…</button>');
+      return parts.join('');
     }
     return '<button type="button" class="att-cell-context-menu-item" role="menuitem" data-att-open-details="1">Open details…</button>';
   }
@@ -390,7 +489,7 @@
     }
     contextMenuAnchor = cellEl;
     contextMenuContext = ctx;
-    contextMenuEl.innerHTML = buildContextMenuHtml(model);
+    contextMenuEl.innerHTML = buildContextMenuHtml(model, ctx);
     positionContextMenu(clientX, clientY);
   }
 
@@ -419,6 +518,16 @@
       if (typeof initOptions.onOpenCellDetails === 'function' && anchor && ctx) {
         initOptions.onOpenCellDetails({ anchorEl: anchor, context: ctx });
       }
+      return;
+    }
+    const statusBtn = event.target.closest('[data-att-quick-status]');
+    if (statusBtn) {
+      event.preventDefault();
+      event.stopPropagation();
+      const nextStatus = String(statusBtn.getAttribute('data-att-quick-status') || '').trim().toLowerCase();
+      const anchor = contextMenuAnchor;
+      if (!nextStatus || !anchor) return;
+      void setStatusFromContextMenu(nextStatus, anchor, contextMenuContext);
       return;
     }
     const btn = event.target.closest('[data-att-excuse-kind]');
@@ -514,6 +623,58 @@
     }
   }
 
+  async function setStatusFromContextMenu(nextStatus, anchorEl, ctxOverride) {
+    if (!initOptions) return;
+    const ctx = ctxOverride || contextMenuContext;
+    if (!ctx || !ctx.record) return;
+    const menuAccess = buildContextMenuAccessContext(ctx);
+    if (cellRosterEditBlocked(ctx.record, menuAccess)) return;
+    const attendance = String(nextStatus || '').trim().toLowerCase();
+    if (!QUICK_MARK_STATUSES.includes(attendance)) return;
+    const payload = {
+      classId: String(ctx.classId || '').trim(),
+      sessionId: String(ctx.record.sessionId || ctx.sessionId || '').trim(),
+      studentPersonId: String(ctx.personId || '').trim(),
+      attendance
+    };
+    if (typeof initOptions.resolveActionStateId === 'function') {
+      const actionStateId = initOptions.resolveActionStateId();
+      if (actionStateId) payload.actionStateId = actionStateId;
+    }
+    try {
+      const res = await fetch('/school/attendances/api/update-roster-cell', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+        body: JSON.stringify(payload)
+      });
+      const result = await res.json().catch(() => null);
+      if (typeof initOptions.onApiResult === 'function') {
+        initOptions.onApiResult(res, result);
+      }
+      if (!result || result.status !== 'success') {
+        if (typeof initOptions.onApiError === 'function') {
+          initOptions.onApiError(result);
+        }
+        hideContextMenu();
+        return;
+      }
+      if (typeof initOptions.onPatched === 'function') {
+        initOptions.onPatched({
+          anchorEl,
+          context: ctx,
+          payload,
+          serverRecord: result.record || null
+        });
+      }
+      hideContextMenu();
+      hideTip();
+    } catch (error) {
+      if (typeof initOptions.onApiError === 'function') {
+        initOptions.onApiError({ message: error && error.message ? error.message : 'Save failed.' });
+      }
+    }
+  }
+
   async function toggleExcuseFromTip(kind, anchorEl, ctxOverride) {
     if (!initOptions) return;
     const ctx = ctxOverride || contextMenuContext;
@@ -537,8 +698,10 @@
     };
     if (kind === 'late') {
       payload.lateExcused = !flagIsTrue(record.lateExcused);
+      payload.lateMinutes = Math.max(0, Math.floor(Number(record.lateMinutes) || 0));
     } else if (kind === 'earlyLeave') {
       payload.earlyLeaveExcused = !flagIsTrue(record.earlyLeaveExcused);
+      payload.earlyLeaveMinutes = Math.max(0, Math.floor(Number(record.earlyLeaveMinutes) || 0));
     } else if (kind === 'absence') {
       payload.absenceExcused = !(absenceIsExcused(record) || attendance === 'excused');
     }
@@ -642,8 +805,10 @@
     buildAttendanceCellTipModel,
     buildTipHtmlFromModel,
     buildExcuseContextMenuItems,
+    buildQuickStatusMenuItems,
     canShowExcuseToggle,
     cellEditBlocked,
+    cellRosterEditBlocked,
     escapeHtml,
     flagIsTrue,
     isAbsentLikeStatus

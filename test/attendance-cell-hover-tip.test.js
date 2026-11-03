@@ -124,3 +124,59 @@ test('canShowExcuseToggle requires canMarkExcused and canEditRoster', () => {
   assert.equal(tip.canShowExcuseToggle(record, { ...fullAccess, canMarkExcused: false }, 'late'), false);
   assert.equal(tip.canShowExcuseToggle(record, { ...fullAccess, canEditRoster: false }, 'late'), false);
 });
+
+test('buildQuickStatusMenuItems offers present and absent when unmarked', () => {
+  const items = tip.buildQuickStatusMenuItems(
+    { status: '' },
+    ['present', 'absent', 'acf'],
+    fullAccess
+  );
+  assert.deepEqual(items.map((row) => row.status), ['present', 'absent', 'acf']);
+});
+
+test('buildQuickStatusMenuItems hides current status and respects class enabled list', () => {
+  const presentItems = tip.buildQuickStatusMenuItems(
+    { status: 'present' },
+    ['present', 'absent', 'acf'],
+    fullAccess
+  );
+  assert.deepEqual(presentItems.map((row) => row.status), ['absent', 'acf']);
+
+  const absentItems = tip.buildQuickStatusMenuItems(
+    { status: 'absent' },
+    ['present', 'absent'],
+    fullAccess
+  );
+  assert.deepEqual(absentItems.map((row) => row.status), ['present']);
+
+  const acfDisabled = tip.buildQuickStatusMenuItems(
+    { status: 'present' },
+    ['present', 'absent'],
+    fullAccess
+  );
+  assert.ok(!acfDisabled.some((row) => row.status === 'acf'));
+});
+
+test('buildQuickStatusMenuItems omits status actions when roster edit is blocked', () => {
+  const items = tip.buildQuickStatusMenuItems(
+    { status: '' },
+    ['present', 'absent', 'acf'],
+    { ...fullAccess, canEditRoster: false }
+  );
+  assert.equal(items.length, 0);
+});
+
+test('buildAttendanceCellTipModel uses unmark labels when excuse flags are set', () => {
+  const model = tip.buildAttendanceCellTipModel({
+    status: 'absent',
+    lateMinutes: 10,
+    earlyLeaveMinutes: 5,
+    lateExcused: true,
+    earlyLeaveExcused: true,
+    absenceExcused: true
+  }, fullAccess);
+
+  assert.ok(model.buttons.some((btn) => btn.kind === 'absence' && btn.label === 'Unmark absence excused'));
+  assert.ok(model.buttons.some((btn) => btn.kind === 'late' && btn.label === 'Unmark late excused'));
+  assert.ok(model.buttons.some((btn) => btn.kind === 'earlyLeave' && btn.label === 'Unmark early leave excused'));
+});

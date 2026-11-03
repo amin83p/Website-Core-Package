@@ -171,8 +171,12 @@ function resolveAttendanceTimingFieldsForSave(incRec = {}, existRec = {}, sessio
       breakEarlyLeaveMinutes: Math.max(0, Math.floor(Number(existRec.breakEarlyLeaveMinutes) || 0))
     };
 
-  const lateSource = incRec.lateMinutes !== undefined ? incRec.lateMinutes : detail.lateMinutes;
-  const earlySource = incRec.earlyLeaveMinutes !== undefined ? incRec.earlyLeaveMinutes : detail.earlyLeaveMinutes;
+  const lateSource = incRec.lateMinutes !== undefined
+    ? incRec.lateMinutes
+    : (incomingHasDetail ? detail.lateMinutes : existRec.lateMinutes);
+  const earlySource = incRec.earlyLeaveMinutes !== undefined
+    ? incRec.earlyLeaveMinutes
+    : (incomingHasDetail ? detail.earlyLeaveMinutes : existRec.earlyLeaveMinutes);
 
   return {
     attendanceArrivalTime: detail.attendanceArrivalTime,

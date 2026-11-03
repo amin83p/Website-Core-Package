@@ -3792,6 +3792,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 canOverrideSessionLock: window.CAN_OVERRIDE_SESSION_LOCK === true
             }),
             resolveActionStateId: resolveAttendanceActionStateId,
+            resolveEnabledStatuses: () => getMatrixEnabledAttendanceStatuses(window.currentMatrixData),
             onApiResult: (res, result) => {
                 hydrateAttendanceBudgetFromApi(res, result, { estimateAttempt: true, source: 'tip-excuse' });
             },

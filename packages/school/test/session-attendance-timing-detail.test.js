@@ -109,3 +109,25 @@ test('resolveAttendanceTimingFieldsForSave keeps existing detail when incoming o
   assert.equal(saved.breakLateMinutes, 3);
   assert.equal(saved.lateMinutes, 20);
 });
+
+test('resolveAttendanceTimingFieldsForSave preserves existing totals on excuse-only partial save', () => {
+  const saved = timingDetail.resolveAttendanceTimingFieldsForSave(
+    {},
+    {
+      attendanceArrivalTime: '',
+      attendanceLeaveTime: '',
+      breakLateMinutes: 8,
+      breakEarlyLeaveMinutes: 5,
+      lateMinutes: 12,
+      earlyLeaveMinutes: 7,
+      lateExcused: false,
+      earlyLeaveExcused: false
+    },
+    { startTime: '09:00', endTime: '12:00' },
+    180
+  );
+  assert.equal(saved.lateMinutes, 12);
+  assert.equal(saved.earlyLeaveMinutes, 7);
+  assert.equal(saved.breakLateMinutes, 8);
+  assert.equal(saved.breakEarlyLeaveMinutes, 5);
+});
