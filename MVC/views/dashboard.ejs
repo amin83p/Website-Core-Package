@@ -900,6 +900,36 @@ main.container.my-4 {
     font-size: 1.6rem;
   }
 }
+
+@media (max-width: 449.98px) {
+  .dashboard-toolbar-row .btn-group .view-btn {
+    width: 30px;
+    min-width: 30px;
+    height: 30px;
+    padding: 0;
+    font-size: 0.82rem;
+    line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .dashboard-toolbar-row .dashboard-toolbar-right {
+    gap: 0.35rem;
+  }
+
+  .dashboard-toolbar-row .btn-sm,
+  #toggleAllSectionsBtn {
+    font-size: 0.72rem;
+    padding: 0.2rem 0.45rem;
+  }
+
+  .dashboard-sort-group .form-select {
+    font-size: 0.78rem;
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+  }
+}
 </style>
 
 <script>
@@ -934,7 +964,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let currentMode = localStorage.getItem(MODE_KEY) || MODE_CATEGORIES;
   let currentCategory = String(localStorage.getItem(CAT_KEY) || CAT_ALL).toUpperCase();
-  let currentView = localStorage.getItem(VIEW_KEY) || 'compact';
+  const NARROW_LIST_MQL = window.matchMedia('(max-width: 449.98px)');
+  function readStoredViewPreference() {
+    const stored = localStorage.getItem(VIEW_KEY);
+    return stored === 'card' || stored === 'compact' || stored === 'list' ? stored : 'compact';
+  }
+  function resolveViewForViewport() {
+    return NARROW_LIST_MQL.matches ? 'list' : readStoredViewPreference();
+  }
+  let currentView = resolveViewForViewport();
   let currentSort = localStorage.getItem(SORT_KEY) || 'name_asc';
   let searchQuery = localStorage.getItem(SEARCH_KEY) || '';
   let currentSourceMode = String(localStorage.getItem(SOURCE_KEY) || SOURCE_MAIN).toLowerCase() === SOURCE_ALL
@@ -1617,14 +1655,33 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  function syncViewForViewport() {
+    const nextView = resolveViewForViewport();
+    if (nextView === currentView) {
+      updateViewBtnState();
+      return;
+    }
+    currentView = nextView;
+    updateViewBtnState();
+    render();
+  }
+
   viewBtns.forEach(btn => {
     btn.addEventListener('click', (e) => {
-      currentView = e.currentTarget.dataset.view;
-      localStorage.setItem(VIEW_KEY, currentView);
+      const preferred = e.currentTarget.dataset.view || 'compact';
+      localStorage.setItem(VIEW_KEY, preferred);
+      currentView = NARROW_LIST_MQL.matches ? 'list' : preferred;
       updateViewBtnState();
       render();
     });
   });
+
+  if (typeof NARROW_LIST_MQL.addEventListener === 'function') {
+    NARROW_LIST_MQL.addEventListener('change', syncViewForViewport);
+  } else if (typeof NARROW_LIST_MQL.addListener === 'function') {
+    NARROW_LIST_MQL.addListener(syncViewForViewport);
+  }
+  window.addEventListener('resize', syncViewForViewport);
 
   if (searchInput) {
     searchInput.addEventListener('input', () => {

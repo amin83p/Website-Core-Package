@@ -32,11 +32,11 @@
   btn_export: false,
   print: false,
   optionalBtnsBeforePrint: [
-    '<button type="button" id="btn_printSchedule" class="btn btn-filled btn-edit btn-md me-2 mb-2" disabled title="Load a schedule first">🖨 Print</button>'
+    '<button type="button" id="btn_printSchedule" class="btn btn-filled btn-secondary btn-md schedule-viewer-header-action me-2 mb-2" disabled title="Load a schedule first"><i class="bi bi-printer me-1"></i>Print</button>'
   ],
   headerManageBtns: [
-    '<a href="' + dashHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
-    '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-journal-bookmark me-1"></i> School Academia</a>'
+    '<a href="' + dashHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md schedule-viewer-header-action mb-2"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a>',
+    '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md schedule-viewer-header-action mb-2"><i class="bi bi-journal-bookmark me-1"></i>Academia</a>'
   ],
   manageBtns: canUseGlobalComparison ? [
     '<a href="/school/schedules/global" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-layers me-1"></i> Global Comparison</a>',

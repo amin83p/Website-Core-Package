@@ -243,6 +243,16 @@ html.app-page-width-full main.container {
   z-index: 1002;
 }
 
+.header-side-controls-fab {
+  display: none;
+}
+
+.header-side-controls-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .header-compact-toggle,
 .header-settings-toggle {
   position: static;
@@ -1603,6 +1613,61 @@ a.header-side-control-btn {
 }
 
 @media (max-width: 991.98px) {
+  #main-header .action-buttons.action-buttons-auth > .navbar-nav.flex-row,
+  #main-header #headerStartMenuTrigger,
+  #main-header #scheduledTaskManagerHeaderTrigger {
+    display: none !important;
+  }
+
+  #main-header .header-inline-menu-wrap {
+    display: none !important;
+  }
+
+  #main-header .action-buttons.action-buttons-auth > .vr {
+    display: none !important;
+  }
+
+  #main-header .action-buttons > .header-hamburger,
+  #main-header #headerDashboardTrigger {
+    display: inline-flex !important;
+  }
+
+  #main-header .action-buttons.action-buttons-auth {
+    gap: 0.35rem !important;
+  }
+
+  #main-header .action-buttons > .header-hamburger {
+    order: 1;
+  }
+
+  #main-header #headerDashboardTrigger {
+    order: 2;
+  }
+
+  #main-header .action-buttons.action-buttons-auth > .dropdown:has(.header-user-menu-trigger) {
+    order: 3;
+  }
+
+  #main-header.header-minimized .header-inline-menu-wrap {
+    display: none !important;
+    padding-right: 0;
+    margin-right: 0;
+    border-right: 0;
+  }
+
+  #main-header.header-minimized .action-buttons > .header-hamburger {
+    display: inline-flex !important;
+  }
+
+  #main-header.header-minimized .action-buttons > .navbar-nav.flex-row,
+  #main-header.header-minimized .action-buttons > .search-btn {
+    display: none !important;
+  }
+
+  #main-header.header-minimized .action-buttons > .navbar-nav {
+    display: none !important;
+  }
+
   .header-utility-controls {
     left: 10px;
     top: calc(100% + 10px);
@@ -1617,27 +1682,99 @@ a.header-side-control-btn {
     box-shadow: 0 3px 10px rgba(0, 0, 0, 0.14);
   }
 
-  .header-side-controls {
-    left: 8px;
-    top: calc(var(--header-height) + var(--notice-height) + 52px);
-    gap: 8px;
+  #main-header {
+    overflow: visible;
   }
 
-  .header-side-control-btn {
-    width: 40px;
-    height: 40px;
-    font-size: 1.05rem;
-  }
-}
-
-@media (max-width: 767.98px) {
   .header-side-controls {
     position: absolute;
-    left: 50px;
-    top: calc(100% + 10px);
-    flex-direction: row;
-    gap: 8px;
+    left: max(8px, env(safe-area-inset-left));
+    top: 100%;
+    margin-top: 6px;
+    bottom: auto;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
     z-index: 1003;
+    max-width: calc(100vw - 16px);
+    pointer-events: none;
+  }
+
+  .header-side-controls-fab,
+  .header-side-controls-panel,
+  .header-side-controls-panel .header-side-control-btn {
+    pointer-events: auto;
+  }
+
+  .header-side-controls-fab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 34px;
+    height: 34px;
+    padding: 0;
+    border-radius: 999px;
+    border: 1px solid #d1d9e6;
+    background: #fff;
+    color: #4b5563;
+    box-shadow: 0 4px 14px rgba(15, 23, 42, 0.16);
+    cursor: pointer;
+    font-size: 0.95rem;
+    line-height: 1;
+  }
+
+  .header-side-controls-fab:hover {
+    background: #f8fafc;
+    border-color: #94a3b8;
+  }
+
+  .header-side-controls.is-expanded .header-side-controls-fab {
+    background: #eef2ff;
+    border-color: #93c5fd;
+    color: #1d4ed8;
+  }
+
+  .header-side-controls-panel {
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-start;
+    width: max-content;
+    max-width: 100%;
+    max-height: min(52vh, calc(100dvh - var(--header-height, 110px) - var(--notice-height, 0px) - 72px));
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+
+  .header-side-controls.is-expanded .header-side-controls-panel {
+    display: flex;
+  }
+
+  .header-side-controls.header-side-controls--single .header-side-controls-fab {
+    display: none !important;
+  }
+
+  .header-side-controls.header-side-controls--single .header-side-controls-panel {
+    display: flex;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .header-side-controls-panel .header-side-control-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 0.9rem;
+    border-radius: 10px;
+    box-shadow: 0 3px 10px rgba(15, 23, 42, 0.12);
+    flex: 0 0 auto;
+  }
+
+  #appSettingsModalToggle {
+    display: none !important;
   }
 }
 
@@ -1654,17 +1791,11 @@ a.header-side-control-btn {
     font-size: 0.9rem;
   }
 
-  .header-side-controls {
-    left: 44px;
-    top: calc(100% + 10px);
-    flex-direction: row;
-    gap: 7px;
-  }
-
-  .header-side-control-btn {
-    width: 36px;
-    height: 36px;
-    font-size: 0.95rem;
+  .header-side-controls-fab,
+  .header-side-controls-panel .header-side-control-btn {
+    width: 30px;
+    height: 30px;
+    font-size: 0.82rem;
   }
 }
 
@@ -1843,6 +1974,51 @@ a.header-side-control-btn {
 
   #main-header .navbar {
     margin-top: 0 !important;
+  }
+}
+
+@media (max-width: 764.98px) {
+  .sections-page {
+    padding-left: 5%;
+    padding-right: 5%;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  main.container {
+    padding-left: 5%;
+    padding-right: 5%;
+    max-width: 100%;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  html.app-page-width-wide main.container,
+  html.app-page-width-full main.container {
+    padding-left: 5%;
+    padding-right: 5%;
+    max-width: 100%;
+    width: 100%;
+    margin-left: auto;
+    margin-right: auto;
+  }
+}
+
+@media (max-width: 449.98px) {
+  .sections-page {
+    padding-left: 1%;
+    padding-right: 1%;
+  }
+
+  main.container {
+    padding-left: 1%;
+    padding-right: 1%;
+  }
+
+  html.app-page-width-wide main.container,
+  html.app-page-width-full main.container {
+    padding-left: 1%;
+    padding-right: 1%;
   }
 }
 /* ==========================================================================

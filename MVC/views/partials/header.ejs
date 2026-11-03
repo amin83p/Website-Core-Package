@@ -419,7 +419,18 @@
         </div>
         </div>
 
-        <div class="header-side-controls" aria-label="Header, organization, and display quick controls">
+        <div class="header-side-controls" id="headerSideControls" aria-label="Header, organization, and display quick controls">
+            <button
+                type="button"
+                id="headerSideControlsFab"
+                class="header-side-controls-fab"
+                aria-label="Page quick controls"
+                aria-expanded="false"
+                aria-controls="headerSideControlsPanel"
+                title="Quick controls">
+                <i class="bi bi-sliders" aria-hidden="true"></i>
+            </button>
+            <div class="header-side-controls-panel" id="headerSideControlsPanel">
             <button
                 type="button"
                 id="headerCompactToggle"
@@ -506,6 +517,7 @@
                     <i class="bi bi-speedometer2" aria-hidden="true"></i>
                 </button>
             <% } %>
+            </div>
         </div>
     </header>
 

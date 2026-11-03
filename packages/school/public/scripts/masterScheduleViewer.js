@@ -2829,6 +2829,9 @@
 
     let scheduleSessionContextEvent = null;
     let scheduleSessionContextMenuSuppressDismissUntil = 0;
+    let scheduleLongPressSuppressContextMenuUntil = 0;
+    const SCHEDULE_LONG_PRESS_MS = 500;
+    const SCHEDULE_LONG_PRESS_MOVE_PX = 10;
     let scheduleSessionAttendanceModalInstance = null;
     let scheduleSessionEnrollmentModalInstance = null;
     let scheduleSessionEnrollmentModalEvent = null;
@@ -3321,6 +3324,97 @@
         }
     }
 
+    function isScheduleContextMenuTriggerIgnored(target) {
+        if (!target) return true;
+        if (target.closest('.schedule-event-info-btn')) return true;
+        if (target.closest('[data-schedule-session-select], .schedule-session-select')) return true;
+        if (target.closest('[data-schedule-draft-select], .schedule-draft-select')) return true;
+        if (target.closest('.schedule-draft-resize-handle')) return true;
+        return false;
+    }
+
+    function isScheduleSessionContextMenuTarget(target) {
+        if (!target || isScheduleContextMenuTriggerIgnored(target)) return false;
+        return Boolean(target.closest('.event-block, .vertical-event-block, .cal-session-chip'));
+    }
+
+    function openScheduleSessionContextMenuFromTarget(target, uiEvent) {
+        if (isScheduleContextMenuTriggerIgnored(target)) return false;
+        const draftEvent = resolveScheduleDraftEventFromTarget(target);
+        if (draftEvent) {
+            uiEvent.preventDefault?.();
+            uiEvent.stopPropagation?.();
+            showScheduleDraftSessionContextMenu(draftEvent, uiEvent, 'timeline');
+            return true;
+        }
+        const event = resolveScheduleContextEventFromTarget(target);
+        if (!event) {
+            const workEvent = resolveWorkSessionEventFromTarget(target);
+            if (!workEvent) return false;
+            uiEvent.preventDefault?.();
+            uiEvent.stopPropagation?.();
+            showScheduleSessionContextMenu(workEvent, uiEvent);
+            return true;
+        }
+        uiEvent.preventDefault?.();
+        uiEvent.stopPropagation?.();
+        showScheduleSessionContextMenu(event, uiEvent);
+        return true;
+    }
+
+    function bindScheduleSessionContextMenuLongPress(visualArea) {
+        let longPressTimer = null;
+        let longPressOrigin = null;
+
+        const clearLongPressTimer = () => {
+            if (longPressTimer) {
+                clearTimeout(longPressTimer);
+                longPressTimer = null;
+            }
+            longPressOrigin = null;
+        };
+
+        visualArea.addEventListener('pointerdown', (pointerEvent) => {
+            if (pointerEvent.pointerType === 'mouse' && pointerEvent.button !== 0) return;
+            if (!isScheduleSessionContextMenuTarget(pointerEvent.target)) return;
+            longPressOrigin = {
+                x: pointerEvent.clientX,
+                y: pointerEvent.clientY,
+                target: pointerEvent.target,
+                pointerId: pointerEvent.pointerId
+            };
+            clearLongPressTimer();
+            longPressTimer = setTimeout(() => {
+                longPressTimer = null;
+                const origin = longPressOrigin;
+                longPressOrigin = null;
+                if (!origin) return;
+                const syntheticEvent = {
+                    clientX: origin.x,
+                    clientY: origin.y,
+                    preventDefault() {},
+                    stopPropagation() {}
+                };
+                const opened = openScheduleSessionContextMenuFromTarget(origin.target, syntheticEvent);
+                if (opened) {
+                    scheduleLongPressSuppressContextMenuUntil = Date.now() + 450;
+                    try { navigator.vibrate?.(10); } catch (_) { /* ignore */ }
+                }
+            }, SCHEDULE_LONG_PRESS_MS);
+        });
+
+        visualArea.addEventListener('pointermove', (pointerEvent) => {
+            if (!longPressOrigin || longPressOrigin.pointerId !== pointerEvent.pointerId) return;
+            const dx = pointerEvent.clientX - longPressOrigin.x;
+            const dy = pointerEvent.clientY - longPressOrigin.y;
+            if (Math.hypot(dx, dy) > SCHEDULE_LONG_PRESS_MOVE_PX) clearLongPressTimer();
+        });
+
+        visualArea.addEventListener('pointerup', clearLongPressTimer);
+        visualArea.addEventListener('pointercancel', clearLongPressTimer);
+        visualArea.addEventListener('lostpointercapture', clearLongPressTimer);
+    }
+
     function bindScheduleSessionContextMenu() {
         const menu = document.getElementById('scheduleSessionContextMenu');
         const visualArea = document.getElementById('visualDisplayArea');
@@ -3329,27 +3423,15 @@
         bindScheduleSessionBulkSelectModal();
 
         visualArea.addEventListener('contextmenu', (mouseEvent) => {
-            if (mouseEvent.target.closest('[data-schedule-session-select], .schedule-session-select')) return;
-            const draftEvent = resolveScheduleDraftEventFromTarget(mouseEvent.target);
-            if (draftEvent) {
+            if (Date.now() < scheduleLongPressSuppressContextMenuUntil) {
                 mouseEvent.preventDefault();
                 mouseEvent.stopPropagation();
-                showScheduleDraftSessionContextMenu(draftEvent, mouseEvent, 'timeline');
                 return;
             }
-            const event = resolveScheduleContextEventFromTarget(mouseEvent.target);
-            if (!event) {
-                const workEvent = resolveWorkSessionEventFromTarget(mouseEvent.target);
-                if (!workEvent) return;
-                mouseEvent.preventDefault();
-                mouseEvent.stopPropagation();
-                showScheduleSessionContextMenu(workEvent, mouseEvent);
-                return;
-            }
-            mouseEvent.preventDefault();
-            mouseEvent.stopPropagation();
-            showScheduleSessionContextMenu(event, mouseEvent);
+            openScheduleSessionContextMenuFromTarget(mouseEvent.target, mouseEvent);
         });
+
+        bindScheduleSessionContextMenuLongPress(visualArea);
 
         visualArea.addEventListener('dblclick', (mouseEvent) => {
             if (isScheduleDraftEditInteractionTarget(mouseEvent.target)) return;
@@ -3382,6 +3464,9 @@
             const event = scheduleSessionContextEvent;
             hideScheduleSessionContextMenu();
             if (!event) return;
+            const manageUrl = buildSessionManagerUrlForEvent(event);
+            if (manageUrl) window.open(manageUrl, '_blank', 'noopener');
+        });
         document.getElementById('scheduleSessionContextMenuTitle')?.addEventListener('click', (clickEvent) => {
             const titleEl = clickEvent.currentTarget;
             if (!titleEl || titleEl.disabled || !titleEl.classList.contains('is-navigable')) return;
@@ -3391,10 +3476,6 @@
             const classId = String(event?.classId || '').trim();
             if (!classId) return;
             window.open(`/school/classes/edit/${encodeURIComponent(classId)}`, '_blank', 'noopener');
-        });
-
-            const manageUrl = buildSessionManagerUrlForEvent(event);
-            if (manageUrl) window.open(manageUrl, '_blank', 'noopener');
         });
         document.getElementById('btn_scheduleSessionContextRollingEnrollment')?.addEventListener('click', (clickEvent) => {
             clickEvent.preventDefault();
@@ -5540,9 +5621,19 @@
 
     function readScheduleHideEmptyDays() {
         try {
-            if (window.localStorage) return window.localStorage.getItem(SCHEDULE_HIDE_EMPTY_DAYS_KEY) === '1';
+            if (window.localStorage) {
+                const stored = window.localStorage.getItem(SCHEDULE_HIDE_EMPTY_DAYS_KEY);
+                if (stored === '1') return true;
+                if (stored === '0') return false;
+            }
         } catch (error) { /* storage can be unavailable */ }
-        return false;
+        return window.matchMedia('(max-width: 767.98px)').matches;
+    }
+
+    function scheduleShouldFilterEmptyDays() {
+        if (activePersonHasDraftStagedSessions()) return false;
+        if (isScheduleNarrowViewport()) return true;
+        return scheduleState.hideEmptyDays === true;
     }
 
     function saveScheduleHideEmptyDays(enabled) {
@@ -5743,7 +5834,8 @@
         return window.matchMedia('(max-width: 767.98px)').matches;
     }
 
-    const SCHEDULE_MOBILE_DAY_WIDTH = 92;
+    const SCHEDULE_MOBILE_DAY_WIDTH = 62;
+    const SCHEDULE_MOBILE_TIME_GUTTER_WIDTH = 44;
 
     function computeScheduleGridViewportHeight(container, weekCount = 1) {
         const el = container || document.getElementById('visualDisplayArea');
@@ -5801,7 +5893,7 @@
         const el = container || document.getElementById('visualDisplayArea');
         const isVertical = mode === 'verticalTimeline';
         const narrowViewport = isScheduleNarrowViewport();
-        const mobileScrollDays = isVertical && !scheduleState.verticalDayWidthUserAdjusted && narrowViewport;
+        const mobileScrollDays = isVertical && narrowViewport;
         const autoFit = isVertical && !scheduleState.verticalDayWidthUserAdjusted && !narrowViewport;
         const scrollEl = el?.querySelector('.session-cal-vertical-scroll');
         const weekRows = scrollEl ? scrollEl.querySelectorAll('.session-cal-week-row') : [];
@@ -5819,7 +5911,7 @@
                 padding: 24,
                 fallback: 120
             });
-        } else if (mobileScrollDays) {
+        } else if (mobileScrollDays || (isVertical && narrowViewport)) {
             dayWidth = SCHEDULE_MOBILE_DAY_WIDTH;
         } else {
             dayWidth = readScheduleVerticalDayWidth();
@@ -5843,22 +5935,24 @@
         if (!container || !container.classList.contains('schedule-week-grid-host')) return null;
         const isVertical = mode === 'verticalTimeline';
         const narrowViewport = isScheduleNarrowViewport();
-        const mobileScrollDays = isVertical && !scheduleState.verticalDayWidthUserAdjusted && narrowViewport;
+        const mobileScrollDays = isVertical && narrowViewport;
         container.classList.toggle('session-cal-auto-day-width', isVertical && !scheduleState.verticalDayWidthUserAdjusted && !narrowViewport);
         container.classList.toggle('schedule-cal-horizontal-mode', mode === 'timeline');
-        container.classList.toggle('schedule-week-grid-manual-day-width', isVertical && (scheduleState.verticalDayWidthUserAdjusted || mobileScrollDays));
+        container.classList.toggle('schedule-week-grid-manual-day-width', isVertical && (narrowViewport || scheduleState.verticalDayWidthUserAdjusted));
         container.classList.toggle('schedule-week-grid-manual-track-height', mode === 'timeline' && scheduleState.horizontalSliderUserAdjusted);
         const layout = computeScheduleWeekGridLayout(mode, container);
         container.style.setProperty('--session-day-width', `${layout.dayWidth}px`);
         container.style.setProperty('--session-hour-height', `${layout.hourHeight}px`);
         container.style.setProperty('--session-hour-slot-count', String(getScheduleMaxHourSlotsForLayout()));
         container.style.setProperty('--session-timeline-track-step', `${layout.trackStep}px`);
+        const timeGutterWidth = narrowViewport && isVertical ? SCHEDULE_MOBILE_TIME_GUTTER_WIDTH : 76;
+        container.style.setProperty('--session-time-gutter-width', `${timeGutterWidth}px`);
         if (mode === 'timeline') {
             applyHorizontalTimelineTrackLayout(container, layout.trackStep);
         }
         if (mode === 'timeline' && scheduleState.horizontalSliderUserAdjusted) {
             applyScheduleDayWidth(readScheduleHorizontalSliderWidth(), { mode: 'timeline' });
-        } else if (isVertical && scheduleState.verticalDayWidthUserAdjusted) {
+        } else if (isVertical && scheduleState.verticalDayWidthUserAdjusted && !narrowViewport) {
             applyScheduleDayWidth(readScheduleVerticalDayWidth(), { mode: 'verticalTimeline' });
         }
         syncScheduleWidthControlDisplay(readScheduleSliderValueForMode(mode), mode);
@@ -6026,16 +6120,23 @@
             applyScheduleWeekGridLayout(mode);
         });
         scheduleGridResizeObserver.observe(container);
+        let scheduleLastNarrowViewport = isScheduleNarrowViewport();
         window.addEventListener('resize', () => {
             const mode = normalizedScheduleViewMode();
+            const narrowNow = isScheduleNarrowViewport();
+            if (narrowNow !== scheduleLastNarrowViewport) {
+                scheduleLastNarrowViewport = narrowNow;
+                refreshScheduleActiveView();
+            }
             if (mode === 'calendar' || !container.classList.contains('schedule-week-grid-host')) return;
             applyScheduleWeekGridLayout(mode);
         });
     }
 
     function scheduleHideEmptyDaysButtonHtml() {
-        const active = scheduleState.hideEmptyDays ? ' active' : '';
-        const pressed = scheduleState.hideEmptyDays ? 'true' : 'false';
+        const filtering = scheduleShouldFilterEmptyDays();
+        const active = filtering ? ' active' : '';
+        const pressed = filtering ? 'true' : 'false';
         return `<button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn schedule-hide-empty-btn${active}" data-schedule-hide-empty-days aria-label="Hide days without sessions" title="Hide days without sessions" aria-pressed="${pressed}"><i class="bi bi-calendar2-x" aria-hidden="true"></i></button>`;
     }
 
@@ -7028,7 +7129,7 @@
         }
         clearScheduleMonthViewLayout(container);
         container.classList.add('schedule-week-grid-host');
-        if (!events.length && scheduleState.hideEmptyDays) {
+        if (!events.length && scheduleShouldFilterEmptyDays()) {
             container.innerHTML = `<div class="alert alert-light text-center border py-5 text-muted"><i class="bi bi-calendar-x fs-1 d-block mb-2"></i>No schedule items found in this date range.</div>`;
             setSchedulePrintEnabled(true);
             syncScheduleAdminWeekRailVisibility();
@@ -7722,6 +7823,7 @@ if (canLoadAllSchedules) {
 
     function buildScheduleWeekGridOptions() {
         const range = getScheduleRange();
+        const filterEmptyDays = scheduleShouldFilterEmptyDays();
         return {
             viewRange: {
                 startDate: range.startDate,
@@ -7730,7 +7832,7 @@ if (canLoadAllSchedules) {
                 anchorDate: range.startDate
             },
             dayWidth: readScheduleVerticalDayWidth(),
-            filterEmptyDays: scheduleState.hideEmptyDays === true && !activePersonHasDraftStagedSessions(),
+            filterEmptyDays,
             enableTimeHover: isScheduleOnScreenManageEnabled(),
             buildPositionedBlockHtml: buildSchedulePositionedBlockHtml,
             buildDayHeaderBadgeHtml: (day, dayEvents, inRange) => {
@@ -7922,7 +8024,11 @@ if (canLoadAllSchedules) {
             : (isLeaveEvent(event)
                 ? 'is-leave'
                 : (scan?.isComplete ? 'is-complete' : 'is-pending'));
-        const timeLabel = formatScheduleCompactClock(event?.start);
+        const compactStart = formatScheduleCompactClock(event?.start);
+        const compactEnd = formatScheduleCompactClock(event?.end);
+        const timeLabel = compactEnd && compactEnd !== compactStart
+            ? `${compactStart}–${compactEnd}`
+            : (formatScheduleClockRange(event?.start, event?.end) || compactStart);
         const makeupMark = scd?.isMakeupRequiredDisplayEvent && scd.isMakeupRequiredDisplayEvent(event)
             ? '<span class="cal-session-makeup">M</span>'
             : '';
@@ -8101,6 +8207,12 @@ if (canLoadAllSchedules) {
         scheduleTipAnchor = target;
     };
 
+    const shouldUseScheduleHoverTips = () => {
+        if (window.matchMedia('(hover: none)').matches) return false;
+        if (window.matchMedia('(max-width: 767.98px)').matches) return false;
+        return true;
+    };
+
     const visualArea = document.getElementById('visualDisplayArea');
     visualArea.addEventListener('click', (event) => {
         const infoBtn = event.target.closest('.schedule-event-info-btn');
@@ -8166,6 +8278,7 @@ if (canLoadAllSchedules) {
         refreshScheduleActiveView();
     }, true);
     visualArea.addEventListener('pointerover', (event) => {
+        if (!shouldUseScheduleHoverTips()) return;
         const target = event.target.closest('.event-block[data-tip], .vertical-event-block[data-tip], .cal-session-chip[data-tip]');
         if (!target || !visualArea.contains(target)) return;
         showScheduleTip(target);
@@ -8178,7 +8291,7 @@ if (canLoadAllSchedules) {
         hideScheduleTip();
     });
     visualArea.addEventListener('focusin', (event) => {
-        const target = event.target.closest('.event-block[data-tip], .vertical-event-block[data-tip]');
+        const target = event.target.closest('.event-block[data-tip], .vertical-event-block[data-tip], .cal-session-chip[data-tip]');
         if (target) showScheduleTip(target);
     });
     visualArea.addEventListener('focusout', (event) => {

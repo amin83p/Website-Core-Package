@@ -45,7 +45,11 @@ test('schedule-viewer.css includes critical layout selectors', () => {
   assert.match(css, /--schedule-admin-rail-sticky-top/);
   assert.match(css, /\.schedule-event-info-btn/);
   assert.match(css, /@media \(max-width: 767\.98px\)[\s\S]*\.schedule-viewbar-row/);
+  assert.match(css, /@media \(max-width: 575\.98px\)/);
+  assert.match(css, /@media \(hover: none\)/);
+  assert.match(css, /#visualDisplayArea \.vertical-event-block \.schedule-event-title[\s\S]*display: none/);
   assert.match(css, /\.schedule-viewer-page \.page-heading/);
+  assert.match(css, /\.schedule-viewer-page\.sections-page[\s\S]*max-width: 100%/);
 });
 
 test('admin Master Schedule week rail markup and sync wiring', () => {

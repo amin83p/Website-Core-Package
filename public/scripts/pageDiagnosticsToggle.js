@@ -107,8 +107,13 @@
     button.innerHTML = '<i class="bi bi-speedometer2" aria-hidden="true"></i>';
   }
 
+  function headerSideControlsButtonHost() {
+    return document.getElementById('headerSideControlsPanel')
+      || document.querySelector('.header-side-controls');
+  }
+
   function ensureButton() {
-    const host = document.querySelector('.header-side-controls');
+    const host = headerSideControlsButtonHost();
     if (!host) return null;
     let button = document.getElementById('pageDiagnosticsSideControl');
     if (!button) {
@@ -133,14 +138,23 @@
       host.appendChild(button);
     }
 
+    if (typeof window.scheduleSyncHeaderSideControlsMobileMode === 'function') {
+      window.scheduleSyncHeaderSideControlsMobileMode();
+    }
     return button;
   }
 
   function installButtonObserver() {
-    const host = document.querySelector('.header-side-controls');
+    const host = headerSideControlsButtonHost();
     if (!host || typeof MutationObserver !== 'function') return;
+    let ensureScheduled = false;
     const observer = new MutationObserver(() => {
-      ensureButton();
+      if (ensureScheduled) return;
+      ensureScheduled = true;
+      window.requestAnimationFrame(() => {
+        ensureScheduled = false;
+        ensureButton();
+      });
     });
     observer.observe(host, { childList: true });
   }

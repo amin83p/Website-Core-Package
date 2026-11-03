@@ -122,8 +122,13 @@
     `;
   }
 
+  function headerSideControlsButtonHost() {
+    return document.getElementById('headerSideControlsPanel')
+      || document.querySelector('.header-side-controls');
+  }
+
   function ensureSideControl() {
-    const host = document.querySelector('.header-side-controls');
+    const host = headerSideControlsButtonHost();
     if (!host) return null;
     let button = document.getElementById('schoolAutosaveSideControl');
     if (!button) {
@@ -146,6 +151,9 @@
       if (diagnosticsButton.previousElementSibling !== button) diagnosticsButton.before(button);
     } else if (button.parentElement !== host) {
       host.appendChild(button);
+    }
+    if (typeof window.scheduleSyncHeaderSideControlsMobileMode === 'function') {
+      window.scheduleSyncHeaderSideControlsMobileMode();
     }
     return button;
   }

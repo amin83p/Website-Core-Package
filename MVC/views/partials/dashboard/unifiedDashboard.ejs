@@ -434,10 +434,6 @@
     .<%= key %>-banner-icon-wrap i {
       font-size: 1.85rem;
     }
-    .<%= key %>-banner-heading {
-      font-size: clamp(1.05rem, 4.5vw, 1.35rem);
-      line-height: 1.25;
-    }
     .<%= key %>-banner-nav .<%= key %>-banner-btn-icon {
       margin-inline-end: 0;
       font-size: 1.35rem;
@@ -469,6 +465,25 @@
   .<%= key %>-banner-heading-row .<%= key %>-banner-heading {
     min-width: 0;
     flex: 1 1 auto;
+  }
+  .<%= key %>-dashboard-page .<%= key %>-banner-heading.page-heading.size-md {
+    font-size: clamp(1.35rem, 0.95rem + 1.35vw, 2rem);
+    line-height: 1.2;
+    letter-spacing: -0.01em;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+  @media (max-width: 767.98px) {
+    .<%= key %>-dashboard-page .<%= key %>-banner-heading.page-heading.size-md {
+      font-size: clamp(1.05rem, 0.82rem + 2.6vw, 1.45rem);
+      line-height: 1.22;
+    }
+  }
+  @media (max-width: 449.98px) {
+    .<%= key %>-dashboard-page .<%= key %>-banner-heading.page-heading.size-md {
+      font-size: clamp(0.95rem, 0.72rem + 3.4vw, 1.12rem);
+      line-height: 1.25;
+    }
   }
   .<%= key %>-mobile-banner-actions {
     flex-shrink: 0;
@@ -806,6 +821,56 @@
   }
   @media (max-width: 575.98px) {
     .<%= key %>-tools-controls { gap: 0.45rem !important; }
+  }
+
+  @media (max-width: 449.98px) {
+    .<%= key %>-mobile-banner-btn {
+      width: 1.85rem;
+      min-width: 1.85rem;
+      height: 1.85rem;
+      font-size: 1rem;
+      border-radius: 0.55rem;
+    }
+    .<%= key %>-tool-toggle-btn {
+      width: 30px;
+      height: 30px;
+      min-width: 30px;
+      font-size: 0.82rem;
+    }
+    .<%= key %>-view-btn-group .<%= key %>-view-btn,
+    .<%= key %>-view-panel .<%= key %>-view-btn {
+      width: 30px;
+      min-width: 30px;
+      height: 30px;
+      font-size: 0.82rem;
+    }
+    .<%= key %>-search-launcher {
+      height: 30px;
+      padding: 0.22rem 0.48rem;
+      font-size: 0.68rem;
+      gap: 0.28rem;
+    }
+    .<%= key %>-module-customize-toggle {
+      font-size: 0.68rem;
+      padding: 0.18rem 0.4rem;
+    }
+    .<%= key %>-module-order-reset {
+      font-size: 0.82rem;
+    }
+    .<%= key %>-module-count-wrap {
+      font-size: 0.72rem;
+    }
+    .<%= key %>-zoom-panel.<%= key %>-icon-size-wrap {
+      min-width: 150px;
+      max-width: min(190px, calc(100vw - 16px));
+      padding: 0.28rem;
+    }
+    .<%= key %>-icon-range {
+      width: 88px;
+    }
+    .<%= key %>-icon-size-value {
+      font-size: 0.65rem;
+    }
   }
 
   .<%= key %>-search-shell {
@@ -1225,7 +1290,15 @@
     const ICON_SIZE_KEY = '<%= sizeKey %>';
     const SEARCH_KEY = '<%= key %>DashboardSearch';
 
-    let currentView = localStorage.getItem(VIEW_KEY) || 'compact';
+    const NARROW_LIST_MQL = window.matchMedia('(max-width: 449.98px)');
+    function readStoredViewPreference() {
+      const stored = localStorage.getItem(VIEW_KEY);
+      return stored === 'card' || stored === 'compact' || stored === 'list' ? stored : 'compact';
+    }
+    function resolveViewForViewport() {
+      return NARROW_LIST_MQL.matches ? 'list' : readStoredViewPreference();
+    }
+    let currentView = resolveViewForViewport();
     let iconSizePercent = Number(localStorage.getItem(ICON_SIZE_KEY) || 110);
     if (localStorage.getItem(SEARCH_KEY)) {
       localStorage.removeItem(SEARCH_KEY);
@@ -2152,14 +2225,31 @@
 
     viewBtns.forEach(btn => {
       btn.addEventListener('click', function () {
-        currentView = btn.dataset.view || 'compact';
-        localStorage.setItem(VIEW_KEY, currentView);
+        const preferred = btn.dataset.view || 'compact';
+        localStorage.setItem(VIEW_KEY, preferred);
+        currentView = NARROW_LIST_MQL.matches ? 'list' : preferred;
         render();
         if (window.matchMedia && window.matchMedia('(max-width: 767.98px)').matches) {
           closeAllToolClusters();
         }
       });
     });
+
+    function syncViewForViewport() {
+      const nextView = resolveViewForViewport();
+      if (nextView === currentView) {
+        updateViewButtons();
+        return;
+      }
+      currentView = nextView;
+      render();
+    }
+
+    if (typeof NARROW_LIST_MQL.addEventListener === 'function') {
+      NARROW_LIST_MQL.addEventListener('change', syncViewForViewport);
+    } else if (typeof NARROW_LIST_MQL.addListener === 'function') {
+      NARROW_LIST_MQL.addListener(syncViewForViewport);
+    }
 
     if (iconSizeRangeEl) {
       iconSizeRangeEl.addEventListener('input', function () {
@@ -2243,6 +2333,7 @@
     });
 
     window.addEventListener('resize', function () {
+      syncViewForViewport();
       if (viewClusterEl && viewClusterEl.classList.contains('is-open')) {
         positionToolPanelWithinViewport(viewClusterEl);
       }
