@@ -1,0 +1,65 @@
+<%
+  const scheduleDateRangeSections = [
+    {
+      title: 'Current Month',
+      items: [
+        { range: 'day', label: 'Today' },
+        { range: 'week', label: 'This week' },
+        { range: 'm0-first', label: 'The First Half' },
+        { range: 'm0-second', label: 'The Second Half' },
+        { range: 'm0-full', label: 'This Month' }
+      ]
+    },
+    {
+      title: 'Previous Month',
+      items: [
+        { range: 'm-1-first', label: 'The First Half' },
+        { range: 'm-1-second', label: 'The Second Half' },
+        { range: 'm-1-full', label: 'The Whole Month' }
+      ]
+    },
+    {
+      title: 'Two Month Ago',
+      items: [
+        { range: 'm-2-first', label: 'The First Half' },
+        { range: 'm-2-second', label: 'The Second Half' },
+        { range: 'm-2-full', label: 'The Whole Month' }
+      ]
+    },
+    {
+      title: 'Three Month Ago',
+      items: [
+        { range: 'm-3-first', label: 'The First Half' },
+        { range: 'm-3-second', label: 'The Second Half' },
+        { range: 'm-3-full', label: 'The Whole Month' }
+      ]
+    },
+    {
+      title: 'Next Month',
+      items: [
+        { range: 'm1-first', label: 'The First Half' },
+        { range: 'm1-second', label: 'The Second Half' },
+        { range: 'm1-full', label: 'The Whole Month' }
+      ]
+    }
+  ];
+%>
+<div
+  id="scheduleDateRangeMenu"
+  class="schedule-date-range-menu"
+  role="menu"
+  aria-label="Quick date ranges"
+  hidden>
+  <% scheduleDateRangeSections.forEach((section, sectionIndex) => { %>
+  <div class="schedule-date-range-menu-section<%= sectionIndex > 0 ? ' schedule-date-range-menu-section--bordered' : '' %>">
+    <div class="schedule-date-range-menu-heading" role="presentation"><%= section.title %></div>
+    <% section.items.forEach((option) => { %>
+    <button
+      type="button"
+      class="schedule-date-range-option schedule-date-range-option--indented"
+      role="menuitem"
+      data-range="<%= option.range %>"><%= option.label %></button>
+    <% }); %>
+  </div>
+  <% }); %>
+</div>

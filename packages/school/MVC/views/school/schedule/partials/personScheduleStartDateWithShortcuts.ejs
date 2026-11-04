@@ -1,0 +1,22 @@
+<%
+  const fieldClass = (typeof startDateFieldClass !== 'undefined' && startDateFieldClass)
+    ? startDateFieldClass
+    : 'schedule-filter-field';
+%>
+<div class="<%= fieldClass %> schedule-date-field-with-shortcuts">
+  <label for="sch_startDate">Start date</label>
+  <div class="schedule-date-shortcuts-wrap">
+    <button
+      type="button"
+      id="btn_scheduleDateShortcuts"
+      class="btn btn-outline-secondary schedule-date-shortcuts-btn"
+      title="Quick date ranges"
+      aria-label="Quick date ranges"
+      aria-haspopup="menu"
+      aria-expanded="false"
+      aria-controls="scheduleDateRangeMenu">
+      <i class="bi bi-calendar-range" aria-hidden="true"></i>
+    </button>
+    <input type="date" id="sch_startDate" class="form-control schedule-date-input schedule-date-input-with-shortcuts">
+  </div>
+</div>

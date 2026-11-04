@@ -9,7 +9,8 @@ const {
   readPersonScheduleAdminBundle,
   readPersonScheduleSelfBundle,
   readPersonScheduleAdminView,
-  readPersonScheduleSelfView
+  readPersonScheduleSelfView,
+  readPackageFile
 } = require('./helpers/scheduleViewerSource');
 
 function read(relPath) {
@@ -134,4 +135,47 @@ test('personSchedule includes master schedule person note script', () => {
   assert.match(adminView, /data-schedule-admin-action="person-schedule-note"/);
   assert.match(adminView, /masterSchedulePersonNote\.js/);
   assert.doesNotMatch(selfView, /masterSchedulePersonNote\.js/);
+});
+
+test('Master Schedule Viewer uses date range menu instead of collapsible quick ranges', () => {
+  const adminView = readPersonScheduleAdminBundle();
+  const selfView = readPersonScheduleSelfBundle();
+  const core = read('public/scripts/masterScheduleViewer.js');
+  const shortcutsPartial = readPackageFile('MVC/views/school/schedule/partials/personScheduleDateRangeShortcuts.ejs');
+  const rangeTokens = ['day', 'week', 'm0-first', 'm0-second', 'm0-full', 'm-1-first', 'm-1-full', 'm1-full'];
+
+  for (const view of [adminView, selfView]) {
+    assert.doesNotMatch(view, /scheduleFilterCollapse/);
+    assert.doesNotMatch(view, /personScheduleQuickRangeChips/);
+    assert.match(view, /id="btn_scheduleDateShortcuts"/);
+    assert.match(view, /id="scheduleDateRangeMenu"/);
+    assert.match(view, /personScheduleDateRangeShortcuts/);
+  }
+  for (const token of rangeTokens) {
+    assert.match(shortcutsPartial, new RegExp(`range: '${token}'`));
+  }
+  assert.match(shortcutsPartial, /Current Month/);
+  assert.match(shortcutsPartial, /Previous Month/);
+  assert.match(shortcutsPartial, /Next Month/);
+  assert.match(core, /resolveScheduleRangeDates/);
+  assert.match(core, /normalizeScheduleRangeToken/);
+
+  assert.match(adminView, /schedule-filter-load-primary/);
+  assert.match(adminView, /schedule-filter-reset-btn/);
+  assert.match(adminView, /id="btn_resetScheduleFilters"/);
+  assert.match(adminView, /id="btn_loadAllSchedules"/);
+  assert.match(core, /syncScheduleLoadAllButtonVisibility/);
+  assert.doesNotMatch(core, /hasCasesOnly/);
+  assert.doesNotMatch(core, /buildScheduleHasCasesFilterHtml/);
+  assert.doesNotMatch(core, /params\.set\('hasCases'/);
+
+  assert.match(core, /bindScheduleDateRangeShortcuts/);
+  assert.match(core, /getElementById\('sch_startDate'\)/);
+  assert.match(core, /getElementById\('sch_endDate'\)/);
+  assert.match(core, /addEventListener\('contextmenu', onDateContextMenu\)/);
+  assert.match(core, /isScheduleDateRangeMenuTarget/);
+  assert.match(core, /pointerdown', onOutside/);
+  assert.match(core, /isScheduleDateRangeMenuTarget\(event\.target\)/);
+  assert.match(core, /querySelectorAll\('#scheduleDateRangeMenu \.schedule-date-range-option'\)/);
+  assert.doesNotMatch(core, /scheduleFilterCollapse/);
 });

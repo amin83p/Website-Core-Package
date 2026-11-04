@@ -24,9 +24,17 @@ function readPersonScheduleSelfView() {
   return readPackageFile('MVC/views/school/schedule/personScheduleSelf.ejs');
 }
 
+function readPersonScheduleFilterPartials() {
+  return [
+    readPackageFile('MVC/views/school/schedule/partials/personScheduleStartDateWithShortcuts.ejs'),
+    readPackageFile('MVC/views/school/schedule/partials/personScheduleDateRangeShortcuts.ejs')
+  ].join('\n');
+}
+
 function readPersonScheduleAdminBundle() {
   return [
     readPersonScheduleAdminView(),
+    readPersonScheduleFilterPartials(),
     readPackageFile('MVC/views/school/schedule/partials/personScheduleCalendarShell.ejs'),
     readPackageFile('MVC/views/school/schedule/partials/personScheduleSharedModals.ejs'),
     readPackageFile('MVC/views/school/schedule/partials/personScheduleSessionContextMenuAdmin.ejs'),
@@ -39,6 +47,7 @@ function readPersonScheduleAdminBundle() {
 function readPersonScheduleSelfBundle() {
   return [
     readPersonScheduleSelfView(),
+    readPersonScheduleFilterPartials(),
     readPackageFile('MVC/views/school/schedule/partials/personScheduleSharedModals.ejs'),
     readPackageFile('MVC/views/school/schedule/partials/personScheduleSessionContextMenuSelf.ejs'),
     readPackageFile('MVC/views/school/schedule/partials/personScheduleScriptsCore.ejs')

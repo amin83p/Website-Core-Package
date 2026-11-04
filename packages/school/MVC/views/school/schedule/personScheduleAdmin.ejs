@@ -42,21 +42,10 @@
 
 <div class="schedule-shell">
   <div class="card border-0 shadow-sm mb-3 schedule-filter-card" id="scheduleFilterCard">
-    <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
-      <div id="scheduleFilterTitleToggle" class="fw-bold text-dark schedule-filter-title-toggle" role="button" tabindex="0" aria-controls="scheduleFilterCollapse">
-        <i class="bi bi-calendar3 me-2"></i>Filter Schedule
+    <div class="card-header bg-white py-2 px-3">
+      <div class="fw-bold text-dark">
+        <i class="bi bi-calendar3 me-2"></i>Filter schedule
       </div>
-      <button
-        id="scheduleFilterToggleBtn"
-        type="button"
-        class="btn btn-outline-secondary btn-sm px-2 schedule-filter-toggle"
-        data-bs-toggle="collapse"
-        data-bs-target="#scheduleFilterCollapse"
-        aria-expanded="false"
-        aria-controls="scheduleFilterCollapse"
-        aria-label="Open filters">
-        <i id="scheduleFilterToggleIcon" class="bi bi-chevron-down"></i>
-      </button>
     </div>
     <div class="schedule-filter-summary">
       <div class="schedule-filter-summary-admin">
@@ -82,41 +71,32 @@
             </button>
           </div>
         </div>
-        <div class="schedule-filter-field">
-          <label for="sch_startDate">Start date</label>
-          <input type="date" id="sch_startDate" class="form-control schedule-date-input">
-        </div>
+        <%- include('school/schedule/partials/personScheduleStartDateWithShortcuts') %>
         <div class="schedule-filter-field">
           <label for="sch_endDate">End date</label>
           <input type="date" id="sch_endDate" class="form-control schedule-date-input">
         </div>
-        <div class="schedule-filter-field schedule-filter-summary-action">
+        <div class="schedule-filter-field schedule-filter-load-primary-cell schedule-filter-summary-action">
           <label class="d-none d-md-block" aria-hidden="true">&nbsp;</label>
-          <button type="button" id="btn_loadSchedule" class="btn btn-primary w-100">
-            <i class="bi bi-arrow-clockwise me-1"></i> Load tab
-          </button>
-        </div>
-      </div>
-    </div>
-    <div class="collapse" id="scheduleFilterCollapse">
-      <div class="card-body filter-panel p-3" id="scheduleFilterForm">
-        <div class="schedule-filter-admin">
-          <%- include('school/schedule/partials/personScheduleQuickRangeChips') %>
-          <div class="schedule-filter-actions schedule-filter-actions--with-cases">
-            <div class="schedule-cases-switch">
-              <input class="form-check-input" type="checkbox" role="switch" id="sch_hasCases">
-              <label class="form-check-label" for="sch_hasCases">With cases only</label>
-            </div>
-            <div class="schedule-filter-actions-buttons">
-              <button type="button" id="btn_resetScheduleFilters" class="btn btn-outline-secondary">Reset</button>
-              <button type="button" id="btn_loadAllSchedules" class="btn btn-outline-primary">
-                <i class="bi bi-cloud-arrow-down me-1"></i> Load all
-              </button>
-            </div>
+          <div class="schedule-filter-load-primary">
+            <button type="button" id="btn_loadSchedule" class="btn btn-primary schedule-filter-load-btn">
+              <i class="bi bi-arrow-clockwise me-1"></i> Load tab
+            </button>
+            <button type="button" id="btn_resetScheduleFilters" class="btn btn-outline-secondary schedule-filter-reset-btn" title="Reset filters" aria-label="Reset filters">
+              <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>
+            </button>
           </div>
         </div>
+        <% if (canLoadAllSchedules) { %>
+        <div class="schedule-filter-field schedule-filter-load-all-cell">
+          <button type="button" id="btn_loadAllSchedules" class="btn btn-outline-primary w-100 schedule-filter-load-all-btn d-none">
+            <i class="bi bi-cloud-arrow-down me-1"></i> Load all tabs
+          </button>
+        </div>
+        <% } %>
       </div>
     </div>
+    <%- include('school/schedule/partials/personScheduleDateRangeShortcuts') %>
   </div>
 
   <%- include('school/schedule/partials/personScheduleCalendarShell', { personScheduleIncludeAdminRail: true }) %>

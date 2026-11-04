@@ -114,17 +114,12 @@
             });
         }
     }
-    bindCollapseToggle({
-        collapseId: 'scheduleFilterCollapse',
-        buttonId: 'scheduleFilterToggleBtn',
-        iconId: 'scheduleFilterToggleIcon',
-        titleId: 'scheduleFilterTitleToggle',
-        cardId: 'scheduleFilterCard'
-    });
 
     function setActiveRangeChip(range) {
-        document.querySelectorAll('.btn-range.range-chip, .schedule-range-chip').forEach((btn) => {
-            btn.classList.toggle('active', btn.getAttribute('data-range') === range);
+        document.querySelectorAll('#scheduleDateRangeMenu .schedule-date-range-option').forEach((btn) => {
+            const isActive = btn.getAttribute('data-range') === range;
+            btn.classList.toggle('active', isActive);
+            btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
         });
     }
 
@@ -5301,6 +5296,7 @@
         if (!scheduleState.persons.length) {
             host.innerHTML = actionsHtml;
             syncActivePersonInputs();
+            syncScheduleLoadAllButtonVisibility();
             return;
         }
         const lastIndex = scheduleState.persons.length - 1;
@@ -5329,6 +5325,14 @@
             return tabWrap;
         }).join('');
         syncActivePersonInputs();
+        syncScheduleLoadAllButtonVisibility();
+    }
+
+    function syncScheduleLoadAllButtonVisibility() {
+        const btn = document.getElementById('btn_loadAllSchedules');
+        if (!btn) return;
+        const show = scheduleState.persons.length > 1;
+        btn.classList.toggle('d-none', !show);
     }
 
     function updateRoleOptionsForActivePerson() {
@@ -5583,7 +5587,6 @@
             endDate: range.endDate
         });
         if (role) params.set('role', role);
-        if (hasCasesOnly()) params.set('hasCases', '1');
         return params;
     }
 
@@ -5653,10 +5656,6 @@
             startDate: document.getElementById('sch_startDate')?.value || '',
             endDate: document.getElementById('sch_endDate')?.value || ''
         };
-    }
-
-    function hasCasesOnly() {
-        return document.getElementById('sch_hasCases')?.checked === true;
     }
 
     function readScheduleHideEmptyDays() {
@@ -6570,18 +6569,18 @@
         if (!loadedAt && !scheduleState.remoteUpdatePending) return '';
         const staleClass = (scheduleState.staleAfterHidden || scheduleState.remoteUpdatePending) ? ' is-stale' : '';
         const label = scheduleState.remoteUpdatePending
-            ? 'Update available'
-            : `Updated ${formatSchoolInstant(loadedAt)}`;
+            ? 'New'
+            : formatScheduleLastLoadedTimeHHMM(loadedAt);
         const title = scheduleState.remoteUpdatePending
             ? 'New schedule data is available. Click to refresh.'
-            : 'Click to refresh schedule data';
+            : `Last loaded at ${formatSchoolInstant(loadedAt)}. Click to refresh schedule data.`;
         const autoDetectOn = isScheduleAutoChangeDetectorEnabled();
         const toggleClass = autoDetectOn ? 'is-on' : 'is-off';
         const toggleLabel = autoDetectOn ? 'ON' : 'OFF';
         const toggleTitle = autoDetectOn
             ? 'Auto-detect schedule changes is on. Click to turn off.'
             : 'Auto-detect schedule changes is off. Click to turn on.';
-        return `<div class="schedule-loaded-at-chip-shell"><button type="button" class="schedule-loaded-at-chip schedule-loaded-at-chip--icon-only${staleClass}" data-schedule-refresh-loaded title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}"><i class="bi bi-arrow-clockwise" aria-hidden="true"></i></button><button type="button" class="schedule-auto-detect-toggle ${toggleClass}" data-schedule-auto-detect-toggle aria-pressed="${autoDetectOn ? 'true' : 'false'}" title="${escapeHtml(toggleTitle)}" aria-label="${escapeHtml(toggleTitle)}">Auto ${escapeHtml(toggleLabel)}</button></div>`;
+        return `<div class="schedule-loaded-at-chip-shell"><button type="button" class="schedule-loaded-at-chip schedule-loaded-at-chip--time${staleClass}" data-schedule-refresh-loaded title="${escapeHtml(title)}" aria-label="${escapeHtml(title)}"><span class="schedule-loaded-at-chip-time">${escapeHtml(label)}</span></button><button type="button" class="schedule-auto-detect-toggle ${toggleClass}" data-schedule-auto-detect-toggle aria-pressed="${autoDetectOn ? 'true' : 'false'}" title="${escapeHtml(toggleTitle)}" aria-label="${escapeHtml(toggleTitle)}">Auto ${escapeHtml(toggleLabel)}</button></div>`;
     }
 
     function markScheduleDataStaleAfterReturn() {
@@ -6694,6 +6693,15 @@
         const dateObj = value instanceof Date ? value : new Date(value);
         if (Number.isNaN(dateObj.getTime())) return String(value || '');
         return dateObj.toLocaleString();
+    }
+
+    function formatScheduleLastLoadedTimeHHMM(value) {
+        const dateObj = value instanceof Date ? value : new Date(value);
+        if (Number.isNaN(dateObj.getTime())) return '--:--';
+        if (window.AppOrgDateTime && typeof window.AppOrgDateTime.formatSchoolTime === 'function') {
+            return window.AppOrgDateTime.formatSchoolTime(value);
+        }
+        return dateObj.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: false });
     }
 
     function schPrintFormatDateShort(ymd) {
@@ -7217,7 +7225,6 @@
             }
             const params = new URLSearchParams({ personId: person.id, startDate: range.startDate, endDate: range.endDate });
             if (role) params.set('role', role);
-            if (hasCasesOnly()) params.set('hasCases', '1');
             const res = await fetch(`/school/schedules/api/person-schedule?${params.toString()}`, {
                 headers: { 'X-AJAX-Request': 'true', Accept: 'application/json' },
                 credentials: 'same-origin'
@@ -7313,100 +7320,179 @@
         await loadSchedulePerson(person);
     }
 
-    async function fetchSchedulePeopleForRole(role) {
-        const normalizedRole = String(role || '').trim();
-        if (!normalizedRole) return [];
-        const items = [];
-        let page = 1;
-        let totalPages = 1;
-        do {
-            const params = new URLSearchParams({ page: String(page), pageSize: '100' });
-            params.set('role', normalizedRole);
-            const res = await fetch(`/school/schedules/api/school-person-picker?${params.toString()}`, {
-                headers: { 'X-AJAX-Request': 'true', Accept: 'application/json' },
-                credentials: 'same-origin'
-            });
-            const result = await res.json().catch(() => ({}));
-            if (!res.ok || result.status !== 'success') throw new Error(result.message || 'Unable to load people for the selected role.');
-            const pageItems = Array.isArray(result.items)
-                ? result.items
-                : (Array.isArray(result.data) ? result.data : (Array.isArray(result.results) ? result.results : []));
-            pageItems.forEach((item) => items.push(item));
-            const pagination = result.pagination || {};
-            totalPages = Number(pagination.totalPages || result.totalPages || totalPages || 1) || 1;
-            page += 1;
-        } while (page <= totalPages);
-        return items;
-    }
-
     async function loadAllSchedulePeople() {
-        if (canSelectAnyPerson && selectedScheduleRole()) {
-            const role = selectedScheduleRole();
-            if (typeof window.showLoading === 'function') window.showLoading(`Loading ${role} people...`);
-            try {
-                const rolePeople = await fetchSchedulePeopleForRole(role);
-                if (!rolePeople.length) {
-                    await uiAlert(`No people were found for the selected ${role} role.`, 'Load people', { icon: 'info' });
-                    return;
-                }
-                scheduleState.persons = [];
-                scheduleState.activePersonId = '';
-                clearLoadedSchedules();
-                rolePeople.forEach((item) => addSchedulePerson(item, { selectedRole: role }));
-                sortSchedulePersons();
-                scheduleState.activePersonId = scheduleState.persons[0]?.id || '';
-                renderSchedulePersonTabs();
-                refreshScheduleActiveView();
-            } catch (error) {
-                await uiAlert(error.message || 'Unable to load people for the selected role.', 'Schedule', { icon: 'error' });
-                return;
-            } finally {
-                if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
-            }
-        }
-        if (!scheduleState.persons.length) { await uiAlert('Please select at least one person first.', 'Load schedules', { icon: 'info' }); return; }
+        if (scheduleState.persons.length <= 1) return;
+        if (!(await confirmDiscardPendingDraftsIfNeeded('Load all selected schedules'))) return;
         for (const person of scheduleState.persons) {
             // eslint-disable-next-line no-await-in-loop
             await loadSchedulePerson(person);
         }
     }
 
-    function applyScheduleRange(range) {
-        setActiveRangeChip(range);
+    function normalizeScheduleRangeToken(range) {
+        const key = String(range || '').trim();
+        const legacyMap = {
+            first15: 'm0-first',
+            second15: 'm0-second',
+            month: 'm0-full'
+        };
+        return legacyMap[key] || key;
+    }
+
+    function resolveScheduleRangeDates(range) {
+        const token = normalizeScheduleRangeToken(range);
         const today = new Date();
-        let start = new Date(today);
-        let end = new Date(today);
-        if (range === 'week') {
+        if (token === 'day') {
+            return { start: new Date(today), end: new Date(today) };
+        }
+        if (token === 'week') {
+            const start = new Date(today);
+            const end = new Date(today);
             const day = today.getDay() || 7;
             if (day !== 1) start.setHours(-24 * (day - 1));
             end.setTime(start.getTime() + (6 * 24 * 60 * 60 * 1000));
-        } else if (range === 'first15') {
-            start = new Date(today.getFullYear(), today.getMonth(), 1);
-            end = new Date(today.getFullYear(), today.getMonth(), 15);
-        } else if (range === 'second15') {
-            start = new Date(today.getFullYear(), today.getMonth(), 16);
-            end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-        } else if (range === 'month') {
-            start = new Date(today.getFullYear(), today.getMonth(), 1);
-            end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-        } else if (range === 'season') {
-            end.setMonth(start.getMonth() + 3);
-        } else if (range === 'year') {
-            start = new Date(today.getFullYear(), 0, 1);
-            end = new Date(today.getFullYear(), 11, 31);
+            return { start, end };
         }
-        setDateRange(start, end);
+        const monthMatch = /^m(-?\d+)-(first|second|full)$/.exec(token);
+        if (monthMatch) {
+            const monthOffset = Number(monthMatch[1]);
+            const part = monthMatch[2];
+            const anchor = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
+            const year = anchor.getFullYear();
+            const month = anchor.getMonth();
+            if (part === 'first') {
+                return { start: new Date(year, month, 1), end: new Date(year, month, 15) };
+            }
+            if (part === 'second') {
+                return { start: new Date(year, month, 16), end: new Date(year, month + 1, 0) };
+            }
+            return { start: new Date(year, month, 1), end: new Date(year, month + 1, 0) };
+        }
+        if (token === 'season') {
+            const start = new Date(today);
+            const end = new Date(today);
+            end.setMonth(start.getMonth() + 3);
+            return { start, end };
+        }
+        if (token === 'year') {
+            return {
+                start: new Date(today.getFullYear(), 0, 1),
+                end: new Date(today.getFullYear(), 11, 31)
+            };
+        }
+        return null;
+    }
+
+    function applyScheduleRange(range) {
+        const normalized = normalizeScheduleRangeToken(range);
+        setActiveRangeChip(normalized);
+        const bounds = resolveScheduleRangeDates(normalized);
+        if (!bounds) return;
+        setDateRange(bounds.start, bounds.end);
         resetScheduleActiveClassFilter();
         clearLoadedSchedules();
         refreshScheduleViewWithHolidays();
     }
 
-    // --- 1. Control Logic & Event Listeners ---
-    document.querySelectorAll('.btn-range').forEach((btn) => {
-        btn.addEventListener('click', (e) => {
-            applyScheduleRange(e.currentTarget.getAttribute('data-range') || 'week');
+    function bindScheduleDateRangeShortcuts() {
+        const menuEl = document.getElementById('scheduleDateRangeMenu');
+        const shortcutsBtn = document.getElementById('btn_scheduleDateShortcuts');
+        const startEl = document.getElementById('sch_startDate');
+        const endEl = document.getElementById('sch_endDate');
+        if (!menuEl) return;
+
+        let dismissCleanup = null;
+
+        const isScheduleDateRangeMenuTarget = (target) => {
+            if (!target || !menuEl) return false;
+            if (target === menuEl || menuEl.contains(target)) return true;
+            if (shortcutsBtn && (target === shortcutsBtn || shortcutsBtn.contains(target))) return true;
+            return false;
+        };
+
+        const hideMenu = () => {
+            menuEl.hidden = true;
+            menuEl.classList.remove('is-open');
+            if (shortcutsBtn) shortcutsBtn.setAttribute('aria-expanded', 'false');
+            if (typeof dismissCleanup === 'function') {
+                dismissCleanup();
+                dismissCleanup = null;
+            }
+        };
+
+        const clampMenuPosition = (left, top) => {
+            menuEl.style.left = `${left}px`;
+            menuEl.style.top = `${top}px`;
+            requestAnimationFrame(() => {
+                const rect = menuEl.getBoundingClientRect();
+                let nextLeft = left;
+                let nextTop = top;
+                if (rect.right > window.innerWidth - 8) nextLeft = Math.max(8, window.innerWidth - rect.width - 8);
+                if (rect.bottom > window.innerHeight - 8) nextTop = Math.max(8, window.innerHeight - rect.height - 8);
+                if (rect.left < 8) nextLeft = 8;
+                if (rect.top < 8) nextTop = 8;
+                menuEl.style.left = `${nextLeft}px`;
+                menuEl.style.top = `${nextTop}px`;
+            });
+        };
+
+        const showMenuAt = (left, top) => {
+            menuEl.hidden = false;
+            menuEl.classList.add('is-open');
+            clampMenuPosition(left, top);
+            if (shortcutsBtn) shortcutsBtn.setAttribute('aria-expanded', 'true');
+            if (dismissCleanup) return;
+            const onOutside = (event) => {
+                if (menuEl.hidden) return;
+                const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
+                if (path.includes(menuEl) || path.includes(shortcutsBtn)) return;
+                if (isScheduleDateRangeMenuTarget(event.target)) return;
+                hideMenu();
+            };
+            const onKey = (event) => {
+                if (event.key === 'Escape') hideMenu();
+            };
+            const onScroll = (event) => {
+                if (menuEl.hidden) return;
+                if (isScheduleDateRangeMenuTarget(event.target)) return;
+                hideMenu();
+            };
+            document.addEventListener('pointerdown', onOutside, true);
+            document.addEventListener('keydown', onKey);
+            window.addEventListener('scroll', onScroll, true);
+            dismissCleanup = () => {
+                document.removeEventListener('pointerdown', onOutside, true);
+                document.removeEventListener('keydown', onKey);
+                window.removeEventListener('scroll', onScroll, true);
+            };
+        };
+
+        menuEl.querySelectorAll('.schedule-date-range-option').forEach((btn) => {
+            btn.addEventListener('click', (event) => {
+                applyScheduleRange(event.currentTarget.getAttribute('data-range') || 'week');
+                hideMenu();
+            });
         });
-    });
+
+        shortcutsBtn?.addEventListener('click', (event) => {
+            event.stopPropagation();
+            if (!menuEl.hidden && menuEl.classList.contains('is-open')) {
+                hideMenu();
+                return;
+            }
+            const rect = shortcutsBtn.getBoundingClientRect();
+            showMenuAt(rect.left, rect.bottom + 4);
+        });
+
+        const onDateContextMenu = (event) => {
+            event.preventDefault();
+            showMenuAt(event.clientX, event.clientY);
+        };
+        startEl?.addEventListener('contextmenu', onDateContextMenu);
+        endEl?.addEventListener('contextmenu', onDateContextMenu);
+    }
+
+    bindScheduleDateRangeShortcuts();
 
 if (canSelectAnyPerson) {
     const btnPicker = document.getElementById('btn_openPersonPicker');
@@ -7478,8 +7564,6 @@ if (canSelectAnyPerson) {
         const roleEl = document.getElementById('sch_role');
         if (roleEl) roleEl.value = 'teacher';
         clearLoadedSchedules();
-        const hasCasesEl = document.getElementById('sch_hasCases');
-        if (hasCasesEl) hasCasesEl.checked = false;
         scheduleState.viewMode = 'verticalTimeline';
         try {
             if (window.localStorage) window.localStorage.setItem(SCHEDULE_VIEW_MODE_STORAGE_KEY, 'verticalTimeline');
@@ -7515,10 +7599,6 @@ if (canLoadAllSchedules) {
         refreshScheduleActiveView();
     });
 
-    document.getElementById('sch_hasCases')?.addEventListener('change', () => {
-        clearLoadedSchedules();
-        refreshScheduleActiveView();
-    });
     document.getElementById('sch_startDate')?.addEventListener('change', () => {
         resetScheduleActiveClassFilter();
         clearLoadedSchedules();
