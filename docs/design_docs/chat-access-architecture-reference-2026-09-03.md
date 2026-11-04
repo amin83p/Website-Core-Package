@@ -82,6 +82,19 @@ Broadcast paths re-check **`isChatBroadcastAdmin()`** in service code.
 | `mark_delivered` / `mark_read` | READ or READ_ALL (participant) |
 | Attachments on send | `fileUrl` must pass **`chatPendingAttachmentService.consumePendingAttachment`** |
 
+### Client transport (chat modal)
+
+Configured under **System Settings → App Defaults → Chat** tab (`settings.app`):
+
+| Setting | Default | Behavior |
+| --- | --- | --- |
+| `chatBackgroundPollIntervalSeconds` | 60 (15–600) | When the modal is **closed** and realtime-when-closed is off, the inbox refreshes via HTTP on this interval. |
+| `chatRealtimeWhenModalClosed` | false | When true, Socket.IO stays connected while the modal is closed (no background poll). |
+
+While the chat modal is **open**, the client uses Socket.IO only (no background poll). Values are exposed to the browser as `appUiSettings` / `window.__APP_UI_SETTINGS__` and applied in `MVC/views/partials/chatModal.ejs`.
+
+Outbound attachment sends must include a client **`tempId`**; the server **`message_sent_ack`** maps the optimistic row to the persisted message id (required for delete and correct attachment URLs).
+
 ---
 
 ## Deletion visibility

@@ -643,6 +643,8 @@ exports.updateAppSettings = async (req, res) => {
         defaultPageSize: parseInt(req.body.defaultPageSize, 10),
         searchDefaultKeyword: req.body.searchDefaultKeyword,
         genericPickerSearchDebounceMs: parseClampedInteger(req.body.genericPickerSearchDebounceMs, 400, 0, 2000),
+        chatBackgroundPollIntervalSeconds: parseClampedInteger(req.body.chatBackgroundPollIntervalSeconds, 60, 15, 600),
+        chatRealtimeWhenModalClosed: req.body.chatRealtimeWhenModalClosed === 'true',
         requestCacheTtlSeconds: parseInt(req.body.requestCacheTtlSeconds, 10),
         requestCacheMaxEntries: parseInt(req.body.requestCacheMaxEntries, 10),
         buildVersionOverride: cleanFormText(req.body.buildVersionOverride, 120),

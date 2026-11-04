@@ -11,6 +11,13 @@
     !!modalChatAccess.canDelete && !['SCP_OWNER', 'OWNER', 'SCP_USER', 'USER'].includes(deleteScopeToken)
   );
   const canChatBroadcast = !!modalChatAccess.canBroadcast;
+  const chatUiSettings = (typeof appUiSettings !== 'undefined' && appUiSettings && typeof appUiSettings === 'object') ? appUiSettings : {};
+  const rawChatPollSec = Number.parseInt(String(chatUiSettings.chatBackgroundPollIntervalSeconds ?? ''), 10);
+  const chatPollSec = Number.isFinite(rawChatPollSec) ? Math.max(15, Math.min(600, rawChatPollSec)) : 60;
+  const chatPollMs = Number.isFinite(Number(chatUiSettings.chatBackgroundPollIntervalMs))
+    ? Math.max(15000, Math.min(600000, Number(chatUiSettings.chatBackgroundPollIntervalMs)))
+    : chatPollSec * 1000;
+  const chatRealtimeWhenClosed = chatUiSettings.chatRealtimeWhenModalClosed === true;
 %>
 <div class="modal fade" id="chatInterfaceModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
   <div class="modal-dialog modal-dialog-centered chat-shell-dialog" id="chatModalDialog" style="max-width: calc(100vw - 8px); width: min(900px, calc(100vw - 8px)); margin: 4px auto;"> 
@@ -406,6 +413,103 @@ let replyTarget = null;
 const selectedMessageIds = new Set();
 let contextMenuMessage = null;
 let touchContextTimer = null;
+const chatTransportConfig = {
+    pollIntervalMs: <%= chatPollMs %>,
+    realtimeWhenModalClosed: <%= chatRealtimeWhenClosed ? 'true' : 'false' %>
+};
+let chatBackgroundPollTimer = null;
+
+function isChatModalVisible() {
+    const modalEl = document.getElementById('chatInterfaceModal');
+    return Boolean(modalEl && modalEl.classList.contains('show'));
+}
+
+function stopChatBackgroundPoll() {
+    if (!chatBackgroundPollTimer) return;
+    clearInterval(chatBackgroundPollTimer);
+    chatBackgroundPollTimer = null;
+}
+
+function startChatBackgroundPoll() {
+    stopChatBackgroundPoll();
+    if (chatTransportConfig.realtimeWhenModalClosed) return;
+    if (!chatAccess.canReadInbox) return;
+    const intervalMs = Math.max(15000, Number(chatTransportConfig.pollIntervalMs) || 60000);
+    chatBackgroundPollTimer = setInterval(() => {
+        if (isChatModalVisible()) return;
+        refreshInbox();
+    }, intervalMs);
+}
+
+function disconnectChatSocket() {
+    if (socket && socket.connected) socket.disconnect();
+    socketReadyPromise = null;
+}
+
+async function applyChatTransportPolicy() {
+    if (isChatModalVisible()) {
+        stopChatBackgroundPoll();
+        await ensureChatSocket();
+        return;
+    }
+    if (chatTransportConfig.realtimeWhenModalClosed) {
+        stopChatBackgroundPoll();
+        await ensureChatSocket();
+    } else {
+        disconnectChatSocket();
+        startChatBackgroundPoll();
+    }
+}
+
+function revokeMessagePreviewObjectUrl(row) {
+    if (!row) return;
+    const previewUrl = String(row.dataset.previewObjectUrl || '').trim();
+    if (previewUrl && previewUrl.startsWith('blob:')) {
+        try { URL.revokeObjectURL(previewUrl); } catch (_) { /* ignore */ }
+    }
+    delete row.dataset.previewObjectUrl;
+}
+
+function applyMessageSentAck(data) {
+    const realMsg = data?.realMsg;
+    const tempId = String(data?.tempId || '').trim();
+    if (!realMsg?.id) return;
+
+    const row = tempId ? document.getElementById(`msg-row-${tempId}`) : null;
+    if (!row) return;
+
+    revokeMessagePreviewObjectUrl(row);
+    row.id = `msg-row-${realMsg.id}`;
+    row.dataset.messageId = String(realMsg.id);
+    row.dataset.deleted = realMsg.deletedAt ? '1' : '0';
+    row.dataset.messageType = String(realMsg.type || row.dataset.messageType || 'text');
+    if (realMsg.fileUrl) row.dataset.fileUrl = String(realMsg.fileUrl);
+
+    const bubble = row.querySelector('.msg-bubble');
+    if (bubble) {
+        const rendered = buildMessageHtml(Object.assign({}, realMsg, { id: realMsg.id, convId: realMsg.convId || currentConvId }), false);
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = rendered.trim();
+        const newBubble = wrapper.firstElementChild?.querySelector('.msg-bubble');
+        if (newBubble) bubble.innerHTML = newBubble.innerHTML;
+    }
+
+    const statusContainer = row.querySelector('.status-container');
+    if (statusContainer) {
+        statusContainer.id = `status-${realMsg.id}`;
+        statusContainer.innerHTML = '<i class="bi bi-check status-sent msg-status"></i>';
+    }
+    bindMessageActionEvents();
+}
+
+function markPendingTempMessagesFailed() {
+    document.querySelectorAll('.chat-message-row[data-message-id^="temp_"]').forEach((row) => {
+        const statusContainer = row.querySelector('.status-container');
+        if (statusContainer) {
+            statusContainer.innerHTML = '<i class="bi bi-exclamation-circle text-danger msg-status" title="Failed to send"></i>';
+        }
+    });
+}
 
 function normalizeClientUnreadCount(value) {
     const parsed = Number(value);
@@ -656,6 +760,7 @@ function bindChatSocketHandlers() {
             window.currentChatCanMessage = false;
             window.currentChatScopeReason = message;
         }
+        markPendingTempMessagesFailed();
         safeShowAlert(message, 'warning');
     });
 
@@ -665,15 +770,7 @@ function bindChatSocketHandlers() {
     });
 
     socket.on('message_sent_ack', (data) => {
-        const tempRow = document.getElementById(`msg-row-${data.tempId}`);
-        if (tempRow) {
-            tempRow.id = `msg-row-${data.realMsg.id}`;
-            const statusContainer = tempRow.querySelector('.status-container');
-            if (statusContainer) {
-                statusContainer.id = `status-${data.realMsg.id}`;
-                statusContainer.innerHTML = '<i class="bi bi-check status-sent msg-status"></i>';
-            }
-        }
+        applyMessageSentAck(data);
     });
 
     socket.on('new_message', (data) => {
@@ -857,6 +954,8 @@ function initChatSystem() {
             clearMessageSelection();
         }
     });
+    window.addEventListener('beforeunload', stopChatBackgroundPoll);
+    applyChatTransportPolicy();
 }
 
 function buildAvatarHtml(name, avatarUrl, size = 40, bgClass = 'bg-secondary', textClass = 'text-white') {
@@ -904,6 +1003,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 3. Connect socket and refresh when modal opens
     modalEl.addEventListener('show.bs.modal', async () => {
+        stopChatBackgroundPoll();
         await ensureChatSocket();
         showInbox();
         const modalContent = document.getElementById('chatModalContent');
@@ -932,8 +1032,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
     modalEl.addEventListener('hidden.bs.modal', () => {
-        if (socket && socket.connected) socket.disconnect();
-        socketReadyPromise = null;
+        applyChatTransportPolicy();
     });
 });
 async function uploadPendingFiles(replyToMessageId = '') {
@@ -960,7 +1059,8 @@ async function uploadPendingFiles(replyToMessageId = '') {
 
     const formData = new FormData();
     formData.append('convId', currentConvId);
-    pendingAttachments.forEach(file => formData.append('files', file));
+    const filesToUpload = pendingAttachments.slice();
+    filesToUpload.forEach(file => formData.append('files', file));
 
     try {
         const resp = await fetch('/chat/upload', { method: 'POST', body: formData });
@@ -976,8 +1076,15 @@ async function uploadPendingFiles(replyToMessageId = '') {
 
             // 2. Process uploaded files
             res.files.forEach((f, index) => {
-                // A. Emit to Server (for Recipient)
+                const tempId = `temp_img_${Date.now()}_${index}`;
+                let previewUrl = '';
+                const sourceFile = filesToUpload[index];
+                if (f.type === 'image' && sourceFile instanceof Blob) {
+                    previewUrl = URL.createObjectURL(sourceFile);
+                }
+
                 if (socket && socket.connected) socket.emit('send_message', {
+                    tempId,
                     convId: currentConvId,
                     content: f.type === 'image' ? 'Image' : 'File',
                     type: f.type,
@@ -986,16 +1093,22 @@ async function uploadPendingFiles(replyToMessageId = '') {
                     replyToMessageId: index === 0 ? replyToMessageId : ''
                 });
 
-                // B. RENDER LOCALLY (Fixes "I don't see my image")
                 appendMessage({
-                    id: 'temp_img_sent_' + Date.now() + Math.random(),
+                    id: tempId,
+                    convId: currentConvId,
                     content: f.type === 'image' ? 'Image' : 'File',
                     type: f.type,
                     fileUrl: f.url,
+                    previewUrl,
                     senderId: currentUser.id,
                     timestamp: new Date(),
-                    status: 'sent'
-                });
+                    status: 'sending'
+                }, true);
+
+                if (previewUrl) {
+                    const row = document.getElementById(`msg-row-${tempId}`);
+                    if (row) row.dataset.previewObjectUrl = previewUrl;
+                }
             });
         } else {
             if (resp.status === 403) {
@@ -1133,7 +1246,12 @@ function buildMessageHtml(msg, isTemp = false) {
     } else if (!isDeleted && msg.type === 'text' && isLegacySystemHtmlMessage(msg.content)) {
         contentHtml = `<div class="msg-text-content msg-system-content">${normalizeLegacySystemHtml(msg.content)}</div>`;
     } else if (!isDeleted && msg.type === 'image') {
-        const safeUrl = buildChatAttachmentUrl(msg, false);
+        let safeUrl = '';
+        if (isTemp && msg.previewUrl) {
+            safeUrl = String(msg.previewUrl);
+        } else {
+            safeUrl = buildChatAttachmentUrl(msg, false);
+        }
         const downloadUrl = buildChatAttachmentUrl(msg, true);
         contentHtml = safeUrl
             ? `<a href="${downloadUrl}" target="_blank"><img src="${safeUrl}" class="img-fluid rounded mb-1" style="max-width: 200px; min-height: 50px; background: #f0f0f0;"></a>`

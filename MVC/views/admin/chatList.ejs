@@ -34,7 +34,7 @@
 
     <tbody>
       <% (data || []).forEach(conv => { %>
-        <tr>
+        <tr data-conversation-id="<%= conv.id %>">
           <td>
             <span class="text-muted small"><%= conv.id %></span>
           </td>
@@ -99,170 +99,352 @@
 <%- include('../partials/tablePages-end') %>
 
 <div class="modal fade" id="adminChatViewModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
-    <div class="modal-content">
-      <div class="modal-header bg-light">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg admin-chat-view-dialog">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header admin-chat-view-header border-0">
         <div>
-            <h5 class="modal-title fw-bold" id="adminChatTitle">Conversation History</h5>
-            <small class="text-muted" id="adminChatSubtitle">ID: ...</small>
+            <h5 class="modal-title fw-bold mb-1" id="adminChatTitle">Conversation History</h5>
+            <div class="small text-muted" id="adminChatSubtitle">ID: ...</div>
+            <div class="small text-muted" id="adminChatMeta"></div>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body bg-light" id="adminChatContainer" style="min-height: 400px;">
+      <div class="modal-body admin-chat-view-body p-0" id="adminChatContainer">
           </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      <div class="modal-footer border-0 bg-light">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>
 </div>
 
 <style>
-    /* Admin View Specific Styles */
-    .admin-msg-row {
-        margin-bottom: 15px;
-        border-left: 3px solid #dee2e6;
-        padding-left: 15px;
-        background: #fff;
-        padding: 10px;
-        border-radius: 0 8px 8px 0;
+    .admin-chat-view-dialog {
+        max-width: min(920px, calc(100vw - 1.5rem));
     }
-    .admin-msg-meta {
-        font-size: 0.75rem;
-        color: #6c757d;
-        margin-bottom: 5px;
+    .admin-chat-view-header {
+        background: linear-gradient(180deg, #f8f9fa 0%, #fff 100%);
+        padding: 1rem 1.25rem;
+    }
+    .admin-chat-view-body {
+        min-height: 420px;
+        max-height: min(70vh, 640px);
+        overflow-y: auto;
+        background: #eef1f4;
+        background-image: radial-gradient(circle at 1px 1px, rgba(0, 0, 0, 0.04) 1px, transparent 0);
+        background-size: 18px 18px;
+    }
+    .admin-chat-transcript {
         display: flex;
-        justify-content: space-between;
-        border-bottom: 1px solid #f1f1f1;
-        padding-bottom: 5px;
+        flex-direction: column;
+        gap: 0.65rem;
+        padding: 1rem 1.1rem 1.25rem;
+        min-height: 100%;
     }
-    .admin-sender-id {
-        font-weight: bold;
-        color: #0d6efd;
-        font-family: monospace;
+    .admin-chat-day-divider {
+        align-self: center;
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        text-transform: uppercase;
+        color: #6c757d;
+        background: rgba(255, 255, 255, 0.85);
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        border-radius: 999px;
+        padding: 0.2rem 0.75rem;
+        margin: 0.35rem 0;
     }
-    .admin-msg-content img {
-        max-width: 300px;
-        border-radius: 8px;
-        border: 1px solid #dee2e6;
+    .admin-chat-message-row {
+        display: flex;
+        flex-direction: column;
+        max-width: 88%;
     }
-    .admin-file-link {
+    .admin-chat-message-row.align-start { align-self: flex-start; }
+    .admin-chat-message-row.align-end { align-self: flex-end; }
+    .admin-chat-message-row.is-system { align-self: center; max-width: 95%; }
+    .admin-chat-message-row.is-deleted { opacity: 0.75; }
+    .admin-chat-sender-label {
+        font-size: 0.68rem;
+        font-weight: 600;
+        color: #495057;
+        margin-bottom: 0.15rem;
+        padding: 0 0.35rem;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    }
+    .admin-chat-bubble {
+        padding: 0.55rem 0.75rem;
+        border-radius: 14px;
+        font-size: 0.9rem;
+        line-height: 1.45;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+        word-break: break-word;
+    }
+    .admin-chat-bubble.received {
+        background: #fff;
+        border: 1px solid rgba(0, 0, 0, 0.06);
+        border-bottom-left-radius: 4px;
+    }
+    .admin-chat-bubble.sent {
+        background: #d1e7dd;
+        border: 1px solid rgba(25, 135, 84, 0.12);
+        border-bottom-right-radius: 4px;
+    }
+    .admin-chat-bubble.system {
+        background: #fff3cd;
+        border: 1px solid rgba(255, 193, 7, 0.35);
+        color: #664d03;
+        font-size: 0.85rem;
+    }
+    .admin-chat-bubble.deleted {
+        background: #f8f9fa;
+        border: 1px dashed #ced4da;
+        font-style: italic;
+        color: #6c757d;
+    }
+    .admin-chat-reply-quote {
+        border-left: 3px solid rgba(13, 110, 253, 0.45);
+        padding: 0.35rem 0.5rem;
+        margin-bottom: 0.45rem;
+        background: rgba(13, 110, 253, 0.06);
+        border-radius: 0 6px 6px 0;
+        font-size: 0.78rem;
+        color: #495057;
+    }
+    .admin-chat-msg-text { white-space: pre-wrap; }
+    .admin-chat-bubble img {
+        max-width: min(280px, 100%);
+        height: auto;
+        border-radius: 10px;
+        display: block;
+        border: 1px solid rgba(0, 0, 0, 0.08);
+        margin-top: 0.15rem;
+    }
+    .admin-chat-file-link {
         display: inline-flex;
         align-items: center;
-        background: #f8f9fa;
-        padding: 8px 12px;
+        gap: 0.5rem;
+        background: #fff;
+        padding: 0.55rem 0.75rem;
         border: 1px solid #dee2e6;
-        border-radius: 6px;
+        border-radius: 10px;
         text-decoration: none;
-        color: #333;
+        color: #212529;
+        margin-top: 0.15rem;
     }
-    .admin-file-link:hover {
-        background: #e9ecef;
+    .admin-chat-file-link:hover {
+        background: #f8f9fa;
+        color: #0d6efd;
+    }
+    .admin-chat-msg-footer {
+        display: flex;
+        align-items: center;
+        justify-content: flex-end;
+        gap: 0.35rem;
+        margin-top: 0.35rem;
+        font-size: 0.65rem;
+        color: #6c757d;
+    }
+    .admin-chat-status-badge {
+        font-size: 0.62rem;
+        text-transform: capitalize;
+        padding: 0.1rem 0.35rem;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.65);
+        border: 1px solid rgba(0, 0, 0, 0.06);
+    }
+    .admin-chat-empty-state {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 320px;
+        color: #6c757d;
+        text-align: center;
+        padding: 2rem;
     }
 </style>
 
 <script>
 const adminCanReviewHistory = <%= canReviewHistory ? 'true' : 'false' %>;
 
+function adminEscapeHtml(value) {
+    return String(value == null ? '' : value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 function getAdminAttachmentUrl(convId, fileRef) {
     const token = String(fileRef || '').split(/[?#]/)[0].replace(/\\/g, '/');
-    const fileName = decodeURIComponent(token.split('/').pop() || '');
+    const parts = token.split('/').filter(Boolean);
+    const rawName = parts.length ? parts[parts.length - 1] : '';
+    let fileName = rawName;
+    try { fileName = decodeURIComponent(rawName); } catch (_) { /* keep raw */ }
     if (!convId || !fileName) return '';
     return `/chat/attachments/${encodeURIComponent(convId)}/${encodeURIComponent(fileName)}`;
 }
 
-// ✅ NEW: View Chat Logic
+function formatAdminMessageInstant(value) {
+    if (window.AppOrgDateTime && typeof AppOrgDateTime.formatInstant === 'function') {
+        return AppOrgDateTime.formatInstant(value);
+    }
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? '' : date.toLocaleString();
+}
+
+function formatAdminDayLabel(value) {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '';
+    if (window.AppOrgDateTime && typeof AppOrgDateTime.formatInstant === 'function') {
+        return AppOrgDateTime.formatInstant(value, { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+    return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function buildAdminMessageContentHtml(msg, convId) {
+    if (msg.deletedAt) {
+        return '<div class="admin-chat-msg-text">Message deleted</div>';
+    }
+    if (msg.type === 'system') {
+        return `<div class="admin-chat-msg-text">${adminEscapeHtml(msg.content || 'System message')}</div>`;
+    }
+    if (msg.type === 'image') {
+        const safeUrl = getAdminAttachmentUrl(convId, msg.fileUrl);
+        if (!safeUrl) {
+            return '<div class="admin-chat-msg-text text-muted">Image unavailable</div>';
+        }
+        return `<a href="${adminEscapeHtml(safeUrl)}" target="_blank" rel="noopener"><img src="${adminEscapeHtml(safeUrl)}" alt="Image attachment"></a>`;
+    }
+    if (msg.type === 'file') {
+        const safeUrl = getAdminAttachmentUrl(convId, msg.fileUrl);
+        if (!safeUrl) {
+            return '<div class="admin-chat-msg-text text-muted">Attachment unavailable</div>';
+        }
+        return `<a href="${adminEscapeHtml(safeUrl)}" target="_blank" rel="noopener" class="admin-chat-file-link"><i class="bi bi-file-earmark-arrow-down fs-5 text-primary"></i><span><strong>Download attachment</strong><br><span class="small text-muted">Open secured file</span></span></a>`;
+    }
+    return `<div class="admin-chat-msg-text">${adminEscapeHtml(msg.content || '')}</div>`;
+}
+
+function renderAdminChatTranscript(container, messages, convId) {
+    const senderAlign = new Map();
+    let alignToggle = 0;
+    let lastDayKey = '';
+
+    const transcript = document.createElement('div');
+    transcript.className = 'admin-chat-transcript';
+
+    messages.forEach((msg) => {
+        const dayKey = formatAdminDayLabel(msg.timestamp || msg.sentAt);
+        if (dayKey && dayKey !== lastDayKey) {
+            lastDayKey = dayKey;
+            const divider = document.createElement('div');
+            divider.className = 'admin-chat-day-divider';
+            divider.textContent = dayKey;
+            transcript.appendChild(divider);
+        }
+
+        const senderId = String(msg.senderId || 'unknown');
+        if (!senderAlign.has(senderId)) {
+            senderAlign.set(senderId, alignToggle % 2 === 0 ? 'start' : 'end');
+            alignToggle += 1;
+        }
+        const align = senderAlign.get(senderId);
+        const isSystem = msg.type === 'system';
+        const isDeleted = Boolean(msg.deletedAt);
+
+        const row = document.createElement('div');
+        row.className = `admin-chat-message-row align-${align}${isSystem ? ' is-system' : ''}${isDeleted ? ' is-deleted' : ''}`;
+
+        if (!isSystem) {
+            const label = document.createElement('div');
+            label.className = 'admin-chat-sender-label';
+            label.textContent = senderId;
+            row.appendChild(label);
+        }
+
+        const bubbleClass = isDeleted
+            ? 'deleted'
+            : (isSystem ? 'system' : (align === 'end' ? 'sent' : 'received'));
+        const bubble = document.createElement('div');
+        bubble.className = `admin-chat-bubble ${bubbleClass}`;
+
+        if (msg.replyTo && !isDeleted) {
+            const quote = document.createElement('div');
+            quote.className = 'admin-chat-reply-quote';
+            quote.textContent = String(msg.replyTo.preview || 'Quoted message');
+            bubble.appendChild(quote);
+        }
+
+        bubble.insertAdjacentHTML('beforeend', buildAdminMessageContentHtml(msg, convId));
+
+        const footer = document.createElement('div');
+        footer.className = 'admin-chat-msg-footer';
+        footer.innerHTML = `<span>${adminEscapeHtml(formatAdminMessageInstant(msg.timestamp || msg.sentAt))}</span><span class="admin-chat-status-badge">${adminEscapeHtml(msg.status || 'sent')}</span>`;
+        bubble.appendChild(footer);
+        row.appendChild(bubble);
+        transcript.appendChild(row);
+    });
+
+    container.innerHTML = '';
+    container.appendChild(transcript);
+    container.scrollTop = container.scrollHeight;
+}
+
+function removeConversationRowFromTable(convId) {
+    const table = document.getElementById('chat-table');
+    const tbody = table?.querySelector('tbody');
+    if (!tbody) return;
+    tbody.querySelector(`tr[data-conversation-id="${CSS.escape(String(convId))}"]`)?.remove();
+    if (!tbody.querySelector('tr[data-conversation-id]')) {
+        tbody.innerHTML = '<tr><td colspan="8" class="text-center py-4 text-muted">No conversations found.</td></tr>';
+    }
+}
+
 async function adminViewChat(convId, participants) {
     if (!adminCanReviewHistory) return;
     const modalEl = document.getElementById('adminChatViewModal');
     const titleEl = document.getElementById('adminChatTitle');
     const subTitleEl = document.getElementById('adminChatSubtitle');
+    const metaEl = document.getElementById('adminChatMeta');
     const container = document.getElementById('adminChatContainer');
 
-    // 1. Setup Modal
-    titleEl.innerText = participants || 'Conversation';
-    subTitleEl.innerText = 'ID: ' + convId;
-    container.innerHTML = '<div class="text-center py-5"><div class="spinner-border text-primary"></div><div class="mt-2 text-muted">Loading history...</div></div>';
-    
-    const bsModal = new bootstrap.Modal(modalEl);
+    titleEl.textContent = participants || 'Conversation';
+    subTitleEl.textContent = `Conversation ID: ${convId}`;
+    metaEl.textContent = '';
+    container.innerHTML = '<div class="admin-chat-empty-state"><div class="spinner-border text-primary mb-3" role="status"></div><div>Loading message history…</div></div>';
+
+    const bsModal = bootstrap.Modal.getOrCreateInstance(modalEl);
     bsModal.show();
 
-    // 2. Fetch Data
     try {
-        const resp = await fetch(`/chat/messages/${convId}`);
+        const resp = await fetch(`/chat/messages/${encodeURIComponent(convId)}`);
         const res = await resp.json();
 
-        if (res.status === 'success') {
-            container.innerHTML = '';
-            
-            if (!res.data || res.data.length === 0) {
-                container.innerHTML = '<div class="text-center text-muted mt-5">No messages found in this history.</div>';
-                return;
-            }
-
-            // 3. Render Messages (Log Style)
-            res.data.forEach(msg => {
-                const timeStr = (window.AppOrgDateTime && AppOrgDateTime.formatInstant) ? AppOrgDateTime.formatInstant(msg.timestamp) : new Date(msg.timestamp).toLocaleString();
-                
-                // Content Handling
-                let contentHtml = msg.content;
-                if(msg.type === 'image') {
-                    const safeUrl = getAdminAttachmentUrl(convId, msg.fileUrl);
-                    contentHtml = `
-                        <div class="mt-1">
-                            <a href="${safeUrl}" target="_blank">
-                                <img src="${safeUrl}" alt="Attachment">
-                            </a>
-                            <div class="small text-muted mt-1"><i class="bi bi-image"></i> Image Attachment</div>
-                        </div>`;
-                } else if (msg.type === 'file') {
-                    const safeUrl = getAdminAttachmentUrl(convId, msg.fileUrl);
-                    contentHtml = `
-                        <div class="mt-1">
-                            <a href="${safeUrl}" target="_blank" class="admin-file-link">
-                                <i class="bi bi-file-earmark-arrow-down fs-5 me-2 text-primary"></i> 
-                                <div>
-                                    <div class="fw-bold">File Attachment</div>
-                                    <div class="x-small text-muted">Click to download</div>
-                                </div>
-                            </a>
-                        </div>`;
-                }
-
-                const html = `
-                <div class="admin-msg-row">
-                    <div class="admin-msg-meta">
-                        <span class="admin-sender-id"><i class="bi bi-person-badge"></i> ${msg.senderId}</span>
-                        <span>${timeStr}</span>
-                    </div>
-                    <div class="admin-msg-content text-dark">
-                        ${contentHtml}
-                    </div>
-                    <div class="mt-1">
-                        <span class="badge bg-light text-secondary border">Status: ${msg.status || 'sent'}</span>
-                    </div>
-                </div>`;
-                
-                container.insertAdjacentHTML('beforeend', html);
-            });
-            
-            // Scroll to bottom
-            container.scrollTop = container.scrollHeight;
-
-        } else {
-            container.innerHTML = `<div class="alert alert-danger">Failed to load messages: ${res.message}</div>`;
+        if (res.status !== 'success') {
+            container.innerHTML = `<div class="p-4"><div class="alert alert-danger mb-0">Failed to load messages: ${adminEscapeHtml(res.message || 'Unknown error')}</div></div>`;
+            return;
         }
+
+        const messages = Array.isArray(res.data) ? res.data : [];
+        metaEl.textContent = `${messages.length} message${messages.length === 1 ? '' : 's'}`;
+
+        if (!messages.length) {
+            container.innerHTML = '<div class="admin-chat-empty-state"><i class="bi bi-chat-square-text fs-2 mb-2"></i><div>No messages in this conversation.</div></div>';
+            return;
+        }
+
+        renderAdminChatTranscript(container, messages, convId);
     } catch (e) {
         console.error(e);
-        container.innerHTML = `<div class="alert alert-danger">Error connecting to server.</div>`;
+        container.innerHTML = '<div class="p-4"><div class="alert alert-danger mb-0">Error connecting to server.</div></div>';
     }
 }
 
 async function adminDeleteChat(convId) {
     let isConfirmed = false;
-    // 1. CONFIRMATION STEP
     if (typeof window.showMessageModal === 'function') {
-        // Use Custom Modal
         const result = await window.showMessageModal({
             title: 'Delete Conversation',
             icon: 'warning',
@@ -274,52 +456,44 @@ async function adminDeleteChat(convId) {
         });
         if (result === 'Delete') isConfirmed = true;
     } else {
-        // Fallback to browser alert
         isConfirmed = confirm("⚠️ ADMIN ACTION: Are you sure?\n\nThis will permanently delete the conversation history and ALL attached files for all participants.");
     }
 
     if (!isConfirmed) return;
 
-    // 2. EXECUTE DELETION
+    const deleteButtons = document.querySelectorAll(`tr[data-conversation-id="${CSS.escape(String(convId))}"] .delete-btn`);
+    deleteButtons.forEach((button) => { button.disabled = true; });
+
     try {
-        const resp = await fetch(`/chat/delete/${convId}`, { method: 'DELETE' });
+        const resp = await fetch(`/chat/delete/${encodeURIComponent(convId)}`, { method: 'DELETE' });
         const res = await resp.json();
 
         if (res.status === 'success') {
-            // SUCCESS NOTIFICATION
+            removeConversationRowFromTable(convId);
             if (typeof window.showMessageModal === 'function') {
                 await window.showMessageModal({
-                    title: 'Success',
+                    title: 'Deleted',
                     icon: 'success',
                     message: 'Conversation and files deleted successfully.',
                     buttons: [{ text: 'OK', class: 'btn-success' }]
                 });
-            } else {
-                alert("Conversation deleted successfully.");
             }
-            window.location.reload();
+            return;
+        }
+
+        deleteButtons.forEach((button) => { button.disabled = false; });
+        const errMsg = `Failed: ${res.message || 'Unable to delete conversation.'}`;
+        if (typeof window.showMessageModal === 'function') {
+            await window.showMessageModal({ title: 'Error', icon: 'error', message: errMsg });
         } else {
-            // ERROR NOTIFICATION
-            const errMsg = "Failed: " + res.message;
-            if (typeof window.showMessageModal === 'function') {
-                await window.showMessageModal({
-                    title: 'Error',
-                    icon: 'error',
-                    message: errMsg
-                });
-            } else {
-                alert(errMsg);
-            }
+            alert(errMsg);
         }
     } catch (e) {
         console.error(e);
-        const errMsg = "Error connecting to server.";
+        deleteButtons.forEach((button) => { button.disabled = false; });
+        const errMsg = 'Error connecting to server.';
         if (typeof window.showMessageModal === 'function') {
-            await window.showMessageModal({
-                title: 'Connection Error',
-                icon: 'error',
-                message: errMsg
-            });
+            await window.showMessageModal({ title: 'Connection Error', icon: 'error', message: errMsg });
         } else {
             alert(errMsg);
         }

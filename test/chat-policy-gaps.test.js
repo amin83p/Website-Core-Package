@@ -59,6 +59,8 @@ test('conversation management view/delete buttons follow review and delete flags
   assert.match(historyAndDelete, /onclick="adminViewChat\(/);
   assert.match(historyAndDelete, /onclick="adminDeleteChat\(/);
   assert.match(historyAndDelete, /getAdminAttachmentUrl/);
+  assert.match(historyAndDelete, /removeConversationRowFromTable/);
+  assert.doesNotMatch(historyAndDelete, /window\.location\.reload\(\)/);
 });
 
 test('deriveAccessFlags exposes CREATE-only, READ-only, and READ_ALL flows', () => {

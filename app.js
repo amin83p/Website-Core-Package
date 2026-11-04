@@ -267,10 +267,27 @@ function resolveAppUiSettings() {
     ? Math.max(0, Math.min(2000, rawPickerDelay))
     : 400;
   const searchDefaultKeyword = String(appSettings.searchDefaultKeyword || 'aaa').trim() || 'aaa';
+  const chatBackgroundPollIntervalSeconds = parseClampedIntegerFromSettings(
+    appSettings.chatBackgroundPollIntervalSeconds,
+    60,
+    15,
+    600
+  );
+  const chatBackgroundPollIntervalMs = chatBackgroundPollIntervalSeconds * 1000;
+  const chatRealtimeWhenModalClosed = isEnabledFlag(appSettings.chatRealtimeWhenModalClosed);
   return {
     genericPickerSearchDebounceMs,
-    searchDefaultKeyword
+    searchDefaultKeyword,
+    chatBackgroundPollIntervalSeconds,
+    chatBackgroundPollIntervalMs,
+    chatRealtimeWhenModalClosed
   };
+}
+
+function parseClampedIntegerFromSettings(value, fallback, min, max) {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
 }
 
 function isEnabledFlag(value) {

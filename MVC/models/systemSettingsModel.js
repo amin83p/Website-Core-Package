@@ -125,6 +125,8 @@ const DEFAULTS = {
     defaultPageSize: 30,
     searchDefaultKeyword: 'aaa',
     genericPickerSearchDebounceMs: 400,
+    chatBackgroundPollIntervalSeconds: 60,
+    chatRealtimeWhenModalClosed: false,
     requestCacheTtlSeconds: 900,
     requestCacheMaxEntries: 500,
     buildVersionOverride: '',

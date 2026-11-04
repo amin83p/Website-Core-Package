@@ -42,7 +42,7 @@
     })();
   </script>
   <script>
-    window.__APP_UI_SETTINGS__ = <%- JSON.stringify((typeof appUiSettings !== 'undefined' && appUiSettings) ? appUiSettings : { genericPickerSearchDebounceMs: 400 }) %>;
+    window.__APP_UI_SETTINGS__ = <%- JSON.stringify((typeof appUiSettings !== 'undefined' && appUiSettings) ? appUiSettings : { genericPickerSearchDebounceMs: 400, chatBackgroundPollIntervalSeconds: 60, chatBackgroundPollIntervalMs: 60000, chatRealtimeWhenModalClosed: false }) %>;
   </script>
 
   <link rel="icon" type="<%= layoutBrowserTabIconType %>" href="<%= layoutBrowserTabIconUrl %>">

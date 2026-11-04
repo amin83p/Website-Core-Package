@@ -105,6 +105,11 @@
           </button>
         </li>
         <li class="nav-item" role="presentation">
+          <button class="nav-link fw-semibold" id="app-chat-tab" data-bs-toggle="tab" data-bs-target="#app-chat-pane" type="button" role="tab" aria-controls="app-chat-pane" aria-selected="false">
+            <i class="bi bi-chat-dots me-1"></i> Chat
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
           <button class="nav-link fw-semibold" id="app-integration-vars-tab" data-bs-toggle="tab" data-bs-target="#app-integration-vars-pane" type="button" role="tab" aria-controls="app-integration-vars-pane" aria-selected="false">
             <i class="bi bi-key me-1"></i> Integration Variables
           </button>
@@ -695,6 +700,30 @@
                 </div>
             </div>
 
+        </div>
+      </div>
+        </div>
+
+        <div class="tab-pane fade" id="app-chat-pane" role="tabpanel" aria-labelledby="app-chat-tab" tabindex="0">
+      <div class="card mb-4 shadow-sm border-0">
+        <div class="card-header bg-white border-0 pb-0">
+          <h5 class="fw-bold mb-1"><i class="bi bi-chat-dots text-primary me-2"></i>Chat (client transport)</h5>
+          <p class="text-muted small mb-0">Controls how the chat modal stays in sync with the server when open or closed.</p>
+        </div>
+        <div class="card-body p-4">
+            <div class="mb-4">
+                <label class="form-label fw-bold">Background inbox poll interval (modal closed)</label>
+                <div class="input-group mb-2">
+                    <input type="number" name="chatBackgroundPollIntervalSeconds" class="form-control" value="<%= settings.app.chatBackgroundPollIntervalSeconds ?? 60 %>" min="15" max="600" step="15">
+                    <span class="input-group-text text-muted">seconds</span>
+                </div>
+                <div class="form-text mb-3">When the chat modal is closed and realtime is off, the inbox refreshes over HTTP at this interval. Ignored while the modal is open (Socket.IO is used instead).</div>
+                <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="chatRealtimeWhenModalClosed" name="chatRealtimeWhenModalClosed" value="true" <%= settings.app.chatRealtimeWhenModalClosed === true ? 'checked' : '' %>>
+                    <label class="form-check-label fw-bold" for="chatRealtimeWhenModalClosed">Keep realtime chat updates when modal is closed</label>
+                </div>
+                <div class="form-text">When enabled, Socket.IO stays connected in the background and the poll interval is not used.</div>
+            </div>
         </div>
       </div>
         </div>

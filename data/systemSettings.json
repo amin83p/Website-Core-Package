@@ -25,6 +25,8 @@
     "defaultPageSize": 50,
     "searchDefaultKeyword": "aaa",
     "genericPickerSearchDebounceMs": 400,
+    "chatBackgroundPollIntervalSeconds": 60,
+    "chatRealtimeWhenModalClosed": false,
     "requestCacheTtlSeconds": 900,
     "requestCacheMaxEntries": 500,
     "buildVersionOverride": "",
@@ -316,9 +318,9 @@
     "rollingWorkflowPilotOrgIds": "",
     "rollingWorkflowPilotProgramIds": ""
   },
-  "logArchive": {},
   "audit": {
     "lastUpdateUser": "ROOT_001",
-    "lastUpdateDateTime": "2026-11-02T20:53:36.831Z"
-  }
+    "lastUpdateDateTime": "2026-11-04T22:27:44.532Z"
+  },
+  "logArchive": {}
 }
