@@ -74,6 +74,8 @@ function requireAnyOfAccess(pairs) {
         });
         if (evaluation?.allowed) {
           granted = evaluation;
+          req.accessGrantSectionId = sectionId;
+          req.accessGrantOperationId = operationId;
           break;
         }
       }
@@ -767,8 +769,15 @@ router.post('/:id/sessions/:sessionId/save',
   trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, sessionManagerMutationActionState),
   classCtrl.saveSession);
 router.post('/:id/sessions/:sessionId/conduct',
-  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, sessionManagerMutationActionState),
+  requireAnyOfAccess([
+    { sectionId: SECTIONS.SCHOOL_SESSIONS, operationId: OPERATIONS.UPDATE },
+    { sectionId: SECTIONS.SCHOOL_CLASS_CONDUCT_MATRIX, operationId: OPERATIONS.UPDATE }
+  ]),
+  (req, res, next) => trackActionState(
+    req.accessGrantSectionId || SECTIONS.SCHOOL_SESSIONS,
+    req.accessGrantOperationId || OPERATIONS.UPDATE,
+    sessionManagerMutationActionState
+  )(req, res, next),
   classCtrl.saveSessionConduct);
 
 module.exports = router;

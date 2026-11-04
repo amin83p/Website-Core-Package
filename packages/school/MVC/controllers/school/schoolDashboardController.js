@@ -34,6 +34,7 @@ const DASHBOARD_ACCESS_RULES = Object.freeze([
     { pattern: /^\/school\/sessions(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_SESSIONS },
     { pattern: /^\/school\/attendances(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_ATTENDANCES },
     { pattern: /^\/school\/grades-matrix(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_GRADEBOOK },
+    { pattern: /^\/school\/conduct-matrix(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_CLASS_CONDUCT_MATRIX },
     { pattern: /^\/school\/leave-requests(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_LEAVE_REQUESTS },
     { pattern: /^\/school\/tasks(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_TASKS },
     { pattern: /^\/school\/notification-center(?:\/|$)/i, sectionId: SECTIONS.SCHOOL_NOTIFICATION_CENTER },
@@ -373,6 +374,16 @@ async function showDashboard(req, res) {
                 icon: 'bi-journal-bookmark-fill',
                 subtleClass: 'bg-success-subtle text-success',
                 buttonClass: 'btn btn-success'
+            },
+            {
+                priority: 176,
+                title: 'Class Conduct Matrix',
+                description: 'View and enter class conduct across sessions for a class.',
+                href: '/school/conduct-matrix',
+                buttonLabel: 'Open conduct matrix',
+                icon: 'bi-emoji-smile',
+                subtleClass: 'bg-primary-subtle text-primary',
+                buttonClass: 'btn btn-primary'
             },
             {
                 priority: 180,

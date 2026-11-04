@@ -193,6 +193,11 @@ router.get('/',
   trackActionState(REPORT_NAV_SECTION, OPERATIONS.READ_ALL),
   ctrl.showHome);
 
+router.use('/conduct-matrix', (req, res) => {
+  const suffix = req.url && req.url !== '/' ? req.url : '';
+  res.redirect(301, `/school/conduct-matrix${suffix}`);
+});
+
 router.get('/semi-monthly',
   requireAccess(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ),
   trackActionState(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ, { keepActive: true }),

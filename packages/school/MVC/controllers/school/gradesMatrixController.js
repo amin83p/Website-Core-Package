@@ -811,6 +811,7 @@ module.exports = {
   getGradesMatrixData,
   postGradesRollups,
   postSaveActivityWeights,
+  loadGradesMatrixSharedContext,
   buildGradesMatrixPayload,
   annotateMatrixColumnsForClient,
   collectColumns,

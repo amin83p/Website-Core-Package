@@ -4737,7 +4737,8 @@ async function manageSession(req, res) {
         );
         const reportConductPersonIds = sessionConductService.resolveSessionReportConductPersonIds({
             assignments: sessionMatchedAssignments,
-            sessionContext
+            sessionContext,
+            sessionRoster: session.roster
         });
         const reportConductRoster = sessionConductService.buildReportConductRoster({
             personIds: reportConductPersonIds,
@@ -4745,6 +4746,9 @@ async function manageSession(req, res) {
             prefetchedStudents: rosterIdentityData.students,
             prefetchedPersons: rosterIdentityData.persons
         });
+        // #region agent log
+        fetch('http://127.0.0.1:7429/ingest/4a4b23d1-b3e8-4c87-b6c0-e036ac2782ab',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2e9ee4'},body:JSON.stringify({sessionId:'2e9ee4',hypothesisId:'A',location:'classController.js:manageSession',message:'report conduct ui inputs',data:{classId,sessionId,sessionHasConductRequiredReports,matchedAssignmentCount:sessionMatchedAssignments.length,reportScopeSamples:sessionMatchedAssignments.map((a)=>String(a?.reportScope||'class')).slice(0,5),reportConductPersonIdCount:reportConductPersonIds.length,reportConductRosterCount:reportConductRoster.length,conductReadyForReports:session?.conductReadyForReports===true,rosterRatedCount:(session?.roster||[]).filter((r)=>sessionConductService.rosterRowHasRatedConduct(r)).length},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         const conductPrefillByPersonId = Object.fromEntries(
             sessionConductService.buildConductPrefillMap({
                 roster: reportConductRoster,
@@ -7237,6 +7241,9 @@ async function postOfficialFinalGradesWorkflow(req, res) {
 async function saveSessionConduct(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
+        // #region agent log
+        fetch('http://127.0.0.1:7429/ingest/4a4b23d1-b3e8-4c87-b6c0-e036ac2782ab',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2e9ee4'},body:JSON.stringify({sessionId:'2e9ee4',runId:'post-fix-v3',hypothesisId:'H',location:'classController.js:saveSessionConduct:entry',message:'conduct save entered',data:{classId,sessionId,grantSection:req.accessGrantSectionId||''},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         const sessionDate = resolveSessionDateFromRequest(req);
         const { classData, sessions, persistAccessContext } = await loadSessionManageScope(classId, req, {
             sessionId,
@@ -7248,7 +7255,27 @@ async function saveSessionConduct(req, res) {
         }
 
         const session = sessions[sessionIndex];
-        assertSessionScopeForRequest(req, classData, session, 'manageSession');
+        let canEditViaConductMatrix = false;
+        try {
+            const matrixEval = await accessService.evaluateAccess({
+                user: req.user,
+                sectionId: SECTIONS.SCHOOL_CLASS_CONDUCT_MATRIX,
+                operationId: OPERATIONS.UPDATE,
+                ipAddress: req.ip
+            });
+            canEditViaConductMatrix = matrixEval?.allowed === true;
+        } catch (_) {
+            canEditViaConductMatrix = false;
+        }
+        try {
+            assertSessionScopeForRequest(req, classData, session, 'manageSession');
+        } catch (scopeError) {
+            if (!canEditViaConductMatrix) throw scopeError;
+            schoolRecordAccessService.assertClassAccessible(
+                classData,
+                schoolRecordAccessService.resolveAccessFromRequest(req)
+            );
+        }
         await assertSessionManagerSessionWithinClassWindowOrThrow(classData, session, req.user);
 
         const isLocked = session.locked === true || String(session.locked) === 'true';
@@ -7271,7 +7298,7 @@ async function saveSessionConduct(req, res) {
         } catch (_accessError) {
             canEditSessionForConduct = false;
         }
-        if (!canOverride && !canEditSessionForConduct) {
+        if (!canOverride && !canEditSessionForConduct && !canEditViaConductMatrix) {
             return res.status(403).json({ status: 'error', message: 'You do not have permission to manage class conduct for this session.' });
         }
         const isTimesheetApprovedLock = schoolDependencyService.isSessionTimesheetApprovedLock(session);
@@ -7305,6 +7332,10 @@ async function saveSessionConduct(req, res) {
             throw new Error('Conduct roster is required.');
         }
 
+        // #region agent log
+        fetch('http://127.0.0.1:7429/ingest/4a4b23d1-b3e8-4c87-b6c0-e036ac2782ab',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2e9ee4'},body:JSON.stringify({sessionId:'2e9ee4',runId:'post-fix-v2',hypothesisId:'H',location:'classController.js:saveSessionConduct',message:'conduct save attempt',data:{classId,sessionId,incomingCount:incomingRoster.length,ready:sessionConductService.parseConductReadyFlag(req.body?.ready,true)},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
+
         sessionConductService.applyConductRosterToSession(session, incomingRoster, {
             ready: sessionConductService.parseConductReadyFlag(req.body?.ready, true),
             userId: req.user?.id
@@ -7313,6 +7344,10 @@ async function saveSessionConduct(req, res) {
         await schoolDataService.saveClassSessions(classId, sessions, req.user, persistAccessContext);
 
         const ready = sessionConductService.isSessionConductReady(session);
+        const savedConductCount = (session?.roster || []).filter((row) => sessionConductService.rosterRowHasRatedConduct(row)).length;
+        // #region agent log
+        fetch('http://127.0.0.1:7429/ingest/4a4b23d1-b3e8-4c87-b6c0-e036ac2782ab',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2e9ee4'},body:JSON.stringify({sessionId:'2e9ee4',runId:'post-fix-v3',hypothesisId:'H',location:'classController.js:saveSessionConduct:success',message:'conduct save persisted',data:{classId,sessionId,ready, savedConductCount,incomingCount:incomingRoster.length},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         return res.json({
             status: 'success',
             message: ready

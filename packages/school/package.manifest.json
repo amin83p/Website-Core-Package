@@ -205,6 +205,9 @@
           "id": "778769"
         },
         {
+          "id": "778772"
+        },
+        {
           "id": "778768"
         },
         {
@@ -1960,6 +1963,90 @@
       ],
       "subsections": [],
       "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "778772",
+      "name": "SCHOOL_CLASS_CONDUCT_MATRIX",
+      "category": "SCHOOL",
+      "description": "Class conduct matrix: view and enter session conduct ratings across students for a class.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/conduct-matrix",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1006",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1010",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1012",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1013",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1022",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [
+        {
+          "id": "358609"
+        }
+      ],
       "adoptExisting": true
     },
     {
@@ -4508,6 +4595,18 @@
       "adoptExisting": true
     },
     {
+      "id": "SYM_SYSTEM_137",
+      "name": "SCHOOL_CLASS_CONDUCT_MATRIX",
+      "type": "class",
+      "value": "bi bi-emoji-smile",
+      "tags": [
+        "SCHOOL_CLASS_CONDUCT_MATRIX",
+        "778772"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
       "id": "SYM_SYSTEM_036",
       "name": "SCHOOL_HOLIDAYS",
       "type": "class",
@@ -6178,6 +6277,19 @@
           ]
         },
         {
+          "sectionId": "778772",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
           "sectionId": "332227",
           "adminAccess": false,
           "operations": [
@@ -7725,6 +7837,19 @@
           ]
         },
         {
+          "sectionId": "778772",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
           "sectionId": "332227",
           "adminAccess": false,
           "operations": [
@@ -9241,6 +9366,19 @@
         },
         {
           "sectionId": "778769",
+          "adminAccess": false,
+          "operations": [
+            {
+              "operationId": "OP1003",
+              "scopeId": "SCP_OWNER",
+              "maxAttemptsPerSession": null,
+              "maxSessionDurationMinutes": null,
+              "maxFetchUploadVolumeKB": null
+            }
+          ]
+        },
+        {
+          "sectionId": "778772",
           "adminAccess": false,
           "operations": [
             {

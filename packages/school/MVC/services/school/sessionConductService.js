@@ -260,16 +260,19 @@ function targetRowMatchesSessionContext(row = {}, sessionContext = {}) {
 }
 
 /**
- * Union of report-selected student person IDs for session-scoped assignments that require conduct.
- * Uses per-row targetStudentIds only (not session/class roster).
- * @param {{ assignments?: Iterable<object>|Map, sessionContext?: { sessionId?: string, sessionDate?: string, classId?: string } }} args
+ * Union of person IDs that need report-gated class conduct on a session.
+ * Uses targetStudentIds when present; otherwise falls back to the session roster for
+ * class-scope assignments and each_student rows with no explicit targets.
+ * @param {{ assignments?: Iterable<object>|Map, sessionContext?: object, sessionRoster?: object[] }} args
  * @returns {string[]}
  */
 function resolveSessionReportConductPersonIds({
   assignments = [],
-  sessionContext = {}
+  sessionContext = {},
+  sessionRoster = []
 } = {}) {
   const union = new Set();
+  const rosterPersonIds = reportRosterService.resolveSessionRosterPersonIds(sessionRoster);
   const list = assignments instanceof Map
     ? Array.from(assignments.values())
     : (Array.isArray(assignments) ? assignments : []);
@@ -277,7 +280,6 @@ function resolveSessionReportConductPersonIds({
   list.forEach((assignment) => {
     if (!reportAssignmentSessionUtils.reportAssignmentMatchesSession(assignment, sessionContext)) return;
     const scope = reportAssignmentSessionUtils.inferAssignmentReportScope(assignment);
-    if (scope !== 'each_student' && scope !== 'selected_students') return;
 
     const activeRows = reportAssignmentSessionUtils.getEffectiveTargetRows(assignment)
       .filter((row) => String(row?.status || 'active').trim().toLowerCase() === 'active')
@@ -285,8 +287,17 @@ function resolveSessionReportConductPersonIds({
 
     activeRows.forEach((targetRow) => {
       if (!assignmentRequiresConductBeforeFill(assignment, { assignmentRowId: targetRow?.rowId })) return;
-      reportRosterService.resolveConfiguredTargetStudentIds(assignment, targetRow)
-        .forEach((id) => union.add(id));
+      if (scope === 'class') {
+        rosterPersonIds.forEach((id) => union.add(id));
+        return;
+      }
+      if (scope !== 'each_student' && scope !== 'selected_students') return;
+
+      const configured = reportRosterService.resolveConfiguredTargetStudentIds(assignment, targetRow);
+      configured.forEach((id) => union.add(id));
+      if (!configured.length) {
+        rosterPersonIds.forEach((id) => union.add(id));
+      }
     });
   });
 
@@ -319,11 +330,28 @@ function buildReportConductRoster({
     const pid = personKey(row?.id || row?.personId);
     if (pid) personsByPerson.set(pid, row);
   });
+  const studentsByRecordId = new Map();
+  (Array.isArray(prefetchedStudents) ? prefetchedStudents : []).forEach((row) => {
+    const recordId = personKey(row?.id);
+    if (recordId) studentsByRecordId.set(recordId, row);
+  });
+
+  function resolveConductPersonId(rawId) {
+    const token = personKey(rawId);
+    if (!token) return '';
+    if (sessionRosterByPerson.has(token)) return token;
+    if (studentsByPerson.has(token)) return token;
+    const student = studentsByRecordId.get(token);
+    const fromRecord = personKey(student?.personId);
+    if (fromRecord && sessionRosterByPerson.has(fromRecord)) return fromRecord;
+    if (fromRecord) return fromRecord;
+    return token;
+  }
 
   const seen = new Set();
   const result = [];
   (Array.isArray(personIds) ? personIds : []).forEach((rawId) => {
-    const pid = personKey(rawId);
+    const pid = resolveConductPersonId(rawId);
     if (!pid || seen.has(pid)) return;
     seen.add(pid);
     const rosterRow = sessionRosterByPerson.get(pid);
@@ -605,7 +633,8 @@ function buildSessionReportConductUiPayload({
   const sessionConductReportPeriod = resolveReportPeriodForSession(assignmentMap, sessionContext);
   const reportConductPersonIds = resolveSessionReportConductPersonIds({
     assignments: sessionMatchedAssignments,
-    sessionContext
+    sessionContext,
+    sessionRoster
   });
   const reportConductRoster = buildReportConductRoster({
     personIds: reportConductPersonIds,

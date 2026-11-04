@@ -61,6 +61,34 @@ test('resolveSessionReportConductPersonIds unions students across matching rows'
   assert.deepEqual(personIds.sort(), ['STU-1', 'STU-2', 'STU-3']);
 });
 
+test('resolveSessionReportConductPersonIds includes session roster for class scope when conduct required', () => {
+  const personIds = sessionConductService.resolveSessionReportConductPersonIds({
+    assignments: [buildAssignment({ reportScope: 'class' })],
+    sessionContext: { classId: 'CLS-1', sessionId: 'SES-1', sessionDate: '2026-09-15' },
+    sessionRoster: [{ personId: 'P1' }, { personId: 'P2' }]
+  });
+  assert.deepEqual(personIds.sort(), ['P1', 'P2']);
+});
+
+test('resolveSessionReportConductPersonIds falls back to session roster for each_student without targetStudentIds', () => {
+  const personIds = sessionConductService.resolveSessionReportConductPersonIds({
+    assignments: [buildAssignment({
+      targetRows: [{
+        rowId: 'row-1',
+        targetType: 'session',
+        sessionId: 'SES-1',
+        sessionDate: '2026-09-15',
+        status: 'active',
+        conductRequiredBeforeFill: true,
+        targetStudentIds: []
+      }]
+    })],
+    sessionContext: { classId: 'CLS-1', sessionId: 'SES-1', sessionDate: '2026-09-15' },
+    sessionRoster: [{ personId: 'P1' }, { personId: 'P2' }]
+  });
+  assert.deepEqual(personIds.sort(), ['P1', 'P2']);
+});
+
 test('resolveSessionReportConductPersonIds skips class scope assignments', () => {
   const personIds = sessionConductService.resolveSessionReportConductPersonIds({
     assignments: [buildAssignment({ reportScope: 'class' })],

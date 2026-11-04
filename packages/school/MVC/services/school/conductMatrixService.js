@@ -1,0 +1,209 @@
+'use strict';
+
+const { requireCoreModule } = require('./schoolCoreContracts');
+const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
+const sessionConductService = require('./sessionConductService');
+const conductRatingScaleService = require('./conductRatingScaleService');
+const schoolDataService = require('./schoolDataService');
+
+const CONDUCT_DIMENSIONS = Object.freeze([
+  { key: 'classEffortPercent', label: 'Effort' },
+  { key: 'classParticipationPercent', label: 'Participation' },
+  { key: 'respectsTeachersPercent', label: 'Respects teachers' },
+  { key: 'respectsStudentsPercent', label: 'Respects students' }
+]);
+
+function personKey(value) {
+  return String(toPublicId(value) || value || '').trim();
+}
+
+function resolveSessionConductRequired(assignments, session, classId) {
+  const sessionContext = {
+    classId: String(classId || '').trim(),
+    sessionId: String(session?.sessionId || session?.id || '').trim(),
+    sessionDate: String(session?.date || '').trim()
+  };
+  const sessionMatchedAssignments = (Array.isArray(assignments) ? assignments : []).filter((assignment) => (
+    reportAssignmentSessionUtils.reportAssignmentMatchesSession(assignment, sessionContext)
+  ));
+  return sessionConductService.resolveSessionHasConductRequiredReports({
+    instanceRows: [],
+    sessionMatchedAssignments,
+    sessionContext
+  });
+}
+
+function rosterRowForPerson(session, personId) {
+  const pid = personKey(personId);
+  if (!pid) return null;
+  const roster = Array.isArray(session?.roster) ? session.roster : [];
+  return roster.find((row) => personKey(row?.personId) === pid) || null;
+}
+
+function personOnSessionRoster(session, personId) {
+  return Boolean(rosterRowForPerson(session, personId));
+}
+
+function buildCellFromRosterRow(rosterRow, conductPolicy) {
+  if (!rosterRow || !sessionConductService.rosterRowHasRatedConduct(rosterRow)) {
+    return null;
+  }
+  const percents = sessionConductService.extractConductPercents(rosterRow);
+  const levels = {};
+  const labels = {};
+  CONDUCT_DIMENSIONS.forEach(({ key }) => {
+    const pct = percents[key];
+    const level = conductRatingScaleService.percentToLevel(pct, conductPolicy);
+    levels[key] = level?.code || 'NA';
+    labels[key] = level?.displayCode || level?.code || '—';
+  });
+  const summary = CONDUCT_DIMENSIONS.map(({ key }) => labels[key] || '—').join('/');
+  return {
+    percents,
+    levels,
+    labels,
+    summary,
+    conductSavedAt: rosterRow.conductSavedAt || null
+  };
+}
+
+/**
+ * @param {import('express').Request} req
+ * @param {{ classId: string, startDate?: string, endDate?: string }} query
+ * @param {object} matrixContext from loadGradesMatrixSharedContext
+ * @param {object} conductPolicy resolved conduct rating scale policy
+ */
+async function buildConductMatrixPayload(req, query, matrixContext, conductPolicy) {
+  const classId = String(query?.classId || '').trim();
+  const {
+    classData,
+    filteredSessions,
+    studentList,
+    getApplicabilityForSession,
+    isRollingClass
+  } = matrixContext;
+
+  const assignments = await schoolDataService.fetchAllData('reportAssignments', {}, req.user);
+
+  // #region agent log
+  fetch('http://127.0.0.1:7429/ingest/4a4b23d1-b3e8-4c87-b6c0-e036ac2782ab',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2e9ee4'},body:JSON.stringify({sessionId:'2e9ee4',hypothesisId:'C',location:'conductMatrixService.js:buildConductMatrixPayload',message:'assignments loaded',data:{classId,assignmentCount:Array.isArray(assignments)?assignments.length:0,filteredSessionCount:filteredSessions.length},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+
+  const conductRequiredBySessionId = new Map();
+  const reportConductTargetsBySessionId = new Map();
+
+  const sessions = filteredSessions.map((session) => {
+    const sessionId = String(session?.sessionId || session?.id || '').trim();
+    const sessionContext = {
+      classId: String(classId || '').trim(),
+      sessionId,
+      sessionDate: String(session?.date || '').trim()
+    };
+    const conductRequiredForReports = resolveSessionConductRequired(assignments, session, classId);
+    conductRequiredBySessionId.set(sessionId, conductRequiredForReports);
+    const sessionMatchedAssignments = (Array.isArray(assignments) ? assignments : []).filter((assignment) => (
+      reportAssignmentSessionUtils.reportAssignmentMatchesSession(assignment, sessionContext)
+    ));
+    const reportConductPersonIds = sessionConductService.resolveSessionReportConductPersonIds({
+      assignments: sessionMatchedAssignments,
+      sessionContext,
+      sessionRoster: session?.roster
+    });
+    reportConductTargetsBySessionId.set(sessionId, new Set(reportConductPersonIds.map(personKey).filter(Boolean)));
+    // #region agent log
+    if (conductRequiredForReports || sessionMatchedAssignments.length) {
+      fetch('http://127.0.0.1:7429/ingest/4a4b23d1-b3e8-4c87-b6c0-e036ac2782ab',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2e9ee4'},body:JSON.stringify({sessionId:'2e9ee4',runId:'post-fix-v2',hypothesisId:'F,G',location:'conductMatrixService.js:sessionMap',message:'session conduct flags',data:{sessionId,sessionDate:session?.date,conductRequiredForReports,matchedAssignmentCount:sessionMatchedAssignments.length,matchedScopes:sessionMatchedAssignments.map((a)=>String(a?.reportScope||'class')).slice(0,5),reportConductPersonIdCount:reportConductPersonIds.length,conductReady:sessionConductService.isSessionConductReady(session),rosterWithConduct:(session?.roster||[]).filter((r)=>sessionConductService.rosterRowHasRatedConduct(r)).length,rosterSize:(session?.roster||[]).length},timestamp:Date.now()})}).catch(()=>{});
+    }
+    // #endregion
+    return {
+      sessionId,
+      date: String(session?.date || '').trim(),
+      startTime: String(session?.startTime || '').trim(),
+      endTime: String(session?.endTime || '').trim(),
+      label: [session?.date, session?.startTime].filter(Boolean).join(' '),
+      conductRequiredForReports,
+      conductReadyForReports: sessionConductService.isSessionConductReady(session),
+      manageSessionHref: classId && sessionId
+        ? `/school/classes/${encodeURIComponent(classId)}/sessions/${encodeURIComponent(sessionId)}`
+        : ''
+    };
+  });
+
+  const cells = {};
+  studentList.forEach((stu) => {
+    const pid = personKey(stu.personId);
+    if (!pid) return;
+    cells[pid] = {};
+    filteredSessions.forEach((session) => {
+      const sessionId = String(session?.sessionId || session?.id || '').trim();
+      if (!sessionId) return;
+      const conductRequiredForReports = conductRequiredBySessionId.get(sessionId) === true;
+      const reportTargets = reportConductTargetsBySessionId.get(sessionId) || new Set();
+      const reportGatedStudent = conductRequiredForReports && reportTargets.has(pid);
+      if (isRollingClass) {
+        const applicability = getApplicabilityForSession(stu, session);
+        if (!applicability?.expected && !reportGatedStudent) {
+          cells[pid][sessionId] = { onRoster: false, value: null };
+          return;
+        }
+      }
+      let onRoster = personOnSessionRoster(session, pid);
+      if (!onRoster && reportGatedStudent) onRoster = true;
+      if (!onRoster) {
+        cells[pid][sessionId] = { onRoster: false, value: null };
+        return;
+      }
+      const rosterRow = rosterRowForPerson(session, pid);
+      const value = buildCellFromRosterRow(rosterRow, conductPolicy);
+      cells[pid][sessionId] = { onRoster: true, value };
+    });
+  });
+
+  let cellsWithValue = 0;
+  let cellsOnRoster = 0;
+  let cellsReportGated = 0;
+  Object.values(cells).forEach((bySession) => {
+    Object.values(bySession || {}).forEach((cell) => {
+      if (cell?.onRoster) cellsOnRoster += 1;
+      if (cell?.value?.summary) cellsWithValue += 1;
+    });
+  });
+  studentList.forEach((stu) => {
+    const pid = personKey(stu.personId);
+    if (!pid) return;
+    filteredSessions.forEach((session) => {
+      const sessionId = String(session?.sessionId || session?.id || '').trim();
+      if (!sessionId || conductRequiredBySessionId.get(sessionId) !== true) return;
+      const reportTargets = reportConductTargetsBySessionId.get(sessionId) || new Set();
+      if (reportTargets.has(pid) && cells[pid]?.[sessionId]?.onRoster) cellsReportGated += 1;
+    });
+  });
+  const requiredSessionCount = sessions.filter((s) => s.conductRequiredForReports).length;
+  // #region agent log
+  fetch('http://127.0.0.1:7429/ingest/4a4b23d1-b3e8-4c87-b6c0-e036ac2782ab',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2e9ee4'},body:JSON.stringify({sessionId:'2e9ee4',runId:'post-fix-v2',hypothesisId:'D,F',location:'conductMatrixService.js:payloadSummary',message:'matrix payload summary',data:{classId,requiredSessionCount,sessionCount:sessions.length,cellsOnRoster,cellsWithValue,cellsReportGated,studentCount:studentList.length,isRollingClass:Boolean(isRollingClass)},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+
+  return {
+    class: {
+      id: classData?.id || classId,
+      title: String(classData?.title || classId).trim()
+    },
+    sessions,
+    students: studentList.map((row) => ({
+      personId: row.personId,
+      name: row.name,
+      studentRecordId: row.studentRecordId || ''
+    })),
+    cells,
+    dimensions: CONDUCT_DIMENSIONS.map(({ key, label }) => ({ key, label })),
+    conductPolicy: conductRatingScaleService.resolvePolicy(conductPolicy)
+  };
+}
+
+module.exports = {
+  CONDUCT_DIMENSIONS,
+  buildConductMatrixPayload,
+  buildCellFromRosterRow,
+  resolveSessionConductRequired
+};
