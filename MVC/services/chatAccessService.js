@@ -2,6 +2,7 @@ const accessService = require('./security/index');
 const adminAuthorityService = require('./adminAuthorityService');
 const chatContactScopeService = require('./chatContactScopeService');
 const chatOperationPolicyService = require('./chatOperationPolicyService');
+const chatPolicyService = require('./chatPolicyService');
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 const { idsEqual, toPublicId } = require('../utils/idAdapter');
 
@@ -115,6 +116,16 @@ async function canUseChatOperation(user, operationIds, ipAddress) {
 async function buildChatAccess(user, ipAddress) {
   if (!user) return { ...EMPTY_CHAT_ACCESS };
 
+  const policyResolved = chatPolicyService.resolveForUser(user?.id);
+  const chatPolicy = chatPolicyService.buildClientPolicyPayload(policyResolved);
+  if (policyResolved.deactivated) {
+    return {
+      ...EMPTY_CHAT_ACCESS,
+      chatPolicy,
+      policyReason: policyResolved.reason || 'Chat has been deactivated for your account.'
+    };
+  }
+
   const [
     read,
     readAll,
@@ -166,7 +177,7 @@ async function buildChatAccess(user, ipAddress) {
     download: downloadPolicy.adminBypass === true
   };
 
-  return chatOperationPolicyService.deriveAccessFlags({
+  const access = chatOperationPolicyService.deriveAccessFlags({
     read: { ...read, allowed: readPolicy.allowed, scopeId: readPolicy.scopeId || read.scopeId },
     readAll: { ...readAll, allowed: readAllPolicy.allowed, scopeId: readAllPolicy.scopeId || readAll.scopeId },
     create: { ...create, allowed: createPolicy.allowed, scopeId: createPolicy.scopeId || create.scopeId },
@@ -181,6 +192,29 @@ async function buildChatAccess(user, ipAddress) {
     broadcast: { ...broadcast, allowed: broadcastPolicy.allowed, scopeId: broadcastPolicy.scopeId || broadcast.scopeId },
     download: { ...download, allowed: downloadPolicy.allowed, scopeId: downloadPolicy.scopeId || download.scopeId }
   }, adminFlags);
+
+  if (policyResolved.banned) {
+    access.canUpdate = false;
+    access.canBroadcast = false;
+  }
+
+  const policyMaxKb = chatPolicyService.mergeEffectiveMaxFileSizeKb(
+    policyResolved,
+    access.updateLimits?.maxFileSizeKB
+  );
+  if (policyMaxKb != null) {
+    const current = access.updateLimits?.maxFileSizeKB;
+    access.updateLimits = {
+      ...(access.updateLimits || {}),
+      maxFileSizeKB: current == null ? policyMaxKb : Math.min(current, policyMaxKb)
+    };
+  }
+
+  access.chatPolicy = chatPolicy;
+  if (policyResolved.banned) {
+    access.policyReason = policyResolved.reason;
+  }
+  return access;
 }
 
 function conversationHasParticipant(conversation, userId) {
@@ -246,6 +280,14 @@ async function canAccessConversation({
   allowGlobalAdmin = false,
   requireMessageContent = false
 } = {}) {
+  const policyResolved = chatPolicyService.resolveForUser(user?.id);
+  if (policyResolved.deactivated) {
+    return {
+      allowed: false,
+      reason: policyResolved.reason || 'Chat has been deactivated for your account.'
+    };
+  }
+
   const normalizedOps = normalizeOperations(operationIds);
   const wantsMessageContent = requireMessageContent || normalizedOps.includes(OPERATIONS.READ_ALL);
 
@@ -257,6 +299,16 @@ async function canAccessConversation({
 
   const operationResult = await canUseChatOperation(user, effectiveOps, ipAddress);
   if (!operationResult.allowed) return operationResult;
+
+  const wantsUpdate = normalizedOps.includes(OPERATIONS.UPDATE)
+    || effectiveOps.includes(OPERATIONS.UPDATE);
+  if (policyResolved.banned && wantsUpdate) {
+    return {
+      allowed: false,
+      operationId: OPERATIONS.UPDATE,
+      reason: policyResolved.reason || 'Your account is restricted from sending chat messages.'
+    };
+  }
 
   const isParticipant = conversationHasParticipant(conversation, user?.id);
 

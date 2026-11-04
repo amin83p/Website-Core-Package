@@ -23,6 +23,8 @@ test('app settings renders chat transport controls', () => {
   assert.match(view, /id="app-chat-pane"/);
   assert.match(view, /name="chatBackgroundPollIntervalSeconds"/);
   assert.match(view, /name="chatRealtimeWhenModalClosed"/);
+  assert.match(view, /name="chatAttachmentsEnabled"/);
+  assert.match(view, /name="chatPolicySpecialUsersJson"/);
   assert.match(view, /min="15"/);
   assert.match(view, /max="600"/);
 });
@@ -52,4 +54,6 @@ test('chat modal implements transport policy and attachment ack flow', () => {
   assert.match(modal, /applyMessageSentAck/);
   assert.match(modal, /temp_img_/);
   assert.match(modal, /hidden\.bs\.modal/);
+  assert.match(modal, /id="chatConversationStorageWarning"/);
+  assert.match(modal, /renderUserStorageWarning/);
 });

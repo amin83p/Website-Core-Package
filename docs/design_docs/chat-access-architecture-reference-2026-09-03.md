@@ -93,6 +93,23 @@ Configured under **System Settings → App Defaults → Chat** tab (`settings.ap
 
 While the chat modal is **open**, the client uses Socket.IO only (no background poll). Values are exposed to the browser as `appUiSettings` / `window.__APP_UI_SETTINGS__` and applied in `MVC/views/partials/chatModal.ejs`.
 
+### Chat policy (`settings.app.chatPolicy`)
+
+Also configured under **System Settings → App Defaults → Chat** (attachments & storage cards). Persisted as `settings.app.chatPolicy` and enforced server-side via `MVC/services/chatPolicyService.js`.
+
+| Field | Default | Behavior |
+| --- | --- | --- |
+| `attachmentsEnabled` | true | Global toggle for file uploads. When false, upload middleware and client hide/disable the attachment control. |
+| `maxFileSizeKb` | null | Optional global cap; combined with access-profile UPDATE `maxFileSizeKB` using the **minimum** non-null value. |
+| `allowedExtensions` / `blockedExtensions` | empty | Extension allow-list (empty = built-in set) minus blocked suffixes. MIME types must match the built-in map unless `exemptFromFileRules` on a special user. |
+| `maxConversationSizeMb` / `maxUserTotalSizeMb` | null | Storage quotas (message JSON + attachment bytes). |
+| `storageWarnPercent` | 85 | When usage ≥ this % of a cap, APIs return `storageWarning` with `warn: true` (banner only). At ≥100%, `blockAttachments: true` (text messages still allowed). |
+| `specialUsers[]` | `[]` | Per-user `deactivated` (no chat), `banned` (read-only), or `custom` overrides; optional `exemptFromStorageLimits` / `exemptFromFileRules`. |
+
+**Enforcement order (attachments):** deactivated/banned → attachments disabled → extension/MIME → effective max file size → storage cap (`assertAttachmentAllowedAtStorageCap`) → access-profile UPDATE limits / pending attachment consume on send.
+
+**Client:** `buildChatAccess` attaches `chatPolicy` on `res.locals.chatAccess`. Inbox/history JSON includes `storageWarning` for `#chatUserStorageWarning` and `#chatConversationStorageWarning` in `chatModal.ejs`.
+
 Outbound attachment sends must include a client **`tempId`**; the server **`message_sent_ack`** maps the optimistic row to the persisted message id (required for delete and correct attachment URLs).
 
 ---

@@ -4,32 +4,11 @@ const fs = require('fs');
 const coreFilesService = require('../services/coreFilesService');
 const chatRepository = require('../repositories/chatRepository');
 const chatAccessService = require('../services/chatAccessService');
+const chatPolicyService = require('../services/chatPolicyService');
 const { OPERATIONS } = require('../../config/accessConstants');
 
-const ALLOWED_EXTENSIONS = new Set([
-  '.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic',
-  '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.txt', '.csv', '.rtf',
-  '.zip', '.rar', '.7z', '.tar', '.gz'
-]);
-
-const ALLOWED_MIME_TYPES = new Set([
-  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic',
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.ms-powerpoint',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'text/plain',
-  'text/csv',
-  'application/rtf',
-  'application/zip',
-  'application/x-rar-compressed',
-  'application/x-7z-compressed',
-  'application/x-tar',
-  'application/gzip'
-]);
+const ALLOWED_EXTENSIONS = new Set(chatPolicyService.DEFAULT_BUILTIN_EXTENSIONS);
+const ALLOWED_MIME_TYPES = new Set(chatPolicyService.DEFAULT_BUILTIN_MIME_TYPES);
 
 function createHttpError(message, statusCode = 400) {
   const error = new Error(message);
@@ -48,6 +27,10 @@ const memoryUploader = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: coreFilesService.getMaxUploadFileMb() * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
+    const global = chatPolicyService.getGlobalPolicy();
+    if (global.attachmentsEnabled === false) {
+      return cb(createHttpError('File attachments are disabled by chat policy.'));
+    }
     const ext = path.extname(file.originalname).toLowerCase();
     const mimeType = file.mimetype;
     if (ALLOWED_EXTENSIONS.has(ext) && ALLOWED_MIME_TYPES.has(mimeType)) {
@@ -77,6 +60,27 @@ async function authorizeAndPersistChatUpload(req, res, next) {
     });
     if (!access.allowed) {
       throw createHttpError(access.reason || 'You cannot upload attachments to this conversation.', 403);
+    }
+
+    const updateAccess = await chatAccessService.canUseChatOperation(req.user, OPERATIONS.UPDATE, req.ip);
+    const profileLimits = updateAccess?.limits || {};
+    const profileMaxFileSizeKB = Number.isFinite(Number(profileLimits.maxVolumeKB))
+      ? Math.floor(Number(profileLimits.maxVolumeKB))
+      : (Number.isFinite(Number(profileLimits.maxFileSizeKB))
+        ? Math.floor(Number(profileLimits.maxFileSizeKB))
+        : null);
+
+    for (const file of req.files) {
+      const validation = chatPolicyService.validateAttachmentFile({
+        user: req.user,
+        originalName: file.originalname,
+        mimeType: file.mimetype,
+        sizeBytes: file.size,
+        profileMaxFileSizeKB: profileMaxFileSizeKB
+      });
+      if (!validation.allowed) {
+        throw createHttpError(validation.reason || 'Attachment is not allowed.', 400);
+      }
     }
 
     const destination = coreFilesService.resolveUploadDestination({

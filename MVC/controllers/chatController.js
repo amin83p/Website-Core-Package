@@ -10,6 +10,7 @@ const chatBroadcastService = require('../services/chatBroadcastService');
 const chatAttachmentAccessService = require('../services/chatAttachmentAccessService');
 const chatPendingAttachmentService = require('../services/chatPendingAttachmentService');
 const chatReviewAuditService = require('../services/chatReviewAuditService');
+const chatPolicyService = require('../services/chatPolicyService');
 const socketService = require('../services/socketService');
 const coreFilesService = require('../services/coreFilesService');
 const fs = require('fs');
@@ -189,6 +190,15 @@ async function assertUpdateWithinLimits(req, conversation, { pendingCount = 1, f
     if (!updateAccess.allowed) {
         throw createHttpError(updateAccess.reason || 'You cannot update this conversation.', 403);
     }
+    if (Number(fileSizeBytes) > 0) {
+        const storageCap = await chatPolicyService.assertAttachmentAllowedAtStorageCap({
+            userId: req.user?.id,
+            convId: conversation?.id
+        });
+        if (!storageCap.allowed) {
+            throw createHttpError(storageCap.reason || 'Chat storage limit reached.', 403);
+        }
+    }
     const limitCheck = await chatOperationPolicyService.assertUpdateWithinLimits({
         user: req.user,
         conversation,
@@ -309,14 +319,7 @@ exports.listAllChats = async (req, res) => {
                 return u ? (u.name || u.username) : 'Unknown';
             }).join(', ');
 
-            let totalBytes = 0;
-            
-            // A. JSON Msg File Size (Data Model Path)
-            const msgFile = path.join(__dirname, '../../data/messages/', `${c.id}.json`);
-            if (fs.existsSync(msgFile)) totalBytes += fs.statSync(msgFile).size;
-
-            // B. Attachment storage under /uploads/ (remote volume or local disk)
-            totalBytes += await getChatAttachmentBytes(c.id);
+            let totalBytes = await chatPolicyService.getConversationStorageBytes(c.id);
 
             return {
                 id: c.id,
@@ -548,7 +551,13 @@ exports.getInbox = async (req, res) => {
             (sum, conversation) => sum + normalizeUnreadCount(conversation?.unreadCount),
             0
         );
-        res.json({ status: 'success', data: enriched, totalUnread });
+        const storageStatus = await chatPolicyService.buildStorageStatus({ userId: req.user.id });
+        res.json({
+            status: 'success',
+            data: enriched,
+            totalUnread,
+            storageWarning: storageStatus.user
+        });
     } catch (err) {
         res.status(500).json({ status: 'error', message: err.message });
     }
@@ -610,7 +619,11 @@ exports.getHistory = async (req, res) => {
                 reason: writeAccess?.allowed
                     ? ''
                     : (writeAccess?.reason || 'This conversation is read-only.')
-            }
+            },
+            storageWarning: (await chatPolicyService.buildStorageStatus({
+                userId: req.user.id,
+                convId
+            })).conversation
         });
     } catch (err) {
         res.status(err.statusCode || 500).json({ status: 'error', message: err.message });

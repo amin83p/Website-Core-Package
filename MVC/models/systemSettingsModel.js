@@ -99,6 +99,17 @@ const DEFAULT_APP_PUBLIC_MENU = {
 
 const PACKAGE_SETTINGS_DEFAULTS = packageSettingsDefaultsService.getPackageSettingsDefaults();
 
+const DEFAULT_CHAT_POLICY = Object.freeze({
+  attachmentsEnabled: true,
+  maxFileSizeKb: null,
+  allowedExtensions: '',
+  blockedExtensions: '',
+  maxConversationSizeMb: null,
+  maxUserTotalSizeMb: null,
+  storageWarnPercent: 85,
+  specialUsers: []
+});
+
 // Updated Defaults mapping to constants.js structure
 const DEFAULTS = {
   newsletter: {
@@ -127,6 +138,7 @@ const DEFAULTS = {
     genericPickerSearchDebounceMs: 400,
     chatBackgroundPollIntervalSeconds: 60,
     chatRealtimeWhenModalClosed: false,
+    chatPolicy: { ...DEFAULT_CHAT_POLICY },
     requestCacheTtlSeconds: 900,
     requestCacheMaxEntries: 500,
     buildVersionOverride: '',
@@ -240,7 +252,14 @@ function mergeAppSettings(base = {}, incoming = {}) {
     ),
     integrationVariables: Array.isArray(incomingApp.integrationVariables)
       ? incomingApp.integrationVariables
-      : (Array.isArray(baseApp.integrationVariables) ? baseApp.integrationVariables : [])
+      : (Array.isArray(baseApp.integrationVariables) ? baseApp.integrationVariables : []),
+    chatPolicy: (() => {
+      const chatPolicyService = require('../services/chatPolicyService');
+      return chatPolicyService.normalizePolicyFromStored({
+        ...(baseApp.chatPolicy || DEFAULT_CHAT_POLICY),
+        ...(incomingApp.chatPolicy || {})
+      });
+    })()
   };
 }
 

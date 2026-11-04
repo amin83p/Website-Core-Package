@@ -705,6 +705,7 @@
         </div>
 
         <div class="tab-pane fade" id="app-chat-pane" role="tabpanel" aria-labelledby="app-chat-tab" tabindex="0">
+      <% const chatPolicyForm = (typeof chatPolicyDisplay !== 'undefined' && chatPolicyDisplay) ? chatPolicyDisplay : (settings.app.chatPolicy || {}); %>
       <div class="card mb-4 shadow-sm border-0">
         <div class="card-header bg-white border-0 pb-0">
           <h5 class="fw-bold mb-1"><i class="bi bi-chat-dots text-primary me-2"></i>Chat (client transport)</h5>
@@ -724,6 +725,80 @@
                 </div>
                 <div class="form-text">When enabled, Socket.IO stays connected in the background and the poll interval is not used.</div>
             </div>
+        </div>
+      </div>
+
+      <div class="card mb-4 shadow-sm border-0">
+        <div class="card-header bg-white border-0 pb-0">
+          <h5 class="fw-bold mb-1"><i class="bi bi-paperclip text-primary me-2"></i>Chat attachments &amp; storage</h5>
+          <p class="text-muted small mb-0">Global defaults for file uploads and storage warnings. Access-profile UPDATE limits still apply (strictest file size wins).</p>
+        </div>
+        <div class="card-body p-4">
+          <div class="form-check form-switch mb-3">
+            <input class="form-check-input" type="checkbox" role="switch" id="chatAttachmentsEnabled" name="chatAttachmentsEnabled" value="true" <%= chatPolicyForm.attachmentsEnabled !== false ? 'checked' : '' %>>
+            <label class="form-check-label fw-bold" for="chatAttachmentsEnabled">Allow file attachments</label>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-4">
+              <label class="form-label fw-bold" for="chatMaxFileSizeKb">Maximum file size (KB)</label>
+              <input type="number" class="form-control" id="chatMaxFileSizeKb" name="chatMaxFileSizeKb" min="0" step="1" placeholder="No global cap" value="<%= chatPolicyForm.maxFileSizeKb != null ? chatPolicyForm.maxFileSizeKb : '' %>">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold" for="chatMaxConversationSizeMb">Max conversation size (MB)</label>
+              <input type="number" class="form-control" id="chatMaxConversationSizeMb" name="chatMaxConversationSizeMb" min="0" step="1" placeholder="No cap" value="<%= chatPolicyForm.maxConversationSizeMb != null ? chatPolicyForm.maxConversationSizeMb : '' %>">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold" for="chatMaxUserTotalSizeMb">Max user total size (MB)</label>
+              <input type="number" class="form-control" id="chatMaxUserTotalSizeMb" name="chatMaxUserTotalSizeMb" min="0" step="1" placeholder="No cap" value="<%= chatPolicyForm.maxUserTotalSizeMb != null ? chatPolicyForm.maxUserTotalSizeMb : '' %>">
+            </div>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-bold" for="chatAllowedExtensions">Allowed extensions</label>
+              <input type="text" class="form-control font-monospace" id="chatAllowedExtensions" name="chatAllowedExtensions" placeholder="Empty = built-in list (.pdf, .jpg, …)" value="<%= String(chatPolicyForm.allowedExtensions || '') %>">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold" for="chatBlockedExtensions">Blocked extensions</label>
+              <input type="text" class="form-control font-monospace" id="chatBlockedExtensions" name="chatBlockedExtensions" placeholder=".exe, .bat" value="<%= String(chatPolicyForm.blockedExtensions || '') %>">
+            </div>
+          </div>
+          <div class="mb-0">
+            <label class="form-label fw-bold" for="chatStorageWarnPercent">Storage warning threshold (%)</label>
+            <input type="number" class="form-control" style="max-width: 8rem;" id="chatStorageWarnPercent" name="chatStorageWarnPercent" min="50" max="99" step="1" value="<%= chatPolicyForm.storageWarnPercent ?? 85 %>">
+            <div class="form-text">Show a banner when usage reaches this percentage of a cap. At 100%, attachments are blocked but text messages still send.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card mb-4 shadow-sm border-0">
+        <div class="card-header bg-white border-0 pb-0 d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <div>
+            <h5 class="fw-bold mb-1"><i class="bi bi-person-gear text-primary me-2"></i>Special chat users</h5>
+            <p class="text-muted small mb-0">Per-user overrides: deactivate chat, ban sending, or custom limits and exemptions.</p>
+          </div>
+          <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddChatSpecialUser"><i class="bi bi-plus-circle me-1"></i>Add user</button>
+        </div>
+        <div class="card-body p-4">
+          <input type="hidden" name="chatPolicySpecialUsersJson" id="chatPolicySpecialUsersJson" value="">
+          <div class="table-responsive">
+            <table class="table table-sm align-middle" id="chatSpecialUsersTable">
+              <thead class="table-light">
+                <tr>
+                  <th>User</th>
+                  <th>Mode</th>
+                  <th>Exempt storage</th>
+                  <th>Exempt file rules</th>
+                  <th>Attachments</th>
+                  <th>Max KB</th>
+                  <th>Conv. MB</th>
+                  <th>User MB</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="chatSpecialUsersTbody"></tbody>
+            </table>
+          </div>
+          <div class="form-text">Custom mode enables override columns. Deactivated removes all chat access; banned is read-only.</div>
         </div>
       </div>
         </div>
@@ -804,7 +879,161 @@
 </style>
 
 <script>
+<% const chatSpecialUsersForScript = (typeof chatPolicyDisplay !== 'undefined' && Array.isArray(chatPolicyDisplay.specialUsers)) ? chatPolicyDisplay.specialUsers : []; %>
+const initialChatSpecialUsers = <%- JSON.stringify(chatSpecialUsersForScript).replace(/</g, '\\u003c') %>;
+
 document.addEventListener('DOMContentLoaded', () => {
+  let chatSpecialUsers = Array.isArray(initialChatSpecialUsers)
+    ? initialChatSpecialUsers.map((row) => ({ ...row }))
+    : [];
+  const chatSpecialUsersTbody = document.getElementById('chatSpecialUsersTbody');
+  const chatPolicySpecialUsersJsonInput = document.getElementById('chatPolicySpecialUsersJson');
+
+  function escapeChatPolicyHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function syncChatSpecialUsersJson() {
+    if (!chatPolicySpecialUsersJsonInput) return;
+    chatPolicySpecialUsersJsonInput.value = JSON.stringify(chatSpecialUsers);
+  }
+
+  function openChatSpecialUserPicker(onSelect) {
+    if (!window.GenericPicker || !window.GenericPickerPresets?.user) {
+      alert('User picker is not available on this page.');
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.user({
+      title: 'Select chat user',
+      icon: 'bi-person-gear',
+      placeholder: 'Search users...',
+      onSelect: (item) => {
+        if (!item?.id) return;
+        onSelect(item);
+      }
+    }));
+  }
+
+  function renderChatSpecialUsers() {
+    if (!chatSpecialUsersTbody) return;
+    chatSpecialUsersTbody.innerHTML = '';
+    if (!chatSpecialUsers.length) {
+      chatSpecialUsersTbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted small">No special users configured.</td></tr>';
+      syncChatSpecialUsersJson();
+      return;
+    }
+    chatSpecialUsers.forEach((row, idx) => {
+      const isCustom = row.mode === 'custom';
+      const label = row.label || row.userId || '(pick user)';
+      const attachmentsVal = row.attachmentsEnabled === true
+        ? 'true'
+        : (row.attachmentsEnabled === false ? 'false' : '');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>
+          <div class="fw-semibold small">${escapeChatPolicyHtml(label)}</div>
+          <div class="text-muted font-monospace" style="font-size:0.7rem">${escapeChatPolicyHtml(row.userId || '—')}</div>
+          <button type="button" class="btn btn-link btn-sm p-0 chat-special-pick-user" data-idx="${idx}">Change user</button>
+        </td>
+        <td>
+          <select class="form-select form-select-sm chat-special-mode" data-idx="${idx}">
+            <option value="deactivated"${row.mode === 'deactivated' ? ' selected' : ''}>Deactivated</option>
+            <option value="banned"${row.mode === 'banned' ? ' selected' : ''}>Banned</option>
+            <option value="custom"${row.mode === 'custom' ? ' selected' : ''}>Custom</option>
+          </select>
+        </td>
+        <td class="text-center"><input type="checkbox" class="form-check-input chat-special-field" data-idx="${idx}" data-field="exemptFromStorageLimits"${row.exemptFromStorageLimits ? ' checked' : ''}></td>
+        <td class="text-center"><input type="checkbox" class="form-check-input chat-special-field" data-idx="${idx}" data-field="exemptFromFileRules"${row.exemptFromFileRules ? ' checked' : ''}></td>
+        <td>
+          <select class="form-select form-select-sm chat-special-field" data-idx="${idx}" data-field="attachmentsEnabled"${isCustom ? '' : ' disabled'}>
+            <option value=""${attachmentsVal === '' ? ' selected' : ''}>Inherit</option>
+            <option value="true"${attachmentsVal === 'true' ? ' selected' : ''}>Allow</option>
+            <option value="false"${attachmentsVal === 'false' ? ' selected' : ''}>Block</option>
+          </select>
+        </td>
+        <td><input type="number" min="0" step="1" class="form-control form-control-sm chat-special-field" data-idx="${idx}" data-field="maxFileSizeKb" value="${row.maxFileSizeKb != null ? row.maxFileSizeKb : ''}"${isCustom ? '' : ' disabled'}></td>
+        <td><input type="number" min="0" step="1" class="form-control form-control-sm chat-special-field" data-idx="${idx}" data-field="maxConversationSizeMb" value="${row.maxConversationSizeMb != null ? row.maxConversationSizeMb : ''}"${isCustom ? '' : ' disabled'}></td>
+        <td><input type="number" min="0" step="1" class="form-control form-control-sm chat-special-field" data-idx="${idx}" data-field="maxUserTotalSizeMb" value="${row.maxUserTotalSizeMb != null ? row.maxUserTotalSizeMb : ''}"${isCustom ? '' : ' disabled'}></td>
+        <td><button type="button" class="btn btn-sm btn-outline-danger chat-special-remove" data-idx="${idx}" title="Remove"><i class="bi bi-trash"></i></button></td>
+      `;
+      chatSpecialUsersTbody.appendChild(tr);
+    });
+    syncChatSpecialUsersJson();
+  }
+
+  document.getElementById('btnAddChatSpecialUser')?.addEventListener('click', () => {
+    openChatSpecialUserPicker((item) => {
+      if (chatSpecialUsers.some((row) => String(row.userId) === String(item.id))) {
+        alert('That user is already in the list.');
+        return;
+      }
+      chatSpecialUsers.push({
+        userId: item.id,
+        label: item.username || item.email || item.displayName || String(item.id),
+        mode: 'custom',
+        exemptFromStorageLimits: false,
+        exemptFromFileRules: false,
+        attachmentsEnabled: null,
+        maxFileSizeKb: null,
+        maxConversationSizeMb: null,
+        maxUserTotalSizeMb: null
+      });
+      renderChatSpecialUsers();
+    });
+  });
+
+  chatSpecialUsersTbody?.addEventListener('click', (event) => {
+    const pickBtn = event.target.closest('.chat-special-pick-user');
+    if (pickBtn) {
+      const idx = Number(pickBtn.dataset.idx);
+      openChatSpecialUserPicker((item) => {
+        if (chatSpecialUsers.some((row, i) => i !== idx && String(row.userId) === String(item.id))) {
+          alert('That user is already in the list.');
+          return;
+        }
+        chatSpecialUsers[idx].userId = item.id;
+        chatSpecialUsers[idx].label = item.username || item.email || item.displayName || String(item.id);
+        renderChatSpecialUsers();
+      });
+      return;
+    }
+    const removeBtn = event.target.closest('.chat-special-remove');
+    if (removeBtn) {
+      chatSpecialUsers.splice(Number(removeBtn.dataset.idx), 1);
+      renderChatSpecialUsers();
+    }
+  });
+
+  chatSpecialUsersTbody?.addEventListener('change', (event) => {
+    const modeSelect = event.target.closest('.chat-special-mode');
+    if (modeSelect) {
+      const idx = Number(modeSelect.dataset.idx);
+      if (Number.isInteger(idx) && chatSpecialUsers[idx]) {
+        chatSpecialUsers[idx].mode = modeSelect.value;
+        renderChatSpecialUsers();
+      }
+      return;
+    }
+    const field = event.target.closest('.chat-special-field');
+    if (!field) return;
+    const idx = Number(field.dataset.idx);
+    const key = field.dataset.field;
+    if (!Number.isInteger(idx) || !chatSpecialUsers[idx] || !key) return;
+    if (field.type === 'checkbox') {
+      chatSpecialUsers[idx][key] = field.checked;
+    } else if (key === 'attachmentsEnabled') {
+      chatSpecialUsers[idx][key] = field.value === '' ? null : field.value === 'true';
+    } else {
+      chatSpecialUsers[idx][key] = field.value === '' ? null : Number.parseInt(field.value, 10);
+    }
+    syncChatSpecialUsersJson();
+  });
+
+  renderChatSpecialUsers();
+
   const contactRowConfigs = {
     emails: {
       titleName: 'contactEmailTitle',
@@ -1362,6 +1591,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const submitBtn = form.querySelector('button[type="submit"]');
       if (submitBtn) { submitBtn.disabled = true; submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...'; }
       syncPublicMenuJson();
+      syncChatSpecialUsersJson();
 
       try {
         const response = await fetch(form.action, {

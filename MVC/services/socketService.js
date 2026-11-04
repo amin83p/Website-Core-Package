@@ -5,6 +5,7 @@ const authService = require('./authService');
 const chatAccessService = require('./chatAccessService');
 const chatOperationPolicyService = require('./chatOperationPolicyService');
 const chatPendingAttachmentService = require('./chatPendingAttachmentService');
+const chatPolicyService = require('./chatPolicyService');
 const sessionService = require('./SessionService');
 const { OPERATIONS } = require('../../config/accessConstants');
 
@@ -290,6 +291,16 @@ function init(server) {
                     messageType = attachment.type || messageType;
                 } else if (messageType !== 'text') {
                     return emitChatError(socket, 'Attachment messages require a server-issued upload reference.');
+                }
+
+                if (fileSizeBytes > 0) {
+                    const storageCap = await chatPolicyService.assertAttachmentAllowedAtStorageCap({
+                        userId: socket.userId,
+                        convId: data.convId
+                    });
+                    if (!storageCap.allowed) {
+                        return emitChatError(socket, storageCap.reason || 'Chat storage limit reached.');
+                    }
                 }
 
                 const pendingCount = 1;

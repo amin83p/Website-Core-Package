@@ -22,6 +22,7 @@ const jsonToMongoMigrationService = require('../services/migration/jsonToMongoMi
 const uploadFolderSettingsService = require('../services/uploadFolderSettingsService');
 const integrationVariableModel = require('../models/integrationVariableModel');
 const integrationVariableService = require('../services/integrationVariableService');
+const chatPolicyService = require('../services/chatPolicyService');
 const publicPageContentSettingsDataService = require('../services/publicPageContentSettingsDataService');
 const coreFilesService = require('../services/coreFilesService');
 const coreUploadRefService = require('../services/coreUploadRefService');
@@ -251,7 +252,8 @@ exports.showAppSettings = async (req, res) => {
       publicMenuEndpointOptions: appBrandingService.getPublicMenuEndpointOptions(),
       timezoneOptions: listCuratedTimezoneOptions(),
       defaultTimezone: resolveDefaultTimezone(),
-      integrationVariableRows: integrationVariableModel.listRowsForForm(settings?.app?.integrationVariables)
+      integrationVariableRows: integrationVariableModel.listRowsForForm(settings?.app?.integrationVariables),
+      chatPolicyDisplay: chatPolicyService.enrichPolicyForDisplay(settings?.app?.chatPolicy)
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
@@ -645,6 +647,7 @@ exports.updateAppSettings = async (req, res) => {
         genericPickerSearchDebounceMs: parseClampedInteger(req.body.genericPickerSearchDebounceMs, 400, 0, 2000),
         chatBackgroundPollIntervalSeconds: parseClampedInteger(req.body.chatBackgroundPollIntervalSeconds, 60, 15, 600),
         chatRealtimeWhenModalClosed: req.body.chatRealtimeWhenModalClosed === 'true',
+        chatPolicy: chatPolicyService.validatePolicyInput(chatPolicyService.normalizePolicyFromForm(req.body)),
         requestCacheTtlSeconds: parseInt(req.body.requestCacheTtlSeconds, 10),
         requestCacheMaxEntries: parseInt(req.body.requestCacheMaxEntries, 10),
         buildVersionOverride: cleanFormText(req.body.buildVersionOverride, 120),
