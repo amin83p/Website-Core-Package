@@ -135,17 +135,26 @@ async function buildConductMatrixPayload(req, query, matrixContext, conductPolic
       const sessionId = String(session?.sessionId || session?.id || '').trim();
       if (!sessionId) return;
       const conductRequiredForReports = conductRequiredBySessionId.get(sessionId) === true;
+      const conductReportStepEnabled = sessionConductService.parseConductReportStepEnabled(session);
+      const voluntaryConduct = conductReportStepEnabled && !conductRequiredForReports;
       const reportTargets = reportConductTargetsBySessionId.get(sessionId) || new Set();
       const reportGatedStudent = conductRequiredForReports && reportTargets.has(pid);
       if (isRollingClass) {
         const applicability = getApplicabilityForSession(stu, session);
-        if (!applicability?.expected && !reportGatedStudent) {
+        if (!applicability?.expected && !reportGatedStudent && !voluntaryConduct) {
           cells[pid][sessionId] = { onRoster: false, value: null };
           return;
         }
       }
       let onRoster = personOnSessionRoster(session, pid);
       if (!onRoster && reportGatedStudent) onRoster = true;
+      if (!onRoster && voluntaryConduct) {
+        if (isRollingClass) {
+          onRoster = getApplicabilityForSession(stu, session)?.expected === true;
+        } else {
+          onRoster = true;
+        }
+      }
       if (!onRoster) {
         cells[pid][sessionId] = { onRoster: false, value: null };
         return;

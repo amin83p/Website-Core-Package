@@ -1,0 +1,116 @@
+<%- include('partials/tablePages-start', {
+  title,
+  user,
+  tableName: 'Class_Conduct_Assignment_Wizard',
+  headerManageBtns: [
+    `<a href="/school/conduct-matrix" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Class Conduct Matrix</a>`
+  ]
+}) %>
+
+<style>
+  #ccaWizardGuide .wizard-step-rail { display: flex; gap: 0.5rem; flex-wrap: nowrap; overflow-x: auto; padding-bottom: 0.25rem; }
+  #ccaWizardGuide .wizard-step-pill {
+    flex: 0 0 auto; white-space: nowrap; border: 1px solid #c8d1dc; background: #f8fafc; color: #17324d;
+    font-weight: 600; font-size: 0.9rem; border-radius: 999px; padding: 0.35rem 0.8rem; pointer-events: none;
+  }
+  #ccaWizardGuide .wizard-step-pill.active { background: #17324d; color: #fff; border-color: #17324d; }
+  #ccaWizardGuide .wizard-step-pill.completed { background: #e8f5ee; border-color: #95d5b2; color: #1b6f4a; }
+  #ccaWizardGuide .wizard-progress { height: 0.35rem; background: #e8edf3; border-radius: 999px; overflow: hidden; }
+  #ccaWizardGuide .wizard-progress-bar { height: 100%; background: linear-gradient(90deg, #17324d 0%, #2f5d8a 100%); width: 0; transition: width 0.25s ease; }
+  .cca-wizard-controls { background: #f8fafc; border: 1px solid #d5dee8; border-radius: 0.75rem; padding: 0.75rem 1rem; }
+  #ccaClassTableWrap tr.cca-row-frozen { background-color: #fff8e6; }
+  #ccaClassTableWrap tr.cca-row-blocked td { opacity: 0.75; }
+</style>
+
+<div class="card border-0 shadow-sm mb-3" id="ccaWizardGuide">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
+      <div>
+        <div class="fw-bold text-primary">Class Conduct Assignment Wizard</div>
+        <div class="text-muted small">Enable or disable voluntary class conduct on matched sessions for selected programs.</div>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-light text-dark border" id="ccaWizardStepBadge">Step 1 of 4</span>
+        <span class="badge bg-primary-subtle text-primary border border-primary-subtle" id="ccaWizardProgressPct">25%</span>
+      </div>
+    </div>
+    <div class="wizard-progress mb-3"><div class="wizard-progress-bar" id="ccaWizardProgressBar" style="width: 25%"></div></div>
+    <div class="wizard-step-rail" id="ccaWizardStepPills">
+      <button type="button" class="wizard-step-pill active" data-cca-pill="scope">1. Programs</button>
+      <button type="button" class="wizard-step-pill" data-cca-pill="date">2. Date</button>
+      <button type="button" class="wizard-step-pill" data-cca-pill="classes">3. Classes</button>
+      <button type="button" class="wizard-step-pill" data-cca-pill="run">4. Summary</button>
+    </div>
+  </div>
+</div>
+
+<div class="card border-0 shadow-sm">
+  <div class="card-body">
+    <div data-cca-step="scope">
+      <div class="row g-3 align-items-end">
+        <div class="col-md-4">
+          <label class="form-label" for="ccaClassCapacityTarget">Class capacity</label>
+          <select class="form-select" id="ccaClassCapacityTarget">
+            <option value="all">All classes</option>
+            <option value="group">Group classes (max capacity more than 1)</option>
+            <option value="one_on_one">One-on-one (max capacity 1)</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="btn_ccaAddProgram">Programs</label>
+          <button type="button" class="btn btn-outline-primary w-100" id="btn_ccaAddProgram">Select programs</button>
+        </div>
+      </div>
+      <div class="table-responsive border rounded mt-3">
+        <table class="table table-sm align-middle mb-0">
+          <thead class="table-light"><tr><th>Program</th><th>Matching classes</th><th></th></tr></thead>
+          <tbody id="ccaProgramTbody"><tr><td colspan="3" class="text-muted">No programs added.</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="d-none" data-cca-step="date">
+      <p class="small text-muted">Choose the anchor date. Each class uses the nearest scheduled session on that date or up to three calendar days earlier.</p>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label" for="ccaAnchorDate">Anchor date</label>
+          <input type="date" class="form-control" id="ccaAnchorDate">
+        </div>
+      </div>
+    </div>
+
+    <div class="d-none" data-cca-step="classes">
+      <p class="small mb-2 text-muted" id="ccaPreviewMessage"></p>
+      <div class="d-flex flex-wrap gap-2 mb-2">
+        <button type="button" class="btn btn-sm btn-outline-primary" id="btn_ccaSelectSelectable">Select all eligible</button>
+        <button type="button" class="btn btn-sm btn-outline-secondary" id="btn_ccaDeselectAll">Deselect all</button>
+      </div>
+      <div class="table-responsive border rounded" id="ccaClassTableWrap">
+        <table class="table table-sm table-hover align-middle mb-0">
+          <thead class="table-light">
+            <tr>
+              <th style="width:2.5rem;"></th>
+              <th>Class</th>
+              <th>Session</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="ccaClassTbody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="d-none" data-cca-step="run">
+      <div id="ccaSummaryIntro" class="small text-muted mb-3"></div>
+      <div id="ccaResult" class="d-none"></div>
+    </div>
+
+    <div class="cca-wizard-controls d-flex justify-content-between align-items-center flex-wrap gap-2 mt-4">
+      <button type="button" class="btn btn-outline-secondary d-none" id="btn_ccaBack">Back</button>
+      <button type="button" class="btn btn-primary ms-auto" id="btn_ccaNext">Next<i class="bi bi-arrow-right ms-1"></i></button>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/tablePages-end') %>
+<script src="/scripts/classConductAssignmentWizard.js"></script>

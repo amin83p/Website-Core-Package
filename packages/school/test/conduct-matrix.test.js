@@ -30,6 +30,7 @@ test('conductMatrixRoutes uses SCHOOL_CLASS_CONDUCT_MATRIX access', () => {
   assert.match(src, /api\/session-visibility/);
   assert.match(src, /OPERATIONS\.UPDATE/);
   assert.match(src, /allowOperationTokenFallback/);
+  assert.match(src, /\/assignment-wizard\/preview/);
 });
 
 test('conductMatrixService exports buildConductMatrixPayload', () => {
@@ -100,9 +101,9 @@ test('sessionConductService exposes conduct report step helpers', () => {
   );
 });
 
-test('buildSessionReportConductUiPayload serves opt-in report conduct roster', () => {
+test('buildSessionReportConductUiPayload serves opt-in report conduct roster', async () => {
   const sessionConductService = require('../MVC/services/school/sessionConductService');
-  const payload = sessionConductService.buildSessionReportConductUiPayload({
+  const payload = await sessionConductService.buildSessionReportConductUiPayload({
     session: { sessionId: 's1', conductReportStepEnabled: true, roster: [{ personId: 'p1', name: 'Student A' }] },
     sessions: [{ sessionId: 's1', roster: [{ personId: 'p1', name: 'Student A' }] }],
     sessionRoster: [{ personId: 'p1', name: 'Student A' }],

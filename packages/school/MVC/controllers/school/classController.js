@@ -4747,7 +4747,12 @@ async function manageSession(req, res) {
             sessionRoster: session.roster
         });
         if (!sessionHasConductRequiredByAssignment && conductReportStepEnabled) {
-            reportConductPersonIds = reportRosterService.resolveSessionRosterPersonIds(session.roster);
+            reportConductPersonIds = await sessionConductService.resolveVoluntaryConductPersonIds({
+                reqUser: req.user,
+                classData,
+                classId,
+                session
+            });
         }
         const reportConductRoster = sessionConductService.buildReportConductRoster({
             personIds: reportConductPersonIds,
@@ -5019,14 +5024,16 @@ async function assignReportToSession(req, res) {
             sessionRoster: enrichedRoster
         });
 
-        const conduct = sessionConductService.buildSessionReportConductUiPayload({
+        const conduct = await sessionConductService.buildSessionReportConductUiPayload({
             session,
             sessions,
             sessionRoster: enrichedRoster,
             assignmentMap: viewerContext.assignmentMap,
             instanceRows: rows,
             sessionId,
-            classId
+            classId,
+            reqUser: req.user,
+            classData
         });
 
         return res.json({

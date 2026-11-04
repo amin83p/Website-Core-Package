@@ -3,6 +3,7 @@
 const { loadGradesMatrixSharedContext } = require('./gradesMatrixController');
 const conductMatrixService = require('../../services/school/conductMatrixService');
 const conductMatrixSessionVisibilityService = require('../../services/school/conductMatrixSessionVisibilityService');
+const classConductAssignmentWizardService = require('../../services/school/classConductAssignmentWizardService');
 const conductRatingScalePolicyModel = require('../../models/school/conductRatingScalePolicyModel');
 const schoolDataService = require('../../services/school/schoolDataService');
 const conductRatingScaleService = require('../../services/school/conductRatingScaleService');
@@ -112,8 +113,69 @@ async function postSessionConductVisibility(req, res) {
   }
 }
 
+async function showConductAssignmentWizard(req, res) {
+  try {
+    res.render('school/report/classConductAssignmentWizard', {
+      title: 'Class Conduct Assignment Wizard',
+      user: req.user,
+      actionStateId: req.actionStateId,
+      includeModal: true
+    });
+  } catch (error) {
+    res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+}
+
+async function postConductAssignmentProgramCount(req, res) {
+  try {
+    const data = await classConductAssignmentWizardService.countProgramClasses({
+      programId: req.body?.programId,
+      classCapacityTarget: req.body?.classCapacityTarget,
+      reqUser: req.user
+    });
+    return res.json({ status: 'success', data });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message || 'Unable to count classes.' });
+  }
+}
+
+async function postConductAssignmentPreview(req, res) {
+  try {
+    const programIds = Array.isArray(req.body?.programIds)
+      ? req.body.programIds
+      : String(req.body?.programIds || '').split(',').map((v) => v.trim()).filter(Boolean);
+    const data = await classConductAssignmentWizardService.previewRows({
+      programIds,
+      classCapacityTarget: req.body?.classCapacityTarget,
+      anchorDate: req.body?.anchorDate,
+      reqUser: req.user
+    });
+    return res.json({ status: 'success', data });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message || 'Unable to preview class sessions.' });
+  }
+}
+
+async function postConductAssignmentApply(req, res) {
+  try {
+    const selections = Array.isArray(req.body?.selections) ? req.body.selections : [];
+    const data = await classConductAssignmentWizardService.applySelections({
+      selections,
+      reqUser: req.user,
+      req
+    });
+    return res.json({ status: 'success', data });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message || 'Unable to apply class conduct assignments.' });
+  }
+}
+
 module.exports = {
   showConductMatrixPage,
   getConductMatrixData,
-  postSessionConductVisibility
+  postSessionConductVisibility,
+  showConductAssignmentWizard,
+  postConductAssignmentProgramCount,
+  postConductAssignmentPreview,
+  postConductAssignmentApply
 };

@@ -131,3 +131,60 @@ test('buildReportConductRoster enriches session roster rows missing display name
   assert.equal(roster[0].personId, '474361');
   assert.equal(roster[0].name, 'Jane Example');
 });
+
+test('resolveVoluntaryConductPersonIds falls back to session roster without reqUser', async () => {
+  const personIds = await sessionConductService.resolveVoluntaryConductPersonIds({
+    classId: 'CLS-1',
+    session: { date: '2026-09-15', roster: [{ personId: 'P1' }, { personId: 'P2' }] }
+  });
+  assert.deepEqual(personIds.sort(), ['P1', 'P2']);
+});
+
+test('resolveVoluntaryConductPersonIds prefers enrollment on session date', async (t) => {
+  const enrollment = require('../MVC/services/school/classEnrollmentReadService');
+  const original = enrollment.listPersonIdsOverlappingEnrollmentWindow;
+  enrollment.listPersonIdsOverlappingEnrollmentWindow = async () => ({
+    personIds: new Set(['ENROLLED-1', 'ENROLLED-2'])
+  });
+  t.after(() => {
+    enrollment.listPersonIdsOverlappingEnrollmentWindow = original;
+  });
+  const personIds = await sessionConductService.resolveVoluntaryConductPersonIds({
+    reqUser: { activeOrgId: 'ORG' },
+    classId: 'CLS-1',
+    classData: { id: 'CLS-1', orgId: 'ORG' },
+    session: { date: '2026-09-15', roster: [{ personId: 'ATTEND-ONLY' }] }
+  });
+  assert.deepEqual(personIds.sort(), ['ENROLLED-1', 'ENROLLED-2']);
+});
+
+test('buildSessionReportConductUiPayload uses enrollment for voluntary conduct', async (t) => {
+  const enrollment = require('../MVC/services/school/classEnrollmentReadService');
+  const original = enrollment.listPersonIdsOverlappingEnrollmentWindow;
+  enrollment.listPersonIdsOverlappingEnrollmentWindow = async () => ({
+    personIds: new Set(['ENROLLED-ONLY'])
+  });
+  t.after(() => {
+    enrollment.listPersonIdsOverlappingEnrollmentWindow = original;
+  });
+  const payload = await sessionConductService.buildSessionReportConductUiPayload({
+    session: {
+      sessionId: 'SES-1',
+      date: '2026-09-15',
+      conductReportStepEnabled: true,
+      roster: [{ personId: 'ATTEND-ONLY', name: 'Attendance Only' }]
+    },
+    sessions: [{ sessionId: 'SES-1', date: '2026-09-15', roster: [{ personId: 'ATTEND-ONLY', name: 'Attendance Only' }] }],
+    sessionRoster: [{ personId: 'ATTEND-ONLY', name: 'Attendance Only' }],
+    assignmentMap: [],
+    instanceRows: [],
+    sessionId: 'SES-1',
+    classId: 'CLS-1',
+    reqUser: { activeOrgId: 'ORG' },
+    classData: { id: 'CLS-1', orgId: 'ORG' },
+    prefetchedStudents: [{ id: 'REG-1', personId: 'ENROLLED-ONLY', name: 'Enrolled Student' }]
+  });
+  assert.equal(payload.conductRequiredByAssignment, false);
+  assert.equal(payload.reportConductRoster.length, 1);
+  assert.equal(payload.reportConductRoster[0].personId, 'ENROLLED-ONLY');
+});

@@ -8,6 +8,7 @@ const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const reportRosterService = require('./reportRosterService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
+const classEnrollmentReadService = require('./classEnrollmentReadService');
 
 const CONDUCT_PERCENT_KEYS = Object.freeze([
   'classEffortPercent',
@@ -302,6 +303,38 @@ function resolveSessionReportConductPersonIds({
   });
 
   return [...union];
+}
+
+/**
+ * Person IDs for voluntary class conduct (enrollment valid on the session date).
+ */
+async function resolveVoluntaryConductPersonIds({
+  reqUser = null,
+  classData = null,
+  classId = '',
+  session = null,
+  studentToPersonMap = null
+} = {}) {
+  const cleanClassId = String(classId || classData?.id || '').trim();
+  const sessionDay = parseDateOnly(session?.date);
+  if (!cleanClassId || !sessionDay || !reqUser) {
+    return reportRosterService.resolveSessionRosterPersonIds(session?.roster);
+  }
+  const overlap = await classEnrollmentReadService.listPersonIdsOverlappingEnrollmentWindow({
+    classId: cleanClassId,
+    classItem: classData,
+    reqUser,
+    activeOrgId: String(classData?.orgId || reqUser?.activeOrgId || '').trim(),
+    sessionDates: [sessionDay],
+    startDate: sessionDay,
+    endDate: sessionDay,
+    canonicalStatuses: classEnrollmentReadService.getReportRosterStatusesForClass(classData),
+    studentToPersonMap: studentToPersonMap instanceof Map ? studentToPersonMap : new Map()
+  });
+  const enrolled = overlap?.personIds instanceof Set ? [...overlap.personIds] : [];
+  const normalized = enrolled.map(personKey).filter(Boolean);
+  if (normalized.length) return normalized;
+  return reportRosterService.resolveSessionRosterPersonIds(session?.roster);
 }
 
 /**
@@ -605,7 +638,7 @@ function resolveSessionHasConductRequiredReports({
  * @param {object} args
  * @returns {{ sessionHasConductRequiredReports: boolean, conductReadyForReports: boolean, reportConductRoster: object[] }}
  */
-function buildSessionReportConductUiPayload({
+async function buildSessionReportConductUiPayload({
   session = null,
   sessions = [],
   sessionRoster = [],
@@ -614,7 +647,10 @@ function buildSessionReportConductUiPayload({
   sessionId = '',
   classId = '',
   prefetchedStudents = [],
-  prefetchedPersons = []
+  prefetchedPersons = [],
+  reqUser = null,
+  classData = null,
+  studentToPersonMap = null
 } = {}) {
   const sessionContext = {
     classId: String(classId || '').trim(),
@@ -657,7 +693,13 @@ function buildSessionReportConductUiPayload({
     sessionRoster
   });
   if (!conductRequiredByAssignment && conductReportStepEnabled) {
-    reportConductPersonIds = reportRosterService.resolveSessionRosterPersonIds(sessionRoster);
+    reportConductPersonIds = await resolveVoluntaryConductPersonIds({
+      reqUser,
+      classData,
+      classId: sessionContext.classId,
+      session,
+      studentToPersonMap
+    });
   }
   const reportConductRoster = buildReportConductRoster({
     personIds: reportConductPersonIds,
@@ -718,6 +760,7 @@ module.exports = {
   resolveReportPeriodForSession,
   targetRowMatchesSessionContext,
   resolveSessionReportConductPersonIds,
+  resolveVoluntaryConductPersonIds,
   buildReportConductRoster,
   resolveConductPrefillForStudent,
   buildConductPrefillMap,
