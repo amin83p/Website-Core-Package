@@ -1,0 +1,307 @@
+<style>
+  .ccr-matrix-wrapper { max-height: 520px; overflow: auto; border: 1px solid #dee2e6; border-radius: 12px; }
+  .ccr-matrix-table th {
+    position: sticky; top: 0; background-color: #f8f9fa; z-index: 2;
+    font-size: 0.72rem; white-space: nowrap;
+  }
+  .ccr-matrix-table th.ccr-sticky-rollup,
+  .ccr-matrix-table td.ccr-sticky-rollup {
+    position: sticky; left: 0; z-index: 3; border-right: 1px solid #dee2e6;
+    background-color: #f8f9fa; width: 96px; min-width: 96px; max-width: 96px; vertical-align: middle;
+  }
+  .ccr-matrix-table td.ccr-sticky-rollup { background-color: #fff; z-index: 2; }
+  .ccr-matrix-table th.ccr-sticky-class,
+  .ccr-matrix-table td.ccr-sticky-class {
+    position: sticky; left: 96px; z-index: 3; background-color: #f8f9fa;
+    min-width: 180px; max-width: 220px; border-right: 2px solid #dee2e6;
+    box-shadow: 2px 0 2px -1px rgba(0, 0, 0, 0.06);
+  }
+  .ccr-matrix-table td.ccr-sticky-class { background-color: #fff; z-index: 1; }
+  #ccrResultsContainer.ccr-week-separators-on .ccr-matrix-table th.ccr-week-boundary,
+  #ccrResultsContainer.ccr-week-separators-on .ccr-matrix-table td.ccr-week-boundary {
+    border-left: 2px solid #6c757d;
+  }
+  .ccr-summary-chip { font-size: 0.82rem; }
+  .ccr-selected-students-menu {
+    min-width: 320px;
+    max-width: min(420px, 100vw - 24px);
+    max-height: min(360px, calc(100vh - 120px));
+    overflow-y: auto;
+  }
+  .ccr-selected-student-row,
+  .sar-selected-student-row {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    background: #fff;
+    padding: 0.35rem 0.5rem;
+    margin-bottom: 0.35rem;
+  }
+  .ccr-selected-student-row:last-child,
+  .sar-selected-student-row:last-child { margin-bottom: 0; }
+  .ccr-collapse-chevron { transition: transform 0.2s ease; font-size: 0.9rem; }
+  .ccr-collapse-toggle[aria-expanded="true"] .ccr-collapse-chevron { transform: rotate(180deg); }
+  .schedule-shell .filter-panel {
+    background: linear-gradient(145deg, #edf5ff 0%, #f8fbff 100%);
+    border: 1px solid #dce9ff; border-radius: 14px;
+  }
+  .schedule-shell .range-chip.active { box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.15); }
+  .schedule-shell .report-filter-main-row {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+  @media (max-width: 991.98px) {
+    .schedule-shell .report-filter-main-row {
+      flex-wrap: wrap;
+    }
+  }
+  .schedule-shell .report-filter-field {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .schedule-shell .report-filter-field-students {
+    flex: 1 1 0;
+    min-width: min(100%, 260px);
+  }
+  .schedule-shell .report-filter-field-date {
+    flex: 0 0 11.5rem;
+    max-width: 100%;
+  }
+  .schedule-shell .report-filter-field-actions {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+  .schedule-shell .report-filter-main-row .form-label,
+  .schedule-shell .report-filter-label-rail {
+    margin-bottom: 0.35rem;
+    min-height: 1.25rem;
+    line-height: 1.25rem;
+  }
+  .schedule-shell .report-filter-label-rail {
+    visibility: hidden;
+    user-select: none;
+  }
+  .schedule-shell .report-filter-control {
+    display: flex;
+    align-items: center;
+    min-height: 2.375rem;
+  }
+  .schedule-shell .report-filter-field-date .report-filter-control {
+    display: block;
+  }
+  .schedule-shell .report-filter-field-date .form-control {
+    width: 100%;
+  }
+  .schedule-shell .report-filter-student-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: center;
+  }
+  .schedule-shell .report-filter-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.5rem;
+    align-items: center;
+    white-space: nowrap;
+  }
+  .cm-dim-chip {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 1.65rem; padding: 0.06rem 0.22rem; border-radius: 0.25rem;
+    background: #e9ecef; font-weight: 700; font-size: 0.65rem; line-height: 1.2;
+  }
+  .cm-dim-chip-empty { background: transparent; color: #ced4da; font-weight: 400; }
+  .cm-dim-chip.cm-code-s { background-color: #198754; color: #fff; border: 1px solid #157347; }
+  .cm-dim-chip.cm-code-sat { background-color: #c5f135; color: #1a3d0a; border: 1px solid #a8d42a; }
+  .cm-dim-chip.cm-code-ni { background-color: #fd7e14; color: #fff; border: 1px solid #e96b00; }
+  .cm-dim-chip.cm-code-u { background-color: #dc3545; color: #fff; border: 1px solid #bb2d3b; }
+  .cm-dim-chip.cm-code-na { background-color: #fff; color: #495057; border: 1px solid #ced4da; font-weight: 600; }
+  .cm-cell-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.15rem 0.25rem; justify-items: center; }
+  .cm-matrix-cell { text-align: center; vertical-align: middle; min-width: 64px; font-size: 0.72rem; padding: 0.35rem 0.2rem !important; cursor: pointer; }
+  .cm-matrix-cell.cm-empty .cm-cell-empty-mark { color: #adb5bd; }
+  .cm-cell-off-roster { color: #dee2e6; font-size: 1.1rem; }
+  .cm-conduct-legend { display: flex; flex-wrap: wrap; gap: 0.35rem; font-size: 0.68rem; }
+  .cm-conduct-legend .cm-legend-item {
+    display: inline-flex; align-items: center; gap: 0.35rem;
+    padding: 0.1rem 0.35rem; border: 1px solid #dee2e6; border-radius: 999px; background: #fff;
+  }
+</style>
+
+<%
+  const ccrManageBtns = [
+    '<a href="/school/conduct-matrix" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-emoji-smile me-1"></i> Class Conduct Matrix</a>',
+    '<a href="/school/attendances/report" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-person-lines-fill me-1"></i> Student Attendance Report</a>'
+  ];
+  const ccrOptionalBtns = [
+    '<button type="button" id="btn_printClassConductReport" class="btn btn-filled btn-edit btn-md me-2 mb-2" disabled title="Load the report first">🖨 Print</button>',
+    '<button type="button" id="ccr_btnCopyLink" class="btn btn-outline-primary btn-md me-2 mb-2" title="Copy a shareable link with the current students and date range"><i class="bi bi-link-45deg me-1"></i> Copy Link</button>'
+  ];
+%>
+
+<%- include('partials/tablePages-start', {
+  title,
+  newUrl: null,
+  newLabel: null,
+  user,
+  tableName: typeof tableName !== 'undefined' ? tableName : 'Class_Conduct_Report',
+  btn_export: false,
+  print: false,
+  optionalBtnsBeforePrint: ccrOptionalBtns,
+  headerManageBtns: [
+    '<a href="/dashboard/section-nav/SCHOOL_REPORTS" class="school-navigator-dashboard school-navigator-reports-dashboard btn btn-filled btn-secondary btn-md mb-2" title="School Reports (Alt+Shift+R)" aria-keyshortcuts="Alt+Shift+R"><i class="bi bi-file-earmark-richtext me-1"></i> School Reports</a>'
+  ],
+  manageBtns: ccrManageBtns
+}) %>
+
+<div class="schedule-shell">
+  <p class="text-muted small mb-3">Review class conduct across all enrolled classes for one or more students. This page is read-only; use Class Conduct Matrix to enter or edit ratings.</p>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
+      <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Class Conduct Report</div>
+      <button
+        id="ccrFilterToggleBtn"
+        type="button"
+        class="btn btn-outline-secondary btn-sm px-2"
+        data-bs-toggle="collapse"
+        data-bs-target="#ccrFilterCollapse"
+        aria-expanded="true"
+        aria-controls="ccrFilterCollapse"
+        aria-label="Close filters">
+        <i id="ccrFilterToggleIcon" class="bi bi-chevron-up"></i>
+      </button>
+    </div>
+    <div class="collapse show" id="ccrFilterCollapse">
+      <div class="card-body filter-panel p-3" id="ccrFilterForm">
+        <div class="report-filter-main-row">
+          <div class="report-filter-field report-filter-field-students">
+            <label class="form-label">Students</label>
+            <div class="report-filter-control report-filter-student-actions">
+              <button type="button" class="btn btn-outline-primary btn-sm" id="ccr_btnStudentPicker">
+                <i class="bi bi-people me-1"></i> Select Students
+              </button>
+              <button type="button" class="btn btn-outline-success btn-sm" id="ccr_btnBrowseClasses" title="Browse students by department and class">
+                <i class="bi bi-diagram-3 me-1"></i> Browse Classes
+              </button>
+              <div class="dropdown" id="ccr_selectedStudentsDropdown">
+                <button
+                  type="button"
+                  class="btn btn-outline-secondary btn-sm dropdown-toggle"
+                  id="ccr_btnSelectedMenu"
+                  data-bs-toggle="dropdown"
+                  data-bs-auto-close="outside"
+                  aria-expanded="false"
+                  disabled>
+                  <span id="ccr_selectedMenuLabel">No students selected</span>
+                </button>
+                <div class="dropdown-menu ccr-selected-students-menu sar-selected-students-menu p-2" id="ccr_selectedMenu" aria-labelledby="ccr_btnSelectedMenu">
+                  <div class="small text-muted px-1 pb-2">Order sets report precedence. Use arrows to reorder.</div>
+                  <div id="ccr_selectedStudentsList"></div>
+                </div>
+              </div>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="ccr_btnClearStudents" title="Clear students">
+                <i class="bi bi-x-lg"></i>
+              </button>
+            </div>
+          </div>
+          <div class="report-filter-field report-filter-field-date">
+            <label class="form-label" for="ccr_startDate">Start Date</label>
+            <div class="report-filter-control">
+              <input type="date" id="ccr_startDate" class="form-control size-md">
+            </div>
+          </div>
+          <div class="report-filter-field report-filter-field-date">
+            <label class="form-label" for="ccr_endDate">End Date</label>
+            <div class="report-filter-control">
+              <input type="date" id="ccr_endDate" class="form-control size-md">
+            </div>
+          </div>
+          <div class="report-filter-field report-filter-field-actions">
+            <div class="form-label report-filter-label-rail" aria-hidden="true">&nbsp;</div>
+            <div class="report-filter-control report-filter-actions">
+              <button type="button" id="ccr_btnLoad" class="btn btn-filled btn-primary btn-md"><i class="bi bi-funnel me-1"></i> Apply</button>
+              <button type="button" id="ccr_btnReset" class="btn btn-outline-secondary btn-md">Reset</button>
+            </div>
+          </div>
+        </div>
+        <div class="border rounded-3 bg-white bg-opacity-75 p-2 mt-3">
+          <div class="small fw-bold text-uppercase text-muted mb-2">Quick Ranges</div>
+          <div class="d-flex flex-wrap gap-2">
+            <button type="button" class="btn btn-outline-secondary btn-sm ccr-range range-chip" data-range="thisMonth">This Month</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm ccr-range range-chip" data-range="thisWeek">This Week</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm ccr-range range-chip" data-range="lastMonth">Last Month</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm ccr-range range-chip" data-range="lastMonthFirstHalf">Last Month - 1st 15 Days</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm ccr-range range-chip" data-range="lastMonthSecondHalf">Last Month - 2nd 15 Days</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm ccr-range range-chip" data-range="allTime">All Dates</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm d-none" id="ccrResultsContainer">
+    <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div class="fw-semibold text-muted small">Class Conduct Report</div>
+      <div class="d-flex align-items-center gap-2 flex-wrap ms-md-auto">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <button type="button"
+            class="btn btn-outline-secondary btn-sm active"
+            id="ccr_btnHideEmptyDays"
+            aria-pressed="true"
+            title="When on, each student's table only shows dates where at least one of their classes had a shown conduct session.">
+            Hide days without sessions
+          </button>
+          <button type="button"
+            class="btn btn-outline-secondary btn-sm"
+            id="ccr_btnWeekSeparators"
+            aria-pressed="false"
+            title="When on, show a vertical line between calendar weeks (Monday start).">
+            Week separators
+          </button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="ccr_btnExpandAllStudents">Expand All</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="ccr_btnCollapseAllStudents">Collapse All</button>
+        </div>
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="cm-conduct-legend mb-3" id="ccrConductLegend" aria-label="Rating scale"></div>
+      <div id="ccrStudentSections"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="ccrCellModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Conduct detail</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="small text-muted mb-2" id="ccrModalMeta"></div>
+        <div id="ccrModalBody"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('partials/modal_GenericPicker') %>
+<%- include('school/partials/modal_SchoolEntityPicker') %>
+<%- include('partials/tablePages-end') %>
+
+<script>
+  window.__conductRatingScalePolicy = <%- JSON.stringify(typeof conductRatingScaleResolved !== 'undefined' ? conductRatingScaleResolved : { levels: [] }).replace(/</g, '\\u003c') %>;
+  window.__classConductReportInitial = <%- JSON.stringify({
+    startDate: typeof initialStartDate !== 'undefined' ? initialStartDate : '',
+    endDate: typeof initialEndDate !== 'undefined' ? initialEndDate : '',
+    studentIds: typeof initialStudentIds !== 'undefined' ? initialStudentIds : [],
+    students: typeof initialStudents !== 'undefined' ? initialStudents : []
+  }).replace(/</g, '\\u003c').replace(/&/g, '\\u0026') %>;
+</script>
+<script src="/scripts/conductRatingCell.js"></script>
+<script src="/scripts/classConductReportClient.js"></script>

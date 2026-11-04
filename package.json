@@ -83,6 +83,7 @@
     "school:library-section:seed": "node scripts/seed-school-library-section.js --db app",
     "school:session-student-cases-section:seed": "node scripts/seed-school-session-student-cases-section.js --db app",
     "school:class-conduct-matrix-section:seed": "node scripts/seed-school-class-conduct-matrix-section.js --db app",
+    "school:class-conduct-report-section:seed": "node scripts/seed-school-class-conduct-report-section.js --db app",
     "school:teaching-outline-templates:reconcile": "node scripts/seed-school-teaching-outline-defaults.js --db app --org 900000 --reconcile-sections",
     "school:class-skills:backfill": "node scripts/school/migration/backfillClassSkills.js --org 900000",
     "school:class-skills:backfill:apply": "node scripts/school/migration/backfillClassSkills.js --org 900000 --apply",

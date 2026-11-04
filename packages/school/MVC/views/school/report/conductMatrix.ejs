@@ -33,6 +33,11 @@
   }
   .cm-matrix-table th.att-cell:hover { background-color: #f1f3f5; }
   .cm-matrix-table th.cm-session-col { padding: 0.35rem 0.25rem !important; vertical-align: middle; }
+  .cm-matrix-table th.cm-session-col.cm-day-start,
+  .cm-matrix-table td.cm-day-start {
+    border-left: 1px solid #e2e8f0;
+    box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.65);
+  }
   .cm-session-header-date {
     display: block; cursor: pointer; color: var(--bs-primary, #0d6efd);
     font-size: 0.875em; font-weight: 700; text-decoration: underline;
@@ -88,6 +93,7 @@
     cmManageBtns.push('<a href="/school/attendances" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-grid-3x3 me-1"></i> Attendance Matrix</a>');
   }
   cmManageBtns.push('<a href="/school/grades-matrix" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-table me-1"></i> Grades Matrix</a>');
+  cmManageBtns.push('<a href="/school/class-conduct-report" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-clipboard2-data me-1"></i> Class Conduct Report</a>');
 %>
 
 <%- include('partials/tablePages-start', {
@@ -98,6 +104,9 @@
   tableName: typeof tableName !== 'undefined' ? tableName : 'Class_Conduct_Matrix',
   btn_export: false,
   print: false,
+  optionalBtnsBeforePrint: [
+    '<button type="button" id="btn_printConductMatrix" class="btn btn-filled btn-edit btn-md me-2 mb-2" disabled title="Load the matrix first">🖨 Print</button>'
+  ],
   headerManageBtns: [
     '<a href="' + dashHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>',
     '<a href="/dashboard/section-nav/SCHOOL_ACADEMIA" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-journal-bookmark me-1"></i> School Academia</a>'
@@ -145,6 +154,9 @@
           <div class="d-flex flex-wrap gap-2">
             <button type="button" class="btn btn-outline-secondary btn-sm cm-range range-chip" data-range="thisMonth">This Month</button>
             <button type="button" class="btn btn-outline-secondary btn-sm cm-range range-chip" data-range="thisWeek">This Week</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm cm-range range-chip" data-range="lastMonth">Last Month</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm cm-range range-chip" data-range="lastMonthFirstHalf">Last Month - 1st 15 Days</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm cm-range range-chip" data-range="lastMonthSecondHalf">Last Month - 2nd 15 Days</button>
             <button type="button" class="btn btn-outline-secondary btn-sm cm-range range-chip" data-range="allTime">All Dates</button>
           </div>
         </div>

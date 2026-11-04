@@ -281,6 +281,7 @@ Manage Session links into report instance routes (Report Hub / `reportRoutes.js`
 - Edit window: `completedSessionConductEdit`
 - Some report assignments require conduct before fill (`conductRequiredBeforeFill`)
 - **Class Conduct Matrix** (`/school/conduct-matrix`): cross-session view and entry for a class; **`SCHOOL_CLASS_CONDUCT_MATRIX` READ_ALL** to open, saves reuse `POST .../conduct`. Column **Show** persists `conductReportStepEnabled` on the session (via `POST /school/conduct-matrix/api/session-visibility`) so optional sessions appear on Manage Session → **Reports**; assignment-required sessions stay enabled. Legacy URL `/school/reports/conduct-matrix` redirects here.
+- **Class Conduct Report** (`/school/class-conduct-report`): read-only, student-centric view across enrolled classes (School Reports section **`SCHOOL_CLASS_CONDUCT_REPORT`**); no export. Edit conduct on Class Conduct Matrix or Session Manager.
 
 ## Grade Book and Activities
 

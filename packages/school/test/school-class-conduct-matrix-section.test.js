@@ -19,11 +19,17 @@ function subsectionIds(section = {}) {
 test('manifest declares SCHOOL_CLASS_CONDUCT_MATRIX under SCHOOL_ACADEMIA', () => {
   const section = findSection('SCHOOL_CLASS_CONDUCT_MATRIX');
   const academia = findSection('SCHOOL_ACADEMIA');
+  const report = findSection('SCHOOL_CLASS_CONDUCT_REPORT');
+  const reports = findSection('SCHOOL_REPORTS');
   assert.ok(section, 'SCHOOL_CLASS_CONDUCT_MATRIX should be declared');
   assert.equal(section.id, '778772');
   assert.equal(String(section.homeURL || ''), '/school/conduct-matrix');
   assert.ok(academia, 'SCHOOL_ACADEMIA should be declared');
   assert.equal(subsectionIds(academia).includes('778772'), true);
+  assert.ok(report, 'SCHOOL_CLASS_CONDUCT_REPORT should be declared');
+  assert.equal(report.id, '778773');
+  assert.ok(reports, 'SCHOOL_REPORTS should be declared');
+  assert.equal(subsectionIds(reports).includes('778773'), true);
 });
 
 test('package access constants expose SCHOOL_CLASS_CONDUCT_MATRIX', () => {

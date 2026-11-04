@@ -76,6 +76,19 @@ test('conduct matrix view and client assets exist', () => {
   assert.ok(fs.existsSync(path.join(ROOT, 'packages/school/public/scripts/conductRatingCell.js')));
 });
 
+test('conduct matrix print button and preview helpers', () => {
+  const view = read('packages/school/MVC/views/school/report/conductMatrix.ejs');
+  const client = read('packages/school/public/scripts/conductMatrixClient.js');
+  const controller = read('packages/school/MVC/controllers/school/conductMatrixController.js');
+  assert.match(view, /optionalBtnsBeforePrint/);
+  assert.match(view, /btn_printConductMatrix/);
+  assert.match(client, /function buildConductPrintDocument/);
+  assert.match(client, /function openConductPrint/);
+  assert.match(client, /function setConductPrintEnabled/);
+  assert.match(client, /conduct-matrix/);
+  assert.match(controller, /includePrintManager:\s*true/);
+});
+
 test('sessionConductService exposes conduct report step helpers', () => {
   const sessionConductService = require('../MVC/services/school/sessionConductService');
   assert.equal(typeof sessionConductService.parseConductReportStepEnabled, 'function');

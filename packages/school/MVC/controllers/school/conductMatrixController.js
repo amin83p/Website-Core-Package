@@ -45,6 +45,7 @@ async function showConductMatrixPage(req, res) {
     res.render('school/report/conductMatrix', {
       title: 'Class Conduct Matrix',
       includeModal: true,
+      includePrintManager: true,
       user: req.user,
       actionStateId: req.actionStateId,
       tableName: 'Class_Conduct_Matrix',

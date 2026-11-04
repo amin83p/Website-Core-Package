@@ -103,6 +103,15 @@
     } else if (range === 'thisMonth') {
       start = new Date(today.getFullYear(), today.getMonth(), 1);
       end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    } else if (range === 'lastMonth') {
+      start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      end = new Date(today.getFullYear(), today.getMonth(), 0);
+    } else if (range === 'lastMonthFirstHalf') {
+      start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+      end = new Date(start.getFullYear(), start.getMonth(), 15);
+    } else if (range === 'lastMonthSecondHalf') {
+      start = new Date(today.getFullYear(), today.getMonth() - 1, 16);
+      end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
     } else if (range === 'allTime') {
       document.getElementById('cm_startDate').value = '';
       document.getElementById('cm_endDate').value = '';
@@ -273,6 +282,333 @@
     return name;
   }
 
+  function getPrintSessionColumns(fromData) {
+    const source = fromData || matrixData;
+    const allSessions = source?.sessions || [];
+    return visibleSessions(allSessions).filter((s) => isColumnShown(s));
+  }
+
+  function setConductPrintEnabled(enabled) {
+    const btn = document.getElementById('btn_printConductMatrix');
+    if (!btn) return;
+    btn.disabled = !enabled;
+    btn.title = enabled ? 'Print class conduct matrix for the loaded range' : 'Load the matrix first';
+  }
+
+  function cmPrintFormatDateShort(ymd) {
+    const raw = String(ymd || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw || '—';
+    const d = new Date(`${raw}T00:00:00`);
+    if (Number.isNaN(d.getTime())) return raw;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  }
+
+  function cmPrintFormatRangeLabel(startDate, endDate) {
+    const start = String(startDate || '').trim();
+    const end = String(endDate || '').trim();
+    if (!start && !end) return 'All sessions';
+    if (start && end) return `${cmPrintFormatDateShort(start)} – ${cmPrintFormatDateShort(end)}`;
+    if (start) return `From ${cmPrintFormatDateShort(start)}`;
+    return `Through ${cmPrintFormatDateShort(end)}`;
+  }
+
+  function buildCmSessionDateGroups(sessions) {
+    const groups = [];
+    let i = 0;
+    const list = Array.isArray(sessions) ? sessions : [];
+    while (i < list.length) {
+      const d = String(list[i].date || '').trim();
+      let j = i + 1;
+      while (j < list.length && String(list[j].date || '').trim() === d) j += 1;
+      groups.push({ date: d, start: i, len: j - i });
+      i = j;
+    }
+    return groups;
+  }
+
+  function buildConductPrintLegendHtml() {
+    const policy = global.__conductRatingScalePolicy || {};
+    const levels = Array.isArray(policy.levels) ? policy.levels : [];
+    if (!levels.length) return '';
+    const items = levels.map((level) => {
+      const code = level.displayCode || level.code || '';
+      return `<span class="cm-print-legend-item">${buildConductChipHtml(code, level.label || code)} ${escapeHtml(level.label || '')}</span>`;
+    }).join('');
+    return `<div class="cm-print-legend">${items}</div>`;
+  }
+
+  function buildConductPrintDocument(data, meta = {}) {
+    const printColumns = getPrintSessionColumns(data);
+    const students = Array.isArray(data?.students) ? data.students : [];
+    const className = String(data?.class?.title || meta.className || 'Class').trim() || 'Class';
+    const orgName = String(meta.orgName || '').trim();
+    const rangeLabel = cmPrintFormatRangeLabel(meta.startDate, meta.endDate);
+    const printedAt = meta.printedAt instanceof Date ? meta.printedAt : new Date();
+    const printedAtLabel = printedAt.toLocaleString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric',
+      hour: 'numeric', minute: '2-digit'
+    });
+    const filterNote = conductOnlyFilter ? 'Conduct sessions only' : '';
+    const fallbackSettings = {
+      includeOrg: true,
+      orgName,
+      includeHeaderNote: false,
+      headerNote: '',
+      orientation: 'landscape',
+      density: 'compact',
+      requestedByLabel: '',
+      logoUrl: ''
+    };
+    const settings = global.AppPrintManager?.normalizeSettings
+      ? global.AppPrintManager.normalizeSettings({ ...fallbackSettings, ...(meta.printSettings || {}) })
+      : fallbackSettings;
+    const displayOrgName = settings.includeOrg ? String(settings.orgName || orgName || '').trim() : '';
+    const logoUrl = String(settings.logoUrl || '').trim();
+    const logoHtml = logoUrl
+      ? `<img class="print-logo" src="${escapeHtml(logoUrl)}" alt="Organization logo" onerror="this.style.display='none'">`
+      : '';
+    const pageCss = global.PrintDocumentBuilder?.buildPageCss
+      ? global.PrintDocumentBuilder.buildPageCss(settings.orientation)
+      : `@page { margin: 10mm; size: ${settings.orientation === 'portrait' ? 'portrait' : 'landscape'}; }`;
+    const previewControlsHtml = global.AppPrintManager?.buildPreviewControlsHtml
+      ? global.AppPrintManager.buildPreviewControlsHtml(settings)
+      : '<div class="screen-actions no-print"><button type="button" onclick="window.print()">Print</button><button type="button" onclick="window.close()">Close</button></div>';
+    const printNoteHtml = global.AppPrintManager?.buildPrintNoteHtml
+      ? global.AppPrintManager.buildPrintNoteHtml(settings)
+      : '';
+    const orientationScript = global.PrintDocumentBuilder?.buildPreviewOrientationScript
+      ? global.PrintDocumentBuilder.buildPreviewOrientationScript({
+        orientation: settings.orientation,
+        sourcePath: global.location.pathname,
+        mode: 'conduct-matrix'
+      })
+      : '';
+
+    const groups = buildCmSessionDateGroups(printColumns);
+    const dateHeaderCells = groups.map((g) => {
+      const label = cmPrintFormatDateShort(g.date) || '—';
+      return `<th class="day-group" colspan="${g.len}">${escapeHtml(label)}</th>`;
+    }).join('');
+
+    let prevSessionDate = '';
+    const sessionHeaderCells = printColumns.map((session, columnIndex) => {
+      const dateKey = String(session.date || '').trim();
+      const dayStart = columnIndex > 0 && dateKey !== prevSessionDate;
+      prevSessionDate = dateKey;
+      const dayClass = dayStart ? ' cm-day-start' : '';
+      const reqMark = session.conductRequiredForReports ? '<span class="req-mark">*</span>' : '';
+      return `<th class="sess-col${dayClass}">${escapeHtml(formatSessionShortDate(session.date))}${reqMark}</th>`;
+    }).join('');
+
+    const bodyRows = students.map((stu) => {
+      const name = escapeHtml(stu.name || stu.personId);
+      const avgs = computeStudentConductAverages(stu.personId, printColumns);
+      const rollupInner = buildRollupInnerHtml(avgs);
+      prevSessionDate = '';
+      const cells = printColumns.map((session, columnIndex) => {
+        const dateKey = String(session.date || '').trim();
+        const dayStart = columnIndex > 0 && dateKey !== prevSessionDate;
+        prevSessionDate = dateKey;
+        const dayClass = dayStart ? ' cm-day-start' : '';
+        const cell = data?.cells?.[stu.personId]?.[session.sessionId] || { onRoster: false, value: null };
+        const inner = buildCellInnerHtml(cell, session);
+        return `<td class="cm-print-cell${dayClass}">${inner}</td>`;
+      }).join('');
+      return `<tr>
+        <td class="rollup-col">${rollupInner}</td>
+        <td class="name-col">${name}</td>
+        ${cells || '<td class="cm-print-cell st-empty">—</td>'}
+      </tr>`;
+    }).join('');
+
+    const emptyRow = !students.length
+      ? `<tr><td colspan="${Math.max(2, printColumns.length + 2)}" class="empty-msg">No students found for this range.</td></tr>`
+      : '';
+
+    const legendHtml = buildConductPrintLegendHtml();
+    const colCount = printColumns.length;
+
+    return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>${escapeHtml(`Class Conduct Matrix — ${className}`)}</title>
+  <style id="print-page-orientation-css">${pageCss}</style>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: "Segoe UI", Arial, sans-serif;
+      font-size: 10px;
+      color: #111;
+      line-height: 1.25;
+    }
+    body.print-density-normal { font-size: 11px; line-height: 1.35; }
+    .sheet { padding: 0; }
+    .identity-block { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 8px; }
+    .identity-copy { min-width: 0; flex: 1 1 auto; }
+    .print-logo { display: block; flex: 0 0 auto; width: auto; height: 58px; max-width: 180px; object-fit: contain; object-position: right top; }
+    .doc-header { margin-bottom: 8px; }
+    .doc-header h1 { margin: 0 0 2px 0; font-size: 16px; font-weight: 700; }
+    .org-name { font-size: 13px; font-weight: 700; margin: 0 0 4px 0; }
+    .meta-row { display: flex; flex-wrap: wrap; gap: 8px 16px; color: #333; font-size: 10px; margin-top: 4px; }
+    .print-note { margin: 0 0 8px; font-size: 10px; color: #444; }
+    .summary { display: flex; flex-wrap: wrap; gap: 8px 14px; margin-bottom: 8px; font-size: 10px; color: #444; }
+    .summary .stat b { color: #111; }
+    .cm-print-legend { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; font-size: 9px; }
+    .cm-print-legend-item { display: inline-flex; align-items: center; gap: 4px; }
+    table.matrix { width: 100%; border-collapse: collapse; table-layout: auto; }
+    table.matrix th, table.matrix td {
+      border: 1px solid #bbb;
+      padding: 3px 4px;
+      vertical-align: middle;
+    }
+    table.matrix thead th {
+      background: #eef1f4;
+      font-weight: 700;
+      text-align: center;
+    }
+    table.matrix thead { display: table-header-group; }
+    table.matrix tbody tr { page-break-inside: avoid; }
+    .rollup-col { text-align: center; min-width: 72px; max-width: 88px; }
+    .name-col { text-align: left; min-width: 110px; max-width: 180px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .day-group { font-size: 9.5px; }
+    .sess-col { min-width: 52px; font-size: 9px; }
+    .req-mark { color: #084298; font-weight: 700; }
+    th.cm-day-start, td.cm-day-start { border-left: 2px solid #94a3b8; }
+    .cm-print-cell { text-align: center; font-size: 8.5px; padding: 2px 3px !important; }
+    .cm-cell-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.12rem 0.2rem; justify-items: center; }
+    .cm-dim-chip {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 1.4rem; padding: 0.05rem 0.18rem; border-radius: 0.2rem;
+      background: #e9ecef; font-weight: 700; font-size: 7.5px; line-height: 1.15;
+    }
+    .cm-dim-chip-empty { background: transparent; color: #adb5bd; font-weight: 400; }
+    .cm-dim-chip.cm-code-s { background-color: #198754; color: #fff; border: 1px solid #157347; }
+    .cm-dim-chip.cm-code-sat { background-color: #c5f135; color: #1a3d0a; border: 1px solid #a8d42a; }
+    .cm-dim-chip.cm-code-ni { background-color: #fd7e14; color: #fff; border: 1px solid #e96b00; }
+    .cm-dim-chip.cm-code-u { background-color: #dc3545; color: #fff; border: 1px solid #bb2d3b; }
+    .cm-dim-chip.cm-code-na { background-color: #fff; color: #495057; border: 1px solid #ced4da; font-weight: 600; }
+    .cm-cell-empty-mark { color: #adb5bd; }
+    .cm-cell-off-roster { color: #dee2e6; }
+    .st-empty { color: #6c757d; }
+    .empty-msg { text-align: center; color: #666; padding: 16px !important; }
+    .doc-footer {
+      margin-top: 10px;
+      padding-top: 4px;
+      border-top: 1px solid #ddd;
+      color: #666;
+      font-size: 9px;
+    }
+    @media print {
+      body { margin: 0; }
+      .no-print { display: none !important; }
+    }
+    @media screen {
+      body { background: #e9ecef; padding: 16px; }
+      .sheet {
+        background: #fff;
+        padding: 14px 16px;
+        box-shadow: 0 1px 6px rgba(0,0,0,0.12);
+        max-width: 100%;
+      }
+    }
+  </style>
+  ${orientationScript}
+</head>
+<body class="print-density-${settings.density}" data-print-orientation="${settings.orientation}">
+  ${previewControlsHtml}
+  <div class="sheet">
+    <div class="identity-block">
+      <div class="identity-copy">
+        <header class="doc-header">
+          ${displayOrgName ? `<div class="org-name">${escapeHtml(displayOrgName)}</div>` : ''}
+          <h1>Class Conduct Matrix</h1>
+          <div class="meta-row">
+            <span><strong>Class:</strong> ${escapeHtml(className)}</span>
+            <span><strong>Range:</strong> ${escapeHtml(rangeLabel)}</span>
+            <span><strong>Printed:</strong> ${escapeHtml(printedAtLabel)}</span>
+            ${settings.requestedByLabel ? `<span><strong>Requested by:</strong> ${escapeHtml(settings.requestedByLabel)}</span>` : ''}
+          </div>
+        </header>
+      </div>
+      ${logoHtml}
+    </div>
+    ${printNoteHtml}
+    <div class="summary">
+      <span class="stat"><b>${students.length}</b> students</span>
+      <span class="stat"><b>${colCount}</b> shown sessions</span>
+      ${filterNote ? `<span class="stat">${escapeHtml(filterNote)}</span>` : ''}
+    </div>
+    ${legendHtml}
+    <table class="matrix">
+      <thead>
+        ${colCount ? `<tr>
+          <th class="rollup-col" rowspan="2">Avg</th>
+          <th class="name-col" rowspan="2">Student</th>
+          ${dateHeaderCells}
+        </tr>
+        <tr>${sessionHeaderCells}</tr>` : `<tr>
+          <th class="rollup-col">Avg</th>
+          <th class="name-col">Student</th>
+          <th>No shown sessions in this range</th>
+        </tr>`}
+      </thead>
+      <tbody>
+        ${bodyRows}${emptyRow}
+      </tbody>
+    </table>
+    <div class="doc-footer">Ratings reflect the loaded date range and session columns enabled via Show or Required. * = required for assigned reports.</div>
+  </div>
+</body>
+</html>`;
+  }
+
+  function openConductPrint() {
+    if (!matrixData) {
+      void showCmMessage('Nothing to print', 'Load a class conduct matrix first.', 'warning');
+      return;
+    }
+    const orgName = String(document.getElementById('activeOrgNameRef')?.getAttribute('data-name') || '').trim();
+    const filters = readFilters();
+    const defaults = { orgName, orientation: 'landscape', density: 'compact' };
+    const openPreview = (settings = defaults) => {
+      const html = buildConductPrintDocument(matrixData, {
+        orgName,
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+        className: matrixData.class?.title,
+        printedAt: new Date(),
+        printSettings: settings
+      });
+      const printWindow = global.AppPrintManager?.openHtmlPreview
+        ? global.AppPrintManager.openHtmlPreview({
+          title: 'Class Conduct Matrix',
+          html,
+          settings,
+          sourcePath: global.location.pathname,
+          view: 'conduct-matrix'
+        })
+        : null;
+      if (!printWindow) {
+        void showCmMessage(
+          'Popup blocked',
+          'Allow pop-ups for this site to open the print page.',
+          'warning'
+        );
+      }
+    };
+    if (global.AppPrintManager?.openSettings) {
+      global.AppPrintManager.openSettings({
+        mode: 'conduct-matrix',
+        defaults,
+        onConfirm: openPreview
+      });
+    } else {
+      openPreview(defaults);
+    }
+  }
+
   async function loadMatrix() {
     const filters = readFilters();
     if (!filters.classId) {
@@ -308,7 +644,9 @@
       if (filters.endDate) url.searchParams.set('endDate', filters.endDate);
       else url.searchParams.delete('endDate');
       global.history.replaceState({}, '', url.toString());
+      setConductPrintEnabled(true);
     } catch (error) {
+      setConductPrintEnabled(false);
       await showCmMessage('Load failed', error.message || 'Load failed.', 'error');
     } finally {
       if (btn) {
@@ -348,16 +686,17 @@
     }
   }
 
-  function buildConductSessionHeaderCell(classId, session) {
+  function buildConductSessionHeaderCell(classId, session, dayStart) {
     const frozen = session.conductRequiredForReports === true;
     const shown = isColumnShown(session);
     const shortDate = escapeHtml(formatSessionShortDate(session.date));
     const sessionIdAttr = escapeHtml(session.sessionId);
     const classIdAttr = escapeHtml(String(classId || '').trim());
+    const dayClass = dayStart ? ' cm-day-start' : '';
     const toggleTitle = frozen
       ? 'Required for assigned reports'
       : 'Show class conduct on Manage Session Reports tab';
-    return `<th class="att-cell text-primary small fw-bold cm-session-col cm-session-header"
+    return `<th class="att-cell text-primary small fw-bold cm-session-col cm-session-header${dayClass}"
       data-class-id="${classIdAttr}" data-session-id="${sessionIdAttr}"
       title="Click to open Session Manager">
       <span class="cm-session-header-date text-decoration-underline">${shortDate}</span>
@@ -380,8 +719,12 @@
     const headerRow = document.createElement('tr');
     headerRow.innerHTML = `<th class="cm-sticky-rollup text-center small px-2 py-2" title="${escapeHtml(rollupTitle)}">Avg</th><th class="cm-sticky-name">Student</th>`;
     const classId = String(matrixData.class?.id || readFilters().classId || '').trim();
-    columns.forEach((session) => {
-      headerRow.innerHTML += buildConductSessionHeaderCell(classId, session);
+    let prevSessionDate = '';
+    columns.forEach((session, columnIndex) => {
+      const dateKey = String(session.date || '').trim();
+      const dayStart = columnIndex > 0 && dateKey !== prevSessionDate;
+      prevSessionDate = dateKey;
+      headerRow.innerHTML += buildConductSessionHeaderCell(classId, session, dayStart);
     });
     thead.innerHTML = '';
     thead.appendChild(headerRow);
@@ -393,10 +736,15 @@
       const avgs = computeStudentConductAverages(stu.personId, columns);
       const rollupInner = buildRollupInnerHtml(avgs);
       tr.innerHTML = `<td class="cm-sticky-rollup px-2 py-2 text-center">${rollupInner}</td><td class="cm-sticky-name">${buildStudentNameCell(stu)}</td>`;
-      columns.forEach((session) => {
+      prevSessionDate = '';
+      columns.forEach((session, columnIndex) => {
+        const dateKey = String(session.date || '').trim();
+        const dayStart = columnIndex > 0 && dateKey !== prevSessionDate;
+        prevSessionDate = dateKey;
+        const dayClass = dayStart ? ' cm-day-start' : '';
         const shown = isColumnShown(session);
         if (!shown) {
-          tr.innerHTML += `<td class="cm-matrix-cell cm-col-disabled" aria-hidden="true"></td>`;
+          tr.innerHTML += `<td class="cm-matrix-cell cm-col-disabled${dayClass}" aria-hidden="true"></td>`;
           return;
         }
         const cell = matrixData.cells?.[stu.personId]?.[session.sessionId] || { onRoster: false, value: null };
@@ -404,6 +752,7 @@
         if (!cell.onRoster) cellClass += ' cm-not-roster';
         else cellClass += ' cm-editable';
         if (cell.onRoster && !cell.value?.summary) cellClass += ' cm-empty';
+        cellClass += dayClass;
         const inner = buildCellInnerHtml(cell, session);
         const title = cell.value?.summary
           ? 'Edit conduct'
@@ -576,6 +925,9 @@
     document.getElementById('cm_btnReset')?.addEventListener('click', () => {
       setFilters({ classId: '', className: '', startDate: '', endDate: '' });
       document.querySelectorAll('.cm-range').forEach((b) => b.classList.remove('active'));
+      matrixData = null;
+      document.getElementById('cm_results')?.classList.add('d-none');
+      setConductPrintEnabled(false);
     });
     document.querySelectorAll('.cm-range').forEach((btn) => {
       btn.addEventListener('click', () => applyQuickRange(btn.getAttribute('data-range')));
@@ -605,6 +957,7 @@
       );
     });
     document.getElementById('cmModalSave')?.addEventListener('click', () => saveCellModal());
+    document.getElementById('btn_printConductMatrix')?.addEventListener('click', () => openConductPrint());
   }
 
   function initFromUrl() {
@@ -621,6 +974,7 @@
 
   document.addEventListener('DOMContentLoaded', () => {
     renderConductLegendHosts();
+    setConductPrintEnabled(false);
     wireEvents();
     initFromUrl();
   });

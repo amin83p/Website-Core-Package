@@ -80,6 +80,7 @@ router.use('/schedules', require('./scheduleRoutes'));
 router.use('/attendances', require('./attendanceRoutes'));
 router.use('/grades-matrix', require('./gradesMatrixRoutes'));
 router.use('/conduct-matrix', require('./conductMatrixRoutes'));
+router.use('/class-conduct-report', require('./classConductReportRoutes'));
 router.use('/holidays', require('./holidayRoutes'));
 router.use('/sessions', require('./sessionRoutes'));
 router.use('/session-student-cases', require('./sessionStudentCaseRoutes'));
