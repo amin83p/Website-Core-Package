@@ -4,8 +4,14 @@ const sessionUncompletedNotificationService = require('./sessionUncompletedNotif
 const schoolDataService = require('./schoolDataService');
 const bookCoveringReportService = require('./bookCoveringReportService');
 const sessionStudentCaseService = require('./sessionStudentCaseService');
+const reportViewService = require('./reportViewService');
+const sessionReportInstanceService = require('./sessionReportInstanceService');
+const sessionConductService = require('./sessionConductService');
 const { requireCoreModule } = require('./schoolCoreContracts');
-const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+
+const PENDING_REPORTS_PAYLOAD_CAP = 20;
 
 function cleanText(value) {
   return String(value || '').trim();
@@ -177,6 +183,156 @@ function evaluateSessionWithActivities(context) {
   return sessionHasInstructionalActivities(context.session);
 }
 
+function buildSessionContext(classData = {}, session = {}) {
+  return {
+    classId: cleanText(classData?.id),
+    sessionId: cleanText(session?.sessionId || session?.id),
+    sessionDate: cleanText(session?.date)
+  };
+}
+
+function filterInstanceRowsForSession(instanceRows = [], sessionContext = {}) {
+  const classId = cleanText(sessionContext?.classId);
+  return (Array.isArray(instanceRows) ? instanceRows : []).filter((row) => (
+    idsEqual(row?.classId, classId)
+    && sessionReportInstanceService.instanceRowMatchesSession(row, sessionContext)
+  ));
+}
+
+function sessionMatchedReportAssignments(assignments = [], sessionContext = {}) {
+  return (Array.isArray(assignments) ? assignments : []).filter((assignment) => (
+    reportAssignmentSessionUtils.reportAssignmentMatchesSession(assignment, sessionContext)
+  ));
+}
+
+function sessionHasAssignedReports({ assignments = [], instanceRows = [], sessionContext = {} } = {}) {
+  if (sessionMatchedReportAssignments(assignments, sessionContext).length > 0) return true;
+  return filterInstanceRowsForSession(instanceRows, sessionContext).length > 0;
+}
+
+function listUnsubmittedReportRowsForSession({
+  instanceRows = [],
+  sessionContext = {},
+  assignmentMap = new Map()
+} = {}) {
+  return filterInstanceRowsForSession(instanceRows, sessionContext)
+    .map((row) => sessionReportInstanceService.mapRowToDto(row, assignmentMap))
+    .filter((row) => !sessionReportInstanceService.isReportRowSubmitted({
+      ...row,
+      isPendingAssignment: row.isPending
+    }));
+}
+
+function slimPendingReportsForPayload(rows = []) {
+  return (Array.isArray(rows) ? rows : [])
+    .slice(0, PENDING_REPORTS_PAYLOAD_CAP)
+    .map((row) => sessionReportInstanceService.mapPendingReportDto(row));
+}
+
+async function loadClassReportPrefetch(classData = {}, reqUser = {}) {
+  const classId = cleanText(classData?.id);
+  if (!classId) {
+    return { assignments: [], assignmentMap: new Map(), instanceRows: [] };
+  }
+  const assignmentResult = await schoolDataService.fetchData(
+    'reportAssignments',
+    { classId__eq: classId },
+    reqUser
+  );
+  const assignments = Array.isArray(assignmentResult) ? assignmentResult : [];
+  const assignmentMap = new Map(
+    assignments
+      .map((row) => [toPublicId(row?.id), row])
+      .filter(([id]) => Boolean(id))
+  );
+  const instanceRows = await reportViewService.buildInstanceListRows({
+    reqUser,
+    classIds: [classId],
+    prefetchedClass: classData
+  });
+  return {
+    assignments,
+    assignmentMap,
+    instanceRows: Array.isArray(instanceRows) ? instanceRows : []
+  };
+}
+
+function evaluateSessionAssignedReportsNotSubmitted(context = {}) {
+  const sessionContext = context.sessionContext || buildSessionContext(context.classData, context.session);
+  const prefetch = context.classReportPrefetch || {};
+  const { assignments = [], assignmentMap = new Map(), instanceRows = [] } = prefetch;
+  if (!sessionHasAssignedReports({ assignments, instanceRows, sessionContext })) return null;
+  const unsubmitted = listUnsubmittedReportRowsForSession({ instanceRows, sessionContext, assignmentMap });
+  if (!unsubmitted.length) return null;
+  return {
+    pendingReportCount: unsubmitted.length,
+    pendingReports: slimPendingReportsForPayload(unsubmitted)
+  };
+}
+
+function evaluateSessionClassConductNotCompleted(context = {}) {
+  const sessionContext = context.sessionContext || buildSessionContext(context.classData, context.session);
+  const prefetch = context.classReportPrefetch || {};
+  const { assignments = [], assignmentMap = new Map(), instanceRows = [] } = prefetch;
+  const sessionMatchedAssignments = sessionMatchedReportAssignments(assignments, sessionContext);
+  const instanceDtos = filterInstanceRowsForSession(instanceRows, sessionContext)
+    .map((row) => sessionReportInstanceService.mapRowToDto(row, assignmentMap));
+  const conductRequiredByAssignment = sessionConductService.resolveSessionHasConductRequiredReports({
+    instanceRows: instanceDtos,
+    sessionMatchedAssignments,
+    sessionContext
+  });
+  if (!sessionConductService.sessionShowsReportConductStep(context.session, conductRequiredByAssignment)) {
+    return null;
+  }
+  if (sessionConductService.isSessionConductReady(context.session)) return null;
+  return {};
+}
+
+async function evaluateSessionsByReportPredicate({
+  orgId,
+  rule,
+  asOfDate,
+  reqUser,
+  predicate
+} = {}) {
+  if (typeof predicate !== 'function') {
+    throw new Error('Session report rule evaluation requires a predicate.');
+  }
+  const { fromDate, throughDate: resolvedThrough, criteria } = await resolveSessionDateWindow({ orgId, rule, asOfDate });
+  const scopedUser = reqUser || { activeOrgId: orgId };
+  const classRows = await sessionUncompletedNotificationService.listOrgClasses(orgId, scopedUser);
+  const findings = [];
+
+  for (const classData of classRows) {
+    const classReportPrefetch = await loadClassReportPrefetch(classData, scopedUser);
+    const sessions = await sessionUncompletedNotificationService.listClassSessions(classData, scopedUser);
+    for (const session of sessions) {
+      const sessionDate = cleanText(session?.date);
+      if (!sessionDate) continue;
+      if (sessionDate < fromDate || sessionDate > resolvedThrough) continue;
+      if (session?.locked === true && criteria.includeLockedSessions !== true) continue;
+
+      const sessionContext = buildSessionContext(classData, session);
+      const extraPayload = predicate({
+        classData,
+        session,
+        sessionContext,
+        classReportPrefetch,
+        reqUser: scopedUser
+      });
+      if (!extraPayload) continue;
+      findings.push(buildFinding({
+        classData,
+        session,
+        extraPayload: typeof extraPayload === 'object' ? extraPayload : {}
+      }));
+    }
+  }
+
+  return { findings, metadata: { fromDate, throughDate: resolvedThrough } };
+}
+
 module.exports = {
   slimClassDataForFinding,
   slimSessionForFinding,
@@ -191,5 +347,13 @@ module.exports = {
   evaluateSessionWithCases,
   evaluateSessionWithActivities,
   loadOrgBookCoveringReports,
-  loadOrgSessionStudentCases
+  loadOrgSessionStudentCases,
+  buildSessionContext,
+  filterInstanceRowsForSession,
+  sessionHasAssignedReports,
+  listUnsubmittedReportRowsForSession,
+  loadClassReportPrefetch,
+  evaluateSessionsByReportPredicate,
+  evaluateSessionAssignedReportsNotSubmitted,
+  evaluateSessionClassConductNotCompleted
 };

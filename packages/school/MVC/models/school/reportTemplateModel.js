@@ -221,7 +221,7 @@ function sanitizeField(rawField, index) {
   };
 }
 
-function sanitizeSchema(v) {
+function sanitizeSchema(v, { existing = null } = {}) {
   const raw = isPlainObject(v) ? v : {};
   const fieldsRaw = Array.isArray(raw.fields) ? raw.fields : [];
   const fieldIds = new Set();
@@ -232,6 +232,8 @@ function sanitizeSchema(v) {
     return normalized;
   });
 
+  const schemaDraft = { schema: { fields }, placeholderMap: {} };
+  reportRuleEngineService.preserveStableFieldDocxAliases(schemaDraft, existing);
   reportRuleEngineService.ensureTemplateDocxAliases({ schema: { fields } });
 
   reportRuleEngineService.validateCalculatedFieldExpressions({ schema: { fields } }, { strict: true });
@@ -441,7 +443,7 @@ function sanitizeSnapshotKeyLabels(rawLabels, snapshotKeys = []) {
   return out;
 }
 
-function sanitizeSnapshotKeyDocxAliases(rawAliases, snapshotKeys = []) {
+function sanitizeSnapshotKeyDocxAliases(rawAliases, snapshotKeys = [], existingAliases = null) {
   const allowed = new Set(
     (Array.isArray(snapshotKeys) ? snapshotKeys : [])
       .map((row) => normalizePrefillKey(row).toLowerCase())
@@ -463,6 +465,20 @@ function sanitizeSnapshotKeyDocxAliases(rawAliases, snapshotKeys = []) {
     const key = normalizePrefillKey(rawKey);
     if (!key) return;
     if (allowed.size && !allowed.has(key.toLowerCase())) return;
+    const alias = cleanString(rawAlias, { max: 32, allowEmpty: false }).toLowerCase();
+    if (!alias) return;
+    out[key] = alias;
+    count += 1;
+  });
+  const priorSource = existingAliases && typeof existingAliases === 'object' && !Array.isArray(existingAliases)
+    ? existingAliases
+    : {};
+  Object.entries(priorSource).forEach(([rawKey, rawAlias]) => {
+    if (count >= 200) return;
+    const key = normalizePrefillKey(rawKey);
+    if (!key) return;
+    if (allowed.size && !allowed.has(key.toLowerCase())) return;
+    if (out[key]) return;
     const alias = cleanString(rawAlias, { max: 32, allowEmpty: false }).toLowerCase();
     if (!alias) return;
     out[key] = alias;
@@ -497,7 +513,7 @@ function sanitizeTemplate(input, { isUpdate = false, existing = null } = {}) {
   if (!TEMPLATE_STATUSES.has(status)) throw new Error('Invalid template status.');
 
   const version = cleanInteger(input.version, { min: 1, max: 1000, allowEmpty: true }) || 1;
-  const schema = sanitizeSchema(input.schema);
+  const schema = sanitizeSchema(input.schema, { existing });
   const placeholderMap = sanitizePlaceholderMap(input.placeholderMap, schema);
   const snapshotKeys = sanitizeSnapshotKeys(
     input.snapshotKeys !== undefined ? input.snapshotKeys : existing?.snapshotKeys
@@ -517,7 +533,8 @@ function sanitizeTemplate(input, { isUpdate = false, existing = null } = {}) {
     ),
     snapshotKeyDocxAliases: sanitizeSnapshotKeyDocxAliases(
       input.snapshotKeyDocxAliases !== undefined ? input.snapshotKeyDocxAliases : existing?.snapshotKeyDocxAliases,
-      snapshotKeys
+      snapshotKeys,
+      existing?.snapshotKeyDocxAliases
     ),
     allowedReportScopes: reportScopePolicy.normalizeAllowedReportScopes(input.allowedReportScopes),
     targetDepartmentIds: reportTargetDepartmentPolicy.normalizeTargetDepartmentIds(

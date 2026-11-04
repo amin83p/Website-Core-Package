@@ -636,6 +636,13 @@ router.get('/:id/sessions/:sessionId/report-instances',
 router.get('/:id/sessions/:sessionId/report-gradebook-skill-coverage',
   requireClassSessionManagePageAccess(),
   classCtrl.getSessionReportGradebookSkillCoverage);
+router.get('/:id/sessions/:sessionId/report-assignments/prepare',
+  requireAccess(SECTIONS.SCHOOL_REPORTS_ASSIGNMENT, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_REPORTS_ASSIGNMENT, OPERATIONS.CREATE, {
+    requireToken: false,
+    keepActive: true
+  }),
+  classCtrl.prepareSessionReportAssignment);
 router.post('/:id/sessions/:sessionId/report-assignments',
   requireAccess(SECTIONS.SCHOOL_REPORTS_ASSIGNMENT, OPERATIONS.CREATE),
   trackActionState(SECTIONS.SCHOOL_REPORTS_ASSIGNMENT, OPERATIONS.CREATE, sessionReportAssignmentActionState),

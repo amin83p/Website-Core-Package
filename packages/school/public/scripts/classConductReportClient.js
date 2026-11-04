@@ -1033,14 +1033,105 @@
     if (Array.isArray(INITIAL.students) && INITIAL.students.length) {
       selectedStudents = normalizeSelectedStudentItems(INITIAL.students);
       renderSelectedStudents();
-      if (INITIAL.startDate && INITIAL.endDate) void loadReport();
     }
   }
+
+  function buildCcrSharedLinkConfirmHtml({ startDate = '', endDate = '', studentCount = 0 } = {}) {
+    const start = escapeHtml(startDate || '—');
+    const end = escapeHtml(endDate || '—');
+    const count = Number(studentCount) || 0;
+    const studentLabel = count === 1 ? '1 student' : `${count} students`;
+    return (
+      '<div class="text-start ccr-shared-link-prompt">'
+      + '<p class="mb-3">This page was opened from a link with report filters already set.</p>'
+      + '<ul class="list-unstyled mb-3 border rounded bg-light px-3 py-2">'
+      + '<li class="mb-2 d-flex align-items-start gap-2">'
+      + '<i class="bi bi-calendar-range text-primary mt-1"></i>'
+      + '<span><span class="text-muted d-block small">Date range</span>'
+      + `<strong>${start}</strong> <span class="text-muted">to</span> <strong>${end}</strong></span></li>`
+      + '<li class="mb-0 d-flex align-items-start gap-2">'
+      + '<i class="bi bi-people text-primary mt-1"></i>'
+      + `<span><span class="text-muted d-block small">Students selected</span><strong>${escapeHtml(studentLabel)}</strong></span></li>`
+      + '</ul>'
+      + '<p class="mb-0">Load the report now with these settings, or choose <strong>Not now</strong> to review the filters first.</p>'
+      + '</div>'
+    );
+  }
+
+  function buildCcrSharedLinkDeclinedHtml() {
+    return (
+      '<div class="text-start ccr-shared-link-prompt">'
+      + '<p class="mb-2">No report was loaded.</p>'
+      + '<p class="mb-2">The date range and students from the link are still shown in the filter panel.</p>'
+      + '<p class="mb-0">When you are ready, click <strong>Load</strong> to run the report.</p>'
+      + '</div>'
+    );
+  }
+
+  function runWhenReportMessageModalReady(callback) {
+    const run = () => {
+      const ready = typeof window.showMessageModal === 'function' && document.getElementById('messageModal');
+      if (!ready) {
+        window.setTimeout(run, 50);
+        return;
+      }
+      callback();
+    };
+    if (document.readyState === 'complete') run();
+    else window.addEventListener('load', run, { once: true });
+  }
+
+  async function promptLoadReportFromUrlLink() {
+    const studentCount = selectedStudents.length
+      || (Array.isArray(INITIAL.studentIds) ? INITIAL.studentIds.length : 0);
+    let confirmed = false;
+    if (window.ReportMessaging?.confirmReportAction) {
+      confirmed = await window.ReportMessaging.confirmReportAction({
+        title: 'Open report from link?',
+        icon: 'info',
+        html: true,
+        message: buildCcrSharedLinkConfirmHtml({
+          startDate: INITIAL.startDate || document.getElementById('ccr_startDate')?.value,
+          endDate: INITIAL.endDate || document.getElementById('ccr_endDate')?.value,
+          studentCount
+        }),
+        confirmText: 'Load report',
+        cancelText: 'Not now',
+        confirmClass: 'btn-primary'
+      });
+    }
+    if (!confirmed) {
+      if (window.ReportMessaging?.showReportMessage) {
+        await window.ReportMessaging.showReportMessage({
+          title: 'Class Conduct Report',
+          icon: 'info',
+          html: true,
+          message: buildCcrSharedLinkDeclinedHtml()
+        });
+      }
+      return;
+    }
+    void loadReport();
+  }
+
+  const ccrOpenedFromUrlQuery = Boolean(
+    INITIAL.startDate
+    && INITIAL.endDate
+    && (
+      (Array.isArray(INITIAL.students) && INITIAL.students.length)
+      || (Array.isArray(INITIAL.studentIds) && INITIAL.studentIds.length)
+    )
+  );
 
   document.addEventListener('DOMContentLoaded', () => {
     renderLegend();
     setClassConductPrintEnabled(false);
     wireEvents();
     initFromUrl();
+    if (ccrOpenedFromUrlQuery) {
+      runWhenReportMessageModalReady(() => {
+        void promptLoadReportFromUrlLink();
+      });
+    }
   });
 }(window));

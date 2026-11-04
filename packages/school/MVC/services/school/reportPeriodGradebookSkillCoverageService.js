@@ -3,6 +3,7 @@ const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const gradebookSkillCatalogService = require('./gradebookSkillCatalogService');
 const sessionGradebookMakeupService = require('./sessionGradebookMakeupService');
+const sessionConductService = require('./sessionConductService');
 
 const STUDENT_GRADEBOOK_SKILL_SUFFIXES = [
   'activity_count',
@@ -63,8 +64,9 @@ function sessionInPeriod(session, startDate, endDate) {
   if (!date) return false;
   const start = normalizeDateOnly(startDate);
   const end = normalizeDateOnly(endDate);
-  if (start && date < start) return false;
-  if (end && date > end) return false;
+  if (!start || !end) return false;
+  if (date < start) return false;
+  if (date > end) return false;
   return true;
 }
 
@@ -152,6 +154,57 @@ function resolveRequiredSkillsForSessionReports({
   };
 }
 
+function reportPeriodFromAssignmentTargetRow(row = {}) {
+  const startDate = normalizeDateOnly(row?.reportStartDate);
+  const dueDate = normalizeDateOnly(row?.reportDueDate || row?.dueDate || row?.sessionDate);
+  if (!startDate || !dueDate) return null;
+  return { startDate, endDate: dueDate };
+}
+
+function resolveGatedSkillChecksForSession({
+  assignments = [],
+  sessionContext = {},
+  templatesById = new Map()
+} = {}) {
+  const checks = [];
+  const seen = new Set();
+
+  (Array.isArray(assignments) ? assignments : []).forEach((assignment) => {
+    if (!reportAssignmentSessionUtils.reportAssignmentMatchesSession(assignment, sessionContext)) return;
+    const templateId = toPublicId(assignment?.templateId);
+    const template = templatesById instanceof Map ? templatesById.get(templateId) : null;
+    if (!template) return;
+    const requiredSkillIds = gradebookSkillCatalogService.normalizeGradebookSkillIds(
+      template.requiredGradebookSkills
+    );
+    if (!requiredSkillIds.length || template.requireGradebookSkillsBeforeFill === false) return;
+
+    const activeRows = reportAssignmentSessionUtils.getEffectiveTargetRows(assignment)
+      .filter((row) => String(row?.status || 'active').trim().toLowerCase() === 'active')
+      .filter((row) => sessionConductService.targetRowMatchesSessionContext(row, sessionContext));
+
+    const pushCheck = (period) => {
+      if (!period) return;
+      const key = `${templateId}|${period.startDate}|${period.endDate}|${requiredSkillIds.join(',')}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      checks.push({
+        requiredSkillIds,
+        startDate: period.startDate,
+        endDate: period.endDate
+      });
+    };
+
+    if (activeRows.length) {
+      activeRows.forEach((row) => pushCheck(reportPeriodFromAssignmentTargetRow(row)));
+      return;
+    }
+    pushCheck(reportPeriodFromAssignmentTargetRow(assignment));
+  });
+
+  return checks;
+}
+
 function evaluatePeriodSkillCoverage({
   requiredSkillIds = [],
   sessions = [],
@@ -227,18 +280,97 @@ function buildSessionSkillCoveragePayload({
     };
   }
 
-  const evaluation = evaluatePeriodSkillCoverage({
-    requiredSkillIds,
-    sessions,
-    startDate: periodStart,
-    endDate: periodDue
+  if (!gateActive) {
+    return {
+      ready: true,
+      gateActive: false,
+      requiredSkillIds,
+      missingSkills: [],
+      message: 'Required gradebook skills are configured but gating before Fill Reports is disabled on the template(s).',
+      period: {
+        startDate: normalizeDateOnly(periodStart),
+        endDate: normalizeDateOnly(periodDue)
+      }
+    };
+  }
+
+  const checks = resolveGatedSkillChecksForSession({
+    assignments,
+    sessionContext,
+    templatesById
+  });
+  const fallbackStart = normalizeDateOnly(periodStart);
+  const fallbackEnd = normalizeDateOnly(periodDue);
+  if (!checks.length && fallbackStart && fallbackEnd) {
+    checks.push({
+      requiredSkillIds,
+      startDate: fallbackStart,
+      endDate: fallbackEnd
+    });
+  }
+
+  const catalog = gradebookSkillCatalogService.listGradebookSkills();
+  const labelById = new Map(catalog.map((row) => [String(row.id), String(row.label || row.id)]));
+
+  if (!checks.length) {
+    return {
+      ready: false,
+      gateActive: true,
+      requiredSkillIds,
+      missingSkills: requiredSkillIds.map((id) => ({
+        id,
+        label: labelById.get(id) || id,
+        activityCount: 0
+      })),
+      coveredSkills: [],
+      period: { startDate: fallbackStart, endDate: fallbackEnd },
+      message: 'Set report start and due dates on the assignment before gradebook skill coverage can be verified.'
+    };
+  }
+
+  let allReady = true;
+  const missingById = new Map();
+  const coveredById = new Map();
+  let displayPeriod = { startDate: '', endDate: '' };
+  let activityCountInPeriod = 0;
+
+  checks.forEach((check) => {
+    const evaluation = evaluatePeriodSkillCoverage({
+      requiredSkillIds: check.requiredSkillIds,
+      sessions,
+      startDate: check.startDate,
+      endDate: check.endDate,
+      skillCatalog: catalog
+    });
+    if (!evaluation.ready) allReady = false;
+    activityCountInPeriod += evaluation.activityCountInPeriod || 0;
+    evaluation.missingSkills.forEach((row) => missingById.set(row.id, row));
+    evaluation.coveredSkills.forEach((row) => coveredById.set(row.id, row));
+    if (!displayPeriod.startDate || check.startDate < displayPeriod.startDate) {
+      displayPeriod.startDate = check.startDate;
+    }
+    if (!displayPeriod.endDate || check.endDate > displayPeriod.endDate) {
+      displayPeriod.endDate = check.endDate;
+    }
   });
 
+  if (checks.length === 1) {
+    displayPeriod = {
+      startDate: checks[0].startDate,
+      endDate: checks[0].endDate
+    };
+  }
+
+  const missingSkills = [...missingById.values()];
   return {
-    ...evaluation,
-    gateActive,
+    ready: allReady,
+    gateActive: true,
     requiredSkillIds,
-    message: evaluation.ready
+    missingSkills,
+    coveredSkills: [...coveredById.values()],
+    activityCountInPeriod,
+    period: displayPeriod,
+    message: allReady
       ? 'All required gradebook skills have at least one activity in the report period.'
       : 'Some required skills do not have a gradebook activity in the report period yet.'
   };
@@ -250,5 +382,6 @@ module.exports = {
   collectGradebookActivitiesInPeriod,
   evaluatePeriodSkillCoverage,
   resolveRequiredSkillsForSessionReports,
+  resolveGatedSkillChecksForSession,
   buildSessionSkillCoveragePayload
 };

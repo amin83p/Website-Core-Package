@@ -653,6 +653,35 @@
       if (token) actionStateId = token;
     }
 
+    async function ensureActionStateForSession(openCtx = {}) {
+      if (actionStateId) return actionStateId;
+      if (typeof deps.fetchActionStateId === 'function') {
+        const delegated = String(await deps.fetchActionStateId(openCtx) || '').trim();
+        if (delegated) {
+          rememberActionStateId(delegated);
+          return actionStateId;
+        }
+      }
+      const classId = String(openCtx.classId || ctx.classId || '').trim();
+      const sessionId = String(openCtx.sessionId || ctx.sessionId || '').trim();
+      if (!classId || !sessionId) return '';
+      const res = await fetch(
+        `/school/classes/${encodeURIComponent(classId)}/sessions/${encodeURIComponent(sessionId)}/report-assignments/prepare`,
+        {
+          method: 'GET',
+          headers: { 'x-ajax-request': 'true', Accept: 'application/json' },
+          credentials: 'same-origin'
+        }
+      );
+      const result = await res.json().catch(() => ({}));
+      const token = String(result.actionStateId || res.headers.get('x-action-state-id') || '').trim();
+      if (!res.ok || result.status !== 'success' || !token) {
+        throw new Error(result.message || 'Could not prepare report assignment.');
+      }
+      rememberActionStateId(token);
+      return actionStateId;
+    }
+
     async function saveAssignment() {
       if (saving) return;
       const modal = getModal();
@@ -804,6 +833,7 @@
           if (patch && typeof patch === 'object') resolvedCtx = { ...resolvedCtx, ...patch };
         }
         ctx = resolvedCtx;
+        await ensureActionStateForSession(resolvedCtx);
         const loadTasks = [fetchActiveReportTemplates(ctx)];
         if (hasFetchExistingReports) {
           loadTasks.push(deps.fetchExistingReports(ctx));

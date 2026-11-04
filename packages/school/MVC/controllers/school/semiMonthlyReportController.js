@@ -230,7 +230,9 @@ async function exportSelections(req, res) {
   } catch (error) {
     return res.status(Number(error?.statusCode) || 400).json({
       status: 'error',
-      message: error.message || 'Could not export semi-monthly reports.'
+      message: error.message || 'Could not export semi-monthly reports.',
+      code: error.code || '',
+      exportFailureReport: error.exportFailureReport || null
     });
   }
 }

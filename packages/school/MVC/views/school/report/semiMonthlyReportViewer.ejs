@@ -662,17 +662,22 @@
     return summary;
   }
 
-  async function showReportMessage({ title = 'School Semi-Monthly Report', icon = 'info', message = '' } = {}) {
+  async function showReportMessage({ title = 'School Semi-Monthly Report', icon = 'info', message = '', exportFailureReport = null } = {}) {
     const safeMessage = String(message || '').trim() || 'Operation could not be completed.';
-    const docxHtml = icon === 'error' && window.ReportMessaging?.buildDocxExportCancelledModalHtml
+    const overallHtml = icon === 'error' && exportFailureReport
+      && window.ReportMessaging?.buildOverallExportPreviewFailureModalHtml
+      ? window.ReportMessaging.buildOverallExportPreviewFailureModalHtml(exportFailureReport)
+      : null;
+    const docxHtml = !overallHtml && icon === 'error' && window.ReportMessaging?.buildDocxExportCancelledModalHtml
       ? window.ReportMessaging.buildDocxExportCancelledModalHtml(safeMessage)
       : null;
-    const exportFailed = Boolean(docxHtml);
+    const richHtml = overallHtml || docxHtml;
+    const exportFailed = Boolean(richHtml);
     if (window.ReportMessaging?.showReportMessage) {
       return window.ReportMessaging.showReportMessage({
-        title: exportFailed ? 'DOCX Export Failed' : title,
+        title: exportFailed ? (overallHtml ? 'Overall Export Failed' : 'DOCX Export Failed') : title,
         icon,
-        message: docxHtml || safeMessage,
+        message: richHtml || safeMessage,
         html: exportFailed,
         size: exportFailed ? 'lg' : 'md',
         buttonClass: icon === 'error' ? (exportFailed ? 'btn-warning' : 'btn-danger') : 'btn-primary'
@@ -680,10 +685,10 @@
     }
     if (typeof window.showMessageModal === 'function' && document.getElementById('messageModal')) {
       return window.showMessageModal({
-        title: exportFailed ? 'DOCX Export Failed' : title,
+        title: exportFailed ? (overallHtml ? 'Overall Export Failed' : 'DOCX Export Failed') : title,
         icon,
-        message: docxHtml || safeMessage,
-        html: Boolean(docxHtml),
+        message: richHtml || safeMessage,
+        html: Boolean(richHtml),
         size: exportFailed ? 'lg' : 'md',
         buttons: [{ text: 'OK', class: icon === 'error' ? (exportFailed ? 'btn-warning' : 'btn-danger') : 'btn-primary' }]
       });
@@ -1498,7 +1503,9 @@
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => null);
-        throw new Error(payload?.message || `Export failed (${response.status}).`);
+        const exportErr = new Error(payload?.message || `Export failed (${response.status}).`);
+        exportErr.exportFailureReport = payload?.exportFailureReport || null;
+        throw exportErr;
       }
       const blob = await response.blob();
       if (!blob || blob.size === 0) throw new Error('Export returned an empty file.');
@@ -1515,7 +1522,11 @@
       URL.revokeObjectURL(url);
       showReportMessage({ icon: 'success', message: 'Export downloaded successfully.' });
     } catch (error) {
-      showReportMessage({ icon: 'error', message: error.message || 'Export failed.' });
+      showReportMessage({
+        icon: 'error',
+        message: error.message || 'Export failed.',
+        exportFailureReport: error.exportFailureReport || null
+      });
     } finally {
       if (loadingToken && typeof window.hideLoading === 'function') window.hideLoading(loadingToken);
     }

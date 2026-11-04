@@ -214,6 +214,46 @@ function buildDefaultTemplates(ruleType = '') {
       smsText: sms,
       useUncompletedBuilder: false
     },
+    session_assigned_reports_not_submitted: {
+      subject,
+      bodyText: [
+        'Hi {{TEACHER_NAME}},',
+        '',
+        'The following session(s) still have assigned report(s) that must be submitted. Open each session below, go to the Reports tab, and submit each report instance before marking the session completed.',
+        '',
+        '{{SESSION_LIST}}',
+        '',
+        'Thank you,',
+        '{{ORG_NAME}}'
+      ].join('\n'),
+      bodyHtml: buildSessionRuleBodyHtml(
+        'The following session(s) still have assigned report(s) that must be submitted. Open each session below, go to the <strong>Reports</strong> tab, and submit each report instance before marking the session completed.'
+      ),
+      emailTitle: 'Assigned reports reminder',
+      eyebrow: 'School notification',
+      smsText: sms,
+      useUncompletedBuilder: false
+    },
+    session_class_conduct_not_completed: {
+      subject,
+      bodyText: [
+        'Hi {{TEACHER_NAME}},',
+        '',
+        'The following session(s) still need class conduct saved on Manage Session → Reports. Complete the ratings and use Save class conduct before filling reports for these sessions.',
+        '',
+        '{{SESSION_LIST}}',
+        '',
+        'Thank you,',
+        '{{ORG_NAME}}'
+      ].join('\n'),
+      bodyHtml: buildSessionRuleBodyHtml(
+        'The following session(s) still need class conduct saved on Manage Session → <strong>Reports</strong>. Complete the ratings and use <strong>Save class conduct</strong> before filling reports for these sessions.'
+      ),
+      emailTitle: 'Class conduct reminder',
+      eyebrow: 'School notification',
+      smsText: sms,
+      useUncompletedBuilder: false
+    },
     timesheet_not_submitted: {
       subject,
       bodyText: [

@@ -697,6 +697,31 @@ function generateDocxAlias(reserved = new Set()) {
   throw new Error('Unable to generate a unique DOCX shortcut for this template.');
 }
 
+function preserveStableFieldDocxAliases(template, existingTemplate = null) {
+  if (!existingTemplate || !template) return template;
+  const existingFields = Array.isArray(existingTemplate?.schema?.fields)
+    ? existingTemplate.schema.fields
+    : [];
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  if (!existingFields.length || !fields.length) return template;
+
+  const priorById = new Map();
+  existingFields.forEach((row) => {
+    const id = String(row?.id || '').trim();
+    if (!id) return;
+    const alias = normalizeDocxAlias(row.docxAlias);
+    if (alias && DOCX_ALIAS_PATTERN.test(alias)) priorById.set(id, alias);
+  });
+
+  fields.forEach((field) => {
+    if (!field || typeof field !== 'object' || isVisualOnlyField(field)) return;
+    const id = String(field?.id || '').trim();
+    const prior = priorById.get(id);
+    if (prior) field.docxAlias = prior;
+  });
+  return template;
+}
+
 function ensureTemplateDocxAliases(template) {
   const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
   const placeholderMap = template?.placeholderMap && typeof template.placeholderMap === 'object'
@@ -1284,6 +1309,7 @@ module.exports = {
   applyExportTextCase,
   normalizeDocxAlias,
   generateDocxAlias,
+  preserveStableFieldDocxAliases,
   ensureTemplateDocxAliases,
   normalizeCalculationDependencies,
   normalizeCalculationRule,

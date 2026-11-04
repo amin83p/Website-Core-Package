@@ -128,3 +128,27 @@ test('overallTemplateForm includes PDF template designer section', () => {
   assert.match(view, /btnInspectPdfFields/);
   assert.match(view, /overall-templates\/.*pdf-fields/);
 });
+
+test('formatOverallExportPreviewFailure lists validation and calculation blockers', () => {
+  const report = overallReportService.buildOverallExportPreviewFailureReport({
+    validation: {
+      errors: [{ fieldLabel: 'Comments', message: 'Required when attendance is below 80%.' }]
+    },
+    conversionDiagnostics: [{ fieldLabel: 'Grade', message: 'Division by zero in conversion rule.' }],
+    calculationDiagnostics: [],
+    calculationMismatches: [{
+      fieldLabel: 'Total',
+      storedValue: 10,
+      calculatedValue: 12
+    }]
+  }, { studentName: 'Jane Doe', formatLabel: 'DOCX' });
+  const message = overallReportService.formatOverallExportPreviewFailureText(report);
+  assert.match(message, /Jane Doe/);
+  assert.match(message, /Validation errors/);
+  assert.match(message, /Comments/);
+  assert.match(message, /Conversion errors/);
+  assert.match(message, /Grade/);
+  assert.match(message, /Stored vs calculated mismatches/);
+  assert.match(message, /Total/);
+  assert.equal(report.sections.length, 3);
+});

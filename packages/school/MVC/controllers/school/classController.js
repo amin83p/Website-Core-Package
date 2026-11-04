@@ -4964,6 +4964,23 @@ async function manageSession(req, res) {
     }
 }
 
+async function prepareSessionReportAssignment(req, res) {
+    try {
+        const { id: classId, sessionId } = req.params;
+        const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+        const sessions = await schoolDataService.getClassSessions(classId, req.user);
+        const { session } = findSessionInList(sessions, sessionId, resolveSessionDateFromRequest(req));
+        if (!session) throw new Error('Session not found.');
+        assertSessionScopeForRequest(req, classData, session);
+        return res.json({
+            status: 'success',
+            actionStateId: req.actionStateId
+        });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
 async function assignReportToSession(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
@@ -7628,7 +7645,7 @@ module.exports = {
   getClassTemplate,
   checkConflicts,
   previewTeacherAssignmentImpact,
-  saveSession, saveSessionGradebooks, getGradebookMakeupSources, getGradebookMakeupActivities, postGradebookMakeupFrom, manageSession, previewClassSessionDelete, uploadSessionFile, createMakeupSession, deleteLinkedMakeupSession, listMergeEligibleTeachers, previewSessionMerge, executeSessionMerge, unmergeSession, assignReportToSession, getBookCoveringSummaryForSession, createBookCoveringForSession, deleteBookCoveringForSession, listSessionBookCoveringAssignedBooks, getSessionBookCoveringAssignedBookDetail, upsertSessionBookCoveringEntry, deleteSessionBookCoveringEntry, listSessionReportInstances, getSessionReportGradebookSkillCoverage, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
+  saveSession, saveSessionGradebooks, getGradebookMakeupSources, getGradebookMakeupActivities, postGradebookMakeupFrom, manageSession, previewClassSessionDelete, uploadSessionFile, createMakeupSession, deleteLinkedMakeupSession, listMergeEligibleTeachers, previewSessionMerge, executeSessionMerge, unmergeSession, prepareSessionReportAssignment, assignReportToSession, getBookCoveringSummaryForSession, createBookCoveringForSession, deleteBookCoveringForSession, listSessionBookCoveringAssignedBooks, getSessionBookCoveringAssignedBookDetail, upsertSessionBookCoveringEntry, deleteSessionBookCoveringEntry, listSessionReportInstances, getSessionReportGradebookSkillCoverage, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
   saveSessionConduct,
   setSessionLock,
   showFinalGradesPage,

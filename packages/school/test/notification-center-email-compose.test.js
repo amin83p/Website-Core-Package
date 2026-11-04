@@ -187,6 +187,32 @@ test('buildBatchPreview delegates to compose service for book report rules', asy
   assert.match(preview.plainText, /submitted book coverage report/i);
 });
 
+test('session_assigned_reports_not_submitted default mentions report submission', async () => {
+  const preview = await composeService.buildEmailPreview({
+    rule: { ruleType: 'session_assigned_reports_not_submitted', label: 'Assigned reports' },
+    recipientPersonId: 'T1',
+    items: [sampleSessionItem],
+    orgName: 'Demo School',
+    baseUrl: 'https://school.example'
+  });
+  assert.match(preview.plainText, /assigned report/i);
+  assert.match(preview.plainText, /submit/i);
+  assert.match(preview.htmlBody, /Assigned reports reminder/);
+});
+
+test('session_class_conduct_not_completed default mentions save class conduct', async () => {
+  const preview = await composeService.buildEmailPreview({
+    rule: { ruleType: 'session_class_conduct_not_completed', label: 'Class conduct' },
+    recipientPersonId: 'T1',
+    items: [sampleSessionItem],
+    orgName: 'Demo School',
+    baseUrl: 'https://school.example'
+  });
+  assert.match(preview.plainText, /class conduct/i);
+  assert.match(preview.plainText, /Save class conduct/i);
+  assert.match(preview.htmlBody, /Class conduct reminder/);
+});
+
 test('rule form includes email template fields', () => {
   const ruleFormPath = path.join(__dirname, '../MVC/views/school/notificationCenter/ruleForm.ejs');
   const html = fs.readFileSync(ruleFormPath, 'utf8');

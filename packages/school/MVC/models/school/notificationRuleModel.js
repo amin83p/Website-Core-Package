@@ -26,7 +26,9 @@ const NOTIFICATION_RULE_TYPE_LABELS = Object.freeze({
   session_without_book_report: 'Sessions without Book Coverage Reports',
   session_without_notes: 'Sessions without Notes',
   session_with_cases: 'Sessions with Cases',
-  session_with_activities: 'Sessions with Activities'
+  session_with_activities: 'Sessions with Activities',
+  session_assigned_reports_not_submitted: 'Not Submitted Assigned Reports',
+  session_class_conduct_not_completed: 'Not Completed Class Conduct'
 });
 
 function formatNotificationTokenLabel(value) {
@@ -48,6 +50,8 @@ const NOTIFICATION_RULE_TYPES = Object.freeze([
   'session_without_notes',
   'session_with_cases',
   'session_with_activities',
+  'session_assigned_reports_not_submitted',
+  'session_class_conduct_not_completed',
   'timesheet_not_submitted'
 ]);
 
@@ -61,7 +65,9 @@ const SESSION_RULE_TYPES_WITH_TIMING = new Set([
   'session_without_book_report',
   'session_without_notes',
   'session_with_cases',
-  'session_with_activities'
+  'session_with_activities',
+  'session_assigned_reports_not_submitted',
+  'session_class_conduct_not_completed'
 ]);
 
 function normalizeNotificationTimingMode(value, fallback = 'daily_digest') {

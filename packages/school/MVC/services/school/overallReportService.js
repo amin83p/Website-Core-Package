@@ -751,6 +751,115 @@ function hasBlockingValidationErrors(validation = {}) {
     || (Array.isArray(validation?.errors) && validation.errors.length > 0);
 }
 
+function buildOverallExportPreviewFailureReport(preview = {}, context = {}) {
+  const studentName = clean(context.studentName);
+  const studentId = clean(context.studentId);
+  const formatLabel = clean(context.formatLabel || 'DOCX').toUpperCase();
+  const sections = [];
+
+  const validation = preview.validation || {};
+  const validationItems = (Array.isArray(validation.errors) ? validation.errors : []).map((issue) => ({
+    fieldId: String(issue?.fieldId || '').trim(),
+    fieldLabel: String(issue?.fieldLabel || issue?.fieldId || 'Field').trim() || 'Field',
+    message: String(issue?.message || 'Validation failed.').trim()
+  }));
+  if (validationItems.length) {
+    sections.push({ type: 'validation', title: 'Validation errors', items: validationItems });
+  }
+
+  const conversionItems = [];
+  (Array.isArray(preview.conversionDiagnostics) ? preview.conversionDiagnostics : []).forEach((row) => {
+    if (!row) return;
+    if (typeof row === 'string') {
+      conversionItems.push({ fieldId: '', fieldLabel: 'Conversion', message: row });
+      return;
+    }
+    conversionItems.push({
+      fieldId: String(row.fieldId || '').trim(),
+      fieldLabel: String(row.fieldLabel || row.fieldId || 'Field').trim() || 'Field',
+      message: String(row.message || row.detail || 'Conversion failed.').trim()
+    });
+  });
+  if (conversionItems.length) {
+    sections.push({ type: 'conversion', title: 'Conversion errors', items: conversionItems });
+  }
+
+  const calculationItems = (Array.isArray(preview.calculationDiagnostics) ? preview.calculationDiagnostics : [])
+    .map((row) => ({
+      fieldId: String(row?.fieldId || '').trim(),
+      fieldLabel: String(row?.fieldLabel || row?.fieldId || 'Field').trim() || 'Field',
+      message: String(row?.message || 'Calculation failed.').trim()
+    }));
+  if (calculationItems.length) {
+    sections.push({ type: 'calculation', title: 'Calculation errors', items: calculationItems });
+  }
+
+  const mismatchItems = (Array.isArray(preview.calculationMismatches) ? preview.calculationMismatches : [])
+    .map((row) => ({
+      fieldId: String(row?.fieldId || '').trim(),
+      fieldLabel: String(row?.fieldLabel || row?.fieldId || 'Field').trim() || 'Field',
+      storedValue: row?.storedValue,
+      calculatedValue: row?.calculatedValue,
+      message: `Stored value ${JSON.stringify(row?.storedValue)} does not match calculated ${JSON.stringify(row?.calculatedValue)}.`
+    }));
+  if (mismatchItems.length) {
+    sections.push({ type: 'mismatch', title: 'Stored vs calculated mismatches', items: mismatchItems });
+  }
+
+  if (!sections.length) {
+    sections.push({
+      type: 'unknown',
+      title: 'Export blocked',
+      items: [{
+        fieldId: '',
+        fieldLabel: 'Overall report',
+        message: 'Export preview was not ready, but no validation, conversion, or calculation details were recorded.'
+      }]
+    });
+  }
+
+  const studentLabel = studentName || studentId;
+  const summary = studentLabel
+    ? `${formatLabel} export was cancelled for ${studentLabel} because the overall report did not pass export checks.`
+    : `${formatLabel} export was cancelled because the overall report did not pass export checks.`;
+
+  return {
+    code: 'OVERALL_EXPORT_PREVIEW_BLOCKED',
+    format: formatLabel,
+    studentName,
+    studentId,
+    summary,
+    sections
+  };
+}
+
+function formatOverallExportPreviewFailureText(report = {}) {
+  const lines = [String(report.summary || 'Export was cancelled.').trim(), ''];
+  (Array.isArray(report.sections) ? report.sections : []).forEach((section) => {
+    lines.push(String(section.title || 'Issues').trim());
+    (Array.isArray(section.items) ? section.items : []).forEach((item) => {
+      const label = String(item.fieldLabel || item.fieldId || 'Field').trim() || 'Field';
+      const detail = String(item.message || '').trim();
+      lines.push(`  • ${label}${detail ? `: ${detail}` : ''}`);
+    });
+    lines.push('');
+  });
+  lines.push('Fix the overall template field(s) listed above, then try the export again.');
+  return lines.join('\n').trim();
+}
+
+function formatOverallExportPreviewFailure(preview = {}, context = {}) {
+  return formatOverallExportPreviewFailureText(buildOverallExportPreviewFailureReport(preview, context));
+}
+
+function throwOverallExportPreviewBlocked(preview = {}, context = {}) {
+  const exportFailureReport = buildOverallExportPreviewFailureReport(preview, context);
+  const error = new Error(formatOverallExportPreviewFailureText(exportFailureReport));
+  error.code = exportFailureReport.code;
+  error.exportFailureReport = exportFailureReport;
+  throw error;
+}
+
 function nextRevision(instance = {}) {
   return Math.max(1, Number(instance?.revision || 1) || 1) + 1;
 }
@@ -1320,7 +1429,11 @@ async function exportOverallReport(instance, reqUser) {
     throw new Error(formatMissingDocxTokenError(entryInstance.templateSnapshot, preview.missingTokens, preview.placeholders));
   }
   if (!preview.ready) {
-    throw new Error('DOCX export cancelled because the overall report has validation or calculation errors.');
+    throwOverallExportPreviewBlocked(preview, {
+      studentName: workspace.studentEntries[0]?.studentName,
+      studentId: workspace.studentEntries[0]?.studentId,
+      formatLabel: 'DOCX'
+    });
   }
   const rendered = await reportDocxRenderService.renderReportInstanceDocx({
     template: entryInstance.templateSnapshot,
@@ -1932,7 +2045,11 @@ async function renderEntryDocx(instance, entry, docxKey, reqUser) {
     throw new Error(formatMissingDocxTokenError(virtual.templateSnapshot, preview.missingTokens, preview.placeholders));
   }
   if (hasBlockingValidationErrors(preview.validation) || preview.calculationMismatches.length || preview.calculationDiagnostics.length) {
-    throw new Error(`DOCX export cancelled for ${entry.studentName || entry.studentId} because of validation or calculation errors.`);
+    throwOverallExportPreviewBlocked(preview, {
+      studentName: entry.studentName,
+      studentId: entry.studentId,
+      formatLabel: 'DOCX'
+    });
   }
   const rendered = await reportDocxRenderService.renderReportInstanceDocx({
     template: virtual.templateSnapshot,
@@ -2060,7 +2177,11 @@ async function renderEntryPdf(instance, entry, pdfKey, reqUser) {
   if (pdfKey) virtual.selectedPdfKey = pdfKey;
   const preview = await buildPdfExportPreview(virtual);
   if (hasBlockingValidationErrors(preview.validation) || preview.calculationMismatches.length || preview.calculationDiagnostics.length) {
-    throw new Error(`PDF export cancelled for ${entry.studentName || entry.studentId} because of validation or calculation errors.`);
+    throwOverallExportPreviewBlocked(preview, {
+      studentName: entry.studentName,
+      studentId: entry.studentId,
+      formatLabel: 'PDF'
+    });
   }
   const rendered = await reportPdfRenderService.renderReportInstancePdf({
     template: virtual.templateSnapshot,
@@ -2196,7 +2317,11 @@ async function exportOverallReportPdf(instance, reqUser) {
     : instance;
   const preview = await buildPdfExportPreview(entryInstance);
   if (!preview.ready) {
-    throw new Error('PDF export cancelled because the overall report has validation or calculation errors.');
+    throwOverallExportPreviewBlocked(preview, {
+      studentName: workspace.studentEntries[0]?.studentName,
+      studentId: workspace.studentEntries[0]?.studentId,
+      formatLabel: 'PDF'
+    });
   }
   const rendered = await reportPdfRenderService.renderReportInstancePdf({
     template: entryInstance.templateSnapshot,
@@ -2305,6 +2430,10 @@ module.exports = {
   resetDerivedOverride,
   transitionStatus,
   hasBlockingValidationErrors,
+  buildOverallExportPreviewFailureReport,
+  formatOverallExportPreviewFailure,
+  formatOverallExportPreviewFailureText,
+  throwOverallExportPreviewBlocked,
   isOverallFieldEditable,
   buildDocxPayload,
   buildDocxPayloadDetailed,

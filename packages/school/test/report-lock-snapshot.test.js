@@ -555,6 +555,49 @@ test('reportTemplateModel sanitizes snapshotKeyDocxAliases against snapshotKeys'
   assert.deepEqual(sanitized.snapshotKeyDocxAliases, { student_full_name: 'key1' });
 });
 
+test('preserveStableFieldDocxAliases keeps docxAlias for unchanged field ids on update', () => {
+  const reportRuleEngineService = require('../MVC/services/school/reportRuleEngineService');
+  const existing = {
+    schema: {
+      fields: [{
+        id: 'listening_avg',
+        label: 'Listening',
+        type: 'text',
+        prefillKey: 'student_gradebook_skill_listening_avg_percent',
+        docxAlias: 'l001'
+      }]
+    }
+  };
+  const next = {
+    schema: {
+      fields: [{
+        id: 'listening_avg',
+        label: 'Listening Average',
+        type: 'text',
+        prefillKey: 'student_gradebook_skill_listening_avg_percent',
+        docxAlias: 'x999'
+      }]
+    }
+  };
+  reportRuleEngineService.preserveStableFieldDocxAliases(next, existing);
+  assert.equal(next.schema.fields[0].docxAlias, 'l001');
+});
+
+test('sanitizeTemplate update preserves snapshot key docx aliases when client omits them', () => {
+  const existing = {
+    ...baseTemplatePayload,
+    snapshotKeys: ['student_full_name', 'class_attendance_present'],
+    snapshotKeyDocxAliases: { class_attendance_present: 'att9' }
+  };
+  const sanitized = reportTemplateModel.sanitizeTemplate({
+    ...existing,
+    snapshotKeys: ['student_full_name', 'class_attendance_present'],
+    snapshotKeyDocxAliases: { student_full_name: 'key1' }
+  }, { isUpdate: true, existing });
+  assert.equal(sanitized.snapshotKeyDocxAliases.student_full_name, 'key1');
+  assert.equal(sanitized.snapshotKeyDocxAliases.class_attendance_present, 'att9');
+});
+
 test('ensureSnapshotDocxShortcuts assigns alias for catalog-only snapshot key', () => {
   const template = JSON.parse(JSON.stringify({
     ...baseTemplatePayload,

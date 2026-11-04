@@ -232,7 +232,11 @@ async function renderVirtualOverallDocx(virtualInstance, docxKey = '') {
     throw new Error(overallReportService.formatMissingDocxTokenError(instance.templateSnapshot, preview.missingTokens, preview.placeholders));
   }
   if (!preview.ready) {
-    throw new Error('DOCX export cancelled because the overall report has validation or calculation errors.');
+    overallReportService.throwOverallExportPreviewBlocked(preview, {
+      studentName: instance.studentName,
+      studentId: instance.studentId,
+      formatLabel: 'DOCX'
+    });
   }
   const rendered = await reportDocxRenderService.renderReportInstanceDocx({
     template: instance.templateSnapshot,
@@ -257,7 +261,11 @@ async function renderVirtualOverallPdf(virtualInstance, pdfKey = '') {
   if (pdfKey) instance.selectedPdfKey = pdfKey;
   const preview = await overallReportService.buildPdfExportPreview(instance);
   if (!preview.ready) {
-    throw new Error('PDF export cancelled because the overall report has validation or calculation errors.');
+    overallReportService.throwOverallExportPreviewBlocked(preview, {
+      studentName: instance.studentName,
+      studentId: instance.studentId,
+      formatLabel: 'PDF'
+    });
   }
   const rendered = await reportPdfRenderService.renderReportInstancePdf({
     template: instance.templateSnapshot,

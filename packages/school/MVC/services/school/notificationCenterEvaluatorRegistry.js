@@ -184,6 +184,26 @@ async function evaluateSessionWithActivities({ orgId, rule, asOfDate, reqUser })
   });
 }
 
+async function evaluateSessionAssignedReportsNotSubmitted({ orgId, rule, asOfDate, reqUser }) {
+  return notificationCenterSessionRuleScanService.evaluateSessionsByReportPredicate({
+    orgId,
+    rule,
+    asOfDate,
+    reqUser,
+    predicate: notificationCenterSessionRuleScanService.evaluateSessionAssignedReportsNotSubmitted
+  });
+}
+
+async function evaluateSessionClassConductNotCompleted({ orgId, rule, asOfDate, reqUser }) {
+  return notificationCenterSessionRuleScanService.evaluateSessionsByReportPredicate({
+    orgId,
+    rule,
+    asOfDate,
+    reqUser,
+    predicate: notificationCenterSessionRuleScanService.evaluateSessionClassConductNotCompleted
+  });
+}
+
 const EVALUATORS = Object.freeze({
   session_not_final: {
     evaluate: evaluateSessionNotFinal,
@@ -207,6 +227,14 @@ const EVALUATORS = Object.freeze({
   },
   session_with_activities: {
     evaluate: evaluateSessionWithActivities,
+    groupFindings: groupFindingsByRecipient
+  },
+  session_assigned_reports_not_submitted: {
+    evaluate: evaluateSessionAssignedReportsNotSubmitted,
+    groupFindings: groupFindingsByRecipient
+  },
+  session_class_conduct_not_completed: {
+    evaluate: evaluateSessionClassConductNotCompleted,
     groupFindings: groupFindingsByRecipient
   },
   timesheet_not_submitted: {
@@ -249,6 +277,8 @@ module.exports = {
   evaluateSessionWithoutNotes,
   evaluateSessionWithCases,
   evaluateSessionWithActivities,
+  evaluateSessionAssignedReportsNotSubmitted,
+  evaluateSessionClassConductNotCompleted,
   evaluateTimesheetNotSubmitted,
   groupFindingsByRecipient
 };

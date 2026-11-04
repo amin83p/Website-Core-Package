@@ -110,6 +110,7 @@ test('school report section header omits School Dashboard button', () => {
   assert.doesNotMatch(headerHtml, /School Dashboard/);
   assert.match(headerHtml, /School Reports/);
   const ccrView = read('packages/school/MVC/views/school/report/classConductReport.ejs');
+  assert.match(ccrView, /reportMessageHelpers/);
   const sarView = read('packages/school/MVC/views/school/attendance/studentAttendanceReportViewer.ejs');
   const smmrView = read('packages/school/MVC/views/school/report/semiMonthlyReportViewer.ejs');
   [ccrView, sarView, smmrView].forEach((view) => {
@@ -132,5 +133,8 @@ test('class conduct report print button and preview helpers', () => {
   assert.match(client, /function openClassConductPrint/);
   assert.match(client, /function setClassConductPrintEnabled/);
   assert.match(client, /class-conduct-report/);
+  assert.match(client, /promptLoadReportFromUrlLink/);
+  assert.match(client, /ccrOpenedFromUrlQuery/);
+  assert.doesNotMatch(client, /if \(INITIAL\.startDate && INITIAL\.endDate\) void loadReport\(\)/);
   assert.match(controller, /includePrintManager:\s*true/);
 });

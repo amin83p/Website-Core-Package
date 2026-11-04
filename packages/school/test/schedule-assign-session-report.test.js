@@ -28,6 +28,8 @@ test('admin schedule wires assign-report modals and scripts', () => {
   assert.match(viewer, /btn_scheduleSessionContextAssignReport/);
   assert.match(assignScript, /applyScheduleSessionChangesInView/);
   assert.match(assignScript, /upsertRefs/);
+  assert.match(read('MVC/routes/classRoutes.js'), /report-assignments\/prepare/);
+  assert.match(read('public/scripts/sessionReportAssignmentClient.js'), /report-assignments\/prepare/);
 
   assert.doesNotMatch(selfView, /sessionReportAssignmentModals/);
   assert.doesNotMatch(selfView, /masterScheduleAssignReport\.js/);
@@ -71,6 +73,15 @@ test('assignment form uses template dropdown with class-scoped fetch', () => {
   assert.match(assignmentForm, /id="assignmentTemplateSelect"/);
   assert.match(assignmentForm, /loadAssignmentTemplatesForClass/);
   assert.doesNotMatch(assignmentForm, /btnPickTemplate/);
+});
+
+test('report template form documents gradebook skills picker', () => {
+  const templateForm = read('MVC/views/school/report/templateForm.ejs');
+  const controller = read('MVC/controllers/school/reportController.js');
+  assert.match(templateForm, /gradebookSkillsCatalog/);
+  assert.match(templateForm, /js-required-gradebook-skill/);
+  assert.match(controller, /loadReportTemplateGradebookSkills/);
+  assert.match(controller, /gradebookSkills,/);
 });
 
 test('sessionReportAssignmentClient fetch templates supports class department filter', () => {

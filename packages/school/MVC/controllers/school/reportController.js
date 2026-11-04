@@ -13,6 +13,7 @@ const reportPdfRenderService = require('../../services/school/reportPdfRenderSer
 const reportIntegrityService = require('../../services/school/reportIntegrityService');
 const reportViewService = require('../../services/school/reportViewService');
 const gradebookSkillCatalogService = require('../../services/school/gradebookSkillCatalogService');
+const skillCatalogService = require('../../services/school/skillCatalogService');
 const reportAssignmentBulkRowService = require('../../services/school/reportAssignmentBulkRowService');
 const reportAssignmentStudentEligibilityService = require('../../services/school/reportAssignmentStudentEligibilityService');
 const semiMonthlyReportAssignmentWizardService = require('../../services/school/semiMonthlyReportAssignmentWizardService');
@@ -575,6 +576,29 @@ function buildCopiedTemplateDraft(sourceTemplate = {}, templates = [], activeOrg
     targetDepartmentIds: reportTargetDepartmentPolicy.resolveTargetDepartmentFields(sourceTemplate).targetDepartmentIds
   };
 }
+
+async function loadReportTemplateGradebookSkills(orgId, reqUser) {
+  const cleanOrgId = String(orgId || '').trim();
+  if (!cleanOrgId) {
+    return gradebookSkillCatalogService.listGradebookSkills();
+  }
+  try {
+    const orgRows = await skillCatalogService.loadOrgSkillCatalog(cleanOrgId, reqUser?.id || 'SYSTEM', {
+      includeInactive: false,
+      allowFallback: true
+    });
+    const catalog = skillCatalogService.toGradebookSkillCatalog(orgRows);
+    if (catalog.length) {
+      return catalog
+        .filter((row) => row.active !== false)
+        .map((row) => ({ id: row.id, label: row.label || row.id }));
+    }
+  } catch (_) {
+    // Use built-in defaults when org catalog is unavailable.
+  }
+  return gradebookSkillCatalogService.listGradebookSkills();
+}
+
 async function showTemplateForm(req, res) {
   try {
     const id = String(req.params.id || '').trim();
@@ -594,10 +618,12 @@ async function showTemplateForm(req, res) {
     const initialTargetDepartments = template
       ? await buildInitialTargetDepartments(template, req.user)
       : [];
+    const gradebookSkills = await loadReportTemplateGradebookSkills(activeOrgId, req.user);
 
     res.render('school/report/templateForm', {
       title: isEdit ? 'Edit Report Template' : 'New Report Template',
       template,
+      gradebookSkills,
       funderPickerOptions,
       initialTargetDepartments,
       fieldTypes: reportTemplateModel.FIELD_TYPES,
@@ -626,10 +652,12 @@ async function showTemplateCopyForm(req, res) {
     const activeFunders = await reportFunderDocxService.loadActiveFunderOptions(req.user, activeOrgId);
     const funderPickerOptions = reportFunderDocxService.buildFunderPickerOptions(activeFunders);
     const initialTargetDepartments = await buildInitialTargetDepartments(template, req.user);
+    const gradebookSkills = await loadReportTemplateGradebookSkills(activeOrgId, req.user);
 
     res.render('school/report/templateForm', {
       title: 'Copy Report Template',
       template,
+      gradebookSkills,
       copySourceTemplate: sourceTemplate,
       funderPickerOptions,
       initialTargetDepartments,
@@ -683,6 +711,9 @@ async function saveTemplate(req, res) {
       payload.targetDepartmentIds,
       req.user
     );
+    if (isEdit && existing) {
+      reportRuleEngineService.preserveStableFieldDocxAliases(payload, existing);
+    }
     reportRuleEngineService.ensureTemplateDocxAliases(payload);
     reportRuleEngineService.validateCalculatedFieldExpressions(payload, { strict: true });
     reportRuleEngineService.validateTemplateExportTextCases(payload);

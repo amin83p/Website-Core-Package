@@ -16,6 +16,7 @@ const scanService = require('../MVC/services/school/notificationCenterSessionRul
 const bookCoveringReportService = require('../MVC/services/school/bookCoveringReportService');
 const sessionUncompletedNotificationService = require('../MVC/services/school/sessionUncompletedNotificationService');
 const schoolDataService = require('../MVC/services/school/schoolDataService');
+const reportViewService = require('../MVC/services/school/reportViewService');
 
 test('notification rule model exposes labels for new session rule types', () => {
   assert.ok(notificationRuleModel.NOTIFICATION_RULE_TYPES.includes('session_without_book_report'));
@@ -27,6 +28,15 @@ test('notification rule model exposes labels for new session rule types', () => 
     notificationRuleModel.formatNotificationTokenLabel('session_with_cases'),
     'Sessions with Cases'
   );
+  assert.ok(notificationRuleModel.NOTIFICATION_RULE_TYPES.includes('session_assigned_reports_not_submitted'));
+  assert.equal(
+    notificationRuleModel.formatNotificationTokenLabel('session_assigned_reports_not_submitted'),
+    'Not Submitted Assigned Reports'
+  );
+  assert.equal(
+    notificationRuleModel.formatNotificationTokenLabel('session_class_conduct_not_completed'),
+    'Not Completed Class Conduct'
+  );
 });
 
 test('registry exposes evaluators for new session rule types', () => {
@@ -34,6 +44,8 @@ test('registry exposes evaluators for new session rule types', () => {
   assert.ok(registry.getEvaluator('session_without_notes'));
   assert.ok(registry.getEvaluator('session_with_cases'));
   assert.ok(registry.getEvaluator('session_with_activities'));
+  assert.ok(registry.getEvaluator('session_assigned_reports_not_submitted'));
+  assert.ok(registry.getEvaluator('session_class_conduct_not_completed'));
 });
 
 test('session scan predicates detect notes, activities, and cases', () => {
@@ -97,6 +109,75 @@ test('submitted book report predicate ignores draft-only reports', () => {
   );
 });
 
+test('report rule predicates distinguish submitted reports and conduct readiness', () => {
+  const classData = { id: 'C1' };
+  const session = { sessionId: 'S1', date: '2026-09-10' };
+  const sessionContext = scanService.buildSessionContext(classData, session);
+  const assignment = {
+    id: 'A1',
+    classId: 'C1',
+    status: 'active',
+    targetRows: [{ status: 'active', targetType: 'session', sessionId: 'S1' }]
+  };
+  const assignmentMap = new Map([['A1', assignment]]);
+  assert.equal(scanService.sessionHasAssignedReports({
+    assignments: [assignment],
+    instanceRows: [],
+    sessionContext
+  }), true);
+
+  const draftRow = {
+    classId: 'C1',
+    sessionId: 'S1',
+    assignmentId: 'A1',
+    status: 'draft',
+    templateTitle: 'Progress'
+  };
+  const submittedRow = { ...draftRow, id: 'I1', status: 'submitted' };
+  const unsubmitted = scanService.listUnsubmittedReportRowsForSession({
+    instanceRows: [draftRow, submittedRow],
+    sessionContext,
+    assignmentMap
+  });
+  assert.equal(unsubmitted.length, 1);
+
+  const prefetch = { assignments: [assignment], assignmentMap, instanceRows: [draftRow] };
+  const reportFinding = scanService.evaluateSessionAssignedReportsNotSubmitted({
+    classData,
+    session,
+    sessionContext,
+    classReportPrefetch: prefetch
+  });
+  assert.ok(reportFinding);
+  assert.equal(reportFinding.pendingReportCount, 1);
+
+  assert.equal(scanService.evaluateSessionAssignedReportsNotSubmitted({
+    classData,
+    session,
+    sessionContext,
+    classReportPrefetch: { assignments: [assignment], assignmentMap, instanceRows: [submittedRow] }
+  }), null);
+
+  assert.ok(scanService.evaluateSessionClassConductNotCompleted({
+    classData,
+    session: { sessionId: 'S1', date: '2026-09-10', conductReportStepEnabled: true },
+    sessionContext,
+    classReportPrefetch: { assignments: [], assignmentMap: new Map(), instanceRows: [] }
+  }));
+
+  assert.equal(scanService.evaluateSessionClassConductNotCompleted({
+    classData,
+    session: {
+      sessionId: 'S1',
+      date: '2026-09-10',
+      conductReportStepEnabled: true,
+      conductReadyForReports: true
+    },
+    sessionContext,
+    classReportPrefetch: { assignments: [], assignmentMap: new Map(), instanceRows: [] }
+  }), null);
+});
+
 test('evaluateSessionWithoutNotes respects session date range', async () => {
   const originalResolve = sessionUncompletedNotificationService.resolveSessionDateRangeBounds;
   const originalListOrg = sessionUncompletedNotificationService.listOrgClasses;
@@ -130,5 +211,62 @@ test('evaluateSessionWithoutNotes respects session date range', async () => {
     sessionUncompletedNotificationService.listOrgClasses = originalListOrg;
     sessionUncompletedNotificationService.listClassSessions = originalListSessions;
     schoolDataService.fetchAllData = originalFetch;
+  }
+});
+
+test('evaluateSessionAssignedReportsNotSubmitted respects session date range', async () => {
+  const originalResolve = sessionUncompletedNotificationService.resolveSessionDateRangeBounds;
+  const originalListOrg = sessionUncompletedNotificationService.listOrgClasses;
+  const originalListSessions = sessionUncompletedNotificationService.listClassSessions;
+  const originalFetchData = schoolDataService.fetchData;
+  const originalBuildRows = reportViewService.buildInstanceListRows;
+
+  sessionUncompletedNotificationService.resolveSessionDateRangeBounds = async () => ({
+    fromDate: '2026-09-01',
+    throughDate: '2026-09-30'
+  });
+  sessionUncompletedNotificationService.listOrgClasses = async () => [{ id: 'C1', title: 'Algebra', orgId: 'ORG1' }];
+  sessionUncompletedNotificationService.listClassSessions = async () => ([
+    { sessionId: 'S1', date: '2026-09-10' },
+    { sessionId: 'S2', date: '2026-08-01' }
+  ]);
+  schoolDataService.fetchData = async (collection) => {
+    if (collection === 'reportAssignments') {
+      return [{
+        id: 'A1',
+        classId: 'C1',
+        status: 'active',
+        targetRows: [{ status: 'active', targetType: 'session', sessionId: 'S1' }]
+      }];
+    }
+    return [];
+  };
+  reportViewService.buildInstanceListRows = async () => ([
+    {
+      classId: 'C1',
+      sessionId: 'S1',
+      assignmentId: 'A1',
+      status: 'draft',
+      templateTitle: 'Progress'
+    }
+  ]);
+
+  try {
+    const evaluator = registry.getEvaluator('session_assigned_reports_not_submitted');
+    const { findings } = await evaluator.evaluate({
+      orgId: 'ORG1',
+      rule: { criteria: { sessionDateRange: { type: 'this_month' } } },
+      asOfDate: '2026-09-15',
+      reqUser: { activeOrgId: 'ORG1' }
+    });
+    assert.equal(findings.length, 1);
+    assert.equal(findings[0].id, 'S1');
+    assert.equal(findings[0].payload?.pendingReportCount, 1);
+  } finally {
+    sessionUncompletedNotificationService.resolveSessionDateRangeBounds = originalResolve;
+    sessionUncompletedNotificationService.listOrgClasses = originalListOrg;
+    sessionUncompletedNotificationService.listClassSessions = originalListSessions;
+    schoolDataService.fetchData = originalFetchData;
+    reportViewService.buildInstanceListRows = originalBuildRows;
   }
 });

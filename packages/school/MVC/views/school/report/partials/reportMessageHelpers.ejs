@@ -311,6 +311,51 @@
     );
   }
 
+  function buildOverallExportPreviewFailureModalHtml(report = {}) {
+    const payload = report && typeof report === 'object' ? report : {};
+    const summary = escapeReportMessage(String(payload.summary || 'The overall report could not be exported.').trim());
+    const format = escapeReportMessage(String(payload.format || 'DOCX').trim());
+    const student = escapeReportMessage(String(payload.studentName || payload.studentId || '').trim());
+    const sections = Array.isArray(payload.sections) ? payload.sections : [];
+    const sectionBlocks = sections.map((section) => {
+      const title = escapeReportMessage(String(section?.title || 'Issues').trim());
+      const items = Array.isArray(section?.items) ? section.items : [];
+      const rows = items.map((item) => {
+        const label = escapeReportMessage(String(item?.fieldLabel || item?.fieldId || 'Field').trim() || 'Field');
+        const fieldId = String(item?.fieldId || '').trim();
+        const message = escapeReportMessage(String(item?.message || '').trim());
+        const idLine = fieldId && fieldId !== String(item?.fieldLabel || '').trim()
+          ? `<div class="small text-muted font-monospace">${escapeReportMessage(fieldId)}</div>`
+          : '';
+        return (
+          `<li class="mb-2 pb-2 border-bottom border-light-subtle">`
+          + `<div class="fw-semibold">${label}</div>`
+          + idLine
+          + (message ? `<div class="small mt-1">${message}</div>` : '')
+          + `</li>`
+        );
+      }).join('');
+      return (
+        `<div class="border rounded p-3 mb-3 bg-light-subtle">`
+        + `<div class="small text-uppercase fw-semibold text-muted mb-2">${title}</div>`
+        + `<ul class="list-unstyled mb-0">${rows || '<li class="small text-muted">No details.</li>'}</ul>`
+        + `</div>`
+      );
+    }).join('');
+    const metaBadges = [
+      format ? `<span class="badge text-bg-secondary">${format}</span>` : '',
+      student ? `<span class="badge text-bg-light text-dark border">${student}</span>` : ''
+    ].filter(Boolean).join('');
+    return (
+      '<div class="text-start report-overall-export-error">'
+      + `<p class="mb-2">${summary}</p>`
+      + (metaBadges ? `<div class="d-flex flex-wrap gap-2 mb-3">${metaBadges}</div>` : '')
+      + sectionBlocks
+      + '<p class="small text-muted mb-0 border-top pt-2">Open the <strong>overall report template</strong>, fix the fields above (validation rules, conversion expressions, or calculations), confirm source class reports cover the period, then export again.</p>'
+      + '</div>'
+    );
+  }
+
   function buildDocxExportCancelledModalHtml(message = '') {
     const raw = String(message || '').trim();
     const prefix = 'DOCX export cancelled. Missing stored values for:';
@@ -428,6 +473,7 @@
     buildTemplateFileComplianceModalHtml,
     buildSnapshotComplianceSaveFailureModalHtml,
     buildDocxExportCancelledModalHtml,
+    buildOverallExportPreviewFailureModalHtml,
     buildRemovedTargetStudentInstancesConfirmHtml,
     buildVerifyAllRowsResultModalHtml,
     buildVerifyAllRowsDeleteConfirmHtml,

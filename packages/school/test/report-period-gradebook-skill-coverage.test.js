@@ -88,3 +88,52 @@ test('buildSessionSkillCoveragePayload gateActive false when no required skills 
   assert.equal(payload.gateActive, false);
   assert.equal(payload.ready, true);
 });
+
+test('buildSessionSkillCoveragePayload uses assignment report period not widened fallback', () => {
+  const sessions = [
+    {
+      sessionId: 'S1',
+      date: '2026-03-05',
+      gradebooks: []
+    },
+    {
+      sessionId: 'S2',
+      date: '2026-03-25',
+      gradebooks: [{ id: 'GB1', name: 'Late reading', skills: ['reading'] }]
+    }
+  ];
+  const assignments = [{
+    id: 'A1',
+    classId: 'C1',
+    templateId: 'T1',
+    status: 'active',
+    targetRows: [{
+      status: 'active',
+      targetType: 'session',
+      sessionId: 'S1',
+      reportStartDate: '2026-03-01',
+      reportDueDate: '2026-03-10'
+    }]
+  }];
+  const templatesById = new Map([['T1', {
+    id: 'T1',
+    requiredGradebookSkills: ['reading'],
+    requireGradebookSkillsBeforeFill: true
+  }]]);
+
+  const payload = coverageService.buildSessionSkillCoveragePayload({
+    assignments,
+    sessionContext: { classId: 'C1', sessionId: 'S1', sessionDate: '2026-03-05' },
+    templatesById,
+    instanceRows: [],
+    sessions,
+    periodStart: '2026-03-01',
+    periodDue: '2026-03-31'
+  });
+
+  assert.equal(payload.gateActive, true);
+  assert.equal(payload.ready, false);
+  assert.equal(payload.period.startDate, '2026-03-01');
+  assert.equal(payload.period.endDate, '2026-03-10');
+  assert.deepEqual(payload.missingSkills.map((row) => row.id), ['reading']);
+});

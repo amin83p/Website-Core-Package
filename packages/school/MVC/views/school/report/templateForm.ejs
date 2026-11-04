@@ -1641,18 +1641,64 @@
       throw new Error('Unable to generate a unique DOCX shortcut for this template.');
     }
 
-    function ensureClientDocxAliases() {
+    function ensureClientDocxAliases({ onlyFillMissing = false } = {}) {
       const used = new Set();
-      const nonAliasReserved = collectReservedDocxTokens({ includeAliases: false });
-      (Array.isArray(fieldsState) ? fieldsState : []).forEach((field) => {
+      (Array.isArray(fieldsState) ? fieldsState : []).forEach((field, fieldIndex) => {
         if (isVisualOnlyType(field?.type)) {
           field.docxAlias = '';
           return;
         }
+        const selfTokens = new Set(
+          [field?.id, field?.prefillKey, field?.placeholderToken]
+            .map((value) => normalizeDocxTokenKey(value))
+            .filter(Boolean)
+        );
+        const nonAliasReserved = collectReservedDocxTokens({ includeAliases: false });
+        selfTokens.forEach((token) => nonAliasReserved.delete(token));
         let alias = normalizeDocxAlias(field?.docxAlias);
-        if (!alias || used.has(alias) || nonAliasReserved.has(alias)) alias = generateUniqueDocxAlias(used);
+        const aliasMissing = !alias || !DOCX_ALIAS_PATTERN.test(alias);
+        const aliasConflict = alias && (used.has(alias) || nonAliasReserved.has(alias));
+        if (aliasMissing || (!onlyFillMissing && aliasConflict)) {
+          alias = generateUniqueDocxAlias(used);
+        } else if (onlyFillMissing && aliasConflict) {
+          alias = generateUniqueDocxAlias(used);
+        }
         field.docxAlias = alias;
         used.add(alias);
+      });
+    }
+
+    function buildSnapshotResolvePayload() {
+      const placeholderMap = {};
+      (Array.isArray(fieldsState) ? fieldsState : []).forEach((source) => {
+        const id = String(source?.id || '').trim();
+        if (!id || isVisualOnlyType(source?.type)) return;
+        const token = String(source?.placeholderToken || '').trim();
+        if (token) placeholderMap[id] = token;
+      });
+      return {
+        schema: { fields: fieldsState },
+        placeholderMap
+      };
+    }
+
+    function resolveSnapshotShortcutForDisplay(key, payload = null) {
+      const normalized = normalizeSnapshotKeyToken(key);
+      if (!normalized) return '';
+      const draft = payload || buildSnapshotResolvePayload();
+      let alias = resolveSnapshotShortcutClient(normalized, draft);
+      if (alias && DOCX_ALIAS_PATTERN.test(alias)) return alias;
+      alias = normalizeDocxAlias(snapshotKeyDocxAliasesState[normalized]);
+      return alias && DOCX_ALIAS_PATTERN.test(alias) ? alias : '';
+    }
+
+    function ensureMissingSnapshotShortcutsBeforeSave(payload = null) {
+      const draft = payload || collect({ skipAliasRegeneration: true });
+      snapshotKeysState.forEach((rawKey) => {
+        const key = normalizeSnapshotKeyToken(rawKey);
+        if (!key) return;
+        if (resolveSnapshotShortcutForDisplay(key, draft)) return;
+        ensureSnapshotShortcutForKey(key, draft);
       });
     }
 
@@ -1998,7 +2044,7 @@ num(value) <= 95</code></pre>
           placeholderToken: String(initialMap[id] || field?.placeholder || '').trim()
         });
       });
-      ensureClientDocxAliases();
+      ensureClientDocxAliases({ onlyFillMissing: true });
     }
 
     async function copyText(value) {
@@ -2123,8 +2169,10 @@ num(value) <= 95</code></pre>
       refreshPrefillKeyOptionsDatalist();
     }
 
-    function collect() {
-      ensureClientDocxAliases();
+    function collect({ skipAliasRegeneration = false } = {}) {
+      if (!skipAliasRegeneration) {
+        ensureClientDocxAliases({ onlyFillMissing: true });
+      }
       const fields = [];
       const placeholderMap = {};
 
@@ -2471,8 +2519,8 @@ num(value) <= 95</code></pre>
       snapshotKeysList.innerHTML = snapshotKeysState.map((key, index) => {
         const label = resolveSnapshotKeyLabelClient(key);
         const showLabel = label && label.toLowerCase() !== String(key).toLowerCase();
-        const payload = collect();
-        const shortcut = ensureSnapshotShortcutForKey(key, payload);
+        const payload = buildSnapshotResolvePayload();
+        const shortcut = resolveSnapshotShortcutForDisplay(key, payload);
         return `
         <li class="list-group-item py-2">
           <div class="d-flex flex-wrap justify-content-between align-items-start gap-2">
@@ -3695,7 +3743,8 @@ num(value) <= 95</code></pre>
       expandSnapshotKeysWithUsedTemplateKeys(payload);
       expandSnapshotKeysWithFieldDependencies(payload);
       renderSnapshotKeysList();
-      const finalPayload = collect();
+      const finalPayload = collect({ skipAliasRegeneration: true });
+      ensureMissingSnapshotShortcutsBeforeSave(finalPayload);
       const shortcutErrors = [];
       snapshotKeysState.forEach((key) => {
         const shortcut = resolveSnapshotShortcutClient(key, finalPayload);
