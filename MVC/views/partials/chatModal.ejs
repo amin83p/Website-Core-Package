@@ -20,16 +20,19 @@
   const chatRealtimeWhenClosed = chatUiSettings.chatRealtimeWhenModalClosed === true;
 %>
 <div class="modal fade" id="chatInterfaceModal" tabindex="-1" aria-hidden="true" data-bs-backdrop="static">
-  <div class="modal-dialog modal-dialog-centered chat-shell-dialog" id="chatModalDialog" style="max-width: calc(100vw - 8px); width: min(900px, calc(100vw - 8px)); margin: 4px auto;"> 
-    <div class="modal-content overflow-hidden shadow-lg" id="chatModalContent" style="height: 600px; min-height: 400px; min-width: 350px; position: relative; resize: none; overflow: hidden;">
+  <div class="modal-dialog modal-dialog-centered chat-shell-dialog" id="chatModalDialog" style="max-width: calc(100vw - 8px); width: min(1080px, calc(100vw - 8px)); margin: 4px auto;"> 
+    <div class="modal-content overflow-hidden shadow-lg" id="chatModalContent" style="height: 720px; min-height: 440px; min-width: 380px; position: relative; resize: none; overflow: hidden;">
       <button type="button" class="btn-close chat-shell-global-close" data-bs-dismiss="modal" aria-label="Close"></button>
       
       <div class="modal-body p-0 d-flex h-100 position-relative">
           
-          <div class="chat-sidebar bg-light border-end d-flex flex-column" id="chatSidebar" style="width: 280px; min-width: 0px; max-width: 65%;">
+          <div class="chat-sidebar bg-light border-end d-flex flex-column" id="chatSidebar" style="width: 320px; min-width: 0px; max-width: 68%;">
               
               <div class="p-2 bg-white border-bottom d-flex justify-content-between align-items-center chat-shell-header" id="chatModalHeaderRow">
                   <div class="d-flex align-items-center gap-2">
+                      <button type="button" class="btn btn-light text-secondary rounded-circle d-none flex-shrink-0 chat-sidebar-back-btn" id="chatSidebarBackBtn" title="Back to conversations" aria-label="Back to conversations" onclick="exitNewChatWizard()">
+                          <i class="bi bi-arrow-left"></i>
+                      </button>
                       <h6 class="fw-bold m-0 text-secondary ps-2" id="sidebarTitle">Messages</h6>
                       <button type="button" class="btn btn-sm btn-light text-secondary rounded-circle chat-modal-drag-handle" id="chatModalDragHandle" title="Move Chat Window" aria-label="Move Chat Window">
                           <i class="bi bi-arrows-move"></i>
@@ -230,6 +233,16 @@
         background-color: rgba(255, 255, 255, 0.96);
         box-shadow: 0 2px 8px rgba(0, 0, 0, 0.14);
     }
+    .chat-sidebar-back-btn {
+        width: 24px;
+        height: 24px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.7rem;
+        line-height: 1;
+    }
     .chat-modal-drag-handle {
         cursor: move;
     }
@@ -237,6 +250,11 @@
         cursor: grabbing;
     }
     .chat-item { cursor: pointer; border-bottom: 1px solid #f8f9fa; padding: 10px; }
+    .chat-contact-email {
+        font-size: 0.625rem;
+        line-height: 1.25;
+        opacity: 0.85;
+    }
     .chat-item:hover, .chat-item.active { background-color: #f1f5f9; }
     .msg-bubble { max-width: 85%; padding: 8px 12px; border-radius: 12px; font-size: 0.9rem; margin-bottom: 2px; }
     .msg-sent { background-color: #d1e7dd; align-self: flex-end; border-bottom-right-radius: 2px; }
@@ -395,7 +413,7 @@ const chatAccess = <%- JSON.stringify({
 let chatUserStorageWarning = null;
 let chatConversationStorageWarning = null;
 let isSidebarVisible = true;
-let previousSidebarWidth = 280;
+let previousSidebarWidth = 320;
 let pendingAttachments = [];
 let currentConversationCanMessage = chatAccess.canUpdate;
 let currentConversationScopeReason = '';
@@ -747,7 +765,7 @@ function loadScript(src) {
 }
 
 function safeInlineJson(value) {
-    return JSON.stringify(String(value == null ? '' : value))
+    return JSON.stringify(value == null ? '' : value)
         .replace(/&/g, '\\u0026')
         .replace(/</g, '\\u003c')
         .replace(/'/g, '\\u0027');
@@ -967,15 +985,62 @@ function initChatSystem() {
     applyChatTransportPolicy();
 }
 
-function buildAvatarHtml(name, avatarUrl, size = 40, bgClass = 'bg-secondary', textClass = 'text-white') {
+function initialsFromDisplayName(name) {
+    const parts = String(name || '').trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '?';
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase();
+}
+
+function buildInitialsAvatarHtml(name, initials, avatarColor, size = 40, extraClass = '') {
+    const label = String(initials || initialsFromDisplayName(name) || '?').slice(0, 3);
+    const bg = avatarColor && avatarColor.background ? String(avatarColor.background) : '#64748b';
+    const fg = avatarColor && avatarColor.foreground ? String(avatarColor.foreground) : '#ffffff';
+    const fontSize = size <= 32 ? '0.75rem' : '0.85rem';
+    return `<div class="rounded-circle d-flex align-items-center justify-content-center fw-bold flex-shrink-0 ${extraClass}" style="width: ${size}px; height: ${size}px; font-size: ${fontSize}; background-color: ${safeAttr(bg)}; color: ${safeAttr(fg)};">${safeText(label)}</div>`;
+}
+
+function buildAvatarHtml(name, avatarUrl, size = 40, bgClass = 'bg-secondary', textClass = 'text-white', presentation = {}) {
     const displayName = String(name || 'U');
-    const initial = displayName.charAt(0).toUpperCase() || 'U';
     const safeName = safeText(displayName);
     const safeAvatarUrl = String(avatarUrl || '').trim();
+    const initials = presentation.initials || initialsFromDisplayName(displayName);
+    const avatarColor = presentation.avatarColor || null;
     if (safeAvatarUrl) {
-        return `<img src="${safeAttr(safeAvatarUrl)}" alt="${safeName}" class="rounded-circle" style="width: ${size}px; height: ${size}px; object-fit: cover;" onerror="this.remove();">`;
+        const fallback = buildInitialsAvatarHtml(displayName, initials, avatarColor, size, 'w-100 h-100');
+        return `<div class="rounded-circle flex-shrink-0 overflow-hidden position-relative" style="width: ${size}px; height: ${size}px;"><img src="${safeAttr(safeAvatarUrl)}" alt="${safeName}" style="width:100%;height:100%;object-fit:cover;" onerror="this.classList.add('d-none');this.nextElementSibling.classList.remove('d-none');"><div class="d-none">${fallback}</div></div>`;
     }
-    return `<div class="rounded-circle ${bgClass} ${textClass} d-flex align-items-center justify-content-center fw-bold" style="width: ${size}px; height: ${size}px; font-size: 1rem;">${safeText(initial)}</div>`;
+    return buildInitialsAvatarHtml(displayName, initials, avatarColor, size);
+}
+
+function applyChatHeaderAvatar(name, avatarUrl = '', presentation = {}) {
+    const headerAvatar = document.getElementById('chatHeaderAvatar');
+    if (!headerAvatar) return;
+    const safeAvatarUrl = String(avatarUrl || '').trim();
+    const initials = presentation.initials || initialsFromDisplayName(name);
+    const avatarColor = presentation.avatarColor || null;
+    headerAvatar.className = 'rounded-circle d-flex align-items-center justify-content-center me-2 fw-bold flex-shrink-0 overflow-hidden';
+    headerAvatar.style.width = '32px';
+    headerAvatar.style.height = '32px';
+    headerAvatar.style.fontSize = '0.75rem';
+    headerAvatar.style.backgroundColor = '';
+    headerAvatar.style.color = '';
+    if (safeAvatarUrl) {
+        headerAvatar.innerHTML = `<img src="${safeAttr(safeAvatarUrl)}" alt="${safeText(name)}" style="width:100%;height:100%;object-fit:cover;" onerror="this.remove();">`;
+        const img = headerAvatar.querySelector('img');
+        if (img) {
+            img.addEventListener('error', () => {
+                headerAvatar.innerHTML = '';
+                headerAvatar.style.backgroundColor = avatarColor?.background || '#64748b';
+                headerAvatar.style.color = avatarColor?.foreground || '#ffffff';
+                headerAvatar.innerText = initials.slice(0, 3);
+            }, { once: true });
+        }
+        return;
+    }
+    headerAvatar.style.backgroundColor = avatarColor?.background || '#64748b';
+    headerAvatar.style.color = avatarColor?.foreground || '#ffffff';
+    headerAvatar.innerText = initials.slice(0, 3);
 }
 
 // --- CUSTOM MODAL HELPER ---
@@ -1035,7 +1100,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     currentChatTarget,
                     currentChatAvatar,
                     window.currentChatCanMessage,
-                    window.currentChatScopeReason
+                    window.currentChatScopeReason,
+                    window.currentChatAvatarInitials || '',
+                    window.currentChatAvatarColor || null
                 );
             }, 100);
         }
@@ -1678,8 +1745,8 @@ function toggleChatModalMaximize(modalContent, reason = 'manual') {
         chatModalOffsetY = Number.isFinite(restore.offsetY) ? restore.offsetY : 0;
         setChatModalSize(
             modalContent,
-            Number.isFinite(restore.width) ? restore.width : 900,
-            Number.isFinite(restore.height) ? restore.height : 600
+            Number.isFinite(restore.width) ? restore.width : 1080,
+            Number.isFinite(restore.height) ? restore.height : 720
         );
         applyChatModalTransform(modalContent);
         chatModalIsMaximized = false;
@@ -2196,10 +2263,28 @@ function initResizers() {
     }
 }
 
+function syncChatSidebarNavChrome() {
+    const titleEl = document.getElementById('sidebarTitle');
+    const backBtn = document.getElementById('chatSidebarBackBtn');
+    const searchInput = document.getElementById('chatSearchInput');
+    const isNewChat = titleEl && String(titleEl.innerText || '').trim() === 'New Chat';
+    if (backBtn) backBtn.classList.toggle('d-none', !isNewChat);
+    if (searchInput) {
+        searchInput.placeholder = isNewChat ? 'Search contacts...' : 'Search...';
+    }
+}
+
 function showInbox() {
     const t = document.getElementById('sidebarTitle');
     if (t) t.innerText = 'Messages';
+    const searchInput = document.getElementById('chatSearchInput');
+    if (searchInput) searchInput.value = '';
+    syncChatSidebarNavChrome();
     refreshInbox();
+}
+
+function exitNewChatWizard() {
+    showInbox();
 }
 
 async function refreshConversationStorageWarning() {
@@ -2270,20 +2355,20 @@ async function refreshInbox() {
                 const displayName = (c.display && c.display.name) ? c.display.name : 'Unknown';
                 const targetId = (c.display && c.display.targetUserId) ? c.display.targetUserId : '';
                 const avatarUrl = (c.display && c.display.avatar) ? String(c.display.avatar) : '';
+                const avatarInitials = (c.display && c.display.initials) ? String(c.display.initials) : '';
+                const avatarColor = (c.display && c.display.avatarColor) ? c.display.avatarColor : null;
                 const canMessage = c.canMessage !== false && (!c.display || c.display.canMessage !== false);
                 const scopeReason = c.scopeReason || (c.display && c.display.scopeReason) || '';
-                const roleLabels = c.display && Array.isArray(c.display.roleLabels) ? c.display.roleLabels : [];
-                const packageLabels = c.display && Array.isArray(c.display.packages) ? c.display.packages : [];
-                const scopeLabel = roleLabels.length
-                    ? roleLabels.join(', ')
-                    : (packageLabels.length ? packageLabels.join(', ') : 'Member');
                 const readOnlyBadge = canMessage
                     ? ''
                     : '<span class="badge bg-secondary-subtle text-secondary ms-1">Read-only</span>';
-                const avatarHtml = buildAvatarHtml(displayName, avatarUrl, 40);
+                const avatarHtml = buildAvatarHtml(displayName, avatarUrl, 40, 'bg-secondary', 'text-white', {
+                    initials: avatarInitials,
+                    avatarColor
+                });
 
                 const html = `
-                <div class="chat-item d-flex align-items-center ${isActive} ${isUnreadClass}" data-conv-id="${safeAttr(c.id)}" onclick='openChat(${safeInlineJson(c.id)}, ${safeInlineJson(displayName)}, ${safeInlineJson(targetId)}, ${safeInlineJson(avatarUrl)}, ${canMessage ? 'true' : 'false'}, ${safeInlineJson(scopeReason)})'>
+                <div class="chat-item d-flex align-items-center ${isActive} ${isUnreadClass}" data-conv-id="${safeAttr(c.id)}" onclick='openChat(${safeInlineJson(c.id)}, ${safeInlineJson(displayName)}, ${safeInlineJson(targetId)}, ${safeInlineJson(avatarUrl)}, ${canMessage ? 'true' : 'false'}, ${safeInlineJson(scopeReason)}, ${safeInlineJson(avatarInitials)}, ${safeInlineJson(avatarColor)})'>
                     <div class="avatar-wrapper me-3">
                         ${avatarHtml}
                     </div>
@@ -2294,7 +2379,7 @@ async function refreshInbox() {
                             <span class="x-small text-muted">${timeStr}</span>
                         </div>
                         <div class="d-flex justify-content-between align-items-center">
-                            <div class="chat-msg x-small text-muted text-truncate" style="max-width: 140px;" title="${safeAttr(scopeLabel)}">${safeText(displayMsg)}</div>
+                            <div class="chat-msg x-small text-muted text-truncate" style="max-width: 200px;">${safeText(displayMsg)}</div>
                             <span class="unread-badge-slot">${badgeHtml}</span>
                         </div>
                     </div>
@@ -2315,6 +2400,7 @@ function startNewChatWizard(){
         return;
     }
     document.getElementById('sidebarTitle').innerText='New Chat';
+    syncChatSidebarNavChrome();
     fetchUsers('');
 }
 
@@ -2329,19 +2415,19 @@ async function fetchUsers(query) {
             listEl.innerHTML = '';
             if (res.data.length === 0) { listEl.innerHTML = '<div class="text-center text-muted mt-4 small">No users found.</div>'; return; }
             res.data.forEach(u => {
-                const avatarHtml = buildAvatarHtml(u.name, u.avatar, 35, 'bg-primary-subtle', 'text-primary');
-                const roleLabels = Array.isArray(u.roleLabels) && u.roleLabels.length
-                    ? u.roleLabels
-                    : ['Member'];
-                const packages = Array.isArray(u.packages) ? u.packages : [];
-                const packageText = packages.length ? `${packages.join(', ')} · ` : '';
-                const detailText = `${u.org || 'General'} · ${packageText}${roleLabels.join(', ')}`;
+                const avatarHtml = buildAvatarHtml(u.name, u.avatar, 35, 'bg-primary-subtle', 'text-primary', {
+                    initials: u.initials,
+                    avatarColor: u.avatarColor
+                });
+                const emailLine = u.email
+                    ? `<div class="chat-contact-email text-muted text-truncate">${safeText(u.email)}</div>`
+                    : '';
                 const html = `
-                <div class="chat-item d-flex align-items-center p-2" onclick='createNewChat(${safeInlineJson(u.id)}, ${safeInlineJson(u.name)}, ${safeInlineJson(u.avatar || '')})'>
+                <div class="chat-item d-flex align-items-center p-2" onclick='createNewChat(${safeInlineJson(u.id)}, ${safeInlineJson(u.name)}, ${safeInlineJson(u.avatar || '')}, ${safeInlineJson(u.initials || '')}, ${safeInlineJson(u.avatarColor || null)})'>
                     <div class="me-2 flex-shrink-0">${avatarHtml}</div>
                     <div class="flex-grow-1 overflow-hidden">
                         <div class="fw-bold small text-dark text-truncate">${safeText(u.name)}</div>
-                        <div class="x-small text-muted text-truncate" title="${safeAttr(detailText)}">${safeText(detailText)}</div>
+                        ${emailLine}
                     </div>
                 </div>`;
                 listEl.insertAdjacentHTML('beforeend', html);
@@ -2352,7 +2438,7 @@ async function fetchUsers(query) {
     } catch (e) { console.error(e); }
 }
 
-async function createNewChat(uid, name = '', avatarUrl = '') {
+async function createNewChat(uid, name = '', avatarUrl = '', initials = '', avatarColor = null) {
     if (!chatAccess.canCreate) {
         safeShowAlert('Your access profile does not allow starting new chats.', 'warning');
         return;
@@ -2377,7 +2463,9 @@ async function createNewChat(uid, name = '', avatarUrl = '') {
             display.targetUserId || uid,
             display.avatar || avatarUrl || '',
             conversation.canMessage !== false,
-            conversation.scopeReason || ''
+            conversation.scopeReason || '',
+            display.initials || initials || '',
+            display.avatarColor || avatarColor || null
         );
     } catch (e) {
         console.error(e);
@@ -2475,7 +2563,14 @@ function setConversationWriteState(canMessage, reason = '') {
     }
 }
 
-async function openChat(convId, name, targetUserId, avatarUrl = '', canMessage = true, scopeReason = '') {
+async function openChat(convId, name, targetUserId, avatarUrl = '', canMessage = true, scopeReason = '', avatarInitials = '', avatarColor = null) {
+    const titleEl = document.getElementById('sidebarTitle');
+    if (titleEl && String(titleEl.innerText || '').trim() === 'New Chat') {
+        titleEl.innerText = 'Messages';
+        const searchInput = document.getElementById('chatSearchInput');
+        if (searchInput) searchInput.value = '';
+        syncChatSidebarNavChrome();
+    }
     currentConvId = convId;
     renderConversationStorageWarning(null);
     hasMoreOlderMessages = false;
@@ -2486,6 +2581,8 @@ async function openChat(convId, name, targetUserId, avatarUrl = '', canMessage =
     window.currentChatName = name; 
     window.currentChatTarget = targetUserId;
     window.currentChatAvatar = avatarUrl || '';
+    window.currentChatAvatarInitials = avatarInitials || '';
+    window.currentChatAvatarColor = avatarColor || null;
     window.currentChatCanMessage = canMessage !== false;
     window.currentChatScopeReason = scopeReason || '';
     setConversationWriteState(canMessage !== false, scopeReason);
@@ -2493,14 +2590,10 @@ async function openChat(convId, name, targetUserId, avatarUrl = '', canMessage =
     document.getElementById('chatEmptyState').classList.add('d-none');
     document.getElementById('chatActiveView').classList.remove('d-none');
     document.getElementById('chatHeaderName').innerText = name;
-    const headerAvatar = document.getElementById('chatHeaderAvatar');
-    if (avatarUrl) {
-        headerAvatar.className = 'rounded-circle d-flex align-items-center justify-content-center me-2 fw-bold flex-shrink-0 overflow-hidden';
-        headerAvatar.innerHTML = `<img src="${safeAttr(avatarUrl)}" alt="${safeText(name)}" style="width:100%;height:100%;object-fit:cover;" onerror="this.remove();">`;
-    } else {
-        headerAvatar.className = 'rounded-circle bg-secondary text-white d-flex align-items-center justify-content-center me-2 fw-bold flex-shrink-0';
-        headerAvatar.innerText = name.charAt(0).toUpperCase();
-    }
+    applyChatHeaderAvatar(name, avatarUrl, {
+        initials: avatarInitials,
+        avatarColor
+    });
 
     const container = document.getElementById('chatMessageContainer');
     if (!chatAccess.canReadMessageContent) {

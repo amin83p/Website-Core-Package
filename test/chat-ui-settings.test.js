@@ -56,4 +56,6 @@ test('chat modal implements transport policy and attachment ack flow', () => {
   assert.match(modal, /hidden\.bs\.modal/);
   assert.match(modal, /id="chatConversationStorageWarning"/);
   assert.match(modal, /renderUserStorageWarning/);
+  assert.match(modal, /avatarColor/);
+  assert.match(modal, /initialsFromDisplayName/);
 });

@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const profileController = require('../controllers/profileController');
 const { requireAuth } = require('../middleware/authMiddleware');
+const { uploadProfilePhoto } = require('../middleware/profileAvatarUploadMiddleware');
 const { trackActionState } = require('../middleware/actionStateMiddleware');
 
 // Define Section/Op IDs for tracking
@@ -23,6 +24,17 @@ router.post('/',
     requireAuth, 
     // Optional: trackActionState(SECTION_ID, OP_UPDATE),
     profileController.updateProfile
+);
+
+router.post('/avatar',
+    requireAuth,
+    uploadProfilePhoto,
+    profileController.uploadProfileAvatar
+);
+
+router.delete('/avatar',
+    requireAuth,
+    profileController.removeProfileAvatar
 );
 
 // Self-serve Admin Authenticator (any admin privilege on active profile)

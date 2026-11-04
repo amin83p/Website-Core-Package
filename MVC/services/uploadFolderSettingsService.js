@@ -38,6 +38,7 @@ const BUILTIN_DEFINITIONS = Object.freeze([
   { key: 'core.symbols', packageName: 'CORE', group: GROUPS.CORE, label: 'Symbol Images', defaultTemplate: 'symbols', placeholders: [] },
   { key: 'core.news', packageName: 'CORE', group: GROUPS.CORE, label: 'News Media', defaultTemplate: 'news', placeholders: [] },
   { key: 'core.chat', packageName: 'CORE', group: GROUPS.CORE, label: 'Chat Attachments', defaultTemplate: 'chat/{conversationId}', placeholders: ['conversationId'] },
+  { key: 'core.profileAvatars', packageName: 'CORE', group: GROUPS.CORE, label: 'Profile Avatars', defaultTemplate: 'profiles/{userId}', placeholders: ['userId'] },
   { key: 'core.contacts', packageName: 'CORE', group: GROUPS.CORE, label: 'Contact Attachments', defaultTemplate: 'contacts', placeholders: [] },
   { key: 'core.ielts', packageName: 'IELTS', group: GROUPS.CORE, label: 'IELTS Attachments', defaultTemplate: 'ielts', placeholders: [] },
   { key: 'core.emailTemplates', packageName: 'CORE', group: GROUPS.CORE, label: 'Email Template Media', defaultTemplate: 'email-templates', placeholders: [] },

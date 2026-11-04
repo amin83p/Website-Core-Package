@@ -874,6 +874,11 @@ a.header-side-control-btn {
   display: block;
 }
 
+#main-header .header-avatar--placeholder.header-avatar--user-color,
+#main-header .header-user-menu-hero-avatar--placeholder.header-avatar--user-color {
+  background-image: none !important;
+}
+
 #main-header .header-avatar--placeholder {
   background: linear-gradient(145deg, #6366f1 0%, #4338ca 100%);
   color: #fff;

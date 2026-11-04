@@ -47,9 +47,31 @@
     ? String(publicSiteUrl).trim().replace(/\/$/, '')
     : '';
   const accountStatusLabel = formatTokenLabel(u.status || 'pending');
+  const profileAvatarUrl = pData && pData.avatarUrl ? String(pData.avatarUrl).trim() : '';
+  const profileHasLinkedPerson = !!String(u.personId || '').trim();
+  const profileInitials = (() => {
+    const parts = linkedPersonName.split(/\s+/).filter(Boolean);
+    if (parts.length >= 2) return `${parts[0][0] || ''}${parts[parts.length - 1][0] || ''}`.toUpperCase();
+    if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+    return 'U';
+  })();
 %>
 
 <div class="sections-page">
+  <style>
+    .profile-avatar-paste-zone {
+      outline: none;
+      border-radius: 0.5rem;
+      padding: 0.25rem;
+      transition: background-color 0.15s ease;
+    }
+    .profile-avatar-paste-zone:focus-visible {
+      box-shadow: 0 0 0 0.15rem rgba(13, 110, 253, 0.25);
+    }
+    .profile-avatar-paste-zone-active {
+      background-color: rgba(13, 110, 253, 0.06);
+    }
+  </style>
   <div id="profilePrintContext" hidden>
     <%- include('../partials/printContextRefs') %>
   </div>
@@ -102,6 +124,35 @@
       <div class="tab-content">
         
         <div class="tab-pane fade show active" id="tab-account">
+          <div class="card border-0 bg-light p-3 mb-3">
+              <label class="form-label small fw-bold text-muted mb-2">Profile photo</label>
+              <% if (!profileHasLinkedPerson) { %>
+                <div class="alert alert-info small mb-0">
+                  Your account is not linked to a person record yet. Profile photos are stored on the linked person identity. Contact an administrator to link your account before uploading a photo.
+                </div>
+              <% } else { %>
+                <div id="profileAvatarPasteZone" class="d-flex flex-wrap align-items-center gap-3 profile-avatar-paste-zone" tabindex="0" role="group" aria-label="Profile photo upload. Paste or drop an image here.">
+                  <div id="profileAvatarPreviewShell" class="rounded-circle overflow-hidden bg-secondary text-white d-flex align-items-center justify-content-center fw-bold flex-shrink-0" style="width: 88px; height: 88px; font-size: 1.35rem;">
+                    <% if (profileAvatarUrl) { %>
+                      <img id="profileAvatarPreviewImg" src="<%= profileAvatarUrl %>" alt="Profile photo" style="width:100%;height:100%;object-fit:cover;">
+                      <span id="profileAvatarPreviewInitials" class="d-none"><%= profileInitials %></span>
+                    <% } else { %>
+                      <img id="profileAvatarPreviewImg" src="" alt="" class="d-none" style="width:100%;height:100%;object-fit:cover;">
+                      <span id="profileAvatarPreviewInitials"><%= profileInitials %></span>
+                    <% } %>
+                  </div>
+                  <div class="flex-grow-1 min-w-0">
+                    <input type="file" id="profileAvatarFileInput" class="form-control form-control-sm mb-2" accept="image/jpeg,image/png,image/webp,image/heic,image/heif,.jpg,.jpeg,.png,.webp,.heic,.heif">
+                    <div class="d-flex flex-wrap gap-2">
+                      <button type="button" class="btn btn-primary btn-sm" id="btnUploadProfileAvatar"><i class="bi bi-upload me-1"></i>Upload photo</button>
+                      <button type="button" class="btn btn-outline-secondary btn-sm" id="btnRemoveProfileAvatar"<%= profileAvatarUrl ? '' : ' disabled' %>><i class="bi bi-trash me-1"></i>Remove</button>
+                    </div>
+                    <div class="form-text mt-2">Photos are resized and optimized to under 500 KB for faster loading. The image is saved to your linked person profile (same field admins use for avatar URL). You can choose a file, paste a copied or captured image (Ctrl+V), or drop an image onto this area.</div>
+                  </div>
+                </div>
+              <% } %>
+          </div>
+
           <div class="card border-0 bg-light p-3 mb-3">
               <div class="row g-3">
                 <div class="col-md-7">
@@ -393,5 +444,195 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     });
   }
+
+  const profileAvatarFileInput = document.getElementById('profileAvatarFileInput');
+  const btnUploadProfileAvatar = document.getElementById('btnUploadProfileAvatar');
+  const btnRemoveProfileAvatar = document.getElementById('btnRemoveProfileAvatar');
+  const profileAvatarPreviewImg = document.getElementById('profileAvatarPreviewImg');
+  const profileAvatarPreviewInitials = document.getElementById('profileAvatarPreviewInitials');
+  const profileAvatarPasteZone = document.getElementById('profileAvatarPasteZone');
+  let profileAvatarObjectUrl = null;
+
+  function revokeProfileAvatarObjectUrl() {
+    if (profileAvatarObjectUrl) {
+      URL.revokeObjectURL(profileAvatarObjectUrl);
+      profileAvatarObjectUrl = null;
+    }
+  }
+
+  function assignProfileAvatarFileToInput(file) {
+    if (!profileAvatarFileInput || !file) return;
+    try {
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+      profileAvatarFileInput.files = transfer.files;
+    } catch (_) {
+      /* DataTransfer unsupported; upload still works via direct File arg */
+    }
+  }
+
+  function previewProfileAvatarFile(file) {
+    if (!file || !profileAvatarPreviewImg) return;
+    revokeProfileAvatarObjectUrl();
+    profileAvatarObjectUrl = URL.createObjectURL(file);
+    profileAvatarPreviewImg.src = profileAvatarObjectUrl;
+    profileAvatarPreviewImg.classList.remove('d-none');
+    if (profileAvatarPreviewInitials) profileAvatarPreviewInitials.classList.add('d-none');
+  }
+
+  function fileFromClipboardItem(item) {
+    if (!item || item.kind !== 'file') return null;
+    const type = String(item.type || '').toLowerCase();
+    if (!type.startsWith('image/')) return null;
+    const blob = item.getAsFile();
+    if (!blob) return null;
+    const ext = type.includes('png') ? '.png' : (type.includes('webp') ? '.webp' : '.jpg');
+    const name = blob.name && blob.name.trim() ? blob.name : `pasted-image${ext}`;
+    return new File([blob], name, { type: blob.type || type });
+  }
+
+  function extractImageFileFromClipboard(clipboardData) {
+    if (!clipboardData) return null;
+    const items = clipboardData.items ? Array.from(clipboardData.items) : [];
+    for (const item of items) {
+      const file = fileFromClipboardItem(item);
+      if (file) return file;
+    }
+    const files = clipboardData.files ? Array.from(clipboardData.files) : [];
+    return files.find((file) => String(file.type || '').startsWith('image/')) || null;
+  }
+
+  async function uploadProfileAvatarFile(file) {
+    if (!file) {
+      await showProfileAvatarMessage('Photo required', 'warning', 'Choose or paste an image first.');
+      return;
+    }
+    assignProfileAvatarFileToInput(file);
+    previewProfileAvatarFile(file);
+    const formData = new FormData();
+    formData.append('photo', file);
+    btnUploadProfileAvatar.disabled = true;
+    const originalLabel = btnUploadProfileAvatar.innerHTML;
+    btnUploadProfileAvatar.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Uploading...';
+    try {
+      const response = await fetch('/profile/avatar', {
+        method: 'POST',
+        body: formData,
+        headers: { 'X-AJAX-Request': 'true' }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        revokeProfileAvatarObjectUrl();
+        setProfileAvatarPreview(result.data?.avatarUrl || '');
+        if (profileAvatarFileInput) profileAvatarFileInput.value = '';
+        await showProfileAvatarMessage('Photo updated', 'success', result.message || 'Profile photo updated.');
+        window.location.reload();
+      } else {
+        await showProfileAvatarMessage('Upload failed', 'error', result.message || 'Upload failed.');
+      }
+    } catch (error) {
+      console.error(error);
+      await showProfileAvatarMessage('Upload failed', 'error', 'An error occurred while uploading.');
+    } finally {
+      btnUploadProfileAvatar.disabled = false;
+      btnUploadProfileAvatar.innerHTML = originalLabel;
+    }
+  }
+
+  async function handleProfileAvatarPaste(event) {
+    const file = extractImageFileFromClipboard(event.clipboardData);
+    if (!file) return;
+    event.preventDefault();
+    await uploadProfileAvatarFile(file);
+  }
+
+  profileAvatarPasteZone?.addEventListener('paste', (event) => {
+    handleProfileAvatarPaste(event);
+  });
+
+  profileAvatarFileInput?.addEventListener('paste', (event) => {
+    handleProfileAvatarPaste(event);
+  });
+
+  profileAvatarPasteZone?.addEventListener('dragover', (event) => {
+    event.preventDefault();
+    profileAvatarPasteZone.classList.add('profile-avatar-paste-zone-active');
+  });
+
+  profileAvatarPasteZone?.addEventListener('dragleave', () => {
+    profileAvatarPasteZone.classList.remove('profile-avatar-paste-zone-active');
+  });
+
+  profileAvatarPasteZone?.addEventListener('drop', async (event) => {
+    event.preventDefault();
+    profileAvatarPasteZone.classList.remove('profile-avatar-paste-zone-active');
+    const file = Array.from(event.dataTransfer?.files || []).find((row) => (
+      String(row.type || '').startsWith('image/')
+    ));
+    if (!file) {
+      await showProfileAvatarMessage('Invalid drop', 'warning', 'Drop an image file only.');
+      return;
+    }
+    await uploadProfileAvatarFile(file);
+  });
+
+  function setProfileAvatarPreview(url) {
+    const token = String(url || '').trim();
+    if (profileAvatarPreviewImg) {
+      if (token) {
+        profileAvatarPreviewImg.src = token;
+        profileAvatarPreviewImg.classList.remove('d-none');
+      } else {
+        profileAvatarPreviewImg.src = '';
+        profileAvatarPreviewImg.classList.add('d-none');
+      }
+    }
+    if (profileAvatarPreviewInitials) {
+      profileAvatarPreviewInitials.classList.toggle('d-none', !!token);
+    }
+    if (btnRemoveProfileAvatar) btnRemoveProfileAvatar.disabled = !token;
+  }
+
+  async function showProfileAvatarMessage(title, icon, message) {
+    if (typeof showMessageModal === 'function') {
+      await showMessageModal({
+        title,
+        icon,
+        message,
+        buttons: [{ text: 'OK', class: icon === 'success' ? 'btn-success' : 'btn-danger' }]
+      });
+    } else {
+      alert(message);
+    }
+  }
+
+  btnUploadProfileAvatar?.addEventListener('click', async () => {
+    const file = profileAvatarFileInput?.files?.[0] || null;
+    await uploadProfileAvatarFile(file);
+  });
+
+  btnRemoveProfileAvatar?.addEventListener('click', async () => {
+    btnRemoveProfileAvatar.disabled = true;
+    try {
+      const response = await fetch('/profile/avatar', {
+        method: 'DELETE',
+        headers: { 'X-AJAX-Request': 'true' }
+      });
+      const result = await response.json();
+      if (result.status === 'success') {
+        setProfileAvatarPreview('');
+        if (profileAvatarFileInput) profileAvatarFileInput.value = '';
+        await showProfileAvatarMessage('Photo removed', 'success', result.message || 'Profile photo removed.');
+        window.location.reload();
+      } else {
+        await showProfileAvatarMessage('Remove failed', 'error', result.message || 'Remove failed.');
+        btnRemoveProfileAvatar.disabled = false;
+      }
+    } catch (error) {
+      console.error(error);
+      await showProfileAvatarMessage('Remove failed', 'error', 'An error occurred while removing the photo.');
+      btnRemoveProfileAvatar.disabled = false;
+    }
+  });
 });
 </script>

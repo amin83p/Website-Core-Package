@@ -5,6 +5,7 @@ const adminTotpService = require('../services/adminTotpService');
 const adminAuthorityService = require('../services/adminAuthorityService');
 const microsoftAuthService = require('../services/microsoftAuthService');
 const { invalidateAuthContextForUser } = require('../services/cache/authContextCacheService');
+const profileAvatarService = require('../services/profileAvatarService');
 const { SYSTEM_CONTEXT } = require('../../config/constants');
 const { buildDataServiceQuery } = require('../utils/generalTools');
 const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
@@ -364,9 +365,59 @@ async function resetAuthenticatorUsage(req, res) {
   }
 }
 
+async function uploadProfileAvatar(req, res) {
+    try {
+        if (!req.user) {
+            return res.status(401).json({ status: 'error', message: 'Authentication required.' });
+        }
+        if (!req.file) {
+            return res.status(400).json({ status: 'error', message: 'Photo file is required.' });
+        }
+        const result = await profileAvatarService.uploadProfileAvatar({
+            user: req.user,
+            file: req.file
+        });
+        invalidateAuthContextForUser(req.user.id);
+        return res.json({
+            status: 'success',
+            message: 'Profile photo updated.',
+            data: result
+        });
+    } catch (error) {
+        const statusCode = Number(error.statusCode) || 400;
+        return res.status(statusCode).json({
+            status: 'error',
+            message: error.message || 'Failed to upload profile photo.'
+        });
+    }
+}
+
+async function removeProfileAvatar(req, res) {
+    try {
+        if (!req.user) {
+            return res.status(401).json({ status: 'error', message: 'Authentication required.' });
+        }
+        const result = await profileAvatarService.removeProfileAvatar({ user: req.user });
+        invalidateAuthContextForUser(req.user.id);
+        return res.json({
+            status: 'success',
+            message: 'Profile photo removed.',
+            data: result
+        });
+    } catch (error) {
+        const statusCode = Number(error.statusCode) || 400;
+        return res.status(statusCode).json({
+            status: 'error',
+            message: error.message || 'Failed to remove profile photo.'
+        });
+    }
+}
+
 module.exports = {
     showProfile,
     updateProfile,
+    uploadProfileAvatar,
+    removeProfileAvatar,
     showAuthenticator,
     getAuthenticatorStatus,
     beginAuthenticatorEnrollment,

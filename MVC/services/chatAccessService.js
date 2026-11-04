@@ -3,6 +3,7 @@ const adminAuthorityService = require('./adminAuthorityService');
 const chatContactScopeService = require('./chatContactScopeService');
 const chatOperationPolicyService = require('./chatOperationPolicyService');
 const chatPolicyService = require('./chatPolicyService');
+const chatAvatarColorService = require('./chatAvatarColorService');
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 const { idsEqual, toPublicId } = require('../utils/idAdapter');
 
@@ -113,17 +114,36 @@ async function canUseChatOperation(user, operationIds, ipAddress) {
   };
 }
 
+async function attachUserAvatarPresentation(access, user) {
+  if (!user?.id) return access;
+  const displayName = typeof user.name === 'string'
+    ? user.name
+    : String(user.username || user.displayName || '').trim();
+  try {
+    const avatarColor = await chatAvatarColorService.ensureAvatarColor(user.id);
+    return {
+      ...access,
+      userAvatarPresentation: {
+        initials: chatAvatarColorService.initialsFromDisplayName(displayName),
+        avatarColor
+      }
+    };
+  } catch (_) {
+    return access;
+  }
+}
+
 async function buildChatAccess(user, ipAddress) {
   if (!user) return { ...EMPTY_CHAT_ACCESS };
 
   const policyResolved = chatPolicyService.resolveForUser(user?.id);
   const chatPolicy = chatPolicyService.buildClientPolicyPayload(policyResolved);
   if (policyResolved.deactivated) {
-    return {
+    return attachUserAvatarPresentation({
       ...EMPTY_CHAT_ACCESS,
       chatPolicy,
       policyReason: policyResolved.reason || 'Chat has been deactivated for your account.'
-    };
+    }, user);
   }
 
   const [
@@ -214,7 +234,7 @@ async function buildChatAccess(user, ipAddress) {
   if (policyResolved.banned) {
     access.policyReason = policyResolved.reason;
   }
-  return access;
+  return attachUserAvatarPresentation(access, user);
 }
 
 function conversationHasParticipant(conversation, userId) {

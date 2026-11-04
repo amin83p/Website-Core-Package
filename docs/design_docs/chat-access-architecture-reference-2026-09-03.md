@@ -110,6 +110,8 @@ Also configured under **System Settings → App Defaults → Chat** (attachments
 
 **Client:** `buildChatAccess` attaches `chatPolicy` on `res.locals.chatAccess`. Inbox/history JSON includes `storageWarning` for `#chatUserStorageWarning` and `#chatConversationStorageWarning` in `chatModal.ejs`.
 
+**Contact list presentation:** Inbox and new-contact search show the peer display name (optional email on search only). Avatars use the contact profile photo when present; otherwise full-name initials on a stable color from `userSettings.chat.avatarColor` (lazy-assigned per user via `chatAvatarColorService`). Profile photos for the signed-in user are uploaded on **My Profile** (`POST /profile/avatar`) and stored in `person.avatarUrl` (optimized to ≤500 KB).
+
 Outbound attachment sends must include a client **`tempId`**; the server **`message_sent_ack`** maps the optimistic row to the persisted message id (required for delete and correct attachment URLs).
 
 ---

@@ -12,6 +12,7 @@ const {
   collectMembershipRoleTokens
 } = require('./person/packageRoleAssignmentService');
 const { idsEqual, toIdArray, toPublicId } = require('../utils/idAdapter');
+const chatAvatarColorService = require('./chatAvatarColorService');
 
 const PERSON_QUERY_OPTIONS = Object.freeze({
   enrichment: { includeSchoolRoles: false }
@@ -479,13 +480,16 @@ async function searchContacts(requestingUser, query = '', options = {}) {
     if (matchesContactQuery(contact, user, person || {}, query)) contacts.push(contact);
   });
 
-  return contacts
-    .sort((left, right) => String(left?.name || left?.id).localeCompare(
-      String(right?.name || right?.id),
-      undefined,
-      { sensitivity: 'base' }
-    ))
-    .slice(0, normalizeLimit(options?.limit));
+  return chatAvatarColorService.enrichContactsWithAvatarPresentation(
+    contacts
+      .sort((left, right) => String(left?.name || left?.id).localeCompare(
+        String(right?.name || right?.id),
+        undefined,
+        { sensitivity: 'base' }
+      ))
+      .slice(0, normalizeLimit(options?.limit)),
+    options
+  );
 }
 
 async function getContactDecision(requestingUser, targetUserId, options = {}) {
@@ -532,6 +536,7 @@ async function buildConversationContactStates(requestingUser, conversations = []
     [...userById.values()].map((user) => user?.personId).filter(Boolean),
     { roleRegistry: context.registry }
   );
+  const colorByUserId = await chatAvatarColorService.ensureAvatarColorsForUserIds(targetUserIds, options);
 
   const stateByConversationId = new Map();
   rows.forEach((conversation) => {
@@ -540,25 +545,31 @@ async function buildConversationContactStates(requestingUser, conversations = []
       const user = userById.get(userId) || null;
       const person = personById.get(toPublicId(user?.personId)) || null;
       const decision = evaluateTargetContact(context, user, person, options);
+      const baseDisplay = user
+        ? projectContact(user, person, decision.targetRoleScope || summarizeRootPerson(person, context.registry))
+        : {
+          id: userId,
+          name: 'Unknown User',
+          avatar: null,
+          email: '',
+          org: 'General',
+          roles: [],
+          roleLabels: [],
+          packages: [],
+          packageDomains: [],
+          plainMember: false
+        };
       return {
         userId,
         user,
         person,
         decision,
-        display: user
-          ? projectContact(user, person, decision.targetRoleScope || summarizeRootPerson(person, context.registry))
-          : {
-            id: userId,
-            name: 'Unknown User',
-            avatar: null,
-            email: '',
-            org: 'General',
-            roles: [],
-            roleLabels: [],
-            packages: [],
-            packageDomains: [],
-            plainMember: false
-          }
+        display: chatAvatarColorService.attachAvatarPresentation(baseDisplay, {
+          name: baseDisplay.name,
+          avatar: baseDisplay.avatar,
+          userId,
+          avatarColor: colorByUserId.get(toPublicId(userId)) || null
+        })
       };
     });
     const denied = participantRows.find((row) => !row.decision.allowed);
