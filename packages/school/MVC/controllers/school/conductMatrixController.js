@@ -2,6 +2,7 @@
 
 const { loadGradesMatrixSharedContext } = require('./gradesMatrixController');
 const conductMatrixService = require('../../services/school/conductMatrixService');
+const conductMatrixSessionVisibilityService = require('../../services/school/conductMatrixSessionVisibilityService');
 const conductRatingScalePolicyModel = require('../../models/school/conductRatingScalePolicyModel');
 const schoolDataService = require('../../services/school/schoolDataService');
 const conductRatingScaleService = require('../../services/school/conductRatingScaleService');
@@ -90,7 +91,28 @@ async function getConductMatrixData(req, res) {
   }
 }
 
+async function postSessionConductVisibility(req, res) {
+  try {
+    const classId = String(req.body?.classId || '').trim();
+    const sessionId = String(req.body?.sessionId || '').trim();
+    const enabled = req.body?.enabled;
+    const result = await conductMatrixSessionVisibilityService.setSessionConductReportStepEnabled(req, {
+      classId,
+      sessionId,
+      enabled
+    });
+    const showEnabled = result.conductReportStepEnabled === true;
+    const message = showEnabled
+      ? 'This session will show class conduct on Manage Session → Reports. Reload that page if it is already open.'
+      : 'Class conduct was hidden for this session on Manage Session → Reports.';
+    return res.json({ status: 'success', message, data: result });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message || 'Failed to update session visibility.' });
+  }
+}
+
 module.exports = {
   showConductMatrixPage,
-  getConductMatrixData
+  getConductMatrixData,
+  postSessionConductVisibility
 };

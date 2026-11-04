@@ -417,6 +417,19 @@ function isSessionConductReady(session) {
     || String(session?.conductReadyForReports || '').trim().toLowerCase() === 'true';
 }
 
+function parseConductReportStepEnabled(session) {
+  return session?.conductReportStepEnabled === true
+    || String(session?.conductReportStepEnabled || '').trim().toLowerCase() === 'true';
+}
+
+function sessionHasAnySavedConduct(session) {
+  return (Array.isArray(session?.roster) ? session.roster : []).some((row) => rosterRowHasRatedConduct(row));
+}
+
+function sessionShowsReportConductStep(session, assignmentConductRequired) {
+  return Boolean(assignmentConductRequired) || parseConductReportStepEnabled(session);
+}
+
 function assertSessionConductReadyForReportsOrThrow(session, contextLabel = 'this session') {
   if (isSessionConductReady(session)) return;
   const err = new Error(
@@ -615,27 +628,37 @@ function buildSessionReportConductUiPayload({
     reportAssignmentSessionUtils.reportAssignmentMatchesSession(assignment, sessionContext)
   ));
 
-  const sessionHasConductRequiredReports = resolveSessionHasConductRequiredReports({
+  const conductRequiredByAssignment = resolveSessionHasConductRequiredReports({
     instanceRows,
     sessionMatchedAssignments,
     sessionContext
   });
+  const conductReportStepEnabled = parseConductReportStepEnabled(session);
+  const sessionHasConductRequiredReports = sessionShowsReportConductStep(
+    session,
+    conductRequiredByAssignment
+  );
   const conductReadyForReports = isSessionConductReady(session);
 
   if (!sessionHasConductRequiredReports) {
     return {
       sessionHasConductRequiredReports: false,
+      conductRequiredByAssignment: false,
+      conductReportStepEnabled,
       conductReadyForReports,
       reportConductRoster: []
     };
   }
 
   const sessionConductReportPeriod = resolveReportPeriodForSession(assignmentMap, sessionContext);
-  const reportConductPersonIds = resolveSessionReportConductPersonIds({
+  let reportConductPersonIds = resolveSessionReportConductPersonIds({
     assignments: sessionMatchedAssignments,
     sessionContext,
     sessionRoster
   });
+  if (!conductRequiredByAssignment && conductReportStepEnabled) {
+    reportConductPersonIds = reportRosterService.resolveSessionRosterPersonIds(sessionRoster);
+  }
   const reportConductRoster = buildReportConductRoster({
     personIds: reportConductPersonIds,
     sessionRoster,
@@ -678,6 +701,8 @@ function buildSessionReportConductUiPayload({
 
   return {
     sessionHasConductRequiredReports: true,
+    conductRequiredByAssignment,
+    conductReportStepEnabled,
     conductReadyForReports,
     reportConductRoster: rosterForClient
   };
@@ -697,6 +722,9 @@ module.exports = {
   resolveConductPrefillForStudent,
   buildConductPrefillMap,
   isSessionConductReady,
+  parseConductReportStepEnabled,
+  sessionHasAnySavedConduct,
+  sessionShowsReportConductStep,
   assertSessionConductReadyForReportsOrThrow,
   applyConductRosterToSession,
   resolveSessionIdFromAssignmentContext,

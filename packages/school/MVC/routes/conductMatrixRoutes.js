@@ -11,6 +11,13 @@ const {
 
 router.use(requireAuth);
 
+const conductMatrixMutationActionState = Object.freeze({
+  requireToken: true,
+  keepActive: true,
+  allowOperationTokenFallback: true,
+  allowInactiveTokenFallback: true
+});
+
 router.get(
   '/',
   requireAccess(SECTIONS.SCHOOL_CLASS_CONDUCT_MATRIX, OPERATIONS.READ_ALL),
@@ -23,6 +30,13 @@ router.get(
   requireAccess(SECTIONS.SCHOOL_CLASS_CONDUCT_MATRIX, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_CLASS_CONDUCT_MATRIX, OPERATIONS.READ_ALL),
   ctrl.getConductMatrixData
+);
+
+router.post(
+  '/api/session-visibility',
+  requireAccess(SECTIONS.SCHOOL_CLASS_CONDUCT_MATRIX, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_CLASS_CONDUCT_MATRIX, OPERATIONS.UPDATE, conductMatrixMutationActionState),
+  ctrl.postSessionConductVisibility
 );
 
 module.exports = router;

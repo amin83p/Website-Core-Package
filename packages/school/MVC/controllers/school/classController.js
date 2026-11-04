@@ -69,6 +69,7 @@ const bookCoveringAccessService = require('../../services/school/bookCoveringAcc
 const sessionNavigationService = require('../../services/school/sessionNavigationService');
 const sessionIdService = require('../../services/school/sessionIdService');
 const sessionConductService = require('../../services/school/sessionConductService');
+const reportRosterService = require('../../services/school/reportRosterService');
 const schoolFileService = require('../../services/school/schoolFileService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
@@ -4710,7 +4711,7 @@ async function manageSession(req, res) {
             .filter((assignment) => reportAssignmentSessionUtils.reportAssignmentMatchesSession(assignment, sessionContext));
         const hasSessionReportsAssigned = (Array.isArray(sessionReportInstanceRows) ? sessionReportInstanceRows : []).length > 0
             || sessionMatchedAssignments.length > 0;
-        const sessionHasConductRequiredReports = (Array.isArray(sessionReportInstanceRows) ? sessionReportInstanceRows : [])
+        const sessionHasConductRequiredByAssignment = (Array.isArray(sessionReportInstanceRows) ? sessionReportInstanceRows : [])
             .some((row) => row?.conductRequiredBeforeFill)
             || sessionMatchedAssignments.some((assignment) => {
                 const activeRows = reportAssignmentSessionUtils.getEffectiveTargetRows(assignment)
@@ -4729,26 +4730,31 @@ async function manageSession(req, res) {
                     );
                 });
             });
+        const conductReportStepEnabled = sessionConductService.parseConductReportStepEnabled(session);
+        const sessionHasConductRequiredReports = sessionConductService.sessionShowsReportConductStep(
+            session,
+            sessionHasConductRequiredByAssignment
+        );
         const reportAssignmentCreateAccessResolved = reportAssignmentCreateAccess;
 
         const sessionConductReportPeriod = sessionConductService.resolveReportPeriodForSession(
             sessionReportViewerContext.assignmentMap,
             sessionContext
         );
-        const reportConductPersonIds = sessionConductService.resolveSessionReportConductPersonIds({
+        let reportConductPersonIds = sessionConductService.resolveSessionReportConductPersonIds({
             assignments: sessionMatchedAssignments,
             sessionContext,
             sessionRoster: session.roster
         });
+        if (!sessionHasConductRequiredByAssignment && conductReportStepEnabled) {
+            reportConductPersonIds = reportRosterService.resolveSessionRosterPersonIds(session.roster);
+        }
         const reportConductRoster = sessionConductService.buildReportConductRoster({
             personIds: reportConductPersonIds,
             sessionRoster: session.roster,
             prefetchedStudents: rosterIdentityData.students,
             prefetchedPersons: rosterIdentityData.persons
         });
-        // #region agent log
-        fetch('http://127.0.0.1:7429/ingest/4a4b23d1-b3e8-4c87-b6c0-e036ac2782ab',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2e9ee4'},body:JSON.stringify({sessionId:'2e9ee4',hypothesisId:'A',location:'classController.js:manageSession',message:'report conduct ui inputs',data:{classId,sessionId,sessionHasConductRequiredReports,matchedAssignmentCount:sessionMatchedAssignments.length,reportScopeSamples:sessionMatchedAssignments.map((a)=>String(a?.reportScope||'class')).slice(0,5),reportConductPersonIdCount:reportConductPersonIds.length,reportConductRosterCount:reportConductRoster.length,conductReadyForReports:session?.conductReadyForReports===true,rosterRatedCount:(session?.roster||[]).filter((r)=>sessionConductService.rosterRowHasRatedConduct(r)).length},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         const conductPrefillByPersonId = Object.fromEntries(
             sessionConductService.buildConductPrefillMap({
                 roster: reportConductRoster,
@@ -4848,6 +4854,18 @@ async function manageSession(req, res) {
         if (canonicalSessionTeacher.sessions[0]?.delivery) {
             session.delivery = canonicalSessionTeacher.sessions[0].delivery;
         }
+        let canEditClassConductViaMatrix = false;
+        try {
+            const matrixConductEval = await accessService.evaluateAccess({
+                user: req.user,
+                sectionId: SECTIONS.SCHOOL_CLASS_CONDUCT_MATRIX,
+                operationId: OPERATIONS.UPDATE,
+                ipAddress: req.ip
+            });
+            canEditClassConductViaMatrix = matrixConductEval?.allowed === true;
+        } catch (_) {
+            canEditClassConductViaMatrix = false;
+        }
         res.render('school/class/sessionManager', {
             title: `Manage Session: ${session.date}`,
             classData,
@@ -4899,7 +4917,7 @@ async function manageSession(req, res) {
             timesheetDeletionLockActive,
             canEditSessionMetadata: canOverride,
             canEditOneOnOneSessionSchedule,
-            canManageClassConduct: Boolean(canOverride) || Boolean(canEditSession),
+            canManageClassConduct: Boolean(canOverride) || Boolean(canEditSession) || canEditClassConductViaMatrix,
             canOverrideMakeupDuration,
             canCreateMakeupWhileLocked,
             canDeleteMakeupSessions: Boolean(canEditSession && !isReadOnly),
@@ -7241,9 +7259,6 @@ async function postOfficialFinalGradesWorkflow(req, res) {
 async function saveSessionConduct(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
-        // #region agent log
-        fetch('http://127.0.0.1:7429/ingest/4a4b23d1-b3e8-4c87-b6c0-e036ac2782ab',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2e9ee4'},body:JSON.stringify({sessionId:'2e9ee4',runId:'post-fix-v3',hypothesisId:'H',location:'classController.js:saveSessionConduct:entry',message:'conduct save entered',data:{classId,sessionId,grantSection:req.accessGrantSectionId||''},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         const sessionDate = resolveSessionDateFromRequest(req);
         const { classData, sessions, persistAccessContext } = await loadSessionManageScope(classId, req, {
             sessionId,
@@ -7332,9 +7347,9 @@ async function saveSessionConduct(req, res) {
             throw new Error('Conduct roster is required.');
         }
 
-        // #region agent log
-        fetch('http://127.0.0.1:7429/ingest/4a4b23d1-b3e8-4c87-b6c0-e036ac2782ab',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2e9ee4'},body:JSON.stringify({sessionId:'2e9ee4',runId:'post-fix-v2',hypothesisId:'H',location:'classController.js:saveSessionConduct',message:'conduct save attempt',data:{classId,sessionId,incomingCount:incomingRoster.length,ready:sessionConductService.parseConductReadyFlag(req.body?.ready,true)},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
+        if (sessionConductService.parseConductRequiredFlag(req.body?.enableReportStep, false)) {
+            session.conductReportStepEnabled = true;
+        }
 
         sessionConductService.applyConductRosterToSession(session, incomingRoster, {
             ready: sessionConductService.parseConductReadyFlag(req.body?.ready, true),
@@ -7345,16 +7360,14 @@ async function saveSessionConduct(req, res) {
 
         const ready = sessionConductService.isSessionConductReady(session);
         const savedConductCount = (session?.roster || []).filter((row) => sessionConductService.rosterRowHasRatedConduct(row)).length;
-        // #region agent log
-        fetch('http://127.0.0.1:7429/ingest/4a4b23d1-b3e8-4c87-b6c0-e036ac2782ab',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2e9ee4'},body:JSON.stringify({sessionId:'2e9ee4',runId:'post-fix-v3',hypothesisId:'H',location:'classController.js:saveSessionConduct:success',message:'conduct save persisted',data:{classId,sessionId,ready, savedConductCount,incomingCount:incomingRoster.length},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         return res.json({
             status: 'success',
             message: ready
                 ? 'Class conduct saved. You can now fill reports for this session.'
                 : 'Optional class conduct saved for the selected students.',
             conductReadyForReports: ready,
-            conductReadyAt: session.conductReadyAt || null
+            conductReadyAt: session.conductReadyAt || null,
+            conductReportStepEnabled: sessionConductService.parseConductReportStepEnabled(session)
         });
     } catch (error) {
         const statusCode = Number(error?.statusCode) || 400;

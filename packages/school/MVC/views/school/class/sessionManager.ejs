@@ -2816,7 +2816,15 @@
                 <% } %>
                 <button type="button" class="session-manager-nav-item" data-session-panel="assignments" <%= isInstructionalInactive ? 'disabled title="Inactive original session"' : '' %>>
                     <i class="bi bi-clipboard-check fs-5"></i><span class="session-manager-nav-label">Reports</span>
-                    <span id="sessionReportsNavBadge" class="badge rounded-pill session-nav-badge d-none" aria-hidden="true"></span>
+                    <%
+                      const reportNavInstanceCount = sessionReportRowsInitial.length;
+                      const reportNavConductOnly = sessionHasConductRequiredReportsResolved && reportNavInstanceCount === 0;
+                      const reportNavConductComplete = conductReadyForReports === true;
+                    %>
+                    <span id="sessionReportsNavBadge"
+                      class="badge rounded-pill session-nav-badge<%= reportNavInstanceCount > 0 ? '' : (reportNavConductOnly ? ' session-nav-badge--dot ' + (reportNavConductComplete ? 'bg-success' : 'bg-danger') : ' d-none') %>"
+                      aria-hidden="<%= (reportNavInstanceCount > 0 || reportNavConductOnly) ? 'false' : 'true' %>"
+                      title="<%= reportNavInstanceCount > 0 ? (reportNavInstanceCount + ' report instance(s)') : (reportNavConductOnly ? (reportNavConductComplete ? 'Class conduct saved for this session' : 'Class conduct required — not yet complete') : '') %>"><% if (reportNavInstanceCount > 0) { %><%= reportNavInstanceCount %><% } else if (reportNavConductOnly) { %>&nbsp;<% } %></span>
                 </button>
                 <% if (canViewBookCoveringReport && isInstructionalInactive !== true) { %>
                 <button type="button" class="session-manager-nav-item" data-session-panel="book-covering" role="tab" aria-selected="false">
@@ -3347,21 +3355,9 @@
                         <% } %>
                     </div>
 
-                    <div id="sessionReportsEmptyState" class="card-body py-4<%= hasSessionReportsAssignedFlag ? ' d-none' : '' %>">
-                            <div class="session-placeholder-card mb-0">
-                                <div class="fw-semibold text-dark mb-1">No reports assigned yet</div>
-                                <div class="small text-muted mb-3">Assign a report to this session to unlock report filling.</div>
-                                <% if (canAssignSessionReports) { %>
-                                <button type="button" class="btn btn-outline-primary session-panel-open-btn w-100" id="btnOpenSessionReportAssignmentModalEmpty">
-                                    <i class="bi bi-file-earmark-plus me-2"></i>Assign Report
-                                </button>
-                                <% } %>
-                            </div>
-                    </div>
-
-                    <div id="sessionReportsAssignedState" class="<%= hasSessionReportsAssignedFlag ? '' : 'd-none' %>">
+                    <div id="sessionReportConductShell" class="card-body py-0<%= sessionHasConductRequiredReportsResolved ? '' : ' d-none' %>">
                         <% if (canManageReportClassConductFlag && !conductSectionReadOnly) { %>
-                        <div class="session-panel-cta-zone session-panel-cta-zone--primary<%= sessionHasConductRequiredReportsResolved ? '' : ' d-none' %>" id="sessionReportConductCtaZone">
+                        <div class="session-panel-cta-zone session-panel-cta-zone--primary py-3<%= sessionHasConductRequiredReportsResolved ? '' : ' d-none' %>" id="sessionReportConductCtaZone">
                             <button type="button" class="btn btn-outline-primary session-panel-open-btn w-100" id="btnOpenConductBulkModal">
                                 <i class="bi bi-lightning-charge me-2"></i>Quick rate class conduct
                             </button>
@@ -3375,6 +3371,22 @@
                             </div>
                         </div>
                         <% } %>
+                        <div id="sessionReportConductAdminPendingAlert" class="alert alert-info mx-0 mb-0 rounded-0 border-0 border-bottom<%= (sessionHasConductRequiredReportsResolved && !canManageReportClassConductFlag && !conductReadyForReports) ? '' : ' d-none' %>">Class conduct must be completed by a class administrator before reports can be filled.</div>
+                    </div>
+
+                    <div id="sessionReportsEmptyState" class="card-body py-4<%= hasSessionReportsAssignedFlag ? ' d-none' : '' %>">
+                            <div class="session-placeholder-card mb-0">
+                                <div class="fw-semibold text-dark mb-1">No reports assigned yet</div>
+                                <div class="small text-muted mb-3">Assign a report to this session to unlock report filling.</div>
+                                <% if (canAssignSessionReports) { %>
+                                <button type="button" class="btn btn-outline-primary session-panel-open-btn w-100" id="btnOpenSessionReportAssignmentModalEmpty">
+                                    <i class="bi bi-file-earmark-plus me-2"></i>Assign Report
+                                </button>
+                                <% } %>
+                            </div>
+                    </div>
+
+                    <div id="sessionReportsAssignedState" class="<%= hasSessionReportsAssignedFlag ? '' : 'd-none' %>">
 
                         <div class="session-panel-cta-zone session-panel-cta-zone--primary d-none" id="sessionReportFillReportsZone">
                             <div id="sessionReportSkillCoverageHost" class="mb-2"></div>
@@ -3382,7 +3394,6 @@
                         </div>
 
                         <div class="card-body py-3" id="sessionReportInstancesStep">
-                            <div id="sessionReportConductAdminPendingAlert" class="alert alert-info<%= (sessionHasConductRequiredReportsResolved && !canManageReportClassConductFlag && !conductReadyForReports) ? '' : ' d-none' %>">Class conduct must be completed by a class administrator before reports can be filled.</div>
                             <div id="sessionReportInstancesStatusSummary" class="small text-muted mb-2"></div>
                             <div id="sessionReportRosterReconciliationHost" class="mb-2"></div>
                             <div class="session-report-instances-panel">
@@ -6242,6 +6253,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateSessionConductStepStatusUi();
         syncReportWorkflowStepUi();
         renderSessionReportInstances();
+        syncSessionReportsNavBadge();
     }
 
     function syncReportWorkflowStepUi() {
@@ -6428,6 +6440,9 @@ document.addEventListener('DOMContentLoaded', () => {
         if (ctaZone) {
             ctaZone.classList.toggle('d-none', !sessionHasConductRequiredReports);
         }
+        document.getElementById('sessionReportConductShell')?.classList.toggle('d-none', !sessionHasConductRequiredReports);
+        syncReportWorkflowStepUi();
+        syncSessionReportsNavBadge();
         if (sessionHasConductRequiredReports && tbody) {
             if (!roster.length) {
                 tbody.innerHTML = `<tr><td colspan="${conductColspan}" class="text-center py-4 text-muted">No students are selected for reports on this session.</td></tr>`;
@@ -8336,27 +8351,43 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!badge) return;
         const rows = Array.isArray(sessionReportInstancesState) ? sessionReportInstancesState : [];
         const total = rows.length;
-        if (!total) {
-            badge.classList.add('d-none');
-            badge.classList.remove('bg-danger', 'bg-success');
-            badge.textContent = '';
-            badge.removeAttribute('title');
-            badge.setAttribute('aria-hidden', 'true');
+
+        if (total > 0) {
+            const pending = getUnsubmittedSessionReports().length;
+            const allSubmitted = pending === 0;
+            badge.classList.remove('d-none', 'bg-danger', 'bg-success', 'session-nav-badge--dot');
+            badge.classList.add(allSubmitted ? 'bg-success' : 'bg-danger');
+            badge.textContent = String(total);
+            badge.setAttribute('aria-hidden', 'false');
+            let title = allSubmitted ? 'All report instances submitted' : `${pending} report(s) still pending submission`;
+            if (sessionGradebookSkillCoverageGateActive && !sessionGradebookSkillCoverageReady) {
+                const miss = Array.isArray(sessionGradebookSkillCoverageMissing) ? sessionGradebookSkillCoverageMissing.length : 0;
+                title = `${title}${miss ? ` · ${miss} skill(s) need gradebook activities` : ' · gradebook skills incomplete'}`;
+            }
+            badge.setAttribute('title', title);
+            badge.title = title;
             return;
         }
-        const pending = getUnsubmittedSessionReports().length;
-        const allSubmitted = pending === 0;
-        badge.classList.remove('d-none', 'bg-danger', 'bg-success');
-        badge.classList.add(allSubmitted ? 'bg-success' : 'bg-danger');
-        badge.textContent = String(total);
-        badge.setAttribute('aria-hidden', 'false');
-        let title = allSubmitted ? 'All report instances submitted' : `${pending} report(s) still pending submission`;
-        if (sessionGradebookSkillCoverageGateActive && !sessionGradebookSkillCoverageReady) {
-            const miss = Array.isArray(sessionGradebookSkillCoverageMissing) ? sessionGradebookSkillCoverageMissing.length : 0;
-            title = `${title}${miss ? ` · ${miss} skill(s) need gradebook activities` : ' · gradebook skills incomplete'}`;
+
+        if (sessionHasConductRequiredReports) {
+            const conductComplete = sessionConductReadyForReports === true;
+            badge.classList.remove('d-none', 'bg-danger', 'bg-success');
+            badge.classList.add('session-nav-badge--dot', conductComplete ? 'bg-success' : 'bg-danger');
+            badge.innerHTML = '&nbsp;';
+            badge.setAttribute('aria-hidden', 'false');
+            const title = conductComplete
+                ? 'Class conduct saved for this session'
+                : 'Class conduct required — not yet complete';
+            badge.setAttribute('title', title);
+            badge.title = title;
+            return;
         }
-        badge.setAttribute('title', title);
-        badge.title = title;
+
+        badge.classList.add('d-none');
+        badge.classList.remove('bg-danger', 'bg-success', 'session-nav-badge--dot');
+        badge.textContent = '';
+        badge.removeAttribute('title');
+        badge.setAttribute('aria-hidden', 'true');
     }
     function syncSessionNotesNavBadge() {
         const badge = document.getElementById('sessionNotesNavBadge');

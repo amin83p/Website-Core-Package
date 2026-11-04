@@ -27,6 +27,9 @@ test('conductMatrixRoutes uses SCHOOL_CLASS_CONDUCT_MATRIX access', () => {
   const src = read('packages/school/MVC/routes/conductMatrixRoutes.js');
   assert.match(src, /SECTIONS\.SCHOOL_CLASS_CONDUCT_MATRIX/);
   assert.match(src, /OPERATIONS\.READ_ALL/);
+  assert.match(src, /api\/session-visibility/);
+  assert.match(src, /OPERATIONS\.UPDATE/);
+  assert.match(src, /allowOperationTokenFallback/);
 });
 
 test('conductMatrixService exports buildConductMatrixPayload', () => {
@@ -70,6 +73,36 @@ test('gradesMatrixController exports loadGradesMatrixSharedContext', () => {
 test('conduct matrix view and client assets exist', () => {
   assert.ok(fs.existsSync(path.join(ROOT, 'packages/school/MVC/views/school/report/conductMatrix.ejs')));
   assert.ok(fs.existsSync(path.join(ROOT, 'packages/school/public/scripts/conductMatrixClient.js')));
+  assert.ok(fs.existsSync(path.join(ROOT, 'packages/school/public/scripts/conductRatingCell.js')));
+});
+
+test('sessionConductService exposes conduct report step helpers', () => {
+  const sessionConductService = require('../MVC/services/school/sessionConductService');
+  assert.equal(typeof sessionConductService.parseConductReportStepEnabled, 'function');
+  assert.equal(typeof sessionConductService.sessionShowsReportConductStep, 'function');
+  assert.equal(sessionConductService.parseConductReportStepEnabled({ conductReportStepEnabled: true }), true);
+  assert.equal(
+    sessionConductService.sessionShowsReportConductStep({ conductReportStepEnabled: true }, false),
+    true
+  );
+});
+
+test('buildSessionReportConductUiPayload serves opt-in report conduct roster', () => {
+  const sessionConductService = require('../MVC/services/school/sessionConductService');
+  const payload = sessionConductService.buildSessionReportConductUiPayload({
+    session: { sessionId: 's1', conductReportStepEnabled: true, roster: [{ personId: 'p1', name: 'Student A' }] },
+    sessions: [{ sessionId: 's1', roster: [{ personId: 'p1', name: 'Student A' }] }],
+    sessionRoster: [{ personId: 'p1', name: 'Student A' }],
+    assignmentMap: [],
+    instanceRows: [],
+    sessionId: 's1',
+    classId: 'c1'
+  });
+  assert.equal(payload.sessionHasConductRequiredReports, true);
+  assert.equal(payload.conductRequiredByAssignment, false);
+  assert.equal(payload.conductReportStepEnabled, true);
+  assert.equal(payload.reportConductRoster.length, 1);
+  assert.equal(payload.reportConductRoster[0].personId, 'p1');
 });
 
 test('school dashboard links Class Conduct Matrix under academia URL', () => {

@@ -22,6 +22,11 @@ test('manageSession resolves report assignment conduct from matched target rows'
   assert.match(classControllerSource, /sessionMatchedAssignments\.some/);
   assert.match(classControllerSource, /assignmentRowId: targetRow\?\.rowId/);
   assert.match(classControllerSource, /hasSessionReportsAssigned/);
+  assert.match(classControllerSource, /sessionHasConductRequiredByAssignment/);
+  assert.match(classControllerSource, /conductReportStepEnabled/);
+  assert.match(classControllerSource, /canEditClassConductViaMatrix/);
+  assert.match(classControllerSource, /SCHOOL_CLASS_CONDUCT_MATRIX/);
+  assert.match(classControllerSource, /sessionShowsReportConductStep/);
 });
 
 test('sessionManager shows optional class conduct panel only for admins', () => {
@@ -31,7 +36,7 @@ test('sessionManager shows optional class conduct panel only for admins', () => 
 
 test('sessionManager keeps report quick-rate conduct for session editors', () => {
   assert.match(sessionManagerSource, /canManageReportClassConductFlag/);
-  assert.match(sessionManagerSource, /sessionHasConductRequiredReportsResolved && canManageReportClassConductFlag/);
+  assert.match(sessionManagerSource, /sessionHasConductRequiredReportsResolved/);
   assert.match(sessionManagerSource, /btnOpenConductBulkModal/);
   assert.match(sessionManagerSource, /sessionConductReadOnly = sessionConductSectionReadOnly \|\| !sessionCanManageClassConduct/);
 });

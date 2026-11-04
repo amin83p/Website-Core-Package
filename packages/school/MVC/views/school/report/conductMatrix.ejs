@@ -1,21 +1,76 @@
 <style>
   .cm-matrix-wrapper { max-height: min(70vh, 720px); overflow: auto; border: 1px solid #dee2e6; border-radius: 12px; box-shadow: 0 0.15rem 0.5rem rgba(15, 23, 42, 0.05); }
-  .cm-matrix-table th { position: sticky; top: 0; z-index: 2; background-color: #f8f9fa; vertical-align: bottom; font-size: 0.78rem; }
+  .attendance-legend-icon-btn {
+    width: 2.25rem; height: 2.25rem; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center; line-height: 1;
+  }
+  .attendance-legend-icon-btn .bi { font-size: 1.05rem; line-height: 1; }
+  .cm-session-view-btn.active {
+    color: #0d6efd; border-color: #0d6efd; background-color: rgba(13, 110, 253, 0.08);
+  }
+  .cm-matrix-table th { position: sticky; top: 0; z-index: 2; background-color: #f8f9fa; vertical-align: bottom; font-size: 0.78rem; box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1); }
+  .cm-matrix-table th.cm-sticky-rollup,
+  .cm-matrix-table td.cm-sticky-rollup {
+    position: sticky; left: 0; z-index: 3; width: 96px; min-width: 96px; max-width: 96px;
+    border-right: 1px solid #dee2e6; background-color: #f8f9fa; vertical-align: middle;
+  }
+  .cm-matrix-table td.cm-sticky-rollup { background-color: #fff; z-index: 2; }
   .cm-matrix-table th.cm-sticky-name,
   .cm-matrix-table td.cm-sticky-name {
-    position: sticky; left: 0; z-index: 3; min-width: 140px; max-width: 180px;
+    position: sticky; left: 96px; z-index: 3; min-width: 148px; max-width: 220px;
     border-right: 2px solid #dee2e6; background-color: #fff; font-weight: 600;
     box-shadow: 2px 0 2px -1px rgba(0, 0, 0, 0.06);
   }
   .cm-matrix-table th.cm-sticky-name { background-color: #f8f9fa; z-index: 4; }
+  .cm-matrix-table tbody tr.cm-student-row:nth-child(even) td:not(.cm-col-disabled) { background-color: #f8fafc; }
+  .cm-matrix-table tbody tr.cm-student-row:nth-child(even) td.cm-sticky-rollup,
+  .cm-matrix-table tbody tr.cm-student-row:nth-child(even) td.cm-sticky-name { background-color: #f8fafc; }
   .cm-matrix-table th.cm-col-disabled,
-  .cm-matrix-table td.cm-col-disabled { opacity: 0.35; pointer-events: none; }
-  .cm-matrix-cell { text-align: center; vertical-align: middle; min-width: 72px; cursor: pointer; font-size: 0.75rem; font-weight: 600; }
-  .cm-matrix-cell.cm-empty { color: #adb5bd; font-weight: 400; cursor: default; }
+  .cm-matrix-table td.cm-col-disabled { opacity: 0.35; pointer-events: none; background: #f8f9fa; }
+  .cm-matrix-table th.att-cell {
+    text-align: center; vertical-align: middle; min-width: 80px; position: relative;
+    transition: background-color 0.2s; font-weight: 700;
+  }
+  .cm-matrix-table th.att-cell:hover { background-color: #f1f3f5; }
+  .cm-matrix-table th.cm-session-col { padding: 0.35rem 0.25rem !important; vertical-align: middle; }
+  .cm-session-header-date {
+    display: block; cursor: pointer; color: var(--bs-primary, #0d6efd);
+    font-size: 0.875em; font-weight: 700; text-decoration: underline;
+  }
+  .cm-col-toggle { font-size: 0.68rem; white-space: nowrap; font-weight: 400; text-decoration: none; }
+  .cm-matrix-cell { text-align: center; vertical-align: middle; min-width: 88px; cursor: pointer; font-size: 0.72rem; padding: 0.35rem 0.2rem !important; }
+  .cm-matrix-cell.cm-empty .cm-cell-empty-mark { color: #adb5bd; font-weight: 400; }
   .cm-matrix-cell.cm-editable:hover { background-color: #f1f3f5; }
-  .cm-matrix-cell.cm-not-roster { cursor: not-allowed; color: #dee2e6; }
-  .cm-col-toggle { font-size: 0.7rem; }
-  .cm-col-toggle input:disabled + span { opacity: 0.85; }
+  .cm-matrix-cell.cm-not-roster { cursor: not-allowed; }
+  .cm-cell-off-roster { color: #dee2e6; font-size: 1.1rem; }
+  .cm-cell-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0.15rem 0.25rem; justify-items: center; }
+  .cm-dim-chip {
+    display: inline-flex; align-items: center; justify-content: center;
+    min-width: 1.65rem; padding: 0.06rem 0.22rem; border-radius: 0.25rem;
+    background: #e9ecef; font-weight: 700; font-size: 0.65rem; line-height: 1.2;
+  }
+  .cm-dim-chip-empty { background: transparent; color: #ced4da; font-weight: 400; }
+  .cm-dim-chip.cm-code-s { background-color: #198754; color: #fff; border: 1px solid #157347; }
+  .cm-dim-chip.cm-code-sat { background-color: #c5f135; color: #1a3d0a; border: 1px solid #a8d42a; }
+  .cm-dim-chip.cm-code-ni { background-color: #fd7e14; color: #fff; border: 1px solid #e96b00; }
+  .cm-dim-chip.cm-code-u { background-color: #dc3545; color: #fff; border: 1px solid #bb2d3b; }
+  .cm-dim-chip.cm-code-na { background-color: #fff; color: #495057; border: 1px solid #ced4da; font-weight: 600; }
+  .cm-col-toggle input:disabled + .cm-col-toggle-label { font-weight: 600; color: #084298; }
+  .cm-conduct-legend { display: flex; flex-wrap: wrap; gap: 0.35rem; font-size: 0.68rem; }
+  .cm-conduct-legend .cm-legend-item { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.1rem 0.35rem; border: 1px solid #dee2e6; border-radius: 999px; background: #fff; }
+  .cm-modal-context-banner { background: linear-gradient(145deg, #f8f9fa 0%, #fff 100%); }
+  .cm-modal-dim-card .conduct-emoji-picker { display: flex; flex-wrap: wrap; gap: 0.25rem; justify-content: center; margin-bottom: 0.5rem; }
+  #cmCellModal .conduct-emoji-picker { display: flex; flex-wrap: wrap; gap: 0.2rem; justify-content: center; margin-bottom: 0.35rem; }
+  #cmCellModal .conduct-code-btn {
+    min-width: 1.85rem; padding: 0.12rem 0.28rem; font-size: 0.72rem; font-weight: 700;
+    border: 1px solid #ced4da; border-radius: 0.35rem; background: #fff;
+  }
+  #cmCellModal .conduct-code-btn.active { background: #0d6efd; border-color: #0d6efd; color: #fff; }
+  #cmCellModal .conduct-code-btn[data-code="S"].active { background: #198754; border-color: #157347; }
+  #cmCellModal .conduct-code-btn[data-code="Sat"].active { background: #c5f135; border-color: #a8d42a; color: #1a3d0a; }
+  #cmCellModal .conduct-code-btn[data-code="NI"].active { background: #fd7e14; border-color: #e96b00; }
+  #cmCellModal .conduct-code-btn[data-code="U"].active { background: #dc3545; border-color: #bb2d3b; }
+  #cmCellModal .conduct-percent-input { max-width: 5.5rem; margin: 0 auto; text-align: center; }
   .schedule-shell .filter-panel {
     background: linear-gradient(145deg, #edf5ff 0%, #f8fbff 100%);
     border: 1px solid #dce9ff;
@@ -51,7 +106,7 @@
 }) %>
 
 <div class="schedule-shell">
-  <p class="text-muted small mb-3">View class conduct across sessions for one class. Cells show ratings only where a teacher saved conduct for that student on that session. Optional sessions can be hidden with the column toggle; sessions that require conduct before reports stay enabled.</p>
+  <p class="text-muted small mb-3">View class conduct across sessions for one class. Use <strong>Show</strong> to include optional sessions on Manage Session → Reports. Sessions that require conduct before reports stay enabled.</p>
 
   <div class="card border-0 shadow-sm mb-3">
     <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
@@ -98,13 +153,42 @@
   </div>
 
   <div class="card border-0 shadow-sm d-none" id="cm_results">
-    <div class="card-header bg-white border-bottom py-3">
-      <h5 class="m-0 fw-bold text-primary" id="cm_classTitle">Class</h5>
-      <div class="small text-muted mt-1">Click a cell to add or edit conduct (when the session column is enabled). Format: Effort / Participation / Teachers / Students.</div>
+    <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <div>
+        <h5 class="m-0 fw-bold text-primary" id="cm_classTitle">Class</h5>
+        <p class="small text-muted mb-0 mt-1">Click a cell to edit. Avg column uses rated sessions with <strong>Show</strong> enabled.</p>
+      </div>
+      <div class="d-flex align-items-center gap-2">
+        <button type="button"
+          class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn cm-session-view-btn active"
+          id="cm_btnShowAllSessions"
+          aria-label="Show all sessions"
+          title="All sessions"
+          aria-pressed="true">
+          <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i>
+        </button>
+        <button type="button"
+          class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn cm-session-view-btn"
+          id="cm_btnShowConductSessions"
+          aria-label="Show conduct sessions only"
+          title="Conduct sessions only"
+          aria-pressed="false">
+          <i class="bi bi-funnel-fill" aria-hidden="true"></i>
+        </button>
+        <button type="button"
+          class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
+          id="cm_btnLegend"
+          data-bs-toggle="modal"
+          data-bs-target="#cmLegendModal"
+          aria-label="Conduct rating legend"
+          title="Legend">
+          <i class="bi bi-info-circle" aria-hidden="true"></i>
+        </button>
+      </div>
     </div>
     <div class="card-body p-0">
       <div class="cm-matrix-wrapper">
-        <table class="table table-hover table-bordered mb-0 cm-matrix-table" id="cm_table">
+        <table class="table table-hover mb-0 cm-matrix-table" id="cm_table">
           <thead id="cm_thead"></thead>
           <tbody id="cm_tbody"></tbody>
         </table>
@@ -113,25 +197,57 @@
   </div>
 </div>
 
-<div class="modal fade" id="cmCellModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-dialog-centered modal-lg">
+<div class="modal fade" id="cmLegendModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content">
-      <div class="modal-header bg-primary text-white">
-        <h5 class="modal-title fw-bold"><i class="bi bi-emoji-smile me-2"></i>Class conduct</h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      <div class="modal-header py-2 px-3">
+        <h6 class="modal-title mb-0 fw-semibold"><i class="bi bi-info-circle me-1"></i>Class conduct legend</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body">
-        <div class="mb-2"><span class="text-muted small">Student</span><div class="fw-semibold" id="cmModalStudent">—</div></div>
-        <div class="mb-3"><span class="text-muted small">Session</span><div class="fw-semibold" id="cmModalSession">—</div></div>
-        <div id="cmModalDimensionFields"></div>
-        <div class="form-check mt-3 d-none" id="cmModalReadyWrap">
-          <input class="form-check-input" type="checkbox" id="cmModalReady">
-          <label class="form-check-label" for="cmModalReady">Mark session ready for reports</label>
+        <p class="small text-muted">Matrix cells show rating codes in order: effort, participation, respects teachers, respects students.</p>
+        <div class="cm-conduct-legend" id="cmConductLegend"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="cmCellModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header border-0 pb-0">
+        <div>
+          <h5 class="modal-title fw-bold mb-0"><i class="bi bi-emoji-smile me-2 text-primary"></i>Class conduct</h5>
+          <p class="text-muted small mb-0 mt-1">Pick a level or enter a percent for each dimension.</p>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body pt-2">
+        <div class="cm-modal-context-banner rounded-3 p-3 mb-3 border">
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <div class="text-uppercase text-muted small fw-semibold mb-1">Student</div>
+              <div class="fw-bold fs-6" id="cmModalStudent">—</div>
+            </div>
+            <div class="col-sm-6">
+              <div class="text-uppercase text-muted small fw-semibold mb-1">Session</div>
+              <div class="fw-bold fs-6" id="cmModalSession">—</div>
+            </div>
+          </div>
+        </div>
+        <div class="cm-conduct-legend mb-3" id="cmModalLegendInline" aria-label="Rating scale"></div>
+        <div class="row g-3" id="cmModalDimensionFields"></div>
+        <div class="alert alert-info border-0 mt-3 mb-0 d-none" id="cmModalReadyWrap">
+          <div class="form-check mb-0">
+            <input class="form-check-input" type="checkbox" id="cmModalReady">
+            <label class="form-check-label fw-semibold" for="cmModalReady">Mark session ready for reports</label>
+            <div class="small text-muted ms-4 ps-1">Completes the class conduct step for this session on Manage Session → Reports.</div>
+          </div>
         </div>
       </div>
-      <div class="modal-footer bg-light">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-primary" id="cmModalSave"><i class="bi bi-check2-circle me-1"></i>Save</button>
+      <div class="modal-footer bg-light border-0">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="cmModalSave"><i class="bi bi-check2-circle me-1"></i>Save conduct</button>
       </div>
     </div>
   </div>
@@ -150,4 +266,5 @@
     actionStateId: typeof actionStateId !== 'undefined' ? actionStateId : ''
   }).replace(/</g, '\\u003c').replace(/&/g, '\\u0026') %>;
 </script>
+<script src="/scripts/conductRatingCell.js"></script>
 <script src="/scripts/conductMatrixClient.js"></script>

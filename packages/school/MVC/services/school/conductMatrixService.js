@@ -86,10 +86,6 @@ async function buildConductMatrixPayload(req, query, matrixContext, conductPolic
 
   const assignments = await schoolDataService.fetchAllData('reportAssignments', {}, req.user);
 
-  // #region agent log
-  fetch('http://127.0.0.1:7429/ingest/4a4b23d1-b3e8-4c87-b6c0-e036ac2782ab',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2e9ee4'},body:JSON.stringify({sessionId:'2e9ee4',hypothesisId:'C',location:'conductMatrixService.js:buildConductMatrixPayload',message:'assignments loaded',data:{classId,assignmentCount:Array.isArray(assignments)?assignments.length:0,filteredSessionCount:filteredSessions.length},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
-
   const conductRequiredBySessionId = new Map();
   const reportConductTargetsBySessionId = new Map();
 
@@ -111,11 +107,8 @@ async function buildConductMatrixPayload(req, query, matrixContext, conductPolic
       sessionRoster: session?.roster
     });
     reportConductTargetsBySessionId.set(sessionId, new Set(reportConductPersonIds.map(personKey).filter(Boolean)));
-    // #region agent log
-    if (conductRequiredForReports || sessionMatchedAssignments.length) {
-      fetch('http://127.0.0.1:7429/ingest/4a4b23d1-b3e8-4c87-b6c0-e036ac2782ab',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2e9ee4'},body:JSON.stringify({sessionId:'2e9ee4',runId:'post-fix-v2',hypothesisId:'F,G',location:'conductMatrixService.js:sessionMap',message:'session conduct flags',data:{sessionId,sessionDate:session?.date,conductRequiredForReports,matchedAssignmentCount:sessionMatchedAssignments.length,matchedScopes:sessionMatchedAssignments.map((a)=>String(a?.reportScope||'class')).slice(0,5),reportConductPersonIdCount:reportConductPersonIds.length,conductReady:sessionConductService.isSessionConductReady(session),rosterWithConduct:(session?.roster||[]).filter((r)=>sessionConductService.rosterRowHasRatedConduct(r)).length,rosterSize:(session?.roster||[]).length},timestamp:Date.now()})}).catch(()=>{});
-    }
-    // #endregion
+    const conductReportStepEnabled = sessionConductService.parseConductReportStepEnabled(session);
+    const hasSavedConduct = sessionConductService.sessionHasAnySavedConduct(session);
     return {
       sessionId,
       date: String(session?.date || '').trim(),
@@ -123,6 +116,9 @@ async function buildConductMatrixPayload(req, query, matrixContext, conductPolic
       endTime: String(session?.endTime || '').trim(),
       label: [session?.date, session?.startTime].filter(Boolean).join(' '),
       conductRequiredForReports,
+      conductReportStepEnabled,
+      hasSavedConduct,
+      columnShowByDefault: conductRequiredForReports || conductReportStepEnabled,
       conductReadyForReports: sessionConductService.isSessionConductReady(session),
       manageSessionHref: classId && sessionId
         ? `/school/classes/${encodeURIComponent(classId)}/sessions/${encodeURIComponent(sessionId)}`
@@ -180,9 +176,6 @@ async function buildConductMatrixPayload(req, query, matrixContext, conductPolic
     });
   });
   const requiredSessionCount = sessions.filter((s) => s.conductRequiredForReports).length;
-  // #region agent log
-  fetch('http://127.0.0.1:7429/ingest/4a4b23d1-b3e8-4c87-b6c0-e036ac2782ab',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'2e9ee4'},body:JSON.stringify({sessionId:'2e9ee4',runId:'post-fix-v2',hypothesisId:'D,F',location:'conductMatrixService.js:payloadSummary',message:'matrix payload summary',data:{classId,requiredSessionCount,sessionCount:sessions.length,cellsOnRoster,cellsWithValue,cellsReportGated,studentCount:studentList.length,isRollingClass:Boolean(isRollingClass)},timestamp:Date.now()})}).catch(()=>{});
-  // #endregion
 
   return {
     class: {
