@@ -13,6 +13,7 @@ const sessionStatusPolicyService = require('../../services/school/sessionStatusP
 const notificationCenterComposeService = require('../../services/school/notificationCenterComposeService');
 const notificationCenterEmailComposeService = require('../../services/school/notificationCenterEmailComposeService');
 const notificationCenterManagerSummaryService = require('../../services/school/notificationCenterManagerSummaryService');
+const notificationCenterRulesViewPreferencesService = require('../../services/school/notificationCenterRulesViewPreferencesService');
 const personDisplayNameService = require('../../services/school/personDisplayNameService');
 
 const notificationRuleModel = require('../../models/school/notificationRuleModel');
@@ -183,6 +184,43 @@ async function baseView(req, res, extra = {}) {
 
 
 
+async function getRulesViewMode(req, res) {
+  try {
+    const userId = String(req.user?.id || '').trim();
+    if (!userId) {
+      return res.status(401).json({ status: 'error', message: 'Authentication required.' });
+    }
+    const viewMode = await notificationCenterRulesViewPreferencesService.getRulesViewMode(userId);
+    return res.json({ status: 'success', viewMode });
+  } catch (error) {
+    return res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to load view preference.'
+    });
+  }
+}
+
+async function saveRulesViewMode(req, res) {
+  try {
+    const userId = String(req.user?.id || '').trim();
+    if (!userId) {
+      return res.status(401).json({ status: 'error', message: 'Authentication required.' });
+    }
+    const payload = (req.body && typeof req.body === 'object') ? req.body : {};
+    const viewMode = await notificationCenterRulesViewPreferencesService.saveRulesViewMode(
+      userId,
+      payload.viewMode,
+      req.user || userId
+    );
+    return res.json({ status: 'success', viewMode });
+  } catch (error) {
+    return res.status(500).json({
+      status: 'error',
+      message: error.message || 'Failed to save view preference.'
+    });
+  }
+}
+
 async function showHome(req, res) {
 
   try {
@@ -190,6 +228,8 @@ async function showHome(req, res) {
     const orgId = getActiveOrgIdOrThrow(req.user);
 
     const access = await notificationCenterAccessService.buildAccessFlags(req.user, req.ip);
+
+    const rulesViewMode = await notificationCenterRulesViewPreferencesService.getRulesViewMode(req.user?.id);
 
 
 
@@ -277,7 +317,9 @@ async function showHome(req, res) {
 
       pagination,
 
-      filters: req.query
+      filters: req.query,
+
+      rulesViewMode
 
     }));
 
@@ -999,6 +1041,10 @@ async function deleteOutboxEntry(req, res) {
 module.exports = {
 
   showHome,
+
+  getRulesViewMode,
+
+  saveRulesViewMode,
 
   showRuleForm,
 

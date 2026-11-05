@@ -28,11 +28,23 @@
 
   ],
 
-  manageBtns: access?.canViewRuns
+  sectionsPageClass: (typeof rulesViewMode !== 'undefined' && String(rulesViewMode || '').trim().toLowerCase() === 'list') ? '' : 'nc-rules-view--tile',
 
-    ? ['<a href="/school/notification-center/outbox" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-envelope-paper me-1"></i> Scheduled emails</a>']
-
-    : [],
+  manageBtns: (function () {
+    const btns = [];
+    if (access?.canViewRuns) {
+      btns.push('<a href="/school/notification-center/outbox" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-envelope-paper me-1"></i> Scheduled emails</a>');
+    }
+    const ncViewMode = (typeof rulesViewMode !== 'undefined' && String(rulesViewMode || '').trim().toLowerCase() === 'list') ? 'list' : 'tile';
+    const ncToggleLabel = ncViewMode === 'tile' ? 'List view' : 'Tile view';
+    const ncToggleIcon = ncViewMode === 'tile' ? 'bi-list-ul' : 'bi-grid-3x3-gap';
+    btns.push(
+      '<button type="button" class="btn btn-outline-secondary btn-md mb-2" id="ncRulesViewToggle" data-nc-view-mode="' + ncViewMode + '" aria-pressed="' + (ncViewMode === 'tile' ? 'true' : 'false') + '">'
+      + '<i class="bi ' + ncToggleIcon + ' me-1"></i> ' + ncToggleLabel
+      + '</button>'
+    );
+    return btns;
+  })(),
 
 }) %>
 
@@ -51,152 +63,16 @@
 
 
 
-<div class="table-scroll-wrapper" data-floating-row-actions="true">
-
-  <table class="table-responsive size-md" id="first-table">
-
-    <thead>
-
-      <tr>
-
-        <th class="draggable ps-4" data-column="label">Label</th>
-
-        <th class="draggable" data-column="ruleType">Type</th>
-
-        <th class="draggable" data-column="enabled">Status</th>
-
-        <th class="draggable" data-column="legacyKey">Source</th>
-
-        <th class="text-end pe-4">Actions</th>
-
-      </tr>
-
-    </thead>
-
-    <tbody>
-
-      <% if (!data || data.length === 0) { %>
-
-        <tr><td colspan="5" class="text-center py-5 text-muted">No rules found.<% if (access?.canConfigure) { %> Create a rule or save session notification settings to import the legacy rule.<% } %></td></tr>
-
-      <% } %>
-
-      <% (data || []).forEach((rule) => { %>
-        <% const showRuleMetadata = access?.canViewRuleMetadata === true; %>
-
-        <tr data-entity-row-id="<%= rule.id %>">
-
-          <td class="ps-4">
-
-            <% if (showRuleMetadata) { %>
-            <div class="fw-semibold text-dark"><%= rule.label %></div>
-            <% } else { %>
-            <span class="text-muted">—</span>
-            <% } %>
-
-          </td>
-
-          <td>
-            <% if (showRuleMetadata) { %>
-            <span class="text-dark"><%= typeof formatNotificationTokenLabel === 'function' ? formatNotificationTokenLabel(rule.ruleType) : rule.ruleType %></span>
-            <% } else { %>
-            <span class="text-muted">—</span>
-            <% } %>
-          </td>
-
-          <td data-sort-value="<%= showRuleMetadata && rule.enabled ? '1' : '0' %>">
-
-            <% if (showRuleMetadata) { %>
-            <% if (rule.enabled) { %><span class="badge bg-success">Enabled</span><% } else { %><span class="badge bg-secondary">Paused</span><% } %>
-            <% if (typeof isRuleOutsideActivityWindow === 'function' && isRuleOutsideActivityWindow(rule)) { %>
-              <div class="x-small text-muted mt-1">Scheduled evaluation paused (outside activity date window)</div>
-            <% } %>
-            <% } else { %>
-            <span class="text-muted">—</span>
-            <% } %>
-
-          </td>
-
-          <td data-sort-value="<%= showRuleMetadata && rule.legacyKey ? 'legacy' : 'custom' %>">
-
-            <% if (showRuleMetadata) { %>
-            <% if (rule.legacyKey) { %><span class="badge bg-light text-muted border">Legacy sync</span><% } else { %><span class="text-muted small">Custom</span><% } %>
-            <% } else { %>
-            <span class="text-muted">—</span>
-            <% } %>
-
-          </td>
-
-          <td class="table-actions text-end pe-4">
-
-            <% if (access?.canConfigure || access?.canRunNow || canRemoveRunResults) { %>
-
-            <div class="row-actions-wrap">
-
-              <button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="<%= rule.id %>" title="Rule actions">
-
-                <i class="bi bi-three-dots-vertical"></i>
-
-              </button>
-
-              <div class="row-actions-menu d-none" data-row-actions-id="<%= rule.id %>">
-
-                <% if (access?.canConfigure) { %>
-
-                  <a href="/school/notification-center/rules/<%= rule.id %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a>
-
-                <% } %>
-
-                <% if (access?.canConfigure && !rule.legacyKey) { %>
-
-                  <button type="button" class="btn btn-outline-danger btn-sm js-nc-delete-rule" data-rule-id="<%= rule.id %>" data-rule-label="<%= rule.label || rule.ruleType || 'rule' %>" data-delete-url="/school/notification-center/rules/<%= rule.id %>/delete">
-
-                    <i class="bi bi-trash me-2"></i>Delete rule
-
-                  </button>
-
-                <% } %>
-
-                <% if (access?.canRunNow) { %>
-
-                  <form method="post" action="/school/notification-center/rules/<%= rule.id %>/run" class="d-inline js-nc-run-rule-form">
-
-                    <button type="submit" class="btn btn-outline-secondary btn-sm"><i class="bi bi-play-fill me-2"></i>Run now</button>
-
-                  </form>
-
-                <% } %>
-
-                <% if (canRemoveRunResults) { %>
-
-                  <button type="button" class="btn btn-outline-danger btn-sm js-nc-delete-rule-runs" data-rule-id="<%= rule.id %>" data-rule-label="<%= rule.label || rule.ruleType || 'rule' %>">
-
-                    <i class="bi bi-trash me-2"></i>Delete run results
-
-                  </button>
-
-                <% } %>
-
-              </div>
-
-            </div>
-
-            <% } %>
-
-          </td>
-
-        </tr>
-
-      <% }) %>
-
-    </tbody>
-
-  </table>
-
-</div>
+<%- include('school/notificationCenter/partials/ruleDefinitionsRegion', {
+  data,
+  access,
+  rulesViewMode,
+  canRemoveRunResultsFlag
+}) %>
 
 
 
+<div id="nc-rules-pagination">
 <%- include('partials/pagination', {
 
   pagination,
@@ -206,10 +82,17 @@
   baseUrlPath: newUrl
 
 }) %>
+</div>
 
 
 
-<div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mt-4 mb-2">
+<div class="nc-rules-run-separator" role="separator" aria-label="Recent run results">
+  <span class="nc-rules-run-separator-line"></span>
+  <span class="nc-rules-run-separator-label">Results</span>
+  <span class="nc-rules-run-separator-line"></span>
+</div>
+
+<div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mt-3 mb-2">
 
   <div>
 
@@ -380,9 +263,19 @@
 
 
 <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/table-draggable-sort.js') : '/scripts/table-draggable-sort.js' %>"></script>
-
+<script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/notificationCenterRunRule.js') : '/scripts/notificationCenterRunRule.js' %>"></script>
+<script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/notificationCenterRulesView.js') : '/scripts/notificationCenterRulesView.js' %>"></script>
 <%- include('school/notificationCenter/partials/runRuleLoadingScript') %>
-
+<script>
+(function () {
+  if (window.NotificationCenterRulesView?.init) {
+    window.NotificationCenterRulesView.init({
+      initialViewMode: '<%= (typeof rulesViewMode !== "undefined" && String(rulesViewMode || "").trim().toLowerCase() === "list") ? "list" : "tile" %>',
+      saveUrl: '/school/notification-center/api/rules-view-mode'
+    });
+  }
+})();
+</script>
 <script>
 
 (function () {

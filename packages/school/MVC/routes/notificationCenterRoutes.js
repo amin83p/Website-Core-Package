@@ -11,6 +11,20 @@ const { requireNotificationCenterOperation } = require('./notificationCenterRout
 
 const SECTION = SECTIONS.SCHOOL_NOTIFICATION_CENTER;
 
+router.get('/api/rules-view-mode',
+  requireAuth,
+  requireNotificationCenterOperation(OPERATIONS.READ),
+  trackActionState(SECTION, OPERATIONS.READ, { requireToken: false, keepActive: true }),
+  notificationCenterController.getRulesViewMode
+);
+
+router.put('/api/rules-view-mode',
+  requireAuth,
+  requireNotificationCenterOperation(OPERATIONS.READ),
+  trackActionState(SECTION, OPERATIONS.READ, { requireToken: false, keepActive: true }),
+  notificationCenterController.saveRulesViewMode
+);
+
 router.get('/',
   requireAuth,
   requireNotificationCenterOperation(OPERATIONS.READ),

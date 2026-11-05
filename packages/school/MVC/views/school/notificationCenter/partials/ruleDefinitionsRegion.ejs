@@ -1,0 +1,108 @@
+<%
+  const ncRulesViewMode = (typeof rulesViewMode !== 'undefined' && String(rulesViewMode || '').trim().toLowerCase() === 'list')
+    ? 'list'
+    : 'tile';
+  const ncListPaneHidden = ncRulesViewMode === 'tile';
+  const ncTilePaneHidden = ncRulesViewMode === 'list';
+  const ncCanRemoveRunResults = typeof canRemoveRunResultsFlag === 'boolean'
+    ? canRemoveRunResultsFlag === true
+    : (access?.canDeleteRuns === true || access?.evaluations?.del?.adminBypass === true);
+%>
+<div id="nc-rules-list-pane" class="<%= ncListPaneHidden ? 'd-none' : '' %>">
+  <div class="table-scroll-wrapper" data-floating-row-actions="true">
+    <table class="table-responsive size-md" id="first-table">
+      <thead>
+        <tr>
+          <th class="draggable ps-4" data-column="label">Label</th>
+          <th class="draggable" data-column="ruleType">Type</th>
+          <th class="draggable" data-column="enabled">Status</th>
+          <th class="draggable" data-column="legacyKey">Source</th>
+          <th class="text-end pe-4">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (!data || data.length === 0) { %>
+          <tr><td colspan="5" class="text-center py-5 text-muted">No rules found.<% if (access?.canConfigure) { %> Create a rule or save session notification settings to import the legacy rule.<% } %></td></tr>
+        <% } %>
+        <% (data || []).forEach((rule) => { %>
+          <% const showRuleMetadata = access?.canViewRuleMetadata === true; %>
+          <tr data-entity-row-id="<%= rule.id %>">
+            <td class="ps-4">
+              <% if (showRuleMetadata) { %>
+              <div class="fw-semibold text-dark"><%= rule.label %></div>
+              <% } else { %>
+              <span class="text-muted">—</span>
+              <% } %>
+            </td>
+            <td>
+              <% if (showRuleMetadata) { %>
+              <span class="text-dark"><%= typeof formatNotificationTokenLabel === 'function' ? formatNotificationTokenLabel(rule.ruleType) : rule.ruleType %></span>
+              <% } else { %>
+              <span class="text-muted">—</span>
+              <% } %>
+            </td>
+            <td data-sort-value="<%= showRuleMetadata && rule.enabled ? '1' : '0' %>">
+              <% if (showRuleMetadata) { %>
+              <% if (rule.enabled) { %><span class="badge bg-success">Enabled</span><% } else { %><span class="badge bg-secondary">Paused</span><% } %>
+              <% if (typeof isRuleOutsideActivityWindow === 'function' && isRuleOutsideActivityWindow(rule)) { %>
+                <div class="x-small text-muted mt-1">Scheduled evaluation paused (outside activity date window)</div>
+              <% } %>
+              <% } else { %>
+              <span class="text-muted">—</span>
+              <% } %>
+            </td>
+            <td data-sort-value="<%= showRuleMetadata && rule.legacyKey ? 'legacy' : 'custom' %>">
+              <% if (showRuleMetadata) { %>
+              <% if (rule.legacyKey) { %><span class="badge bg-light text-muted border">Legacy sync</span><% } else { %><span class="text-muted small">Custom</span><% } %>
+              <% } else { %>
+              <span class="text-muted">—</span>
+              <% } %>
+            </td>
+            <td class="table-actions text-end pe-4">
+              <%- include('school/notificationCenter/partials/ruleRowActions', {
+                rule,
+                access,
+                canRemoveRunResults: ncCanRemoveRunResults
+              }) %>
+            </td>
+          </tr>
+        <% }) %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div id="nc-rules-tile-pane" class="nc-rules-tile-grid-wrapper<%= ncTilePaneHidden ? ' d-none' : '' %>" data-floating-row-actions="true">
+  <% if (!data || data.length === 0) { %>
+    <div class="text-center py-5 text-muted">No rules found.<% if (access?.canConfigure) { %> Create a rule or save session notification settings to import the legacy rule.<% } %></div>
+  <% } else { %>
+    <div class="nc-rules-tile-grid">
+      <% (data || []).forEach((rule) => { %>
+        <% const ruleLabel = String(rule.label || rule.ruleType || 'Rule').trim(); %>
+        <article
+          class="nc-rule-tile<%= access?.canRunNow ? ' nc-rule-tile--runnable' : '' %>"
+          data-nc-rule-id="<%= rule.id %>"
+          data-entity-row-id="<%= rule.id %>"
+          data-rule-label="<%= ruleLabel %>"
+          data-can-run-now="<%= access?.canRunNow ? '1' : '0' %>"
+          tabindex="0"
+          role="button"
+          aria-label="<%= ruleLabel %>"
+        >
+          <% if (access?.canConfigure || access?.canRunNow || ncCanRemoveRunResults) { %>
+            <div class="nc-rule-tile-menu-anchor">
+              <%- include('school/notificationCenter/partials/ruleRowActions', {
+                rule,
+                access,
+                canRemoveRunResults: ncCanRemoveRunResults,
+                actionMenuIdOverride: rule.id + '-tile',
+                hideActionToggle: true
+              }) %>
+            </div>
+          <% } %>
+          <span class="nc-rule-tile-name" title="<%= ruleLabel %>"><%= ruleLabel %></span>
+        </article>
+      <% }) %>
+    </div>
+  <% } %>
+</div>

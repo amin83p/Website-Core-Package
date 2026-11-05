@@ -4280,4 +4280,84 @@ a .spinner-border.spinner-border-sm,
   color: #5c4a12;
 }
 
+/* Notification Centre — rules tile view */
+.sections-page.nc-rules-view--tile .search-container,
+.sections-page.nc-rules-view--tile .search-container + .d-flex,
+.sections-page.nc-rules-view--tile #nc-rules-pagination {
+  display: none !important;
+}
+
+.nc-rules-tile-grid-wrapper {
+  margin: 0.25rem 0 1.5rem;
+}
+
+.nc-rules-tile-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.nc-rule-tile {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  min-height: 6.5rem;
+  padding: 1.15rem 1.25rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 1rem;
+  background: linear-gradient(165deg, #ffffff 0%, #f8fafc 55%, #eef2ff 100%);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 8px 20px rgba(15, 23, 42, 0.04);
+  text-align: left;
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+
+.nc-rule-tile-name {
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.35;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+}
+
+.nc-rule-tile--runnable {
+  cursor: pointer;
+}
+
+.nc-rule-tile--runnable:hover,
+.nc-rule-tile--runnable:focus-visible {
+  transform: translateY(-2px);
+  border-color: #c7d2fe;
+  box-shadow: 0 10px 28px rgba(79, 70, 229, 0.14);
+  outline: none;
+}
+
+.nc-rule-tile-menu-anchor {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.nc-rules-run-separator {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin: 1.75rem 0 0.35rem;
+}
+
+.nc-rules-run-separator-line {
+  flex: 1 1 auto;
+  height: 1px;
+  background: linear-gradient(90deg, transparent 0%, #c7d2fe 18%, #818cf8 50%, #c7d2fe 82%, transparent 100%);
+}
+
+.nc-rules-run-separator-label {
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #6366f1;
+}
+
 @import url('pages/error.css');

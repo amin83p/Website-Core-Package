@@ -1,0 +1,29 @@
+<% const actionMenuId = String(typeof actionMenuIdOverride !== 'undefined' && actionMenuIdOverride ? actionMenuIdOverride : (rule.id || '')).trim(); %>
+<% const ncHideActionToggle = (typeof hideActionToggle !== 'undefined' && hideActionToggle === true); %>
+<% if (access?.canConfigure || access?.canRunNow || canRemoveRunResults) { %>
+<div class="row-actions-wrap">
+  <button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle<%= ncHideActionToggle ? ' visually-hidden' : '' %>" data-row-actions-id="<%= actionMenuId %>" title="Rule actions"<% if (ncHideActionToggle) { %> tabindex="-1" aria-hidden="true"<% } %>>
+    <i class="bi bi-three-dots-vertical"></i>
+  </button>
+  <div class="row-actions-menu d-none" data-row-actions-id="<%= actionMenuId %>">
+    <% if (access?.canConfigure) { %>
+      <a href="/school/notification-center/rules/<%= rule.id %>" class="btn btn-outline-primary btn-sm"><i class="bi bi-pencil-square me-2"></i>Edit</a>
+    <% } %>
+    <% if (access?.canConfigure && !rule.legacyKey) { %>
+      <button type="button" class="btn btn-outline-danger btn-sm js-nc-delete-rule" data-rule-id="<%= rule.id %>" data-rule-label="<%= rule.label || rule.ruleType || 'rule' %>" data-delete-url="/school/notification-center/rules/<%= rule.id %>/delete">
+        <i class="bi bi-trash me-2"></i>Delete rule
+      </button>
+    <% } %>
+    <% if (access?.canRunNow) { %>
+      <form method="post" action="/school/notification-center/rules/<%= rule.id %>/run" class="d-inline js-nc-run-rule-form">
+        <button type="submit" class="btn btn-outline-secondary btn-sm"><i class="bi bi-play-fill me-2"></i>Run now</button>
+      </form>
+    <% } %>
+    <% if (canRemoveRunResults) { %>
+      <button type="button" class="btn btn-outline-danger btn-sm js-nc-delete-rule-runs" data-rule-id="<%= rule.id %>" data-rule-label="<%= rule.label || rule.ruleType || 'rule' %>">
+        <i class="bi bi-trash me-2"></i>Delete run results
+      </button>
+    <% } %>
+  </div>
+</div>
+<% } %>
