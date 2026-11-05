@@ -714,6 +714,37 @@ document.addEventListener('DOMContentLoaded', () => {
       buttonId: 'btn_gmDateShortcuts',
       startInputId: 'gm_startDate',
       endInputId: 'gm_endDate',
+      confirmBeforeApply: async ({ payload, rangeLabel }) => {
+        const className = String(document.getElementById('gm_className')?.value || '').trim();
+        const html = shortcuts.buildDateRangeShortcutConfirmHtml({
+          shortcutLabel: rangeLabel,
+          startDate: payload.startDate,
+          endDate: payload.endDate,
+          allDates: payload.token === 'allTime',
+          extraRows: className ? [{ icon: 'bi-book', label: 'Class', value: className }] : []
+        });
+        let confirmed = false;
+        if (window.ReportMessaging?.confirmReportAction) {
+          confirmed = await window.ReportMessaging.confirmReportAction({
+            title: 'Load matrix for this range?',
+            icon: 'info',
+            html: true,
+            message: html,
+            confirmText: 'Load matrix',
+            cancelText: 'Not now',
+            confirmClass: 'btn-primary'
+          });
+        }
+        if (!confirmed && window.ReportMessaging?.showReportMessage) {
+          await window.ReportMessaging.showReportMessage({
+            title: 'Grades Matrix',
+            icon: 'info',
+            message: 'Dates unchanged. Adjust filters or pick a shortcut again when ready.',
+            buttons: [{ text: 'OK', class: 'btn-secondary' }]
+          });
+        }
+        return confirmed;
+      },
       onApply: () => {
         if (document.getElementById('gm_classId').value) {
           document.getElementById('gm_btnLoad').click();

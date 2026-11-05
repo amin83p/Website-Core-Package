@@ -102,7 +102,43 @@
       menuId: CM_DATE_RANGE_MENU_ID,
       buttonId: 'btn_cmDateShortcuts',
       startInputId: 'cm_startDate',
-      endInputId: 'cm_endDate'
+      endInputId: 'cm_endDate',
+      confirmBeforeApply: async ({ payload, rangeLabel }) => {
+        const className = String(document.getElementById('cm_className')?.value || '').trim();
+        const html = shortcuts.buildDateRangeShortcutConfirmHtml({
+          shortcutLabel: rangeLabel,
+          startDate: payload.startDate,
+          endDate: payload.endDate,
+          allDates: payload.token === 'allTime',
+          extraRows: className ? [{ icon: 'bi-book', label: 'Class', value: className }] : []
+        });
+        let confirmed = false;
+        if (global.ReportMessaging?.confirmReportAction) {
+          confirmed = await global.ReportMessaging.confirmReportAction({
+            title: 'Load matrix for this range?',
+            icon: 'info',
+            html: true,
+            message: html,
+            confirmText: 'Load matrix',
+            cancelText: 'Not now',
+            confirmClass: 'btn-primary'
+          });
+        }
+        if (!confirmed && global.ReportMessaging?.showReportMessage) {
+          await global.ReportMessaging.showReportMessage({
+            title: 'Class Conduct Matrix',
+            icon: 'info',
+            message: 'Dates unchanged. Adjust filters or pick a shortcut again when ready.',
+            buttons: [{ text: 'OK', class: 'btn-secondary' }]
+          });
+        }
+        return confirmed;
+      },
+      onApply: () => {
+        if (String(document.getElementById('cm_classId')?.value || '').trim()) {
+          document.getElementById('cm_btnLoad')?.click();
+        }
+      }
     });
   }
 

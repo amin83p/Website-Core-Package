@@ -132,6 +132,67 @@
     });
   }
 
+  function escapeShortcutConfirmHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;'
+    }[char]));
+  }
+
+  function resolveRangeOptionLabel(menuElOrId, token) {
+    const menuEl = resolveMenuElement(menuElOrId);
+    const normalized = normalizeRangeToken(token);
+    if (!menuEl || !normalized) return '';
+    const btn = menuEl.querySelector(`.schedule-date-range-option[data-range="${normalized}"]`);
+    return btn ? String(btn.textContent || '').trim() : '';
+  }
+
+  function buildDateRangeShortcutConfirmHtml({
+    shortcutLabel = '',
+    startDate = '',
+    endDate = '',
+    allDates = false,
+    extraRows = [],
+    footerNote = ''
+  } = {}) {
+    const label = escapeShortcutConfirmHtml(String(shortcutLabel || '').trim() || 'Selected range');
+    const rangeHtml = allDates
+      ? '<strong>All dates</strong>'
+      : `<strong>${escapeShortcutConfirmHtml(startDate || '—')}</strong> <span class="text-muted">to</span> <strong>${escapeShortcutConfirmHtml(endDate || '—')}</strong>`;
+    const extra = (Array.isArray(extraRows) ? extraRows : [])
+      .filter((row) => row && String(row.value || '').trim())
+      .map((row) => (
+        '<li class="mb-2 d-flex align-items-start gap-2">'
+        + `<i class="bi ${escapeShortcutConfirmHtml(row.icon || 'bi-info-circle')} text-primary mt-1"></i>`
+        + '<span>'
+        + `<span class="text-muted d-block small">${escapeShortcutConfirmHtml(row.label || '')}</span>`
+        + `<strong>${escapeShortcutConfirmHtml(row.value)}</strong>`
+        + '</span></li>'
+      ))
+      .join('');
+    const extraList = extra
+      ? `<ul class="list-unstyled mb-3 border rounded bg-light px-3 py-2">${extra}</ul>`
+      : '';
+    const footer = String(footerNote || '').trim()
+      ? `<p class="mb-0">${escapeShortcutConfirmHtml(footerNote)}</p>`
+      : '<p class="mb-0">Load now with this range, or choose <strong>Not now</strong> to keep the current dates.</p>';
+    return (
+      '<div class="text-start school-date-range-shortcut-prompt">'
+      + '<p class="small text-muted text-uppercase fw-semibold mb-2">Quick range</p>'
+      + `<p class="mb-3"><strong>${label}</strong></p>`
+      + '<p class="small text-muted text-uppercase fw-semibold mb-2">Date range</p>'
+      + `<p class="mb-3 d-flex align-items-start gap-2">`
+      + '<i class="bi bi-calendar-range text-primary mt-1"></i>'
+      + `<span>${rangeHtml}</span></p>`
+      + extraList
+      + footer
+      + '</div>'
+    );
+  }
+
   function bindDateRangeShortcuts(config = {}) {
     const menuEl = document.getElementById(String(config.menuId || 'scheduleDateRangeMenu'));
     const shortcutsBtn = document.getElementById(String(config.buttonId || 'btn_scheduleDateShortcuts'));
@@ -205,20 +266,31 @@
       };
     };
 
-    const applyToken = (rawRange) => {
+    const applyToken = async (rawRange, rangeLabel = '') => {
       const payload = datesFromRangeToken(rawRange);
+      const label = String(rangeLabel || '').trim()
+        || resolveRangeOptionLabel(menuEl, payload.token)
+        || payload.token;
+      if (typeof config.confirmBeforeApply === 'function') {
+        const confirmed = await config.confirmBeforeApply({ payload, rangeLabel: label, menuEl });
+        if (!confirmed) return false;
+      }
       setActiveMenuOption(menuEl, payload.token);
       if (startEl) startEl.value = payload.startDate;
       if (endEl) endEl.value = payload.endDate;
       if (typeof config.onApply === 'function') {
-        config.onApply(payload);
+        await config.onApply(payload);
       }
+      return true;
     };
 
     menuEl.querySelectorAll('.schedule-date-range-option').forEach((btn) => {
       btn.addEventListener('click', (event) => {
-        applyToken(event.currentTarget.getAttribute('data-range') || 'week');
-        hideMenu();
+        const rawRange = event.currentTarget.getAttribute('data-range') || 'week';
+        const rangeLabel = String(event.currentTarget.textContent || '').trim();
+        void applyToken(rawRange, rangeLabel).then((applied) => {
+          if (applied !== false) hideMenu();
+        });
       });
     });
 
@@ -260,6 +332,8 @@
     setActiveMenuOption,
     getActiveRangeToken,
     clearActiveMenuOption,
+    resolveRangeOptionLabel,
+    buildDateRangeShortcutConfirmHtml,
     bindDateRangeShortcuts
   };
 }(window));

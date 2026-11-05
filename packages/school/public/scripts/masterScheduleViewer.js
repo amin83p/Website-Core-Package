@@ -7351,10 +7351,32 @@
             startInputId: 'sch_startDate',
             endInputId: 'sch_endDate',
             clearActiveOnManualChange: false,
-            onApply: () => {
+            confirmBeforeApply: async ({ payload, rangeLabel }) => {
+                const person = activeSchedulePerson();
+                const html = shortcuts.buildDateRangeShortcutConfirmHtml({
+                    shortcutLabel: rangeLabel,
+                    startDate: payload.startDate,
+                    endDate: payload.endDate,
+                    allDates: payload.token === 'allTime',
+                    footerNote: person
+                        ? 'The schedule will reload for the selected person when you confirm.'
+                        : 'Dates will update on confirm. Select a person and use Load to fetch schedule data for this range.'
+                });
+                return uiConfirm(html, 'Load schedule for this range?', {
+                    icon: 'info',
+                    html: true,
+                    cancelText: 'Not now',
+                    confirmText: 'Load schedule',
+                    confirmClass: 'btn-primary btn-md'
+                });
+            },
+            onApply: async () => {
                 resetScheduleActiveClassFilter();
                 clearLoadedSchedules();
                 refreshScheduleViewWithHolidays();
+                if (activeSchedulePerson()) {
+                    await loadActiveSchedulePerson();
+                }
             }
         });
     }

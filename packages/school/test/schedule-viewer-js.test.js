@@ -173,8 +173,12 @@ test('Master Schedule Viewer uses date range menu instead of collapsible quick r
   assert.match(shortcutsJs, /normalizeRangeToken/);
   assert.match(shortcutsJs, /bindDateRangeShortcuts/);
   assert.match(shortcutsJs, /datesFromRangeToken/);
+  assert.match(shortcutsJs, /confirmBeforeApply/);
+  assert.match(shortcutsJs, /buildDateRangeShortcutConfirmHtml/);
   assert.match(core, /SchoolDateRangeShortcuts/);
   assert.match(core, /bindScheduleDateRangeShortcuts/);
+  assert.match(core, /confirmBeforeApply/);
+  assert.match(core, /Load schedule for this range/);
   assert.match(core, /applyScheduleRange/);
   assert.doesNotMatch(core, /function resolveScheduleRangeDates/);
   assert.doesNotMatch(core, /function normalizeScheduleRangeToken/);

@@ -1951,6 +1951,37 @@ document.addEventListener('DOMContentLoaded', () => {
             buttonId: 'btn_attDateShortcuts',
             startInputId: 'filter_startDate',
             endInputId: 'filter_endDate',
+            confirmBeforeApply: async ({ payload, rangeLabel }) => {
+                const className = String(document.getElementById('filter_className')?.value || '').trim();
+                const html = shortcuts.buildDateRangeShortcutConfirmHtml({
+                    shortcutLabel: rangeLabel,
+                    startDate: payload.startDate,
+                    endDate: payload.endDate,
+                    allDates: payload.token === 'allTime',
+                    extraRows: className ? [{ icon: 'bi-book', label: 'Class', value: className }] : []
+                });
+                let confirmed = false;
+                if (window.ReportMessaging?.confirmReportAction) {
+                    confirmed = await window.ReportMessaging.confirmReportAction({
+                        title: 'Load matrix for this range?',
+                        icon: 'info',
+                        html: true,
+                        message: html,
+                        confirmText: 'Load matrix',
+                        cancelText: 'Not now',
+                        confirmClass: 'btn-primary'
+                    });
+                }
+                if (!confirmed && window.ReportMessaging?.showReportMessage) {
+                    await window.ReportMessaging.showReportMessage({
+                        title: 'Attendance Matrix',
+                        icon: 'info',
+                        message: 'Dates unchanged. Adjust filters or pick a shortcut again when ready.',
+                        buttons: [{ text: 'OK', class: 'btn-secondary' }]
+                    });
+                }
+                return confirmed;
+            },
             onApply: () => {
                 syncAttendanceMatrixUrl(captureAttendanceMatrixFilterState());
                 if (document.getElementById('filter_classId').value) {
