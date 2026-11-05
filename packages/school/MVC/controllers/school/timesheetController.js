@@ -2750,7 +2750,14 @@ exports.viewTimesheet = async (req, res) => {
         incompleteSessions.push(...(Array.isArray(incompleteActivitySessions) ? incompleteActivitySessions : []));
         const stampedIncompleteSessions = await timesheetSessionStudentLabelService.stampEnrolledStudentCountsOnRows(
             incompleteSessions,
-            { activeOrgId, reqUser: req.user }
+            {
+                activeOrgId,
+                reqUser: req.user,
+                classRows: scopedClasses,
+                sessionsByClassId,
+                students,
+                statusMap
+            }
         );
         const filteredIncompleteSessions = timesheetParametersPolicyService.applyEmptyEnrollmentSessionsPolicy(
             stampedIncompleteSessions,

@@ -159,7 +159,7 @@ test('hiding empty-enrollment incomplete class sessions does not leave a submit 
   assert.equal(hasBlockingIncompleteClassSource(onlyEmptyHidden), false);
 });
 
-test('live session enrichment stamps enrolledStudentCount from active enrollments on the session date', async () => {
+test('live session enrichment stamps enrolledStudentCount from session applicability, not active period status alone', async () => {
   const original = classEnrollmentReadService.listActiveStudentIdsForClass;
   const calls = [];
   classEnrollmentReadService.listActiveStudentIdsForClass = async (args) => {
@@ -221,12 +221,67 @@ test('live session enrichment stamps enrolledStudentCount from active enrollment
 
     assert.equal(enriched.find((row) => row.sessionId === 'SES-EMPTY')?.enrolledStudentCount, 0);
     assert.equal(enriched.find((row) => row.sessionId === 'SES-ONE')?.enrolledStudentCount, 1);
-    assert.ok(calls.every((call) => call.startDate === '2026-07-08' && call.canonicalStatuses.includes('active')));
+    assert.ok(calls.some((call) => call.classId === 'CLASS-ONE' && call.canonicalStatuses.includes('active')));
 
     const hidden = applyEmptyEnrollmentSessionsPolicy(enriched, { emptyEnrollmentSessions: 'hide' });
     assert.deepEqual(hidden.map((row) => row.sessionId), ['SES-ONE']);
   } finally {
     classEnrollmentReadService.listActiveStudentIdsForClass = original;
+  }
+});
+
+test('rolling class with office-closed enrollment period still counts expected students on applicable sessions', async () => {
+  const classSessionCapacityService = require('../packages/school/MVC/services/school/classSessionCapacityService');
+  const applicabilityService = require('../packages/school/MVC/services/school/classEnrollmentSessionApplicabilityService');
+  const originalBuild = classSessionCapacityService.buildRollingApplicabilityByClassId;
+  const originalGetState = applicabilityService.getApplicabilityState;
+
+  const sessionRow = {
+    sessionId: 'SES-PM',
+    status: 'completed',
+    date: '2026-11-03',
+    startTime: '13:00',
+    endTime: '16:00',
+    roster: [{ personId: 'PER-1', attendance: 'present' }]
+  };
+
+  classSessionCapacityService.buildRollingApplicabilityByClassId = async () => new Map([
+    ['CLASS-ROLL', { personIds: new Set(['PER-1']), stateByKey: new Map() }]
+  ]);
+  applicabilityService.getApplicabilityState = () => ({ expected: true });
+
+  try {
+    const enriched = await studentLabelService.enrichClassLiveSessions({
+      classRows: [{ id: 'CLASS-ROLL', registrationMode: 'rolling', orgId: 'ORG-1' }],
+      sessionsByClassId: new Map([['CLASS-ROLL', [sessionRow]]]),
+      liveSessionBuilders: [{
+        classId: 'CLASS-ROLL',
+        sessionRow,
+        payload: {
+          sessionId: 'SES-PM',
+          classId: 'CLASS-ROLL',
+          date: '2026-11-03',
+          timesheetHours: 3,
+          durationHours: 3,
+          isFinalStatus: true
+        }
+      }],
+      students: [{ id: 'STU-1', personId: 'PER-1' }],
+      persons: [{ id: 'PER-1', name: { first: 'Student', last: 'One' } }],
+      departments: [],
+      statusMap: new Map([['completed', { code: 'completed', makeUpRequired: false }]]),
+      periodStartDate: '2026-10-26',
+      periodEndDate: '2026-11-05',
+      activeOrgId: 'ORG-1',
+      reqUser: { id: 'USER-1' }
+    });
+
+    assert.equal(enriched[0]?.enrolledStudentCount, 1);
+    const hidden = applyEmptyEnrollmentSessionsPolicy(enriched, { emptyEnrollmentSessions: 'hide' });
+    assert.deepEqual(hidden.map((row) => row.sessionId), ['SES-PM']);
+  } finally {
+    classSessionCapacityService.buildRollingApplicabilityByClassId = originalBuild;
+    applicabilityService.getApplicabilityState = originalGetState;
   }
 });
 
