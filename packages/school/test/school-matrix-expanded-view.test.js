@@ -25,13 +25,16 @@ test('schoolMatrixExpandedView.js passes syntax check and exports API', () => {
   vm.runInContext(src, context);
   assert.equal(typeof context.window.SchoolMatrixExpandedView.bindMatrixExpandedView, 'function');
   assert.equal(typeof context.window.SchoolMatrixExpandedView.setMatrixExpandEnabled, 'function');
+  assert.equal(typeof context.window.SchoolMatrixExpandedView.moveToolbarToModal, 'function');
+  assert.equal(typeof context.window.SchoolMatrixExpandedView.restoreToolbarInline, 'function');
+  assert.equal(typeof context.window.SchoolMatrixExpandedView.raiseModalAboveOpenStack, 'function');
 });
 
 test('school-matrix-expand.css styles modal scroll wrappers', () => {
   const css = fs.readFileSync(path.join(root, 'public/styles/school-matrix-expand.css'), 'utf8');
   assert.match(css, /school-matrix-expand-modal/);
   assert.match(css, /100dvh/);
-  assert.match(css, /\.cm-matrix-wrapper/);
+  assert.match(css, /school-matrix-expand-toolbar-bar/);
 });
 
 const MATRIX_PAGES = [
@@ -39,19 +42,25 @@ const MATRIX_PAGES = [
     view: 'packages/school/MVC/views/school/attendance/attendanceViewer.ejs',
     buttonId: 'btn_attExpandMatrixView',
     inlineHostId: 'attMatrixExpandInlineHost',
-    modalId: 'attMatrixExpandModal'
+    modalId: 'attMatrixExpandModal',
+    actionsId: 'attMatrixResultActions',
+    toolbarSlotId: 'attMatrixExpandToolbarSlot'
   },
   {
     view: 'packages/school/MVC/views/school/grades/gradesMatrix.ejs',
     buttonId: 'btn_gmExpandMatrixView',
     inlineHostId: 'gmMatrixExpandInlineHost',
-    modalId: 'gmMatrixExpandModal'
+    modalId: 'gmMatrixExpandModal',
+    actionsId: 'gmMatrixResultActions',
+    toolbarSlotId: 'gmMatrixExpandToolbarSlot'
   },
   {
     view: 'packages/school/MVC/views/school/report/conductMatrix.ejs',
     buttonId: 'btn_cmExpandMatrixView',
     inlineHostId: 'cmMatrixExpandInlineHost',
-    modalId: 'cmMatrixExpandModal'
+    modalId: 'cmMatrixExpandModal',
+    actionsId: 'cmMatrixResultActions',
+    toolbarSlotId: 'cmMatrixExpandToolbarSlot'
   }
 ];
 
@@ -61,6 +70,8 @@ test('matrix pages include expand view assets and markup', () => {
     assert.match(src, new RegExp(`id="${page.buttonId}"`));
     assert.match(src, new RegExp(`id="${page.inlineHostId}"`));
     assert.match(src, new RegExp(`expandModalId: '${page.modalId}'`));
+    assert.match(src, new RegExp(`id="${page.actionsId}"`));
+    assert.match(src, new RegExp(`expandModalToolbarSlotId: '${page.toolbarSlotId}'`));
     assert.match(src, /schoolMatrixExpandModal/);
     assert.match(src, /schoolMatrixExpandedView\.js/);
     assert.match(src, /school-matrix-expand\.css/);
@@ -73,4 +84,6 @@ test('conduct matrix client wires expanded view enable with print', () => {
   assert.match(client, /btn_cmExpandMatrixView/);
   assert.match(client, /SchoolMatrixExpandedView\.bindMatrixExpandedView/);
   assert.match(client, /SchoolMatrixExpandedView\.setMatrixExpandEnabled/);
+  assert.match(client, /cmMatrixResultActions/);
+  assert.match(client, /cmMatrixExpandToolbarSlot/);
 });

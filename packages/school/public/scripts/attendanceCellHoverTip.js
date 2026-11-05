@@ -773,23 +773,22 @@
     scheduleHide();
   }
 
-  function initAttendanceCellHoverTip(options) {
-    initOptions = options || {};
-    if (!initOptions.cellSelector) return;
-    const root = initOptions.root || document;
-    if (boundRoot && boundRoot !== root) {
+  function bindHoverTipRoot(root) {
+    if (!initOptions || !initOptions.cellSelector) return;
+    const resolvedRoot = root || document;
+    if (boundRoot && boundRoot !== resolvedRoot) {
       boundRoot.removeEventListener('mouseover', onRootPointerOver);
       boundRoot.removeEventListener('mouseout', onRootPointerOut);
       boundRoot.removeEventListener('focusin', onRootFocusIn);
       boundRoot.removeEventListener('focusout', onRootFocusOut);
       boundRoot.removeEventListener('contextmenu', onRootContextMenu);
     }
-    boundRoot = root;
-    root.addEventListener('mouseover', onRootPointerOver);
-    root.addEventListener('mouseout', onRootPointerOut);
-    root.addEventListener('focusin', onRootFocusIn);
-    root.addEventListener('focusout', onRootFocusOut);
-    root.addEventListener('contextmenu', onRootContextMenu);
+    boundRoot = resolvedRoot;
+    boundRoot.addEventListener('mouseover', onRootPointerOver);
+    boundRoot.addEventListener('mouseout', onRootPointerOut);
+    boundRoot.addEventListener('focusin', onRootFocusIn);
+    boundRoot.addEventListener('focusout', onRootFocusOut);
+    boundRoot.addEventListener('contextmenu', onRootContextMenu);
     bindContextMenuDismiss();
     if (!tipEl) {
       tipEl = document.createElement('div');
@@ -800,8 +799,19 @@
     }
   }
 
+  function initAttendanceCellHoverTip(options) {
+    initOptions = options || {};
+    if (!initOptions.cellSelector) return;
+    bindHoverTipRoot(initOptions.root || document);
+  }
+
+  function setAttendanceCellHoverTipRoot(rootEl) {
+    bindHoverTipRoot(rootEl || document);
+  }
+
   const api = {
     initAttendanceCellHoverTip,
+    setAttendanceCellHoverTipRoot,
     buildAttendanceCellTipModel,
     buildTipHtmlFromModel,
     buildExcuseContextMenuItems,

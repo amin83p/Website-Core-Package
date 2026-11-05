@@ -260,6 +260,7 @@
     <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
       <h5 class="m-0 fw-bold text-primary" id="gm_classTitle">Class</h5>
       <div class="d-flex align-items-center gap-2 flex-wrap ms-md-auto">
+        <div class="d-flex align-items-center gap-2" id="gmMatrixResultActions">
         <% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
         <button type="button" id="btn_toggleEnrollmentClaims" class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn" disabled aria-label="Show claim numbers" title="Load the matrix first"><i class="bi bi-card-text" aria-hidden="true"></i></button>
         <% } %>
@@ -272,6 +273,7 @@
           title="How final grades are calculated">
           <i class="bi bi-info-circle" aria-hidden="true"></i>
         </button>
+        </div>
         <button type="button"
           class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
           id="btn_gmExpandMatrixView"
@@ -301,6 +303,7 @@
   expandModalId: 'gmMatrixExpandModal',
   expandModalDialogId: 'gmMatrixExpandModalDialog',
   expandModalHostId: 'gmMatrixExpandModalHost',
+  expandModalToolbarSlotId: 'gmMatrixExpandToolbarSlot',
   expandModalTitle: 'Grades matrix'
 }) %>
 
@@ -727,6 +730,8 @@ document.addEventListener('DOMContentLoaded', () => {
       modalDialogId: 'gmMatrixExpandModalDialog',
       inlineHostId: 'gmMatrixExpandInlineHost',
       modalHostId: 'gmMatrixExpandModalHost',
+      toolbarContainerId: 'gmMatrixResultActions',
+      modalToolbarSlotId: 'gmMatrixExpandToolbarSlot',
       wrapperSelector: '.matrix-wrapper'
     });
   }

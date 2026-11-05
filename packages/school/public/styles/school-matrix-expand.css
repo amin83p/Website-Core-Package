@@ -18,7 +18,7 @@
   flex: 0 0 auto;
 }
 
-.school-matrix-expand-modal .modal-body {
+.school-matrix-expand-modal .school-matrix-expand-body {
   flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
@@ -27,7 +27,54 @@
   flex-direction: column;
 }
 
-.school-matrix-expand-modal .modal-body > .school-matrix-expand-active {
+.school-matrix-expand-modal .school-matrix-expand-toolbar-bar {
+  flex: 0 0 auto;
+}
+
+.school-matrix-expand-modal .school-matrix-expand-toolbar-bar .attendance-legend-icon-btn {
+  width: 2.25rem;
+  height: 2.25rem;
+  min-width: 2.25rem;
+  min-height: 2.25rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.school-matrix-expand-modal .school-matrix-expand-toolbar-bar .attendance-legend-icon-btn .bi {
+  font-size: 1.05rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  vertical-align: 0;
+}
+
+.school-matrix-expand-modal .school-matrix-expand-toolbar-bar .attendance-legend-icon-btn .bi::before {
+  vertical-align: 0;
+  line-height: 1;
+}
+
+.school-matrix-expand-modal .school-matrix-expand-toolbar-bar .attendance-history-toggle-btn.active,
+.school-matrix-expand-modal .school-matrix-expand-toolbar-bar .cm-session-view-btn.active {
+  color: #0d6efd;
+  border-color: #0d6efd;
+  background-color: rgba(13, 110, 253, 0.08);
+}
+
+.school-matrix-expand-modal .school-matrix-expand-scroll-host {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.school-matrix-expand-modal .school-matrix-expand-scroll-host > .school-matrix-expand-active {
   flex: 1 1 auto;
   min-height: 0;
   min-width: 0;
@@ -40,9 +87,9 @@
   box-sizing: border-box;
 }
 
-.school-matrix-expand-modal .modal-body > .school-matrix-expand-active .matrix-table,
-.school-matrix-expand-modal .modal-body > .school-matrix-expand-active .gm-matrix-table,
-.school-matrix-expand-modal .modal-body > .school-matrix-expand-active .cm-matrix-table {
+.school-matrix-expand-modal .school-matrix-expand-scroll-host > .school-matrix-expand-active .matrix-table,
+.school-matrix-expand-modal .school-matrix-expand-scroll-host > .school-matrix-expand-active .gm-matrix-table,
+.school-matrix-expand-modal .school-matrix-expand-scroll-host > .school-matrix-expand-active .cm-matrix-table {
   width: max-content;
   min-width: 100%;
 }

@@ -1086,6 +1086,8 @@
         modalDialogId: 'cmMatrixExpandModalDialog',
         inlineHostId: 'cmMatrixExpandInlineHost',
         modalHostId: 'cmMatrixExpandModalHost',
+        toolbarContainerId: 'cmMatrixResultActions',
+        modalToolbarSlotId: 'cmMatrixExpandToolbarSlot',
         wrapperSelector: '.cm-matrix-wrapper'
       });
     }

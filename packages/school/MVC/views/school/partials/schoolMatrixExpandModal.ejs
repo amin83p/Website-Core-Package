@@ -11,15 +11,25 @@
   const resolvedExpandModalTitle = (typeof expandModalTitle !== 'undefined' && expandModalTitle)
     ? expandModalTitle
     : 'Matrix';
+  const resolvedExpandModalToolbarSlotId = (typeof expandModalToolbarSlotId !== 'undefined' && expandModalToolbarSlotId)
+    ? expandModalToolbarSlotId
+    : '';
 %>
 <div class="modal fade school-matrix-expand-modal" id="<%= resolvedExpandModalId %>" tabindex="-1" aria-labelledby="<%= resolvedExpandModalId %>Label" aria-hidden="true">
   <div class="modal-dialog" id="<%= resolvedExpandModalDialogId %>">
     <div class="modal-content">
-      <div class="modal-header py-2 px-3">
-        <h5 class="modal-title" id="<%= resolvedExpandModalId %>Label"><i class="bi bi-table me-2 text-primary"></i><%= resolvedExpandModalTitle %></h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      <div class="modal-header bg-white border-bottom py-2 px-3 d-flex align-items-center gap-2 flex-shrink-0">
+        <h5 class="modal-title m-0 fw-bold text-primary me-auto" id="<%= resolvedExpandModalId %>Label"><i class="bi bi-table me-2"></i><%= resolvedExpandModalTitle %></h5>
+        <button type="button" class="btn-close flex-shrink-0" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body p-0" id="<%= resolvedExpandModalHostId %>"></div>
+      <div class="modal-body p-0 school-matrix-expand-body">
+        <% if (resolvedExpandModalToolbarSlotId) { %>
+        <div class="school-matrix-expand-toolbar-bar bg-white border-bottom py-3 px-3 flex-shrink-0">
+          <div class="d-flex align-items-center justify-content-end gap-2 flex-wrap w-100" id="<%= resolvedExpandModalToolbarSlotId %>"></div>
+        </div>
+        <% } %>
+        <div class="school-matrix-expand-scroll-host" id="<%= resolvedExpandModalHostId %>"></div>
+      </div>
     </div>
   </div>
 </div>

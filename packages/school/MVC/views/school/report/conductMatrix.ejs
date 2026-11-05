@@ -193,7 +193,8 @@
         <h5 class="m-0 fw-bold text-primary" id="cm_classTitle">Class</h5>
         <p class="small text-muted mb-0 mt-1">Click a cell to edit. Avg column uses rated sessions with <strong>Show</strong> enabled.</p>
       </div>
-      <div class="d-flex align-items-center gap-2">
+      <div class="d-flex align-items-center gap-2 flex-wrap ms-md-auto">
+        <div class="d-flex align-items-center gap-2" id="cmMatrixResultActions">
         <% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
         <button type="button" id="btn_toggleEnrollmentClaims" class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn" disabled aria-label="Show claim numbers" title="Load the matrix first"><i class="bi bi-card-text" aria-hidden="true"></i></button>
         <% } %>
@@ -222,6 +223,7 @@
           title="Legend">
           <i class="bi bi-info-circle" aria-hidden="true"></i>
         </button>
+        </div>
         <button type="button"
           class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
           id="btn_cmExpandMatrixView"
@@ -251,6 +253,7 @@
   expandModalId: 'cmMatrixExpandModal',
   expandModalDialogId: 'cmMatrixExpandModalDialog',
   expandModalHostId: 'cmMatrixExpandModalHost',
+  expandModalToolbarSlotId: 'cmMatrixExpandToolbarSlot',
   expandModalTitle: 'Class conduct matrix'
 }) %>
 

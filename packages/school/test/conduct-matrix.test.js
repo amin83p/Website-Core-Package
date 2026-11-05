@@ -90,7 +90,9 @@ test('conduct matrix print button and preview helpers', () => {
   assert.match(client, /promptLoadConductMatrixFromUrlLink/);
   assert.doesNotMatch(client, /if \(INITIAL\.classId\) loadMatrix\(\)/);
   assert.match(client, /bindConductMatrixDateRangeShortcuts/);
+  assert.match(view, /schoolMatrixExpandedView\.js/);
   assert.match(client, /btn_cmExpandMatrixView/);
+  assert.match(client, /cmMatrixResultActions/);
   assert.doesNotMatch(client, /cm-range/);
   assert.match(controller, /includePrintManager:\s*true/);
 });
