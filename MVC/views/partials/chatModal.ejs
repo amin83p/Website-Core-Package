@@ -84,6 +84,9 @@
                   
                   <div class="p-2 px-3 border-bottom d-flex justify-content-between align-items-center bg-white shadow-sm" style="z-index: 10;">
                       <div class="d-flex align-items-center overflow-hidden">
+                           <button id="chatThreadBackBtn" type="button" class="btn btn-sm btn-light border me-2 text-secondary d-none chat-thread-back-btn" onclick="backFromChatThread()" title="Back to conversations" aria-label="Back to conversations">
+                                <i class="bi bi-arrow-left"></i>
+                           </button>
                            <button id="toggleSidebarBtn" class="btn btn-sm btn-light border me-2 text-secondary" onclick="toggleSidebar()" title="Toggle Sidebar">
                                 <i class="bi bi-layout-sidebar"></i>
                            </button>
@@ -384,6 +387,70 @@
     .chat-message-row.is-selected .msg-bubble { outline: 2px solid #0d6efd; outline-offset: 2px; }
     .chat-message-row.is-deleted .msg-bubble { opacity: 0.72; font-style: italic; }
     .chat-reply-quote { border-left: 3px solid rgba(13, 110, 253, 0.55); background: rgba(255,255,255,.55); padding: 4px 7px; margin-bottom: 5px; font-size: .73rem; }
+
+    .chat-thread-back-btn {
+        width: 32px;
+        height: 32px;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    @media (max-width: 991.98px) {
+        #chatInterfaceModal .chat-shell-dialog {
+            width: calc(100vw - 8px) !important;
+            max-width: calc(100vw - 8px) !important;
+            margin: 4px auto !important;
+        }
+
+        #chatInterfaceModal #chatModalContent {
+            min-width: 0 !important;
+            height: min(720px, calc(100dvh - 12px)) !important;
+        }
+
+        #chatInterfaceModal #sidebarResizer {
+            display: none !important;
+        }
+
+        #chatInterfaceModal:not(.chat-mobile-thread) .chat-main {
+            display: none !important;
+        }
+
+        #chatInterfaceModal:not(.chat-mobile-thread) .chat-sidebar {
+            width: 100% !important;
+            max-width: 100% !important;
+            flex: 1 1 auto !important;
+        }
+
+        #chatInterfaceModal.chat-mobile-thread .chat-sidebar,
+        #chatInterfaceModal.chat-mobile-thread #sidebarResizer {
+            display: none !important;
+        }
+
+        #chatInterfaceModal.chat-mobile-thread .chat-main {
+            display: flex !important;
+            flex: 1 1 100% !important;
+            width: 100% !important;
+            min-width: 0 !important;
+        }
+
+        #chatInterfaceModal.chat-mobile-thread #chatEmptyState {
+            display: none !important;
+        }
+
+        #chatInterfaceModal.chat-mobile-thread #chatActiveView {
+            display: flex !important;
+        }
+
+        #chatInterfaceModal .chat-shell-header {
+            padding-right: 2.85rem !important;
+        }
+
+        #chatInterfaceModal .chat-shell-header .d-flex.align-items-center.gap-1 {
+            flex-shrink: 0;
+        }
+    }
 </style>
 
 <script>
@@ -444,6 +511,50 @@ const chatTransportConfig = {
     realtimeWhenModalClosed: <%= chatRealtimeWhenClosed ? 'true' : 'false' %>
 };
 let chatBackgroundPollTimer = null;
+const CHAT_MOBILE_STACK_MQ = typeof window !== 'undefined' && window.matchMedia
+    ? window.matchMedia('(max-width: 991.98px)')
+    : { matches: false, addEventListener: () => {} };
+
+function isChatMobileStackLayout() {
+    return Boolean(CHAT_MOBILE_STACK_MQ.matches);
+}
+
+function isChatThreadVisible() {
+    const activeView = document.getElementById('chatActiveView');
+    return Boolean(activeView && !activeView.classList.contains('d-none'));
+}
+
+function syncChatThreadHeaderChrome() {
+    const toggleBtn = document.getElementById('toggleSidebarBtn');
+    const threadBack = document.getElementById('chatThreadBackBtn');
+    const mobile = isChatMobileStackLayout();
+    if (toggleBtn) toggleBtn.classList.toggle('d-none', mobile);
+    if (threadBack) threadBack.classList.toggle('d-none', !mobile);
+}
+
+function syncChatMobileStackLayout() {
+    const modalEl = document.getElementById('chatInterfaceModal');
+    if (!modalEl) return;
+    const mobile = isChatMobileStackLayout();
+    const showThread = mobile && isChatThreadVisible();
+    modalEl.classList.toggle('chat-mobile-thread', showThread);
+    syncChatThreadHeaderChrome();
+}
+
+function backFromChatThread() {
+    const titleEl = document.getElementById('sidebarTitle');
+    if (titleEl && String(titleEl.innerText || '').trim() === 'New Chat') {
+        exitNewChatWizard();
+        syncChatMobileStackLayout();
+        return;
+    }
+    const activeView = document.getElementById('chatActiveView');
+    const emptyState = document.getElementById('chatEmptyState');
+    if (activeView) activeView.classList.add('d-none');
+    if (emptyState) emptyState.classList.remove('d-none');
+    syncChatMobileStackLayout();
+    if (chatAccess.canReadInbox) refreshInbox();
+}
 
 function isChatModalVisible() {
     const modalEl = document.getElementById('chatInterfaceModal');
@@ -544,19 +655,26 @@ function normalizeClientUnreadCount(value) {
 }
 
 function renderGlobalUnreadCount() {
-    const badge = document.getElementById('chatGlobalBadge');
-    if (!badge) return;
     const count = normalizeClientUnreadCount(totalUnreadCount);
-    badge.innerText = String(count);
-    badge.classList.toggle('d-none', count === 0);
-
-    const trigger = document.getElementById('chatGlobalTrigger');
-    if (trigger) {
-        trigger.setAttribute(
-            'aria-label',
-            count > 0 ? `Messages, ${count} unread` : 'Messages'
-        );
+    const badge = document.getElementById('chatGlobalBadge');
+    if (badge) {
+        badge.innerText = String(count);
+        badge.classList.toggle('d-none', count === 0);
     }
+
+    const hamburgerDot = document.getElementById('headerHamburgerUnreadDot');
+    const mobileChatDot = document.getElementById('chatGlobalTriggerMobileUnreadDot');
+    [hamburgerDot, mobileChatDot].forEach((dotEl) => {
+        if (!dotEl) return;
+        dotEl.classList.toggle('d-none', count === 0);
+        dotEl.setAttribute('aria-hidden', count === 0 ? 'true' : 'false');
+    });
+
+    const chatAriaLabel = count > 0 ? `Messages, ${count} unread` : 'Messages';
+    ['chatGlobalTrigger', 'chatGlobalTriggerMobile'].forEach((triggerId) => {
+        const trigger = document.getElementById(triggerId);
+        if (trigger) trigger.setAttribute('aria-label', chatAriaLabel);
+    });
 }
 
 function renderConversationUnreadCount(convId) {
@@ -856,10 +974,11 @@ function bindChatSocketHandlers() {
 
     socket.on('on_conversation_deleted', (data) => {
         refreshInbox();
-        if (currentConvId === data.convId) {
+        if (String(currentConvId || '') === String(data?.convId || '')) {
             currentConvId = null;
             document.getElementById('chatActiveView').classList.add('d-none');
             document.getElementById('chatEmptyState').classList.remove('d-none');
+            syncChatMobileStackLayout();
             safeShowAlert("The other user has deleted this conversation.", "warning");
         }
     });
@@ -1088,7 +1207,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         const sidebar = document.getElementById('chatSidebar');
-        if (sidebar && sidebar.classList.contains('d-none')) {
+        if (sidebar && sidebar.classList.contains('d-none') && !isChatMobileStackLayout()) {
             toggleSidebar();
         }
 
@@ -1105,11 +1224,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     window.currentChatAvatarColor || null
                 );
             }, 100);
+        } else {
+            syncChatMobileStackLayout();
         }
     });
     modalEl.addEventListener('hidden.bs.modal', () => {
         applyChatTransportPolicy();
     });
+
+    if (typeof CHAT_MOBILE_STACK_MQ.addEventListener === 'function') {
+        CHAT_MOBILE_STACK_MQ.addEventListener('change', () => syncChatMobileStackLayout());
+    } else if (typeof CHAT_MOBILE_STACK_MQ.addListener === 'function') {
+        CHAT_MOBILE_STACK_MQ.addListener(() => syncChatMobileStackLayout());
+    }
 });
 async function uploadPendingFiles(replyToMessageId = '') {
     if (!currentConvId) return;
@@ -1237,6 +1364,7 @@ async function deleteCurrentChat() {
             currentConvId = null;
             document.getElementById('chatActiveView').classList.add('d-none');
             document.getElementById('chatEmptyState').classList.remove('d-none');
+            syncChatMobileStackLayout();
             refreshInbox();
             safeShowAlert("Conversation deleted successfully.", "success");
         } else {
@@ -2279,7 +2407,12 @@ function showInbox() {
     if (t) t.innerText = 'Messages';
     const searchInput = document.getElementById('chatSearchInput');
     if (searchInput) searchInput.value = '';
+    const activeView = document.getElementById('chatActiveView');
+    const emptyState = document.getElementById('chatEmptyState');
+    if (activeView) activeView.classList.add('d-none');
+    if (emptyState) emptyState.classList.remove('d-none');
     syncChatSidebarNavChrome();
+    syncChatMobileStackLayout();
     refreshInbox();
 }
 
@@ -2589,6 +2722,7 @@ async function openChat(convId, name, targetUserId, avatarUrl = '', canMessage =
 
     document.getElementById('chatEmptyState').classList.add('d-none');
     document.getElementById('chatActiveView').classList.remove('d-none');
+    syncChatMobileStackLayout();
     document.getElementById('chatHeaderName').innerText = name;
     applyChatHeaderAvatar(name, avatarUrl, {
         initials: avatarInitials,
@@ -2648,6 +2782,7 @@ async function openChat(convId, name, targetUserId, avatarUrl = '', canMessage =
 }
 // ✅ ADD THIS: Missing Sidebar Toggle
 function toggleSidebar(){
+    if (isChatMobileStackLayout()) return;
     const s = document.getElementById('chatSidebar'); 
     const r = document.getElementById('sidebarResizer');
     

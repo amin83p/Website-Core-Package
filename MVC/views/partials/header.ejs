@@ -236,9 +236,9 @@
 
                 <% if (typeof user !== 'undefined' && user !== null) { %>
                     <% if (canUseHeaderChat) { %>
-                        <ul class="navbar-nav flex-row">
+                        <ul class="navbar-nav flex-row d-none d-lg-flex">
                             <li class="nav-item">
-                                <a class="nav-link position-relative px-2" href="#" data-bs-toggle="modal" data-bs-target="#chatInterfaceModal" id="chatGlobalTrigger" title="Messages (Alt+Shift+C)" aria-keyshortcuts="Alt+Shift+C">
+                                <a class="nav-link position-relative px-2" href="#" data-bs-toggle="modal" data-bs-target="#chatInterfaceModal" id="chatGlobalTrigger" title="Messages (Alt+Shift+C)" aria-keyshortcuts="Alt+Shift+C" aria-label="Messages">
                                     <i class="bi bi-chat-dots-fill fs-4 text-secondary top-action-icon"></i>
                                     <span class="position-absolute badge rounded-pill bg-danger d-none" id="chatGlobalBadge">
                                         0
@@ -250,7 +250,7 @@
                     <% if (canUseScheduledTaskManager) { %>
                         <button
                             id="scheduledTaskManagerHeaderTrigger"
-                            class="nav-pill-btn px-2 position-relative"
+                            class="nav-pill-btn px-2 position-relative d-none d-lg-inline-flex"
                             type="button"
                             title="Task Manager (Alt+Shift+T)"
                             aria-keyshortcuts="Alt+Shift+T"
@@ -261,7 +261,7 @@
                     <% } %>
                     
                     <div class="position-relative d-flex align-items-center">
-                        <button id="headerStartMenuTrigger" class="nav-pill-btn px-2 search-btn" type="button" title="Start Menu (Alt+Shift+S)" aria-keyshortcuts="Alt+Shift+S" data-bs-toggle="modal" data-bs-target="#startMenuModal" style="position: relative; z-index: 11;">
+                        <button id="headerStartMenuTrigger" class="nav-pill-btn px-2 search-btn d-none d-lg-inline-flex" type="button" title="Start Menu (Alt+Shift+S)" aria-keyshortcuts="Alt+Shift+S" data-bs-toggle="modal" data-bs-target="#startMenuModal" style="position: relative; z-index: 11;">
                             <i class="bi bi-windows text-secondary fs-5 top-action-icon"></i>
                         </button>
                     </div>
@@ -409,10 +409,11 @@
                 </a>
                 <% } %>
 
-                <button class="nav-pill-btn px-2 d-lg-none header-hamburger" type="button"
+                <button class="nav-pill-btn px-2 d-lg-none header-hamburger position-relative" type="button"
                         data-bs-toggle="collapse" data-bs-target="#navbarNav"
                         aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation" title="Menu">
                     <i class="bi bi-list fs-3 text-secondary top-action-icon"></i>
+                    <span id="headerHamburgerUnreadDot" class="header-chat-unread-dot header-hamburger-unread-dot d-none" aria-hidden="true"></span>
                 </button>
              </div>
         </div>
@@ -421,6 +422,44 @@
             <div class="col-12">
             <nav class="navbar navbar-expand-lg mt-1 mt-lg-0 p-0">
                 <div class="collapse navbar-collapse" id="navbarNav">
+                <% if (typeof user !== 'undefined' && user !== null) { %>
+                <div class="header-mobile-quick-actions d-lg-none" role="toolbar" aria-label="Quick actions">
+                    <% if (canUseHeaderChat) { %>
+                    <a class="nav-pill-btn px-2 header-mobile-quick-action position-relative"
+                       href="#"
+                       id="chatGlobalTriggerMobile"
+                       data-bs-toggle="modal"
+                       data-bs-target="#chatInterfaceModal"
+                       title="Messages (Alt+Shift+C)"
+                       aria-keyshortcuts="Alt+Shift+C"
+                       aria-label="Messages">
+                        <i class="bi bi-chat-dots-fill fs-4 text-secondary top-action-icon"></i>
+                        <span id="chatGlobalTriggerMobileUnreadDot" class="header-chat-unread-dot header-mobile-chat-unread-dot d-none" aria-hidden="true"></span>
+                    </a>
+                    <% } %>
+                    <button id="headerStartMenuTriggerMobile"
+                            class="nav-pill-btn px-2 search-btn header-mobile-quick-action"
+                            type="button"
+                            title="Start Menu (Alt+Shift+S)"
+                            aria-keyshortcuts="Alt+Shift+S"
+                            data-bs-toggle="modal"
+                            data-bs-target="#startMenuModal">
+                        <i class="bi bi-windows text-secondary fs-5 top-action-icon"></i>
+                    </button>
+                    <% if (canUseScheduledTaskManager) { %>
+                    <button id="scheduledTaskManagerHeaderTriggerMobile"
+                            class="nav-pill-btn px-2 position-relative header-mobile-quick-action"
+                            type="button"
+                            title="Task Manager (Alt+Shift+T)"
+                            aria-keyshortcuts="Alt+Shift+T"
+                            aria-label="Open scheduled task manager">
+                        <i class="bi bi-calendar2-check fs-4 text-secondary top-action-icon"></i>
+                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-primary d-none" id="scheduledTaskManagerHeaderBadgeMobile">0</span>
+                    </button>
+                    <% } %>
+                </div>
+                <hr class="header-mobile-quick-actions-divider d-lg-none my-2" />
+                <% } %>
                 <ul class="navbar-nav w-100 justify-content-lg-center gap-3">
                     <%- renderHeaderNavItems(headerPublicMenu) %>
                     <% if (typeof user !== 'undefined' && user !== null) { %>
@@ -1106,8 +1145,6 @@
     <% if (canUseScheduledTaskManager) { %>
     <script>
       (function () {
-        const trigger = document.getElementById('scheduledTaskManagerHeaderTrigger');
-        if (!trigger) return;
         let loaderPromise = null;
         function loadManagerLoader() {
           if (window.ScheduledTaskManagerLoader) return Promise.resolve();
@@ -1122,11 +1159,17 @@
           });
           return loaderPromise;
         }
-        trigger.addEventListener('click', function (event) {
+        function openScheduledTaskManager(event) {
           event.preventDefault();
           loadManagerLoader()
             .then(() => window.ScheduledTaskManagerLoader?.open())
             .catch((error) => console.error('[ScheduledTaskManager]', error));
+        }
+        ['scheduledTaskManagerHeaderTrigger', 'scheduledTaskManagerHeaderTriggerMobile'].forEach((id) => {
+          const trigger = document.getElementById(id);
+          if (!trigger || trigger.dataset.stmBound === '1') return;
+          trigger.dataset.stmBound = '1';
+          trigger.addEventListener('click', openScheduledTaskManager);
         });
       })();
     </script>

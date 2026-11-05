@@ -498,6 +498,12 @@ exports.deleteChat = async (req, res) => {
             console.warn(`[Chat] File cleanup note for ${convId}:`, e.message);
         }
 
+        await socketService.emitConversationDeleted({
+            conversation,
+            convId,
+            deletedByUserId: req.user?.id
+        });
+
         const dataDeleted = await chatRepository.remove(convId);
 
         if (dataDeleted || filesDeleted) {

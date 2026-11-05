@@ -113,6 +113,32 @@ async function emitNewMessageToRecipients({
     return { recipientIds: recipients };
 }
 
+async function emitConversationDeleted({
+    conversation = null,
+    convId = '',
+    deletedByUserId = ''
+} = {}) {
+    if (!io) return { participantIds: [] };
+    const effectiveConvId = String(convId || conversation?.id || '').trim();
+    if (!effectiveConvId) return { participantIds: [] };
+
+    const participantIds = [...new Set((Array.isArray(conversation?.participants)
+        ? conversation.participants
+        : [])
+        .map((participant) => String(participant?.userId || '').trim())
+        .filter(Boolean))];
+    if (!participantIds.length) return { participantIds: [] };
+
+    const payload = {
+        convId: effectiveConvId,
+        deletedByUserId: String(deletedByUserId || '').trim()
+    };
+    participantIds.forEach((userId) => {
+        io.to(getUserRoom(userId)).emit('on_conversation_deleted', payload);
+    });
+    return { participantIds };
+}
+
 async function emitMessagesDeleted({
     convId = '',
     messageIds = [],
@@ -422,15 +448,19 @@ function init(server) {
 
         socket.on('conversation_deleted', async (data = {}) => {
             try {
-                const conversation = await chatRepository.getById(data.convId);
+                const convId = String(data?.convId || '').trim();
+                const conversation = convId ? await chatRepository.getById(convId) : null;
+                if (!conversation) return;
                 const access = await chatAccessService.canDeleteConversation(
                     socket.user,
                     conversation,
                     socket.handshake?.address
                 );
                 if (!access.allowed) return;
-                socket.to(String(data.convId)).emit('on_conversation_deleted', {
-                    convId: data.convId
+                await emitConversationDeleted({
+                    conversation,
+                    convId,
+                    deletedByUserId: socket.userId
                 });
             } catch (error) {
                 console.error('Socket Delete Broadcast Error:', error);
@@ -450,4 +480,4 @@ function getIo() {
     return io;
 }
 
-module.exports = { init, getIo, emitNewMessageToRecipients, emitMessagesDeleted };
+module.exports = { init, getIo, emitNewMessageToRecipients, emitMessagesDeleted, emitConversationDeleted };

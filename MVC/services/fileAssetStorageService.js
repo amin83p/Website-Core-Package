@@ -15,6 +15,7 @@ const {
   gatewayCreateFolder,
   gatewayListDirectory
 } = require('./fileGatewayClientService');
+const { getGatewayBaseUrl } = require('../utils/uploadModeUtils');
 
 function clean(value) {
   return String(value || '').trim();
@@ -241,6 +242,18 @@ async function readUploadReferenceBuffer(token = '') {
 
   const fromDisk = await readUploadReferenceBufferFromDisk(token, diskPath);
   if (fromDisk) return fromDisk;
+
+  const gatewayBaseUrl = getGatewayBaseUrl();
+  if (gatewayBaseUrl && !uploadStoragePolicy.isRailwayGatewayBackend()) {
+    try {
+      return await readUploadReferenceBufferFromGateway(token, parsed);
+    } catch (gatewayError) {
+      if (!/not found|ENOENT|404/i.test(String(gatewayError?.message || ''))) {
+        throw gatewayError;
+      }
+    }
+  }
+
   if (!diskPath) throw new Error('Unable to resolve upload URL.');
   const error = new Error(`ENOENT: no such file or directory, open '${diskPath}'`);
   error.code = 'ENOENT';

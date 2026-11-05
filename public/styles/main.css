@@ -1695,6 +1695,48 @@ a.header-side-control-btn {
     border-radius: 8px;
   }
 
+  #main-header .header-mobile-quick-actions {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding: 0.15rem 0.1rem 0.25rem;
+  }
+
+  #main-header .header-mobile-quick-actions .header-mobile-quick-action {
+    min-width: 40px;
+    justify-content: center;
+  }
+
+  #main-header .header-mobile-quick-actions-divider {
+    border-color: rgba(226, 232, 240, 0.9);
+    opacity: 1;
+  }
+
+  #main-header .header-chat-unread-dot {
+    position: absolute;
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    background-color: var(--bs-danger, #dc3545);
+    border: 2px solid #fff;
+    pointer-events: none;
+    z-index: 2;
+    box-shadow: 0 0 0 1px rgba(220, 53, 69, 0.35);
+  }
+
+  #main-header .header-hamburger-unread-dot {
+    top: 0.22rem;
+    right: 0.22rem;
+  }
+
+  #main-header .header-mobile-chat-unread-dot {
+    top: 0.32rem;
+    right: 0.38rem;
+  }
+
   .header-utility-controls {
     left: 10px;
     top: calc(100% + 10px);
@@ -2477,6 +2519,7 @@ body > .row-actions-menu.row-actions-menu--floating {
   min-width: 40px;
   justify-content: center;
   padding-right: 8px;
+  position: relative;
 }
 .user-zoom-controls .form-range {
   min-width: 110px;

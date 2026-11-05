@@ -359,6 +359,12 @@ test('rendered chat client script is valid and includes badge, sound, and read-s
   assert.match(rendered, /id="chatSoundToggle"/);
   assert.match(rendered, /id="chatSendButton"[^>]*data-no-wait="true"/);
   assert.match(clientSource, /getElementById\('chatGlobalBadge'\)/);
+  assert.match(clientSource, /getElementById\('headerHamburgerUnreadDot'\)/);
+  assert.match(clientSource, /getElementById\('chatGlobalTriggerMobileUnreadDot'\)/);
+  assert.match(clientSource, /chatGlobalTriggerMobile/);
+  assert.match(clientSource, /function backFromChatThread\(\)/);
+  assert.match(clientSource, /chat-mobile-thread/);
+  assert.match(rendered, /id="chatThreadBackBtn"/);
   assert.match(clientSource, /ensureChatSocket/);
   assert.match(clientSource, /loadOlderMessages/);
   assert.match(clientSource, /CHAT_MESSAGE_PAGE_SIZE/);

@@ -3943,7 +3943,9 @@ function initHeaderShortcuts() {
         }
 
         if (key === 's') {
-            const startMenuTrigger = document.getElementById('headerStartMenuTrigger') || document.querySelector('.search-btn[data-bs-target="#startMenuModal"]');
+            const startMenuTrigger = document.getElementById('headerStartMenuTrigger')
+                || document.getElementById('headerStartMenuTriggerMobile')
+                || document.querySelector('.search-btn[data-bs-target="#startMenuModal"]');
             if (!startMenuTrigger) return;
             event.preventDefault();
             triggerElement(startMenuTrigger);
@@ -3951,7 +3953,8 @@ function initHeaderShortcuts() {
         }
 
         if (key === 'c') {
-            const chatTrigger = document.getElementById('chatGlobalTrigger');
+            const chatTrigger = document.getElementById('chatGlobalTrigger')
+                || document.getElementById('chatGlobalTriggerMobile');
             if (!chatTrigger) return;
             event.preventDefault();
             triggerElement(chatTrigger);
@@ -3959,7 +3962,8 @@ function initHeaderShortcuts() {
         }
 
         if (key === 't') {
-            const taskManagerTrigger = document.getElementById('scheduledTaskManagerHeaderTrigger');
+            const taskManagerTrigger = document.getElementById('scheduledTaskManagerHeaderTrigger')
+                || document.getElementById('scheduledTaskManagerHeaderTriggerMobile');
             if (!taskManagerTrigger) return;
             event.preventDefault();
             triggerElement(taskManagerTrigger);

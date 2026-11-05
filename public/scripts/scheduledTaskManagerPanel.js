@@ -218,11 +218,13 @@
       generatedAtEl.textContent = `Updated ${payload.generatedAtDisplay || formatDateTime(payload.generatedAt, payload.viewerTimezone)}`;
     }
 
-    const badgeEl = document.getElementById('scheduledTaskManagerHeaderBadge');
-    if (badgeEl) {
+    const badgeIds = ['scheduledTaskManagerHeaderBadge', 'scheduledTaskManagerHeaderBadgeMobile'];
+    badgeIds.forEach((badgeId) => {
+      const badgeEl = document.getElementById(badgeId);
+      if (!badgeEl) return;
       badgeEl.textContent = String(upcoming.length);
       badgeEl.classList.toggle('d-none', upcoming.length <= 0);
-    }
+    });
 
     root.__stmPayload = payload;
     setActiveTab(root, root.__stmActiveTab || 'upcoming');

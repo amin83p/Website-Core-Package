@@ -2,6 +2,7 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 const coreFilesService = require('../services/coreFilesService');
+const uploadStorageService = require('../services/uploadStorageService');
 const chatRepository = require('../repositories/chatRepository');
 const chatAccessService = require('../services/chatAccessService');
 const chatPolicyService = require('../services/chatPolicyService');
@@ -106,10 +107,17 @@ async function authorizeAndPersistChatUpload(req, res, next) {
       };
     });
 
+    await uploadStorageService.persistMulterUploads({
+      category: 'chat',
+      req,
+      options: { force: true }
+    });
+
     req.chatUploadConversation = conversation;
     req.chatUploadAccess = access;
     return next();
   } catch (error) {
+    await coreFilesService.deleteUploadedFiles(req).catch(() => {});
     return next(error);
   }
 }

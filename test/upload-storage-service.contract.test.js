@@ -138,3 +138,12 @@ test('coreFilesService getStoredFileUrl does not mint URL from multer path in ra
   });
   assert.equal(url, '');
 });
+
+test('chat upload middleware mirrors through uploadStorageService like other multer routes', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '..', 'MVC', 'middleware', 'chatUploadMiddleware.js'),
+    'utf8'
+  );
+  assert.match(source, /uploadStorageService\.persistMulterUploads\(/);
+  assert.match(source, /category:\s*'chat'/);
+});
