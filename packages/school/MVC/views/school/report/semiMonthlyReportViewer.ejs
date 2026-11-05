@@ -34,6 +34,16 @@
     }
     .student-report-table td.matrix-sticky-class { background-color: #fff; z-index: 1; }
     .student-summary-chip { font-size: 0.82rem; }
+    .attendance-legend-icon-btn {
+        width: 2.25rem;
+        height: 2.25rem;
+        padding: 0;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 1;
+    }
+    .attendance-legend-icon-btn .bi { font-size: 1.05rem; line-height: 1; }
     .sar-selected-students-menu {
         min-width: 320px;
         max-width: min(420px, 100vw - 24px);
@@ -321,9 +331,24 @@
     <div class="card border-0 shadow-sm d-none" id="resultsContainer">
         <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
             <div class="fw-semibold text-muted small">School Semi-Monthly Report</div>
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_expandAllStudents">Expand All</button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_collapseAllStudents">Collapse All</button>
+            <div class="d-flex align-items-center gap-2 flex-wrap ms-md-auto">
+                <% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
+                <button type="button" id="btn_toggleEnrollmentClaims" class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn" disabled aria-label="Show claim numbers" title="Load the report first"><i class="bi bi-card-text" aria-hidden="true"></i></button>
+                <% } %>
+                <button type="button"
+                    class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
+                    id="btn_expandAllStudents"
+                    aria-label="Expand all students"
+                    title="Expand all students">
+                    <i class="bi bi-arrows-expand" aria-hidden="true"></i>
+                </button>
+                <button type="button"
+                    class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
+                    id="btn_collapseAllStudents"
+                    aria-label="Collapse all students"
+                    title="Collapse all students">
+                    <i class="bi bi-arrows-collapse" aria-hidden="true"></i>
+                </button>
             </div>
         </div>
         <div class="card-body" id="studentReportSections"></div>
@@ -385,6 +410,9 @@
 <%- include('partials/reportMessageHelpers') %>
 
 <script src="/scripts/reportByFunderModal.js"></script>
+<% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
+<script src="/scripts/enrollmentClaimToggle.js"></script>
+<% } %>
 <script>
 (function () {
   const initialStartDate = '<%= typeof initialStartDate !== "undefined" ? initialStartDate : "" %>';
@@ -764,9 +792,12 @@
     const personId = String(student?.personId || '').trim();
     const collapseId = `student-report-${personId.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
     const summary = summarizeStudentReport(student);
-    const studentNameHtml = typeof schoolRenderStudentNameHtml === 'function'
+    const studentNameInner = typeof schoolRenderStudentNameHtml === 'function'
       ? schoolRenderStudentNameHtml(student.name, student.studentRecordId, { className: 'text-decoration-none fw-bold' })
       : escapeHtml(student.name || personId);
+    const studentNameHtml = (window.EnrollmentClaimToggle && typeof window.EnrollmentClaimToggle.wrapNameHtml === 'function')
+      ? window.EnrollmentClaimToggle.wrapNameHtml(studentNameInner, { personId, studentRecordId: student.studentRecordId })
+      : studentNameInner;
 
     let classRows = '';
     (student.classes || []).forEach((classRow) => {
@@ -991,6 +1022,10 @@
       ? students.map((student) => buildStudentSection(student, payload.startDate || startDate, payload.endDate || endDate)).join('')
       : '<p class="text-muted mb-0">No enrolled classes found for the selected students and date range.</p>';
     document.getElementById('resultsContainer').classList.remove('d-none');
+    if (window.EnrollmentClaimToggle) {
+      window.EnrollmentClaimToggle.setReady(true);
+      window.EnrollmentClaimToggle.afterRender();
+    }
     syncShareUrl();
     const filterSnapshot = getFilterParams();
     if (payload.exportPreview && typeof payload.exportPreview === 'object') {
@@ -1642,6 +1677,7 @@
     renderSelectedStudents();
     document.getElementById('studentReportSections').innerHTML = '';
     document.getElementById('resultsContainer').classList.add('d-none');
+    if (window.EnrollmentClaimToggle) window.EnrollmentClaimToggle.setReady(false);
     showConfigWarning('');
   });
   document.getElementById('btn_loadData')?.addEventListener('click', () => {
@@ -1832,6 +1868,19 @@
   if (smmrOpenedFromUrlQuery) {
     runWhenReportMessageModalReady(() => {
       void promptLoadReportFromUrlLink();
+    });
+  }
+
+  if (window.EnrollmentClaimToggle) {
+    window.EnrollmentClaimToggle.init({
+      page: 'semi-monthly',
+      getWindow() {
+        return {
+          classId: '',
+          startDate: document.getElementById('filter_startDate')?.value || '',
+          endDate: document.getElementById('filter_endDate')?.value || ''
+        };
+      }
     });
   }
 })();

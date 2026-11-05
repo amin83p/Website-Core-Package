@@ -479,23 +479,40 @@
             <div class="d-flex align-items-center gap-2 flex-wrap ms-md-auto">
                 <div class="d-flex align-items-center gap-2 flex-wrap">
                     <button type="button"
-                        class="btn btn-outline-secondary btn-sm active"
+                        class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn active"
                         id="btn_sarHideDaysWithoutSession"
+                        aria-label="Hide days without sessions"
                         aria-pressed="true"
                         title="When on, each student's table only shows dates where at least one of their classes had a scheduled session.">
-                        Hide days without sessions
+                        <i class="bi bi-calendar2-x" aria-hidden="true"></i>
                     </button>
                     <button type="button"
-                        class="btn btn-outline-secondary btn-sm"
+                        class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
                         id="btn_sarWeekSeparators"
+                        aria-label="Week separators"
                         aria-pressed="false"
                         title="When on, show a vertical line between calendar weeks (Monday start).">
-                        Week separators
+                        <i class="bi bi-grip-vertical" aria-hidden="true"></i>
                     </button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_expandAllStudents">Expand All</button>
-                    <button type="button" class="btn btn-outline-secondary btn-sm" id="btn_collapseAllStudents">Collapse All</button>
+                    <button type="button"
+                        class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
+                        id="btn_expandAllStudents"
+                        aria-label="Expand all students"
+                        title="Expand all students">
+                        <i class="bi bi-arrows-expand" aria-hidden="true"></i>
+                    </button>
+                    <button type="button"
+                        class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
+                        id="btn_collapseAllStudents"
+                        aria-label="Collapse all students"
+                        title="Collapse all students">
+                        <i class="bi bi-arrows-collapse" aria-hidden="true"></i>
+                    </button>
                 </div>
                 <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
+                    <button type="button" id="btn_toggleEnrollmentClaims" class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn" disabled aria-label="Show claim numbers" title="Load the report first"><i class="bi bi-card-text" aria-hidden="true"></i></button>
+                    <% } %>
                     <button type="button"
                         class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn attendance-history-toggle-btn"
                         id="btn_sarAttendanceHistory"
@@ -789,6 +806,9 @@
 <script src="/scripts/attendanceMarkAppearanceClient.js"></script>
 <script src="/scripts/reportByFunderModal.js"></script>
 <script src="/scripts/attendanceCellHoverTip.js"></script>
+<% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
+<script src="/scripts/enrollmentClaimToggle.js"></script>
+<% } %>
 
 <script>
 (() => {
@@ -1268,6 +1288,10 @@
         renderStudentReportSections(payload);
         syncSarUrlFromFilters();
         document.getElementById('resultsContainer').classList.remove('d-none');
+        if (window.EnrollmentClaimToggle) {
+            window.EnrollmentClaimToggle.setReady(true);
+            window.EnrollmentClaimToggle.afterRender();
+        }
     }
 
     function hideSarReportWaiting() {
@@ -1973,9 +1997,12 @@
         const summary = student?.summary || {};
         const rollupPct = summary.rollupPercent == null ? '—' : `${summary.rollupPercent}%`;
         const notesLabel = summary.notesExist ? 'Yes' : 'No';
-        const studentNameHtml = typeof schoolRenderStudentNameHtml === 'function'
+        const studentNameInner = typeof schoolRenderStudentNameHtml === 'function'
             ? schoolRenderStudentNameHtml(student.name, student.studentRecordId, { className: 'text-decoration-none fw-bold' })
             : escapeHtml(student.name || personId);
+        const studentNameHtml = (window.EnrollmentClaimToggle && typeof window.EnrollmentClaimToggle.wrapNameHtml === 'function')
+            ? window.EnrollmentClaimToggle.wrapNameHtml(studentNameInner, { personId, studentRecordId: student.studentRecordId })
+            : studentNameInner;
         const studentName = String(student?.name || personId).trim();
         const studentExcelExportBtn = canExportStudentMatrixExcel
             ? `<button type="button" class="btn btn-filled btn-success btn-sm flex-shrink-0 js-sar-student-excel-export" data-person-id="${escapeHtml(personId)}" title="Export attendance matrix Excel for all classes"><i class="bi bi-cloud-download me-1"></i> Export</button>`
@@ -3137,6 +3164,7 @@
         cellDetailByKey.clear();
         document.getElementById('studentReportSections').innerHTML = '';
         document.getElementById('resultsContainer').classList.add('d-none');
+        if (window.EnrollmentClaimToggle) window.EnrollmentClaimToggle.setReady(false);
         sarExportPlan = null;
         sarLastReportPayload = null;
         setSarHideDaysWithoutSession(true);
@@ -3254,6 +3282,7 @@
         cellDetailByKey.clear();
         document.getElementById('resultsContainer').classList.add('d-none');
         document.getElementById('studentReportSections').innerHTML = '';
+        if (window.EnrollmentClaimToggle) window.EnrollmentClaimToggle.setReady(false);
         sarExportPlan = null;
     });
 
@@ -3487,6 +3516,19 @@
             },
             onOpenCellDetails: ({ context }) => {
                 openCellDetailModal(context.cellKey);
+            }
+        });
+    }
+
+    if (window.EnrollmentClaimToggle) {
+        window.EnrollmentClaimToggle.init({
+            page: 'attendance-report',
+            getWindow() {
+                return {
+                    classId: '',
+                    startDate: document.getElementById('filter_startDate')?.value || '',
+                    endDate: document.getElementById('filter_endDate')?.value || ''
+                };
             }
         });
     }

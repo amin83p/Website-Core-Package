@@ -1,0 +1,48 @@
+.school-matrix-expand-modal .modal-dialog.modal-fullscreen {
+  width: 100vw;
+  max-width: none;
+  height: 100%;
+  max-height: 100dvh;
+  margin: 0;
+}
+
+.school-matrix-expand-modal .modal-content {
+  height: 100%;
+  max-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 0;
+}
+
+.school-matrix-expand-modal .modal-header {
+  flex: 0 0 auto;
+}
+
+.school-matrix-expand-modal .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.school-matrix-expand-modal .modal-body > .school-matrix-expand-active {
+  flex: 1 1 auto;
+  min-height: 0;
+  min-width: 0;
+  align-self: stretch;
+  width: 100%;
+  max-height: none !important;
+  height: auto;
+  overflow: auto;
+  border-radius: 0;
+  box-sizing: border-box;
+}
+
+.school-matrix-expand-modal .modal-body > .school-matrix-expand-active .matrix-table,
+.school-matrix-expand-modal .modal-body > .school-matrix-expand-active .gm-matrix-table,
+.school-matrix-expand-modal .modal-body > .school-matrix-expand-active .cm-matrix-table {
+  width: max-content;
+  min-width: 100%;
+}

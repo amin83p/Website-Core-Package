@@ -8,6 +8,8 @@ const conductRatingScalePolicyModel = require('../../models/school/conductRating
 const schoolDataService = require('../../services/school/schoolDataService');
 const conductRatingScaleService = require('../../services/school/conductRatingScaleService');
 const { userCanOpenAttendanceMatrix } = require('../../services/school/attendanceMatrixAccessService');
+const enrollmentClaimDisplayService = require('../../services/school/enrollmentClaimDisplayService');
+const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 async function resolveConductPolicyForRequest(req, classData) {
   const orgId = String(req.user?.activeOrgId || classData?.orgId || '').trim();
@@ -33,6 +35,11 @@ async function showConductMatrixPage(req, res) {
     }
 
     const canOpenAttendanceMatrix = await userCanOpenAttendanceMatrix(req.user, req.ip);
+    const canShowEnrollmentClaims = await enrollmentClaimDisplayService.canShowOnSectionPage(
+      req.user,
+      SECTIONS.SCHOOL_CLASS_CONDUCT_MATRIX,
+      { operationId: OPERATIONS.READ_ALL, ipAddress: req.ip }
+    );
     let conductRatingScaleResolved = conductRatingScaleService.resolvePolicy({});
     if (initialClassId) {
       try {
@@ -56,6 +63,7 @@ async function showConductMatrixPage(req, res) {
       initialEndDate,
       initialRange,
       canOpenAttendanceMatrix,
+      canShowEnrollmentClaims,
       conductRatingScaleResolved
     });
   } catch (error) {

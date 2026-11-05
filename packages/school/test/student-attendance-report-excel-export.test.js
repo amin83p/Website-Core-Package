@@ -326,6 +326,23 @@ test('formatClaimNumbersDisplay joins number and label', () => {
   );
 });
 
+test('formatClaimNumbersDisplay mentions a repeated claim number once', () => {
+  assert.equal(
+    studentAttendanceReportService.formatClaimNumbersDisplay([
+      { number: '785 5565', label: 'WCB' },
+      { number: '785 5565', label: 'WCB' }
+    ]),
+    '785 5565 WCB'
+  );
+  assert.equal(
+    studentAttendanceReportService.formatClaimNumbersDisplay([
+      { number: '785 5565', label: 'WCB' },
+      { number: '785 5565', label: 'EI' }
+    ]),
+    '785 5565 EI / WCB'
+  );
+});
+
 test('resolveClaimNumbersForEnrollmentPeriods collects distinct overlapping claims', () => {
   const numbers = studentAttendanceReportService.resolveClaimNumbersForEnrollmentPeriods({
     periodRows: [

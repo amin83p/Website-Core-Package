@@ -82,7 +82,19 @@
     border-radius: 14px;
   }
   .schedule-shell .range-chip.active { box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.15); }
+  .cm-filter-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+    margin-left: auto;
+  }
+  .cm-filter-actions .cm-filter-action-btn {
+    width: 7.25rem;
+    justify-content: center;
+  }
 </style>
+<link rel="stylesheet" href="/styles/schedule-viewer.css">
+<link rel="stylesheet" href="/styles/school-matrix-expand.css">
 
 <%
   const dashHref = typeof schoolSectionDashboardHref === 'string' && schoolSectionDashboardHref
@@ -121,49 +133,59 @@
   <div class="card border-0 shadow-sm mb-3">
     <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
       <div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filter Class Conduct Matrix</div>
-      <button id="cmFilterToggleBtn" type="button" class="btn btn-outline-secondary btn-sm px-2" data-bs-toggle="collapse" data-bs-target="#cmFilterCollapse" aria-expanded="true" aria-controls="cmFilterCollapse">
+      <button
+        id="cmFilterToggleBtn"
+        type="button"
+        class="btn btn-outline-secondary btn-sm px-2"
+        data-bs-toggle="collapse"
+        data-bs-target="#cmFilterCollapse"
+        aria-expanded="true"
+        aria-controls="cmFilterCollapse"
+        aria-label="Close filters">
         <i id="cmFilterToggleIcon" class="bi bi-chevron-up"></i>
       </button>
     </div>
     <div class="collapse show" id="cmFilterCollapse">
-      <div class="card-body filter-panel p-3">
+      <div class="card-body filter-panel p-3" id="cmFilterForm">
         <div class="row g-3 align-items-end">
           <div class="col-lg-4 col-md-6">
             <label class="form-label" for="cm_className">Class</label>
             <div class="input-group">
               <input type="hidden" id="cm_classId">
               <input type="text" id="cm_className" class="form-control bg-white" placeholder="Select class..." readonly>
-              <button type="button" class="btn btn-outline-primary" id="cm_btnClassPicker" title="Select class"><i class="bi bi-book"></i></button>
-              <button type="button" class="btn btn-outline-secondary" id="cm_btnClearClass" title="Clear class"><i class="bi bi-x-lg"></i></button>
+              <button type="button" class="btn btn-outline-primary" id="cm_btnClassPicker" title="Select class">
+                <i class="bi bi-book"></i>
+              </button>
+              <button type="button" class="btn btn-outline-secondary" id="cm_btnClearClass" title="Clear class">
+                <i class="bi bi-x-lg"></i>
+              </button>
             </div>
           </div>
           <div class="col-lg-2 col-md-3">
-            <label class="form-label" for="cm_startDate">Start Date</label>
-            <input type="date" id="cm_startDate" class="form-control size-md">
+            <%- include('../schedule/partials/personScheduleStartDateWithShortcuts', {
+              startDateFieldClass: 'w-100 schedule-date-field-with-shortcuts',
+              shortcutsButtonId: 'btn_cmDateShortcuts',
+              startDateInputId: 'cm_startDate',
+              menuControlsId: 'cmDateRangeMenu',
+              startDateLabelFor: 'cm_startDate',
+              startDateInputClass: 'form-control size-md schedule-date-input-with-shortcuts'
+            }) %>
           </div>
           <div class="col-lg-2 col-md-3">
             <label class="form-label" for="cm_endDate">End Date</label>
             <input type="date" id="cm_endDate" class="form-control size-md">
           </div>
-          <div class="col-12 col-lg-auto d-flex gap-2">
-            <button type="button" id="cm_btnReset" class="btn btn-outline-secondary btn-md">Reset</button>
-            <button type="button" id="cm_btnLoad" class="btn btn-filled btn-primary btn-md"><i class="bi bi-funnel me-1"></i> Apply</button>
-          </div>
-        </div>
-        <div class="border rounded-3 bg-white bg-opacity-75 p-2 mt-3">
-          <div class="small fw-bold text-uppercase text-muted mb-2">Quick Ranges</div>
-          <div class="d-flex flex-wrap gap-2">
-            <button type="button" class="btn btn-outline-secondary btn-sm cm-range range-chip" data-range="thisMonth">This Month</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm cm-range range-chip" data-range="thisWeek">This Week</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm cm-range range-chip" data-range="lastMonth">Last Month</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm cm-range range-chip" data-range="lastMonthFirstHalf">Last Month - 1st 15 Days</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm cm-range range-chip" data-range="lastMonthSecondHalf">Last Month - 2nd 15 Days</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm cm-range range-chip" data-range="allTime">All Dates</button>
+          <div class="col-12 col-lg-auto cm-filter-actions">
+            <button type="button" id="cm_btnReset" class="btn btn-outline-secondary btn-md cm-filter-action-btn">Reset</button>
+            <button type="button" id="cm_btnLoad" class="btn btn-filled btn-primary btn-md cm-filter-action-btn">
+              <i class="bi bi-funnel me-1"></i> Apply
+            </button>
           </div>
         </div>
       </div>
     </div>
   </div>
+  <%- include('../schedule/partials/personScheduleDateRangeShortcuts', { dateRangeMenuId: 'cmDateRangeMenu', includeMatrixAllDates: true }) %>
 
   <div class="card border-0 shadow-sm d-none" id="cm_results">
     <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
@@ -172,6 +194,9 @@
         <p class="small text-muted mb-0 mt-1">Click a cell to edit. Avg column uses rated sessions with <strong>Show</strong> enabled.</p>
       </div>
       <div class="d-flex align-items-center gap-2">
+        <% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
+        <button type="button" id="btn_toggleEnrollmentClaims" class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn" disabled aria-label="Show claim numbers" title="Load the matrix first"><i class="bi bi-card-text" aria-hidden="true"></i></button>
+        <% } %>
         <button type="button"
           class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn cm-session-view-btn active"
           id="cm_btnShowAllSessions"
@@ -197,18 +222,37 @@
           title="Legend">
           <i class="bi bi-info-circle" aria-hidden="true"></i>
         </button>
+        <button type="button"
+          class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
+          id="btn_cmExpandMatrixView"
+          data-bs-toggle="modal"
+          data-bs-target="#cmMatrixExpandModal"
+          disabled
+          aria-label="Load the matrix first"
+          title="Load the matrix first">
+          <i class="bi bi-arrows-fullscreen" aria-hidden="true"></i>
+        </button>
       </div>
     </div>
     <div class="card-body p-0">
+      <div id="cmMatrixExpandInlineHost">
       <div class="cm-matrix-wrapper">
         <table class="table table-hover mb-0 cm-matrix-table" id="cm_table">
           <thead id="cm_thead"></thead>
           <tbody id="cm_tbody"></tbody>
         </table>
       </div>
+      </div>
     </div>
   </div>
 </div>
+
+<%- include('../partials/schoolMatrixExpandModal', {
+  expandModalId: 'cmMatrixExpandModal',
+  expandModalDialogId: 'cmMatrixExpandModalDialog',
+  expandModalHostId: 'cmMatrixExpandModalHost',
+  expandModalTitle: 'Class conduct matrix'
+}) %>
 
 <div class="modal fade" id="cmLegendModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
@@ -266,6 +310,7 @@
   </div>
 </div>
 
+<%- include('partials/reportMessageHelpers') %>
 <%- include('partials/tablePages-end') %>
 
 <script>
@@ -279,5 +324,10 @@
     actionStateId: typeof actionStateId !== 'undefined' ? actionStateId : ''
   }).replace(/</g, '\\u003c').replace(/&/g, '\\u0026') %>;
 </script>
+<% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
+<script src="/scripts/schoolDateRangeShortcuts.js"></script>
+<script src="/scripts/schoolMatrixExpandedView.js"></script>
+<script src="/scripts/enrollmentClaimToggle.js"></script>
+<% } %>
 <script src="/scripts/conductRatingCell.js"></script>
 <script src="/scripts/conductMatrixClient.js"></script>

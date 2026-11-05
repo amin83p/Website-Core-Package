@@ -116,11 +116,12 @@
     }
 
     function setActiveRangeChip(range) {
-        document.querySelectorAll('#scheduleDateRangeMenu .schedule-date-range-option').forEach((btn) => {
-            const isActive = btn.getAttribute('data-range') === range;
-            btn.classList.toggle('active', isActive);
-            btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
-        });
+        if (global.SchoolDateRangeShortcuts) {
+            global.SchoolDateRangeShortcuts.setActiveMenuOption(
+                document.getElementById('scheduleDateRangeMenu'),
+                range
+            );
+        }
     }
 
     const setDateRange = (start, end) => {
@@ -7329,167 +7330,33 @@
         }
     }
 
-    function normalizeScheduleRangeToken(range) {
-        const key = String(range || '').trim();
-        const legacyMap = {
-            first15: 'm0-first',
-            second15: 'm0-second',
-            month: 'm0-full'
-        };
-        return legacyMap[key] || key;
-    }
-
-    function resolveScheduleRangeDates(range) {
-        const token = normalizeScheduleRangeToken(range);
-        const today = new Date();
-        if (token === 'day') {
-            return { start: new Date(today), end: new Date(today) };
-        }
-        if (token === 'week') {
-            const start = new Date(today);
-            const end = new Date(today);
-            const day = today.getDay() || 7;
-            if (day !== 1) start.setHours(-24 * (day - 1));
-            end.setTime(start.getTime() + (6 * 24 * 60 * 60 * 1000));
-            return { start, end };
-        }
-        const monthMatch = /^m(-?\d+)-(first|second|full)$/.exec(token);
-        if (monthMatch) {
-            const monthOffset = Number(monthMatch[1]);
-            const part = monthMatch[2];
-            const anchor = new Date(today.getFullYear(), today.getMonth() + monthOffset, 1);
-            const year = anchor.getFullYear();
-            const month = anchor.getMonth();
-            if (part === 'first') {
-                return { start: new Date(year, month, 1), end: new Date(year, month, 15) };
-            }
-            if (part === 'second') {
-                return { start: new Date(year, month, 16), end: new Date(year, month + 1, 0) };
-            }
-            return { start: new Date(year, month, 1), end: new Date(year, month + 1, 0) };
-        }
-        if (token === 'season') {
-            const start = new Date(today);
-            const end = new Date(today);
-            end.setMonth(start.getMonth() + 3);
-            return { start, end };
-        }
-        if (token === 'year') {
-            return {
-                start: new Date(today.getFullYear(), 0, 1),
-                end: new Date(today.getFullYear(), 11, 31)
-            };
-        }
-        return null;
-    }
-
     function applyScheduleRange(range) {
-        const normalized = normalizeScheduleRangeToken(range);
-        setActiveRangeChip(normalized);
-        const bounds = resolveScheduleRangeDates(normalized);
-        if (!bounds) return;
-        setDateRange(bounds.start, bounds.end);
+        const shortcuts = global.SchoolDateRangeShortcuts;
+        if (!shortcuts) return;
+        const payload = shortcuts.datesFromRangeToken(range);
+        shortcuts.setActiveMenuOption(document.getElementById('scheduleDateRangeMenu'), payload.token);
+        if (!payload.startDate || !payload.endDate) return;
+        setDateRangeFromIso(payload.startDate, payload.endDate);
         resetScheduleActiveClassFilter();
         clearLoadedSchedules();
         refreshScheduleViewWithHolidays();
     }
 
     function bindScheduleDateRangeShortcuts() {
-        const menuEl = document.getElementById('scheduleDateRangeMenu');
-        const shortcutsBtn = document.getElementById('btn_scheduleDateShortcuts');
-        const startEl = document.getElementById('sch_startDate');
-        const endEl = document.getElementById('sch_endDate');
-        if (!menuEl) return;
-
-        let dismissCleanup = null;
-
-        const isScheduleDateRangeMenuTarget = (target) => {
-            if (!target || !menuEl) return false;
-            if (target === menuEl || menuEl.contains(target)) return true;
-            if (shortcutsBtn && (target === shortcutsBtn || shortcutsBtn.contains(target))) return true;
-            return false;
-        };
-
-        const hideMenu = () => {
-            menuEl.hidden = true;
-            menuEl.classList.remove('is-open');
-            if (shortcutsBtn) shortcutsBtn.setAttribute('aria-expanded', 'false');
-            if (typeof dismissCleanup === 'function') {
-                dismissCleanup();
-                dismissCleanup = null;
+        const shortcuts = global.SchoolDateRangeShortcuts;
+        if (!shortcuts) return;
+        shortcuts.bindDateRangeShortcuts({
+            menuId: 'scheduleDateRangeMenu',
+            buttonId: 'btn_scheduleDateShortcuts',
+            startInputId: 'sch_startDate',
+            endInputId: 'sch_endDate',
+            clearActiveOnManualChange: false,
+            onApply: () => {
+                resetScheduleActiveClassFilter();
+                clearLoadedSchedules();
+                refreshScheduleViewWithHolidays();
             }
-        };
-
-        const clampMenuPosition = (left, top) => {
-            menuEl.style.left = `${left}px`;
-            menuEl.style.top = `${top}px`;
-            requestAnimationFrame(() => {
-                const rect = menuEl.getBoundingClientRect();
-                let nextLeft = left;
-                let nextTop = top;
-                if (rect.right > window.innerWidth - 8) nextLeft = Math.max(8, window.innerWidth - rect.width - 8);
-                if (rect.bottom > window.innerHeight - 8) nextTop = Math.max(8, window.innerHeight - rect.height - 8);
-                if (rect.left < 8) nextLeft = 8;
-                if (rect.top < 8) nextTop = 8;
-                menuEl.style.left = `${nextLeft}px`;
-                menuEl.style.top = `${nextTop}px`;
-            });
-        };
-
-        const showMenuAt = (left, top) => {
-            menuEl.hidden = false;
-            menuEl.classList.add('is-open');
-            clampMenuPosition(left, top);
-            if (shortcutsBtn) shortcutsBtn.setAttribute('aria-expanded', 'true');
-            if (dismissCleanup) return;
-            const onOutside = (event) => {
-                if (menuEl.hidden) return;
-                const path = typeof event.composedPath === 'function' ? event.composedPath() : [];
-                if (path.includes(menuEl) || path.includes(shortcutsBtn)) return;
-                if (isScheduleDateRangeMenuTarget(event.target)) return;
-                hideMenu();
-            };
-            const onKey = (event) => {
-                if (event.key === 'Escape') hideMenu();
-            };
-            const onScroll = (event) => {
-                if (menuEl.hidden) return;
-                if (isScheduleDateRangeMenuTarget(event.target)) return;
-                hideMenu();
-            };
-            document.addEventListener('pointerdown', onOutside, true);
-            document.addEventListener('keydown', onKey);
-            window.addEventListener('scroll', onScroll, true);
-            dismissCleanup = () => {
-                document.removeEventListener('pointerdown', onOutside, true);
-                document.removeEventListener('keydown', onKey);
-                window.removeEventListener('scroll', onScroll, true);
-            };
-        };
-
-        menuEl.querySelectorAll('.schedule-date-range-option').forEach((btn) => {
-            btn.addEventListener('click', (event) => {
-                applyScheduleRange(event.currentTarget.getAttribute('data-range') || 'week');
-                hideMenu();
-            });
         });
-
-        shortcutsBtn?.addEventListener('click', (event) => {
-            event.stopPropagation();
-            if (!menuEl.hidden && menuEl.classList.contains('is-open')) {
-                hideMenu();
-                return;
-            }
-            const rect = shortcutsBtn.getBoundingClientRect();
-            showMenuAt(rect.left, rect.bottom + 4);
-        });
-
-        const onDateContextMenu = (event) => {
-            event.preventDefault();
-            showMenuAt(event.clientX, event.clientY);
-        };
-        startEl?.addEventListener('contextmenu', onDateContextMenu);
-        endEl?.addEventListener('contextmenu', onDateContextMenu);
     }
 
     bindScheduleDateRangeShortcuts();

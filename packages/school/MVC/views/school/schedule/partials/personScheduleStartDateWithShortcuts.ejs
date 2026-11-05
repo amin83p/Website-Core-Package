@@ -1,22 +1,37 @@
 <%
-  const fieldClass = (typeof startDateFieldClass !== 'undefined' && startDateFieldClass)
+  const resolvedFieldClass = (typeof startDateFieldClass !== 'undefined' && startDateFieldClass)
     ? startDateFieldClass
     : 'schedule-filter-field';
+  const resolvedShortcutsButtonId = (typeof shortcutsButtonId !== 'undefined' && shortcutsButtonId)
+    ? shortcutsButtonId
+    : 'btn_scheduleDateShortcuts';
+  const resolvedStartDateInputId = (typeof startDateInputId !== 'undefined' && startDateInputId)
+    ? startDateInputId
+    : 'sch_startDate';
+  const resolvedMenuControlsId = (typeof menuControlsId !== 'undefined' && menuControlsId)
+    ? menuControlsId
+    : 'scheduleDateRangeMenu';
+  const resolvedStartDateLabelFor = (typeof startDateLabelFor !== 'undefined' && startDateLabelFor)
+    ? startDateLabelFor
+    : resolvedStartDateInputId;
+  const resolvedStartDateInputClass = (typeof startDateInputClass !== 'undefined' && startDateInputClass)
+    ? startDateInputClass
+    : 'form-control schedule-date-input schedule-date-input-with-shortcuts';
 %>
-<div class="<%= fieldClass %> schedule-date-field-with-shortcuts">
-  <label for="sch_startDate">Start date</label>
+<div class="<%= resolvedFieldClass %> schedule-date-field-with-shortcuts">
+  <label for="<%= resolvedStartDateLabelFor %>">Start date</label>
   <div class="schedule-date-shortcuts-wrap">
     <button
       type="button"
-      id="btn_scheduleDateShortcuts"
+      id="<%= resolvedShortcutsButtonId %>"
       class="btn btn-outline-secondary schedule-date-shortcuts-btn"
       title="Quick date ranges"
       aria-label="Quick date ranges"
       aria-haspopup="menu"
       aria-expanded="false"
-      aria-controls="scheduleDateRangeMenu">
+      aria-controls="<%= resolvedMenuControlsId %>">
       <i class="bi bi-calendar-range" aria-hidden="true"></i>
     </button>
-    <input type="date" id="sch_startDate" class="form-control schedule-date-input schedule-date-input-with-shortcuts">
+    <input type="date" id="<%= resolvedStartDateInputId %>" class="<%= resolvedStartDateInputClass %>">
   </div>
 </div>

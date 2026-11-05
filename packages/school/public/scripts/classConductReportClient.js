@@ -182,9 +182,12 @@
     const collapseId = `ccr-student-${personId.replace(/[^a-zA-Z0-9_-]/g, '_')}`;
     const summary = student?.summary || {};
     const rated = Number(summary.ratedSessions) || 0;
-    const nameHtml = typeof global.schoolRenderStudentNameHtml === 'function'
+    const nameInner = typeof global.schoolRenderStudentNameHtml === 'function'
       ? global.schoolRenderStudentNameHtml(student.name, student.studentRecordId, { className: 'text-decoration-none fw-bold' })
       : escapeHtml(student.name || personId);
+    const nameHtml = (global.EnrollmentClaimToggle && typeof global.EnrollmentClaimToggle.wrapNameHtml === 'function')
+      ? global.EnrollmentClaimToggle.wrapNameHtml(nameInner, { personId, studentRecordId: student.studentRecordId })
+      : nameInner;
     const weekFlags = buildWeekBoundaryFlags(visibleDays);
 
     let classRows = '';
@@ -276,6 +279,9 @@
       : '<p class="text-muted mb-0">No conduct data found for the selected students.</p>';
     document.getElementById('ccrResultsContainer')?.classList.remove('d-none');
     setClassConductPrintEnabled(students.length > 0);
+    if (global.EnrollmentClaimToggle && students.length) {
+      global.EnrollmentClaimToggle.afterRender();
+    }
   }
 
   function setClassConductPrintEnabled(enabled) {
@@ -283,6 +289,9 @@
     if (!btn) return;
     btn.disabled = !enabled;
     btn.title = enabled ? 'Print class conduct report for the loaded range' : 'Load the report first';
+    if (global.EnrollmentClaimToggle) {
+      global.EnrollmentClaimToggle.setReady(Boolean(enabled));
+    }
   }
 
   function ccrPrintFormatDateShort(ymd) {
@@ -1127,6 +1136,18 @@
     renderLegend();
     setClassConductPrintEnabled(false);
     wireEvents();
+    if (global.EnrollmentClaimToggle) {
+      global.EnrollmentClaimToggle.init({
+        page: 'conduct-report',
+        getWindow() {
+          return {
+            classId: '',
+            startDate: document.getElementById('ccr_startDate')?.value || '',
+            endDate: document.getElementById('ccr_endDate')?.value || ''
+          };
+        }
+      });
+    }
     initFromUrl();
     if (ccrOpenedFromUrlQuery) {
       runWhenReportMessageModalReady(() => {

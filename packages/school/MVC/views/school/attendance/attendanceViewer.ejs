@@ -258,6 +258,8 @@
         box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.15);
     }
 </style>
+<link rel="stylesheet" href="/styles/schedule-viewer.css">
+<link rel="stylesheet" href="/styles/school-matrix-expand.css">
 
 <%
   const dashHref = typeof schoolSectionDashboardHref === 'string' && schoolSectionDashboardHref
@@ -267,9 +269,7 @@
   const attManageBtns = showAttendanceManageBtns ? [
     '<a href="/school/attendances/report" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-person-lines-fill me-1"></i> Student Attendance Report</a>',
     '<a href="/school/settings" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-gear me-1"></i> School Settings</a>',
-    '<button type="button" id="btn_copyLink" class="btn btn-outline-primary btn-md mb-2" onclick="navigator.clipboard.writeText(window.location.href); alert(\'Link copied\');"><i class="bi bi-link-45deg me-1"></i> Copy Link</button>',
-    '<a href="/school/grades-matrix" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-table me-1"></i> Grades Matrix</a>',
-    '<a href="/school/conduct-matrix" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-emoji-smile me-1"></i> Class Conduct Matrix</a>'
+    '<button type="button" id="btn_copyLink" class="btn btn-outline-primary btn-md mb-2" onclick="navigator.clipboard.writeText(window.location.href); alert(\'Link copied\');"><i class="bi bi-link-45deg me-1"></i> Copy Link</button>'
   ] : [];
   const showAttendanceExportBtn = typeof canExportExcel !== 'undefined' && canExportExcel === true;
   const showAttendancePrintBtn = typeof canPrintMatrix !== 'undefined' && canPrintMatrix === true;
@@ -339,8 +339,14 @@
                         </div>
                     </div>
                     <div class="col-lg-2 col-md-3">
-                        <label class="form-label" for="filter_startDate">Start Date</label>
-                        <input type="date" id="filter_startDate" class="form-control size-md">
+                        <%- include('../schedule/partials/personScheduleStartDateWithShortcuts', {
+                            startDateFieldClass: 'w-100 schedule-date-field-with-shortcuts',
+                            shortcutsButtonId: 'btn_attDateShortcuts',
+                            startDateInputId: 'filter_startDate',
+                            menuControlsId: 'attDateRangeMenu',
+                            startDateLabelFor: 'filter_startDate',
+                            startDateInputClass: 'form-control size-md schedule-date-input-with-shortcuts'
+                        }) %>
                     </div>
                     <div class="col-lg-2 col-md-3">
                         <label class="form-label" for="filter_endDate">End Date</label>
@@ -353,26 +359,18 @@
                         <button type="button" id="btn_reset" class="btn btn-outline-secondary btn-md">Reset</button>
                     </div>
                 </div>
-                <div class="border rounded-3 bg-white bg-opacity-75 p-2 mt-3">
-                    <div class="small fw-bold text-uppercase text-muted mb-2">Quick Ranges</div>
-                    <div class="d-flex flex-wrap gap-2">
-                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="today">Today</button>
-                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="twoWeeks">Two Weeks</button>
-                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="thisWeek">This Week</button>
-                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="prevWeek">Prev Week</button>
-                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="thisMonth">This Month</button>
-                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="prevMonth">Prev Month</button>
-                        <button type="button" class="btn btn-outline-secondary btn-sm btn-range range-chip" data-range="allTime">Whole Class (All Time)</button>
-                    </div>
-                </div>
             </div>
         </div>
     </div>
+    <%- include('../schedule/partials/personScheduleDateRangeShortcuts', { dateRangeMenuId: 'attDateRangeMenu', includeMatrixAllDates: true }) %>
 
     <div class="card border-0 shadow-sm d-none" id="resultsContainer">
         <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
             <h5 class="m-0 fw-bold text-primary" id="lbl_displayClassName">Class Name</h5>
             <div class="d-flex align-items-center gap-2">
+                <% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
+                <button type="button" id="btn_toggleEnrollmentClaims" class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn" disabled aria-label="Show claim numbers" title="Load the matrix first"><i class="bi bi-card-text" aria-hidden="true"></i></button>
+                <% } %>
                 <button type="button"
                     class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn attendance-history-toggle-btn"
                     id="btn_attendanceMatrixHistory"
@@ -389,18 +387,37 @@
                     title="Legend">
                     <i class="bi bi-info-circle" aria-hidden="true"></i>
                 </button>
+                <button type="button"
+                    class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
+                    id="btn_attExpandMatrixView"
+                    data-bs-toggle="modal"
+                    data-bs-target="#attMatrixExpandModal"
+                    disabled
+                    aria-label="Load the matrix first"
+                    title="Load the matrix first">
+                    <i class="bi bi-arrows-fullscreen" aria-hidden="true"></i>
+                </button>
             </div>
         </div>
         <div class="card-body p-0">
+            <div id="attMatrixExpandInlineHost">
             <div class="matrix-wrapper">
                 <table class="table table-hover mb-0 matrix-table" id="attendanceTable">
                     <thead><tr id="matrixHeaders"></tr></thead>
                     <tbody id="matrixBody"></tbody>
                 </table>
             </div>
+            </div>
         </div>
     </div>
 </div>
+
+<%- include('../partials/schoolMatrixExpandModal', {
+  expandModalId: 'attMatrixExpandModal',
+  expandModalDialogId: 'attMatrixExpandModalDialog',
+  expandModalHostId: 'attMatrixExpandModalHost',
+  expandModalTitle: 'Attendance matrix'
+}) %>
 
 <div class="modal fade" id="attendanceMatrixLegendModal" tabindex="-1" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -663,10 +680,16 @@
 </div>
 
 <%- include('partials/modal_GenericPicker') %>
+<%- include('../report/partials/reportMessageHelpers') %>
 <%- include('partials/tablePages-end') %>
+<script src="/scripts/schoolDateRangeShortcuts.js"></script>
+<script src="/scripts/schoolMatrixExpandedView.js"></script>
 <script src="/scripts/sessionAttendanceTimingDetailClient.js"></script>
 <script src="/scripts/attendanceMarkAppearanceClient.js"></script>
 <script src="/scripts/attendanceCellHoverTip.js"></script>
+<% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
+<script src="/scripts/enrollmentClaimToggle.js"></script>
+<% } %>
 
 <script>
 // Store the loaded matrix globally so we can access it on clicks
@@ -1064,8 +1087,9 @@ function setAttendanceBudgetState(nextState = {}) {
 }
 
 function getActiveAttendanceRangeChip() {
-    const active = document.querySelector('.btn-range.range-chip.active');
-    return active ? String(active.getAttribute('data-range') || '').trim() : '';
+    const shortcuts = window.SchoolDateRangeShortcuts;
+    if (!shortcuts) return '';
+    return shortcuts.getActiveRangeToken('attDateRangeMenu');
 }
 
 function captureAttendanceMatrixFilterState() {
@@ -1777,6 +1801,17 @@ document.addEventListener('DOMContentLoaded', () => {
         buttonId: 'attFilterToggleBtn',
         iconId: 'attFilterToggleIcon'
     });
+    bindAttendanceMatrixDateRangeShortcuts();
+    if (window.SchoolMatrixExpandedView) {
+        window.SchoolMatrixExpandedView.bindMatrixExpandedView({
+            buttonId: 'btn_attExpandMatrixView',
+            modalId: 'attMatrixExpandModal',
+            modalDialogId: 'attMatrixExpandModalDialog',
+            inlineHostId: 'attMatrixExpandInlineHost',
+            modalHostId: 'attMatrixExpandModalHost',
+            wrapperSelector: '.matrix-wrapper'
+        });
+    }
     [
         { collapseId: 'cell_modal_excuse_collapse', openLabel: 'Collapse excuse notes', closeLabel: 'Expand excuse notes' },
         { collapseId: 'cell_modal_roster_note_collapse', openLabel: 'Collapse student note', closeLabel: 'Expand student note' },
@@ -1856,73 +1891,34 @@ document.addEventListener('DOMContentLoaded', () => {
     const startOfLocalDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
     function setActiveRangeChip(range) {
-        document.querySelectorAll('.btn-range.range-chip').forEach((btn) => {
-            btn.classList.toggle('active', btn.getAttribute('data-range') === range);
-        });
+        const shortcuts = window.SchoolDateRangeShortcuts;
+        if (!shortcuts) return;
+        if (!String(range || '').trim()) {
+            shortcuts.clearActiveMenuOption('attDateRangeMenu');
+            return;
+        }
+        shortcuts.setActiveMenuOption('attDateRangeMenu', range);
     }
 
     function normalizeAttendanceRangeToken(raw) {
-        const token = String(raw || '').trim();
-        if (!token) return '';
-        const lower = token.toLowerCase();
-        if (lower === 'alltime' || lower === 'all_time') return 'allTime';
-        const known = ['today', 'twoWeeks', 'thisWeek', 'prevWeek', 'thisMonth', 'prevMonth'];
-        return known.find((key) => key.toLowerCase() === lower) || '';
-    }
-
-    function computeAttendanceRangeDates(range) {
-        const today = new Date();
-        let start;
-        let end;
-        if (range === 'today') {
-            start = startOfLocalDay(today);
-            end = new Date(start);
-        } else if (range === 'twoWeeks') {
-            const day = today.getDay() || 7;
-            start = startOfLocalDay(today);
-            start.setDate(today.getDate() - (day - 1));
-            end = new Date(start);
-            end.setDate(start.getDate() + 13);
-        } else if (range === 'thisWeek') {
-            const day = today.getDay() || 7;
-            start = startOfLocalDay(today);
-            start.setDate(today.getDate() - (day - 1));
-            end = new Date(start);
-            end.setDate(start.getDate() + 6);
-        } else if (range === 'prevWeek') {
-            const day = today.getDay() || 7;
-            start = startOfLocalDay(today);
-            start.setDate(today.getDate() - (day - 1) - 7);
-            end = new Date(start);
-            end.setDate(start.getDate() + 6);
-        } else if (range === 'thisMonth') {
-            start = new Date(today.getFullYear(), today.getMonth(), 1);
-            end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-        } else if (range === 'prevMonth') {
-            start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-            end = new Date(today.getFullYear(), today.getMonth(), 0);
-        } else {
-            return null;
-        }
-        return { start, end };
+        const shortcuts = window.SchoolDateRangeShortcuts;
+        if (!shortcuts) return '';
+        return shortcuts.normalizeRangeToken(raw);
     }
 
     function applyAttendanceRangeSelection(range, { autoLoad = true } = {}) {
-        const token = normalizeAttendanceRangeToken(range);
-        if (!token) return false;
-        if (token === 'allTime') {
+        const shortcuts = window.SchoolDateRangeShortcuts;
+        if (!shortcuts) return false;
+        const payload = shortcuts.datesFromRangeToken(range);
+        if (payload.token === 'allTime') {
             setDateRange(null, null);
-            setActiveRangeChip('allTime');
-            syncAttendanceMatrixUrl(captureAttendanceMatrixFilterState());
-            if (autoLoad && document.getElementById('filter_classId').value) {
-                document.getElementById('btn_loadData').click();
-            }
-            return true;
+        } else if (!payload.startDate || !payload.endDate) {
+            return false;
+        } else {
+            document.getElementById('filter_startDate').value = payload.startDate;
+            document.getElementById('filter_endDate').value = payload.endDate;
         }
-        const dates = computeAttendanceRangeDates(token);
-        if (!dates) return false;
-        setDateRange(dates.start, dates.end);
-        setActiveRangeChip(token);
+        setActiveRangeChip(payload.token);
         syncAttendanceMatrixUrl(captureAttendanceMatrixFilterState());
         if (autoLoad && document.getElementById('filter_classId').value) {
             document.getElementById('btn_loadData').click();
@@ -1930,12 +1926,22 @@ document.addEventListener('DOMContentLoaded', () => {
         return true;
     }
 
-    document.querySelectorAll('.btn-range').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            const range = e.currentTarget.getAttribute('data-range');
-            applyAttendanceRangeSelection(range);
+    function bindAttendanceMatrixDateRangeShortcuts() {
+        const shortcuts = window.SchoolDateRangeShortcuts;
+        if (!shortcuts) return;
+        shortcuts.bindDateRangeShortcuts({
+            menuId: 'attDateRangeMenu',
+            buttonId: 'btn_attDateShortcuts',
+            startInputId: 'filter_startDate',
+            endInputId: 'filter_endDate',
+            onApply: () => {
+                syncAttendanceMatrixUrl(captureAttendanceMatrixFilterState());
+                if (document.getElementById('filter_classId').value) {
+                    document.getElementById('btn_loadData').click();
+                }
+            }
         });
-    });
+    }
 
     function setAttendancePrintEnabled(enabled) {
         const printBtn = document.getElementById('btn_printAttendanceMatrix');
@@ -1947,6 +1953,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (exportBtn) {
             exportBtn.disabled = !enabled;
             exportBtn.title = enabled ? 'Export attendance matrix to Excel for the loaded range' : 'Load the matrix first';
+        }
+        if (window.EnrollmentClaimToggle) {
+            window.EnrollmentClaimToggle.setReady(Boolean(enabled));
+        }
+        if (window.SchoolMatrixExpandedView) {
+            window.SchoolMatrixExpandedView.setMatrixExpandEnabled('btn_attExpandMatrixView', enabled);
         }
     }
 
@@ -2379,6 +2391,17 @@ document.addEventListener('DOMContentLoaded', () => {
         rerenderAttendanceMatrixCellsForHistoryMode();
     }
 
+    function wrapAttendanceEnrollmentClaimName(nameHtml, personId, studentRecordId) {
+        if (window.EnrollmentClaimToggle && typeof window.EnrollmentClaimToggle.wrapNameHtml === 'function') {
+            return window.EnrollmentClaimToggle.wrapNameHtml(nameHtml, { personId, studentRecordId });
+        }
+        return nameHtml;
+    }
+
+    function syncAttendanceEnrollmentClaimHosts() {
+        if (window.EnrollmentClaimToggle) window.EnrollmentClaimToggle.afterRender();
+    }
+
     function buildAttendanceStudentRowHtml(stu) {
         const personId = String(stu?.personId || '').trim();
         const s = stu.summary || {};
@@ -2398,7 +2421,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div><span class="text-success fw-semibold">${p}</span><span class="text-muted"> / </span><span class="text-danger fw-semibold">${a}</span>${na ? `<span class="text-muted"> / </span><span class="text-secondary fw-semibold">${na}</span>` : ''}</div>
             <div class="fw-bold text-primary mt-1" style="font-size: 0.9rem;">${pctStr}</div>
           </td>
-          <td class="ps-3 matrix-sticky-name">${typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(stu.name, stu.studentRecordId, { className: 'text-decoration-none fw-bold' }) : stu.name}</td>`;
+          <td class="ps-3 matrix-sticky-name">${wrapAttendanceEnrollmentClaimName(typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(stu.name, stu.studentRecordId, { className: 'text-decoration-none fw-bold' }) : stu.name, personId, stu.studentRecordId)}</td>`;
         (stu.records || []).forEach((rec) => {
             rowHtml += buildAttendanceRecordCell(stu, rec);
         });
@@ -2734,6 +2757,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 bindAttendanceStudentVisibilityDropdown();
                 applyAttendanceStudentVisibility();
+                syncAttendanceEnrollmentClaimHosts();
                 return;
             }
 
@@ -2743,6 +2767,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
                 bindAttendanceStudentVisibilityDropdown();
                 applyAttendanceStudentVisibility();
+                syncAttendanceEnrollmentClaimHosts();
                 return;
             }
 
@@ -2765,6 +2790,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 tbody.innerHTML = '<tr><td colspan="3" class="text-center py-5 text-muted">No active sessions found in this date range.</td></tr>';
                 headers.innerHTML = headerHtml;
                 bindAttendanceStudentVisibilityDropdown();
+                syncAttendanceEnrollmentClaimHosts();
                 return;
             }
 
@@ -2776,6 +2802,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (result.matrix.length === 0) {
                 tbody.innerHTML = `<tr><td colspan="${result.sessions.length + 2}" class="text-center py-5 text-muted">No students found.</td></tr>`;
                 bindAttendanceStudentVisibilityDropdown();
+                syncAttendanceEnrollmentClaimHosts();
                 return;
             }
 
@@ -2785,6 +2812,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             bindAttendanceStudentVisibilityDropdown();
             applyAttendanceStudentVisibility();
+            syncAttendanceEnrollmentClaimHosts();
             await refreshAttendanceDisplayRollups();
 
             syncAttendanceMatrixUrl({
@@ -3748,20 +3776,104 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (!qClassId) {
-        applyAttendanceRangeSelection('thisWeek');
+        applyAttendanceRangeSelection('week');
     } else if (qStart && qEnd) {
         if (normalizedRange) setActiveRangeChip(normalizedRange);
-        document.getElementById('btn_loadData').click();
     } else if (normalizedRange) {
-        applyAttendanceRangeSelection(normalizedRange);
+        applyAttendanceRangeSelection(normalizedRange, { autoLoad: false });
     } else if (qStudentId && qSessionId && !qStart) {
-        applyAttendanceRangeSelection('allTime');
+        applyAttendanceRangeSelection('allTime', { autoLoad: false });
     } else if (qSessionIds && qClassId && !qStart) {
-        applyAttendanceRangeSelection('allTime');
+        applyAttendanceRangeSelection('allTime', { autoLoad: false });
     } else {
-        applyAttendanceRangeSelection('thisWeek');
+        applyAttendanceRangeSelection('week', { autoLoad: false });
     }
     renderAttendanceMatrixLegend();
+
+    function buildAttendanceSharedLinkConfirmHtml() {
+        const className = attEscapeHtml(document.getElementById('filter_className')?.value || qClassName || qClassId || '—');
+        const start = attEscapeHtml(document.getElementById('filter_startDate')?.value || qStart || '—');
+        const end = attEscapeHtml(document.getElementById('filter_endDate')?.value || qEnd || '—');
+        return (
+            '<div class="text-start att-shared-link-prompt">'
+            + '<p class="mb-3">This page was opened from a <strong>shared link</strong>.</p>'
+            + '<p class="small text-muted text-uppercase fw-semibold mb-2">Applied from the link</p>'
+            + '<ul class="list-unstyled mb-3 border rounded bg-light px-3 py-2">'
+            + '<li class="mb-2 d-flex align-items-start gap-2">'
+            + '<i class="bi bi-book text-primary mt-1"></i>'
+            + '<span><span class="text-muted d-block small">Class</span><strong>' + className + '</strong></span></li>'
+            + '<li class="mb-0 d-flex align-items-start gap-2">'
+            + '<i class="bi bi-calendar-range text-primary mt-1"></i>'
+            + '<span><span class="text-muted d-block small">Date range</span>'
+            + '<strong>' + start + '</strong> <span class="text-muted">to</span> <strong>' + end + '</strong></span></li>'
+            + '</ul>'
+            + '<p class="mb-0">Load the matrix now with these settings, or choose <strong>Not now</strong> to review the filters first.</p>'
+            + '</div>'
+        );
+    }
+
+    function buildAttendanceSharedLinkDeclinedHtml() {
+        return (
+            '<div class="text-start att-shared-link-prompt">'
+            + '<p class="mb-2">No matrix was loaded.</p>'
+            + '<p class="mb-2">The class and date range from the link are still shown in the filter panel.</p>'
+            + '<p class="mb-0">When you are ready, click <strong>Load</strong> to run the matrix.</p>'
+            + '</div>'
+        );
+    }
+
+    async function promptLoadAttendanceMatrixFromUrlLink() {
+        let confirmed = false;
+        if (window.ReportMessaging?.confirmReportAction) {
+            confirmed = await window.ReportMessaging.confirmReportAction({
+                title: 'Open matrix from link?',
+                icon: 'info',
+                html: true,
+                message: buildAttendanceSharedLinkConfirmHtml(),
+                confirmText: 'Load matrix',
+                cancelText: 'Not now',
+                confirmClass: 'btn-primary'
+            });
+        }
+        if (!confirmed) {
+            if (window.ReportMessaging?.showReportMessage) {
+                await window.ReportMessaging.showReportMessage({
+                    title: 'Attendance Matrix',
+                    icon: 'info',
+                    html: true,
+                    message: buildAttendanceSharedLinkDeclinedHtml()
+                });
+            } else {
+                showAttendanceMatrixMessage({
+                    title: 'Attendance Matrix',
+                    icon: 'info',
+                    message: 'The link settings are on the page. When you are ready, click Load to run the matrix.',
+                    buttons: [{ text: 'Close', class: 'btn-secondary' }]
+                });
+            }
+            return;
+        }
+        document.getElementById('btn_loadData')?.click();
+    }
+
+    function runWhenAttendanceMessageModalReady(callback) {
+        const run = () => {
+            const ready = typeof window.showMessageModal === 'function' && document.getElementById('messageModal');
+            if (!ready) {
+                window.setTimeout(run, 50);
+                return;
+            }
+            callback();
+        };
+        if (document.readyState === 'complete') run();
+        else window.addEventListener('load', run, { once: true });
+    }
+
+    if (qClassId) {
+        runWhenAttendanceMessageModalReady(() => {
+            void promptLoadAttendanceMatrixFromUrlLink();
+        });
+    }
 
     function resolveAttendanceMatrixTipContext(cellEl) {
         const key = String(cellEl?.getAttribute('data-att-tip-key') || '').trim();
@@ -4026,4 +4138,17 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
     detailsModalSnapshot = captureAttendanceDetailsModalSnapshot();
     detailsModalAllowClose = false;
 };
+
+if (window.EnrollmentClaimToggle) {
+    window.EnrollmentClaimToggle.init({
+        page: 'attendance-matrix',
+        getWindow() {
+            return {
+                classId: document.getElementById('filter_classId')?.value || '',
+                startDate: document.getElementById('filter_startDate')?.value || '',
+                endDate: document.getElementById('filter_endDate')?.value || ''
+            };
+        }
+    });
+}
 </script>

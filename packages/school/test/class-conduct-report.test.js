@@ -74,14 +74,21 @@ test('class conduct report view and client exist', () => {
   assert.doesNotMatch(view, /btn_exportSar|Export attendance|Report By Funder/i);
 });
 
-test('class conduct report quick ranges match conduct matrix shortcuts', () => {
+test('class conduct report quick ranges use chip row; conduct matrix uses schedule date menu', () => {
   const matrixView = read('packages/school/MVC/views/school/report/conductMatrix.ejs');
   const reportView = read('packages/school/MVC/views/school/report/classConductReport.ejs');
   const client = read('packages/school/public/scripts/classConductReportClient.js');
+  const matrixClient = read('packages/school/public/scripts/conductMatrixClient.js');
+  assert.doesNotMatch(matrixView, /Quick Ranges/);
+  assert.match(matrixView, /cmDateRangeMenu/);
+  assert.match(matrixView, /schoolDateRangeShortcuts\.js/);
+  assert.match(matrixClient, /SchoolDateRangeShortcuts/);
+  assert.match(matrixClient, /applyConductRangeSelection/);
+  assert.match(matrixClient, /m0-full/);
   ['lastMonthFirstHalf', 'lastMonthSecondHalf', 'data-range="allTime"'].forEach((token) => {
-    assert.match(matrixView, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
     assert.match(reportView, new RegExp(token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
   });
+  assert.match(reportView, /Quick Ranges/);
   assert.match(client, /lastMonthFirstHalf/);
   assert.match(client, /allTime/);
 });

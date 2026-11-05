@@ -4,6 +4,8 @@ const classConductReportService = require('../../services/school/classConductRep
 const conductRatingScaleService = require('../../services/school/conductRatingScaleService');
 const conductRatingScalePolicyModel = require('../../models/school/conductRatingScalePolicyModel');
 const { resolveSelectedStudents } = require('../../services/school/studentAttendanceReportService');
+const enrollmentClaimDisplayService = require('../../services/school/enrollmentClaimDisplayService');
+const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 function parseStudentIds(raw = '') {
   return String(raw || '')
@@ -32,6 +34,11 @@ async function showClassConductReportPage(req, res) {
       ? await conductRatingScalePolicyModel.getPolicyForOrg(activeOrgId)
       : {};
     const conductRatingScaleResolved = conductRatingScaleService.resolvePolicy(orgPolicy);
+    const canShowEnrollmentClaims = await enrollmentClaimDisplayService.canShowOnSectionPage(
+      req.user,
+      SECTIONS.SCHOOL_CLASS_CONDUCT_REPORT,
+      { operationId: OPERATIONS.READ, ipAddress: req.ip }
+    );
 
     res.render('school/report/classConductReport', {
       title: 'Class Conduct Report',
@@ -44,6 +51,7 @@ async function showClassConductReportPage(req, res) {
       initialEndDate,
       initialStudentIds,
       initialStudents,
+      canShowEnrollmentClaims,
       conductRatingScaleResolved
     });
   } catch (error) {

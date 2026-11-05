@@ -659,7 +659,7 @@ function resolveClaimEntriesForEnrollmentPeriods({
       }
     }
     if (!number && !claimNumberId) return;
-    const key = claimNumberId || number;
+    const key = number ? `${number}\u0000${label}` : claimNumberId;
     if (!key) return;
     entriesByKey.set(key, { number, label });
   });
@@ -677,10 +677,20 @@ function formatClaimNumberEntryDisplay(entry = {}) {
 }
 
 function formatClaimNumbersDisplay(claimNumbers = []) {
-  const list = (Array.isArray(claimNumbers) ? claimNumbers : [])
-    .map((item) => formatClaimNumberEntryDisplay(item))
-    .filter(Boolean)
-    .sort();
+  const labelsByNumber = new Map();
+  (Array.isArray(claimNumbers) ? claimNumbers : []).forEach((item) => {
+    const number = String(item?.number || (typeof item === 'string' ? item : '') || '').trim();
+    const label = item && typeof item === 'object' ? String(item.label || '').trim() : '';
+    if (!number) return;
+    if (!labelsByNumber.has(number)) labelsByNumber.set(number, new Set());
+    if (label) labelsByNumber.get(number).add(label);
+  });
+  const list = Array.from(labelsByNumber.entries())
+    .map(([number, labels]) => {
+      const labelText = Array.from(labels).sort((a, b) => a.localeCompare(b)).join(' / ');
+      return labelText ? `${number} ${labelText}` : number;
+    })
+    .sort((a, b) => a.localeCompare(b));
   if (!list.length) return '';
   if (list.length === 1) return list[0];
   return list.join(', ');

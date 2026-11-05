@@ -83,47 +83,26 @@
     return `Request failed (${res?.status || 'unknown'}).`;
   }
 
-  function pad2(n) {
-    return String(n).padStart(2, '0');
+  const CM_DATE_RANGE_MENU_ID = 'cmDateRangeMenu';
+
+  function applyConductRangeSelection(range) {
+    const shortcuts = global.SchoolDateRangeShortcuts;
+    if (!shortcuts) return false;
+    const payload = shortcuts.datesFromRangeToken(range);
+    document.getElementById('cm_startDate').value = payload.startDate;
+    document.getElementById('cm_endDate').value = payload.endDate;
+    shortcuts.setActiveMenuOption(CM_DATE_RANGE_MENU_ID, payload.token);
+    return true;
   }
 
-  function formatDateLocal(d) {
-    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-  }
-
-  function applyQuickRange(range) {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    let start = new Date(today);
-    let end = new Date(today);
-    if (range === 'thisWeek') {
-      const day = today.getDay();
-      const diff = day === 0 ? -6 : 1 - day;
-      start.setDate(today.getDate() + diff);
-    } else if (range === 'thisMonth') {
-      start = new Date(today.getFullYear(), today.getMonth(), 1);
-      end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    } else if (range === 'lastMonth') {
-      start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      end = new Date(today.getFullYear(), today.getMonth(), 0);
-    } else if (range === 'lastMonthFirstHalf') {
-      start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-      end = new Date(start.getFullYear(), start.getMonth(), 15);
-    } else if (range === 'lastMonthSecondHalf') {
-      start = new Date(today.getFullYear(), today.getMonth() - 1, 16);
-      end = new Date(start.getFullYear(), start.getMonth() + 1, 0);
-    } else if (range === 'allTime') {
-      document.getElementById('cm_startDate').value = '';
-      document.getElementById('cm_endDate').value = '';
-      document.querySelectorAll('.cm-range').forEach((btn) => {
-        btn.classList.toggle('active', btn.getAttribute('data-range') === range);
-      });
-      return;
-    }
-    document.getElementById('cm_startDate').value = formatDateLocal(start);
-    document.getElementById('cm_endDate').value = formatDateLocal(end);
-    document.querySelectorAll('.cm-range').forEach((btn) => {
-      btn.classList.toggle('active', btn.getAttribute('data-range') === range);
+  function bindConductMatrixDateRangeShortcuts() {
+    const shortcuts = global.SchoolDateRangeShortcuts;
+    if (!shortcuts) return;
+    shortcuts.bindDateRangeShortcuts({
+      menuId: CM_DATE_RANGE_MENU_ID,
+      buttonId: 'btn_cmDateShortcuts',
+      startInputId: 'cm_startDate',
+      endInputId: 'cm_endDate'
     });
   }
 
@@ -272,14 +251,23 @@
     return `<div class="cm-cell-grid" title="${escapeHtml(cell.value.summary)}">${chips}</div>`;
   }
 
+  function wrapEnrollmentClaimName(nameHtml, stu) {
+    if (global.EnrollmentClaimToggle && typeof global.EnrollmentClaimToggle.wrapNameHtml === 'function') {
+      return global.EnrollmentClaimToggle.wrapNameHtml(nameHtml, {
+        personId: stu?.personId,
+        studentRecordId: stu?.studentRecordId
+      });
+    }
+    return nameHtml;
+  }
+
   function buildStudentNameCell(stu) {
     const name = escapeHtml(stu.name || stu.personId);
     const recordId = String(stu.studentRecordId || '').trim();
-    if (recordId) {
-      const href = `/school/students/edit/${encodeURIComponent(recordId)}`;
-      return `<a href="${href}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">${name}</a>`;
-    }
-    return name;
+    const nameHtml = recordId
+      ? `<a href="/school/students/edit/${encodeURIComponent(recordId)}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">${name}</a>`
+      : name;
+    return wrapEnrollmentClaimName(nameHtml, stu);
   }
 
   function getPrintSessionColumns(fromData) {
@@ -293,6 +281,12 @@
     if (!btn) return;
     btn.disabled = !enabled;
     btn.title = enabled ? 'Print class conduct matrix for the loaded range' : 'Load the matrix first';
+    if (global.EnrollmentClaimToggle) {
+      global.EnrollmentClaimToggle.setReady(Boolean(enabled));
+    }
+    if (global.SchoolMatrixExpandedView) {
+      global.SchoolMatrixExpandedView.setMatrixExpandEnabled('btn_cmExpandMatrixView', enabled);
+    }
   }
 
   function cmPrintFormatDateShort(ymd) {
@@ -762,6 +756,8 @@
       tbody.appendChild(tr);
     });
 
+    if (global.EnrollmentClaimToggle) global.EnrollmentClaimToggle.afterRender();
+
     thead.querySelectorAll('.cm-col-enable').forEach((input) => {
       input.addEventListener('change', async (event) => {
         const sessionId = String(event.target.getAttribute('data-session-id') || '').trim();
@@ -924,13 +920,10 @@
     });
     document.getElementById('cm_btnReset')?.addEventListener('click', () => {
       setFilters({ classId: '', className: '', startDate: '', endDate: '' });
-      document.querySelectorAll('.cm-range').forEach((b) => b.classList.remove('active'));
+      global.SchoolDateRangeShortcuts?.clearActiveMenuOption(CM_DATE_RANGE_MENU_ID);
       matrixData = null;
       document.getElementById('cm_results')?.classList.add('d-none');
       setConductPrintEnabled(false);
-    });
-    document.querySelectorAll('.cm-range').forEach((btn) => {
-      btn.addEventListener('click', () => applyQuickRange(btn.getAttribute('data-range')));
     });
     document.getElementById('cm_btnShowAllSessions')?.addEventListener('click', () => {
       conductOnlyFilter = false;
@@ -960,6 +953,85 @@
     document.getElementById('btn_printConductMatrix')?.addEventListener('click', () => openConductPrint());
   }
 
+  function buildCmSharedLinkConfirmHtml() {
+    const filters = readFilters();
+    const className = escapeHtml(filters.className || INITIAL.className || INITIAL.classId || '—');
+    const start = escapeHtml(filters.startDate || INITIAL.startDate || '—');
+    const end = escapeHtml(filters.endDate || INITIAL.endDate || '—');
+    return (
+      '<div class="text-start cm-shared-link-prompt">'
+      + '<p class="mb-3">This page was opened from a <strong>shared link</strong>.</p>'
+      + '<p class="small text-muted text-uppercase fw-semibold mb-2">Applied from the link</p>'
+      + '<ul class="list-unstyled mb-3 border rounded bg-light px-3 py-2">'
+      + '<li class="mb-2 d-flex align-items-start gap-2">'
+      + '<i class="bi bi-book text-primary mt-1"></i>'
+      + '<span><span class="text-muted d-block small">Class</span><strong>' + className + '</strong></span></li>'
+      + '<li class="mb-0 d-flex align-items-start gap-2">'
+      + '<i class="bi bi-calendar-range text-primary mt-1"></i>'
+      + '<span><span class="text-muted d-block small">Date range</span>'
+      + '<strong>' + start + '</strong> <span class="text-muted">to</span> <strong>' + end + '</strong></span></li>'
+      + '</ul>'
+      + '<p class="mb-0">Load the matrix now with these settings, or choose <strong>Not now</strong> to review the filters first.</p>'
+      + '</div>'
+    );
+  }
+
+  function buildCmSharedLinkDeclinedHtml() {
+    return (
+      '<div class="text-start cm-shared-link-prompt">'
+      + '<p class="mb-2">No matrix was loaded.</p>'
+      + '<p class="mb-2">The class and date range from the link are still shown in the filter panel.</p>'
+      + '<p class="mb-0">When you are ready, click <strong>Load</strong> to run the matrix.</p>'
+      + '</div>'
+    );
+  }
+
+  function runWhenCmMessageModalReady(callback) {
+    const run = () => {
+      const ready = typeof global.showMessageModal === 'function' && document.getElementById('messageModal');
+      if (!ready) {
+        global.setTimeout(run, 50);
+        return;
+      }
+      callback();
+    };
+    if (document.readyState === 'complete') run();
+    else global.addEventListener('load', run, { once: true });
+  }
+
+  async function promptLoadConductMatrixFromUrlLink() {
+    let confirmed = false;
+    if (global.ReportMessaging?.confirmReportAction) {
+      confirmed = await global.ReportMessaging.confirmReportAction({
+        title: 'Open matrix from link?',
+        icon: 'info',
+        html: true,
+        message: buildCmSharedLinkConfirmHtml(),
+        confirmText: 'Load matrix',
+        cancelText: 'Not now',
+        confirmClass: 'btn-primary'
+      });
+    }
+    if (!confirmed) {
+      if (global.ReportMessaging?.showReportMessage) {
+        await global.ReportMessaging.showReportMessage({
+          title: 'Class Conduct Matrix',
+          icon: 'info',
+          html: true,
+          message: buildCmSharedLinkDeclinedHtml()
+        });
+      } else {
+        await showCmMessage(
+          'Class Conduct Matrix',
+          'The link settings are on the page. When you are ready, click Load to run the matrix.',
+          'info'
+        );
+      }
+      return;
+    }
+    await loadMatrix();
+  }
+
   function initFromUrl() {
     setFilters({
       classId: INITIAL.classId || '',
@@ -967,15 +1039,69 @@
       startDate: INITIAL.startDate || '',
       endDate: INITIAL.endDate || ''
     });
-    if (INITIAL.range) applyQuickRange(INITIAL.range);
-    else if (!INITIAL.startDate && !INITIAL.endDate) applyQuickRange('thisMonth');
-    if (INITIAL.classId) loadMatrix();
+    const shortcuts = global.SchoolDateRangeShortcuts;
+    if (INITIAL.range && !INITIAL.startDate && !INITIAL.endDate) {
+      applyConductRangeSelection(INITIAL.range);
+    } else if (INITIAL.range && shortcuts) {
+      shortcuts.setActiveMenuOption(CM_DATE_RANGE_MENU_ID, shortcuts.normalizeRangeToken(INITIAL.range));
+    } else if (!INITIAL.startDate && !INITIAL.endDate) {
+      applyConductRangeSelection('m0-full');
+    }
+    if (INITIAL.classId) {
+      runWhenCmMessageModalReady(() => {
+        void promptLoadConductMatrixFromUrlLink();
+      });
+    }
+  }
+
+  function bindCollapseToggle(options = {}) {
+    const collapseEl = document.getElementById(String(options.collapseId || ''));
+    const buttonEl = document.getElementById(String(options.buttonId || ''));
+    const iconEl = document.getElementById(String(options.iconId || ''));
+    if (!collapseEl || !buttonEl || !iconEl) return;
+    const setState = (open) => {
+      iconEl.className = open ? 'bi bi-chevron-up' : 'bi bi-chevron-down';
+      buttonEl.setAttribute('aria-expanded', open ? 'true' : 'false');
+      buttonEl.setAttribute('aria-label', open ? 'Close filters' : 'Open filters');
+    };
+    setState(collapseEl.classList.contains('show'));
+    collapseEl.addEventListener('shown.bs.collapse', () => setState(true));
+    collapseEl.addEventListener('hidden.bs.collapse', () => setState(false));
   }
 
   document.addEventListener('DOMContentLoaded', () => {
+    bindCollapseToggle({
+      collapseId: 'cmFilterCollapse',
+      buttonId: 'cmFilterToggleBtn',
+      iconId: 'cmFilterToggleIcon'
+    });
     renderConductLegendHosts();
     setConductPrintEnabled(false);
     wireEvents();
+    bindConductMatrixDateRangeShortcuts();
+    if (global.SchoolMatrixExpandedView) {
+      global.SchoolMatrixExpandedView.bindMatrixExpandedView({
+        buttonId: 'btn_cmExpandMatrixView',
+        modalId: 'cmMatrixExpandModal',
+        modalDialogId: 'cmMatrixExpandModalDialog',
+        inlineHostId: 'cmMatrixExpandInlineHost',
+        modalHostId: 'cmMatrixExpandModalHost',
+        wrapperSelector: '.cm-matrix-wrapper'
+      });
+    }
+    if (global.EnrollmentClaimToggle) {
+      global.EnrollmentClaimToggle.init({
+        page: 'conduct-matrix',
+        getWindow() {
+          const filters = readFilters();
+          return {
+            classId: filters.classId,
+            startDate: filters.startDate,
+            endDate: filters.endDate
+          };
+        }
+      });
+    }
     initFromUrl();
   });
 }(window));

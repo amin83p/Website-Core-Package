@@ -99,6 +99,16 @@
   .schedule-shell .range-chip.active {
     box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.15);
   }
+  .attendance-legend-icon-btn {
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+  .attendance-legend-icon-btn .bi { font-size: 1.05rem; line-height: 1; }
   .gm-filter-actions {
     display: flex;
     justify-content: flex-end;
@@ -110,6 +120,8 @@
     justify-content: center;
   }
 </style>
+<link rel="stylesheet" href="/styles/schedule-viewer.css">
+<link rel="stylesheet" href="/styles/school-matrix-expand.css">
 
 <%
   const dashHref = typeof schoolSectionDashboardHref === 'string' && schoolSectionDashboardHref
@@ -175,8 +187,14 @@
             </div>
           </div>
           <div class="col-lg-2 col-md-3">
-            <label class="form-label" for="gm_startDate">Start Date</label>
-            <input type="date" id="gm_startDate" class="form-control size-md">
+            <%- include('../schedule/partials/personScheduleStartDateWithShortcuts', {
+              startDateFieldClass: 'w-100 schedule-date-field-with-shortcuts',
+              shortcutsButtonId: 'btn_gmDateShortcuts',
+              startDateInputId: 'gm_startDate',
+              menuControlsId: 'gmDateRangeMenu',
+              startDateLabelFor: 'gm_startDate',
+              startDateInputClass: 'form-control size-md schedule-date-input-with-shortcuts'
+            }) %>
           </div>
           <div class="col-lg-2 col-md-3">
             <label class="form-label" for="gm_endDate">End Date</label>
@@ -189,19 +207,10 @@
             </button>
           </div>
         </div>
-        <div class="border rounded-3 bg-white bg-opacity-75 p-2 mt-3">
-          <div class="small fw-bold text-uppercase text-muted mb-2">Quick Ranges</div>
-          <div class="d-flex flex-wrap gap-2">
-            <button type="button" class="btn btn-outline-secondary btn-sm gm-range range-chip" data-range="today">Today</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm gm-range range-chip" data-range="twoWeeks">Two Weeks</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm gm-range range-chip" data-range="thisWeek">This Week</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm gm-range range-chip" data-range="thisMonth">This Month</button>
-            <button type="button" class="btn btn-outline-secondary btn-sm gm-range range-chip" data-range="allTime">All Dates</button>
-          </div>
-        </div>
       </div>
     </div>
   </div>
+  <%- include('../schedule/partials/personScheduleDateRangeShortcuts', { dateRangeMenuId: 'gmDateRangeMenu', includeMatrixAllDates: true }) %>
 
   <div class="card border-0 shadow-sm mb-3 d-none" id="gm_evalCard">
     <div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">
@@ -248,20 +257,67 @@
   </div>
 
   <div class="card border-0 shadow-sm d-none" id="gm_results">
-    <div class="card-header bg-white border-bottom py-3">
+    <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
       <h5 class="m-0 fw-bold text-primary" id="gm_classTitle">Class</h5>
-      <div class="small text-muted mt-1" id="gm_matrixBlurb">
-        <span class="me-3" id="gm_matrixBlurbMain"><strong>Final</strong> = period-weighted average of included activities (per-student renormalization; absent/missing = 0%; N/A excluded).</span>
-        <span class="me-2"><span class="badge bg-light text-success border">Included</span> counts toward period average</span>
-        <span><span class="badge bg-secondary">excl.</span> excluded from period average</span>
+      <div class="d-flex align-items-center gap-2 flex-wrap ms-md-auto">
+        <% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
+        <button type="button" id="btn_toggleEnrollmentClaims" class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn" disabled aria-label="Show claim numbers" title="Load the matrix first"><i class="bi bi-card-text" aria-hidden="true"></i></button>
+        <% } %>
+        <button type="button"
+          class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
+          id="btn_gmMatrixHelp"
+          data-bs-toggle="modal"
+          data-bs-target="#gmMatrixHelpModal"
+          aria-label="How final grades are calculated"
+          title="How final grades are calculated">
+          <i class="bi bi-info-circle" aria-hidden="true"></i>
+        </button>
+        <button type="button"
+          class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
+          id="btn_gmExpandMatrixView"
+          data-bs-toggle="modal"
+          data-bs-target="#gmMatrixExpandModal"
+          disabled
+          aria-label="Load the matrix first"
+          title="Load the matrix first">
+          <i class="bi bi-arrows-fullscreen" aria-hidden="true"></i>
+        </button>
       </div>
     </div>
     <div class="card-body p-0">
+      <div id="gmMatrixExpandInlineHost">
       <div class="matrix-wrapper gm-matrix">
         <table class="table table-hover table-bordered mb-0 gm-matrix-table" id="gm_table">
           <thead id="gm_thead"></thead>
           <tbody id="gm_tbody"></tbody>
         </table>
+      </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('../partials/schoolMatrixExpandModal', {
+  expandModalId: 'gmMatrixExpandModal',
+  expandModalDialogId: 'gmMatrixExpandModalDialog',
+  expandModalHostId: 'gmMatrixExpandModalHost',
+  expandModalTitle: 'Grades matrix'
+}) %>
+
+<div class="modal fade" id="gmMatrixHelpModal" tabindex="-1" aria-labelledby="gmMatrixHelpModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header py-2 px-3">
+        <h6 class="modal-title mb-0 fw-semibold" id="gmMatrixHelpModalTitle"><i class="bi bi-info-circle me-1"></i>Grades matrix</h6>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body small text-muted">
+        <p class="mb-3"><strong>Final</strong> = period-weighted average of included activities (per-student renormalization; absent/missing = 0%; N/A excluded).</p>
+        <p class="mb-2"><span class="badge bg-light text-success border">Included</span> counts toward period average</p>
+        <p class="mb-0"><span class="badge bg-secondary">excl.</span> excluded from period average</p>
+      </div>
+      <div class="modal-footer py-2 px-3">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
       </div>
     </div>
   </div>
@@ -331,7 +387,13 @@
 </div>
 
 <%- include('partials/modal_GenericPicker') %>
+<%- include('../report/partials/reportMessageHelpers') %>
 <%- include('partials/tablePages-end') %>
+<script src="/scripts/schoolDateRangeShortcuts.js"></script>
+<script src="/scripts/schoolMatrixExpandedView.js"></script>
+<% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
+<script src="/scripts/enrollmentClaimToggle.js"></script>
+<% } %>
 
 <script>
 document.addEventListener('DOMContentLoaded', () => {
@@ -575,6 +637,23 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!btn) return;
     btn.disabled = !enabled;
     btn.title = enabled ? 'Print grades matrix for the loaded range' : 'Load the matrix first';
+    if (window.EnrollmentClaimToggle) {
+      window.EnrollmentClaimToggle.setReady(Boolean(enabled));
+    }
+    if (window.SchoolMatrixExpandedView) {
+      window.SchoolMatrixExpandedView.setMatrixExpandEnabled('btn_gmExpandMatrixView', enabled);
+    }
+  }
+
+  function wrapGmEnrollmentClaimName(nameHtml, personId, studentRecordId) {
+    if (window.EnrollmentClaimToggle && typeof window.EnrollmentClaimToggle.wrapNameHtml === 'function') {
+      return window.EnrollmentClaimToggle.wrapNameHtml(nameHtml, { personId, studentRecordId });
+    }
+    return nameHtml;
+  }
+
+  function syncGmEnrollmentClaimHosts() {
+    if (window.EnrollmentClaimToggle) window.EnrollmentClaimToggle.afterRender();
   }
 
   const toYmd = (d) => {
@@ -586,50 +665,71 @@ document.addEventListener('DOMContentLoaded', () => {
   };
   const startOfLocalDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
 
-  function setActiveRangeChip(range) {
-    document.querySelectorAll('.gm-range.range-chip').forEach((btn) => {
-      btn.classList.toggle('active', btn.getAttribute('data-range') === range);
-    });
+  const GM_DATE_RANGE_MENU_ID = 'gmDateRangeMenu';
+
+  function getGmActiveRangeToken() {
+    const shortcuts = window.SchoolDateRangeShortcuts;
+    if (!shortcuts) return '';
+    return shortcuts.getActiveRangeToken(GM_DATE_RANGE_MENU_ID);
   }
 
-  function setRange(range) {
-    const today = new Date();
-    let start; let end;
-    if (range === 'today') {
-      start = startOfLocalDay(today);
-      end = new Date(start);
-    } else if (range === 'twoWeeks') {
-      const day = today.getDay() || 7;
-      start = startOfLocalDay(today);
-      start.setDate(today.getDate() - (day - 1));
-      end = new Date(start);
-      end.setDate(start.getDate() + 13);
-    } else if (range === 'thisWeek') {
-      const day = today.getDay() || 7;
-      start = startOfLocalDay(today);
-      start.setDate(today.getDate() - (day - 1));
-      end = new Date(start);
-      end.setDate(start.getDate() + 6);
-    } else if (range === 'thisMonth') {
-      start = new Date(today.getFullYear(), today.getMonth(), 1);
-      end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-    } else if (range === 'allTime') {
+  function setGmActiveRangeToken(range) {
+    const shortcuts = window.SchoolDateRangeShortcuts;
+    if (!shortcuts) return;
+    if (!String(range || '').trim()) {
+      shortcuts.clearActiveMenuOption(GM_DATE_RANGE_MENU_ID);
+      return;
+    }
+    shortcuts.setActiveMenuOption(GM_DATE_RANGE_MENU_ID, range);
+  }
+
+  function applyGmRangeSelection(range, { autoLoad = false } = {}) {
+    const shortcuts = window.SchoolDateRangeShortcuts;
+    if (!shortcuts) return false;
+    const payload = shortcuts.datesFromRangeToken(range);
+    if (payload.token === 'allTime') {
       document.getElementById('gm_startDate').value = '';
       document.getElementById('gm_endDate').value = '';
-      setActiveRangeChip(range);
-      return;
-    } else return;
-    document.getElementById('gm_startDate').value = toYmd(start);
-    document.getElementById('gm_endDate').value = toYmd(end);
-    setActiveRangeChip(range);
+    } else if (!payload.startDate || !payload.endDate) {
+      return false;
+    } else {
+      document.getElementById('gm_startDate').value = payload.startDate;
+      document.getElementById('gm_endDate').value = payload.endDate;
+    }
+    setGmActiveRangeToken(payload.token);
+    if (autoLoad && document.getElementById('gm_classId').value) {
+      document.getElementById('gm_btnLoad').click();
+    }
+    return true;
   }
 
-  document.querySelectorAll('.gm-range').forEach((btn) => {
-    btn.addEventListener('click', () => {
-      setRange(btn.getAttribute('data-range'));
-      if (document.getElementById('gm_classId').value) document.getElementById('gm_btnLoad').click();
+  function bindGradesMatrixDateRangeShortcuts() {
+    const shortcuts = window.SchoolDateRangeShortcuts;
+    if (!shortcuts) return;
+    shortcuts.bindDateRangeShortcuts({
+      menuId: GM_DATE_RANGE_MENU_ID,
+      buttonId: 'btn_gmDateShortcuts',
+      startInputId: 'gm_startDate',
+      endInputId: 'gm_endDate',
+      onApply: () => {
+        if (document.getElementById('gm_classId').value) {
+          document.getElementById('gm_btnLoad').click();
+        }
+      }
     });
-  });
+  }
+
+  bindGradesMatrixDateRangeShortcuts();
+  if (window.SchoolMatrixExpandedView) {
+    window.SchoolMatrixExpandedView.bindMatrixExpandedView({
+      buttonId: 'btn_gmExpandMatrixView',
+      modalId: 'gmMatrixExpandModal',
+      modalDialogId: 'gmMatrixExpandModalDialog',
+      inlineHostId: 'gmMatrixExpandInlineHost',
+      modalHostId: 'gmMatrixExpandModalHost',
+      wrapperSelector: '.matrix-wrapper'
+    });
+  }
 
   document.getElementById('gm_btnClearClass')?.addEventListener('click', () => {
     document.getElementById('gm_classId').value = '';
@@ -649,7 +749,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('gm_evalCard').classList.add('d-none');
     window.currentGradesMatrixData = null;
     setGradesPrintEnabled(false);
-    setActiveRangeChip('');
+    setGmActiveRangeToken('');
   });
 
   if (INITIAL.classId) {
@@ -657,7 +757,12 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('gm_className').value = INITIAL.className || '';
     document.getElementById('gm_startDate').value = INITIAL.startDate || '';
     document.getElementById('gm_endDate').value = INITIAL.endDate || '';
-    if (INITIAL.range) setActiveRangeChip(INITIAL.range);
+    const shortcuts = window.SchoolDateRangeShortcuts;
+    if (INITIAL.range && !INITIAL.startDate && !INITIAL.endDate) {
+      applyGmRangeSelection(INITIAL.range, { autoLoad: false });
+    } else if (INITIAL.range && shortcuts) {
+      setGmActiveRangeToken(shortcuts.normalizeRangeToken(INITIAL.range));
+    }
   }
 
   document.getElementById('gm_btnClassPicker').addEventListener('click', () => {
@@ -1178,7 +1283,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const tr = document.createElement('tr');
     tr.dataset.personId = String(row.personId || '');
     const fp = row.finalPercent != null ? `<span class="fw-bold">${formatGmPercent(row.finalPercent)}</span>` : '—';
-    let html = `<td class="gm-sticky-final text-center small">${fp}</td><td class="gm-sticky-name ps-3">${typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(row.name, row.studentRecordId) : row.name}</td><td class="gm-sticky-calc">${renderGmGradeCalcButton(row.personId)}</td>`;
+    const nameInner = typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(row.name, row.studentRecordId) : row.name;
+    let html = `<td class="gm-sticky-final text-center small">${fp}</td><td class="gm-sticky-name ps-3">${wrapGmEnrollmentClaimName(nameInner, row.personId, row.studentRecordId)}</td><td class="gm-sticky-calc">${renderGmGradeCalcButton(row.personId)}</td>`;
     row.cells.forEach((cell, idx) => {
       const col = columns[idx];
       html += `<td class="text-center small ${bandClass(col.dateBand)}">${renderCellHtml(cell, col, row.name)}</td>`;
@@ -1289,6 +1395,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         document.getElementById('gm_results').classList.remove('d-none');
         await refreshGradesDisplayRollups();
+        syncGmEnrollmentClaimHosts();
         return;
       }
 
@@ -1296,6 +1403,7 @@ document.addEventListener('DOMContentLoaded', () => {
         (chunk.matrix || []).forEach((row) => appendGmStudentRow(row, chunk.columns || []));
         document.getElementById('gm_results').classList.remove('d-none');
         await refreshGradesDisplayRollups();
+        syncGmEnrollmentClaimHosts();
         return;
       }
 
@@ -1305,10 +1413,11 @@ document.addEventListener('DOMContentLoaded', () => {
           const tr = document.createElement('tr');
           tr.dataset.personId = String(row.personId || '');
           const fp = formatGmPercent(row.finalPercent);
-          tr.innerHTML = `<td class="gm-sticky-final text-center small">${fp}</td><td class="gm-sticky-name ps-3">${typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(row.name, row.studentRecordId) : row.name}</td><td class="gm-sticky-calc">${renderGmGradeCalcButton(row.personId)}</td><td class="text-muted">—</td>`;
+          tr.innerHTML = `<td class="gm-sticky-final text-center small">${fp}</td><td class="gm-sticky-name ps-3">${wrapGmEnrollmentClaimName(typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(row.name, row.studentRecordId) : row.name, row.personId, row.studentRecordId)}</td><td class="gm-sticky-calc">${renderGmGradeCalcButton(row.personId)}</td><td class="text-muted">—</td>`;
           tbody.appendChild(tr);
         });
         document.getElementById('gm_results').classList.remove('d-none');
+        syncGmEnrollmentClaimHosts();
         return;
       }
 
@@ -1333,6 +1442,7 @@ document.addEventListener('DOMContentLoaded', () => {
       matrix.forEach((row) => appendGmStudentRow(row, columns));
 
       document.getElementById('gm_results').classList.remove('d-none');
+      syncGmEnrollmentClaimHosts();
     } catch (e) {
       if (e && e.name === 'AbortError') return;
       if (!mergeMode) {
@@ -1898,8 +2008,110 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.getElementById('btn_printGradesMatrix')?.addEventListener('click', () => openGradesPrint());
 
+  if (window.EnrollmentClaimToggle) {
+    window.EnrollmentClaimToggle.init({
+      page: 'grades-matrix',
+      getWindow() {
+        return {
+          classId: document.getElementById('gm_classId')?.value || '',
+          startDate: document.getElementById('gm_startDate')?.value || '',
+          endDate: document.getElementById('gm_endDate')?.value || ''
+        };
+      }
+    });
+  }
+
+  function gmEscapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function buildGmSharedLinkConfirmHtml() {
+    const className = gmEscapeHtml(document.getElementById('gm_className')?.value || INITIAL.className || INITIAL.classId || '—');
+    const start = gmEscapeHtml(document.getElementById('gm_startDate')?.value || INITIAL.startDate || '—');
+    const end = gmEscapeHtml(document.getElementById('gm_endDate')?.value || INITIAL.endDate || '—');
+    return (
+      '<div class="text-start gm-shared-link-prompt">'
+      + '<p class="mb-3">This page was opened from a <strong>shared link</strong>.</p>'
+      + '<p class="small text-muted text-uppercase fw-semibold mb-2">Applied from the link</p>'
+      + '<ul class="list-unstyled mb-3 border rounded bg-light px-3 py-2">'
+      + '<li class="mb-2 d-flex align-items-start gap-2">'
+      + '<i class="bi bi-book text-primary mt-1"></i>'
+      + '<span><span class="text-muted d-block small">Class</span><strong>' + className + '</strong></span></li>'
+      + '<li class="mb-0 d-flex align-items-start gap-2">'
+      + '<i class="bi bi-calendar-range text-primary mt-1"></i>'
+      + '<span><span class="text-muted d-block small">Date range</span>'
+      + '<strong>' + start + '</strong> <span class="text-muted">to</span> <strong>' + end + '</strong></span></li>'
+      + '</ul>'
+      + '<p class="mb-0">Load the matrix now with these settings, or choose <strong>Not now</strong> to review the filters first.</p>'
+      + '</div>'
+    );
+  }
+
+  function buildGmSharedLinkDeclinedHtml() {
+    return (
+      '<div class="text-start gm-shared-link-prompt">'
+      + '<p class="mb-2">No matrix was loaded.</p>'
+      + '<p class="mb-2">The class and date range from the link are still shown in the filter panel.</p>'
+      + '<p class="mb-0">When you are ready, click <strong>Load</strong> to run the matrix.</p>'
+      + '</div>'
+    );
+  }
+
+  async function promptLoadGradesMatrixFromUrlLink() {
+    let confirmed = false;
+    if (window.ReportMessaging?.confirmReportAction) {
+      confirmed = await window.ReportMessaging.confirmReportAction({
+        title: 'Open matrix from link?',
+        icon: 'info',
+        html: true,
+        message: buildGmSharedLinkConfirmHtml(),
+        confirmText: 'Load matrix',
+        cancelText: 'Not now',
+        confirmClass: 'btn-primary'
+      });
+    }
+    if (!confirmed) {
+      if (window.ReportMessaging?.showReportMessage) {
+        await window.ReportMessaging.showReportMessage({
+          title: 'Grades Matrix',
+          icon: 'info',
+          html: true,
+          message: buildGmSharedLinkDeclinedHtml()
+        });
+      } else if (typeof showMessageModal === 'function') {
+        await showMessageModal({
+          title: 'Grades Matrix',
+          icon: 'info',
+          message: 'The link settings are on the page. When you are ready, click Load to run the matrix.',
+          buttons: [{ text: 'OK', class: 'btn-secondary' }]
+        });
+      }
+      return;
+    }
+    document.getElementById('gm_btnLoad')?.click();
+  }
+
+  function runWhenGmMessageModalReady(callback) {
+    const run = () => {
+      const ready = typeof window.showMessageModal === 'function' && document.getElementById('messageModal');
+      if (!ready) {
+        window.setTimeout(run, 50);
+        return;
+      }
+      callback();
+    };
+    if (document.readyState === 'complete') run();
+    else window.addEventListener('load', run, { once: true });
+  }
+
   if (INITIAL.classId) {
-    setTimeout(() => document.getElementById('gm_btnLoad').click(), 100);
+    runWhenGmMessageModalReady(() => {
+      void promptLoadGradesMatrixFromUrlLink();
+    });
   }
 });
 </script>

@@ -1,4 +1,8 @@
 <%
+  const resolvedDateRangeMenuId = (typeof dateRangeMenuId !== 'undefined' && dateRangeMenuId)
+    ? dateRangeMenuId
+    : 'scheduleDateRangeMenu';
+  const resolvedIncludeMatrixAllDates = typeof includeMatrixAllDates !== 'undefined' && includeMatrixAllDates === true;
   const scheduleDateRangeSections = [
     {
       title: 'Current Month',
@@ -45,7 +49,7 @@
   ];
 %>
 <div
-  id="scheduleDateRangeMenu"
+  id="<%= resolvedDateRangeMenuId %>"
   class="schedule-date-range-menu"
   role="menu"
   aria-label="Quick date ranges"
@@ -62,4 +66,13 @@
     <% }); %>
   </div>
   <% }); %>
+  <% if (resolvedIncludeMatrixAllDates) { %>
+  <div class="schedule-date-range-menu-section schedule-date-range-menu-section--bordered">
+    <button
+      type="button"
+      class="schedule-date-range-option"
+      role="menuitem"
+      data-range="allTime">All dates</button>
+  </div>
+  <% } %>
 </div>

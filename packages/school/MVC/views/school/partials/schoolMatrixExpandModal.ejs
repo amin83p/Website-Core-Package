@@ -1,0 +1,25 @@
+<%
+  const resolvedExpandModalId = (typeof expandModalId !== 'undefined' && expandModalId)
+    ? expandModalId
+    : 'schoolMatrixExpandModal';
+  const resolvedExpandModalDialogId = (typeof expandModalDialogId !== 'undefined' && expandModalDialogId)
+    ? expandModalDialogId
+    : 'schoolMatrixExpandModalDialog';
+  const resolvedExpandModalHostId = (typeof expandModalHostId !== 'undefined' && expandModalHostId)
+    ? expandModalHostId
+    : 'schoolMatrixExpandModalHost';
+  const resolvedExpandModalTitle = (typeof expandModalTitle !== 'undefined' && expandModalTitle)
+    ? expandModalTitle
+    : 'Matrix';
+%>
+<div class="modal fade school-matrix-expand-modal" id="<%= resolvedExpandModalId %>" tabindex="-1" aria-labelledby="<%= resolvedExpandModalId %>Label" aria-hidden="true">
+  <div class="modal-dialog" id="<%= resolvedExpandModalDialogId %>">
+    <div class="modal-content">
+      <div class="modal-header py-2 px-3">
+        <h5 class="modal-title" id="<%= resolvedExpandModalId %>Label"><i class="bi bi-table me-2 text-primary"></i><%= resolvedExpandModalTitle %></h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0" id="<%= resolvedExpandModalHostId %>"></div>
+    </div>
+  </div>
+</div>

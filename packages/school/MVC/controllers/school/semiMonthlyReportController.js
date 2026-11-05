@@ -8,6 +8,8 @@ const schoolSemiMonthlyReportExportService = require('../../services/school/scho
 const studentAttendanceReportService = require('../../services/school/studentAttendanceReportService');
 const reportViewService = require('../../services/school/reportViewService');
 const reportFunderDocxService = require('../../services/school/reportFunderDocxService');
+const enrollmentClaimDisplayService = require('../../services/school/enrollmentClaimDisplayService');
+const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 function parseIdListParam(value = '') {
   if (Array.isArray(value)) {
@@ -34,6 +36,11 @@ async function showSemiMonthlyReportPage(req, res) {
       ? await semiMonthlyReportPolicyModel.getPolicyForOrg(activeOrgId)
       : {});
     const canExportReport = await reportViewService.canExportReportInstance(req.user);
+    const canShowEnrollmentClaims = await enrollmentClaimDisplayService.canShowOnSectionPage(
+      req.user,
+      SECTIONS.SCHOOL_SEMI_MONTHLY_REPORT,
+      { operationId: OPERATIONS.READ, ipAddress: req.ip }
+    );
     const configuredOverallCount = semiMonthlyReportPolicyService.normalizeIdList(
       policy.overallReportTemplateIds
     ).length;
@@ -54,6 +61,7 @@ async function showSemiMonthlyReportPage(req, res) {
       configuredTemplateCount: (policy.reportTemplateIds || []).length,
       configuredOverallCount,
       canExportReport,
+      canShowEnrollmentClaims,
       funderPickerOptions
     });
   } catch (error) {

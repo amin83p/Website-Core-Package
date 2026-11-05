@@ -115,8 +115,17 @@ test('master schedule viewer templates expose core DOM hooks', () => {
   const adminView = readPersonScheduleAdminBundle();
   const selfView = readPersonScheduleSelfBundle();
   const calendarShell = read('MVC/views/school/schedule/partials/personScheduleCalendarShell.ejs');
-  const requiredIds = ['sch_startDate', 'sch_endDate', 'scheduleContainer', 'scheduleSessionContextMenu', 'btn_loadSchedule'];
-  requiredIds.forEach((id) => {
+  const filterPartials = read('MVC/views/school/schedule/partials/personScheduleStartDateWithShortcuts.ejs')
+    + read('MVC/views/school/schedule/partials/personScheduleDateRangeShortcuts.ejs');
+  assert.match(filterPartials, /'sch_startDate'/);
+  assert.match(filterPartials, /'btn_scheduleDateShortcuts'/);
+  assert.match(filterPartials, /'scheduleDateRangeMenu'/);
+  const adminOnlyIds = ['sch_endDate', 'btn_loadSchedule'];
+  adminOnlyIds.forEach((id) => {
+    assert.match(adminView, new RegExp(`id="${id}"`));
+  });
+  const sharedIds = ['scheduleContainer', 'scheduleSessionContextMenu'];
+  sharedIds.forEach((id) => {
     assert.match(adminView, new RegExp(`id="${id}"`));
     if (id === 'scheduleContainer') {
       assert.match(readPersonScheduleSelfView(), /personScheduleCalendarShell/);
@@ -142,23 +151,33 @@ test('Master Schedule Viewer uses date range menu instead of collapsible quick r
   const selfView = readPersonScheduleSelfBundle();
   const core = read('public/scripts/masterScheduleViewer.js');
   const shortcutsPartial = readPackageFile('MVC/views/school/schedule/partials/personScheduleDateRangeShortcuts.ejs');
+  const startShortcutsPartial = readPackageFile('MVC/views/school/schedule/partials/personScheduleStartDateWithShortcuts.ejs');
   const rangeTokens = ['day', 'week', 'm0-first', 'm0-second', 'm0-full', 'm-1-first', 'm-1-full', 'm1-full'];
 
   for (const view of [adminView, selfView]) {
     assert.doesNotMatch(view, /scheduleFilterCollapse/);
     assert.doesNotMatch(view, /personScheduleQuickRangeChips/);
-    assert.match(view, /id="btn_scheduleDateShortcuts"/);
-    assert.match(view, /id="scheduleDateRangeMenu"/);
+    assert.match(view, /personScheduleStartDateWithShortcuts/);
     assert.match(view, /personScheduleDateRangeShortcuts/);
   }
+  assert.match(startShortcutsPartial, /'btn_scheduleDateShortcuts'/);
+  assert.match(shortcutsPartial, /'scheduleDateRangeMenu'/);
   for (const token of rangeTokens) {
     assert.match(shortcutsPartial, new RegExp(`range: '${token}'`));
   }
   assert.match(shortcutsPartial, /Current Month/);
   assert.match(shortcutsPartial, /Previous Month/);
   assert.match(shortcutsPartial, /Next Month/);
-  assert.match(core, /resolveScheduleRangeDates/);
-  assert.match(core, /normalizeScheduleRangeToken/);
+  const shortcutsJs = read('public/scripts/schoolDateRangeShortcuts.js');
+  assert.match(adminView, /schoolDateRangeShortcuts\.js/);
+  assert.match(shortcutsJs, /normalizeRangeToken/);
+  assert.match(shortcutsJs, /bindDateRangeShortcuts/);
+  assert.match(shortcutsJs, /datesFromRangeToken/);
+  assert.match(core, /SchoolDateRangeShortcuts/);
+  assert.match(core, /bindScheduleDateRangeShortcuts/);
+  assert.match(core, /applyScheduleRange/);
+  assert.doesNotMatch(core, /function resolveScheduleRangeDates/);
+  assert.doesNotMatch(core, /function normalizeScheduleRangeToken/);
 
   assert.match(adminView, /schedule-filter-load-primary/);
   assert.match(adminView, /schedule-filter-reset-btn/);
@@ -169,13 +188,7 @@ test('Master Schedule Viewer uses date range menu instead of collapsible quick r
   assert.doesNotMatch(core, /buildScheduleHasCasesFilterHtml/);
   assert.doesNotMatch(core, /params\.set\('hasCases'/);
 
-  assert.match(core, /bindScheduleDateRangeShortcuts/);
-  assert.match(core, /getElementById\('sch_startDate'\)/);
-  assert.match(core, /getElementById\('sch_endDate'\)/);
-  assert.match(core, /addEventListener\('contextmenu', onDateContextMenu\)/);
-  assert.match(core, /isScheduleDateRangeMenuTarget/);
-  assert.match(core, /pointerdown', onOutside/);
-  assert.match(core, /isScheduleDateRangeMenuTarget\(event\.target\)/);
-  assert.match(core, /querySelectorAll\('#scheduleDateRangeMenu \.schedule-date-range-option'\)/);
+  assert.match(shortcutsJs, /pointerdown', onOutside/);
+  assert.match(shortcutsJs, /addEventListener\('contextmenu', onDateContextMenu\)/);
   assert.doesNotMatch(core, /scheduleFilterCollapse/);
 });

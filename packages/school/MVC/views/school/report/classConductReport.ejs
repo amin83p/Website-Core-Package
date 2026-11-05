@@ -122,6 +122,16 @@
   .cm-matrix-cell { text-align: center; vertical-align: middle; min-width: 64px; font-size: 0.72rem; padding: 0.35rem 0.2rem !important; cursor: pointer; }
   .cm-matrix-cell.cm-empty .cm-cell-empty-mark { color: #adb5bd; }
   .cm-cell-off-roster { color: #dee2e6; font-size: 1.1rem; }
+  .attendance-legend-icon-btn {
+    width: 2.25rem;
+    height: 2.25rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+  .attendance-legend-icon-btn .bi { font-size: 1.05rem; line-height: 1; }
   .cm-conduct-legend { display: flex; flex-wrap: wrap; gap: 0.35rem; font-size: 0.68rem; }
   .cm-conduct-legend .cm-legend-item {
     display: inline-flex; align-items: center; gap: 0.35rem;
@@ -248,22 +258,39 @@
       <div class="d-flex align-items-center gap-2 flex-wrap ms-md-auto">
         <div class="d-flex align-items-center gap-2 flex-wrap">
           <button type="button"
-            class="btn btn-outline-secondary btn-sm active"
+            class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn active"
             id="ccr_btnHideEmptyDays"
+            aria-label="Hide days without sessions"
             aria-pressed="true"
             title="When on, each student's table only shows dates where at least one of their classes had a shown conduct session.">
-            Hide days without sessions
+            <i class="bi bi-calendar2-x" aria-hidden="true"></i>
           </button>
           <button type="button"
-            class="btn btn-outline-secondary btn-sm"
+            class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
             id="ccr_btnWeekSeparators"
+            aria-label="Week separators"
             aria-pressed="false"
             title="When on, show a vertical line between calendar weeks (Monday start).">
-            Week separators
+            <i class="bi bi-grip-vertical" aria-hidden="true"></i>
           </button>
-          <button type="button" class="btn btn-outline-secondary btn-sm" id="ccr_btnExpandAllStudents">Expand All</button>
-          <button type="button" class="btn btn-outline-secondary btn-sm" id="ccr_btnCollapseAllStudents">Collapse All</button>
+          <button type="button"
+            class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
+            id="ccr_btnExpandAllStudents"
+            aria-label="Expand all students"
+            title="Expand all students">
+            <i class="bi bi-arrows-expand" aria-hidden="true"></i>
+          </button>
+          <button type="button"
+            class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
+            id="ccr_btnCollapseAllStudents"
+            aria-label="Collapse all students"
+            title="Collapse all students">
+            <i class="bi bi-arrows-collapse" aria-hidden="true"></i>
+          </button>
         </div>
+        <% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
+        <button type="button" id="btn_toggleEnrollmentClaims" class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn" disabled aria-label="Show claim numbers" title="Load the report first"><i class="bi bi-card-text" aria-hidden="true"></i></button>
+        <% } %>
       </div>
     </div>
     <div class="card-body">
@@ -305,5 +332,8 @@
     students: typeof initialStudents !== 'undefined' ? initialStudents : []
   }).replace(/</g, '\\u003c').replace(/&/g, '\\u0026') %>;
 </script>
+<% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
+<script src="/scripts/enrollmentClaimToggle.js"></script>
+<% } %>
 <script src="/scripts/conductRatingCell.js"></script>
 <script src="/scripts/classConductReportClient.js"></script>
