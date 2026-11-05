@@ -2042,6 +2042,16 @@
     return sorted[0] || null;
   }
 
+  function prefillClbCurrentFromLatest() {
+    const latest = getLatestClbLevelEntry();
+    if (!latest) return;
+    CLB_SKILLS.forEach((skill) => {
+      const input = getClbEditorInput('current', skill);
+      const value = String(latest?.result?.[skill] || '').trim();
+      if (input && value) input.value = value;
+    });
+  }
+
   function collectClbEditorGroupsFromInputs() {
     const values = { goal: {}, current: {}, result: {} };
     CLB_VALUE_GROUPS.forEach((group) => {
@@ -2081,6 +2091,7 @@
   function showClbEditor() {
     resetClbEditorMode();
     clearClbEditor();
+    prefillClbCurrentFromLatest();
     syncClbEvaluationTypeOptions();
     applyDefaultClbEvaluationTypeForNewEntry();
     if (clbEntryEditor) clbEntryEditor.classList.remove('d-none');

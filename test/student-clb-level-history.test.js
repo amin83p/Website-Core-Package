@@ -445,6 +445,8 @@ test('student form includes CLB history UI and hidden JSON field', () => {
   assert.match(source, /previous_enrollments/);
   assert.match(source, /syncClbEvaluationTypeOptions/);
   assert.match(source, /applyDefaultClbEvaluationTypeForNewEntry/);
+  assert.match(source, /function prefillClbCurrentFromLatest\(/);
+  assert.match(source, /prefillClbCurrentFromLatest\(\)/);
   assert.match(source, /clbLevelHistory\.length >= 1 \? 'previous_enrollments'/);
   const rollingSource = read('packages/school/MVC/views/school/class/rollingEnrollment.ejs');
   assert.match(rollingSource, /inp_rolling_clb_note/);
