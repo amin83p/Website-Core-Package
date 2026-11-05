@@ -355,6 +355,11 @@ test('rendered chat client script is valid and includes badge, sound, and read-s
   assert.match(clientSource, /document\.visibilityState === 'visible'/);
   assert.match(clientSource, /chatInitialUnreadSoundPlayed/);
   assert.match(clientSource, /if \(!chatInitialUnreadSoundPlayed && loadedTotalUnread > 0/);
+  assert.match(clientSource, /playChatBackgroundAlert/);
+  assert.match(clientSource, /playChatReceiveTone/);
+  assert.match(clientSource, /playChatSendTone/);
+  assert.match(clientSource, /playChatMessageSound/);
+  assert.match(rendered, /chat-compose-bar/);
   assert.doesNotMatch(clientSource, /updateUnreadCount\(0,\s*true\)/);
   assert.match(rendered, /id="chatSoundToggle"/);
   assert.match(rendered, /id="chatSendButton"[^>]*data-no-wait="true"/);

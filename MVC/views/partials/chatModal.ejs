@@ -131,20 +131,20 @@
                       <div id="chatReadOnlyNotice" class="small text-muted px-2 py-1 <%= canChatUpdate ? 'd-none' : '' %>">
                           You can read this conversation, but your access profile does not allow sending messages.
                       </div>
-                      <form id="chatForm" class="d-flex align-items-end gap-2 <%= canChatUpdate ? '' : 'd-none' %>">
-                           <button type="button" id="chatAttachmentButton" class="btn btn-light text-secondary rounded-circle" onclick="document.getElementById('chatFileInput').click()">
-                              <i class="bi bi-paperclip"></i>
-                          </button>
-              
-                          <input type="file" id="chatFileInput" class="d-none" multiple onchange="handleFileSelection(this)">
-                          
-                          <textarea class="form-control bg-light border-0" id="chatInput" rows="1" 
-                                    placeholder="Message..." 
-                                    style="resize:none; min-height: 38px; max-height: 160px; overflow-y: auto; line-height: 1.5;"></textarea>
-                          
-                          <button type="submit" id="chatSendButton" data-no-wait="true" class="btn btn-primary rounded-circle d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
-                              <i class="bi bi-send-fill" style="font-size: 0.9rem; margin-left: 2px;"></i>
-                          </button>
+                      <form id="chatForm" class="chat-compose-form <%= canChatUpdate ? '' : 'd-none' %>">
+                          <div class="chat-compose-bar">
+                              <button type="button" id="chatAttachmentButton" class="btn btn-light text-secondary chat-compose-action-btn" onclick="document.getElementById('chatFileInput').click()" title="Attach files">
+                                  <i class="bi bi-paperclip" aria-hidden="true"></i>
+                              </button>
+                              <input type="file" id="chatFileInput" class="d-none" multiple onchange="handleFileSelection(this)">
+                              <div class="chat-compose-input-wrap">
+                                  <textarea class="form-control chat-compose-input" id="chatInput" rows="1"
+                                            placeholder="Write a message…"></textarea>
+                              </div>
+                              <button type="submit" id="chatSendButton" data-no-wait="true" class="btn btn-primary chat-compose-action-btn chat-compose-send-btn" title="Send message">
+                                  <i class="bi bi-send-fill" aria-hidden="true"></i>
+                              </button>
+                          </div>
                       </form>
                   </div>
               </div>
@@ -351,27 +351,75 @@
     }
 
     .chat-compose-wrap {
-        background: linear-gradient(180deg, #ffffff 0%, #fafcff 100%);
+        background: linear-gradient(180deg, #ffffff 0%, #f4f8ff 100%);
+        padding: 0.65rem 0.75rem 0.75rem !important;
     }
 
-    #chatForm {
-        border: 1px solid #dbe7fb;
-        border-radius: 999px;
-        padding: 4px 6px;
-        background: #f8fbff;
+    .chat-compose-form {
+        margin: 0;
     }
-    #chatForm #chatInput {
-        background: transparent !important;
+
+    .chat-compose-bar {
+        display: flex;
+        align-items: flex-end;
+        gap: 0.5rem;
+        border: 1px solid #c9dcfa;
+        border-radius: 16px;
+        padding: 0.35rem 0.45rem 0.35rem 0.35rem;
+        background: linear-gradient(145deg, #f8fbff 0%, #eef4ff 100%);
+        box-shadow: 0 2px 14px rgba(15, 23, 42, 0.07);
+    }
+
+    .chat-compose-input-wrap {
+        flex: 1 1 auto;
+        min-width: 0;
+        display: flex;
+        align-items: stretch;
+    }
+
+    .chat-compose-input {
+        width: 100%;
+        resize: none;
+        min-height: 40px;
+        max-height: 160px;
+        overflow-y: auto;
+        line-height: 1.45;
         border: none !important;
-        box-shadow: none !important;
-        padding-left: 4px;
-        padding-right: 6px;
+        background: rgba(255, 255, 255, 0.92) !important;
+        border-radius: 12px !important;
+        padding: 0.5rem 0.65rem !important;
+        box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04) !important;
     }
+
+    .chat-compose-input:focus {
+        background: #fff !important;
+        box-shadow: inset 0 0 0 1px rgba(13, 110, 253, 0.35), 0 0 0 0.15rem rgba(13, 110, 253, 0.12) !important;
+    }
+
+    .chat-compose-action-btn {
+        flex: 0 0 auto;
+        width: 40px;
+        height: 40px;
+        padding: 0;
+        border-radius: 12px !important;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        align-self: flex-end;
+    }
+
     #chatForm #chatAttachmentButton {
         border: 1px solid #dbe7fb;
+        background: #fff;
     }
-    #chatForm #chatSendButton {
-        box-shadow: 0 4px 12px rgba(13, 110, 253, 0.25);
+
+    .chat-compose-send-btn {
+        box-shadow: 0 4px 14px rgba(13, 110, 253, 0.35);
+    }
+
+    .chat-compose-send-btn i {
+        font-size: 0.95rem;
+        margin-left: 1px;
     }
 
     .broadcast-recipient-row {
@@ -815,31 +863,79 @@ async function unlockChatAudio() {
     return context;
 }
 
-async function playChatDing() {
-    if (chatSoundMuted || !isTabVisible()) return;
+function scheduleChatOscillatorTone(context, {
+    frequency = 880,
+    type = 'sine',
+    startOffset = 0,
+    duration = 0.1,
+    peakGain = 0.2,
+    attack = 0.012,
+    release = 0.04
+} = {}) {
+    const start = context.currentTime + startOffset;
+    const end = start + duration;
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, start);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(Math.max(0.0001, peakGain), start + attack);
+    gain.gain.exponentialRampToValueAtTime(0.0001, end + release);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start(start);
+    oscillator.stop(end + release + 0.02);
+}
 
+async function playChatToneSequence(tones = []) {
+    if (chatSoundMuted || !isTabVisible()) return;
     const context = await unlockChatAudio();
     if (!context || context.state !== 'running') return;
+    (Array.isArray(tones) ? tones : []).forEach((tone) => scheduleChatOscillatorTone(context, tone));
+}
 
-    const start = context.currentTime;
-    [
-        { frequency: 880, offset: 0, duration: 0.09 },
-        { frequency: 1174.66, offset: 0.1, duration: 0.12 }
-    ].forEach((tone) => {
-        const oscillator = context.createOscillator();
-        const gain = context.createGain();
-        const toneStart = start + tone.offset;
-        const toneEnd = toneStart + tone.duration;
-        oscillator.type = 'sine';
-        oscillator.frequency.setValueAtTime(tone.frequency, toneStart);
-        gain.gain.setValueAtTime(0.0001, toneStart);
-        gain.gain.exponentialRampToValueAtTime(0.12, toneStart + 0.015);
-        gain.gain.exponentialRampToValueAtTime(0.0001, toneEnd);
-        oscillator.connect(gain);
-        gain.connect(context.destination);
-        oscillator.start(toneStart);
-        oscillator.stop(toneEnd + 0.01);
-    });
+async function playChatBackgroundAlert() {
+    await playChatToneSequence([
+        { frequency: 880, type: 'triangle', startOffset: 0, duration: 0.14, peakGain: 0.44 },
+        { frequency: 1174.66, type: 'triangle', startOffset: 0.15, duration: 0.14, peakGain: 0.42 },
+        { frequency: 1567.98, type: 'sine', startOffset: 0.32, duration: 0.2, peakGain: 0.38 }
+    ]);
+}
+
+async function playChatReceiveTone() {
+    await playChatToneSequence([
+        { frequency: 740, type: 'sine', startOffset: 0, duration: 0.09, peakGain: 0.2 },
+        { frequency: 988, type: 'sine', startOffset: 0.1, duration: 0.11, peakGain: 0.17 }
+    ]);
+}
+
+async function playChatSendTone() {
+    await playChatToneSequence([
+        { frequency: 520, type: 'sine', startOffset: 0, duration: 0.07, peakGain: 0.16 },
+        { frequency: 780, type: 'sine', startOffset: 0.06, duration: 0.08, peakGain: 0.12 }
+    ]);
+}
+
+/** @deprecated use playChatBackgroundAlert */
+async function playChatDing() {
+    await playChatBackgroundAlert();
+}
+
+function isChatModalShowingConversation(convId) {
+    const modal = document.getElementById('chatInterfaceModal');
+    return Boolean(
+        modal &&
+        modal.classList.contains('show') &&
+        String(currentConvId || '') === String(convId || '')
+    );
+}
+
+async function playChatMessageSound(convId) {
+    if (isChatModalShowingConversation(convId)) {
+        await playChatReceiveTone();
+        return;
+    }
+    await playChatBackgroundAlert();
 }
 
 function initChatSoundControls() {
@@ -934,7 +1030,7 @@ function bindChatSocketHandlers() {
             : normalizeClientUnreadCount(totalUnreadCount) + 1;
         applyUnreadState(data.convId, eventConversationUnread, eventTotalUnread);
         latestIncomingMessageByConversation.set(String(data.convId), data.message.id);
-        if (!isActiveConversation) playChatDing();
+        void playChatMessageSound(data.convId);
 
         if (isCurrentConversationOpen && !messageExistsInContainer(data.message.id)) {
             appendMessage(data.message);
@@ -1070,8 +1166,9 @@ function initChatFormHandler() {
                 tempId: tempId, convId: currentConvId, content: text, type: 'text', senderId: currentUser.id,
                 replyToMessageId
             });
+            void playChatSendTone();
             input.value = '';
-            input.style.height = '38px';
+            resetChatInputHeight(input);
         }
         if (text || pendingAttachments.length === 0) clearReplyTarget();
     });
@@ -1313,6 +1410,7 @@ async function uploadPendingFiles(replyToMessageId = '') {
                     if (row) row.dataset.previewObjectUrl = previewUrl;
                 }
             });
+            void playChatSendTone();
             await refreshConversationStorageWarning();
             if (chatAccess.canReadInbox) refreshInbox();
         } else {
@@ -2170,13 +2268,21 @@ function initBroadcastComposer() {
     }
 }
 
+function resetChatInputHeight(inputEl) {
+    const input = inputEl || document.getElementById('chatInput');
+    if (!input) return;
+    input.style.height = '40px';
+    input.style.overflowY = 'hidden';
+}
+
 function initResizers() {
     const tx = document.getElementById('chatInput');
     if (tx) {
         tx.addEventListener("input", function() {
-            this.style.height = 0;
-            this.style.height = this.scrollHeight + "px";
-            this.style.overflowY = this.scrollHeight > 160 ? "scroll" : "hidden";
+            this.style.height = '40px';
+            const nextHeight = Math.min(160, Math.max(40, this.scrollHeight));
+            this.style.height = `${nextHeight}px`;
+            this.style.overflowY = nextHeight >= 160 ? "scroll" : "hidden";
         }, false);
     }
 
@@ -2454,7 +2560,7 @@ async function refreshInbox() {
             const loadedTotalUnread = normalizeClientUnreadCount(res.totalUnread);
             if (!chatInitialUnreadSoundPlayed && loadedTotalUnread > 0 && previousTotalUnread === 0) {
                 chatInitialUnreadSoundPlayed = true;
-                playChatDing();
+                void playChatBackgroundAlert();
             }
             
             if(!res.data || res.data.length === 0) {
