@@ -265,6 +265,9 @@ async function buildStudentMatrixRow({
   treatSubmittedAsLocked = false
 } = {}) {
   let effectiveInstance = instance;
+  const editorMergeOptions = reportService.templateUsesSnapshotScope(template)
+    ? { respectSnapshotKeys: true }
+    : {};
   if (!effectiveInstance) {
     const prefillSnapshot = await reportService.buildPrefillSnapshot({
       assignment,
@@ -288,24 +291,35 @@ async function buildStudentMatrixRow({
       prefillSnapshot
     };
   } else {
-    const freshPrefill = await reportService.buildPrefillSnapshot({
-      assignment,
-      teacherId,
-      studentId,
-      reqUser,
-      requiredKeys: reportService.resolveTemplateFillKeys(template)
-    });
-    const canEditAnswers = await reportViewService.canEditReportInstanceAnswers(instance, reqUser);
-    if (canEditAnswers) {
-      effectiveInstance = { ...instance, prefillSnapshot: freshPrefill };
+    const freezeOnOpen = reportService.shouldFreezeReportInstanceOnOpen(template, instance);
+    if (!freezeOnOpen) {
+      const freshPrefill = await reportService.buildPrefillSnapshot({
+        assignment,
+        teacherId,
+        studentId,
+        reqUser,
+        requiredKeys: reportService.resolveTemplateFillKeys(template)
+      });
+      const canEditAnswers = await reportViewService.canEditReportInstanceAnswers(instance, reqUser);
+      if (canEditAnswers) {
+        effectiveInstance = { ...instance, prefillSnapshot: freshPrefill };
+      }
     }
   }
-  const mergedAnswers = reportService.mergeTemplateData(template, effectiveInstance, assignment);
+  const skipRecalculation = Boolean(
+    instance
+      && reportService.shouldFreezeReportInstanceOnOpen(template, effectiveInstance)
+      && reportService.isInstanceRenderCacheValid(template, effectiveInstance)
+  );
+  const mergedAnswers = skipRecalculation
+    ? { ...effectiveInstance.renderCache.mergedAnswers }
+    : reportService.mergeTemplateData(template, effectiveInstance, assignment, editorMergeOptions);
   const prefill = effectiveInstance.prefillSnapshot || {};
   const prepared = reportRuleEngineService.prepareReportAnswersForUI({
     template,
     mergedAnswers,
-    prefill
+    prefill,
+    skipRecalculation
   });
   const renderedAnswersRaw = prepared.calculationAnswers;
   const renderedAnswers = prepared.displayAnswers;
@@ -905,7 +919,30 @@ async function applyMatrixPrefill({ assignmentId, assignmentRowId = '', teacherI
     (Array.isArray(source.template?.schema?.fields) ? source.template.schema.fields : [])
       .filter((field) => isCalculatedField(field) && field.id)
       .forEach((field) => { nextAnswers[field.id] = prepared.calculationAnswers[field.id]; });
-    await schoolDataService.updateData('reportInstances', instance.id, { prefillSnapshot: nextPrefill, answers: nextAnswers, audit: { lastUpdateUser: reqUser?.id || '', lastUpdateDateTime: new Date().toISOString(), prefillRefreshedAt: new Date().toISOString() } }, reqUser);
+    const mergedForRenderCache = reportService.mergeTemplateData(
+      source.template,
+      { ...instance, prefillSnapshot: nextPrefill, answers: nextAnswers },
+      source.assignment
+    );
+    const cacheAt = new Date().toISOString();
+    const templateVersionForCache = Number(source.template?.version || instance.templateVersion || 1) || 1;
+    const renderCache = {
+      templateId: String(source.template?.id || instance.templateId || '').trim(),
+      templateVersion: templateVersionForCache,
+      capturedAt: cacheAt,
+      mergedAnswers: { ...mergedForRenderCache }
+    };
+    await schoolDataService.updateData('reportInstances', instance.id, {
+      prefillSnapshot: nextPrefill,
+      answers: nextAnswers,
+      renderCache,
+      audit: {
+        lastUpdateUser: reqUser?.id || '',
+        lastUpdateDateTime: cacheAt,
+        prefillRefreshedAt: cacheAt,
+        ...(instance.audit?.firstSavedAt ? {} : { firstSavedAt: cacheAt })
+      }
+    }, reqUser);
     results.push({ studentId, status: 'success', appliedCount: changes.length });
   }
   const matrix = await buildMatrixContext({
@@ -959,6 +996,8 @@ async function buildMatrixExportPayload({ assignmentId, assignmentRowId = '', te
       prefillSnapshot: effective.prefillSnapshot || {},
       answers: effective.answers || {},
       rawAnswers: effective.answers || {},
+      renderCache: effective.renderCache || null,
+      audit: effective.audit || {},
       mergedAnswers: payload.mergedAnswers,
       warnings: payload.warnings || []
     });

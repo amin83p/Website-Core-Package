@@ -34,6 +34,14 @@
     if (hasSharedFields && field?.sharedAcrossStudents === true && !sharedFieldsEditableSafe) return true;
     return false;
   };
+  const conversionHints = (typeof conversionDisplayHints !== 'undefined' && conversionDisplayHints && typeof conversionDisplayHints === 'object')
+    ? conversionDisplayHints
+    : {};
+  const attrEscapeForTitle = (v) => String(v ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
   const lifecycleMode = String(classData?.registrationMode || 'term_based').trim().toLowerCase() === 'rolling' ? 'rolling' : 'term_based';
   const parsedCycleNo = Number.parseInt(String(classData?.cycleNo || '').trim(), 10);
   const lifecycleCycleNo = Number.isFinite(parsedCycleNo) && parsedCycleNo > 0 ? parsedCycleNo : 1;
@@ -126,6 +134,7 @@
   <script type="application/json" id="reportInstanceSnapshotComputationFieldIds"><%- JSON.stringify(typeof snapshotComputationFieldIds !== 'undefined' ? snapshotComputationFieldIds : null).replace(/</g, '\\u003c') %></script>
   <script type="application/json" id="reportInstanceMergedData"><%- JSON.stringify((typeof mergedDataForClient !== 'undefined' && mergedDataForClient) ? mergedDataForClient : (mergedData || {})).replace(/</g, '\\u003c') %></script>
   <script type="application/json" id="reportInstancePrefillData"><%- JSON.stringify(instance?.prefillSnapshot || {}).replace(/</g, '\\u003c') %></script>
+  <script type="application/json" id="reportInstanceServerValidationByField"><%- JSON.stringify(validationByField).replace(/</g, '\\u003c') %></script>
 
   <div class="row g-2 align-items-start mb-4">
     <div class="col">
@@ -442,6 +451,7 @@
                           <% const fieldColClass = fullWidthField ? 'col-12' : 'col'; %>
                           <% const selectOptSt = field.type === 'select' ? (field.options || []).find((o) => String(o.value) === String(value)) : null; %>
                           <% const displaySelectSt = selectOptSt ? (selectOptSt.label || selectOptSt.value) : value; %>
+                          <% const conversionHint = conversionHints[field.id]; %>
                           <% const serverFieldIssues = Array.isArray(validationByField[field.id]) ? validationByField[field.id] : []; %>
                           <% const hasFieldBorder = field.hasBorder === true || String(field.hasBorder).toLowerCase() === 'true'; %>
                           <% const fieldBackgroundColor = String(field.backgroundColor || '').trim(); %>
@@ -452,8 +462,14 @@
                             <div class="<%= fieldShellClass %>" style="<%= fieldShellStyleValue %>">
                               <label class="form-label fw-bold">
                                 <%= field.label %>
-                                <% if (isV2 && field.helpText) { %>
-                                  <button type="button" class="help-tooltip-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= field.helpText %>" aria-label="Field help">
+                                <% if (isV2 && (field.helpText || (readOnlyField && conversionHint?.originalFormatted))) { %>
+                                  <% const helpTitleCombined = [
+                                      field.helpText ? String(field.helpText) : '',
+                                      (readOnlyField && conversionHint?.originalFormatted)
+                                        ? `Original value (before display conversion): ${conversionHint.originalFormatted}`
+                                        : ''
+                                    ].filter(Boolean).join('\n\n'); %>
+                                  <button type="button" class="help-tooltip-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= attrEscapeForTitle(helpTitleCombined) %>" aria-label="Field help">
                                     <i class="bi bi-info-circle"></i>
                                   </button>
                                 <% } %>
@@ -565,6 +581,7 @@
                       <% const fieldColClass = fullWidthField ? 'col-12' : 'col'; %>
                       <% const selectOptSt = field.type === 'select' ? (field.options || []).find((o) => String(o.value) === String(value)) : null; %>
                       <% const displaySelectSt = selectOptSt ? (selectOptSt.label || selectOptSt.value) : value; %>
+                      <% const conversionHint = conversionHints[field.id]; %>
                       <% const serverFieldIssues = Array.isArray(validationByField[field.id]) ? validationByField[field.id] : []; %>
                       <% const hasFieldBorder = field.hasBorder === true || String(field.hasBorder).toLowerCase() === 'true'; %>
                       <% const fieldBackgroundColor = String(field.backgroundColor || '').trim(); %>
@@ -575,8 +592,14 @@
                         <div class="<%= fieldShellClass %>" style="<%= fieldShellStyleValue %>">
                           <label class="form-label fw-bold">
                             <%= field.label %>
-                            <% if (isV2 && field.helpText) { %>
-                              <button type="button" class="help-tooltip-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= field.helpText %>" aria-label="Field help">
+                            <% if (isV2 && (field.helpText || (readOnlyField && conversionHint?.originalFormatted))) { %>
+                              <% const helpTitleCombinedNs = [
+                                  field.helpText ? String(field.helpText) : '',
+                                  (readOnlyField && conversionHint?.originalFormatted)
+                                    ? `Original value (before display conversion): ${conversionHint.originalFormatted}`
+                                    : ''
+                                ].filter(Boolean).join('\n\n'); %>
+                              <button type="button" class="help-tooltip-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= attrEscapeForTitle(helpTitleCombinedNs) %>" aria-label="Field help">
                                 <i class="bi bi-info-circle"></i>
                               </button>
                             <% } %>
@@ -916,9 +939,11 @@
     const fieldConfigEl = document.getElementById('reportInstanceFieldsConfig');
     const mergedDataEl = document.getElementById('reportInstanceMergedData');
     const prefillDataEl = document.getElementById('reportInstancePrefillData');
+    const serverValidationByFieldEl = document.getElementById('reportInstanceServerValidationByField');
     const snapshotComputationFieldIdsEl = document.getElementById('reportInstanceSnapshotComputationFieldIds');
     const reportReviewNavLinks = Array.from(document.querySelectorAll('.js-report-review-nav-link'));
     const instanceId = <%- JSON.stringify(String(instance?.id || '')) %>;
+    const useFrozenRenderCache = <%- JSON.stringify(Boolean(typeof useFrozenRenderCache !== 'undefined' && useFrozenRenderCache)) %>;
     const summaryFocusStorageKey = 'report_instance_validation_focus';
     let prefillRefreshModal = null;
     let prefillRefreshChanges = [];
@@ -1347,6 +1372,27 @@
         const icon = severity === 'warning' ? 'bi-exclamation-triangle' : 'bi-x-circle';
         return `<div class="${cls}"><i class="bi ${icon} me-1"></i>${String(issue?.message || 'Validation failed.')}</div>`;
       }).join('');
+    }
+
+    function clearAllFieldIssueSlots() {
+      document.querySelectorAll('.js-field-validation[data-field-validation-for]').forEach((slot) => {
+        slot.innerHTML = '';
+      });
+    }
+
+    function applyServerFieldIssues() {
+      const raw = parseJsonScript(serverValidationByFieldEl, {});
+      if (!raw || typeof raw !== 'object') return;
+      Object.keys(raw).forEach((fieldId) => {
+        const row = raw[fieldId];
+        const issues = Array.isArray(row)
+          ? row.map((issue) => ({
+            severity: String(issue?.severity || 'error').trim().toLowerCase() === 'warning' ? 'warning' : 'error',
+            message: String(issue?.message || 'Validation failed.').trim()
+          }))
+          : [];
+        setFieldIssues(fieldId, issues);
+      });
     }
 
     function helpers() {
@@ -1864,6 +1910,16 @@
     }
 
     function runClientValidation() {
+      if (useFrozenRenderCache) {
+        clearAllFieldIssueSlots();
+        applyServerFieldIssues();
+        return {
+          issuesByField: {},
+          allIssues: [],
+          errors: [],
+          warnings: []
+        };
+      }
       const fields = parseJsonScript(fieldConfigEl, []);
       const computationFields = fieldsForSnapshotComputation(fields);
       const mergedBefore = parseJsonScript(mergedDataEl, {});
@@ -1934,10 +1990,15 @@
           input.addEventListener('input', scheduleClientValidation);
           input.addEventListener('change', scheduleClientValidation);
         });
-        runClientValidation();
+        if (useFrozenRenderCache) {
+          applyServerFieldIssues();
+        } else {
+          runClientValidation();
+        }
 
         formEl.querySelectorAll('button[type="submit"][value="submit"]').forEach((btn) => {
           btn.addEventListener('click', async (event) => {
+            if (useFrozenRenderCache) return;
             const summary = runClientValidation();
             if (!summary.errors.length) return;
             event.preventDefault();
@@ -1962,6 +2023,7 @@
             return;
           }
           if (submitAction === 'submit') {
+            if (useFrozenRenderCache) return;
             const summary = runClientValidation();
             if (summary.errors.length) {
               event.preventDefault();

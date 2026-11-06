@@ -19,6 +19,7 @@ const reportAssignmentStudentEligibilityService = require('../../services/school
 const semiMonthlyReportAssignmentWizardService = require('../../services/school/semiMonthlyReportAssignmentWizardService');
 const reportRuleEngineService = require('../../services/school/reportRuleEngineService');
 const reportInstanceSaveService = require('../../services/school/reportInstanceSaveService');
+const reportPrefillRefreshPreviewService = require('../../services/school/reportPrefillRefreshPreviewService');
 const reportMatrixService = require('../../services/school/reportMatrixService');
 const reportGenerationEngineService = require('../../services/school/reportGenerationEngineService');
 const matrixWindowService = require('../../services/school/matrixWindowService');
@@ -32,7 +33,6 @@ const sessionConductService = require('../../services/school/sessionConductServi
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
 const classReferenceSyncService = require('../../services/school/classReferenceSyncService');
-const { getPrefillValue } = require('../../services/school/reportPrefillKeyUtils');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const reportTemplateModel = require('../../models/school/reportTemplateModel');
 const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
@@ -219,136 +219,6 @@ function sendGuardedResponse(res, guardResult, duplicateMessage, duplicateStatus
 
 function hydrateInitialAnswersFromPrefill(template, instance, options = {}) {
   return reportGenerationEngineService.hydrateAnswersFromPrefill(template, instance, options);
-}
-
-function coercePrefillValueForField(field, rawPrefill) {
-  return reportGenerationEngineService.coercePrefillValueForField(field, rawPrefill);
-}
-
-function evaluateExpressionFieldValue(field, answers, prefill) {
-  return reportGenerationEngineService.evaluateExpressionFieldValue(field, answers, prefill);
-}
-
-function coerceExpressionValueForField(field, rawValue) {
-  return reportGenerationEngineService.coerceExpressionValueForField(field, rawValue);
-}
-
-function stableValueToken(value) {
-  return reportGenerationEngineService.stableValueToken(value);
-}
-
-function buildAssignmentSnapshotFallback(instance, assignment) {
-  return assignment || {
-    classId: instance.classId,
-    orgId: instance.orgId,
-    sessionId: instance.sessionId,
-    sessionDate: instance.sessionDate,
-    teacherIds: [instance.teacherId].filter(Boolean),
-    reportStartDate: instance.reportStartDate,
-    reportDueDate: instance.reportDueDate,
-    dueDate: instance.dueDate
-  };
-}
-
-async function buildPrefillRefreshPreview({ instance, template, assignment, reqUser }) {
-  const oldPrefill = instance?.prefillSnapshot && typeof instance.prefillSnapshot === 'object'
-    ? instance.prefillSnapshot
-    : {};
-  const refreshedPrefill = await reportService.buildPrefillSnapshot({
-    assignment: buildAssignmentSnapshotFallback(instance, assignment),
-    teacherId: instance.teacherId,
-    studentId: instance.studentId,
-    reqUser,
-    requiredKeys: reportService.resolveTemplateFillKeys(template)
-  });
-  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
-  const scopeCtx = reportService.resolveSnapshotScopeContext(template);
-  const currentMerged = reportService.mergeTemplateData(template, instance, assignment);
-  const changesByKey = new Map();
-
-  fields.forEach((field) => {
-    const type = String(field?.type || '').trim().toLowerCase();
-    if (!field?.id || type === 'section' || type === 'subheader' || type === 'row_break') return;
-    if (scopeCtx.active
-      && !reportService.fieldIsInSnapshotScope(field, scopeCtx.baseLowerSet, scopeCtx.placeholderMap)) {
-      return;
-    }
-
-    const valueMode = reportRuleEngineService.normalizeValueMode(field?.valueMode);
-    if (valueMode === 'calculated' || valueMode === 'derived_editable') {
-      const oldExprValue = evaluateExpressionFieldValue(field, instance?.answers || {}, oldPrefill);
-      const newExprValue = evaluateExpressionFieldValue(field, instance?.answers || {}, refreshedPrefill);
-      if (stableValueToken(oldExprValue) === stableValueToken(newExprValue)) return;
-
-      const changeKey = `__field__${String(field.id)}`;
-      const oldValue = coerceExpressionValueForField(field, oldExprValue);
-      const newValue = coerceExpressionValueForField(field, newExprValue);
-      const skippedDueToOverride = valueMode === 'derived_editable'
-        && instance?.derivedOverrides?.[field.id] === true;
-
-      changesByKey.set(changeKey, {
-        prefillKey: changeKey,
-        expressionDriven: true,
-        fieldId: String(field.id),
-        oldRawValue: oldExprValue,
-        newRawValue: newExprValue,
-        fields: [{
-          fieldId: String(field.id || ''),
-          label: String(field.label || field.id || ''),
-          type,
-          oldValue,
-          newValue,
-          currentValue: currentMerged[field.id],
-          oldRawValue: oldExprValue,
-          newRawValue: newExprValue,
-          skippedDueToOverride
-        }]
-      });
-      return;
-    }
-
-    const prefillKey = reportService.normalizePrefillKey(field?.prefillKey || '');
-    if (!prefillKey) return;
-
-    const oldResolved = getPrefillValue(oldPrefill, prefillKey);
-    const newResolved = getPrefillValue(refreshedPrefill, prefillKey);
-    if (!newResolved.found) return;
-
-    const oldRawValue = oldResolved.found ? oldResolved.value : undefined;
-    const newRawValue = newResolved.value;
-    const oldValue = coercePrefillValueForField(field, oldRawValue);
-    const newValue = coercePrefillValueForField(field, newRawValue);
-    const currentValue = currentMerged[field.id];
-    const prefillChanged = stableValueToken(oldRawValue) !== stableValueToken(newRawValue);
-    const differsFromCurrent = stableValueToken(newValue) !== stableValueToken(currentValue);
-    if (!prefillChanged && !differsFromCurrent) return;
-
-    if (!changesByKey.has(prefillKey)) {
-      changesByKey.set(prefillKey, {
-        prefillKey,
-        oldRawValue,
-        newRawValue,
-        fields: []
-      });
-    }
-
-    changesByKey.get(prefillKey).fields.push({
-      fieldId: String(field.id || ''),
-      label: String(field.label || field.id || ''),
-      type,
-      oldValue,
-      newValue,
-      currentValue,
-      oldRawValue,
-      newRawValue,
-      skippedDueToOverride: instance?.derivedOverrides?.[field.id] === true
-    });
-  });
-
-  return {
-    refreshedPrefill,
-    changes: Array.from(changesByKey.values())
-  };
 }
 
 async function showHome(req, res) {
@@ -2047,7 +1917,9 @@ async function buildInstanceEditorRenderContext(req) {
   let latestInstance = await schoolDataService.getDataById('reportInstances', req.params.id, req.user);
   const canEditAnswers = await reportViewService.canEditReportInstanceAnswers(latestInstance, req.user);
   const isAdminEditor = await reportViewService.isReportInstanceAdminEditor(req.user);
-  if (canEditAnswers) {
+  const freezeOnOpen = reportService.shouldFreezeReportInstanceOnOpen(template, latestInstance);
+
+  if (canEditAnswers && !freezeOnOpen) {
     // Refresh prefill so Step 1 conduct saved after instance create still flows into rating fields.
     const freshPrefill = await reportService.buildPrefillSnapshot({
       assignment: effectiveAssignment || assignment,
@@ -2086,24 +1958,54 @@ async function buildInstanceEditorRenderContext(req) {
   const editorMergeOptions = reportService.templateUsesSnapshotScope(template)
     ? { respectSnapshotKeys: true }
     : {};
-  const mergedBeforeCalculation = reportService.mergeTemplateData(
-    template,
-    latestInstance,
-    effectiveAssignment,
-    editorMergeOptions
-  );
+  let mergedBeforeCalculation;
+  let skipRecalculation = false;
+  if (freezeOnOpen && reportService.isInstanceRenderCacheValid(template, latestInstance)) {
+    mergedBeforeCalculation = { ...latestInstance.renderCache.mergedAnswers };
+    skipRecalculation = true;
+  } else {
+    mergedBeforeCalculation = reportService.mergeTemplateData(
+      template,
+      latestInstance,
+      effectiveAssignment,
+      editorMergeOptions
+    );
+  }
   const preparedForRender = reportRuleEngineService.prepareReportAnswersForUI({
     template,
     mergedAnswers: mergedBeforeCalculation,
-    prefill: latestInstance?.prefillSnapshot || {}
+    prefill: latestInstance?.prefillSnapshot || {},
+    skipRecalculation
   });
   const mergedDataForValidation = preparedForRender.calculationAnswers;
   const validationSummary = reportRuleEngineService.evaluateTemplateValidations({
     template,
     mergedAnswers: mergedDataForValidation,
-    prefill: latestInstance?.prefillSnapshot || {}
+    prefill: latestInstance?.prefillSnapshot || {},
+    skipRecalculation
   });
   const mergedData = preparedForRender.displayAnswers;
+
+  function formatConversionOriginalForTooltip(value) {
+    if (value === undefined) return '(not set)';
+    if (value === null || value === '') return '(empty)';
+    if (typeof value === 'object') {
+      try {
+        return JSON.stringify(value);
+      } catch (_) {
+        return String(value);
+      }
+    }
+    return String(value);
+  }
+  const conversionDisplayHints = {};
+  const editorFields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  editorFields.forEach((field) => {
+    if (!field?.id || !reportRuleEngineService.shouldApplyReadOnlyDisplayConversion(field)) return;
+    conversionDisplayHints[String(field.id)] = {
+      originalFormatted: formatConversionOriginalForTooltip(mergedDataForValidation[field.id])
+    };
+  });
 
   const studentPersonId = String(latestInstance.studentId || '').trim();
   const [classSessions, teacherPerson, studentRowsByPerson, studentPersonDirect] = await Promise.all([
@@ -2171,6 +2073,7 @@ async function buildInstanceEditorRenderContext(req) {
     instanceDetails,
     mergedData,
     mergedDataForClient: mergedDataForValidation,
+    conversionDisplayHints,
     validationSummary,
     snapshotComputationFieldIds: reportService.resolveSnapshotComputationFieldIds(template),
     reportReviewNavigator,
@@ -2187,7 +2090,8 @@ async function buildInstanceEditorRenderContext(req) {
     safeReturnUrl: resolveSafeSameOriginReturnUrl(req, latestInstance?.id),
     includeModal: true,
     user: req.user,
-    actionStateId: req.actionStateId
+    actionStateId: req.actionStateId,
+    useFrozenRenderCache: freezeOnOpen
   };
 }
 
@@ -2449,11 +2353,27 @@ async function previewInstancePrefillRefresh(req, res) {
       });
     }
 
+    const statusLower = String(instance.status || '').toLowerCase();
+    if (statusLower === 'submitted') {
+      const isAdminEditor = await reportViewService.isReportInstanceAdminEditor(req.user);
+      if (!isAdminEditor) {
+        return res.status(403).json({
+          status: 'error',
+          message: 'Only an administrator can preview prefill updates on a submitted report.'
+        });
+      }
+    }
+
     const effectiveAssignment = reportViewService.applyAssignmentRow(
       assignment,
       reportViewService.findAssignmentRow(assignment, instance.assignmentRowId || '')
     );
-    const preview = await buildPrefillRefreshPreview({ instance, template, assignment: effectiveAssignment, reqUser: req.user });
+    const preview = await reportPrefillRefreshPreviewService.buildPrefillRefreshPreview({
+      instance,
+      template,
+      assignment: effectiveAssignment,
+      reqUser: req.user
+    });
     return res.json({
       status: 'success',
       message: preview.changes.length
@@ -2470,6 +2390,16 @@ async function previewInstancePrefillRefresh(req, res) {
 async function applyInstancePrefillRefresh(req, res) {
   try {
     const instance = await reportIntegrityService.getEditableInstanceOrThrow(req.params.id, req.user);
+    const statusLower = String(instance.status || '').toLowerCase();
+    if (statusLower === 'submitted') {
+      const isAdminEditor = await reportViewService.isReportInstanceAdminEditor(req.user);
+      if (!isAdminEditor) {
+        return res.status(403).json({
+          status: 'error',
+          message: 'Only an administrator can apply prefill updates on a submitted report.'
+        });
+      }
+    }
     const [template, assignment] = await Promise.all([
       schoolDataService.getDataById('reportTemplates', instance.templateId, req.user),
       schoolDataService.getDataById('reportAssignments', instance.assignmentId, req.user)
@@ -2492,7 +2422,12 @@ async function applyInstancePrefillRefresh(req, res) {
       throw new Error('Select at least one prefill key to replace.');
     }
 
-    const preview = await buildPrefillRefreshPreview({ instance, template, assignment: effectiveAssignment, reqUser: req.user });
+    const preview = await reportPrefillRefreshPreviewService.buildPrefillRefreshPreview({
+      instance,
+      template,
+      assignment: effectiveAssignment,
+      reqUser: req.user
+    });
     const selectedChanges = preview.changes.filter((change) => selectedKeys.has(change.prefillKey));
     if (!selectedChanges.length) {
       throw new Error('The selected prefill keys no longer have changes to apply.');
@@ -2545,14 +2480,34 @@ async function applyInstancePrefillRefresh(req, res) {
       nextAnswers[field.id] = recomputedAfterPrefillRefresh.answers[field.id];
     });
 
+    const mergedForRenderCache = reportService.mergeTemplateData(
+      template,
+      {
+        ...(instance || {}),
+        prefillSnapshot: nextPrefill,
+        answers: nextAnswers,
+        derivedOverrides: nextDerivedOverrides
+      },
+      effectiveAssignment
+    );
+    const templateVersionForCache = Number(template?.version || instance.templateVersion || 1) || 1;
+    const renderCacheUpdatedAt = new Date().toISOString();
+    const renderCache = {
+      templateId: String(template?.id || instance.templateId || '').trim(),
+      templateVersion: templateVersionForCache,
+      capturedAt: renderCacheUpdatedAt,
+      mergedAnswers: { ...mergedForRenderCache }
+    };
+
     await schoolDataService.updateData('reportInstances', instance.id, {
       prefillSnapshot: nextPrefill,
       answers: nextAnswers,
       derivedOverrides: nextDerivedOverrides,
+      renderCache,
       audit: {
         lastUpdateUser: req.user?.id || '',
-        lastUpdateDateTime: new Date().toISOString(),
-        prefillRefreshedAt: new Date().toISOString()
+        lastUpdateDateTime: renderCacheUpdatedAt,
+        prefillRefreshedAt: renderCacheUpdatedAt
       }
     }, req.user);
 
@@ -2721,6 +2676,7 @@ async function reopenInstance(req, res) {
 
     await schoolDataService.updateData('reportInstances', instance.id, {
       status: 'draft',
+      renderCache: null,
       audit: {
         lastUpdateUser: req.user?.id || '',
         lastUpdateDateTime: now,
@@ -3135,7 +3091,9 @@ async function exportReportMatrix(req, res) {
           studentId: row.studentId,
           status: row.status,
           answers: row.answers,
-          prefillSnapshot: row.prefillSnapshot
+          prefillSnapshot: row.prefillSnapshot,
+          renderCache: row.renderCache || null,
+          audit: row.audit || {}
         };
         const pdfKey = selectionByStudent.get(String(row.studentId))
           || suggestedByStudent.get(String(row.studentId))
@@ -3145,7 +3103,16 @@ async function exportReportMatrix(req, res) {
           throw new Error(`No PDF template available for student ${row.studentName || row.studentId}.`);
         }
         const placeholderBundle = reportService.buildPdfPlaceholderPayloadDetailed(template, instance, effectiveAssignment);
-        const mergedAnswers = reportService.mergeTemplateData(template, instance, effectiveAssignment);
+        const editorMergeOpts = reportService.templateUsesSnapshotScope(template)
+          ? { respectSnapshotKeys: true }
+          : {};
+        const mergedAnswers = reportService.resolveInstanceMergedAnswersForDisplay({
+          template,
+          instance,
+          assignment: effectiveAssignment,
+          options: { scopeOptions: editorMergeOpts },
+          lockSnapshot: null
+        });
         const file = await reportPdfRenderService.renderReportInstancePdf({
           template,
           instance,
@@ -3215,7 +3182,9 @@ async function exportReportMatrix(req, res) {
         studentId: row.studentId,
         status: row.status,
         answers: row.answers,
-        prefillSnapshot: row.prefillSnapshot
+        prefillSnapshot: row.prefillSnapshot,
+        renderCache: row.renderCache || null,
+        audit: row.audit || {}
       };
       const docxKey = selectionByStudent.get(String(row.studentId))
         || suggestedByStudent.get(String(row.studentId))
@@ -3316,7 +3285,6 @@ module.exports = {
   previewInstanceDocxExport,
   previewInstancePdfExport,
   exportInstance,
-  hydrateInitialAnswersFromPrefill,
-  buildPrefillRefreshPreview
+  hydrateInitialAnswersFromPrefill
 };
 

@@ -1116,12 +1116,26 @@ function templateForSnapshotComputation(template) {
   }
 }
 
-function prepareReportAnswersForUI({ template, mergedAnswers = {}, prefill = {} } = {}) {
+function prepareReportAnswersForUI({
+  template,
+  mergedAnswers = {},
+  prefill = {},
+  skipRecalculation = false
+} = {}) {
   const computationTemplate = templateForSnapshotComputation(template);
-  const recalculated = recomputeCalculatedAnswers({ template: computationTemplate, mergedAnswers, prefill });
-  const calculationAnswers = recalculated.answers && typeof recalculated.answers === 'object'
-    ? recalculated.answers
-    : (mergedAnswers && typeof mergedAnswers === 'object' ? { ...mergedAnswers } : {});
+  let calculationAnswers;
+  let diagnostics = [];
+  let orderedIds = [];
+  if (skipRecalculation) {
+    calculationAnswers = mergedAnswers && typeof mergedAnswers === 'object' ? { ...mergedAnswers } : {};
+  } else {
+    const recalculated = recomputeCalculatedAnswers({ template: computationTemplate, mergedAnswers, prefill });
+    calculationAnswers = recalculated.answers && typeof recalculated.answers === 'object'
+      ? recalculated.answers
+      : (mergedAnswers && typeof mergedAnswers === 'object' ? { ...mergedAnswers } : {});
+    diagnostics = recalculated.diagnostics || [];
+    orderedIds = recalculated.orderedIds || [];
+  }
   const displayAnswers = applyReadOnlyDisplayConversions({
     template,
     mergedAnswers: calculationAnswers,
@@ -1130,8 +1144,8 @@ function prepareReportAnswersForUI({ template, mergedAnswers = {}, prefill = {} 
   return {
     calculationAnswers,
     displayAnswers,
-    diagnostics: recalculated.diagnostics || [],
-    orderedIds: recalculated.orderedIds || []
+    diagnostics,
+    orderedIds
   };
 }
 
@@ -1204,17 +1218,30 @@ function evaluateFieldValidations({ field, value, answers = {}, prefill = {} }) 
   return issues;
 }
 
-function evaluateTemplateValidations({ template, mergedAnswers = {}, prefill = {}, extraIssues = [] }) {
+function evaluateTemplateValidations({
+  template,
+  mergedAnswers = {},
+  prefill = {},
+  extraIssues = [],
+  skipRecalculation = false
+} = {}) {
   const computationTemplate = templateForSnapshotComputation(template);
   const fields = Array.isArray(computationTemplate?.schema?.fields) ? computationTemplate.schema.fields : [];
   const answersRaw = mergedAnswers && typeof mergedAnswers === 'object' ? mergedAnswers : {};
   const prefillSafe = prefill && typeof prefill === 'object' ? prefill : {};
-  const recalculated = recomputeCalculatedAnswers({
-    template: computationTemplate,
-    mergedAnswers: answersRaw,
-    prefill: prefillSafe
-  });
-  const answers = recalculated.answers;
+  let recalculated;
+  let answers;
+  if (skipRecalculation) {
+    answers = { ...answersRaw };
+    recalculated = { diagnostics: [] };
+  } else {
+    recalculated = recomputeCalculatedAnswers({
+      template: computationTemplate,
+      mergedAnswers: answersRaw,
+      prefill: prefillSafe
+    });
+    answers = recalculated.answers;
+  }
   const issues = [];
 
   fields.forEach((field) => {

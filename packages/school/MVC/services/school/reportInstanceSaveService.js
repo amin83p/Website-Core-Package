@@ -163,18 +163,56 @@ async function persistInstanceAnswers({
     }
   }
 
-  const updatedInstance = await schoolDataService.updateData('reportInstances', instance.id, {
-    answers: studentAnswers,
-    derivedOverrides,
-    status: nextStatus,
-    audit: {
-      lastUpdateUser: reqUser?.id || '',
-      lastUpdateDateTime: new Date().toISOString(),
-      submittedAt: nextStatus === 'submitted'
-        ? (instance.audit?.submittedAt || new Date().toISOString())
-        : instance.audit?.submittedAt
-    }
-  }, reqUser);
+  const nowIso = new Date().toISOString();
+  const templateVersionForCache = Number(template?.version || instance.templateVersion || 1) || 1;
+  const renderCache = {
+    templateId: String(template?.id || instance.templateId || '').trim(),
+    templateVersion: templateVersionForCache,
+    capturedAt: nowIso,
+    mergedAnswers: { ...mergedForValidation }
+  };
+
+  const sharedAuditBase = {
+    lastUpdateUser: reqUser?.id || '',
+    lastUpdateDateTime: nowIso,
+    lastDraftSavedAt: nowIso,
+    ...(instance.audit?.firstSavedAt ? {} : { firstSavedAt: nowIso })
+  };
+
+  let updatedInstance;
+  if (isSubmitAction && nextStatus === 'submitted') {
+    // Two-step persist: same answers/renderCache as draft, then status submitted (audit trail).
+    await schoolDataService.updateData('reportInstances', instance.id, {
+      answers: studentAnswers,
+      derivedOverrides,
+      status: 'draft',
+      renderCache,
+      audit: {
+        ...sharedAuditBase,
+        submittedAt: instance.audit?.submittedAt
+      }
+    }, reqUser);
+    const submittedAtIso = new Date().toISOString();
+    updatedInstance = await schoolDataService.updateData('reportInstances', instance.id, {
+      status: 'submitted',
+      audit: {
+        lastUpdateUser: reqUser?.id || '',
+        lastUpdateDateTime: submittedAtIso,
+        submittedAt: submittedAtIso
+      }
+    }, reqUser);
+  } else {
+    updatedInstance = await schoolDataService.updateData('reportInstances', instance.id, {
+      answers: studentAnswers,
+      derivedOverrides,
+      status: nextStatus,
+      renderCache,
+      audit: {
+        ...sharedAuditBase,
+        submittedAt: instance.audit?.submittedAt
+      }
+    }, reqUser);
+  }
 
   return {
     updatedInstance,

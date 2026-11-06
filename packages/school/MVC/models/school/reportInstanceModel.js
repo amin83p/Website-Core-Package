@@ -93,6 +93,20 @@ function sanitizeLockSnapshot(raw, existing = null) {
   };
 }
 
+function sanitizeRenderCache(raw, existing = null) {
+  if (raw === null || raw === undefined || raw === '') return null;
+  if (!isPlainObject(raw)) {
+    if (existing?.renderCache && isPlainObject(existing.renderCache)) return existing.renderCache;
+    return null;
+  }
+  return {
+    templateId: cleanId(raw.templateId, { max: 80, allowEmpty: true }) || '',
+    templateVersion: cleanInteger(raw.templateVersion, { min: 1, max: 1000, allowEmpty: true }) || 1,
+    capturedAt: cleanString(raw.capturedAt, { max: 60, allowEmpty: true }) || new Date().toISOString(),
+    mergedAnswers: cleanPlainObject(raw.mergedAnswers, 'renderCache.mergedAnswers')
+  };
+}
+
 function sanitizeDerivedOverrides(value) {
   const derivedOverrides = {};
   if (!isPlainObject(value)) return derivedOverrides;
@@ -128,7 +142,11 @@ function sanitizeAudit(v, existingAudit = {}) {
     unlockedAt: cleanString(raw.unlockedAt || existingAudit.unlockedAt, { max: 60, allowEmpty: true }),
     unlockedBy: cleanString(raw.unlockedBy || existingAudit.unlockedBy, { max: 80, allowEmpty: true }),
     archivedAt: cleanString(raw.archivedAt || existingAudit.archivedAt, { max: 60, allowEmpty: true }),
-    archivedReason: cleanString(raw.archivedReason || existingAudit.archivedReason, { max: 500, allowEmpty: true })
+    archivedReason: cleanString(raw.archivedReason || existingAudit.archivedReason, { max: 500, allowEmpty: true }),
+    firstSavedAt: cleanString(raw.firstSavedAt || existingAudit.firstSavedAt, { max: 60, allowEmpty: true }),
+    lastDraftSavedAt: cleanString(raw.lastDraftSavedAt || existingAudit.lastDraftSavedAt, { max: 60, allowEmpty: true }),
+    prefillHydratedAt: cleanString(raw.prefillHydratedAt || existingAudit.prefillHydratedAt, { max: 60, allowEmpty: true }),
+    prefillRefreshedAt: cleanString(raw.prefillRefreshedAt || existingAudit.prefillRefreshedAt, { max: 60, allowEmpty: true })
   };
 }
 
@@ -166,6 +184,12 @@ function sanitizeInstance(input, { isUpdate = false, existing = null } = {}) {
       ? null
       : sanitizeLockSnapshot(
         input.lockSnapshot !== undefined ? input.lockSnapshot : existing?.lockSnapshot,
+        existing
+      ),
+    renderCache: input.renderCache === null
+      ? null
+      : sanitizeRenderCache(
+        input.renderCache !== undefined ? input.renderCache : existing?.renderCache,
         existing
       ),
     derivedOverrides: sanitizeDerivedOverrides(input.derivedOverrides),
@@ -309,7 +333,8 @@ module.exports = {
   addInstance,
   updateInstance,
   deleteInstance,
-  clearByOrg
+  clearByOrg,
+  sanitizeInstance
 };
 
 

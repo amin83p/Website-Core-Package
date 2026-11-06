@@ -4004,6 +4004,78 @@ function resolveExportLockSnapshot(instance) {
   return instance.lockSnapshot;
 }
 
+/**
+ * After the first successful save (audit.firstSavedAt), draft/submitted opens may use
+ * persisted renderCache.mergedAnswers instead of recomputing mergeTemplateData.
+ */
+function isInstanceRenderCacheValid(template, instance) {
+  if (!instance?.audit?.firstSavedAt) return false;
+  const rc = instance.renderCache;
+  if (!rc || typeof rc !== 'object' || !rc.mergedAnswers || typeof rc.mergedAnswers !== 'object') {
+    return false;
+  }
+  const tid = String(template?.id || '').trim();
+  if (!tid || String(rc.templateId || '').trim() !== tid) return false;
+  const templateVersion = Number(template?.version || instance?.templateVersion || 1) || 1;
+  const cacheVersion = Number(rc.templateVersion || 0) || 0;
+  return cacheVersion === templateVersion;
+}
+
+/**
+ * True when the instance editor should not auto-refresh prefill or run merge+recalc on GET.
+ */
+function shouldFreezeReportInstanceOnOpen(template, instance) {
+  const status = String(instance?.status || '').toLowerCase();
+  if (status === 'locked' || status === 'archived') return false;
+  if (!(status === 'draft' || status === 'submitted')) return false;
+  return isInstanceRenderCacheValid(template, instance);
+}
+
+/**
+ * Resolve merged answers for export/matrix: lock snapshot > render cache > live mergeTemplateData.
+ */
+/**
+ * Always run full mergeTemplateData from persisted instance (ignore renderCache shortcut).
+ * Use for prefill preview and any path that must reflect stored answers + prefill recomputed.
+ */
+function mergeTemplateDataLivePersisted(template, instance, assignment = null, options = {}) {
+  const scopeOptions = options.scopeOptions !== undefined
+    ? options.scopeOptions
+    : (templateUsesSnapshotScope(template) ? { respectSnapshotKeys: true } : {});
+  return mergeTemplateData(template, instance, assignment, scopeOptions);
+}
+
+function resolveInstanceMergedAnswersForDisplay({
+  template,
+  instance,
+  assignment = null,
+  options = {},
+  lockSnapshot = null
+} = {}) {
+  const scopeOptions = options.scopeOptions !== undefined
+    ? options.scopeOptions
+    : (templateUsesSnapshotScope(template) ? { respectSnapshotKeys: true } : {});
+  const ctx = resolveSnapshotScopeContext(template);
+  const resolvedLock = lockSnapshot !== undefined && lockSnapshot !== null
+    ? lockSnapshot
+    : resolveExportLockSnapshot(instance);
+
+  if (resolvedLock?.mergedAnswers && typeof resolvedLock.mergedAnswers === 'object') {
+    return ctx.active
+      ? stripOutOfScopeMergedAnswers(template, resolvedLock.mergedAnswers, ctx)
+      : { ...resolvedLock.mergedAnswers };
+  }
+
+  if (isInstanceRenderCacheValid(template, instance)) {
+    const rc = instance.renderCache;
+    return ctx.active
+      ? stripOutOfScopeMergedAnswers(template, rc.mergedAnswers, ctx)
+      : { ...rc.mergedAnswers };
+  }
+
+  return mergeTemplateData(template, instance, assignment, scopeOptions);
+}
+
 function filterAnswersToSnapshotScope(template, answers = {}) {
   const fieldIds = resolveSnapshotComputationFieldIds(template);
   if (!fieldIds) {
@@ -4042,7 +4114,12 @@ async function buildReportInstanceExportPayload({
   const fillKeySet = resolveTemplateFillKeys(template);
 
   let workingInstance = instance;
-  if (!lockSnapshot && reqUser) {
+  const skipPrefillRefresh = Boolean(
+    !lockSnapshot
+      && reqUser
+      && isInstanceRenderCacheValid(template, instance)
+  );
+  if (!lockSnapshot && reqUser && !skipPrefillRefresh) {
     const freshPrefill = await buildPrefillSnapshot({
       assignment,
       teacherId: instance?.teacherId,
@@ -4063,7 +4140,13 @@ async function buildReportInstanceExportPayload({
       ? stripOutOfScopeMergedAnswers(template, lockSnapshot.mergedAnswers, ctx)
       : { ...lockSnapshot.mergedAnswers };
   } else {
-    mergedAnswers = mergeTemplateData(template, workingInstance, assignment, scopeOptions);
+    mergedAnswers = resolveInstanceMergedAnswersForDisplay({
+      template,
+      instance: workingInstance,
+      assignment,
+      options: { scopeOptions },
+      lockSnapshot
+    });
   }
 
   let placeholderBundle;
@@ -4220,6 +4303,10 @@ module.exports = {
   buildReportInstanceExportPayload,
   resolveExportLockSnapshot,
   filterAnswersToSnapshotScope,
+  isInstanceRenderCacheValid,
+  shouldFreezeReportInstanceOnOpen,
+  resolveInstanceMergedAnswersForDisplay,
+  mergeTemplateDataLivePersisted,
   buildTemplateSnapshotKeySuggestions,
   resolveSnapshotKeyLabel,
   resolveCanonicalSnapshotKeyForField,
