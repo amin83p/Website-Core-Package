@@ -2064,6 +2064,11 @@ async function buildInstanceEditorRenderContext(req) {
     assignmentRowId: assignmentRowIdForGate
   });
 
+  const instStatusLower = String(latestInstance?.status || '').toLowerCase();
+  const renderCacheStaleVersusTemplate = instStatusLower !== 'locked'
+    && freezeOnOpen
+    && reportService.isTemplateVersionAheadOfRenderCache(template, latestInstance);
+
   return {
     title: `Report Editor: ${template.title}`,
     instance: latestInstance,
@@ -2091,7 +2096,8 @@ async function buildInstanceEditorRenderContext(req) {
     includeModal: true,
     user: req.user,
     actionStateId: req.actionStateId,
-    useFrozenRenderCache: freezeOnOpen
+    useFrozenRenderCache: freezeOnOpen,
+    renderCacheStaleVersusTemplate
   };
 }
 

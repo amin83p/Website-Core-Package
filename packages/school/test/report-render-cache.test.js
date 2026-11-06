@@ -28,7 +28,7 @@ const simpleTemplate = {
   }
 };
 
-test('isInstanceRenderCacheValid requires firstSavedAt, matching template id/version, mergedAnswers', () => {
+test('isInstanceRenderCacheValid requires firstSavedAt, matching template id, mergedAnswers (ignores version mismatch)', () => {
   assert.equal(reportService.isInstanceRenderCacheValid(simpleTemplate, { audit: {} }), false);
   assert.equal(reportService.isInstanceRenderCacheValid(simpleTemplate, {
     audit: { firstSavedAt: '2025-01-01T00:00:00.000Z' },
@@ -47,6 +47,45 @@ test('isInstanceRenderCacheValid requires firstSavedAt, matching template id/ver
       mergedAnswers: { name: 'a', doubled: 2 }
     }
   }), true);
+  assert.equal(reportService.isInstanceRenderCacheValid(
+    { ...simpleTemplate, version: 10 },
+    {
+      audit: { firstSavedAt: '2025-01-01T00:00:00.000Z' },
+      templateVersion: 3,
+      renderCache: {
+        templateId: 'TPL-RRC-1',
+        templateVersion: 3,
+        mergedAnswers: { name: 'a', doubled: 2 }
+      }
+    }
+  ), true);
+});
+
+test('isTemplateVersionAheadOfRenderCache is true only when live version exceeds cached', () => {
+  assert.equal(reportService.isTemplateVersionAheadOfRenderCache(simpleTemplate, { renderCache: null }), false);
+  assert.equal(reportService.isTemplateVersionAheadOfRenderCache(simpleTemplate, {
+    renderCache: { templateVersion: 3, mergedAnswers: {} }
+  }), false);
+  assert.equal(reportService.isTemplateVersionAheadOfRenderCache(
+    { ...simpleTemplate, version: 5 },
+    {
+      renderCache: {
+        templateId: 'TPL-RRC-1',
+        templateVersion: 3,
+        mergedAnswers: { name: 'a' }
+      }
+    }
+  ), true);
+  assert.equal(reportService.isTemplateVersionAheadOfRenderCache(
+    { ...simpleTemplate, version: 3 },
+    {
+      renderCache: {
+        templateId: 'TPL-RRC-1',
+        templateVersion: 3,
+        mergedAnswers: { name: 'a' }
+      }
+    }
+  ), false);
 });
 
 test('resolveInstanceMergedAnswersForDisplay uses renderCache when valid', () => {
@@ -62,6 +101,27 @@ test('resolveInstanceMergedAnswersForDisplay uses renderCache when valid', () =>
   };
   const merged = reportService.resolveInstanceMergedAnswersForDisplay({
     template: simpleTemplate,
+    instance,
+    assignment: null,
+    lockSnapshot: null
+  });
+  assert.equal(merged.name, 'cached');
+  assert.equal(merged.doubled, 999);
+});
+
+test('resolveInstanceMergedAnswersForDisplay uses renderCache when template version is newer than cache', () => {
+  const instance = {
+    status: 'draft',
+    audit: { firstSavedAt: '2025-01-01T00:00:00.000Z' },
+    templateVersion: 3,
+    renderCache: {
+      templateId: 'TPL-RRC-1',
+      templateVersion: 3,
+      mergedAnswers: { name: 'cached', doubled: 999 }
+    }
+  };
+  const merged = reportService.resolveInstanceMergedAnswersForDisplay({
+    template: { ...simpleTemplate, version: 7 },
     instance,
     assignment: null,
     lockSnapshot: null

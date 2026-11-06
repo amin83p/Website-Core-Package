@@ -29,6 +29,10 @@
     typeof sharedFieldsReopenWarning !== 'undefined' ? sharedFieldsReopenWarning : ''
   ).trim();
   const isReadOnly = !canEditAnswersSafe;
+  const renderCacheStaleVersusTemplateSafe = Boolean(
+    typeof renderCacheStaleVersusTemplate !== 'undefined' && renderCacheStaleVersusTemplate
+  );
+  const showTemplateAheadOfCacheBanner = isV2 && !isLocked && renderCacheStaleVersusTemplateSafe;
   const fieldIsDisabled = (field) => {
     if (isReadOnly) return true;
     if (hasSharedFields && field?.sharedAcrossStudents === true && !sharedFieldsEditableSafe) return true;
@@ -212,6 +216,12 @@
       <div class="fw-semibold mb-1"><i class="bi bi-lock-fill me-1"></i>Shared fields are read-only</div>
       <div class="small mb-0"><%= sharedFieldsLockReasonSafe %></div>
       <div class="small mt-1 mb-0">You can still edit student-specific (private) fields on this report.</div>
+    </div>
+  <% } %>
+
+  <% if (showTemplateAheadOfCacheBanner) { %>
+    <div class="alert alert-info border-info-subtle mb-4 py-2" role="status">
+      <div class="small mb-0">The report template was updated since your last save. Displayed values are from your last save until you use Preview Prefill Updates or save again.</div>
     </div>
   <% } %>
 

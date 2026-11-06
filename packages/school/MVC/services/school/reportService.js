@@ -4016,9 +4016,21 @@ function isInstanceRenderCacheValid(template, instance) {
   }
   const tid = String(template?.id || '').trim();
   if (!tid || String(rc.templateId || '').trim() !== tid) return false;
-  const templateVersion = Number(template?.version || instance?.templateVersion || 1) || 1;
-  const cacheVersion = Number(rc.templateVersion || 0) || 0;
-  return cacheVersion === templateVersion;
+  // Intentionally ignore template.version vs renderCache.templateVersion so formula edits
+  // do not force a full recalculation on GET; save / Preview Prefill refresh rebuilds cache.
+  return true;
+}
+
+/**
+ * True when the live template was published after the snapshot used for frozen display.
+ * For UI notice only; does not invalidate renderCache.
+ */
+function isTemplateVersionAheadOfRenderCache(template, instance) {
+  const rc = instance?.renderCache;
+  if (!rc || typeof rc !== 'object') return false;
+  const live = Number(template?.version || 1) || 1;
+  const cached = Number(rc.templateVersion || 0) || 0;
+  return cached > 0 && live > cached;
 }
 
 /**
@@ -4304,6 +4316,7 @@ module.exports = {
   resolveExportLockSnapshot,
   filterAnswersToSnapshotScope,
   isInstanceRenderCacheValid,
+  isTemplateVersionAheadOfRenderCache,
   shouldFreezeReportInstanceOnOpen,
   resolveInstanceMergedAnswersForDisplay,
   mergeTemplateDataLivePersisted,
