@@ -45,6 +45,7 @@ const sessionManagementService = require('../../services/school/sessionManagemen
 const attendanceOperationPolicyService = require('../../services/school/attendanceOperationPolicyService');
 const attendanceEnrollmentNaLockService = require('../../services/school/attendanceEnrollmentNaLockService');
 const sessionAttendanceTimingDetailService = require('../../services/school/sessionAttendanceTimingDetailService');
+const schoolRollingEnrollmentAccessService = require('../../services/school/schoolRollingEnrollmentAccessService');
 
 function buildAttendanceRouteAccessContext(req) {
     return schoolDataService.buildRouteAccessContext(req);
@@ -479,6 +480,8 @@ async function showAttendancePage(req, res) {
             maxVolumeKB: parsePositiveLimit(req.accessLimits?.maxVolumeKB)
         };
 
+        const canOpenRollingEnrollment = await schoolRollingEnrollmentAccessService.canAccessRollingEnrollment(req.user);
+
         res.render('school/attendance/attendanceViewer', {
             title: 'Attendance Matrix',
             includeModal: true,
@@ -508,7 +511,8 @@ async function showAttendancePage(req, res) {
             initialStudentId,
             initialSessionId,
             initialRange,
-            attendanceActionLimits
+            attendanceActionLimits,
+            canOpenRollingEnrollment
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
@@ -1030,6 +1034,7 @@ async function buildAttendanceMatrixPayload(req, options = {}) {
             classId: classId,
             className: classData.title,
             teacherName: resolveClassTeacherName(classData),
+            registrationMode: registrationMode === 'rolling' ? 'rolling' : 'term_based',
             startDate: String(startDate || '').trim(),
             endDate: String(endDate || '').trim(),
             sessions: buildSessions.map((s) => ({
@@ -1674,6 +1679,8 @@ async function showStudentAttendanceReportPage(req, res) {
                 )
             });
         }
+        const canOpenRollingEnrollment = await schoolRollingEnrollmentAccessService.canAccessRollingEnrollment(req.user);
+
         res.render('school/attendance/studentAttendanceReportViewer', {
             title: 'Student Attendance Report',
             includeModal: true,
@@ -1701,7 +1708,8 @@ async function showStudentAttendanceReportPage(req, res) {
             ),
             overallReportTemplateLabel: overallReportTemplateLabels[0]?.label || '',
             overallReportTemplateLabels,
-            funderPickerOptions
+            funderPickerOptions,
+            canOpenRollingEnrollment
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });

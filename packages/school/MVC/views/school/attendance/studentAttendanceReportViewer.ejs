@@ -809,6 +809,12 @@
 <% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
 <script src="/scripts/enrollmentClaimToggle.js"></script>
 <% } %>
+<% if (typeof canOpenRollingEnrollment !== 'undefined' && canOpenRollingEnrollment) { %>
+<script>
+window.__schoolRollingEnrollmentAccess = { canOpen: true };
+</script>
+<script src="/scripts/schoolRollingEnrollmentDeepLink.js"></script>
+<% } %>
 
 <script>
 (() => {
@@ -905,10 +911,13 @@
         });
     }
 
-    function buildSarAttendanceCellHtml(dayCell, personId, classId, studentName, weekBoundary = false) {
+    function buildSarAttendanceCellHtml(dayCell, personId, classId, studentName, weekBoundary = false, registrationMode = '') {
         const boundaryClass = sarShowWeekSeparators && weekBoundary ? ' sar-week-boundary' : '';
+        const regAttr = escapeHtml(String(registrationMode || '').trim());
+        const classAttr = escapeHtml(String(classId || '').trim());
+        const nameAttr = escapeHtml(String(studentName || '').trim());
         if (!dayCell?.hasSession) {
-            return `<td class="attendance-no-session-cell${boundaryClass}" title="No session scheduled"><i class="bi bi-x-lg sar-no-session-icon" aria-hidden="true"></i><span class="visually-hidden">No session scheduled</span></td>`;
+            return `<td class="attendance-no-session-cell${boundaryClass}" data-class-id="${classAttr}" data-registration-mode="${regAttr}" data-student-name="${nameAttr}" title="No session scheduled"><i class="bi bi-x-lg sar-no-session-icon" aria-hidden="true"></i><span class="visually-hidden">No session scheduled</span></td>`;
         }
         const noteBadge = dayCell.notesExist
             ? '<div class="position-absolute top-0 end-0 pe-1 pt-1"><i class="bi bi-chat-dots-fill text-primary" style="font-size: 0.65rem;"></i></div>'
@@ -924,7 +933,7 @@
             studentName
         };
         const historyBtn = window.sarAttendanceHistoryModeOn ? buildSarCellHistoryButton(detail) : '';
-        return `<td class="att-cell att-cell-tip-trigger position-relative${boundaryClass}" data-sar-cell-key="${escapeHtml(cellKey)}" tabindex="0" aria-label="${escapeHtml(ariaLabel)}">${historyBtn}${buildStatusIcon(dayCell)}${noteBadge}</td>`;
+        return `<td class="att-cell att-cell-tip-trigger position-relative${boundaryClass}" data-sar-cell-key="${escapeHtml(cellKey)}" data-class-id="${classAttr}" data-registration-mode="${regAttr}" data-student-name="${nameAttr}" tabindex="0" aria-label="${escapeHtml(ariaLabel)}">${historyBtn}${buildStatusIcon(dayCell)}${noteBadge}</td>`;
     }
 
     function formatAttendanceHistorySessionDate(ymd) {
@@ -1414,6 +1423,7 @@
                 const classId = String(classRow.classId || '').trim();
                 const className = String(classRow.className || classId).trim();
                 const teacherName = String(classRow.teacherName || '').trim();
+                const registrationMode = String(classRow.registrationMode || '').trim();
                 const matrixUrl = `/school/attendances?classId=${encodeURIComponent(classId)}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&studentId=${encodeURIComponent(personId)}`;
                 (classRow.days || []).forEach((day) => {
                     if (!day?.hasSession) return;
@@ -1432,7 +1442,8 @@
                         studentRecordId,
                         classId,
                         className,
-                        teacherName
+                        teacherName,
+                        registrationMode
                     });
                 });
             });
@@ -2014,6 +2025,7 @@
         if (enrolledClasses.length && visibleDays.length) {
             enrolledClasses.forEach((classRow) => {
                 const classId = String(classRow.classId || '').trim();
+                const registrationMode = String(classRow.registrationMode || '').trim();
                 const matrixUrl = `/school/attendances?classId=${encodeURIComponent(classId)}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&studentId=${encodeURIComponent(personId)}`;
                 let cells = '';
                 let visibleDayIndex = 0;
@@ -2022,12 +2034,15 @@
                     if (!visibleDaySet.has(date)) return;
                     const weekBoundary = Boolean(weekBoundaryFlags[visibleDayIndex]);
                     visibleDayIndex += 1;
-                    cells += buildSarAttendanceCellHtml(dayCell, personId, classId, studentName, weekBoundary);
+                    cells += buildSarAttendanceCellHtml(dayCell, personId, classId, studentName, weekBoundary, registrationMode);
                 });
+                const classIdAttr = escapeHtml(classId);
+                const regModeAttr = escapeHtml(registrationMode);
+                const studentNameAttr = escapeHtml(studentName);
                 classRows += `
-                <tr>
+                <tr class="sar-class-matrix-row" data-class-id="${classIdAttr}" data-registration-mode="${regModeAttr}" data-student-name="${studentNameAttr}">
                     ${buildAttendanceRollupCellHtml(classRow.summary)}
-                    <td class="matrix-sticky-class px-3 py-2 small fw-semibold">
+                    <td class="matrix-sticky-class px-3 py-2 small fw-semibold js-sar-rolling-class-anchor" data-class-id="${classIdAttr}" data-registration-mode="${regModeAttr}">
                         <button type="button" class="btn btn-link p-0 text-decoration-none fw-semibold sar-matrix-link" data-sar-matrix-url="${escapeHtml(matrixUrl)}">${escapeHtml(classRow.className || classId)}</button>
                         ${classRow.teacherName ? `<div class="text-muted" style="font-size:0.72rem;">${escapeHtml(classRow.teacherName)}</div>` : ''}
                     </td>
@@ -3490,7 +3505,8 @@
             detail.personId,
             detail.classId,
             detail.studentName,
-            weekBoundary
+            weekBoundary,
+            detail.registrationMode || ''
         );
         const replacement = document.createElement('template');
         replacement.innerHTML = html.trim();
@@ -3529,6 +3545,38 @@
                     startDate: document.getElementById('filter_startDate')?.value || '',
                     endDate: document.getElementById('filter_endDate')?.value || ''
                 };
+            }
+        });
+    }
+
+    if (window.SchoolRollingEnrollmentDeepLink) {
+        window.SchoolRollingEnrollmentDeepLink.initRollingEnrollmentContextMenu({
+            root: document.getElementById('studentReportSections') || document,
+            resolveContext(event) {
+                const classOnly = event.target.closest('td.js-sar-rolling-class-anchor');
+                if (classOnly) {
+                    return {
+                        classId: String(classOnly.getAttribute('data-class-id') || '').trim(),
+                        registrationMode: String(classOnly.getAttribute('data-registration-mode') || '').trim()
+                    };
+                }
+                const cell = event.target.closest('td.att-cell[data-class-id]');
+                if (cell) {
+                    return {
+                        classId: String(cell.getAttribute('data-class-id') || '').trim(),
+                        registrationMode: String(cell.getAttribute('data-registration-mode') || '').trim(),
+                        studentName: String(cell.getAttribute('data-student-name') || '').trim()
+                    };
+                }
+                const row = event.target.closest('tr.sar-class-matrix-row');
+                if (row) {
+                    return {
+                        classId: String(row.getAttribute('data-class-id') || '').trim(),
+                        registrationMode: String(row.getAttribute('data-registration-mode') || '').trim(),
+                        studentName: String(row.getAttribute('data-student-name') || '').trim()
+                    };
+                }
+                return null;
             }
         });
     }

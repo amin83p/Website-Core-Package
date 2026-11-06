@@ -413,6 +413,12 @@
 <% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
 <script src="/scripts/enrollmentClaimToggle.js"></script>
 <% } %>
+<% if (typeof canOpenRollingEnrollment !== 'undefined' && canOpenRollingEnrollment) { %>
+<script>
+window.__schoolRollingEnrollmentAccess = { canOpen: true };
+</script>
+<script src="/scripts/schoolRollingEnrollmentDeepLink.js"></script>
+<% } %>
 <script>
 (function () {
   const initialStartDate = '<%= typeof initialStartDate !== "undefined" ? initialStartDate : "" %>';
@@ -800,13 +806,18 @@
       : studentNameInner;
 
     let classRows = '';
+    const personName = String(student?.name || personId).trim();
     (student.classes || []).forEach((classRow) => {
       const classId = String(classRow.classId || '').trim();
+      const registrationMode = String(classRow.registrationMode || '').trim();
+      const classIdAttr = escapeHtml(classId);
+      const regModeAttr = escapeHtml(registrationMode);
+      const studentNameAttr = escapeHtml(personName);
       const matrixUrl = `/school/attendances?classId=${encodeURIComponent(classId)}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}&studentId=${encodeURIComponent(personId)}`;
       classRows += `
-        <tr>
+        <tr class="sar-class-matrix-row" data-class-id="${classIdAttr}" data-registration-mode="${regModeAttr}" data-student-name="${studentNameAttr}">
           ${buildClassReportRollupCellHtml(classRow.instances)}
-          <td class="matrix-sticky-class px-3 py-2 small fw-semibold">
+          <td class="matrix-sticky-class px-3 py-2 small fw-semibold js-sar-rolling-class-anchor" data-class-id="${classIdAttr}" data-registration-mode="${regModeAttr}">
             <button type="button" class="btn btn-link p-0 text-decoration-none fw-semibold sar-matrix-link" data-sar-matrix-url="${escapeHtml(matrixUrl)}">${escapeHtml(classRow.className || classId)}</button>
             ${classRow.teacherName ? `<div class="text-muted" style="font-size:0.72rem;">${escapeHtml(classRow.teacherName)}</div>` : ''}
           </td>
@@ -1880,6 +1891,30 @@
           startDate: document.getElementById('filter_startDate')?.value || '',
           endDate: document.getElementById('filter_endDate')?.value || ''
         };
+      }
+    });
+  }
+
+  if (window.SchoolRollingEnrollmentDeepLink) {
+    window.SchoolRollingEnrollmentDeepLink.initRollingEnrollmentContextMenu({
+      root: document.getElementById('studentReportSections') || document,
+      resolveContext(event) {
+        const classOnly = event.target.closest('td.js-sar-rolling-class-anchor');
+        if (classOnly) {
+          return {
+            classId: String(classOnly.getAttribute('data-class-id') || '').trim(),
+            registrationMode: String(classOnly.getAttribute('data-registration-mode') || '').trim()
+          };
+        }
+        const row = event.target.closest('tr.sar-class-matrix-row');
+        if (row) {
+          return {
+            classId: String(row.getAttribute('data-class-id') || '').trim(),
+            registrationMode: String(row.getAttribute('data-registration-mode') || '').trim(),
+            studentName: String(row.getAttribute('data-student-name') || '').trim()
+          };
+        }
+        return null;
       }
     });
   }

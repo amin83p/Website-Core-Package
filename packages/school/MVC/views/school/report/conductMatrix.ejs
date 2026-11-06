@@ -152,7 +152,7 @@
             <label class="form-label" for="cm_className">Class</label>
             <div class="input-group">
               <input type="hidden" id="cm_classId">
-              <input type="text" id="cm_className" class="form-control bg-white" placeholder="Select class..." readonly>
+              <input type="text" id="cm_className" class="form-control bg-white js-cm-rolling-class-anchor" placeholder="Select class..." readonly>
               <button type="button" class="btn btn-outline-primary" id="cm_btnClassPicker" title="Select class">
                 <i class="bi bi-book"></i>
               </button>
@@ -190,7 +190,7 @@
   <div class="card border-0 shadow-sm d-none" id="cm_results">
     <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
       <div>
-        <h5 class="m-0 fw-bold text-primary" id="cm_classTitle">Class</h5>
+        <h5 class="m-0 fw-bold text-primary js-cm-rolling-class-anchor" id="cm_classTitle">Class</h5>
         <p class="small text-muted mb-0 mt-1">Click a cell to edit. Avg column uses rated sessions with <strong>Show</strong> enabled.</p>
       </div>
       <div class="d-flex align-items-center gap-2 flex-wrap ms-md-auto">
@@ -327,9 +327,15 @@
     actionStateId: typeof actionStateId !== 'undefined' ? actionStateId : ''
   }).replace(/</g, '\\u003c').replace(/&/g, '\\u0026') %>;
 </script>
-<% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
+<% if (typeof canOpenRollingEnrollment !== 'undefined' && canOpenRollingEnrollment) { %>
+<script>
+window.__schoolRollingEnrollmentAccess = { canOpen: true };
+</script>
+<script src="/scripts/schoolRollingEnrollmentDeepLink.js"></script>
+<% } %>
 <script src="/scripts/schoolDateRangeShortcuts.js"></script>
 <script src="/scripts/schoolMatrixExpandedView.js"></script>
+<% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
 <script src="/scripts/enrollmentClaimToggle.js"></script>
 <% } %>
 <script src="/scripts/conductRatingCell.js"></script>

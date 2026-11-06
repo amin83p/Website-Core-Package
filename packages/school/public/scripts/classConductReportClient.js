@@ -189,10 +189,15 @@
       ? global.EnrollmentClaimToggle.wrapNameHtml(nameInner, { personId, studentRecordId: student.studentRecordId })
       : nameInner;
     const weekFlags = buildWeekBoundaryFlags(visibleDays);
+    const studentName = String(student?.name || personId).trim();
 
     let classRows = '';
     (student.classes || []).forEach((classRow) => {
       const classId = String(classRow.classId || '').trim();
+      const registrationMode = String(classRow.registrationMode || '').trim();
+      const classIdAttr = escapeHtml(classId);
+      const regModeAttr = escapeHtml(registrationMode);
+      const studentNameAttr = escapeHtml(studentName);
       const matrixUrl = `/school/conduct-matrix?classId=${encodeURIComponent(classId)}&startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`;
       let cells = '';
       let vi = 0;
@@ -202,11 +207,11 @@
         const weekClass = showWeekSeparators && weekFlags[vi] ? ' ccr-week-boundary' : '';
         vi += 1;
         const inner = buildCellInnerHtml(dayCell);
-        cells += `<td class="cm-matrix-cell${weekClass}" data-ccr-cell="1" data-person-id="${escapeHtml(personId)}" data-class-id="${escapeHtml(classId)}" data-date="${escapeHtml(date)}" data-session-id="${escapeHtml(dayCell.sessionId || '')}">${inner}</td>`;
+        cells += `<td class="cm-matrix-cell${weekClass}" data-ccr-cell="1" data-person-id="${escapeHtml(personId)}" data-class-id="${escapeHtml(classId)}" data-registration-mode="${regModeAttr}" data-student-name="${studentNameAttr}" data-date="${escapeHtml(date)}" data-session-id="${escapeHtml(dayCell.sessionId || '')}">${inner}</td>`;
       });
-      classRows += `<tr>
+      classRows += `<tr class="ccr-class-matrix-row" data-class-id="${classIdAttr}" data-registration-mode="${regModeAttr}" data-student-name="${studentNameAttr}">
         <td class="ccr-sticky-rollup px-2 py-2 text-center">${buildRollupInnerHtml(classRow.summary)}</td>
-        <td class="ccr-sticky-class px-3 py-2 small fw-semibold">
+        <td class="ccr-sticky-class px-3 py-2 small fw-semibold js-ccr-rolling-class-anchor" data-class-id="${classIdAttr}" data-registration-mode="${regModeAttr}">
           <a href="${escapeHtml(matrixUrl)}" class="text-decoration-none fw-semibold" target="_blank" rel="noopener noreferrer">${escapeHtml(classRow.className || classId)}</a>
           ${classRow.teacherName ? `<div class="text-muted" style="font-size:0.72rem;">${escapeHtml(classRow.teacherName)}</div>` : ''}
         </td>
@@ -1152,6 +1157,38 @@
     if (ccrOpenedFromUrlQuery) {
       runWhenReportMessageModalReady(() => {
         void promptLoadReportFromUrlLink();
+      });
+    }
+
+    if (global.SchoolRollingEnrollmentDeepLink) {
+      global.SchoolRollingEnrollmentDeepLink.initRollingEnrollmentContextMenu({
+        root: document.getElementById('ccrStudentSections') || document,
+        resolveContext(event) {
+          const classAnchor = event.target.closest('td.js-ccr-rolling-class-anchor');
+          if (classAnchor) {
+            return {
+              classId: String(classAnchor.getAttribute('data-class-id') || '').trim(),
+              registrationMode: String(classAnchor.getAttribute('data-registration-mode') || '').trim()
+            };
+          }
+          const cell = event.target.closest('td[data-ccr-cell][data-class-id][data-person-id]');
+          if (cell) {
+            return {
+              classId: String(cell.getAttribute('data-class-id') || '').trim(),
+              registrationMode: String(cell.getAttribute('data-registration-mode') || '').trim(),
+              studentName: String(cell.getAttribute('data-student-name') || '').trim()
+            };
+          }
+          const row = event.target.closest('tr.ccr-class-matrix-row');
+          if (row) {
+            return {
+              classId: String(row.getAttribute('data-class-id') || '').trim(),
+              registrationMode: String(row.getAttribute('data-registration-mode') || '').trim(),
+              studentName: String(row.getAttribute('data-student-name') || '').trim()
+            };
+          }
+          return null;
+        }
       });
     }
   });

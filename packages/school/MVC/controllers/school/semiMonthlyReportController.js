@@ -9,6 +9,7 @@ const studentAttendanceReportService = require('../../services/school/studentAtt
 const reportViewService = require('../../services/school/reportViewService');
 const reportFunderDocxService = require('../../services/school/reportFunderDocxService');
 const enrollmentClaimDisplayService = require('../../services/school/enrollmentClaimDisplayService');
+const schoolRollingEnrollmentAccessService = require('../../services/school/schoolRollingEnrollmentAccessService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 function parseIdListParam(value = '') {
@@ -48,6 +49,7 @@ async function showSemiMonthlyReportPage(req, res) {
       ? await reportFunderDocxService.loadActiveFunderOptions(req.user, activeOrgId).catch(() => [])
       : [];
     const funderPickerOptions = reportFunderDocxService.buildFunderPickerOptions(activeFunders);
+    const canOpenRollingEnrollment = await schoolRollingEnrollmentAccessService.canAccessRollingEnrollment(req.user);
     res.render('school/report/semiMonthlyReportViewer', {
       title: 'School Semi-Monthly Report',
       includeModal: true,
@@ -62,7 +64,8 @@ async function showSemiMonthlyReportPage(req, res) {
       configuredOverallCount,
       canExportReport,
       canShowEnrollmentClaims,
-      funderPickerOptions
+      funderPickerOptions,
+      canOpenRollingEnrollment
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });

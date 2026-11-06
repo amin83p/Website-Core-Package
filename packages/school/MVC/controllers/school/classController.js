@@ -74,6 +74,7 @@ const schoolFileService = require('../../services/school/schoolFileService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const schoolRepositories = require('../../repositories/school');
+const schoolRollingEnrollmentAccessService = require('../../services/school/schoolRollingEnrollmentAccessService');
 const classCycleLinkResolutionService = require('../../services/school/classCycleLinkResolutionService');
 const classDeletePreparationService = require('../../services/school/classDeletePreparationService');
 const classDeleteCascadeService = require('../../services/school/classDeleteCascadeService');
@@ -427,20 +428,6 @@ function getClassRegistrationModeKey(classData) {
 
 function isSchoolRequestAdmin(reqUser, sectionId, operationId = OPERATIONS.READ_ALL) {
     return schoolAdminAccessService.isAdminForRequest(reqUser, sectionId, operationId);
-}
-
-async function canAccessRollingEnrollment(user) {
-    try {
-        if (!user) return false;
-        const result = await accessService.evaluateAccess({
-            user,
-            sectionId: SECTIONS.SCHOOL_ROLLING_ENROLLMENT,
-            operationId: OPERATIONS.READ_ALL
-        });
-        return result === true || result?.granted === true || result?.allowed === true;
-    } catch (_) {
-        return false;
-    }
 }
 
 /**
@@ -3282,7 +3269,7 @@ async function showEditForm(req, res) {
         classData.instructors = canonicalTeachers.instructors;
     }
 
-    const canAccessRollingEnrollmentPage = await canAccessRollingEnrollment(req.user);
+    const canAccessRollingEnrollmentPage = await schoolRollingEnrollmentAccessService.canAccessRollingEnrollment(req.user);
 
     res.render('school/class/classForm', {
       title: 'Edit Class', 

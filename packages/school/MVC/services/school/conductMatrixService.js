@@ -187,6 +187,7 @@ async function buildConductMatrixPayload(req, query, matrixContext, conductPolic
   const requiredSessionCount = sessions.filter((s) => s.conductRequiredForReports).length;
 
   return {
+    registrationMode: isRollingClass ? 'rolling' : 'term_based',
     class: {
       id: classData?.id || classId,
       title: String(classData?.title || classId).trim()

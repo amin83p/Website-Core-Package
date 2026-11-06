@@ -246,6 +246,9 @@ async function buildSemiMonthlyReportPayload(req, options = {}) {
         classId,
         className: String(classRow?.name || classRow?.title || classId).trim(),
         teacherName: String(classRow?.instructors?.[0]?.name || classRow?.teacherName || '').trim(),
+        registrationMode: String(classRow?.registrationMode || '').trim().toLowerCase() === 'rolling'
+          ? 'rolling'
+          : 'term_based',
         matchedStudentIds
       };
     } finally {
@@ -257,7 +260,7 @@ async function buildSemiMonthlyReportPayload(req, options = {}) {
   });
 
   enrollmentMatches.filter(Boolean).forEach((match) => {
-    const { classId, className, teacherName, matchedStudentIds } = match;
+    const { classId, className, teacherName, registrationMode, matchedStudentIds } = match;
     matchedStudentIds.forEach((studentRecordId) => {
       const studentRow = selectedStudents.find((row) => idsEqual(row.studentRecordId, studentRecordId));
       if (!studentRow || !studentMap.has(studentRow.personId)) return;
@@ -276,6 +279,7 @@ async function buildSemiMonthlyReportPayload(req, options = {}) {
       studentMap.get(studentRow.personId).classes.push({
         classId,
         className,
+        registrationMode: registrationMode || 'term_based',
         teacherName,
         instances: serialized
       });

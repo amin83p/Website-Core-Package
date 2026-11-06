@@ -156,6 +156,21 @@
     document.getElementById('cm_className').value = filters.className || '';
     document.getElementById('cm_startDate').value = filters.startDate || '';
     document.getElementById('cm_endDate').value = filters.endDate || '';
+    syncCmRollingClassAnchors();
+  }
+
+  function syncCmRollingClassAnchors() {
+    const classId = String(matrixData?.class?.id || readFilters().classId || '').trim();
+    const registrationMode = String(matrixData?.registrationMode || '').trim();
+    document.querySelectorAll('.js-cm-rolling-class-anchor').forEach((el) => {
+      if (classId) {
+        el.setAttribute('data-class-id', classId);
+        el.setAttribute('data-registration-mode', registrationMode);
+      } else {
+        el.removeAttribute('data-class-id');
+        el.removeAttribute('data-registration-mode');
+      }
+    });
   }
 
   function conductChipClassFromCode(code) {
@@ -667,6 +682,7 @@
       renderMatrix();
       document.getElementById('cm_results')?.classList.remove('d-none');
       document.getElementById('cm_classTitle').textContent = result.class?.title || filters.className || 'Class';
+      syncCmRollingClassAnchors();
       const url = new URL(global.location.href);
       url.searchParams.set('classId', filters.classId);
       if (filters.startDate) url.searchParams.set('startDate', filters.startDate);
@@ -760,9 +776,14 @@
     thead.appendChild(headerRow);
 
     tbody.innerHTML = '';
+    const registrationMode = String(matrixData.registrationMode || '').trim();
     (matrixData.students || []).forEach((stu) => {
       const tr = document.createElement('tr');
       tr.className = 'cm-student-row';
+      const pid = String(stu.personId || '').trim();
+      if (pid) tr.setAttribute('data-person-id', pid);
+      if (registrationMode) tr.setAttribute('data-registration-mode', registrationMode);
+      if (stu.name) tr.setAttribute('data-student-name', String(stu.name));
       const avgs = computeStudentConductAverages(stu.personId, columns);
       const rollupInner = buildRollupInnerHtml(avgs);
       tr.innerHTML = `<td class="cm-sticky-rollup px-2 py-2 text-center">${rollupInner}</td><td class="cm-sticky-name">${buildStudentNameCell(stu)}</td>`;
@@ -943,6 +964,7 @@
         if (!classId) return;
         document.getElementById('cm_classId').value = classId;
         document.getElementById('cm_className').value = name;
+        syncCmRollingClassAnchors();
       }
     }));
   }
@@ -953,6 +975,8 @@
     document.getElementById('cm_btnClearClass')?.addEventListener('click', () => {
       document.getElementById('cm_classId').value = '';
       document.getElementById('cm_className').value = '';
+      matrixData = null;
+      syncCmRollingClassAnchors();
     });
     document.getElementById('cm_btnReset')?.addEventListener('click', () => {
       setFilters({ classId: '', className: '', startDate: '', endDate: '' });
@@ -1141,5 +1165,36 @@
       });
     }
     initFromUrl();
+    syncCmRollingClassAnchors();
+
+    if (global.SchoolRollingEnrollmentDeepLink) {
+      global.SchoolRollingEnrollmentDeepLink.initRollingEnrollmentContextMenu({
+        resolveContext(event) {
+          const studentRow = event.target.closest('tr.cm-student-row[data-person-id]');
+          const classAnchor = event.target.closest('.js-cm-rolling-class-anchor');
+          const filters = readFilters();
+          const classIdFromFilter = String(filters.classId || '').trim();
+          const regFromMatrix = String(matrixData?.registrationMode || '').trim();
+          if (studentRow) {
+            const personId = String(studentRow.getAttribute('data-person-id') || '').trim();
+            if (!personId) return null;
+            const classId = String(matrixData?.class?.id || classIdFromFilter || '').trim();
+            const registrationMode = String(studentRow.getAttribute('data-registration-mode') || regFromMatrix || '').trim();
+            let studentName = String(studentRow.getAttribute('data-student-name') || '').trim();
+            if (!studentName && Array.isArray(matrixData?.students)) {
+              const st = matrixData.students.find((s) => String(s?.personId || '').trim() === personId);
+              studentName = String(st?.name || '').trim();
+            }
+            return { classId, registrationMode, studentName };
+          }
+          if (classAnchor) {
+            const classId = String(classAnchor.getAttribute('data-class-id') || classIdFromFilter || '').trim();
+            const registrationMode = String(classAnchor.getAttribute('data-registration-mode') || regFromMatrix || '').trim();
+            return { classId, registrationMode };
+          }
+          return null;
+        }
+      });
+    }
   });
 }(window));

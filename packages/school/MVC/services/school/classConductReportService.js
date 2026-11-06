@@ -58,6 +58,12 @@ function resolveClassDisplayName(classRow = {}, classId = '') {
   ).trim() || id;
 }
 
+function registrationModeKeyFromClassRow(classRow = {}) {
+  return String(classRow?.registrationMode || '').trim().toLowerCase() === 'rolling'
+    ? 'rolling'
+    : 'term_based';
+}
+
 function isSessionColumnShown(session = {}) {
   return session?.conductRequiredForReports === true || session?.conductReportStepEnabled === true;
 }
@@ -331,6 +337,7 @@ async function buildClassConductReportPayload(req, options = {}) {
       studentRow.classes.push({
         classId,
         className,
+        registrationMode: payload.registrationMode || registrationModeKeyFromClassRow(classRow),
         teacherName,
         summary: classSummary,
         days: classDays

@@ -332,6 +332,12 @@
     students: typeof initialStudents !== 'undefined' ? initialStudents : []
   }).replace(/</g, '\\u003c').replace(/&/g, '\\u0026') %>;
 </script>
+<% if (typeof canOpenRollingEnrollment !== 'undefined' && canOpenRollingEnrollment) { %>
+<script>
+window.__schoolRollingEnrollmentAccess = { canOpen: true };
+</script>
+<script src="/scripts/schoolRollingEnrollmentDeepLink.js"></script>
+<% } %>
 <% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
 <script src="/scripts/enrollmentClaimToggle.js"></script>
 <% } %>

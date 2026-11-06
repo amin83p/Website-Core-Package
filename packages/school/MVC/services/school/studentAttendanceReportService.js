@@ -69,6 +69,12 @@ function resolveAttendanceClassDisplayName(classRow = {}, classId = '') {
   ).trim() || id;
 }
 
+function registrationModeKeyFromClassRow(classRow = {}) {
+  return String(classRow?.registrationMode || '').trim().toLowerCase() === 'rolling'
+    ? 'rolling'
+    : 'term_based';
+}
+
 function recordHasNotes(record = {}) {
   const comments = Array.isArray(record?.comments) ? record.comments : [];
   return Boolean(
@@ -428,6 +434,7 @@ async function buildStudentAttendanceReportPayload(req, options = {}) {
       studentRow.classes.push({
         classId: payload.classId,
         className: payload.className,
+        registrationMode: payload.registrationMode || registrationModeKeyFromClassRow(classRow),
         teacherName: payload.teacherName || '',
         teacherId: String(classRow?.instructors?.[0]?.personId || classRow?.instructors?.[0]?.id || '').trim(),
         summary: classRollupSummary,
@@ -1002,6 +1009,7 @@ async function buildStudentAttendanceReportExportContextPayload(req, options = {
       studentRow.classes.push({
         classId,
         className: resolveAttendanceClassDisplayName(classRow, classId),
+        registrationMode: registrationModeKeyFromClassRow(classRow),
         teacherName: String(classRow?.teacherName || '').trim(),
         teacherId,
         summary: {

@@ -177,7 +177,7 @@
             <label class="form-label" for="gm_className">Class</label>
             <div class="input-group">
               <input type="hidden" id="gm_classId">
-              <input type="text" id="gm_className" class="form-control bg-white" placeholder="All classes" readonly>
+              <input type="text" id="gm_className" class="form-control bg-white js-gm-rolling-class-anchor" placeholder="All classes" readonly>
               <button type="button" class="btn btn-outline-primary" id="gm_btnClassPicker" title="Select class">
                 <i class="bi bi-book"></i>
               </button>
@@ -258,7 +258,7 @@
 
   <div class="card border-0 shadow-sm d-none" id="gm_results">
     <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
-      <h5 class="m-0 fw-bold text-primary" id="gm_classTitle">Class</h5>
+      <h5 class="m-0 fw-bold text-primary js-gm-rolling-class-anchor" id="gm_classTitle">Class</h5>
       <div class="d-flex align-items-center gap-2 flex-wrap ms-md-auto">
         <div class="d-flex align-items-center gap-2" id="gmMatrixResultActions">
         <% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
@@ -396,6 +396,12 @@
 <script src="/scripts/schoolMatrixExpandedView.js"></script>
 <% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
 <script src="/scripts/enrollmentClaimToggle.js"></script>
+<% } %>
+<% if (typeof canOpenRollingEnrollment !== 'undefined' && canOpenRollingEnrollment) { %>
+<script>
+window.__schoolRollingEnrollmentAccess = { canOpen: true };
+</script>
+<script src="/scripts/schoolRollingEnrollmentDeepLink.js"></script>
 <% } %>
 
 <script>
@@ -774,6 +780,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('gm_evalCard').classList.add('d-none');
     window.currentGradesMatrixData = null;
     setGradesPrintEnabled(false);
+    syncGmRollingClassAnchors();
   });
 
   document.getElementById('gm_btnReset')?.addEventListener('click', () => {
@@ -786,6 +793,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.currentGradesMatrixData = null;
     setGradesPrintEnabled(false);
     setGmActiveRangeToken('');
+    syncGmRollingClassAnchors();
   });
 
   if (INITIAL.classId) {
@@ -799,6 +807,9 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (INITIAL.range && shortcuts) {
       setGmActiveRangeToken(shortcuts.normalizeRangeToken(INITIAL.range));
     }
+    syncGmRollingClassAnchors();
+  } else {
+    syncGmRollingClassAnchors();
   }
 
   document.getElementById('gm_btnClassPicker').addEventListener('click', () => {
@@ -809,6 +820,7 @@ document.addEventListener('DOMContentLoaded', () => {
       onSelect: (item) => {
         document.getElementById('gm_classId').value = item.id;
         document.getElementById('gm_className').value = item.title || item.id;
+        syncGmRollingClassAnchors();
         document.getElementById('gm_btnLoad').click();
       }
     }));
@@ -1318,6 +1330,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const tbody = document.getElementById('gm_tbody');
     const tr = document.createElement('tr');
     tr.dataset.personId = String(row.personId || '');
+    const reg = String(window.currentGradesMatrixData?.registrationMode || '').trim();
+    if (reg) tr.dataset.registrationMode = reg;
+    if (row.name) tr.dataset.studentName = String(row.name);
     const fp = row.finalPercent != null ? `<span class="fw-bold">${formatGmPercent(row.finalPercent)}</span>` : '—';
     const nameInner = typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(row.name, row.studentRecordId) : row.name;
     let html = `<td class="gm-sticky-final text-center small">${fp}</td><td class="gm-sticky-name ps-3">${wrapGmEnrollmentClaimName(nameInner, row.personId, row.studentRecordId)}</td><td class="gm-sticky-calc">${renderGmGradeCalcButton(row.personId)}</td>`;
@@ -1327,6 +1342,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     tr.innerHTML = html;
     tbody.appendChild(tr);
+  }
+
+  function syncGmRollingClassAnchors() {
+    const data = window.currentGradesMatrixData;
+    const classId = String(data?.classId || document.getElementById('gm_classId')?.value || '').trim();
+    const registrationMode = String(data?.registrationMode || '').trim();
+    document.querySelectorAll('.js-gm-rolling-class-anchor').forEach((el) => {
+      if (classId) {
+        el.setAttribute('data-class-id', classId);
+        el.setAttribute('data-registration-mode', registrationMode);
+      } else {
+        el.removeAttribute('data-class-id');
+        el.removeAttribute('data-registration-mode');
+      }
+    });
   }
 
   async function loadGradesMatrixData(options = {}) {
@@ -1405,6 +1435,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
       window.currentGradesMatrixData = result;
       setGradesPrintEnabled(true);
+      syncGmRollingClassAnchors();
 
       const { columns, matrix, className } = result;
       document.getElementById('gm_classTitle').textContent = className || 'Class';
@@ -1432,6 +1463,12 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('gm_results').classList.remove('d-none');
         await refreshGradesDisplayRollups();
         syncGmEnrollmentClaimHosts();
+        const regCols = String(result?.registrationMode || '').trim();
+        if (regCols) {
+          tbody.querySelectorAll('tr[data-person-id]').forEach((rowEl) => {
+            rowEl.setAttribute('data-registration-mode', regCols);
+          });
+        }
         return;
       }
 
@@ -1448,6 +1485,9 @@ document.addEventListener('DOMContentLoaded', () => {
         matrix.forEach((row) => {
           const tr = document.createElement('tr');
           tr.dataset.personId = String(row.personId || '');
+          const reg = String(result?.registrationMode || '').trim();
+          if (reg) tr.dataset.registrationMode = reg;
+          if (row.name) tr.dataset.studentName = String(row.name);
           const fp = formatGmPercent(row.finalPercent);
           tr.innerHTML = `<td class="gm-sticky-final text-center small">${fp}</td><td class="gm-sticky-name ps-3">${wrapGmEnrollmentClaimName(typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(row.name, row.studentRecordId) : row.name, row.personId, row.studentRecordId)}</td><td class="gm-sticky-calc">${renderGmGradeCalcButton(row.personId)}</td><td class="text-muted">—</td>`;
           tbody.appendChild(tr);
@@ -2147,6 +2187,35 @@ document.addEventListener('DOMContentLoaded', () => {
   if (INITIAL.classId) {
     runWhenGmMessageModalReady(() => {
       void promptLoadGradesMatrixFromUrlLink();
+    });
+  }
+
+  if (window.SchoolRollingEnrollmentDeepLink) {
+    window.SchoolRollingEnrollmentDeepLink.initRollingEnrollmentContextMenu({
+      resolveContext(event) {
+        const row = event.target.closest('#gm_tbody tr[data-person-id]');
+        const classAnchor = event.target.closest('.js-gm-rolling-class-anchor');
+        const classIdFromFilter = String(document.getElementById('gm_classId')?.value || '').trim();
+        const regFromMatrix = String(window.currentGradesMatrixData?.registrationMode || '').trim();
+        if (row) {
+          const personId = String(row.getAttribute('data-person-id') || '').trim();
+          if (!personId) return null;
+          const classId = String(window.currentGradesMatrixData?.classId || classIdFromFilter || '').trim();
+          const registrationMode = String(row.getAttribute('data-registration-mode') || regFromMatrix || '').trim();
+          let studentName = String(row.getAttribute('data-student-name') || '').trim();
+          if (!studentName && Array.isArray(window.currentGradesMatrixData?.matrix)) {
+            const st = window.currentGradesMatrixData.matrix.find((r) => String(r?.personId || '').trim() === personId);
+            studentName = String(st?.name || '').trim();
+          }
+          return { classId, registrationMode, studentName };
+        }
+        if (classAnchor) {
+          const classId = String(classAnchor.getAttribute('data-class-id') || classIdFromFilter || '').trim();
+          const registrationMode = String(classAnchor.getAttribute('data-registration-mode') || regFromMatrix || '').trim();
+          return { classId, registrationMode };
+        }
+        return null;
+      }
     });
   }
 });

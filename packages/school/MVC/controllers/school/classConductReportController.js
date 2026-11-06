@@ -5,6 +5,7 @@ const conductRatingScaleService = require('../../services/school/conductRatingSc
 const conductRatingScalePolicyModel = require('../../models/school/conductRatingScalePolicyModel');
 const { resolveSelectedStudents } = require('../../services/school/studentAttendanceReportService');
 const enrollmentClaimDisplayService = require('../../services/school/enrollmentClaimDisplayService');
+const schoolRollingEnrollmentAccessService = require('../../services/school/schoolRollingEnrollmentAccessService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 function parseStudentIds(raw = '') {
@@ -39,6 +40,7 @@ async function showClassConductReportPage(req, res) {
       SECTIONS.SCHOOL_CLASS_CONDUCT_REPORT,
       { operationId: OPERATIONS.READ, ipAddress: req.ip }
     );
+    const canOpenRollingEnrollment = await schoolRollingEnrollmentAccessService.canAccessRollingEnrollment(req.user);
 
     res.render('school/report/classConductReport', {
       title: 'Class Conduct Report',
@@ -52,7 +54,8 @@ async function showClassConductReportPage(req, res) {
       initialStudentIds,
       initialStudents,
       canShowEnrollmentClaims,
-      conductRatingScaleResolved
+      conductRatingScaleResolved,
+      canOpenRollingEnrollment
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });

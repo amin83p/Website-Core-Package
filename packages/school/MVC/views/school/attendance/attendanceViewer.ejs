@@ -330,7 +330,7 @@
                         <label class="form-label" for="filter_className">Class</label>
                         <div class="input-group">
                             <input type="hidden" id="filter_classId">
-                            <input type="text" id="filter_className" class="form-control bg-white" placeholder="Select class..." readonly>
+                            <input type="text" id="filter_className" class="form-control bg-white js-att-rolling-class-anchor" placeholder="Select class..." readonly>
                             <button type="button" class="btn btn-outline-primary" id="btn_openClassPicker" title="Select class">
                                 <i class="bi bi-book"></i>
                             </button>
@@ -367,7 +367,7 @@
 
     <div class="card border-0 shadow-sm d-none" id="resultsContainer">
         <div class="card-header bg-white border-bottom py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
-            <h5 class="m-0 fw-bold text-primary" id="lbl_displayClassName">Class Name</h5>
+            <h5 class="m-0 fw-bold text-primary js-att-rolling-class-anchor" id="lbl_displayClassName">Class Name</h5>
             <div class="d-flex align-items-center gap-2 flex-wrap ms-md-auto">
                 <div class="d-flex align-items-center gap-2" id="attMatrixResultActions">
                 <% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
@@ -693,6 +693,12 @@
 <script src="/scripts/attendanceCellHoverTip.js"></script>
 <% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
 <script src="/scripts/enrollmentClaimToggle.js"></script>
+<% } %>
+<% if (typeof canOpenRollingEnrollment !== 'undefined' && canOpenRollingEnrollment) { %>
+<script>
+window.__schoolRollingEnrollmentAccess = { canOpen: true };
+</script>
+<script src="/scripts/schoolRollingEnrollmentDeepLink.js"></script>
 <% } %>
 
 <script>
@@ -2051,6 +2057,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.currentMatrixData = null;
         window.attendanceVisiblePersonIds = null;
         setAttendancePrintEnabled(false);
+        syncAttendanceRollingClassAnchors();
         syncAttendanceMatrixUrl(captureAttendanceMatrixFilterState());
     });
 
@@ -2064,6 +2071,7 @@ document.addEventListener('DOMContentLoaded', () => {
         window.attendanceVisiblePersonIds = null;
         setAttendancePrintEnabled(false);
         setActiveRangeChip('');
+        syncAttendanceRollingClassAnchors();
         syncAttendanceMatrixUrl({});
     });
 
@@ -2077,6 +2085,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 onSelect: (item) => {
                     document.getElementById('filter_classId').value = item.id;
                     document.getElementById('filter_className').value = item.title || item.id;
+                    syncAttendanceRollingClassAnchors();
                     syncAttendanceMatrixUrl(captureAttendanceMatrixFilterState());
                     document.getElementById('btn_loadData').click();
                 }
@@ -2453,6 +2462,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function buildAttendanceStudentRowHtml(stu) {
         const personId = String(stu?.personId || '').trim();
+        const registrationMode = String(window.currentMatrixData?.registrationMode || '').trim();
+        const studentName = String(stu?.name || '').trim();
         const s = stu.summary || {};
         const p = Number(s.totalPresentSessions) || 0;
         const a = Number(s.totalAbsentSessions) || 0;
@@ -2474,7 +2485,22 @@ document.addEventListener('DOMContentLoaded', () => {
         (stu.records || []).forEach((rec) => {
             rowHtml += buildAttendanceRecordCell(stu, rec);
         });
-        return `<tr class="matrix-student-row" data-person-id="${attEscapeHtml(personId)}">${rowHtml}</tr>`;
+        return `<tr class="matrix-student-row" data-person-id="${attEscapeHtml(personId)}" data-registration-mode="${attEscapeHtml(registrationMode)}" data-student-name="${attEscapeHtml(studentName)}">${rowHtml}</tr>`;
+    }
+
+    function syncAttendanceRollingClassAnchors() {
+        const data = window.currentMatrixData;
+        const classId = String(data?.classId || document.getElementById('filter_classId')?.value || '').trim();
+        const registrationMode = String(data?.registrationMode || '').trim();
+        document.querySelectorAll('.js-att-rolling-class-anchor').forEach((el) => {
+            if (classId) {
+                el.setAttribute('data-class-id', classId);
+                el.setAttribute('data-registration-mode', registrationMode);
+            } else {
+                el.removeAttribute('data-class-id');
+                el.removeAttribute('data-registration-mode');
+            }
+        });
     }
 
     function updateAttendanceRollupDom(matrixRows) {
@@ -2789,6 +2815,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             document.getElementById('filter_className').value = result.className || 'Loaded Class';
             document.getElementById('lbl_displayClassName').innerText = result.className || 'Class Attendance';
+            syncAttendanceRollingClassAnchors();
 
             const headers = document.getElementById('matrixHeaders');
             const tbody = document.getElementById('matrixBody');
@@ -2807,6 +2834,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 bindAttendanceStudentVisibilityDropdown();
                 applyAttendanceStudentVisibility();
                 syncAttendanceEnrollmentClaimHosts();
+                const regModeSessions = String(result?.registrationMode || '').trim();
+                if (regModeSessions) {
+                  tbody.querySelectorAll('tr.matrix-student-row').forEach((rowEl) => {
+                    rowEl.setAttribute('data-registration-mode', regModeSessions);
+                  });
+                }
                 return;
             }
 
@@ -2814,6 +2847,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 (chunk.matrix || []).forEach((stu) => {
                     tbody.insertAdjacentHTML('beforeend', buildAttendanceStudentRowHtml(stu));
                 });
+                const regModeStudents = String(result?.registrationMode || '').trim();
+                if (regModeStudents) {
+                  tbody.querySelectorAll('tr.matrix-student-row').forEach((rowEl) => {
+                    rowEl.setAttribute('data-registration-mode', regModeStudents);
+                  });
+                }
                 bindAttendanceStudentVisibilityDropdown();
                 applyAttendanceStudentVisibility();
                 syncAttendanceEnrollmentClaimHosts();
@@ -4197,6 +4236,35 @@ if (window.EnrollmentClaimToggle) {
                 startDate: document.getElementById('filter_startDate')?.value || '',
                 endDate: document.getElementById('filter_endDate')?.value || ''
             };
+        }
+    });
+}
+
+if (window.SchoolRollingEnrollmentDeepLink) {
+    window.SchoolRollingEnrollmentDeepLink.initRollingEnrollmentContextMenu({
+        resolveContext(event) {
+            const studentRow = event.target.closest('tr.matrix-student-row[data-person-id]');
+            const classAnchor = event.target.closest('.js-att-rolling-class-anchor');
+            const classIdFromFilter = String(document.getElementById('filter_classId')?.value || '').trim();
+            const regFromMatrix = String(window.currentMatrixData?.registrationMode || '').trim();
+            if (studentRow) {
+                const personId = String(studentRow.getAttribute('data-person-id') || '').trim();
+                if (!personId) return null;
+                const classId = String(window.currentMatrixData?.classId || classIdFromFilter || '').trim();
+                const registrationMode = String(studentRow.getAttribute('data-registration-mode') || regFromMatrix || '').trim();
+                let studentName = String(studentRow.getAttribute('data-student-name') || '').trim();
+                if (!studentName && Array.isArray(window.currentMatrixData?.matrix)) {
+                    const row = window.currentMatrixData.matrix.find((r) => String(r?.personId || '').trim() === personId);
+                    studentName = String(row?.name || '').trim();
+                }
+                return { classId, registrationMode, studentName };
+            }
+            if (classAnchor) {
+                const classId = String(classAnchor.getAttribute('data-class-id') || classIdFromFilter || '').trim();
+                const registrationMode = String(classAnchor.getAttribute('data-registration-mode') || regFromMatrix || '').trim();
+                return { classId, registrationMode };
+            }
+            return null;
         }
     });
 }

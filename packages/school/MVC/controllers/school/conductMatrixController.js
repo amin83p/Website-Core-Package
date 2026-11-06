@@ -9,6 +9,7 @@ const schoolDataService = require('../../services/school/schoolDataService');
 const conductRatingScaleService = require('../../services/school/conductRatingScaleService');
 const { userCanOpenAttendanceMatrix } = require('../../services/school/attendanceMatrixAccessService');
 const enrollmentClaimDisplayService = require('../../services/school/enrollmentClaimDisplayService');
+const schoolRollingEnrollmentAccessService = require('../../services/school/schoolRollingEnrollmentAccessService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 async function resolveConductPolicyForRequest(req, classData) {
@@ -40,6 +41,7 @@ async function showConductMatrixPage(req, res) {
       SECTIONS.SCHOOL_CLASS_CONDUCT_MATRIX,
       { operationId: OPERATIONS.READ_ALL, ipAddress: req.ip }
     );
+    const canOpenRollingEnrollment = await schoolRollingEnrollmentAccessService.canAccessRollingEnrollment(req.user);
     let conductRatingScaleResolved = conductRatingScaleService.resolvePolicy({});
     if (initialClassId) {
       try {
@@ -64,7 +66,8 @@ async function showConductMatrixPage(req, res) {
       initialRange,
       canOpenAttendanceMatrix,
       canShowEnrollmentClaims,
-      conductRatingScaleResolved
+      conductRatingScaleResolved,
+      canOpenRollingEnrollment
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });

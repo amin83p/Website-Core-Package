@@ -10902,6 +10902,22 @@
     if (!result) return;
     periodRows = Array.isArray(result.items) ? result.items : [];
     renderRows();
+    syncRollingEnrollmentSearchInputsFromUrl();
+  }
+
+  function syncRollingEnrollmentSearchInputsFromUrl() {
+    try {
+      const params = new URLSearchParams(window.location.search || '');
+      const q = String(params.get('q') || '').trim();
+      const searchFields = String(params.get('searchFields') || params.get('searchField') || '').trim();
+      const searchInput = document.getElementById('searchInput');
+      const searchField = document.getElementById('searchField');
+      if (searchInput && q) searchInput.value = q;
+      if (searchField && searchFields) {
+        const opt = Array.from(searchField.options || []).find((o) => String(o.value || '').trim() === searchFields);
+        if (opt) searchField.value = opt.value;
+      }
+    } catch (_) { /* ignore */ }
   }
 
   async function addPeriod() {

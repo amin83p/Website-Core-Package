@@ -18,6 +18,7 @@ const {
   userCanOpenAttendanceMatrix
 } = require('../../services/school/attendanceMatrixAccessService');
 const enrollmentClaimDisplayService = require('../../services/school/enrollmentClaimDisplayService');
+const schoolRollingEnrollmentAccessService = require('../../services/school/schoolRollingEnrollmentAccessService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const matrixWindowService = require('../../services/school/matrixWindowService');
 const matrixRollupService = require('../../services/school/matrixRollupService');
@@ -596,6 +597,7 @@ async function showGradesMatrixPage(req, res) {
       SECTIONS.SCHOOL_GRADEBOOK,
       { operationId: OPERATIONS.READ_ALL, ipAddress: req.ip }
     );
+    const canOpenRollingEnrollment = await schoolRollingEnrollmentAccessService.canAccessRollingEnrollment(req.user);
 
     res.render('school/grades/gradesMatrix', {
       title: 'Grades Matrix',
@@ -610,7 +612,8 @@ async function showGradesMatrixPage(req, res) {
       initialEndDate,
       initialRange,
       canOpenAttendanceMatrix,
-      canShowEnrollmentClaims
+      canShowEnrollmentClaims,
+      canOpenRollingEnrollment
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
