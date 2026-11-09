@@ -12,8 +12,8 @@
     const AUDIO_EXT = /\.(mp3|wav|m4a|aac|ogg|webm|flac)$/i;
     const VIDEO_EXT = /\.(mp4|mov|avi|mkv|webm|m4v)$/i;
 
-    const uploadUsesRemoteStorage = Boolean(typeof uploadUsesRemoteStorage !== 'undefined' && uploadUsesRemoteStorage);
-    const uploadStorageBackend = String(typeof uploadStorageBackend !== 'undefined' ? uploadStorageBackend : 'local');
+    const uploadUsesRemoteStorageFlag = Boolean(typeof uploadUsesRemoteStorage !== 'undefined' && uploadUsesRemoteStorage);
+    const uploadStorageBackendLabel = String(typeof uploadStorageBackend !== 'undefined' ? uploadStorageBackend : 'local');
 
     function previewUrlFromPath(filePath) {
       return '/uploads/' + String(filePath || '').split('/').filter(Boolean).map(encodeURIComponent).join('/');
@@ -73,8 +73,8 @@
   </nav>
 
   <div class="alert alert-info py-2 px-3 mb-4 small">
-    <% if (uploadUsesRemoteStorage) { %>
-    <strong>Upload destination:</strong> Files are stored on the remote upload volume (<code><%= uploadStorageBackend %></code>).
+    <% if (uploadUsesRemoteStorageFlag) { %>
+    <strong>Upload destination:</strong> Files are stored on the remote upload volume (<code><%= uploadStorageBackendLabel %></code>).
     Uploads and downloads use <code>/uploads/</code> URLs; this app node does not serve stale copies from local disk.
     <% } else { %>
     <strong>Upload destination:</strong> Files are saved under <code>app.uploadsPath</code> from System Settings (local disk).
