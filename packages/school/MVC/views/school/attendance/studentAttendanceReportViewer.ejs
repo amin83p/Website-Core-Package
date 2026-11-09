@@ -658,6 +658,37 @@
                     </div>
                 </div>
 
+                <div class="sar-export-bulk-panel mb-3 d-none" id="sarExportApplyAllPanel">
+                    <button
+                        type="button"
+                        class="btn btn-link btn-sm text-decoration-none w-100 text-start d-flex align-items-center gap-1 p-0 fw-semibold"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#sarExportApplyAllCollapse"
+                        aria-expanded="false"
+                        aria-controls="sarExportApplyAllCollapse"
+                        id="sarExportApplyAllToggle">
+                        <i class="bi bi-chevron-right sar-apply-all-chevron" id="sarApplyAllChevron" aria-hidden="true"></i>
+                        <span><i class="bi bi-sliders me-1 text-primary"></i>Apply overall templates to all students</span>
+                    </button>
+                    <div class="collapse" id="sarExportApplyAllCollapse">
+                        <div class="row g-2 align-items-end pt-2">
+                            <div class="col-md-4">
+                                <label class="form-label small mb-1" for="sarApplyAllOverallTemplate">Overall report — template</label>
+                                <select class="form-select form-select-sm" id="sarApplyAllOverallTemplate" aria-label="Overall template for all students"></select>
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label small mb-1" for="sarApplyAllOverallVariant">Overall report — variant</label>
+                                <select class="form-select form-select-sm" id="sarApplyAllOverallVariant" aria-label="Overall variant for all students"></select>
+                            </div>
+                            <div class="col-md-4">
+                                <button type="button" class="btn btn-outline-primary btn-sm w-100 mt-4 mt-md-0" id="sarApplyAllOverallTemplatesBtn">
+                                    Apply to all overall reports
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="sar-export-bulk-panel mb-3 d-none" id="sarExportClassBulkPanel">
                     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                         <div>
@@ -675,6 +706,24 @@
                         <button type="button" class="btn btn-outline-secondary btn-sm js-sar-bulk-export" data-format="json" data-export-scope="class">
                             <i class="bi bi-braces me-1"></i>Payload
                         </button>
+                    </div>
+                </div>
+
+                <div class="sar-export-bulk-panel mb-3 d-none" id="sarExportTemplatePlanPanel">
+                    <button
+                        type="button"
+                        class="btn btn-link btn-sm text-decoration-none w-100 text-start d-flex align-items-center gap-1 p-0 fw-semibold"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#sarExportTemplatePlanCollapse"
+                        aria-expanded="false"
+                        aria-controls="sarExportTemplatePlanCollapse"
+                        id="sarExportTemplatePlanToggle">
+                        <i class="bi bi-chevron-right sar-template-plan-chevron" aria-hidden="true"></i>
+                        <span><i class="bi bi-file-earmark-word me-1 text-primary"></i>Templates that will be used</span>
+                    </button>
+                    <div class="collapse" id="sarExportTemplatePlanCollapse">
+                        <div class="small text-muted pt-1">Unique DOCX templates from checked rows and dropdown selections (for bulk DOCX export).</div>
+                        <ul class="small mb-0 mt-2 ps-3" id="sarExportTemplatePlanList"></ul>
                     </div>
                 </div>
 
@@ -705,7 +754,7 @@
                     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-2">
                         <div>
                             <div class="fw-semibold small"><i class="bi bi-layers me-1 text-primary"></i>Overall report templates</div>
-                            <div class="small text-muted">Bulk export checked overall reports using each student's selected template (DOCX, PDF, and payload).</div>
+                            <div class="small text-muted">Bulk export checked overall reports into one merged DOCX or PDF file per format.</div>
                         </div>
                     </div>
                     <div class="sar-export-bulk-toolbar">
@@ -2471,7 +2520,80 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
         return badges.length ? `<div class="d-flex flex-wrap gap-1 mt-1">${badges.join('')}</div>` : '';
     }
 
+    function buildSarFileOptionSelectHtml({ className, options = [], suggestedKey = '', classId = '', ariaLabel = '' }) {
+        const rows = (Array.isArray(options) ? options : []).filter((opt) => opt && String(opt.key || '').trim());
+        if (!rows.length) return '';
+        const suggested = String(suggestedKey || rows[0]?.key || '').trim();
+        const optionsHtml = rows.map((opt) => {
+            const key = String(opt.key || '').trim();
+            const label = String(opt.label || key);
+            const fileName = String(opt.fileName || '').trim();
+            const text = fileName ? `${label} (${fileName})` : label;
+            const selected = key === suggested ? ' selected' : '';
+            return `<option value="${escapeHtml(key)}"${selected}>${escapeHtml(text)}</option>`;
+        }).join('');
+        const disabled = rows.length <= 1 ? ' disabled' : '';
+        return `<select class="form-select form-select-sm ${className} mb-1" style="max-width: 14rem;" data-class-id="${escapeHtml(classId)}"${disabled} aria-label="${escapeHtml(ariaLabel)}">${optionsHtml}</select>`;
+    }
+
+    function readClassExportKeys(classRowEl, format = '') {
+        if (!classRowEl) return {};
+        const token = String(format || '').trim().toLowerCase();
+        const keys = {};
+        if (token === 'docx' || token === 'all') {
+            const docxKey = String(classRowEl.querySelector('.js-sar-class-docx-select')?.value || '').trim();
+            if (docxKey) keys.docxKey = docxKey;
+        }
+        if (token === 'pdf' || token === 'all') {
+            const pdfKey = String(classRowEl.querySelector('.js-sar-class-pdf-select')?.value || '').trim();
+            if (pdfKey) keys.pdfKey = pdfKey;
+        }
+        return keys;
+    }
+
+    function buildClassExportControls(classRow = {}, personId = '') {
+        const classId = String(classRow.classId || '').trim();
+        const parts = [];
+        const funderHint = String(classRow.funderLabel || '').trim();
+        if (funderHint) {
+            parts.push(`<div class="small text-muted mb-1">Detected funder: <strong>${escapeHtml(funderHint)}</strong></div>`);
+        }
+        const controls = [];
+        if (classRow.hasDocx) {
+            const docxSelect = buildSarFileOptionSelectHtml({
+                className: 'js-sar-class-docx-select',
+                options: classRow.docxOptions,
+                suggestedKey: classRow.suggestedDocxKey,
+                classId,
+                ariaLabel: 'Word template for this class report'
+            });
+            if (docxSelect) controls.push(docxSelect);
+            controls.push(`<button type="button" class="btn btn-outline-primary btn-sm py-0 js-sar-row-export" data-format="docx" data-student-id="${escapeHtml(personId)}" data-class-id="${escapeHtml(classId)}"><i class="bi bi-filetype-docx me-1"></i>DOCX</button>`);
+        }
+        if (classRow.hasPdf) {
+            const pdfSelect = buildSarFileOptionSelectHtml({
+                className: 'js-sar-class-pdf-select',
+                options: classRow.pdfOptions,
+                suggestedKey: classRow.suggestedPdfKey,
+                classId,
+                ariaLabel: 'PDF template for this class report'
+            });
+            if (pdfSelect) controls.push(pdfSelect);
+            controls.push(`<button type="button" class="btn btn-outline-danger btn-sm py-0 js-sar-row-export" data-format="pdf" data-student-id="${escapeHtml(personId)}" data-class-id="${escapeHtml(classId)}"><i class="bi bi-filetype-pdf me-1"></i>PDF</button>`);
+        }
+        if (classRow.hasPayload !== false) {
+            controls.push(`<button type="button" class="btn btn-outline-secondary btn-sm py-0 js-sar-row-export" data-format="json" data-student-id="${escapeHtml(personId)}" data-class-id="${escapeHtml(classId)}"><i class="bi bi-braces me-1"></i>Payload</button>`);
+        }
+        if (!controls.length) return '';
+        parts.push(`<div class="d-flex flex-wrap gap-1 align-items-start mt-1">${controls.join('')}</div>`);
+        return parts.join('');
+    }
+
     function buildSarFormatButtons(row = {}, exportType = 'class') {
+        if (exportType === 'class') {
+            const personId = String(row.personId || '').trim();
+            return buildClassExportControls(row, personId);
+        }
         const hasDocx = Boolean(row.hasDocx);
         const hasPdf = Boolean(row.hasPdf);
         const hasPayload = row.hasPayload !== false;
@@ -2486,6 +2608,70 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
             buttons.push('<button type="button" class="btn btn-outline-secondary btn-sm js-sar-row-export" data-format="json"><i class="bi bi-braces me-1"></i>Payload</button>');
         }
         return buttons.length ? `<div class="btn-group btn-group-sm flex-wrap mt-2">${buttons.join('')}</div>` : '';
+    }
+
+    function populateSarApplyAllSelect(selectEl, options = [], ariaPrefix = '') {
+        if (!selectEl) return;
+        const rows = (Array.isArray(options) ? options : []).filter((opt) => opt && String(opt.key || '').trim());
+        if (!rows.length) {
+            selectEl.innerHTML = '';
+            selectEl.disabled = true;
+            return;
+        }
+        selectEl.innerHTML = rows.map((opt) => {
+            const key = String(opt.key || '').trim();
+            const label = String(opt.label || key);
+            const fileName = String(opt.fileName || '').trim();
+            const text = fileName ? `${label} (${fileName})` : label;
+            return `<option value="${escapeHtml(key)}">${escapeHtml(text)}</option>`;
+        }).join('');
+        selectEl.disabled = rows.length <= 1;
+        if (!selectEl.disabled && ariaPrefix) {
+            selectEl.setAttribute('aria-label', ariaPrefix);
+        }
+    }
+
+    function refreshSarApplyAllOverallVariantSelect(templateId = '') {
+        const variantSelect = document.getElementById('sarApplyAllOverallVariant');
+        const tid = String(templateId || '').trim();
+        if (!variantSelect || !tid || !sarExportPlan) {
+            variantSelect && (variantSelect.innerHTML = '');
+            return;
+        }
+        const students = Array.isArray(sarExportPlan.students) ? sarExportPlan.students : [];
+        let sampleOption = null;
+        for (const student of students) {
+            const option = getOverallOptionById(student, tid);
+            if (option?.defined) {
+                sampleOption = option;
+                break;
+            }
+        }
+        const variants = sampleOption ? getOverallVariantOptionsForOption(sampleOption) : [];
+        populateSarApplyAllSelect(variantSelect, variants.map((row) => ({
+            key: row.key,
+            label: row.label || row.key,
+            fileName: ''
+        })), 'Overall variant for all students');
+        if (sampleOption?.suggestedTemplateVariantKey) {
+            variantSelect.value = sampleOption.suggestedTemplateVariantKey;
+        }
+    }
+
+    function updateSarApplyAllPanel(plan = {}) {
+        const panel = document.getElementById('sarExportApplyAllPanel');
+        if (!panel) return;
+        const hasOverall = Array.isArray(plan.overallReportTemplates) && plan.overallReportTemplates.length > 0;
+        panel.classList.toggle('d-none', !hasOverall);
+        const overallTemplateSelect = document.getElementById('sarApplyAllOverallTemplate');
+        if (overallTemplateSelect && hasOverall) {
+            const templates = plan.overallReportTemplates;
+            overallTemplateSelect.innerHTML = templates.map((row) => (
+                `<option value="${escapeHtml(row.id)}">${escapeHtml(row.title || row.id)}</option>`
+            )).join('');
+            overallTemplateSelect.disabled = templates.length <= 1;
+            refreshSarApplyAllOverallVariantSelect(overallTemplateSelect.value);
+        }
     }
 
     function applySarBulkFormatVisibility(panel, flags = {}) {
@@ -2659,6 +2845,15 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
             else if (!checkbox.hasAttribute('data-user-touched')) checkbox.checked = true;
         }
 
+        const funderHintEl = cell.querySelector('.js-sar-overall-funder-hint');
+        const funderLabelEl = cell.querySelector('.js-sar-overall-funder-label');
+        const planStudent = findSarExportStudent(studentId);
+        const funderLabel = String(selectedOption?.funderLabel || planStudent?.overallFunderLabel || '').trim();
+        if (funderHintEl && funderLabelEl) {
+            funderLabelEl.textContent = funderLabel;
+            funderHintEl.classList.toggle('d-none', !funderLabel);
+        }
+
         if (badgesEl) {
             badgesEl.innerHTML = eligible ? buildSarFormatBadges(formatFlags, 'overall') : '';
         }
@@ -2725,6 +2920,7 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
             tableWrap?.classList.add('d-none');
             classBulkPanel?.classList.add('d-none');
             overallBulkPanel?.classList.add('d-none');
+            document.getElementById('sarExportApplyAllPanel')?.classList.add('d-none');
             tableBody.innerHTML = '';
             return;
         }
@@ -2762,6 +2958,9 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
                 const templateTitle = escapeHtml(classRow.templateTitle || classRow.templateId || '');
                 const label = `${className} — ${templateTitle}`;
                 const disabled = !classRow.exportable;
+                const exportControls = !disabled
+                    ? buildClassExportControls({ ...classRow, personId }, personId)
+                    : '';
                 return `
                     <div class="sar-export-class-row">
                         <div class="d-flex flex-wrap align-items-start gap-2">
@@ -2778,7 +2977,7 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
                                 <div class="sar-export-template-label">${templateTitle}</div>
                                 ${!disabled ? buildSarFormatBadges(classRow, 'class') : ''}
                                 ${disabled && classRow.warning ? `<div class="small text-warning mt-1">${escapeHtml(classRow.warning)}</div>` : ''}
-                                ${!disabled ? buildSarFormatButtons(classRow, 'class') : ''}
+                                ${exportControls}
                             </div>
                         </div>
                     </div>`;
@@ -2809,6 +3008,7 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
                                         ${selectOptions}
                                     </select>
                                     <div class="js-sar-overall-variant-host">${initialEligible && selectedOption ? buildSarOverallVariantSelectHtml(personId, selectedOption) : ''}</div>
+                                    <div class="small text-muted js-sar-overall-funder-hint mb-1${student.overallFunderLabel || selectedOption?.funderLabel ? '' : ' d-none'}">Detected funder: <strong class="js-sar-overall-funder-label">${escapeHtml(student.overallFunderLabel || selectedOption?.funderLabel || '')}</strong></div>
                                     <div class="small text-muted">Overall merged report</div>
                                     <div class="js-sar-overall-badges">${initialEligible ? buildSarFormatBadges(resolveOverallFormatFlagsForOption(selectedOption, selectedOption?.suggestedTemplateVariantKey), 'overall') : ''}</div>
                                     <div class="small text-warning js-sar-overall-status ${initialEligible ? 'd-none' : ''}">
@@ -2832,6 +3032,54 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
         }).join('');
 
         students.forEach((student) => updateOverallEligibilityUi(student.personId));
+        updateSarApplyAllPanel(plan);
+        refreshSarExportTemplatePlanList();
+    }
+
+    function refreshSarExportTemplatePlanList() {
+        const panel = document.getElementById('sarExportTemplatePlanPanel');
+        const listEl = document.getElementById('sarExportTemplatePlanList');
+        if (!panel || !listEl || !sarExportPlan) return;
+        const unique = new Map();
+        const addEntry = (key, label) => {
+            const token = String(key || '').trim();
+            const text = String(label || '').trim();
+            if (!token || !text || unique.has(token)) return;
+            unique.set(token, text);
+        };
+        const classDocxOptions = Array.isArray(sarExportPlan.classTemplateDocxOptions)
+            ? sarExportPlan.classTemplateDocxOptions
+            : [];
+
+        gatherSarExportTargets('docx', 'all').forEach((target) => {
+            if (target.type === 'class') {
+                const docxKey = String(target.docxKey || 'default').trim() || 'default';
+                const match = classDocxOptions.find((row) => String(row.key || '').trim() === docxKey)
+                    || classDocxOptions.find((row) => String(row.key || '').trim() === 'default');
+                const label = match?.fileName || match?.label || docxKey;
+                addEntry(`class|${docxKey}|${label}`, `Class report — ${label}`);
+                return;
+            }
+            if (target.type === 'overall') {
+                const student = findSarExportStudent(target.studentId);
+                const overall = getOverallOptionById(student || {}, target.overallTemplateId);
+                const variantKey = String(target.templateVariantKey || overall?.suggestedTemplateVariantKey || 'default').trim() || 'default';
+                const variantOptions = Array.isArray(overall?.templateVariantOptions) ? overall.templateVariantOptions : [];
+                const variantMatch = variantOptions.find((row) => String(row.key || '').trim() === variantKey);
+                const variantLabel = variantMatch?.label || variantMatch?.fileName || variantKey;
+                const templateTitle = String(overall?.title || target.overallTemplateId || 'Overall').trim();
+                addEntry(
+                    `overall|${target.overallTemplateId}|${variantKey}|${variantLabel}`,
+                    `Overall (${templateTitle}) — ${variantLabel}`
+                );
+            }
+        });
+
+        const rows = [...unique.values()];
+        listEl.innerHTML = rows.length
+            ? rows.map((line) => `<li>${escapeHtml(line)}</li>`).join('')
+            : '<li class="text-muted">Check class or overall DOCX rows to list templates.</li>';
+        panel.classList.toggle('d-none', !rows.length);
     }
 
     function gatherSarExportTargets(format = '', scope = 'all') {
@@ -2853,7 +3101,9 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
                 if (normalizedFormat === 'docx' && !classRow.hasDocx) return;
                 if (normalizedFormat === 'pdf' && !classRow.hasPdf) return;
                 if (normalizedFormat === 'json' && classRow.hasPayload === false) return;
-                targets.push({ type: 'class', studentId, classId });
+                const classRowEl = checkbox.closest('.sar-export-class-row');
+                const fileKeys = readClassExportKeys(classRowEl, normalizedFormat);
+                targets.push({ type: 'class', studentId, classId, ...fileKeys });
             });
         }
 
@@ -3219,7 +3469,9 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
             if (exportType === 'class') {
                 const classId = String(checkbox.getAttribute('data-class-id') || '').trim();
                 if (!studentId || !classId) return;
-                targets.push({ type: 'class', studentId, classId });
+                const classRowEl = exportBtn.closest('.sar-export-class-row') || rowHost;
+                const fileKeys = readClassExportKeys(classRowEl, format);
+                targets.push({ type: 'class', studentId, classId, ...fileKeys });
             } else if (exportType === 'overall') {
                 const overallTemplateId = String(rowHost?.querySelector('.js-sar-overall-template-select')?.value || checkbox.getAttribute('data-overall-template-id') || '').trim();
                 if (!overallTemplateId) return;
@@ -3262,15 +3514,63 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
         }
     });
 
+    const sarApplyAllCollapseEl = document.getElementById('sarExportApplyAllCollapse');
+    sarApplyAllCollapseEl?.addEventListener('show.bs.collapse', () => {
+        const chevron = document.getElementById('sarApplyAllChevron');
+        chevron?.classList.replace('bi-chevron-right', 'bi-chevron-down');
+        document.getElementById('sarExportApplyAllToggle')?.setAttribute('aria-expanded', 'true');
+    });
+    sarApplyAllCollapseEl?.addEventListener('hide.bs.collapse', () => {
+        const chevron = document.getElementById('sarApplyAllChevron');
+        chevron?.classList.replace('bi-chevron-down', 'bi-chevron-right');
+        document.getElementById('sarExportApplyAllToggle')?.setAttribute('aria-expanded', 'false');
+    });
+
+    document.getElementById('sarApplyAllOverallTemplatesBtn')?.addEventListener('click', () => {
+        const root = getSarExportRoot();
+        if (!root) return;
+        const templateId = String(document.getElementById('sarApplyAllOverallTemplate')?.value || '').trim();
+        const variantKey = String(document.getElementById('sarApplyAllOverallVariant')?.value || '').trim();
+        if (!templateId) return;
+        root.querySelectorAll('.js-sar-overall-cell').forEach((cell) => {
+            const templateSelect = cell.querySelector('.js-sar-overall-template-select');
+            const checkbox = cell.querySelector('.js-sar-export-check[data-sar-export-type="overall"]');
+            if (!templateSelect) return;
+            const options = Array.from(templateSelect.options).map((opt) => String(opt.value || '').trim());
+            if (!options.includes(templateId)) return;
+            templateSelect.value = templateId;
+            const studentId = String(cell.getAttribute('data-student-id') || templateSelect.getAttribute('data-student-id') || '').trim();
+            updateOverallEligibilityUi(studentId);
+            const variantSelect = cell.querySelector('.js-sar-overall-variant-select');
+            if (variantSelect && variantKey && !variantSelect.disabled) {
+                const variantOptions = Array.from(variantSelect.options).map((opt) => String(opt.value || '').trim());
+                if (variantOptions.includes(variantKey)) variantSelect.value = variantKey;
+            }
+            updateOverallEligibilityUi(studentId);
+            if (checkbox && !checkbox.disabled) checkbox.checked = true;
+        });
+    });
+
+    document.getElementById('sarApplyAllOverallTemplate')?.addEventListener('change', (event) => {
+        refreshSarApplyAllOverallVariantSelect(String(event.target.value || '').trim());
+    });
+
     document.getElementById('sarExportModal')?.addEventListener('change', (event) => {
         const variantSelect = event.target.closest('.js-sar-overall-variant-select');
         if (variantSelect) {
             updateOverallEligibilityUi(String(variantSelect.getAttribute('data-student-id') || '').trim());
+            refreshSarExportTemplatePlanList();
             return;
         }
         const select = event.target.closest('.js-sar-overall-template-select');
         if (select) {
             updateOverallEligibilityUi(String(select.getAttribute('data-student-id') || '').trim());
+            refreshSarExportTemplatePlanList();
+            return;
+        }
+        const classDocxSelect = event.target.closest('.js-sar-class-docx-select');
+        if (classDocxSelect) {
+            refreshSarExportTemplatePlanList();
             return;
         }
         const checkbox = event.target.closest('.js-sar-export-check');
@@ -3288,6 +3588,7 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
             return;
         }
         updateOverallEligibilityUi(studentId);
+        refreshSarExportTemplatePlanList();
     });
     document.getElementById('btn_reset').addEventListener('click', () => {
         selectedStudents = [];

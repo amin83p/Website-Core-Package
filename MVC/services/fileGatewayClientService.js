@@ -416,7 +416,7 @@ async function gatewayDownloadByUploadUrlOnce(uploadUrl = '') {
 async function gatewayDownloadByUploadUrl(uploadUrl = '') {
   const token = clean(uploadUrl);
   if (!token) throw new Error('Upload URL is required.');
-  const maxAttempts = 4;
+  const maxAttempts = 6;
   let lastError = null;
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {

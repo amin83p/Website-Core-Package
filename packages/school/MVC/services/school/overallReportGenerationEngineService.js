@@ -224,7 +224,7 @@ async function buildStudentSourceValues(template, slotMap, studentId, templateCa
   return sourceValues;
 }
 
-async function renderVirtualOverallDocx(virtualInstance, docxKey = '') {
+async function renderVirtualOverallDocx(virtualInstance, docxKey = '', exportBatchCache = null) {
   const instance = { ...virtualInstance };
   if (docxKey) instance.selectedDocxKey = docxKey;
   const preview = await overallReportService.buildExportPreview(instance);
@@ -243,7 +243,8 @@ async function renderVirtualOverallDocx(virtualInstance, docxKey = '') {
     instance,
     placeholders: preview.placeholders,
     collections: {},
-    docxTemplateOverride: preview.resolved.docxTemplate
+    docxTemplateOverride: preview.resolved.docxTemplate,
+    exportBatchCache
   });
   const safeStudent = clean(instance.studentName || instance.studentId || 'student').replace(/[^\w.-]+/g, '_');
   const fileName = rendered.fileName?.includes(safeStudent)
@@ -316,7 +317,13 @@ async function generateSourceBatch(request = {}, reqUser) {
 
   const globalStudentIds = Array.isArray(request?.studentIds) ? request.studentIds : undefined;
   const exportBatchCache = request?.exportBatchCache || null;
-  const concurrency = sarExportConfigService.getExportConcurrency();
+  const { requireCoreModule } = require('./schoolCoreContracts');
+  const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
+  const anyDocxSource = sourceRuns.some((row) => clean(row?.format).toLowerCase() === 'docx');
+  let concurrency = sarExportConfigService.getExportConcurrency();
+  if (uploadStorage.isRailwayGatewayBackend()) {
+    concurrency = anyDocxSource ? 1 : Math.min(concurrency, 2);
+  }
   const warnings = [];
 
   const results = await runWithConcurrency(sourceRuns, concurrency, async (run) => {
@@ -476,6 +483,7 @@ async function generateOverallFromSourceBatch(request = {}, reqUser) {
   };
 
   const templateCache = new Map();
+  const exportBatchCache = request?.exportBatchCache || null;
   const warnings = [...(sourceBatch.warnings || [])];
   const studentEntries = [];
 
@@ -559,7 +567,7 @@ async function generateOverallFromSourceBatch(request = {}, reqUser) {
   for (const entry of studentEntries) {
     const selection = selectionByStudent.get(String(entry.studentId ?? '').trim()) || {};
     const docxKey = clean(selection.docxKey) || selectedDocxKey;
-    const file = await renderVirtualOverallDocx(entry.virtualInstance, docxKey);
+    const file = await renderVirtualOverallDocx(entry.virtualInstance, docxKey, exportBatchCache);
     rendered.push(file);
     entry.file = file;
   }
@@ -695,7 +703,8 @@ async function generateOverallPipeline(request = {}, reqUser) {
     selectedPdfKey: request?.selectedPdfKey,
     format: request?.format,
     docxMode: request?.docxMode,
-    selections: request?.selections
+    selections: request?.selections,
+    exportBatchCache: request?.exportBatchCache || null
   }, reqUser);
 
   return {

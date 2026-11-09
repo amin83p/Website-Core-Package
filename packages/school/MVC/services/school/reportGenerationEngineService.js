@@ -623,7 +623,8 @@ async function renderStudentDocx({
   instance,
   reqUser,
   docxKey = '',
-  payload = null
+  payload = null,
+  exportBatchCache = null
 } = {}) {
   if (!reportFunderDocxService.templateHasAnyDocx(template)) {
     throw new Error('This report template has no DOCX file configured.');
@@ -647,7 +648,8 @@ async function renderStudentDocx({
     instance,
     placeholders: studentPayload.placeholders,
     collections: studentPayload.collections,
-    docxTemplateOverride: resolved.docxTemplate
+    docxTemplateOverride: resolved.docxTemplate,
+    exportBatchCache
   });
   const safeName = String(studentPayload.studentName || instance?.studentId || file.fileName)
     .trim()
@@ -889,7 +891,8 @@ async function generateReportOutput(request = {}, options = {}, reqUser) {
       instance: row.instance,
       reqUser,
       docxKey,
-      payload: row.payload
+      payload: row.payload,
+      exportBatchCache: dataCache
     });
     rendered.push(file);
   }

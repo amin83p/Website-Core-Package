@@ -3,6 +3,8 @@
 const schoolDataService = require('./schoolDataService');
 const schoolIdentityLookupService = require('./schoolIdentityLookupService');
 const reportIntegrityService = require('./reportIntegrityService');
+const reportFunderDocxService = require('./reportFunderDocxService');
+const reportDocxRenderService = require('./reportDocxRenderService');
 
 function cleanId(value = '') {
   return String(value ?? '').trim();
@@ -12,10 +14,85 @@ function createExportBatchCache() {
   return {
     classById: new Map(),
     templateById: new Map(),
+    docxBufferByRef: new Map(),
+    docxBufferLoadByRef: new Map(),
     studentsAll: null,
     personsAll: null,
     studentsPersonsLoading: null
   };
+}
+
+async function prewarmDocxTemplates(cache, templates = [], options = {}) {
+  if (!cache?.docxBufferByRef) return 0;
+  const strict = Boolean(options.strict);
+  const unique = (Array.isArray(templates) ? templates : []).filter(Boolean);
+  let warmed = 0;
+  const failures = [];
+  for (const template of unique) {
+    const keys = reportFunderDocxService.buildAvailableDocxOptions(template)
+      .map((row) => cleanId(row.key))
+      .filter(Boolean);
+  // eslint-disable-next-line no-await-in-loop
+    for (const key of keys) {
+      const resolved = reportFunderDocxService.resolveDocxTemplateForFunder({ template, funderKey: key });
+      if (!resolved?.docxTemplate) continue;
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        await reportDocxRenderService.readDocxTemplateBuffer(resolved.docxTemplate, { exportBatchCache: cache });
+        warmed += 1;
+      } catch (error) {
+        failures.push(error);
+        if (strict) throw error;
+      }
+    }
+  }
+  if (strict && warmed === 0 && unique.length) {
+    const error = failures[0] || new Error('Could not prewarm any DOCX templates for export.');
+    throw error;
+  }
+  return warmed;
+}
+
+function dedupeDocxLoadRefs(refs = []) {
+  const unique = new Map();
+  (Array.isArray(refs) ? refs : []).forEach((row) => {
+    if (!row?.docxTemplate) return;
+    const uploadRef = reportDocxRenderService.resolveDocxTemplateReadRef(row.docxTemplate);
+    const key = `${cleanId(row.templateId)}|${cleanId(row.variantKey) || 'default'}|${uploadRef}`;
+    if (!uploadRef || unique.has(key)) return;
+    unique.set(key, {
+      templateId: cleanId(row.templateId),
+      variantKey: cleanId(row.variantKey) || 'default',
+      uploadRef,
+      label: String(row.label || '').trim(),
+      docxTemplate: row.docxTemplate
+    });
+  });
+  return [...unique.values()];
+}
+
+async function prewarmDocxRefs(cache, refs = [], options = {}) {
+  if (!cache?.docxBufferByRef) return 0;
+  const strict = Boolean(options.strict);
+  const unique = dedupeDocxLoadRefs(refs);
+  let warmed = 0;
+  const failures = [];
+  for (const row of unique) {
+    if (!row?.docxTemplate) continue;
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await reportDocxRenderService.readDocxTemplateBuffer(row.docxTemplate, { exportBatchCache: cache });
+      warmed += 1;
+    } catch (error) {
+      failures.push(error);
+      if (strict) throw error;
+    }
+  }
+  if (strict && warmed === 0 && unique.length) {
+    const error = failures[0] || new Error('Could not prewarm any DOCX templates for export.');
+    throw error;
+  }
+  return warmed;
 }
 
 async function getOrLoadClassBundle(cache, classId, reqUser) {
@@ -91,5 +168,8 @@ module.exports = {
   createExportBatchCache,
   getOrLoadClassBundle,
   getOrLoadTemplate,
-  ensureStudentsAndPersons
+  ensureStudentsAndPersons,
+  prewarmDocxTemplates,
+  dedupeDocxLoadRefs,
+  prewarmDocxRefs
 };

@@ -10,12 +10,17 @@ const reportDocxRenderService = require('./reportDocxRenderService');
 const reportPdfRenderService = require('./reportPdfRenderService');
 const reportFunderDocxService = require('./reportFunderDocxService');
 const reportFunderPdfService = require('./reportFunderPdfService');
+const rollingEnrollmentFunderService = require('./rollingEnrollmentFunderService');
 const overallReportService = require('./overallReportService');
 const studentAttendanceReportExportFormatService = require('./studentAttendanceReportExportFormatService');
 const reportExportBatchCacheService = require('./reportExportBatchCacheService');
+const { requireCoreModule } = require('./schoolCoreContracts');
 const sarExportTimingService = require('./sarExportTimingService');
 const sarExportConfigService = require('./sarExportConfigService');
 const { runWithConcurrency } = require('../../utils/asyncPool');
+const fs = require('fs');
+const path = require('path');
+const os = require('os');
 
 function clean(value = '') {
   return String(value ?? '').trim();
@@ -170,8 +175,149 @@ function buildSourceRunsForStudent({
   return { sourceRuns, warnings };
 }
 
-function parseExportConcurrency() {
-  return sarExportConfigService.getExportConcurrency();
+function resolveExportPartBuffer(row = {}) {
+  if (Buffer.isBuffer(row?.buffer) && row.buffer.length) return row.buffer;
+  const scratchPath = clean(row?.scratchPath);
+  if (scratchPath && fs.existsSync(scratchPath)) {
+    return fs.readFileSync(scratchPath);
+  }
+  return null;
+}
+
+function removeSarExportScratchDir(scratchDir) {
+  const dir = clean(scratchDir);
+  if (!dir) return;
+  if (String(process.env.SAR_EXPORT_KEEP_SCRATCH || '').trim().toLowerCase() === '1'
+    || String(process.env.SAR_EXPORT_KEEP_SCRATCH || '').trim().toLowerCase() === 'true') {
+    return;
+  }
+  try {
+    fs.rmSync(dir, { recursive: true, force: true });
+  } catch {
+    // ignore cleanup errors
+  }
+}
+
+function stageExportFileToScratch({ file, index, scratchDir, format }) {
+  if (!scratchDir || format !== 'docx' || !file) return file;
+  const buffer = resolveExportPartBuffer(file);
+  if (!buffer) return file;
+  const partPath = path.join(
+    scratchDir,
+    `part-${index}-${safeFileToken(file.fileName || `student_${index}`, `part_${index}`)}.docx`
+  );
+  fs.writeFileSync(partPath, buffer);
+  return {
+    ...file,
+    buffer,
+    scratchPath: partPath
+  };
+}
+
+async function buildDocxTemplateLoadPlan(targets = [], ctx = {}, studentMap = new Map(), exportBatchCache, reqUser) {
+  const uniqueMap = new Map();
+  const byStudent = [];
+
+  const registerRef = (ref = {}) => {
+    if (!ref?.docxTemplate) return;
+    const uploadRef = reportDocxRenderService.resolveDocxTemplateReadRef(ref.docxTemplate);
+    const key = `${clean(ref.templateId)}|${clean(ref.variantKey) || 'default'}|${uploadRef}`;
+    if (!uploadRef || uniqueMap.has(key)) return;
+    uniqueMap.set(key, {
+      templateId: clean(ref.templateId),
+      variantKey: clean(ref.variantKey) || 'default',
+      uploadRef,
+      label: clean(ref.label),
+      docxTemplate: ref.docxTemplate
+    });
+  };
+
+  for (const target of Array.isArray(targets) ? targets : []) {
+    const type = clean(target?.type).toLowerCase();
+    const studentId = clean(target?.studentId);
+    const student = studentMap.get(studentId);
+    const studentRefs = [];
+    if (!student) continue;
+
+    if (type === 'class') {
+      const template = await reportExportBatchCacheService.getOrLoadTemplate(
+        exportBatchCache,
+        clean(ctx.policy?.reportTemplateId),
+        reqUser
+      );
+      const docxKey = clean(target?.docxKey) || 'default';
+      const resolved = reportFunderDocxService.resolveDocxTemplateForFunder({ template, funderKey: docxKey });
+      registerRef({
+        templateId: template?.id,
+        variantKey: resolved.docxKey,
+        label: resolved.label,
+        docxTemplate: resolved.docxTemplate
+      });
+      if (resolved.docxTemplate) {
+        studentRefs.push({ kind: 'class', variantKey: resolved.docxKey, label: resolved.label });
+      }
+    }
+
+    if (type === 'overall') {
+      const classIds = Array.isArray(target?.classIds)
+        ? target.classIds.map((id) => clean(id)).filter(Boolean)
+        : [];
+      try {
+        const { overallTemplate } = resolveEligibleOverallTemplateForTarget({
+          student,
+          selectedClassIds: classIds,
+          overallTemplateId: clean(target?.overallTemplateId),
+          ctx
+        });
+        const variantKey = overallReportService.resolveOverallTemplateVariantKey(
+          overallTemplate,
+          clean(target?.templateVariantKey),
+          'default'
+        );
+        const resolved = reportFunderDocxService.resolveDocxTemplateForFunder({
+          template: overallTemplate,
+          funderKey: variantKey
+        });
+        registerRef({
+          templateId: overallTemplate?.id,
+          variantKey: resolved.docxKey || variantKey,
+          label: resolved.label,
+          docxTemplate: resolved.docxTemplate
+        });
+        if (resolved.docxTemplate) {
+          studentRefs.push({
+            kind: 'overall',
+            templateId: clean(overallTemplate?.id),
+            variantKey: resolved.docxKey || variantKey,
+            label: resolved.label
+          });
+        }
+      } catch {
+        // Skip targets that cannot satisfy template requirements during planning.
+      }
+    }
+
+    byStudent.push({ studentId, refs: studentRefs });
+  }
+
+  return {
+    uniqueRefs: [...uniqueMap.values()],
+    byStudent
+  };
+}
+
+function parseExportConcurrency(options = {}) {
+  const format = clean(options.format).toLowerCase();
+  let concurrency = sarExportConfigService.getExportConcurrency();
+  try {
+    const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
+    if (uploadStorage.isRailwayGatewayBackend()) {
+      concurrency = format === 'docx' ? 1 : Math.min(concurrency, 2);
+    }
+  } catch {
+    // ignore
+  }
+  return concurrency;
 }
 
 function collectTargetClassIds(targets = []) {
@@ -269,10 +415,80 @@ async function loadTemplateMetaMap(templateIds = [], reqUser, policy = {}, acces
     );
     map.set(templateId, {
       ...rawMeta,
-      ...effective
+      ...effective,
+      template
     });
   }
   return map;
+}
+
+function buildFunderLabelLookup(activeFunders = []) {
+  const labelById = new Map(
+    (Array.isArray(activeFunders) ? activeFunders : []).map((row) => [
+      String(row.id),
+      String(row.label || row.id)
+    ])
+  );
+  labelById.set(reportFunderDocxService.SELF_FUNDER_KEY, 'Self Fund');
+  return labelById;
+}
+
+function enrichClassExportRowsWithFunderSuggestions(
+  student = {},
+  classRows = [],
+  template = null,
+  periodRowsByClassId = null,
+  startDate = '',
+  endDate = '',
+  labelById = new Map()
+) {
+  const personId = clean(student.personId);
+  const studentId = clean(student.studentRecordId || student.studentId);
+  const docxOptions = template ? reportFunderDocxService.buildAvailableDocxOptions(template) : [];
+  const pdfOptions = template ? reportFunderPdfService.buildAvailablePdfOptions(template) : [];
+
+  return (Array.isArray(classRows) ? classRows : []).map((row) => {
+    if (!row?.exportable) {
+      return {
+        ...row,
+        funderLabel: '',
+        docxOptions,
+        pdfOptions,
+        suggestedDocxKey: '',
+        suggestedPdfKey: ''
+      };
+    }
+    const classId = clean(row.classId);
+    const periodRows = periodRowsByClassId instanceof Map
+      ? (periodRowsByClassId.get(classId) || [])
+      : [];
+    const funder = reportFunderDocxService.resolveStudentFunderForReportPeriod({
+      periodRows,
+      personId,
+      studentId,
+      windowStart: startDate,
+      windowEnd: endDate
+    });
+    const funderKey = funder.funderKey || '';
+    const funderLabel = funderKey
+      ? rollingEnrollmentFunderService.resolveEnrollmentFunderLabel(
+        { funderId: funder.funderId, funderType: funder.funderType },
+        labelById
+      )
+      : '';
+    return {
+      ...row,
+      funderLabel,
+      docxOptions,
+      pdfOptions,
+      suggestedDocxKey: template
+        ? reportFunderDocxService.suggestDocxKeyForFunder({ template, funderKey })
+        : '',
+      suggestedPdfKey: template
+        ? reportFunderPdfService.suggestPdfKeyForFunder({ template, funderKey })
+        : ''
+    };
+  });
 }
 
 function buildClassExportRowsForStudent(student, policy, overallTemplate, templateMetaMap) {
@@ -440,7 +656,8 @@ async function enrichOverallExportOptionsForStudent({
   startDate = '',
   endDate = '',
   reqUser,
-  periodRowsByClassId = null
+  periodRowsByClassId = null,
+  funderLabelById = null
 } = {}) {
   const classIds = classRows.map((row) => clean(row.classId)).filter(Boolean);
   let periodRows = [];
@@ -452,20 +669,31 @@ async function enrichOverallExportOptionsForStudent({
   } else {
     periodRows = await loadEnrollmentPeriodRowsForClassIds(classIds, reqUser);
   }
+  const personId = clean(student.personId);
+  const studentId = clean(student.studentRecordId || student.studentId);
   const funder = reportFunderDocxService.resolveStudentFunderForReportPeriod({
     periodRows,
-    personId: clean(student.personId),
+    personId,
+    studentId,
     windowStart: startDate,
     windowEnd: endDate
   });
   const funderKey = funder.funderKey || '';
+  const labelMap = funderLabelById instanceof Map ? funderLabelById : new Map();
+  const funderLabel = funderKey
+    ? rollingEnrollmentFunderService.resolveEnrollmentFunderLabel(
+      { funderId: funder.funderId, funderType: funder.funderType },
+      labelMap
+    )
+    : '';
   const templateById = new Map(
     (Array.isArray(overallTemplates) ? overallTemplates : []).map((template) => [clean(template.id), template])
   );
   return (Array.isArray(overallOptions) ? overallOptions : []).map((option) => {
     const overallTemplate = templateById.get(clean(option.templateId));
-    if (!overallTemplate) return option;
-    return applyOverallTemplateVariantToOption(option, overallTemplate, policy, funderKey);
+    if (!overallTemplate) return { ...option, funderLabel };
+    const withVariant = applyOverallTemplateVariantToOption(option, overallTemplate, policy, funderKey);
+    return { ...withVariant, funderLabel };
   });
 }
 
@@ -494,9 +722,26 @@ async function buildStudentAttendanceReportExportPlan(req, options = {}) {
     periodRowsByClassId.set(classId, Array.isArray(rows) ? rows : []);
   });
 
+  const defaultReportMeta = templateMetaMap.get(clean(policy.reportTemplateId)) || {};
+  const classReportTemplate = defaultReportMeta.template || null;
+  const orgId = clean(req.user?.activeOrgId || classReportTemplate?.orgId);
+  const activeFunders = orgId
+    ? await reportFunderDocxService.loadActiveFunderOptions(req.user, orgId).catch(() => [])
+    : [];
+  const funderLabelById = buildFunderLabelLookup(activeFunders);
+
   const planStudents = [];
   for (const student of students) {
-    const classRows = buildClassExportRowsForStudent(student, policy, null, templateMetaMap);
+    let classRows = buildClassExportRowsForStudent(student, policy, null, templateMetaMap);
+    classRows = enrichClassExportRowsWithFunderSuggestions(
+      student,
+      classRows,
+      classReportTemplate,
+      periodRowsByClassId,
+      startDate,
+      endDate,
+      funderLabelById
+    );
     let overallOptions = buildOverallExportOptions(student, policy, overallTemplates, classRows);
     // eslint-disable-next-line no-await-in-loop
     overallOptions = await enrichOverallExportOptionsForStudent({
@@ -508,19 +753,21 @@ async function buildStudentAttendanceReportExportPlan(req, options = {}) {
       startDate,
       endDate,
       reqUser: req.user,
-      periodRowsByClassId
+      periodRowsByClassId,
+      funderLabelById
     });
     const overall = overallOptions.find((option) => option.eligible) || overallOptions[0] || null;
+    const overallFunderLabel = clean(overallOptions.find((row) => row.funderLabel)?.funderLabel);
     planStudents.push({
       personId: clean(student.personId),
       name: clean(student.name) || clean(student.personId),
       classes: classRows,
       overall,
-      overallOptions
+      overallOptions,
+      overallFunderLabel
     });
   }
 
-  const defaultReportMeta = templateMetaMap.get(clean(policy.reportTemplateId)) || {};
   const overallTemplateSummaries = overallTemplates.map((template) => {
     const templateId = clean(template.id);
     const rawOverallMeta = {
@@ -551,6 +798,12 @@ async function buildStudentAttendanceReportExportPlan(req, options = {}) {
       hasPdf: Boolean(defaultReportMeta.hasPdf),
       hasPayload: defaultReportMeta.hasPayload !== false
     },
+    classTemplateDocxOptions: classReportTemplate
+      ? reportFunderDocxService.buildAvailableDocxOptions(classReportTemplate)
+      : [],
+    classTemplatePdfOptions: classReportTemplate
+      ? reportFunderPdfService.buildAvailablePdfOptions(classReportTemplate)
+      : [],
     overallReportTemplateId: clean(policy.overallReportTemplateId),
     overallReportTemplateIds: policy.overallReportTemplateIds || [],
     overallReportTemplateTitle: overallTemplateSummaries[0]?.title || '',
@@ -633,7 +886,7 @@ function resolveClassTemplateId(policy) {
   return clean(policy.reportTemplateId);
 }
 
-async function exportClassTarget(student, classId, format, ctx, reqUser, exportBatchCache = null) {
+async function exportClassTarget(student, classId, format, ctx, reqUser, exportBatchCache = null, fileKeys = {}) {
   const { policy, startDate, endDate } = ctx;
   const classes = sortClasses(student.classes);
   const classRow = classes.find((row) => clean(row.classId) === clean(classId));
@@ -657,18 +910,27 @@ async function exportClassTarget(student, classId, format, ctx, reqUser, exportB
     templateId,
     format
   );
-  const engineResult = await reportGenerationEngineService.generateReportOutput({
+  const personId = clean(student.personId);
+  const docxKey = clean(fileKeys.docxKey);
+  const pdfKey = clean(fileKeys.pdfKey);
+  const engineRequest = {
     templateId,
     classId: clean(classId),
     teacherId,
     reportStartDate: startDate,
     reportDueDate: endDate,
     reportScope: 'selected_students',
-    targetStudentIds: [clean(student.personId)],
+    targetStudentIds: [personId],
     format,
     docxMode: 'single',
     exportBatchCache: exportBatchCache || ctx?.exportBatchCache || null
-  }, {}, reqUser);
+  };
+  if (docxKey || pdfKey) {
+    engineRequest.selections = [{ studentId: personId, docxKey, pdfKey }];
+    if (docxKey) engineRequest.docxKey = docxKey;
+    if (pdfKey) engineRequest.pdfKey = pdfKey;
+  }
+  const engineResult = await reportGenerationEngineService.generateReportOutput(engineRequest, {}, reqUser);
 
   const fileStem = `${student.name || student.personId}_${classRow.className || classId}`;
   return normalizeEngineResultToFile(engineResult, format, fileStem);
@@ -872,19 +1134,54 @@ async function bundleExportFiles(files, format, startDate, endDate, options = {}
     throw error;
   }
 
+  const mergeDocuments = Boolean(options.mergeDocuments);
+  const expectedTargetCount = Math.max(0, Number(options.expectedTargetCount) || 0);
+  if (mergeDocuments && expectedTargetCount > 1 && files.length < expectedTargetCount) {
+    const stats = reportDocxRenderService.summarizeDocxFileBuffers(files);
+    const error = new Error(
+      `Bulk merge expected ${expectedTargetCount} reports but only ${files.length} file(s) were produced (${stats.totalBytes} bytes total).`
+    );
+    error.statusCode = 500;
+    throw error;
+  }
+
+  if (format === 'docx') {
+    files.forEach((row, index) => {
+      const buffer = resolveExportPartBuffer(row);
+      if (!buffer) return;
+      reportDocxRenderService.assertValidDocxPackage(buffer, row.fileName || `export part ${index + 1}`);
+    });
+  }
+
   if (files.length === 1) {
+    const buffer = resolveExportPartBuffer(files[0]);
     return {
-      buffer: files[0].buffer,
+      buffer,
       contentType: files[0].contentType,
       fileName: files[0].fileName,
       warnings
     };
   }
 
-  const mergeDocuments = Boolean(options.mergeDocuments);
-
   if (format === 'docx' && mergeDocuments) {
-    const buffer = reportDocxRenderService.mergeReportInstanceDocxBuffers(files.map((row) => row.buffer));
+    const partBuffers = files.map((row) => resolveExportPartBuffer(row)).filter(Boolean);
+    const scratchPaths = files.map((row) => clean(row?.scratchPath)).filter(Boolean);
+    const stats = reportDocxRenderService.summarizeDocxFileBuffers(
+      partBuffers.map((buffer, index) => ({ buffer, fileName: files[index]?.fileName }))
+    );
+    const mergeViaPaths = scratchPaths.length === partBuffers.length && scratchPaths.length > 1;
+    const buffer = mergeViaPaths
+      ? reportDocxRenderService.mergeReportInstanceDocxPaths(scratchPaths)
+      : reportDocxRenderService.mergeReportInstanceDocxBuffers(partBuffers);
+    reportDocxRenderService.assertValidDocxPackage(buffer, 'consolidated SAR export');
+    const mergeRatio = stats.totalBytes > 0 ? buffer.length / stats.totalBytes : 1;
+    if (mergeRatio < 0.35) {
+      const error = new Error(
+        'Merged DOCX is much smaller than the individual reports. This often happens when a funder template (e.g. WCB) uses section marks inside the document body.'
+      );
+      error.statusCode = 500;
+      throw error;
+    }
     return {
       buffer,
       contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -957,10 +1254,54 @@ async function exportStudentAttendanceReportSelections(req, options = {}) {
   });
   exportTimer.mark('loadGenerationContext', { targetCount: targets.length });
   ctx.exportBatchCache = exportBatchCache;
-  await reportExportBatchCacheService.getOrLoadTemplate(exportBatchCache, clean(ctx.policy.reportTemplateId), req.user);
-
   const studentMap = new Map(ctx.students.map((row) => [clean(row.personId), row]));
-  const concurrency = parseExportConcurrency();
+  const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
+  const gatewayDocx = format === 'docx' && uploadStorage.isRailwayGatewayBackend();
+
+  const jobId = clean(options.jobId);
+  let scratchDir = null;
+  if (jobId && format === 'docx') {
+    scratchDir = path.join(os.tmpdir(), 'sar-export', jobId);
+    fs.mkdirSync(scratchDir, { recursive: true });
+  }
+
+  try {
+  let docxLoadPlan = { uniqueRefs: [], byStudent: [] };
+  if (format === 'docx') {
+    docxLoadPlan = await buildDocxTemplateLoadPlan(targets, ctx, studentMap, exportBatchCache, req.user);
+    const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
+    if (onProgress) {
+      onProgress({
+        processed: 0,
+        total: targets.length,
+        phase: 'prewarm',
+        templateCount: docxLoadPlan.uniqueRefs.length
+      });
+    }
+    if (docxLoadPlan.uniqueRefs.length) {
+      await reportExportBatchCacheService.prewarmDocxRefs(exportBatchCache, docxLoadPlan.uniqueRefs, {
+        strict: gatewayDocx
+      });
+    } else {
+      const classReportTemplate = await reportExportBatchCacheService.getOrLoadTemplate(
+        exportBatchCache,
+        clean(ctx.policy.reportTemplateId),
+        req.user
+      );
+      const fallbackTemplates = [
+        classReportTemplate,
+        ...(Array.isArray(ctx.overallTemplates) ? ctx.overallTemplates : [])
+      ].filter(Boolean);
+      await reportExportBatchCacheService.prewarmDocxTemplates(exportBatchCache, fallbackTemplates, {
+        strict: gatewayDocx
+      });
+    }
+    exportTimer.mark('prewarm_complete', {
+      uniqueTemplateRefs: docxLoadPlan.uniqueRefs.length
+    });
+  }
+
+  const concurrency = parseExportConcurrency({ format });
   const onProgress = typeof options.onProgress === 'function' ? options.onProgress : null;
   const totalTargets = targets.length;
   let processedTargets = 0;
@@ -986,7 +1327,10 @@ async function exportStudentAttendanceReportSelections(req, options = {}) {
           error.statusCode = 400;
           throw error;
         }
-        return exportClassTarget(student, classId, format, ctx, req.user, exportBatchCache);
+        return exportClassTarget(student, classId, format, ctx, req.user, exportBatchCache, {
+          docxKey: clean(target?.docxKey),
+          pdfKey: clean(target?.pdfKey)
+        });
       }
 
       if (type === 'overall') {
@@ -1016,17 +1360,32 @@ async function exportStudentAttendanceReportSelections(req, options = {}) {
   });
   exportTimer.mark('targets_complete', { fileCount: files.length });
 
+  const stagedFiles = scratchDir
+    ? files.map((file, index) => stageExportFileToScratch({ file, index, scratchDir, format }))
+    : files;
+
   const bundleMode = clean(body.bundleMode).toLowerCase();
   const mergeDocuments = bundleMode === 'merge' && (format === 'docx' || format === 'pdf');
-  const bundled = await bundleExportFiles(files, format, ctx.startDate, ctx.endDate, { mergeDocuments });
+  if (format === 'docx' && mergeDocuments) {
+    const stats = reportDocxRenderService.summarizeDocxFileBuffers(stagedFiles);
+    exportTimer.mark('bundle_prepare', stats);
+  }
+  const bundled = await bundleExportFiles(stagedFiles, format, ctx.startDate, ctx.endDate, {
+    mergeDocuments,
+    expectedTargetCount: targets.length
+  });
   exportTimer.mark('bundle_complete');
   exportTimer.log({
     format,
     targetCount: targets.length,
-    fileCount: files.length,
-    concurrency
+    fileCount: stagedFiles.length,
+    concurrency,
+    docxTemplateRefs: docxLoadPlan.uniqueRefs.length
   });
   return bundled;
+  } finally {
+    removeSarExportScratchDir(scratchDir);
+  }
 }
 
 async function generateDocxForStudentWithoutOverall(student, policy, startDate, endDate, reqUser) {
@@ -1199,7 +1558,10 @@ module.exports = {
   buildOverallExportOptions,
   applyOverallTemplateVariantToOption,
   enrichOverallExportOptionsForStudent,
+  enrichClassExportRowsWithFunderSuggestions,
   buildStudentAttendanceReportExportPlan,
+  exportClassTarget,
+  buildDocxTemplateLoadPlan,
   exportStudentAttendanceReportSelections,
   generateStudentAttendanceReports,
   bundleExportFiles

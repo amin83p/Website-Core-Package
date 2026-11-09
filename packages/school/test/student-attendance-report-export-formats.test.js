@@ -237,3 +237,105 @@ test('buildOverallExportBlock exposes pdf when overall template has attached pdf
   assert.equal(block.hasPdf, true);
   assert.equal(block.hasPayload, true);
 });
+
+test('enrichClassExportRowsWithFunderSuggestions sets suggested docx key from enrollment funder', () => {
+  const funderId = 'funder-wioa';
+  const template = {
+    docxTemplate: { path: '/tmp/default.docx' },
+    docxTemplatesByFunder: [
+      { funderKey: funderId, label: 'WIOA', docxTemplate: { path: '/tmp/wioa.docx' } }
+    ]
+  };
+  const periodRowsByClassId = new Map([
+    ['c1', [{
+      studentId: 'sr1',
+      personId: 'p1',
+      funderId,
+      funderType: 'funder',
+      periodStart: '2025-01-01',
+      periodEnd: '2025-12-31'
+    }]]
+  ]);
+  const labelById = new Map([[funderId, 'WIOA Program']]);
+  const rows = generationService.enrichClassExportRowsWithFunderSuggestions(
+    { personId: 'p1', studentRecordId: 'sr1' },
+    [{
+      classId: 'c1',
+      className: 'Math',
+      exportable: true,
+      hasDocx: true,
+      hasPdf: false,
+      hasPayload: true
+    }],
+    template,
+    periodRowsByClassId,
+    '2025-06-01',
+    '2025-06-30',
+    labelById
+  );
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].suggestedDocxKey, funderId);
+  assert.match(rows[0].funderLabel || '', /WIOA/i);
+  assert.ok((rows[0].docxOptions || []).length >= 1);
+});
+
+test('enrichClassExportRowsWithFunderSuggestions uses default docx when no overlapping period', () => {
+  const template = {
+    docxTemplate: { path: '/tmp/default.docx' },
+    docxTemplatesByFunder: [
+      { funderKey: 'funder-x', label: 'Other', docxTemplate: { path: '/tmp/other.docx' } }
+    ]
+  };
+  const rows = generationService.enrichClassExportRowsWithFunderSuggestions(
+    { personId: 'p1' },
+    [{ classId: 'c1', exportable: true, hasDocx: true }],
+    template,
+    new Map([['c1', []]]),
+    '2025-06-01',
+    '2025-06-30',
+    new Map()
+  );
+  assert.equal(rows[0].suggestedDocxKey, 'default');
+  assert.equal(rows[0].funderLabel, '');
+});
+
+test('exportClassTarget forwards docxKey to generateReportOutput', async () => {
+  const reportGenerationEngineService = require('../MVC/services/school/reportGenerationEngineService');
+  const original = reportGenerationEngineService.generateReportOutput;
+  let captured = null;
+  reportGenerationEngineService.generateReportOutput = async (requestPayload) => {
+    captured = requestPayload;
+    return { file: { buffer: Buffer.from('docx'), contentType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' } };
+  };
+  try {
+    const ctx = {
+      policy: {
+        reportTemplateId: 'tpl-1',
+        templateExportFormats: {
+          report: { 'tpl-1': { docx: true, pdf: true, payload: true } },
+          overall: {}
+        }
+      },
+      startDate: '2025-01-01',
+      endDate: '2025-01-31'
+    };
+    await generationService.exportClassTarget(
+      {
+        personId: 'p1',
+        name: 'Student',
+        classes: [{ classId: 'c1', className: 'Math', teacherId: 't1' }]
+      },
+      'c1',
+      'docx',
+      ctx,
+      {},
+      null,
+      { docxKey: 'funder-wioa', pdfKey: '' }
+    );
+    assert.ok(captured);
+    assert.equal(captured.docxKey, 'funder-wioa');
+    assert.deepEqual(captured.selections, [{ studentId: 'p1', docxKey: 'funder-wioa', pdfKey: '' }]);
+  } finally {
+    reportGenerationEngineService.generateReportOutput = original;
+  }
+});

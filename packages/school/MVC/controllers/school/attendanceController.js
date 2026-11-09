@@ -1954,11 +1954,12 @@ async function exportStudentAttendanceReport(req, res) {
             });
             sarExportJobService.startJob(job.id, (runningJob) =>
                 studentAttendanceReportGenerationService.exportStudentAttendanceReportSelections(fauxReq, {
-                    onProgress: ({ processed, total }) => {
+                    jobId: runningJob.id,
+                    onProgress: ({ processed, total, phase }) => {
                         sarExportJobService.updateJobProgress(runningJob.id, {
                             processedItems: processed,
                             totalItems: total,
-                            phase: 'export'
+                            phase: phase || 'export'
                         });
                     }
                 })
@@ -1977,6 +1978,12 @@ async function exportStudentAttendanceReport(req, res) {
             : Buffer.from(result.buffer || []);
         if (!buffer.length) {
             throw new Error('Export completed but no file data was produced.');
+        }
+        const contentType = String(result.contentType || '').toLowerCase();
+        const fileName = String(result.fileName || '').toLowerCase();
+        if (contentType.includes('wordprocessingml') || fileName.endsWith('.docx')) {
+            const reportDocxRenderService = require('../../services/school/reportDocxRenderService');
+            reportDocxRenderService.assertValidDocxPackage(buffer, result.fileName || 'SAR export');
         }
         res.setHeader('Content-Type', result.contentType || 'application/octet-stream');
         res.setHeader('Content-Disposition', `attachment; filename="${String(result.fileName || 'student_attendance_export').replace(/"/g, '')}"`);

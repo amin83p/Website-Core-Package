@@ -177,6 +177,12 @@ function startJob(jobId, runner = async () => null) {
       if (!buffer.length) {
         throw new Error('Export completed but no file data was produced.');
       }
+      const contentType = String(result.contentType || '').toLowerCase();
+      const fileName = String(result.fileName || '').toLowerCase();
+      if (contentType.includes('wordprocessingml') || fileName.endsWith('.docx')) {
+        const reportDocxRenderService = require('./reportDocxRenderService');
+        reportDocxRenderService.assertValidDocxPackage(buffer, result.fileName || 'SAR export');
+      }
       const filePath = path.join(os.tmpdir(), `sar-export-${job.id}`);
       fs.writeFileSync(filePath, buffer);
       job.status = 'complete';
