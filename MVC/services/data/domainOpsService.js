@@ -11,6 +11,7 @@ const entityGatewayService = require('./entityGatewayService');
 const adminChekersService = require('../adminChekersService');
 const { normalizeOrgRoles, getPrimaryOrgRole } = require('../../utils/orgContextUtils');
 const { toPublicId, idsEqual } = require('../../utils/idAdapter');
+const newsUnreadNotifyService = require('../newsUnreadNotifyService');
 
 function normalizeIdList(values = []) {
   const rows = Array.isArray(values) ? values : [values];
@@ -260,6 +261,9 @@ const domainOpsService = {
       publicGuestView
     };
     const ok = await newsRepository.logView(newsId, logEntry);
+    if (ok && resolvedUserId) {
+      newsUnreadNotifyService.appendReadArticleId(resolvedUserId, newsId).catch(() => {});
+    }
     return ok;
   },
 

@@ -1594,6 +1594,197 @@ a.header-side-control-btn {
   }
 }
 
+.news-unread-side-control {
+  position: relative;
+  overflow: visible;
+  isolation: isolate;
+}
+
+.news-unread-side-control__icon {
+  position: relative;
+  z-index: 2;
+  line-height: 1;
+}
+
+.news-unread-side-control__rings {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  display: none;
+}
+
+.news-unread-side-control__rings span {
+  position: absolute;
+  inset: 2px;
+  border: 2px solid rgba(220, 53, 69, 0.55);
+  border-radius: 50%;
+  opacity: 0;
+  animation: school-autosave-broadcast 2.4s ease-out infinite;
+}
+
+.news-unread-side-control__rings span:nth-child(2) {
+  animation-delay: 0.8s;
+}
+
+.news-unread-side-control__rings span:nth-child(3) {
+  animation-delay: 1.6s;
+}
+
+.news-unread-side-control--broadcast {
+  color: #b42318;
+  border-color: #f1a6a0;
+  background: #fff5f5;
+}
+
+.news-unread-side-control--broadcast .news-unread-side-control__rings {
+  display: block;
+}
+
+.news-unread-list-modal__content {
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.news-unread-list-modal__header {
+  align-items: flex-start;
+  background: linear-gradient(135deg, #f8fafc 0%, #fff 55%);
+  border-bottom: 1px solid #e8edf3;
+  padding: 1.1rem 1.25rem 1rem;
+}
+
+.news-unread-list-modal__header-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(220, 53, 69, 0.1);
+  color: #b42318;
+  font-size: 1.15rem;
+  flex-shrink: 0;
+}
+
+.news-unread-list-modal__body {
+  padding: 1rem 1.25rem 1.15rem;
+  max-height: min(62vh, 480px);
+  overflow-y: auto;
+}
+
+.news-unread-list-modal__footer {
+  border-top: 1px solid #e8edf3;
+  padding: 0.85rem 1.25rem 1rem;
+}
+
+.news-unread-list-modal__lede {
+  line-height: 1.45;
+}
+
+.news-unread-list-modal__list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.news-unread-list-modal__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  text-decoration: none;
+  color: inherit;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.04);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.news-unread-list-modal__item:hover {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+  color: inherit;
+}
+
+.news-unread-list-modal__item:focus-visible {
+  outline: 2px solid #0d6efd;
+  outline-offset: 2px;
+}
+
+.news-unread-list-modal__item-accent {
+  width: 4px;
+  align-self: stretch;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #f87171 0%, #dc3545 100%);
+  flex-shrink: 0;
+}
+
+.news-unread-list-modal__chip {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #0f6770;
+  background: rgba(8, 127, 140, 0.12);
+  border-radius: 999px;
+  padding: 0.25rem 0.55rem;
+  margin-bottom: 0.35rem;
+}
+
+.news-unread-list-modal__title {
+  display: block;
+  font-size: 0.98rem;
+  font-weight: 700;
+  line-height: 1.35;
+  color: #0f172a;
+  margin-bottom: 0.25rem;
+}
+
+.news-unread-list-modal__item:hover .news-unread-list-modal__title {
+  color: #0d6efd;
+}
+
+.news-unread-list-modal__date {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: #64748b;
+}
+
+.news-unread-list-modal__open {
+  color: #94a3b8;
+  font-size: 1rem;
+  padding-top: 0.15rem;
+  flex-shrink: 0;
+  transition: color 0.15s ease;
+}
+
+.news-unread-list-modal__item:hover .news-unread-list-modal__open {
+  color: #0d6efd;
+}
+
+.news-unread-list-modal__empty {
+  text-align: center;
+  padding: 1.5rem 0.75rem 0.5rem;
+}
+
+.news-unread-list-modal__empty-icon {
+  width: 52px;
+  height: 52px;
+  margin: 0 auto 0.75rem;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(25, 135, 84, 0.12);
+  color: #198754;
+  font-size: 1.5rem;
+}
+
 @keyframes school-autosave-spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }

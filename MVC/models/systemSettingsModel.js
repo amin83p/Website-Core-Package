@@ -110,6 +110,13 @@ const DEFAULT_CHAT_POLICY = Object.freeze({
   specialUsers: []
 });
 
+const DEFAULT_NEWS_UNREAD_NOTIFY = Object.freeze({
+  enabled: true,
+  notifyStartDate: '',
+  notifyEndDate: '',
+  categories: []
+});
+
 // Updated Defaults mapping to constants.js structure
 const DEFAULTS = {
   newsletter: {
@@ -139,6 +146,7 @@ const DEFAULTS = {
     chatBackgroundPollIntervalSeconds: 60,
     chatRealtimeWhenModalClosed: false,
     chatPolicy: { ...DEFAULT_CHAT_POLICY },
+    newsUnreadNotify: { ...DEFAULT_NEWS_UNREAD_NOTIFY },
     requestCacheTtlSeconds: 900,
     requestCacheMaxEntries: 500,
     buildVersionOverride: '',
@@ -258,6 +266,13 @@ function mergeAppSettings(base = {}, incoming = {}) {
       return chatPolicyService.normalizePolicyFromStored({
         ...(baseApp.chatPolicy || DEFAULT_CHAT_POLICY),
         ...(incomingApp.chatPolicy || {})
+      });
+    })(),
+    newsUnreadNotify: (() => {
+      const newsUnreadNotifyPolicyService = require('../services/newsUnreadNotifyPolicyService');
+      return newsUnreadNotifyPolicyService.normalizePolicyFromStored({
+        ...(baseApp.newsUnreadNotify || DEFAULT_NEWS_UNREAD_NOTIFY),
+        ...(incomingApp.newsUnreadNotify || {})
       });
     })()
   };

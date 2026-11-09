@@ -45,6 +45,7 @@ const enforceSitePolicy = require('./MVC/middleware/siteStateMiddleware');
 const sessionEnforcement = require('./MVC/middleware/sessionEnforcement');
 const requestRatePhaseOne = require('./MVC/middleware/requestRateMonitor');
 const settingService = require('./MVC/services/settingService'); // Import Setting Service
+const newsUnreadNotifyPolicyService = require('./MVC/services/newsUnreadNotifyPolicyService');
 const appBrandingService = require('./MVC/services/appBrandingService');
 const appPublicUrlService = require('./MVC/services/appPublicUrlService');
 const smsProviderService = require('./MVC/services/sms/smsProviderService');
@@ -556,6 +557,8 @@ app.use(requestPerfTracer.wrapMiddleware('app-locals', async (req, res, next) =>
   res.locals.canUsePageDiagnostics = false;
   res.locals.pageDiagnosticsEnabled = false;
   res.locals.pageDiagnosticsPreferenceEndpoint = '/debug/client-diagnostics/preference';
+  res.locals.newsUnreadSideControlEnabled = false;
+  res.locals.newsUnreadPollIntervalSeconds = 120;
   if (req.user) {
     const canViewActiveUsers = req.user.canViewActiveUsers === true || req.user.uiAccess?.canViewActiveUsers === true;
     const canUsePageDiagnostics = req.user.canUsePageDiagnostics === true || req.user.uiAccess?.canUsePageDiagnostics === true;
@@ -565,6 +568,8 @@ app.use(requestPerfTracer.wrapMiddleware('app-locals', async (req, res, next) =>
     if (canUsePageDiagnostics) {
       res.locals.pageDiagnosticsRuntime = resolvePageDiagnosticsRuntime(req);
     }
+    const newsUnreadPolicy = newsUnreadNotifyPolicyService.getPolicySync();
+    res.locals.newsUnreadSideControlEnabled = newsUnreadPolicy.enabled === true;
   }
   try {
     await authImpersonationService.resolveImpersonationLocals(req, res);

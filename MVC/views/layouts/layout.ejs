@@ -13,6 +13,8 @@
   const layoutMainClass = (typeof mainClass !== 'undefined' && mainClass) ? String(mainClass).trim() : 'container my-4';
   const layoutCanUsePageDiagnostics = (typeof canUsePageDiagnostics !== 'undefined' && canUsePageDiagnostics);
   const layoutPageDiagnosticsEnabled = (typeof pageDiagnosticsEnabled === 'undefined' || pageDiagnosticsEnabled);
+  const layoutNewsUnreadSideControl = (typeof user !== 'undefined' && user)
+    && (typeof newsUnreadSideControlEnabled !== 'undefined' && newsUnreadSideControlEnabled);
 %>
 <html lang="en"<% if (layoutHtmlClass) { %> class="<%= layoutHtmlClass %>"<% } %>>
 <head>
@@ -231,6 +233,17 @@
     <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/orgDateTime.js') : '/scripts/orgDateTime.js' %>"></script>
   <% } %>
   <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/main.js') : '/scripts/main.js' %>"></script>
+
+  <% if (layoutNewsUnreadSideControl) { %>
+    <script>
+      window.__NEWS_UNREAD_SIDE_CONTROL__ = {
+        endpoint: '/news/api/unread',
+        pollIntervalSeconds: <%- JSON.stringify(typeof newsUnreadPollIntervalSeconds !== 'undefined' ? newsUnreadPollIntervalSeconds : 120) %>,
+        csrfToken: <%- JSON.stringify(typeof csrfToken !== 'undefined' ? csrfToken : '') %>
+      };
+    </script>
+    <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/newsUnreadSideControl.js') : '/scripts/newsUnreadSideControl.js' %>"></script>
+  <% } %>
 
   <% if (typeof includeModal !== 'undefined' && includeModal) { %>
     <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/modal.js') : '/scripts/modal.js' %>"></script>

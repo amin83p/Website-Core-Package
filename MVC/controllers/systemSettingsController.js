@@ -23,6 +23,7 @@ const uploadFolderSettingsService = require('../services/uploadFolderSettingsSer
 const integrationVariableModel = require('../models/integrationVariableModel');
 const integrationVariableService = require('../services/integrationVariableService');
 const chatPolicyService = require('../services/chatPolicyService');
+const newsUnreadNotifyPolicyService = require('../services/newsUnreadNotifyPolicyService');
 const publicPageContentSettingsDataService = require('../services/publicPageContentSettingsDataService');
 const coreFilesService = require('../services/coreFilesService');
 const coreUploadRefService = require('../services/coreUploadRefService');
@@ -237,9 +238,21 @@ exports.updateAccessSettings = async (req, res) => {
 /* =========================================================
    APPLICATION DEFAULTS (Fixed for Relative Paths)
 ========================================================= */
+async function loadNewsCategoriesForSettings() {
+  try {
+    const p = path.join(__dirname, '../../data/newsCategories.json');
+    const data = await fs.readFile(p, 'utf8');
+    const rows = JSON.parse(data);
+    return Array.isArray(rows) ? rows : [];
+  } catch (_) {
+    return [{ name: 'General' }, { name: 'Announcements' }];
+  }
+}
+
 exports.showAppSettings = async (req, res) => {
   try {
     const settings = await systemSettingsRepository.getSettings();
+    const newsCategories = await loadNewsCategoriesForSettings();
     
     // uploadsPath supports absolute and relative values (resolved from project root).
     
@@ -253,7 +266,9 @@ exports.showAppSettings = async (req, res) => {
       timezoneOptions: listCuratedTimezoneOptions(),
       defaultTimezone: resolveDefaultTimezone(),
       integrationVariableRows: integrationVariableModel.listRowsForForm(settings?.app?.integrationVariables),
-      chatPolicyDisplay: chatPolicyService.enrichPolicyForDisplay(settings?.app?.chatPolicy)
+      chatPolicyDisplay: chatPolicyService.enrichPolicyForDisplay(settings?.app?.chatPolicy),
+      newsUnreadNotifyDisplay: newsUnreadNotifyPolicyService.enrichPolicyForDisplay(settings?.app?.newsUnreadNotify),
+      newsCategories
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
@@ -648,6 +663,9 @@ exports.updateAppSettings = async (req, res) => {
         chatBackgroundPollIntervalSeconds: parseClampedInteger(req.body.chatBackgroundPollIntervalSeconds, 60, 15, 600),
         chatRealtimeWhenModalClosed: req.body.chatRealtimeWhenModalClosed === 'true',
         chatPolicy: chatPolicyService.validatePolicyInput(chatPolicyService.normalizePolicyFromForm(req.body)),
+        newsUnreadNotify: newsUnreadNotifyPolicyService.validatePolicyInput(
+          newsUnreadNotifyPolicyService.normalizePolicyFromForm(req.body)
+        ),
         requestCacheTtlSeconds: parseInt(req.body.requestCacheTtlSeconds, 10),
         requestCacheMaxEntries: parseInt(req.body.requestCacheMaxEntries, 10),
         buildVersionOverride: cleanFormText(req.body.buildVersionOverride, 120),

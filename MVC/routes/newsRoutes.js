@@ -32,6 +32,7 @@ router.get('/manage', requireAuth, controller.listAdmin);
 
 // ✅ NEW: API Route for Media Manager Uploads
 // This enforces the 'news' folder configuration
+router.get('/api/unread', requireAuth, controller.getUnreadArticlesApi);
 router.get('/api/media/library', requireAuth, controller.listNewsMediaLibrary);
 router.get('/api/notify/roles', requireAuth, controller.getNotifyRoles);
 router.post('/api/notify/recipients', requireAuth, controller.postNotifyRecipients);

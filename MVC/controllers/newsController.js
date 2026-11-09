@@ -16,6 +16,7 @@ const {
     extractImgSrcList
 } = require('../utils/newsHtmlAssetUrls');
 const newsRoleNotifyService = require('../services/newsRoleNotifyService');
+const newsUnreadNotifyService = require('../services/newsUnreadNotifyService');
 const { defaultSendAtLocalFromNow } = require('../utils/scheduleSendAtUtils');
 
 const MAX_ARTICLE_VISIT_PAGE_LIMIT = 100;
@@ -468,6 +469,25 @@ async function feed(req, res) {
 
     } catch (error) {
         res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+    }
+}
+
+async function getUnreadArticlesApi(req, res) {
+    try {
+        const user = req.user || null;
+        if (!user) {
+            return res.status(401).json({ status: 'error', message: 'Authentication required.' });
+        }
+        const result = await newsUnreadNotifyService.getUnreadForUser(user);
+        return res.json({
+            status: 'success',
+            ...result
+        });
+    } catch (error) {
+        return res.status(500).json({
+            status: 'error',
+            message: error.message || 'Unable to load unread news.'
+        });
     }
 }
 
@@ -1175,6 +1195,7 @@ async function uploadMedia(req, res) {
 module.exports = {
     showCenter,
     feed,
+    getUnreadArticlesApi,
     viewArticle,
     listAdmin,
     showForm,

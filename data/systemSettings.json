@@ -27,6 +27,22 @@
     "genericPickerSearchDebounceMs": 400,
     "chatBackgroundPollIntervalSeconds": 60,
     "chatRealtimeWhenModalClosed": false,
+    "chatPolicy": {
+      "attachmentsEnabled": true,
+      "maxFileSizeKb": null,
+      "allowedExtensions": "",
+      "blockedExtensions": "",
+      "maxConversationSizeMb": null,
+      "maxUserTotalSizeMb": null,
+      "storageWarnPercent": 85,
+      "specialUsers": []
+    },
+    "newsUnreadNotify": {
+      "enabled": false,
+      "notifyStartDate": "",
+      "notifyEndDate": "",
+      "categories": []
+    },
     "requestCacheTtlSeconds": 900,
     "requestCacheMaxEntries": 500,
     "buildVersionOverride": "",
@@ -39,6 +55,7 @@
       "core.symbols": "symbols",
       "core.news": "news",
       "core.chat": "chat/{conversationId}",
+      "core.profileAvatars": "profiles/{userId}",
       "core.contacts": "contacts",
       "core.ielts": "ielts",
       "core.emailTemplates": "email-templates",
@@ -65,9 +82,9 @@
       "pte.packageAssets": "PTE/Package_Assets"
     },
     "brand": {
-      "appName": "EQUALIZER",
-      "appShortName": "EQZ",
-      "tagline": "EQUALIZER Platform",
+      "appName": "EQU Portal",
+      "appShortName": "EQU",
+      "tagline": "Equilibrium Portal",
       "logoUrl": "/uploads/GLOBAL/logo/Logo1.png",
       "faviconUrl": "/uploads/GLOBAL/logo/tabLogo.png",
       "iconSvgUrl": "/uploads/GLOBAL/logo/Logo.svg",
@@ -320,7 +337,7 @@
   },
   "audit": {
     "lastUpdateUser": "ROOT_001",
-    "lastUpdateDateTime": "2026-11-04T22:27:44.532Z"
+    "lastUpdateDateTime": "2026-11-09T19:14:50.984Z"
   },
   "logArchive": {}
 }

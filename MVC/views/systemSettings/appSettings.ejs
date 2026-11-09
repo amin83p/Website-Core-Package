@@ -105,6 +105,11 @@
           </button>
         </li>
         <li class="nav-item" role="presentation">
+          <button class="nav-link fw-semibold" id="app-news-tab" data-bs-toggle="tab" data-bs-target="#app-news-pane" type="button" role="tab" aria-controls="app-news-pane" aria-selected="false">
+            <i class="bi bi-newspaper me-1"></i> News
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
           <button class="nav-link fw-semibold" id="app-chat-tab" data-bs-toggle="tab" data-bs-target="#app-chat-pane" type="button" role="tab" aria-controls="app-chat-pane" aria-selected="false">
             <i class="bi bi-chat-dots me-1"></i> Chat
           </button>
@@ -700,6 +705,56 @@
                 </div>
             </div>
 
+        </div>
+      </div>
+        </div>
+
+        <div class="tab-pane fade" id="app-news-pane" role="tabpanel" aria-labelledby="app-news-tab" tabindex="0">
+      <% const newsUnreadNotifyForm = (typeof newsUnreadNotifyDisplay !== 'undefined' && newsUnreadNotifyDisplay)
+        ? newsUnreadNotifyDisplay
+        : (settings.app.newsUnreadNotify || {}); %>
+      <% const newsCategoryRows = (typeof newsCategories !== 'undefined' && Array.isArray(newsCategories)) ? newsCategories : []; %>
+      <% const newsUnreadCategorySet = new Set((Array.isArray(newsUnreadNotifyForm.categories) ? newsUnreadNotifyForm.categories : []).map((c) => String(c || '').trim().toLowerCase()).filter(Boolean)); %>
+      <div class="card mb-4 shadow-sm border-0">
+        <div class="card-header bg-white border-0 pb-0">
+          <h5 class="fw-bold mb-1"><i class="bi bi-newspaper text-primary me-2"></i>News unread alerts</h5>
+          <p class="text-muted small mb-0">Header side control for signed-in users: unread published articles in the date window and selected categories.</p>
+        </div>
+        <div class="card-body p-4">
+          <div class="form-check form-switch mb-4">
+            <input type="hidden" name="newsUnreadNotifyEnabled_present" value="1">
+            <input class="form-check-input" type="checkbox" role="switch" id="newsUnreadNotifyEnabled" name="newsUnreadNotifyEnabled" value="true" <%= newsUnreadNotifyForm.enabled !== false ? 'checked' : '' %>>
+            <label class="form-check-label fw-bold" for="newsUnreadNotifyEnabled">Enable news unread side button</label>
+          </div>
+          <div class="row g-3 mb-4">
+            <div class="col-md-6">
+              <label class="form-label fw-bold" for="newsUnreadNotifyStartDate">Notify from (publish date)</label>
+              <input type="date" class="form-control" id="newsUnreadNotifyStartDate" name="newsUnreadNotifyStartDate" value="<%= newsUnreadNotifyForm.notifyStartDate || '' %>">
+              <div class="form-text">Leave empty for no start limit.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold" for="newsUnreadNotifyEndDate">Notify until (publish date)</label>
+              <input type="date" class="form-control" id="newsUnreadNotifyEndDate" name="newsUnreadNotifyEndDate" value="<%= newsUnreadNotifyForm.notifyEndDate || '' %>">
+              <div class="form-text">Leave empty for no end limit.</div>
+            </div>
+          </div>
+          <div class="mb-0">
+            <span class="form-label fw-bold d-block mb-2">Target categories</span>
+            <div class="form-text mb-2">Leave all unchecked to include every category.</div>
+            <div class="d-flex flex-wrap gap-3">
+              <% newsCategoryRows.forEach((row) => {
+                const catName = String(row?.name || '').trim();
+                if (!catName) return;
+                const inputId = 'newsUnreadCat_' + catName.replace(/[^a-zA-Z0-9]+/g, '_');
+                const checked = newsUnreadCategorySet.has(catName.toLowerCase());
+              %>
+                <div class="form-check">
+                  <input class="form-check-input" type="checkbox" name="newsUnreadNotifyCategories" value="<%= catName %>" id="<%= inputId %>" <%= checked ? 'checked' : '' %>>
+                  <label class="form-check-label" for="<%= inputId %>"><%= catName %></label>
+                </div>
+              <% }); %>
+            </div>
+          </div>
         </div>
       </div>
         </div>
