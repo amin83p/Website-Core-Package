@@ -608,6 +608,10 @@
                             <div class="col-12" id="wrap_cellExcuseNotes">
                                 <div class="row g-2 align-items-start" id="wrap_cellExcuseNotesEditor">
                                     <div class="col-md-8">
+                                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
+                                            <span class="small fw-bold text-secondary">Excuse / reference notes</span>
+                                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnPickCellExcuseReason" title="Pick a frequent excuse reason"><i class="bi bi-ui-checks-grid me-1"></i>Pick reason</button>
+                                        </div>
                                         <textarea class="form-control form-control-sm" id="inp_cellExcuseRef" rows="3" placeholder="Add details..."></textarea>
                                     </div>
                                     <div class="col-md-4">
@@ -684,6 +688,7 @@
 </div>
 
 <%- include('partials/modal_GenericPicker') %>
+<%- include('partials/attendanceExcuseReasonPickerModal') %>
 <%- include('../report/partials/reportMessageHelpers') %>
 <%- include('partials/tablePages-end') %>
 <script src="/scripts/schoolDateRangeShortcuts.js"></script>
@@ -691,6 +696,7 @@
 <script src="/scripts/sessionAttendanceTimingDetailClient.js"></script>
 <script src="/scripts/attendanceMarkAppearanceClient.js"></script>
 <script src="/scripts/attendanceCellHoverTip.js"></script>
+<script src="/scripts/attendanceExcuseReasonPickerClient.js"></script>
 <% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
 <script src="/scripts/enrollmentClaimToggle.js"></script>
 <% } %>
@@ -1051,17 +1057,29 @@ function renderAttendanceAttachmentLink(attachment, emptyText = '') {
     return `<a href="${attendanceAttachmentEscape(href)}" target="_blank" rel="noopener" class="text-decoration-none"><i class="bi bi-paperclip me-1"></i>${attendanceAttachmentEscape(att.name || att.originalName || 'Open attachment')}</a>`;
 }
 
-function showAttendanceMatrixMessage({ title = 'Attendance Matrix', icon = 'info', message = '', buttons = null } = {}) {
+function showAttendanceMatrixMessage({ title = 'Attendance Matrix', icon = 'info', message = '', buttons = null, html = false } = {}) {
     try { hideAttendanceMatrixBusy(true); } catch (_) {}
     const safeMessage = String(message || '').trim() || 'Operation could not be completed.';
     const safeButtons = Array.isArray(buttons) && buttons.length
         ? buttons
         : [{ text: 'Close', class: icon === 'error' ? 'btn-danger' : 'btn-primary' }];
     if (typeof window.showMessageModal === 'function') {
-        return window.showMessageModal({ title, icon, message: safeMessage, buttons: safeButtons });
+        return window.showMessageModal({
+            title,
+            icon,
+            message: html ? String(message || '') : safeMessage,
+            buttons: safeButtons
+        });
     }
     alert(safeMessage.replace(/<[^>]*>/g, ''));
     return Promise.resolve();
+}
+
+async function attendanceExcuseReasonMessageBox(opts = {}) {
+    if (opts.html === true && typeof window.showMessageModal === 'function') {
+        return window.showMessageModal(opts);
+    }
+    return showAttendanceMatrixMessage(opts);
 }
 
 function parseAttendancePositiveInteger(value) {
@@ -1854,6 +1872,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const actionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
     setAttendanceActionStateId(actionStateId);
+    const attendanceExcuseReasonsInitial = <%- JSON.stringify(
+        Array.isArray(typeof attendanceExcuseReasons !== 'undefined' ? attendanceExcuseReasons : null)
+            ? attendanceExcuseReasons
+            : []
+    ).replace(/</g, '\\u003c') %>;
+    const canManageAttendanceExcuseReasonCatalog = <%= (typeof canManageAttendanceExcuseReasons !== 'undefined' && canManageAttendanceExcuseReasons) ? 'true' : 'false' %>;
+    if (typeof installAttendanceExcuseReasonPicker === 'function') {
+        window.matrixExcuseReasonPicker = installAttendanceExcuseReasonPicker({
+            textareaId: 'inp_cellExcuseRef',
+            pickButtonId: 'btnPickCellExcuseReason',
+            initialReasons: attendanceExcuseReasonsInitial,
+            canManageCatalog: canManageAttendanceExcuseReasonCatalog,
+            getActionStateId: () => resolveAttendanceActionStateId(),
+            escapeHtml: attendanceAttachmentEscape,
+            messageBox: attendanceExcuseReasonMessageBox
+        });
+    }
     setAttendanceBudgetState(window.ATTENDANCE_ACTION_LIMITS || {});
     syncAttendanceRequestBudgetFromUsage();
     window.CAN_EDIT_ATTENDANCE_ROSTER = <%= (typeof canEditAttendanceRoster !== 'undefined' && canEditAttendanceRoster) ? 'true' : 'false' %>;
@@ -4143,6 +4178,7 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
     if (rosterStudentNoteEl) rosterStudentNoteEl.disabled = !allowStudentRosterNoteEdit;
     const excuseRefEl = document.getElementById('inp_cellExcuseRef');
     if (excuseRefEl) excuseRefEl.disabled = !allowExcuseNotesEdit;
+    window.matrixExcuseReasonPicker?.setPickButtonDisabled?.(!allowExcuseNotesEdit);
     const lockNotice = document.getElementById('cell_modal_lock_notice');
     const attendanceEditWindowNotice = document.getElementById('cell_modal_attendance_edit_window_notice');
     const makeupNotice = document.getElementById('cell_modal_makeup_notice');

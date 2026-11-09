@@ -39,6 +39,7 @@ const {
     userCanMarkAttendanceExcused
 } = require('../../services/school/attendanceMatrixAccessService');
 const attendanceAccessService = require('../../services/school/attendanceAccessService');
+const attendanceExcuseReasonPolicyModel = require('../../models/school/attendanceExcuseReasonPolicyModel');
 const reportFunderDocxService = require('../../services/school/reportFunderDocxService');
 const schoolSemiMonthlyReportByFunderService = require('../../services/school/schoolSemiMonthlyReportByFunderService');
 const sessionManagementService = require('../../services/school/sessionManagementService');
@@ -481,6 +482,14 @@ async function showAttendancePage(req, res) {
         };
 
         const canOpenRollingEnrollment = await schoolRollingEnrollmentAccessService.canAccessRollingEnrollment(req.user);
+        const activeOrgId = String(req.user?.activeOrgId || '').trim();
+        const attendanceExcuseReasonPolicy = activeOrgId
+            ? await attendanceExcuseReasonPolicyModel.getPolicyForOrg(activeOrgId)
+            : { reasons: [] };
+        const attendanceExcuseReasons = Array.isArray(attendanceExcuseReasonPolicy?.reasons)
+            ? attendanceExcuseReasonPolicy.reasons
+            : [];
+        const canManageAttendanceExcuseReasons = attendanceAccessService.canManageExcuseReasonCatalog(attendanceAccess);
 
         res.render('school/attendance/attendanceViewer', {
             title: 'Attendance Matrix',
@@ -512,7 +521,9 @@ async function showAttendancePage(req, res) {
             initialSessionId,
             initialRange,
             attendanceActionLimits,
-            canOpenRollingEnrollment
+            canOpenRollingEnrollment,
+            attendanceExcuseReasons,
+            canManageAttendanceExcuseReasons
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
@@ -2087,6 +2098,63 @@ async function getAttendanceChangeLog(req, res) {
     }
 }
 
+async function getAttendanceExcuseReasons(req, res) {
+    try {
+        const attendanceAccess = await resolveAttendanceAccessForRequest(req);
+        const canViewFromSessions = await accessService.evaluateAccess({
+            user: req.user,
+            sectionId: SECTIONS.SCHOOL_SESSIONS,
+            operationId: OPERATIONS.READ_ALL,
+            ipAddress: req.ip
+        }).then((row) => row?.allowed === true).catch(() => false);
+        if (!attendanceAccess.canViewRosterFields && !canViewFromSessions) {
+            const error = new Error('You do not have permission to view attendance excuse reasons.');
+            error.statusCode = 403;
+            throw error;
+        }
+        const activeOrgId = String(req.user?.activeOrgId || '').trim();
+        if (!activeOrgId) throw new Error('Active organization is required.');
+        const policy = await attendanceExcuseReasonPolicyModel.getPolicyForOrg(activeOrgId);
+        const reasons = Array.isArray(policy?.reasons) ? policy.reasons : [];
+        return res.json({
+            status: 'success',
+            reasons,
+            canManage: attendanceAccessService.canManageExcuseReasonCatalog(attendanceAccess)
+        });
+    } catch (error) {
+        const status = error.statusCode || 400;
+        return res.status(status).json({ status: 'error', message: error.message });
+    }
+}
+
+async function saveAttendanceExcuseReasons(req, res) {
+    try {
+        const attendanceAccess = await resolveAttendanceAccessForRequest(req);
+        if (!attendanceAccessService.canManageExcuseReasonCatalog(attendanceAccess)) {
+            const error = new Error('You do not have permission to manage excuse reasons.');
+            error.statusCode = 403;
+            throw error;
+        }
+        const activeOrgId = String(req.user?.activeOrgId || '').trim();
+        if (!activeOrgId) throw new Error('Active organization is required.');
+        const raw = req.body?.reasons;
+        const patch = { reasons: Array.isArray(raw) ? raw : [] };
+        const saved = await attendanceExcuseReasonPolicyModel.savePolicyForOrg(
+            activeOrgId,
+            patch,
+            req.user?.id || req.user?._id || 'system'
+        );
+        return res.json({
+            status: 'success',
+            reasons: Array.isArray(saved?.reasons) ? saved.reasons : [],
+            usesCustomList: saved?.usesCustomList === true
+        });
+    } catch (error) {
+        const status = error.statusCode || 400;
+        return res.status(status).json({ status: 'error', message: error.message });
+    }
+}
+
 async function queryAttendanceChangeLogs(req, res) {
     try {
         const attendanceAccess = await resolveAttendanceAccessForRequest(req);
@@ -2138,5 +2206,7 @@ module.exports = {
     addAttendanceComment,
     updateAttendanceRosterCell,
     getAttendanceChangeLog,
-    queryAttendanceChangeLogs
+    queryAttendanceChangeLogs,
+    getAttendanceExcuseReasons,
+    saveAttendanceExcuseReasons
 };

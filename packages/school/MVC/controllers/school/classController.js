@@ -120,6 +120,7 @@ const sessionConflictDetectionService = require('../../services/school/sessionCo
 const oneOnOneSessionScheduleService = require('../../services/school/oneOnOneSessionScheduleService');
 const { userCanOpenAttendanceMatrix, getAttendanceAccessForRequest } = require('../../services/school/attendanceMatrixAccessService');
 const attendanceAccessService = require('../../services/school/attendanceAccessService');
+const attendanceExcuseReasonPolicyModel = require('../../models/school/attendanceExcuseReasonPolicyModel');
 const studentListSearchService = require('../../services/school/studentListSearchService');
 const { userCanViewSchoolSettings } = require('../../services/school/schoolSettingsAccessService');
 
@@ -4494,6 +4495,11 @@ async function manageSession(req, res) {
             })
         ]);
         const attendanceAccess = await attendanceAccessService.buildAttendanceAccess(req.user, req.ip);
+        const attendanceExcuseReasonPolicy = await attendanceExcuseReasonPolicyModel.getPolicyForOrg(orgIdForPolicies);
+        const attendanceExcuseReasons = Array.isArray(attendanceExcuseReasonPolicy?.reasons)
+            ? attendanceExcuseReasonPolicy.reasons
+            : [];
+        const canManageAttendanceExcuseReasons = attendanceAccessService.canManageExcuseReasonCatalog(attendanceAccess);
         const canOverrideAttendanceEdit = canOverride || Boolean(attendanceAccess.canOverrideSessionLock);
         const canOverrideCompletedSections = Boolean(canOverride);
         const attendanceEditLocked = !attendanceAccess.canEditRoster
@@ -4985,6 +4991,8 @@ async function manageSession(req, res) {
             periodGradebookOtherWeightTotal,
             attendanceRosterPersonOrder,
             hasAttendanceRosterOrder,
+            attendanceExcuseReasons,
+            canManageAttendanceExcuseReasons,
             includeModal: true,  
             user: req.user,
             actionStateId: req.actionStateId

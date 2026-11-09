@@ -171,9 +171,15 @@ function assertAttendanceAccessFlag(access, flagName, message) {
   }
 }
 
+function canManageExcuseReasonCatalog(access) {
+  if (!access || typeof access !== 'object') return false;
+  return Boolean(access.adminFlags?.update || access.canOverrideSessionLock);
+}
+
 module.exports = {
   evaluateAttendanceOperation,
   buildAttendanceAccess,
   buildAttendanceReportAccess,
-  assertAttendanceAccessFlag
+  assertAttendanceAccessFlag,
+  canManageExcuseReasonCatalog
 };

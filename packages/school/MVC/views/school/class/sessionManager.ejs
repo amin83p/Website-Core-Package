@@ -3775,7 +3775,10 @@
 
                 <div class="row g-3 mb-2">
                     <div class="col-12">
-                        <label class="form-label fw-bold small" for="modalExcuseRef">Excuse / reference notes</label>
+                        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
+                            <label class="form-label fw-bold small mb-0" for="modalExcuseRef">Excuse / reference notes</label>
+                            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnPickExcuseReason" title="Pick a frequent excuse reason" <%= attendanceDisabledAttr %>><i class="bi bi-ui-checks-grid me-1"></i>Pick reason</button>
+                        </div>
                         <textarea class="form-control" id="modalExcuseRef" rows="3" placeholder="Add details..." <%- attendanceDisabledAttr %>></textarea>
                         <label class="form-label fw-bold small mt-2" for="modalExcuseFile">Attach supporting file</label>
                         <input type="file" class="form-control form-control-sm" id="modalExcuseFile" <%- attendanceUploadDisabledAttr %>>
@@ -3814,6 +3817,8 @@
         </div>
     </div>
 </div>
+
+<%- include('../attendance/partials/attendanceExcuseReasonPickerModal') %>
 
 <div class="modal fade" id="attendanceNaNoteModal" tabindex="-1" aria-labelledby="attendanceNaNoteModalTitle" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
@@ -4117,6 +4122,7 @@
 <script src="/scripts/visibilityInterval.js"></script>
 <script src="/scripts/schoolAutosave.js"></script>
 <script src="/scripts/sessionAttendanceTimingDetailClient.js"></script>
+<script src="/scripts/attendanceExcuseReasonPickerClient.js"></script>
 <% if (canAssignSessionReports) { %>
 <script src="/scripts/reportPeriodBasePolicy.js"></script>
 <script src="/scripts/reportAssignmentStudentPickerUi.js"></script>
@@ -4605,6 +4611,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionCanEditScheduleFields = sessionCanEditMetadata || sessionCanEditOneOnOneSchedule;
     const sessionAttendanceReadOnly = <%- jsonForScript(Boolean(attendanceReadOnly)) %>;
     window.sessionAttendanceReadOnly = sessionAttendanceReadOnly;
+    let attendanceExcuseReasonsState = <%- jsonForScript(Array.isArray(typeof attendanceExcuseReasons !== 'undefined' ? attendanceExcuseReasons : null) ? attendanceExcuseReasons : []) %>;
+    const canManageAttendanceExcuseReasonCatalog = <%- jsonForScript(Boolean(typeof canManageAttendanceExcuseReasons !== 'undefined' && canManageAttendanceExcuseReasons)) %>;
     const sessionCanUploadAttendanceFiles = <%- jsonForScript(Boolean(typeof canUploadAttendanceFiles !== 'undefined' && canUploadAttendanceFiles)) %>;
     const sessionCanDeleteAttendanceFiles = <%- jsonForScript(Boolean(typeof canDeleteAttendanceFiles !== 'undefined' && canDeleteAttendanceFiles)) %>;
     const sessionNotesSectionReadOnly = <%- jsonForScript(Boolean(sessionNotesReadOnly)) %>;
@@ -8261,6 +8269,20 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!assignAttendanceFileInput(targetInput, file)) return;
             if (targetInput.id === 'modalExcuseFile') updateModalExcusePastePreview(file);
         });
+    }
+
+    let sessionExcuseReasonPicker = null;
+    if (typeof installAttendanceExcuseReasonPicker === 'function') {
+        sessionExcuseReasonPicker = installAttendanceExcuseReasonPicker({
+            textareaId: 'modalExcuseRef',
+            pickButtonId: 'btnPickExcuseReason',
+            initialReasons: attendanceExcuseReasonsState,
+            canManageCatalog: canManageAttendanceExcuseReasonCatalog,
+            getActionStateId: () => actionStateId,
+            escapeHtml: attendanceAttachmentEscape,
+            messageBox: (opts) => sessionMessageBox(opts)
+        });
+        window.sessionExcuseReasonPicker = sessionExcuseReasonPicker;
     }
 
     const SIDEBAR_KEY = 'sessionManagerSidebarCollapsed';
@@ -12371,6 +12393,7 @@ function openDetailsModal(personId, name) {
     });
     const modalExcuseRef = document.getElementById('modalExcuseRef');
     if (modalExcuseRef) modalExcuseRef.disabled = timingDisabled;
+    window.sessionExcuseReasonPicker?.setPickButtonDisabled?.(timingDisabled);
     const modalExcuseFile = document.getElementById('modalExcuseFile');
     if (modalExcuseFile) modalExcuseFile.disabled = timingDisabled;
     const resetStudentAttendanceBtn = document.getElementById('btnResetStudentAttendance');

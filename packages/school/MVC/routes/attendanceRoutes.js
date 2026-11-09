@@ -130,6 +130,15 @@ router.get('/api/change-log',
   trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL, { keepActive: true }),
   ctrl.getAttendanceChangeLog);
 
+router.get('/api/excuse-reasons',
+  requireAccessAny([SECTIONS.SCHOOL_ATTENDANCES, SECTIONS.SCHOOL_SESSIONS].filter(Boolean), OPERATIONS.READ_ALL),
+  ctrl.getAttendanceExcuseReasons);
+
+router.put('/api/excuse-reasons',
+  requireAttendanceOperation(OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.UPDATE, attendanceMatrixMutationActionState),
+  ctrl.saveAttendanceExcuseReasons);
+
 router.post('/api/change-log/query',
   requireAttendanceOperation(OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL, { keepActive: true }),
