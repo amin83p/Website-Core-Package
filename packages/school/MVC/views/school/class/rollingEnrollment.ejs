@@ -2508,6 +2508,7 @@
             <div class="col-lg-3 col-md-6">
               <label class="form-label" for="move_startDate">Start Date *</label>
               <input type="date" id="move_startDate" class="form-control"<% if (cycleStartDate) { %> min="<%= cycleStartDate %>"<% } %><% if (cycleEndDate) { %> max="<%= cycleEndDate %>"<% } %>>
+              <div class="form-text compact-help text-danger d-none" id="move_startDateGapHelp" role="alert"></div>
             </div>
             <div class="col-lg-3 col-md-6">
               <label class="form-label" for="move_endDate">End Date</label>
@@ -2633,7 +2634,7 @@
             <div class="d-flex flex-wrap gap-3 align-items-center">
               <span><span class="text-muted">Closing date:</span> <strong id="classMove_contextCloseDate">—</strong></span>
               <span><span class="text-muted">Close status:</span> <strong>Completed</strong></span>
-              <span class="text-muted small">New enrollment start date matches the closing date for all selected students.</span>
+              <span class="text-muted small">Each Start date must be at least one day after the closing date (default is the next day; adjust per student in the Start column).</span>
             </div>
           </div>
           <div class="d-flex flex-wrap gap-2 mb-2">
@@ -2646,6 +2647,7 @@
                 <tr>
                   <th class="ps-2" style="width:2.5rem;"><input type="checkbox" class="form-check-input" id="classMove_checkAll" aria-label="Select all"></th>
                   <th>Student</th>
+                  <th>Start</th>
                   <th>End</th>
                   <th>Sessions</th>
                   <th>Hours</th>
@@ -2656,7 +2658,7 @@
                 </tr>
               </thead>
               <tbody id="classMove_candidatesTbody">
-                <tr><td colspan="9" class="text-center text-muted py-4">Load students using Next.</td></tr>
+                <tr><td colspan="10" class="text-center text-muted py-4">Load students using Next.</td></tr>
               </tbody>
             </table>
           </div>
@@ -2678,7 +2680,7 @@
           </div>
           <div class="table-responsive border rounded">
             <table class="table table-sm align-middle mb-0">
-              <thead class="table-light"><tr><th>Student</th><th>End</th><th>Sessions</th><th>Hours</th><th>Capacity</th><th>Claim</th></tr></thead>
+              <thead class="table-light"><tr><th>Student</th><th>Start</th><th>End</th><th>Sessions</th><th>Hours</th><th>Capacity</th><th>Claim</th></tr></thead>
               <tbody id="classMove_selectedSummaryTbody"></tbody>
             </table>
           </div>
@@ -3085,6 +3087,61 @@
   function orgTodayFallback() {
     if (ORG_TODAY) return ORG_TODAY;
     return (window.AppOrgDateTime && window.AppOrgDateTime.today) ? String(window.AppOrgDateTime.today) : '';
+  }
+  function addDaysToIsoDate(dateStr, days) {
+    const token = String(dateStr || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(token)) return '';
+    const [year, month, day] = token.split('-').map((part) => Number(part));
+    const utc = Date.UTC(year, month - 1, day + Number(days || 0));
+    const next = new Date(utc);
+    return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}-${String(next.getUTCDate()).padStart(2, '0')}`;
+  }
+  function defaultMoveTargetStartAfterClose(closeDate) {
+    const close = String(closeDate || '').trim();
+    if (!close) return '';
+    return addDaysToIsoDate(close, 1) || close;
+  }
+  function validateMoveStartAfterClose(closeDate, startDate) {
+    const close = String(closeDate || '').trim();
+    const start = String(startDate || '').trim();
+    if (!close || !start) return '';
+    const minStart = defaultMoveTargetStartAfterClose(close);
+    if (!minStart || start >= minStart) return '';
+    if (start === close) {
+      return `The new enrollment cannot start on the same day the current one ends (${close}). Set Start to ${minStart} or later (the day after the close end date).`;
+    }
+    return `Start date is too early. Choose ${minStart} or later — at least one day after the close end date (${close}).`;
+  }
+  function formatMoveEnrollmentBlockerHtml(blocker) {
+    const code = String(blocker?.code || '').trim();
+    const message = String(blocker?.message || '').trim();
+    if (code === 'TARGET_START_GAP_REQUIRED' && message) {
+      return formatRichServerMessageHtml(message);
+    }
+    return formatRichServerMessageHtml(message || 'Unable to continue.');
+  }
+  function syncMoveModalStartGapHint() {
+    const help = qs('move_startDateGapHelp');
+    const startInput = qs('move_startDate');
+    if (!help) return;
+    if (getMoveEnrollmentMode() !== 'move') {
+      help.classList.add('d-none');
+      help.textContent = '';
+      if (startInput) startInput.classList.remove('is-invalid');
+      return;
+    }
+    const closeDate = String(qs('move_close_endDate')?.value || '').trim();
+    const startDate = String(startInput?.value || '').trim();
+    const issue = validateMoveStartAfterClose(closeDate, startDate);
+    if (issue) {
+      help.classList.remove('d-none');
+      help.innerHTML = formatRichServerMessageHtml(issue);
+      startInput?.classList.add('is-invalid');
+    } else {
+      help.classList.add('d-none');
+      help.textContent = '';
+      startInput?.classList.remove('is-invalid');
+    }
   }
   const classId = <%- classIdJson %>;
   const rollingClassData = <%- rollingClassDataJson %>;
@@ -11517,7 +11574,7 @@
     qs('move_sourcePeriodLabel').textContent = `Period ${String(row.startDate || '')}${row.endDate ? ' to ' + String(row.endDate) : ''} (${formatPeriodStatusLabel(row.status)})`;
     qs('move_close_endDate').value = closeDateDefault;
     qs('move_close_reason').value = '';
-    qs('move_startDate').value = closeDateDefault;
+    qs('move_startDate').value = defaultMoveTargetStartAfterClose(closeDateDefault);
     qs('move_endDate').value = sourceEndDate;
     const sessionCount = normalizeTargetSessionCountValue(row?.targetSessionCount);
     const hourCount = normalizeTargetHoursValue(row?.targetHours);
@@ -11538,6 +11595,7 @@
     if (transferToggle) transferToggle.checked = true;
     setMoveEnrollmentMode('move');
     await refreshClaimNumberSelect('move_claimNumber', row.studentId, resolveClaimSelectToken(row));
+    syncMoveModalStartGapHint();
     moveEnrollmentModal.show();
   }
 
@@ -11600,7 +11658,7 @@
     panel.className = 'alert alert-warning mb-0';
     panel.innerHTML = [
       '<div class="fw-semibold mb-1">Preview blocked</div>',
-      ...blockers.map((row) => `<div>${formatRichServerMessageHtml(row.message || 'Unable to preview move.')}</div>`),
+      ...blockers.map((row) => `<div>${formatMoveEnrollmentBlockerHtml(row)}</div>`),
       sessionPlanHtml,
       conflictLines.length ? `<div class="small mt-2">${conflictLines.map((line) => htmlEscape(line)).join('<br>')}</div>` : '',
       scheduleLinkHtml
@@ -11667,6 +11725,16 @@
     const payload = readMoveEnrollmentPayload();
     if (!payload.close.effectiveDate || !payload.close.reason || !payload.target.classId || !payload.target.startDate || !payload.target.reasonStart) {
       await showMsg('Missing Fields', 'warning', 'Complete all required close and target enrollment fields before previewing.');
+      return;
+    }
+    const moveStartGapIssue = validateMoveStartAfterClose(payload.close.effectiveDate, payload.target.startDate);
+    if (moveStartGapIssue) {
+      syncMoveModalStartGapHint();
+      renderMovePreviewPanel({
+        canApply: false,
+        blockers: [{ code: 'TARGET_START_GAP_REQUIRED', message: moveStartGapIssue }]
+      });
+      await showMsg('Adjust start date', 'warning', moveStartGapIssue);
       return;
     }
     try {
@@ -11895,8 +11963,12 @@
     const key = String(periodId || '').trim();
     if (!classMoveWizardState.rowEdits[key]) {
       const def = candidate?.defaultPayload || {};
+      const closeDate = getClassMoveCloseDate();
+      const defaultStart = String(def?.target?.startDate || '').trim()
+        || defaultMoveTargetStartAfterClose(closeDate);
       classMoveWizardState.rowEdits[key] = {
         selected: true,
+        targetStartDate: defaultStart,
         targetEndDate: String(def?.target?.endDate || '').trim(),
         targetSessionCount: Number(def?.target?.targetSessionCount || 0) || '',
         targetHours: Number(def?.target?.targetHours || 0) || '',
@@ -11950,7 +12022,7 @@
       },
       target: {
         studentId: String(candidate?.studentId || '').trim(),
-        startDate: closeDate,
+        startDate: String(edit.targetStartDate || '').trim() || defaultMoveTargetStartAfterClose(closeDate),
         endDate: String(edit.targetEndDate || '').trim(),
         targetSessionCount: sessionCount,
         targetHours,
@@ -11990,7 +12062,7 @@
     if (!tbody) return;
     const rows = Array.isArray(classMoveWizardState.candidates) ? classMoveWizardState.candidates : [];
     if (!rows.length) {
-      tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4">No eligible enrollments for the selected closing date.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="10" class="text-center text-muted py-4">No eligible enrollments for the selected closing date.</td></tr>';
       return;
     }
     tbody.innerHTML = rows.map((candidate) => {
@@ -12001,6 +12073,7 @@
       return `<tr data-class-move-period="${htmlEscape(periodId)}">
         <td class="ps-2"><input type="checkbox" class="form-check-input class-move-row-check" data-period-id="${htmlEscape(periodId)}" ${edit.selected ? 'checked' : ''}></td>
         <td><div class="fw-semibold">${htmlEscape(studentLabel)}</div><div class="small text-muted">${htmlEscape(candidate.periodStartDate || '')}${candidate.periodEndDate ? ' – ' + htmlEscape(candidate.periodEndDate) : ''}</div></td>
+        <td><input type="date" class="form-control form-control-sm class-move-field" data-period-id="${htmlEscape(periodId)}" data-field="targetStartDate" value="${htmlEscape(edit.targetStartDate)}" min="${htmlEscape(defaultMoveTargetStartAfterClose(getClassMoveCloseDate()))}" title="Must be at least one day after the closing date"></td>
         <td><input type="date" class="form-control form-control-sm class-move-field" data-period-id="${htmlEscape(periodId)}" data-field="targetEndDate" value="${htmlEscape(edit.targetEndDate)}"></td>
         <td><input type="number" min="0" step="1" class="form-control form-control-sm class-move-field" data-period-id="${htmlEscape(periodId)}" data-field="targetSessionCount" value="${htmlEscape(edit.targetSessionCount)}"></td>
         <td><input type="number" min="0" step="0.25" class="form-control form-control-sm class-move-field" data-period-id="${htmlEscape(periodId)}" data-field="targetHours" value="${htmlEscape(edit.targetHours)}"></td>
@@ -12024,9 +12097,9 @@
         const claimLabel = claimSelect
           ? String(claimSelect.selectedOptions?.[0]?.textContent || readClaimNumberSelectValue(claimSelect) || '—').trim()
           : String(edit.claimNumber || '—');
-        return `<tr><td>${htmlEscape(candidate.studentLabel || '')}</td><td>${htmlEscape(edit.targetEndDate || '—')}</td><td>${htmlEscape(edit.targetSessionCount || '—')}</td><td>${htmlEscape(edit.targetHours || '—')}</td><td>${htmlEscape(formatSessionCapacityTypeLabel(edit.sessionCapacityType))}</td><td>${htmlEscape(claimLabel || '—')}</td></tr>`;
+        return `<tr><td>${htmlEscape(candidate.studentLabel || '')}</td><td>${htmlEscape(edit.targetStartDate || '—')}</td><td>${htmlEscape(edit.targetEndDate || '—')}</td><td>${htmlEscape(edit.targetSessionCount || '—')}</td><td>${htmlEscape(edit.targetHours || '—')}</td><td>${htmlEscape(formatSessionCapacityTypeLabel(edit.sessionCapacityType))}</td><td>${htmlEscape(claimLabel || '—')}</td></tr>`;
       }).join('')
-      : '<tr><td colspan="6" class="text-center text-muted py-3">No students selected.</td></tr>';
+      : '<tr><td colspan="7" class="text-center text-muted py-3">No students selected.</td></tr>';
   }
 
   function renderClassMovePreviewTable() {
@@ -12041,7 +12114,7 @@
       const periodId = String(item.periodId || '').trim();
       const blocked = item.canApply !== true;
       const msg = blocked
-        ? (item.blockers || []).map((row) => formatRichServerMessageHtml(row.message || '')).join('<br>')
+        ? (item.blockers || []).map((row) => formatMoveEnrollmentBlockerHtml(row)).join('<br>')
         : (item.summaryLines || []).map((line) => htmlEscape(line)).join('<br>');
       return `<tr class="${blocked ? 'table-warning' : ''}">
         <td><input type="checkbox" class="form-check-input class-move-preview-check" data-period-id="${htmlEscape(periodId)}" ${blocked ? '' : 'checked'} ${blocked ? 'disabled' : ''}></td>
@@ -12105,6 +12178,12 @@
     classMoveWizardState.rowEdits[periodId][field] = input.value;
     classMoveWizardState.batchPreviewHash = '';
     classMoveWizardState.previewItems = [];
+    if (field === 'targetStartDate') {
+      const closeDate = getClassMoveCloseDate();
+      const issue = validateMoveStartAfterClose(closeDate, input.value);
+      input.classList.toggle('is-invalid', Boolean(issue));
+      input.title = issue || '';
+    }
   }
 
   async function handleClassMoveClaimSelectChange(selectEl) {
@@ -12898,6 +12977,37 @@
     }
   }
 
+  async function confirmEnrollmentRemovalTwoStep({ personLabel, isRollback } = {}) {
+    const label = htmlEscape(String(personLabel || '').trim() || 'this student');
+    const firstTitle = isRollback ? 'Rollback Posted Enrollment' : 'Delete Enrollment';
+    const firstMessage = isRollback
+      ? `Rollback posted transactions for <b>${label}</b>?`
+      : `Delete enrollment for <b>${label}</b>?`;
+    const firstConfirmed = await showConfirm(firstMessage, firstTitle, {
+      html: true,
+      icon: isRollback ? 'warning' : 'question',
+      confirmText: 'Continue',
+      confirmClass: 'btn-outline-danger'
+    });
+    if (!firstConfirmed) return false;
+
+    const irreversibleMessage = isRollback
+      ? `<p class="mb-2"><strong>This operation is irreversible.</strong></p>`
+        + `<p class="mb-0">Rolling back will reverse posted enrollment activity for <b>${label}</b>. `
+        + `Associated records removed in this rollback cannot be restored from this screen.</p>`
+      : `<p class="mb-2"><strong>This operation is irreversible.</strong></p>`
+        + `<p class="mb-0">The enrollment period for <b>${label}</b> will be permanently deleted. `
+        + `It cannot be recovered.</p>`;
+    const finalConfirmText = isRollback ? 'Yes, rollback now' : 'Yes, delete permanently';
+    return showConfirm(irreversibleMessage, 'Confirm irreversible action', {
+      html: true,
+      icon: 'error',
+      size: 'lg',
+      confirmText: finalConfirmText,
+      confirmClass: 'btn-danger'
+    });
+  }
+
   async function removeOrRollbackPeriod(periodId) {
     const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === String(periodId || ''));
     if (!row) return;
@@ -12906,22 +13016,9 @@
       ? row.transactionSummary.postedTransactionIds.length
       : 0;
     const isRollback = status !== 'draft' && postedCount > 0;
-    const actionLabel = isRollback ? 'Rollback Posted Enrollment' : 'Delete Draft Enrollment';
     const personLabel = String(row?.studentLabel || row?.studentId || periodId).trim();
 
-    const confirmText = isRollback ? 'Rollback' : 'Delete';
-    const confirmed = await showConfirm(
-      isRollback
-        ? `Rollback posted transactions for <b>${htmlEscape(personLabel)}</b>?`
-        : `Delete draft enrollment for <b>${htmlEscape(personLabel)}</b> before posting?`,
-      actionLabel,
-      {
-        html: true,
-        icon: isRollback ? 'warning' : 'question',
-        confirmText,
-        confirmClass: 'btn-danger'
-      }
-    );
+    const confirmed = await confirmEnrollmentRemovalTwoStep({ personLabel, isRollback });
     if (!confirmed) return;
 
     try {
@@ -14257,10 +14354,16 @@
     const closeDate = String(qs('move_close_endDate')?.value || '').trim();
     const startInput = qs('move_startDate');
     if (getMoveEnrollmentMode() === 'move' && startInput && closeDate) {
-      startInput.value = closeDate;
+      startInput.value = defaultMoveTargetStartAfterClose(closeDate);
     }
+    syncMoveModalStartGapHint();
     resetMovePreviewState();
   });
+  qs('move_startDate')?.addEventListener('change', () => {
+    syncMoveModalStartGapHint();
+    resetMovePreviewState();
+  });
+  qs('move_startDate')?.addEventListener('input', syncMoveModalStartGapHint);
   qs('btn_confirmUndoClosePeriod')?.addEventListener('click', submitUndoClose);
   qs('btn_previewUndoClosePeriod')?.addEventListener('click', () => previewUndoClose());
   qs('undo_close_reason')?.addEventListener('input', syncUndoCloseConfirmState);

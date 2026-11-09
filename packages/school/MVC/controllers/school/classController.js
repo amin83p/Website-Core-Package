@@ -46,6 +46,7 @@ const { respondSchoolDeleteError } = require('../../utils/schoolDeleteErrorRespo
 const academicLedgerService = require('../../services/school/academicLedgerService');
 const academicSnapshotService = require('../../services/school/academicSnapshotService');
 const classEnrollmentReadService = require('../../services/school/classEnrollmentReadService');
+const classAttendanceRosterOrderService = require('../../services/school/classAttendanceRosterOrderService');
 const classEnrollmentSessionApplicabilityService = require('../../services/school/classEnrollmentSessionApplicabilityService');
 const enrollmentSessionMarksService = require('../../services/school/enrollmentSessionMarksService');
 const attendanceEnrollmentNaLockService = require('../../services/school/attendanceEnrollmentNaLockService');
@@ -69,6 +70,7 @@ const bookCoveringAccessService = require('../../services/school/bookCoveringAcc
 const sessionNavigationService = require('../../services/school/sessionNavigationService');
 const sessionIdService = require('../../services/school/sessionIdService');
 const sessionConductService = require('../../services/school/sessionConductService');
+const sessionConductReportLockService = require('../../services/school/sessionConductReportLockService');
 const reportRosterService = require('../../services/school/reportRosterService');
 const schoolFileService = require('../../services/school/schoolFileService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
@@ -1846,7 +1848,18 @@ async function buildEnrichedSessionRosterForMutation({
         contextByPersonId
     );
 
-    filteredRoster.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    const attendanceRosterPersonOrder = classAttendanceRosterOrderService.normalizeAttendanceRosterPersonOrder(
+        classData?.attendanceRosterPersonOrder
+    );
+    if (attendanceRosterPersonOrder.length) {
+        const sortedRoster = classAttendanceRosterOrderService.sortRosterRowsByPersonOrder(
+            filteredRoster,
+            attendanceRosterPersonOrder
+        );
+        filteredRoster.splice(0, filteredRoster.length, ...sortedRoster);
+    } else {
+        filteredRoster.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    }
 
     const enrollmentContextByPersonId = await sessionEnrollmentContextService.buildRosterEnrollmentContextBatch({
         personIds: filteredRoster.map((row) => cleanPersonId(row?.personId)).filter(Boolean),
@@ -4745,7 +4758,10 @@ async function manageSession(req, res) {
             personIds: reportConductPersonIds,
             sessionRoster: session.roster,
             prefetchedStudents: rosterIdentityData.students,
-            prefetchedPersons: rosterIdentityData.persons
+            prefetchedPersons: rosterIdentityData.persons,
+            attendanceRosterPersonOrder: classAttendanceRosterOrderService.normalizeAttendanceRosterPersonOrder(
+                classData?.attendanceRosterPersonOrder
+            )
         });
         const conductPrefillByPersonId = Object.fromEntries(
             sessionConductService.buildConductPrefillMap({
@@ -4846,6 +4862,10 @@ async function manageSession(req, res) {
         if (canonicalSessionTeacher.sessions[0]?.delivery) {
             session.delivery = canonicalSessionTeacher.sessions[0].delivery;
         }
+        const attendanceRosterPersonOrder = classAttendanceRosterOrderService.normalizeAttendanceRosterPersonOrder(
+            classData?.attendanceRosterPersonOrder
+        );
+        const hasAttendanceRosterOrder = attendanceRosterPersonOrder.length > 0;
         let canEditClassConductViaMatrix = false;
         try {
             const matrixConductEval = await accessService.evaluateAccess({
@@ -4858,6 +4878,19 @@ async function manageSession(req, res) {
         } catch (_) {
             canEditClassConductViaMatrix = false;
         }
+        const canOverrideReportLinkedConductLock = await sessionConductReportLockService.canOverrideReportLinkedConductLock(
+            req.user,
+            req.ip
+        );
+        const submittedConductLockPersonIdSet = await sessionConductReportLockService.buildSubmittedConductLockPersonIdSet({
+            classId,
+            sessionId,
+            reqUser: req.user
+        });
+        const submittedConductLockPersonIds = [...submittedConductLockPersonIdSet];
+        const hasReportLinkedConductLocked = submittedConductLockPersonIdSet.size > 0
+            || (Array.isArray(session?.roster) ? session.roster : [])
+                .some((row) => sessionConductReportLockService.isRosterConductLockedByReport(row));
         res.render('school/class/sessionManager', {
             title: `Manage Session: ${session.date}`,
             classData,
@@ -4910,6 +4943,9 @@ async function manageSession(req, res) {
             canEditSessionMetadata: canOverride,
             canEditOneOnOneSessionSchedule,
             canManageClassConduct: Boolean(canOverride) || Boolean(canEditSession) || canEditClassConductViaMatrix,
+            canOverrideReportLinkedConductLock,
+            hasReportLinkedConductLocked,
+            submittedConductLockPersonIds,
             canOverrideMakeupDuration,
             canCreateMakeupWhileLocked,
             canDeleteMakeupSessions: Boolean(canEditSession && !isReadOnly),
@@ -4947,12 +4983,131 @@ async function manageSession(req, res) {
             enrollmentLockedAttendancePersonIds,
             canOverrideEnrollmentNaLock: Boolean(canOverrideAttendanceEdit),
             periodGradebookOtherWeightTotal,
+            attendanceRosterPersonOrder,
+            hasAttendanceRosterOrder,
             includeModal: true,  
             user: req.user,
             actionStateId: req.actionStateId
         });
     } catch (error) {
         return renderSchoolPageError(res, req, error);
+    }
+}
+
+function parseAttendanceRosterPersonOrderBody(raw) {
+    if (raw === undefined || raw === null || raw === '') return [];
+    if (Array.isArray(raw)) return raw;
+    const text = String(raw).trim();
+    if (!text) return [];
+    try {
+        const parsed = JSON.parse(text);
+        return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+        throw new Error('Invalid attendance roster order payload.');
+    }
+}
+
+async function loadAttendanceRosterOrderEditorContext(classId, req) {
+    const reqUser = req.user;
+    const { classData } = await getClassByIdWithOrgCheck(classId, reqUser, buildRouteAccessContext(req));
+    const identityData = await loadSessionRosterIdentityData(reqUser);
+    const eligibleRows = await classAttendanceRosterOrderService.listEligibleRosterRowsForToday({
+        classData,
+        reqUser,
+        students: identityData.students,
+        persons: identityData.persons
+    });
+    const savedOrder = classAttendanceRosterOrderService.normalizeAttendanceRosterPersonOrder(
+        classData?.attendanceRosterPersonOrder
+    );
+    const editorRows = classAttendanceRosterOrderService.buildEditorRows({ savedOrder, eligibleRows });
+    const eligiblePersonIdSet = new Set(
+        eligibleRows.map((row) => cleanPersonId(row?.personId)).filter(Boolean)
+    );
+    return { classData, editorRows, eligiblePersonIdSet, orgToday: classAttendanceRosterOrderService.resolveOrgToday(reqUser) };
+}
+
+async function showAttendanceRosterOrderEditor(req, res) {
+    try {
+        const classId = toPublicId(req.params.id);
+        const sessionId = toPublicId(req.query?.sessionId || '');
+        const { classData, editorRows, orgToday } = await loadAttendanceRosterOrderEditorContext(classId, req);
+        const backHref = sessionId
+            ? `/school/classes/${encodeURIComponent(classId)}/sessions/${encodeURIComponent(sessionId)}`
+            : `/school/classes/edit/${encodeURIComponent(classId)}`;
+        res.render('school/class/attendanceRosterOrder', {
+            title: 'Attendance Display Order',
+            tableName: 'School_AttendanceRosterOrder',
+            classData,
+            editorRows,
+            sessionId,
+            backHref,
+            orgToday,
+            user: req.user,
+            actionStateId: req.actionStateId,
+            includeModal: true,
+            print: false,
+            btn_export: false
+        });
+    } catch (error) {
+        return renderSchoolPageError(res, req, error);
+    }
+}
+
+async function saveAttendanceRosterOrder(req, res) {
+    try {
+        const classId = toPublicId(req.params.id);
+        const sessionId = toPublicId(req.body?.sessionId || req.query?.sessionId || '');
+        const { eligiblePersonIdSet } = await loadAttendanceRosterOrderEditorContext(classId, req);
+        const rawOrder = parseAttendanceRosterPersonOrderBody(req.body?.personOrder);
+        const nextOrder = classAttendanceRosterOrderService.normalizeOrderForSave({
+            order: rawOrder,
+            eligiblePersonIdSet
+        });
+        await schoolDataService.updateData(
+            'classes',
+            classId,
+            { attendanceRosterPersonOrder: nextOrder },
+            req.user
+        );
+        const redirectHref = sessionId
+            ? `/school/classes/${encodeURIComponent(classId)}/sessions/${encodeURIComponent(sessionId)}`
+            : `/school/classes/${encodeURIComponent(classId)}/attendance-roster-order`;
+        if (isAjax(req) || req.headers['x-ajax-request']) {
+            return res.json({ status: 'success', message: 'Attendance display order saved.', redirectHref });
+        }
+        return res.redirect(redirectHref);
+    } catch (error) {
+        if (isAjax(req) || req.headers['x-ajax-request']) {
+            return res.status(400).json({ status: 'error', message: error.message });
+        }
+        return res.status(400).render('error', { title: 'Error', message: error.message, user: req.user });
+    }
+}
+
+async function resetAttendanceRosterOrder(req, res) {
+    try {
+        const classId = toPublicId(req.params.id);
+        const sessionId = toPublicId(req.body?.sessionId || req.query?.sessionId || '');
+        await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+        await schoolDataService.updateData(
+            'classes',
+            classId,
+            { attendanceRosterPersonOrder: [] },
+            req.user
+        );
+        const redirectHref = sessionId
+            ? `/school/classes/${encodeURIComponent(classId)}/sessions/${encodeURIComponent(sessionId)}`
+            : `/school/classes/${encodeURIComponent(classId)}/attendance-roster-order`;
+        if (isAjax(req) || req.headers['x-ajax-request']) {
+            return res.json({ status: 'success', message: 'Attendance display order reset to alphabetical.', redirectHref });
+        }
+        return res.redirect(redirectHref);
+    } catch (error) {
+        if (isAjax(req) || req.headers['x-ajax-request']) {
+            return res.status(400).json({ status: 'error', message: error.message });
+        }
+        return res.status(400).render('error', { title: 'Error', message: error.message, user: req.user });
     }
 }
 
@@ -6710,6 +6865,15 @@ async function saveSession(req, res) {
             await cleanupRemovedExcuseAttachments(existingRoster, incomingRoster, {
                 canDeleteFiles: canDeleteAttendanceFilesSave
             });
+            const canOverrideReportConduct = await sessionConductReportLockService.canOverrideReportLinkedConductLock(
+                req.user,
+                req.ip
+            );
+            const submittedConductLockPersonIdSet = await sessionConductReportLockService.buildSubmittedConductLockPersonIdSet({
+                classId,
+                sessionId,
+                reqUser: req.user
+            });
             const mergedSessionRoster = incomingRoster.map((incRec) => {
                 const incomingPersonId = cleanPersonId(incRec.personId);
                 if (!incomingPersonId) return null;
@@ -6729,6 +6893,10 @@ async function saveSession(req, res) {
                 const existingClassParticipation = normalizeSessionRatingPercent(existRec.classParticipationPercent, null);
                 const existingRespectsTeachers = normalizeSessionRatingPercent(existRec.respectsTeachersPercent, null);
                 const existingRespectsStudents = normalizeSessionRatingPercent(existRec.respectsStudentsPercent, null);
+                const conductLockedByReport = !canOverrideReportConduct && (
+                    sessionConductReportLockService.isRosterConductLockedByReport(existRec)
+                    || submittedConductLockPersonIdSet.has(incomingPersonId)
+                );
                 const excuseFields = resolveAttendanceExcuseFieldsForSave({
                     canOverride,
                     canMarkExcused: canMarkExcusedSave,
@@ -6760,35 +6928,49 @@ async function saveSession(req, res) {
                         existRec,
                         canDeleteAttendanceFilesSave
                     ),
-                    classEffortPercent: canOverride
-                        ? (incRec.classEffortPercent === undefined
-                            ? existingClassEffort
-                            : normalizeSessionRatingPercent(incRec.classEffortPercent, null))
-                        : (incRec.classEffortPercent === undefined
-                            ? existingClassEffort
-                            : normalizeSessionRatingPercent(incRec.classEffortPercent, null)),
-                    classParticipationPercent: canOverride
-                        ? (incRec.classParticipationPercent === undefined
-                            ? existingClassParticipation
-                            : normalizeSessionRatingPercent(incRec.classParticipationPercent, null))
-                        : (incRec.classParticipationPercent === undefined
-                            ? existingClassParticipation
-                            : normalizeSessionRatingPercent(incRec.classParticipationPercent, null)),
-                    respectsTeachersPercent: canOverride
-                        ? (incRec.respectsTeachersPercent === undefined
-                            ? existingRespectsTeachers
-                            : normalizeSessionRatingPercent(incRec.respectsTeachersPercent, null))
-                        : (incRec.respectsTeachersPercent === undefined
-                            ? existingRespectsTeachers
-                            : normalizeSessionRatingPercent(incRec.respectsTeachersPercent, null)),
-                    respectsStudentsPercent: canOverride
-                        ? (incRec.respectsStudentsPercent === undefined
-                            ? existingRespectsStudents
-                            : normalizeSessionRatingPercent(incRec.respectsStudentsPercent, null))
-                        : (incRec.respectsStudentsPercent === undefined
-                            ? existingRespectsStudents
-                            : normalizeSessionRatingPercent(incRec.respectsStudentsPercent, null)),
-                    conductSavedAt: resolveConductSavedAtForRosterMerge(incRec, existRec),
+                    classEffortPercent: conductLockedByReport
+                        ? existingClassEffort
+                        : (canOverride
+                            ? (incRec.classEffortPercent === undefined
+                                ? existingClassEffort
+                                : normalizeSessionRatingPercent(incRec.classEffortPercent, null))
+                            : (incRec.classEffortPercent === undefined
+                                ? existingClassEffort
+                                : normalizeSessionRatingPercent(incRec.classEffortPercent, null))),
+                    classParticipationPercent: conductLockedByReport
+                        ? existingClassParticipation
+                        : (canOverride
+                            ? (incRec.classParticipationPercent === undefined
+                                ? existingClassParticipation
+                                : normalizeSessionRatingPercent(incRec.classParticipationPercent, null))
+                            : (incRec.classParticipationPercent === undefined
+                                ? existingClassParticipation
+                                : normalizeSessionRatingPercent(incRec.classParticipationPercent, null))),
+                    respectsTeachersPercent: conductLockedByReport
+                        ? existingRespectsTeachers
+                        : (canOverride
+                            ? (incRec.respectsTeachersPercent === undefined
+                                ? existingRespectsTeachers
+                                : normalizeSessionRatingPercent(incRec.respectsTeachersPercent, null))
+                            : (incRec.respectsTeachersPercent === undefined
+                                ? existingRespectsTeachers
+                                : normalizeSessionRatingPercent(incRec.respectsTeachersPercent, null))),
+                    respectsStudentsPercent: conductLockedByReport
+                        ? existingRespectsStudents
+                        : (canOverride
+                            ? (incRec.respectsStudentsPercent === undefined
+                                ? existingRespectsStudents
+                                : normalizeSessionRatingPercent(incRec.respectsStudentsPercent, null))
+                            : (incRec.respectsStudentsPercent === undefined
+                                ? existingRespectsStudents
+                                : normalizeSessionRatingPercent(incRec.respectsStudentsPercent, null))),
+                    conductSavedAt: conductLockedByReport
+                        ? (existRec.conductSavedAt || resolveConductSavedAtForRosterMerge(incRec, existRec))
+                        : resolveConductSavedAtForRosterMerge(incRec, existRec),
+                    ...(conductLockedByReport ? {
+                        conductLockedByReportAt: existRec.conductLockedByReportAt,
+                        conductLockedByReportInstanceId: existRec.conductLockedByReportInstanceId
+                    } : {}),
                     notes: resolveRosterStudentNoteForSave({
                         canOverride,
                         canEditStudentRosterNote: canEditStudentRosterNoteSave,
@@ -7358,13 +7540,49 @@ async function saveSessionConduct(req, res) {
             throw new Error('Conduct roster is required.');
         }
 
+        const canOverrideReportConduct = await sessionConductReportLockService.canOverrideReportLinkedConductLock(
+            req.user,
+            req.ip
+        );
+        const submittedConductLockPersonIdSet = await sessionConductReportLockService.buildSubmittedConductLockPersonIdSet({
+            classId,
+            sessionId,
+            reqUser: req.user
+        });
+        const existingByPerson = new Map(
+            (Array.isArray(session?.roster) ? session.roster : [])
+                .map((row) => [String(row?.personId || '').trim(), row])
+                .filter(([personId]) => Boolean(personId))
+        );
+        for (const inc of incomingRoster) {
+            const personId = String(inc?.personId || '').trim();
+            if (!personId) continue;
+            await sessionConductReportLockService.assertCanEditRosterConduct({
+                existingRow: existingByPerson.get(personId) || null,
+                incomingRow: inc,
+                reqUser: req.user,
+                ipAddress: req.ip,
+                classId,
+                sessionId,
+                submittedLockSet: submittedConductLockPersonIdSet
+            });
+        }
+
         if (sessionConductService.parseConductRequiredFlag(req.body?.enableReportStep, false)) {
             session.conductReportStepEnabled = true;
         }
 
         sessionConductService.applyConductRosterToSession(session, incomingRoster, {
             ready: sessionConductService.parseConductReadyFlag(req.body?.ready, true),
-            userId: req.user?.id
+            userId: req.user?.id,
+            canEditPersonConduct: (personId) => {
+                const existing = existingByPerson.get(personId) || null;
+                if (submittedConductLockPersonIdSet.has(String(personId || '').trim())) {
+                    return canOverrideReportConduct;
+                }
+                if (!sessionConductReportLockService.isRosterConductLockedByReport(existing)) return true;
+                return canOverrideReportConduct;
+            }
         });
         sessions[sessionIndex] = session;
         await schoolDataService.saveClassSessions(classId, sessions, req.user, persistAccessContext);
@@ -7639,7 +7857,7 @@ module.exports = {
   getClassTemplate,
   checkConflicts,
   previewTeacherAssignmentImpact,
-  saveSession, saveSessionGradebooks, getGradebookMakeupSources, getGradebookMakeupActivities, postGradebookMakeupFrom, manageSession, previewClassSessionDelete, uploadSessionFile, createMakeupSession, deleteLinkedMakeupSession, listMergeEligibleTeachers, previewSessionMerge, executeSessionMerge, unmergeSession, prepareSessionReportAssignment, assignReportToSession, getBookCoveringSummaryForSession, createBookCoveringForSession, deleteBookCoveringForSession, listSessionBookCoveringAssignedBooks, getSessionBookCoveringAssignedBookDetail, upsertSessionBookCoveringEntry, deleteSessionBookCoveringEntry, listSessionReportInstances, getSessionReportGradebookSkillCoverage, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
+  saveSession, saveSessionGradebooks, getGradebookMakeupSources, getGradebookMakeupActivities, postGradebookMakeupFrom, manageSession, showAttendanceRosterOrderEditor, saveAttendanceRosterOrder, resetAttendanceRosterOrder, previewClassSessionDelete, uploadSessionFile, createMakeupSession, deleteLinkedMakeupSession, listMergeEligibleTeachers, previewSessionMerge, executeSessionMerge, unmergeSession, prepareSessionReportAssignment, assignReportToSession, getBookCoveringSummaryForSession, createBookCoveringForSession, deleteBookCoveringForSession, listSessionBookCoveringAssignedBooks, getSessionBookCoveringAssignedBookDetail, upsertSessionBookCoveringEntry, deleteSessionBookCoveringEntry, listSessionReportInstances, getSessionReportGradebookSkillCoverage, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
   saveSessionConduct,
   setSessionLock,
   showFinalGradesPage,

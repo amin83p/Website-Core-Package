@@ -9,6 +9,7 @@ const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignme
 const reportRosterService = require('./reportRosterService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
+const classAttendanceRosterOrderService = require('./classAttendanceRosterOrderService');
 
 const CONDUCT_PERCENT_KEYS = Object.freeze([
   'classEffortPercent',
@@ -346,7 +347,8 @@ function buildReportConductRoster({
   personIds = [],
   sessionRoster = [],
   prefetchedStudents = [],
-  prefetchedPersons = []
+  prefetchedPersons = [],
+  attendanceRosterPersonOrder = []
 } = {}) {
   const sessionRosterByPerson = new Map();
   (Array.isArray(sessionRoster) ? sessionRoster : []).forEach((row) => {
@@ -420,7 +422,11 @@ function buildReportConductRoster({
       respectsStudentsPercent: null
     });
   });
-  return result;
+  const savedOrder = classAttendanceRosterOrderService.normalizeAttendanceRosterPersonOrder(
+    attendanceRosterPersonOrder
+  );
+  if (!savedOrder.length) return result;
+  return classAttendanceRosterOrderService.sortRosterRowsByPersonOrder(result, savedOrder);
 }
 
 function buildConductPrefillMap({
@@ -477,13 +483,16 @@ function assertSessionConductReadyForReportsOrThrow(session, contextLabel = 'thi
  * Apply incoming conduct roster rows onto an existing session roster.
  * @param {object} session
  * @param {Array<object>} incomingRoster
- * @param {{ ready?: boolean, userId?: string }} [options]
+ * @param {{ ready?: boolean, userId?: string, canEditPersonConduct?: (personId: string, existingRow: object, incomingRow: object) => boolean }} [options]
  * @returns {object} mutated session
  */
 function applyConductRosterToSession(session, incomingRoster, options = {}) {
   if (!session || typeof session !== 'object') throw new Error('Session is required.');
   const existingRoster = Array.isArray(session.roster) ? session.roster : [];
   const incoming = Array.isArray(incomingRoster) ? incomingRoster : [];
+  const canEditPersonConduct = typeof options.canEditPersonConduct === 'function'
+    ? options.canEditPersonConduct
+    : () => true;
   const byPerson = new Map();
   existingRoster.forEach((row) => {
     const pid = personKey(row?.personId);
@@ -495,6 +504,7 @@ function applyConductRosterToSession(session, incomingRoster, options = {}) {
     const pid = personKey(inc?.personId);
     if (!pid) return;
     const existing = byPerson.get(pid) || { personId: pid };
+    if (!canEditPersonConduct(pid, existing, inc)) return;
     const next = { ...existing, personId: existing.personId || pid };
     let touched = false;
     CONDUCT_PERCENT_KEYS.forEach((key) => {
@@ -705,7 +715,10 @@ async function buildSessionReportConductUiPayload({
     personIds: reportConductPersonIds,
     sessionRoster,
     prefetchedStudents,
-    prefetchedPersons
+    prefetchedPersons,
+    attendanceRosterPersonOrder: classAttendanceRosterOrderService.normalizeAttendanceRosterPersonOrder(
+      classData?.attendanceRosterPersonOrder
+    )
   });
   const persistedSession = (Array.isArray(sessions) ? sessions : []).find((row) => (
     idsEqual(row?.sessionId, sessionId) || String(row?.sessionId || '').trim() === String(sessionId || '').trim()
@@ -734,6 +747,7 @@ async function buildSessionReportConductUiPayload({
       personId: merged.personId,
       name: merged.name,
       studentRecordId: merged.studentRecordId || '',
+      conductLockedByReportAt: merged.conductLockedByReportAt || '',
       classEffortPercent: merged.classEffortPercent ?? null,
       classParticipationPercent: merged.classParticipationPercent ?? null,
       respectsTeachersPercent: merged.respectsTeachersPercent ?? null,

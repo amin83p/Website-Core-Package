@@ -12,6 +12,7 @@ const rollingEnrollmentFunderService = require('./rollingEnrollmentFunderService
 const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
 const enrollmentMoveOneOnOneService = require('./enrollmentMoveOneOnOneService');
 const scheduleMoveSessionsService = require('./scheduleMoveSessionsService');
+const { addDaysToDateKey } = require('./sessionAttendanceEditAccessService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -119,8 +120,17 @@ function assertMovePayloadBasics(normalized, sourcePeriod, sourceClass, targetCl
   if (normalized.close.effectiveDate && sourceStart && normalized.close.effectiveDate < sourceStart) {
     blockers.push({ code: 'CLOSE_BEFORE_START', message: 'Close end date cannot be before the enrollment start date.' });
   }
-  if (normalized.target.startDate && normalized.close.effectiveDate && normalized.target.startDate < normalized.close.effectiveDate) {
-    blockers.push({ code: 'TARGET_BEFORE_CLOSE', message: 'Target enrollment start date cannot be before the close end date.' });
+  if (normalized.target.startDate && normalized.close.effectiveDate) {
+    const minTargetStart = addDaysToDateKey(normalized.close.effectiveDate, 1);
+    if (minTargetStart && normalized.target.startDate < minTargetStart) {
+      const sameDay = normalized.target.startDate === normalized.close.effectiveDate;
+      blockers.push({
+        code: 'TARGET_START_GAP_REQUIRED',
+        message: sameDay
+          ? `The new enrollment cannot start on the same day the current one ends (${normalized.close.effectiveDate}). Set the close end date to the student's last day in this class, then set the new start date to ${minTargetStart} or later.`
+          : `The new enrollment start date (${normalized.target.startDate}) is too early. It must be ${minTargetStart} or later — at least one full day after the close end date (${normalized.close.effectiveDate}).`
+      });
+    }
   }
   if (!OPEN_STATUSES.has(String(sourcePeriod?.status || '').trim().toLowerCase())) {
     blockers.push({ code: 'SOURCE_NOT_OPEN', message: 'Only open enrollment periods can be moved.' });

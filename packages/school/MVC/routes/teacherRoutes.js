@@ -58,7 +58,11 @@ router.post('/:id/change-system-id', requireAccess(SECTIONS.SCHOOL_TEACHERS, OPE
 
 router.post('/recover/:id',
   requireAccess(SECTIONS.SCHOOL_TEACHERS, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_TEACHERS, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_TEACHERS, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   ctrl.recoverTeacher);
 
 router.get('/archive/:id',

@@ -4,6 +4,7 @@ const { requireCoreModule } = require('./schoolCoreContracts');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const sessionConductService = require('./sessionConductService');
+const sessionConductReportLockService = require('./sessionConductReportLockService');
 const conductRatingScaleService = require('./conductRatingScaleService');
 const schoolDataService = require('./schoolDataService');
 
@@ -64,7 +65,8 @@ function buildCellFromRosterRow(rosterRow, conductPolicy) {
     levels,
     labels,
     summary,
-    conductSavedAt: rosterRow.conductSavedAt || null
+    conductSavedAt: rosterRow.conductSavedAt || null,
+    conductLockedByReport: sessionConductReportLockService.isRosterConductLockedByReport(rosterRow)
   };
 }
 

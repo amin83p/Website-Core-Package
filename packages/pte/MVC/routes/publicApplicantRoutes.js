@@ -25,7 +25,11 @@ router.get('/archived',
 
 router.post('/recover/:id',
   requireAccess(SECTIONS.PTE_PUBLIC_APPLICANTS, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.PTE_PUBLIC_APPLICANTS, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTIONS.PTE_PUBLIC_APPLICANTS, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   ctrl.recoverPublicApplicant);
 
 router.post('/promote/:id',

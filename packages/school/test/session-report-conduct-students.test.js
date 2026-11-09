@@ -132,6 +132,19 @@ test('buildReportConductRoster enriches session roster rows missing display name
   assert.equal(roster[0].name, 'Jane Example');
 });
 
+test('buildReportConductRoster applies saved attendance display order', () => {
+  const roster = sessionConductService.buildReportConductRoster({
+    personIds: ['P_C', 'P_A', 'P_B'],
+    sessionRoster: [
+      { personId: 'P_A', name: 'Alpha' },
+      { personId: 'P_B', name: 'Bravo' },
+      { personId: 'P_C', name: 'Charlie' }
+    ],
+    attendanceRosterPersonOrder: ['P_C', 'P_B', 'P_A']
+  });
+  assert.deepEqual(roster.map((row) => row.personId), ['P_C', 'P_B', 'P_A']);
+});
+
 test('resolveVoluntaryConductPersonIds falls back to session roster without reqUser', async () => {
   const personIds = await sessionConductService.resolveVoluntaryConductPersonIds({
     classId: 'CLS-1',

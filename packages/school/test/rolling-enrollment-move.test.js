@@ -74,7 +74,7 @@ function buildPayload(overrides = {}) {
     target: {
       classId: 'CLS_TARGET',
       studentId: 'STU_001',
-      startDate: '2026-03-15',
+      startDate: '2026-03-16',
       endDate: '',
       targetSessionCount: 12,
       targetHours: 0,
@@ -155,6 +155,12 @@ function buildMocks() {
           return [{
             sessionId: 'SRC_SESS_1',
             date: '2026-03-15',
+            startTime: '09:00',
+            endTime: '10:00',
+            roster: [{ personId: 'PERSON_001', attendance: { status: 'present' } }]
+          }, {
+            sessionId: 'SRC_SESS_2',
+            date: '2026-03-16',
             startTime: '09:00',
             endTime: '10:00',
             roster: [{ personId: 'PERSON_001', attendance: { status: 'present' } }]
@@ -293,6 +299,30 @@ test('normalizeMovePayload always closes source as completed', () => {
 
 test('CLOSE_STATUSES only allows completed for move flow', () => {
   assert.deepEqual([...enrollmentMoveService.CLOSE_STATUSES], ['completed']);
+});
+
+test('previewMoveEnrollment rejects target start on same day as close end', async () => {
+  const mocks = buildMocks();
+  enrollmentMoveService.__setDependenciesForTest(mocks);
+  try {
+    const preview = await enrollmentMoveService.previewMoveEnrollment({
+      sourcePeriodId: sourcePeriod.id,
+      payload: buildPayload({
+        target: {
+          ...buildPayload().target,
+          startDate: '2026-03-15'
+        }
+      }),
+      reqUser: { id: 'USR_1' },
+      orgId: 'ORG_001'
+    });
+    assert.equal(preview.canApply, false);
+    const gapBlocker = (preview.blockers || []).find((row) => row.code === 'TARGET_START_GAP_REQUIRED');
+    assert.ok(gapBlocker);
+    assert.match(String(gapBlocker.message || ''), /same day|cannot start on the same day/i);
+  } finally {
+    enrollmentMoveService.__resetDependenciesForTest();
+  }
 });
 
 test('previewMoveEnrollment succeeds for valid cross-class move payload', async () => {

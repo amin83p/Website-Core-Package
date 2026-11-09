@@ -11,6 +11,8 @@ const { normalizeSkillCode } = require('../../../config/skillDefinitions');
 const schoolCatalogEntityIdService = require('../../services/school/schoolCatalogEntityIdService');
 const { resolveJsonEntityCreateId } = require('../../services/school/schoolJsonEntityCreateIdService');
 
+const ATTENDANCE_ROSTER_ORDER_MAX = 500;
+
 const dataPath = path.join(resolveCoreRoot(), 'data/school/classes.json');
 const legacyStorageBasePath = path.join(resolveCoreRoot(), 'data/school/classes_storage');
 
@@ -92,6 +94,20 @@ function sanitizeSkillIds(value) {
   return [...new Set(value.map((entry) => normalizeSkillCode(entry)).filter(Boolean))];
 }
 
+function sanitizeAttendanceRosterPersonOrder(value) {
+  if (value === undefined || value === null || value === '') return [];
+  if (!Array.isArray(value)) throw new Error('Attendance roster person order must be an array.');
+  const seen = new Set();
+  const out = [];
+  value.forEach((entry) => {
+    const personId = cleanId(entry, { max: 64, allowEmpty: true });
+    if (!personId || seen.has(personId)) return;
+    seen.add(personId);
+    out.push(personId);
+  });
+  return out.length > ATTENDANCE_ROSTER_ORDER_MAX ? out.slice(0, ATTENDANCE_ROSTER_ORDER_MAX) : out;
+}
+
 function sanitizeClassBasic(item) {
   if (!item || typeof item !== 'object') throw new Error('Invalid class payload.');
   const registrationMode = normalizeRegistrationMode(item.registrationMode);
@@ -122,7 +138,8 @@ function sanitizeClassBasic(item) {
     cycleNo,
     skillIds: sanitizeSkillIds(item.skillIds),
     allowedProgramTerms,
-    officialFinalGrades
+    officialFinalGrades,
+    attendanceRosterPersonOrder: sanitizeAttendanceRosterPersonOrder(item.attendanceRosterPersonOrder)
   };
 }
 /* ============================================================

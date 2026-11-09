@@ -621,6 +621,21 @@ router.post('/conduct-rating-scale/settings',
   }),
   settingsCtrl.saveConductRatingScale);
 
+router.get('/:id/attendance-roster-order',
+  requireClassSessionManagePageAccess(),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, { keepActive: true }),
+  classCtrl.showAttendanceRosterOrderEditor);
+
+router.post('/:id/attendance-roster-order',
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, sessionManagerMutationActionState),
+  classCtrl.saveAttendanceRosterOrder);
+
+router.post('/:id/attendance-roster-order/reset',
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, sessionManagerMutationActionState),
+  classCtrl.resetAttendanceRosterOrder);
+
 // --- Session Execution Routes ---
 router.get('/:id/sessions/:sessionId',
   requireClassSessionManagePageAccess(),

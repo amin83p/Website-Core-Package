@@ -4,6 +4,7 @@ const reportViewService = require('./reportViewService');
 const reportRuleEngineService = require('./reportRuleEngineService');
 const reportGenerationEngineService = require('./reportGenerationEngineService');
 const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
+const sessionConductReportLockService = require('./sessionConductReportLockService');
 const { getPrefillValue, isAutoRefreshPrefillKey } = require('./reportPrefillKeyUtils');
 
 function isVisualOnlyField(field = {}) {
@@ -201,6 +202,30 @@ async function persistInstanceAnswers({
         submittedAt: submittedAtIso
       }
     }, reqUser);
+    try {
+      const lockResult = await sessionConductReportLockService.lockConductForSubmittedReport({
+        instance: { ...instance, ...updatedInstance, audit: { ...(instance.audit || {}), ...(updatedInstance?.audit || {}), submittedAt: submittedAtIso } },
+        assignment,
+        reqUser
+      });
+      sessionConductReportLockService.debugConductLockLog(
+        'reportInstanceSaveService.persistInstanceAnswers',
+        'post-submit conduct lock',
+        {
+          instanceId: String(instance?.id || '').trim(),
+          applied: Boolean(lockResult?.applied),
+          reason: String(lockResult?.reason || '')
+        },
+        'H1'
+      );
+    } catch (lockError) {
+      sessionConductReportLockService.debugConductLockLog(
+        'reportInstanceSaveService.persistInstanceAnswers',
+        'post-submit conduct lock error',
+        { message: String(lockError?.message || lockError) },
+        'H1'
+      );
+    }
   } else {
     updatedInstance = await schoolDataService.updateData('reportInstances', instance.id, {
       answers: studentAnswers,

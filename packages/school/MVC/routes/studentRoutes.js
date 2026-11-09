@@ -71,7 +71,11 @@ router.put('/api/:id/claim-numbers',
 
 router.post('/recover/:id',
   requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   ctrl.recoverStudent);
 
 router.get('/archive/:id',

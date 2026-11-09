@@ -651,8 +651,14 @@ exports.listArchivedStudents = async (req, res) => {
         let query = await buildDataServiceQuery(req.query);
         const searchDefaultKeyword = settingService.getValue('app', 'searchDefaultKeyword') || 'aaa';
         if (query.q === searchDefaultKeyword) query.q = '';
+        const searchTerm = String(query.q || '').trim().toLowerCase();
 
         const archivedQuery = { ...query, academicStatus: 'Archived' };
+        delete archivedQuery.q;
+        delete archivedQuery.type;
+        delete archivedQuery.searchFields;
+        delete archivedQuery.page;
+        delete archivedQuery.limit;
         const allStudents = await dataService.fetchData('students', archivedQuery, req.user, dataService.buildRouteAccessContext(req));
         const personById = await schoolPersonAccessService.buildPersonByIdMap({
             reqUser: req.user,
@@ -670,9 +676,20 @@ exports.listArchivedStudents = async (req, res) => {
             };
         });
 
-        const activeStudents = enrichedStudents.filter((s) => String(s?.academicStatus || '') !== 'Archived');
-        const searchableFields = await inferSearchableFields(activeStudents, { exclude: ['audit', 'attachments'] });
-        const { data, pagination } = paginate(activeStudents, query);
+        const archivedStudents = enrichedStudents.filter((s) => {
+            const st = String(s?.academicStatus || '').trim().toLowerCase();
+            return st === 'archived';
+        });
+        const searchedArchivedStudents = !searchTerm
+            ? archivedStudents
+            : archivedStudents.filter((student) => studentListSearchService.studentMatchesListSearch(student, {
+                q: searchTerm,
+                type: query.type,
+                searchFields: query.searchFields
+            }));
+
+        const searchableFields = await inferSearchableFields(searchedArchivedStudents, { exclude: ['audit', 'attachments'] });
+        const { data, pagination } = paginate(searchedArchivedStudents, query);
 
         if (isAjax(req)) return res.json({ status: 'success', results: data, pagination });
 

@@ -3,6 +3,7 @@ const reportViewService = require('./reportViewService');
 const sessionDeliveryTeamService = require('./sessionDeliveryTeamService');
 const sessionConductService = require('./sessionConductService');
 const reportRosterService = require('./reportRosterService');
+const classAttendanceRosterOrderService = require('./classAttendanceRosterOrderService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
@@ -371,13 +372,44 @@ async function buildSessionReportInstanceRows({
   const visibleRows = sessionMatchedRows
     .filter((row) => canViewerSeeSessionReportRow(row, resolvedViewerContext));
 
+  const classData = prefetchedClass?.classData || prefetchedClass || null;
+  const attendanceRosterPersonOrder = classAttendanceRosterOrderService.normalizeAttendanceRosterPersonOrder(
+    classData?.attendanceRosterPersonOrder
+  );
+  const studentRows = Array.isArray(prefetchedStudents)
+    ? prefetchedStudents
+  : (Array.isArray(baseViewerContext?.prefetchedStudents) ? baseViewerContext.prefetchedStudents : []);
+  const studentIdToPersonId = new Map(
+    studentRows
+      .map((row) => [toPublicId(row?.id), toPublicId(row?.personId)])
+      .filter(([studentId, personId]) => Boolean(studentId && personId))
+  );
+  const resolveInstanceRowPersonId = (row) => {
+    const studentId = toPublicId(row?.studentId);
+    return studentIdToPersonId.get(studentId) || studentId || '';
+  };
+
   return visibleRows
     .map((row) => mapRowToDto(row, resolvedViewerContext.assignmentMap))
     .sort((a, b) => {
       const titleCompare = String(a.templateTitle || '').localeCompare(String(b.templateTitle || ''));
       if (titleCompare) return titleCompare;
-      const studentCompare = String(a.studentName || '').localeCompare(String(b.studentName || ''));
-      if (studentCompare) return studentCompare;
+      if (attendanceRosterPersonOrder.length) {
+        const orderMap = classAttendanceRosterOrderService.buildAttendancePersonOrderMap(attendanceRosterPersonOrder);
+        const studentOrder = classAttendanceRosterOrderService.compareByAttendancePersonOrder(
+          a,
+          b,
+          orderMap,
+          {
+            resolvePersonId: resolveInstanceRowPersonId,
+            nameKey: 'studentName'
+          }
+        );
+        if (studentOrder) return studentOrder;
+      } else {
+        const studentCompare = String(a.studentName || '').localeCompare(String(b.studentName || ''));
+        if (studentCompare) return studentCompare;
+      }
       return String(a.id || '').localeCompare(String(b.id || ''));
     });
 }

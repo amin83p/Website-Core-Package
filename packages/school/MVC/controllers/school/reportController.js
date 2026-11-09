@@ -30,6 +30,7 @@ const reportPeriodBasePolicy = require('../../services/school/reportPeriodBasePo
 const reportPeriodBaseService = require('../../services/school/reportPeriodBaseService');
 const reportTargetDepartmentPolicy = require('../../services/school/reportTargetDepartmentPolicy');
 const sessionConductService = require('../../services/school/sessionConductService');
+const sessionConductReportLockService = require('../../services/school/sessionConductReportLockService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
 const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
 const classReferenceSyncService = require('../../services/school/classReferenceSyncService');
@@ -2690,6 +2691,16 @@ async function reopenInstance(req, res) {
         reopenedBy: toPublicId(req.user?.id || '')
       }
     }, req.user);
+
+    try {
+      await sessionConductReportLockService.unlockConductForReopenedReport({
+        instance,
+        assignment: effectiveAssignment || assignment,
+        reqUser: req.user
+      });
+    } catch (_) {
+      // Reopen should succeed even if conduct unlock fails.
+    }
 
     let message = 'Report reopened to draft for the teacher.';
     if (sharedLockPreview.sharedFieldsWillBeLocked) {

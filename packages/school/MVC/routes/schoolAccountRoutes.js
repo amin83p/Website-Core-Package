@@ -23,7 +23,11 @@ router.get('/archived',
 
 router.post('/recover/:id',
   requireAccess(SECTIONS.SCHOOL_ACCOUNTS, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ACCOUNTS, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_ACCOUNTS, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   ctrl.recoverAccount);
 
 router.post('/api/sync-owner-names',

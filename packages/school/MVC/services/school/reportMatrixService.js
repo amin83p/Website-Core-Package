@@ -11,6 +11,7 @@ const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { getPrefillValue } = require('./reportPrefillKeyUtils');
 const matrixWindowService = require('./matrixWindowService');
 const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
+const classAttendanceRosterOrderService = require('./classAttendanceRosterOrderService');
 
 const VISUAL_TYPES = new Set(['section', 'subheader', 'row_break']);
 const STUDENT_NAME_KEYS = new Set([
@@ -471,10 +472,46 @@ async function buildMatrixContext({
     limit: 10000
   }, reqUser);
   const assignmentRowKey = assignment.assignmentRowId || assignmentRow?.rowId || '';
+  const attendanceRosterPersonOrder = classAttendanceRosterOrderService.normalizeAttendanceRosterPersonOrder(
+    classData?.attendanceRosterPersonOrder
+  );
+  let studentIdToPersonId = new Map();
+  if (attendanceRosterPersonOrder.length) {
+    const studentIds = [...targetStudentIds].map((studentId) => clean(studentId)).filter(Boolean);
+    if (studentIds.length) {
+      const studentRows = await schoolDataService.fetchData('students', {
+        id__in: studentIds,
+        page: 1,
+        limit: Math.max(studentIds.length, 1)
+      }, reqUser);
+      studentIdToPersonId = new Map(
+        (Array.isArray(studentRows) ? studentRows : [])
+          .map((row) => [clean(row?.id), toPublicId(row?.personId)])
+          .filter(([studentId, personId]) => Boolean(studentId && personId))
+      );
+    }
+  }
+  const resolveMatrixRowPersonId = (studentId) => {
+    const token = clean(studentId);
+    return studentIdToPersonId.get(token) || token;
+  };
   const sortedStudentIds = [...targetStudentIds]
     .map((studentId) => clean(studentId))
-    .filter(Boolean)
-    .sort((left, right) => left.localeCompare(right));
+    .filter(Boolean);
+  if (attendanceRosterPersonOrder.length) {
+    const orderMap = classAttendanceRosterOrderService.buildAttendancePersonOrderMap(attendanceRosterPersonOrder);
+    sortedStudentIds.sort((left, right) => classAttendanceRosterOrderService.compareByAttendancePersonOrder(
+      { studentId: left, studentName: left },
+      { studentId: right, studentName: right },
+      orderMap,
+      {
+        resolvePersonId: (row) => resolveMatrixRowPersonId(row?.studentId),
+        nameKey: 'studentName'
+      }
+    ));
+  } else {
+    sortedStudentIds.sort((left, right) => left.localeCompare(right));
+  }
 
   const allRows = await Promise.all(sortedStudentIds.map((studentId) => buildStudentMatrixRow({
     assignment,
@@ -490,7 +527,24 @@ async function buildMatrixContext({
     reqUser,
     treatSubmittedAsLocked
   })));
-  allRows.sort((a, b) => a.studentName.localeCompare(b.studentName) || a.studentId.localeCompare(b.studentId));
+  if (attendanceRosterPersonOrder.length) {
+    const orderMap = classAttendanceRosterOrderService.buildAttendancePersonOrderMap(attendanceRosterPersonOrder);
+    allRows.sort((a, b) => {
+      const primary = classAttendanceRosterOrderService.compareByAttendancePersonOrder(
+        a,
+        b,
+        orderMap,
+        {
+          resolvePersonId: (row) => resolveMatrixRowPersonId(row?.studentId),
+          nameKey: 'studentName'
+        }
+      );
+      if (primary) return primary;
+      return a.studentId.localeCompare(b.studentId);
+    });
+  } else {
+    allRows.sort((a, b) => a.studentName.localeCompare(b.studentName) || a.studentId.localeCompare(b.studentId));
+  }
 
   const teacherName = clean(
     allRows[0]?.answers?.teacher_name

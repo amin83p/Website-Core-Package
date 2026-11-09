@@ -86,6 +86,8 @@ test('listEligibleMoveCandidates filters open periods covering close date', asyn
     assert.deepEqual(periodIds, ['PER_ACTIVE']);
     assert.equal(rows[0].studentLabel, 'Student One (100)');
     assert.equal(rows[0].defaultPayload.close.targetStatus, 'completed');
+    assert.equal(rows[0].defaultPayload.close.effectiveDate, '2026-03-15');
+    assert.equal(rows[0].defaultPayload.target.startDate, '2026-03-16');
   } finally {
     enrollmentClassMoveService.__resetDependenciesForTest();
   }
@@ -186,8 +188,11 @@ test('static: routes and rolling enrollment view expose class-move bulk move UI'
   assert.match(viewSource, /class-move-claim-select/);
   assert.match(viewSource, /data-field="sessionCapacityType"/);
   assert.doesNotMatch(viewSource, /data-field="closeEffectiveDate"/);
-  assert.doesNotMatch(viewSource, /data-field="targetStartDate"/);
   assert.match(viewSource, /classMoveWizardStepPills/);
+  assert.match(viewSource, /buildClassMovePayloadForRow[\s\S]*defaultMoveTargetStartAfterClose\(closeDate\)/);
+  assert.match(viewSource, /data-field="targetStartDate"/);
+  assert.match(viewSource, /validateMoveStartAfterClose/);
+  assert.match(viewSource, /move_startDateGapHelp/);
 });
 
 test('OPEN_STATUSES used for candidate filtering matches enrollment move service', () => {

@@ -43,7 +43,11 @@ router.post('/archive/:id',
 
 router.post('/recover/:id',
   requireAccess(SECTIONS.PTE_COURSES, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.PTE_COURSES, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTIONS.PTE_COURSES, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   ctrl.recoverCourse);
 
 router.get('/api/pickers/teachers',

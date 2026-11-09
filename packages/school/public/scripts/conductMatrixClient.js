@@ -284,6 +284,10 @@
     });
   }
 
+  function isCellLockedByReport(cell) {
+    return Boolean(cell?.value?.conductLockedByReport) && !Boolean(matrixData?.canOverrideReportLinkedConductLock);
+  }
+
   function buildCellInnerHtml(cell, session) {
     if (!cell?.onRoster) {
       return '<span class="cm-cell-off-roster" aria-hidden="true">·</span>';
@@ -803,11 +807,15 @@
         if (!cell.onRoster) cellClass += ' cm-not-roster';
         else cellClass += ' cm-editable';
         if (cell.onRoster && !cell.value?.summary) cellClass += ' cm-empty';
+        if (isCellLockedByReport(cell)) cellClass += ' cm-report-locked';
         cellClass += dayClass;
         const inner = buildCellInnerHtml(cell, session);
-        const title = cell.value?.summary
-          ? 'Edit conduct'
-          : (cell.onRoster ? 'Add conduct' : 'Not on session roster');
+        const locked = isCellLockedByReport(cell);
+        const title = locked
+          ? 'Conduct locked by submitted report (view only)'
+          : (cell.value?.summary
+            ? 'Edit conduct'
+            : (cell.onRoster ? 'Add conduct' : 'Not on session roster'));
         tr.innerHTML += `<td class="${cellClass}" data-person-id="${escapeHtml(stu.personId)}" data-session-id="${escapeHtml(session.sessionId)}" data-on-roster="${cell.onRoster ? '1' : '0'}" title="${escapeHtml(title)}">${inner}</td>`;
       });
       tbody.appendChild(tr);
@@ -841,14 +849,14 @@
     syncConductFilterButtons();
   }
 
-  function buildModalDimensionFields(cell) {
+  function buildModalDimensionFields(cell, readOnly = false) {
     const host = document.getElementById('cmModalDimensionFields');
     if (!host || !CONDUCT.buildConductRatingCellHtml) return;
     const percents = cell?.value?.percents || {};
     const pickerLevels = CONDUCT.getPickerLevels ? CONDUCT.getPickerLevels() : [];
     host.innerHTML = DIMENSIONS.map((dim) => {
       const pct = percents[dim.key];
-      const cellHtml = CONDUCT.buildConductRatingCellHtml(dim.key, dim.label, pickerLevels, pct, false);
+      const cellHtml = CONDUCT.buildConductRatingCellHtml(dim.key, dim.label, pickerLevels, pct, readOnly);
       return `<div class="col-md-6">
         <div class="card h-100 border shadow-sm cm-modal-dim-card">
           <div class="card-body p-3">
@@ -859,7 +867,7 @@
       </div>`;
     }).join('');
     host.querySelectorAll('.conduct-rating-cell').forEach((ratingCell) => {
-      CONDUCT.bindConductRatingCell(ratingCell, { readOnly: false });
+      CONDUCT.bindConductRatingCell(ratingCell, { readOnly });
     });
   }
 
@@ -869,10 +877,11 @@
     const cell = matrixData?.cells?.[personId]?.[sessionId];
     if (!session || !student || !cell?.onRoster || !isColumnShown(session)) return;
 
-    modalContext = { personId, sessionId, session, student, cell };
+    const modalReadOnly = isCellLockedByReport(cell);
+    modalContext = { personId, sessionId, session, student, cell, modalReadOnly };
     document.getElementById('cmModalStudent').textContent = student.name || personId;
     document.getElementById('cmModalSession').textContent = session.label || session.date || sessionId;
-    buildModalDimensionFields(cell);
+    buildModalDimensionFields(cell, modalReadOnly);
     renderConductLegendHosts();
 
     const readyWrap = document.getElementById('cmModalReadyWrap');
@@ -881,6 +890,12 @@
       const showReady = session.conductRequiredForReports === true || session.conductReportStepEnabled === true;
       readyWrap.classList.toggle('d-none', !showReady);
       readyInput.checked = session.conductReadyForReports === true;
+      readyInput.disabled = modalReadOnly;
+    }
+    const saveBtn = document.getElementById('cmModalSave');
+    if (saveBtn) {
+      saveBtn.disabled = modalReadOnly;
+      saveBtn.classList.toggle('d-none', modalReadOnly);
     }
 
     const modalEl = document.getElementById('cmCellModal');
@@ -902,6 +917,7 @@
 
   async function saveCellModal() {
     if (!modalContext || !matrixData?.class?.id) return;
+    if (modalContext.modalReadOnly) return;
     const { personId, sessionId, session } = modalContext;
     const rosterRow = collectModalRosterRow();
     const ready = (session.conductRequiredForReports === true || session.conductReportStepEnabled === true)

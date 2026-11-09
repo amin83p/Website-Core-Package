@@ -10,6 +10,7 @@ const conductRatingScaleService = require('../../services/school/conductRatingSc
 const { userCanOpenAttendanceMatrix } = require('../../services/school/attendanceMatrixAccessService');
 const enrollmentClaimDisplayService = require('../../services/school/enrollmentClaimDisplayService');
 const schoolRollingEnrollmentAccessService = require('../../services/school/schoolRollingEnrollmentAccessService');
+const sessionConductReportLockService = require('../../services/school/sessionConductReportLockService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 
 async function resolveConductPolicyForRequest(req, classData) {
@@ -93,10 +94,15 @@ async function getConductMatrixData(req, res) {
       matrixContext,
       conductPolicy
     );
+    const canOverrideReportLinkedConductLock = await sessionConductReportLockService.canOverrideReportLinkedConductLock(
+      req.user,
+      req.ip
+    );
 
     return res.json({
       status: 'success',
       ...payload,
+      canOverrideReportLinkedConductLock,
       conductPolicy: conductRatingScaleService.resolvePolicy(conductPolicy)
     });
   } catch (error) {

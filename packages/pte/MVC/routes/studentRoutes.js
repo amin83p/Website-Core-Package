@@ -25,7 +25,11 @@ router.get('/archived',
 
 router.post('/recover/:id',
   requireAccess(SECTIONS.PTE_STUDENTS, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.PTE_STUDENTS, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTIONS.PTE_STUDENTS, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
   ctrl.recoverApplicant);
 
 router.get('/picker/persons',

@@ -5,6 +5,7 @@ const schoolDataService = require('./schoolDataService');
 const enrollmentMoveService = require('./enrollmentMoveService');
 const rollingEnrollmentFunderService = require('./rollingEnrollmentFunderService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
+const { addDaysToDateKey } = require('./sessionAttendanceEditAccessService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -70,7 +71,7 @@ function buildDefaultMovePayloadFromPeriod({
     target: {
       classId: toPublicId(targetClassId),
       studentId: toPublicId(period?.studentId),
-      startDate: closeDate,
+      startDate: addDaysToDateKey(closeDate, 1) || closeDate,
       endDate,
       targetSessionCount: Number.isFinite(sessionCount) && sessionCount > 0 ? sessionCount : 0,
       targetHours: Number.isFinite(targetHours) && targetHours > 0 ? targetHours : 0,

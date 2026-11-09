@@ -618,6 +618,12 @@
         padding-top: 0.4rem;
         border-top: 1px solid #eef2f7;
     }
+    .attendance-roster-toolbar-secondary-actions {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex-shrink: 0;
+    }
     .attendance-roster-toolbar:not(:has(.attendance-roster-toolbar-apply)) .attendance-roster-toolbar-secondary {
         padding-top: 0;
         border-top: none;
@@ -2933,9 +2939,21 @@
                         </div>
                         <% } %>
                         <div class="attendance-roster-toolbar-secondary">
-                            <button type="button" class="btn btn-outline-secondary btn-sm attendance-status-info-btn" id="btnOpenAttendanceStatusSummary" data-bs-toggle="modal" data-bs-target="#attendanceStatusSummaryModal" aria-controls="attendanceStatusSummaryModal" title="View attendance status counts" aria-label="View attendance status counts">
-                                <i class="bi bi-info-circle" aria-hidden="true"></i>
-                            </button>
+                            <div class="attendance-roster-toolbar-secondary-actions">
+                                <button type="button" class="btn btn-outline-secondary btn-sm attendance-status-info-btn" id="btnOpenAttendanceStatusSummary" data-bs-toggle="modal" data-bs-target="#attendanceStatusSummaryModal" aria-controls="attendanceStatusSummaryModal" title="View attendance status counts" aria-label="View attendance status counts">
+                                    <i class="bi bi-info-circle" aria-hidden="true"></i>
+                                </button>
+                                <% if (!attendanceReadOnly) { %>
+                                <a href="/school/classes/<%= encodeURIComponent(classData.id) %>/attendance-roster-order?sessionId=<%= encodeURIComponent(session.sessionId) %>"
+                                   target="_blank"
+                                   rel="noopener noreferrer"
+                                   class="btn btn-outline-secondary btn-sm attendance-status-info-btn"
+                                   title="<%= (typeof hasAttendanceRosterOrder !== 'undefined' && hasAttendanceRosterOrder) ? 'Custom display order is active — opens editor in a new tab' : 'Set custom student display order for this class (new tab)' %>"
+                                   aria-label="Customize attendance display order">
+                                    <i class="bi bi-sort-numeric-down<%= (typeof hasAttendanceRosterOrder !== 'undefined' && hasAttendanceRosterOrder) ? ' text-primary' : '' %>" aria-hidden="true"></i>
+                                </a>
+                                <% } %>
+                            </div>
                             <% if (!attendanceReadOnly && session.roster.length > 0) { %>
                             <button type="button" class="btn att-bulk-btn-reset" id="btnAllResetAttendance" title="Clear attendance back to unmarked">
                                 <i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i>Reset
@@ -3355,6 +3373,22 @@
                         <% } %>
                     </div>
 
+                    <% if (typeof hasReportLinkedConductLocked !== 'undefined' && hasReportLinkedConductLocked) { %>
+                    <div class="alert alert-secondary border-0 border-bottom rounded-0 mb-0 d-flex align-items-center mx-0">
+                        <i class="bi bi-lock-fill fs-4 me-3 text-secondary" aria-hidden="true"></i>
+                        <div>
+                            <h6 class="fw-bold mb-1">Class conduct locked by submitted report</h6>
+                            <div class="small text-muted mb-0">
+                                <% if (typeof canOverrideReportLinkedConductLock !== 'undefined' && canOverrideReportLinkedConductLock) { %>
+                                    One or more students have class conduct locked because a linked report was submitted. You have administrator access to edit locked conduct.
+                                <% } else { %>
+                                    One or more students have class conduct locked because a linked report was submitted. Only an administrator can change locked conduct after submission.
+                                <% } %>
+                            </div>
+                        </div>
+                    </div>
+                    <% } %>
+
                     <div id="sessionReportConductShell" class="card-body py-0<%= sessionHasConductRequiredReportsResolved ? '' : ' d-none' %>">
                         <% if (canManageReportClassConductFlag && !conductSectionReadOnly) { %>
                         <div class="session-panel-cta-zone session-panel-cta-zone--primary py-3<%= sessionHasConductRequiredReportsResolved ? '' : ' d-none' %>" id="sessionReportConductCtaZone">
@@ -3437,7 +3471,8 @@
                                         <tr><td colspan="5" class="text-center py-4 text-muted">No students are selected for reports on this session.</td></tr>
                                     <% } else if (sessionHasConductRequiredReportsResolved) { %>
                                         <% reportConductStudents.forEach((student) => { %>
-                                            <tr class="conduct-row" data-personid="<%= student.personId %>" data-student-name="<%= student.name %>">
+                                            <% const conductRowLockedByReport = !(typeof canOverrideReportLinkedConductLock !== 'undefined' && canOverrideReportLinkedConductLock) && (Boolean(student.conductLockedByReportAt) || (Array.isArray(typeof submittedConductLockPersonIds !== 'undefined' ? submittedConductLockPersonIds : []) && submittedConductLockPersonIds.some((id) => String(id) === String(student.personId)))); %>
+                                            <tr class="conduct-row" data-personid="<%= student.personId %>" data-student-name="<%= student.name %>" data-conduct-locked-by-report="<%= conductRowLockedByReport ? '1' : '0' %>">
                                                 <td class="ps-4 fw-bold align-middle">
                                                     <%- include('school/partials/studentNameLink', { name: student.name, studentRecordId: student.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %>
                                                 </td>
@@ -3446,10 +3481,10 @@
                                                         <div class="conduct-rating-cell" data-dimension="<%= dim.key %>">
                                                             <div class="conduct-emoji-picker" role="group" aria-label="<%= dim.label %> rating">
                                                                 <% conductPickerLevels.forEach((level) => { %>
-                                                                    <button type="button" class="conduct-emoji-btn conduct-code-btn" data-code="<%= level.code %>" title="<%= level.label %><%= level.minPercent != null ? (' (' + level.minPercent + '%–' + level.maxPercent + '%)') : '' %>"><%= level.displayCode || level.code %></button>
+                                                                    <button type="button" class="conduct-emoji-btn conduct-code-btn" data-code="<%= level.code %>" title="<%= level.label %><%= level.minPercent != null ? (' (' + level.minPercent + '%–' + level.maxPercent + '%)') : '' %>"<%= conductRowLockedByReport ? ' disabled' : '' %>><%= level.displayCode || level.code %></button>
                                                                 <% }) %>
                                                             </div>
-                                                            <input type="number" class="form-control form-control-sm conduct-percent-input conduct-rating-input <%= dim.className %>" min="0" max="100" step="0.5" value="<%= resolveConductPrefillValue(student, dim.valueKey) %>" <%= conductSectionReadOnly ? 'disabled' : '' %>>
+                                                            <input type="number" class="form-control form-control-sm conduct-percent-input conduct-rating-input <%= dim.className %>" min="0" max="100" step="0.5" value="<%= resolveConductPrefillValue(student, dim.valueKey) %>" <%= (conductSectionReadOnly || conductRowLockedByReport) ? 'disabled' : '' %>>
                                                         </div>
                                                     </td>
                                                 <% }) %>
@@ -4574,6 +4609,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionCanDeleteAttendanceFiles = <%- jsonForScript(Boolean(typeof canDeleteAttendanceFiles !== 'undefined' && canDeleteAttendanceFiles)) %>;
     const sessionNotesSectionReadOnly = <%- jsonForScript(Boolean(sessionNotesReadOnly)) %>;
     const sessionConductSectionReadOnly = <%- jsonForScript(Boolean(conductSectionReadOnly)) %>;
+    const canOverrideReportLinkedConductLock = <%- jsonForScript(Boolean(typeof canOverrideReportLinkedConductLock !== 'undefined' && canOverrideReportLinkedConductLock)) %>;
+    const submittedConductLockPersonIds = <%- jsonForScript(Array.isArray(typeof submittedConductLockPersonIds !== 'undefined' ? submittedConductLockPersonIds : []) ? submittedConductLockPersonIds : []) %>;
+    const submittedConductLockPersonIdSet = new Set((Array.isArray(submittedConductLockPersonIds) ? submittedConductLockPersonIds : []).map((id) => String(id || '').trim()).filter(Boolean));
     const sessionCurriculumSectionReadOnly = <%- jsonForScript(Boolean(curriculumSectionReadOnly)) %>;
     const sessionGradebookSectionReadOnly = <%- jsonForScript(Boolean(gradebookSectionReadOnly)) %>;
     const sessionCanManageClassConduct = <%- jsonForScript(Boolean(canManageReportClassConductFlag)) %>;
@@ -5705,6 +5743,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const REPORT_CONDUCT_TABLE_SELECTOR = '#sessionReportConductDataHost #conductTable';
     const optionalConductRosterSeed = <%- jsonForScript((session.roster || []).map((student) => ({
         personId: String(student.personId || ''),
+        studentRecordId: String(student.studentRecordId || ''),
+        conductLockedByReport: Boolean(student.conductLockedByReportAt),
         name: String(student.name || ''),
         classEffortPercent: student.classEffortPercent == null ? null : student.classEffortPercent,
         classParticipationPercent: student.classParticipationPercent == null ? null : student.classParticipationPercent,
@@ -5712,6 +5752,8 @@ document.addEventListener('DOMContentLoaded', () => {
         respectsStudentsPercent: student.respectsStudentsPercent == null ? null : student.respectsStudentsPercent,
         conductSavedAt: student.conductSavedAt || null
     }))) %>;
+    const hasAttendanceRosterOrderFlag = <%= (typeof hasAttendanceRosterOrder !== 'undefined' && hasAttendanceRosterOrder) ? 'true' : 'false' %>;
+    const attendanceRosterPersonOrderForClient = <%- jsonForScript(typeof attendanceRosterPersonOrder !== 'undefined' ? attendanceRosterPersonOrder : []) %>;
     const attendanceDetailsState = <%- jsonForScript((session.roster || []).reduce((acc, student) => {
         const personId = String(student.personId || '').trim();
         if (!personId) return acc;
@@ -6191,14 +6233,28 @@ document.addEventListener('DOMContentLoaded', () => {
         return normalizeConductPercent(cell.querySelector('.conduct-percent-input')?.value, fallback);
     }
 
+    function isConductCellReadOnly(cell) {
+        if (sessionConductReadOnly) return true;
+        const conductRow = cell?.closest?.('.conduct-row');
+        const personId = String(conductRow?.getAttribute('data-personid') || cell?.dataset?.personid || '').trim();
+        if (conductRow?.getAttribute('data-conduct-locked-by-report') === '1') return true;
+        return isPersonConductLockedByReport(personId);
+    }
+
     function initConductRatingCell(cell) {
         if (!cell) return;
         updateConductCellUi(cell);
         if (cell.dataset.conductBound === '1') return;
         cell.dataset.conductBound = '1';
+        const cellReadOnly = isConductCellReadOnly(cell);
+        if (cellReadOnly) {
+            cell.querySelectorAll('.conduct-emoji-btn, .conduct-code-btn, .conduct-percent-input').forEach((el) => {
+                el.disabled = true;
+            });
+        }
         cell.querySelectorAll('.conduct-emoji-btn, .conduct-code-btn').forEach((btn) => {
             btn.addEventListener('click', () => {
-                if (sessionConductReadOnly) return;
+                if (isConductCellReadOnly(cell)) return;
                 applyConductLevel(cell, btn.dataset.code);
                 markSessionAutosaveRosterDirty();
                 markConductModalDirty();
@@ -6370,9 +6426,20 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function isPersonConductLockedByReport(personId, studentRow = null) {
+        if (canOverrideReportLinkedConductLock) return false;
+        const pid = String(personId || '').trim();
+        if (pid && submittedConductLockPersonIdSet.has(pid)) return true;
+        const row = studentRow
+            || optionalConductRosterSeed.find((entry) => String(entry.personId) === String(personId))
+            || null;
+        return Boolean(row?.conductLockedByReport);
+    }
+
     function buildOptionalConductRowHtml(student) {
         const personId = String(student?.personId || '').trim();
         const name = String(student?.name || personId);
+        const rowLocked = isPersonConductLockedByReport(personId, student);
         const cells = (conductDimensionMeta || []).map((dim) => {
             const percent = normalizeConductPercent(student?.[dim.valueKey], null);
             const valueAttr = percent === null ? '' : String(percent);
@@ -6386,14 +6453,14 @@ document.addEventListener('DOMContentLoaded', () => {
                             return `<button type="button" class="conduct-emoji-btn conduct-code-btn" data-code="${conductEscapeHtml(level.code)}" title="${title}">${conductEscapeHtml(conductDisplayCode(level))}</button>`;
                         }).join('')}
                     </div>
-                    <input type="number" class="form-control form-control-sm conduct-percent-input conduct-rating-input ${conductEscapeHtml(dim.className || '')}" min="0" max="100" step="0.5" value="${conductEscapeHtml(valueAttr)}"${sessionConductReadOnly ? ' disabled' : ''}>
+                    <input type="number" class="form-control form-control-sm conduct-percent-input conduct-rating-input ${conductEscapeHtml(dim.className || '')}" min="0" max="100" step="0.5" value="${conductEscapeHtml(valueAttr)}"${sessionConductReadOnly || rowLocked ? ' disabled' : ''}>
                 </div>
             </td>`;
         }).join('');
-        const removeCell = sessionConductReadOnly
+        const removeCell = sessionConductReadOnly || rowLocked
             ? ''
             : `<td class="text-end pe-3"><button type="button" class="btn btn-sm btn-outline-secondary btn-remove-optional-conduct" data-personid="${conductEscapeHtml(personId)}" title="Remove from table"><i class="bi bi-x-lg"></i></button></td>`;
-        return `<tr class="conduct-row" data-personid="${conductEscapeHtml(personId)}" data-student-name="${conductEscapeHtml(name)}">
+        return `<tr class="conduct-row" data-personid="${conductEscapeHtml(personId)}" data-student-name="${conductEscapeHtml(name)}" data-conduct-locked-by-report="${rowLocked ? '1' : '0'}">
             <td class="ps-3 fw-bold align-middle">${conductEscapeHtml(name)}</td>
             ${cells}
             ${removeCell}
@@ -6403,6 +6470,11 @@ document.addEventListener('DOMContentLoaded', () => {
     function buildReportConductRowHtml(student) {
         const personId = String(student?.personId || '').trim();
         const name = String(student?.name || personId);
+        const mergedStudent = {
+            ...(optionalConductRosterSeed.find((row) => String(row.personId) === personId) || {}),
+            ...student
+        };
+        const rowLocked = isPersonConductLockedByReport(personId, mergedStudent);
         const cells = (conductDimensionMeta || []).map((dim) => {
             const percent = normalizeConductPercent(student?.[dim.valueKey], null);
             const valueAttr = percent === null ? '' : String(percent);
@@ -6416,11 +6488,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             return `<button type="button" class="conduct-emoji-btn conduct-code-btn" data-code="${conductEscapeHtml(level.code)}" title="${title}">${conductEscapeHtml(conductDisplayCode(level))}</button>`;
                         }).join('')}
                     </div>
-                    <input type="number" class="form-control form-control-sm conduct-percent-input conduct-rating-input ${conductEscapeHtml(dim.className || '')}" min="0" max="100" step="0.5" value="${conductEscapeHtml(valueAttr)}"${sessionConductReadOnly ? ' disabled' : ''}>
+                    <input type="number" class="form-control form-control-sm conduct-percent-input conduct-rating-input ${conductEscapeHtml(dim.className || '')}" min="0" max="100" step="0.5" value="${conductEscapeHtml(valueAttr)}"${sessionConductReadOnly || rowLocked ? ' disabled' : ''}>
                 </div>
             </td>`;
         }).join('');
-        return `<tr class="conduct-row" data-personid="${conductEscapeHtml(personId)}" data-student-name="${conductEscapeHtml(name)}">
+        return `<tr class="conduct-row" data-personid="${conductEscapeHtml(personId)}" data-student-name="${conductEscapeHtml(name)}" data-conduct-locked-by-report="${rowLocked ? '1' : '0'}">
             <td class="ps-4 fw-bold align-middle">${conductEscapeHtml(name)}</td>
             ${cells}
         </tr>`;
@@ -6456,11 +6528,54 @@ document.addEventListener('DOMContentLoaded', () => {
         renderSessionReportInstances();
     }
 
+    function buildAttendancePersonOrderIndexMap() {
+        const map = new Map();
+        (Array.isArray(attendanceRosterPersonOrderForClient) ? attendanceRosterPersonOrderForClient : []).forEach((personId, index) => {
+            const token = String(personId || '').trim();
+            if (token && !map.has(token)) map.set(token, index);
+        });
+        return map;
+    }
+
+    function compareRowsByAttendancePersonOrder(rowA, rowB, { resolvePersonId, nameKey = 'name' } = {}) {
+        if (!hasAttendanceRosterOrderFlag) {
+            const nameA = String(rowA?.[nameKey] || '').trim();
+            const nameB = String(rowB?.[nameKey] || '').trim();
+            return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+        }
+        const orderMap = buildAttendancePersonOrderIndexMap();
+        if (!orderMap.size) {
+            const nameA = String(rowA?.[nameKey] || '').trim();
+            const nameB = String(rowB?.[nameKey] || '').trim();
+            return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+        }
+        const resolve = typeof resolvePersonId === 'function'
+            ? resolvePersonId
+            : (row) => String(row?.personId || '').trim();
+        const aId = String(resolve(rowA) || '').trim();
+        const bId = String(resolve(rowB) || '').trim();
+        const aOrder = orderMap.has(aId) ? orderMap.get(aId) : Number.MAX_SAFE_INTEGER;
+        const bOrder = orderMap.has(bId) ? orderMap.get(bId) : Number.MAX_SAFE_INTEGER;
+        if (aOrder !== bOrder) return aOrder - bOrder;
+        const nameA = String(rowA?.[nameKey] || '').trim();
+        const nameB = String(rowB?.[nameKey] || '').trim();
+        return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' });
+    }
+
     function getOptionalConductStudentsInTable() {
-        return Array.from(optionalConductTablePersonIds).map((personId) => {
-            const seed = optionalConductRosterSeed.find((row) => String(row.personId) === String(personId));
-            return seed || { personId, name: personId };
-        }).filter((row) => row.personId);
+        if (hasAttendanceRosterOrderFlag) {
+            return Array.from(optionalConductTablePersonIds)
+                .map((personId) => {
+                    const seed = optionalConductRosterSeed.find((row) => String(row.personId) === String(personId));
+                    return seed || { personId, name: personId };
+                })
+                .filter((row) => row.personId)
+                .sort((a, b) => compareRowsByAttendancePersonOrder(a, b));
+        }
+        return (optionalConductRosterSeed || []).filter((student) => {
+            const personId = String(student.personId || '').trim();
+            return personId && optionalConductTablePersonIds.has(personId);
+        });
     }
 
     function updateOptionalConductActionButtons(hasRows) {
@@ -7325,18 +7440,32 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!groups.has(key)) groups.set(key, []);
             groups.get(key).push(row);
         });
+        const sessionReportStudentPersonMap = new Map(
+            (optionalConductRosterSeed || [])
+                .map((row) => [String(row?.studentRecordId || '').trim(), String(row?.personId || '').trim()])
+                .filter(([studentId, personId]) => Boolean(studentId && personId))
+        );
         body.innerHTML = Array.from(groups.values()).map((groupRows) => {
-            const first = groupRows[0] || {};
+            const orderedGroupRows = hasAttendanceRosterOrderFlag
+                ? [...groupRows].sort((a, b) => compareRowsByAttendancePersonOrder(a, b, {
+                    resolvePersonId: (row) => {
+                        const studentId = String(row?.studentId || '').trim();
+                        return sessionReportStudentPersonMap.get(studentId) || studentId;
+                    },
+                    nameKey: 'studentName'
+                }))
+                : groupRows;
+            const first = orderedGroupRows[0] || {};
             const blockReason = getReportFillBlockReason(first);
             const reportActionsLocked = blockReason === 'conduct' || blockReason === 'skills';
             const groupHeader = `
                 <tr class="table-primary-subtle border-top">
                     <td colspan="5" class="px-4 py-3">
                         <div class="fw-bold text-primary">${scEscapeHtml(first.templateTitle || 'Report')}</div>
-                        <div class="small text-muted">${scEscapeHtml(first.teacherName || '-')} · ${groupRows.length} student target(s) · ${scEscapeHtml(first.scopeLabel || '')}</div>
+                        <div class="small text-muted">${scEscapeHtml(first.teacherName || '-')} · ${orderedGroupRows.length} student target(s) · ${scEscapeHtml(first.scopeLabel || '')}</div>
                     </td>
                 </tr>`;
-            const instanceRows = groupRows.map((row) => {
+            const instanceRows = orderedGroupRows.map((row) => {
                 const statusLabel = String(row.statusLabel || row.status || 'draft');
                 const badgeClass = String(row.statusBadgeClass || 'bg-warning text-dark');
                 const actionLabel = String(row.actionLabel || (row.isPending ? 'Start' : 'Open V2'));
@@ -11650,7 +11779,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const attendanceTableEl = document.getElementById('attendanceTable');
     if (attendanceTableEl) {
-        sortAttendanceRosterByName('asc');
+        if (hasAttendanceRosterOrderFlag) {
+            refreshAttendanceOrderNumbers();
+        } else {
+            sortAttendanceRosterByName('asc');
+        }
         updateAttendanceSortHeader();
         const attendanceSortNameEl = document.getElementById('attendanceSortName');
         if (attendanceSortNameEl) {
@@ -11855,10 +11988,11 @@ document.addEventListener('DOMContentLoaded', () => {
             const excuseRef = row.querySelector('.att-excuse').value || '';
             const excuseAttachment = getAttendanceDetails(personId).excuseAttachment || null;
             const conductRow = conductRowsByPersonId.get(personId);
-            const classEffortPercent = readConductRating(conductRow, '.conduct-class-effort');
-            const classParticipationPercent = readConductRating(conductRow, '.conduct-class-participation');
-            const respectsTeachersPercent = readConductRating(conductRow, '.conduct-respects-teachers');
-            const respectsStudentsPercent = readConductRating(conductRow, '.conduct-respects-students');
+            const conductLocked = isPersonConductLockedByReport(personId);
+            const classEffortPercent = conductLocked ? undefined : readConductRating(conductRow, '.conduct-class-effort');
+            const classParticipationPercent = conductLocked ? undefined : readConductRating(conductRow, '.conduct-class-participation');
+            const respectsTeachersPercent = conductLocked ? undefined : readConductRating(conductRow, '.conduct-respects-teachers');
+            const respectsStudentsPercent = conductLocked ? undefined : readConductRating(conductRow, '.conduct-respects-students');
             const timingDetail = readRowTimingDetail(row);
             const rosterRow = {
                 personId,
