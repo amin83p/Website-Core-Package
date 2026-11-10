@@ -198,8 +198,11 @@ async function buildConductMatrixPayload(req, query, matrixContext, conductPolic
     students: studentList.map((row) => ({
       personId: row.personId,
       name: row.name,
+      legalName: row.legalName || row.name,
+      rosterNickname: row.rosterNickname || '',
       studentRecordId: row.studentRecordId || ''
     })),
+    rosterNicknames: matrixContext?.rosterNicknames || {},
     cells,
     dimensions: CONDUCT_DIMENSIONS.map(({ key, label }) => ({ key, label })),
     conductPolicy: conductRatingScaleService.resolvePolicy(conductPolicy)

@@ -4555,6 +4555,24 @@ async function manageSession(req, res) {
             prefetchedPeriodRows: enrollmentPeriodRows,
             enrollmentFinishAlertPolicy
         });
+        const attendanceRosterNicknamesForClass = classAttendanceRosterOrderService.normalizeAttendanceRosterNicknames(
+            classData?.attendanceRosterNicknames
+        );
+        const sessionPersonsById = new Map(
+            (Array.isArray(rosterIdentityData.persons) ? rosterIdentityData.persons : [])
+                .map((person) => [String(person?.id || '').trim(), person])
+                .filter(([id]) => id)
+        );
+        session.roster = (Array.isArray(session.roster) ? session.roster : []).map((row) => {
+            const person = sessionPersonsById.get(String(row?.personId || '').trim());
+            const legalName = classAttendanceRosterOrderService.readPersonLegalName(person)
+                || String(row?.legalName || row?.name || '').trim();
+            return classAttendanceRosterOrderService.decorateRowWithRosterNickname(
+                { ...row, legalName },
+                attendanceRosterNicknamesForClass,
+                { applyDisplayName: true }
+            );
+        });
         logManageSessionStep(req, 'roster', rosterStart);
 
         // 4. Build curriculum subjects for class curriculum panel
@@ -4767,7 +4785,8 @@ async function manageSession(req, res) {
             prefetchedPersons: rosterIdentityData.persons,
             attendanceRosterPersonOrder: classAttendanceRosterOrderService.normalizeAttendanceRosterPersonOrder(
                 classData?.attendanceRosterPersonOrder
-            )
+            ),
+            attendanceRosterNicknames: attendanceRosterNicknamesForClass
         });
         const conductPrefillByPersonId = Object.fromEntries(
             sessionConductService.buildConductPrefillMap({
@@ -4991,6 +5010,7 @@ async function manageSession(req, res) {
             periodGradebookOtherWeightTotal,
             attendanceRosterPersonOrder,
             hasAttendanceRosterOrder,
+            attendanceRosterNicknames: attendanceRosterNicknamesForClass,
             attendanceExcuseReasons,
             canManageAttendanceExcuseReasons,
             includeModal: true,  
@@ -5012,6 +5032,19 @@ function parseAttendanceRosterPersonOrderBody(raw) {
         return Array.isArray(parsed) ? parsed : [];
     } catch (_) {
         throw new Error('Invalid attendance roster order payload.');
+    }
+}
+
+function parseAttendanceRosterNicknamesBody(raw) {
+    if (raw === undefined || raw === null || raw === '') return {};
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) return raw;
+    const text = String(raw).trim();
+    if (!text) return {};
+    try {
+        const parsed = JSON.parse(text);
+        return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
+    } catch (_) {
+        throw new Error('Invalid attendance roster nicknames payload.');
     }
 }
 
@@ -5072,10 +5105,18 @@ async function saveAttendanceRosterOrder(req, res) {
             order: rawOrder,
             eligiblePersonIdSet
         });
+        const rawNicknames = parseAttendanceRosterNicknamesBody(req.body?.rosterNicknames);
+        const nextNicknames = classAttendanceRosterOrderService.normalizeNicknamesForSave({
+            nicknames: rawNicknames,
+            eligiblePersonIdSet
+        });
         await schoolDataService.updateData(
             'classes',
             classId,
-            { attendanceRosterPersonOrder: nextOrder },
+            {
+                attendanceRosterPersonOrder: nextOrder,
+                attendanceRosterNicknames: nextNicknames
+            },
             req.user
         );
         const redirectHref = sessionId

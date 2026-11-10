@@ -80,6 +80,7 @@
     <div class="small text-muted">
       Lists students with valid enrollment as of <strong><%= todayLabel || 'today' %></strong>.
       Saved order applies on the Manage Session attendance tab for all teachers.
+      Optional nicknames appear in parentheses on session attendance, conduct, and matrix pages (not on reports).
       Drag by the grip handle to reorder, use arrows to fine-tune, or auto-sort then save.
     </div>
   </div>
@@ -90,7 +91,8 @@
   <div class="card-body py-2 px-3 d-flex flex-wrap align-items-center gap-2">
     <span class="small fw-semibold text-muted me-1">Auto sort:</span>
     <div class="btn-group btn-group-sm flex-wrap" role="group" aria-label="Auto sort attendance display order">
-      <button type="button" class="btn btn-outline-secondary js-attendance-order-autosort" data-sort-key="enrollment">Enrollment</button>
+      <button type="button" class="btn btn-outline-secondary js-attendance-order-autosort" data-sort-key="enrollment">Enrollment start</button>
+      <button type="button" class="btn btn-outline-secondary js-attendance-order-autosort" data-sort-key="enrollmentEnd">Enrollment end</button>
       <button type="button" class="btn btn-outline-secondary js-attendance-order-autosort" data-sort-key="firstName">First name</button>
       <button type="button" class="btn btn-outline-secondary js-attendance-order-autosort" data-sort-key="lastName">Last name</button>
       <button type="button" class="btn btn-outline-secondary js-attendance-order-autosort" data-sort-key="dateOfBirth">Date of birth</button>
@@ -103,6 +105,7 @@
   <input type="hidden" name="actionStateId" value="<%= asid %>">
   <% if (sid) { %><input type="hidden" name="sessionId" value="<%= sid %>"><% } %>
   <input type="hidden" name="personOrder" id="hid_personOrder" value="">
+  <input type="hidden" name="rosterNicknames" id="hid_rosterNicknames" value="">
 
   <div class="table-scroll-wrapper" data-floating-row-actions="false">
     <table class="table-responsive size-md" id="first-table">
@@ -111,12 +114,13 @@
           <th class="text-center" data-column="drag" aria-label="Drag"></th>
           <th class="draggable ps-2" data-column="order" style="width: 3rem;">#</th>
           <th class="draggable" data-column="student">Student</th>
+          <th class="draggable" data-column="nickname" style="min-width: 8rem;">Nickname</th>
           <th class="text-end pe-4" data-column="actions" style="width: 7rem;">Move</th>
         </tr>
       </thead>
       <tbody id="attendanceOrderTbody">
         <% if (!rows.length) { %>
-          <tr><td colspan="4" class="text-center py-5 text-muted">No students with valid enrollment for today.</td></tr>
+          <tr><td colspan="5" class="text-center py-5 text-muted">No students with valid enrollment for today.</td></tr>
         <% } else { %>
           <% rows.forEach((row, index) => { %>
             <tr class="attendance-order-row"
@@ -124,7 +128,8 @@
                 data-first-name="<%= (row.firstName || '').replace(/"/g, '&quot;') %>"
                 data-last-name="<%= (row.lastName || '').replace(/"/g, '&quot;') %>"
                 data-date-of-birth="<%= row.dateOfBirth || '' %>"
-                data-enrollment-start="<%= row.enrollmentStartDate || '' %>">
+                data-enrollment-start="<%= row.enrollmentStartDate || '' %>"
+                data-enrollment-end="<%= row.enrollmentEndDate || '' %>">
               <td class="text-center attendance-order-drag-col ps-3">
                 <span class="attendance-order-drag-handle" draggable="true" title="Drag to reorder" aria-label="Drag to reorder row <%= index + 1 %>"><i class="bi bi-grip-vertical" aria-hidden="true"></i></span>
               </td>
@@ -135,6 +140,14 @@
                 <div class="fw-semibold text-dark">
                   <%- include('school/partials/studentNameLink', { name: row.name, studentRecordId: row.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %>
                 </div>
+              </td>
+              <td>
+                <input type="text"
+                  class="form-control form-control-sm js-attendance-order-nickname"
+                  maxlength="60"
+                  placeholder="Optional"
+                  value="<%= (row.nickname || '').replace(/"/g, '&quot;') %>"
+                  aria-label="Nickname for <%= (row.name || row.personId || '').replace(/"/g, '&quot;') %>">
               </td>
               <td class="text-end pe-4">
                 <div class="btn-group btn-group-sm">
@@ -211,6 +224,7 @@
 
   const tbody = document.getElementById('attendanceOrderTbody');
   const hid = document.getElementById('hid_personOrder');
+  const hidNicknames = document.getElementById('hid_rosterNicknames');
   const form = document.getElementById('attendanceRosterOrderForm');
   if (!tbody) return;
 
@@ -230,6 +244,18 @@
       .filter(Boolean);
   }
 
+  function collectRosterNicknames() {
+    const payload = {};
+    rosterRows().forEach((row) => {
+      const personId = String(row.getAttribute('data-personid') || '').trim();
+      const input = row.querySelector('.js-attendance-order-nickname');
+      const nickname = String(input?.value || '').trim();
+      if (!personId || !nickname) return;
+      payload[personId] = nickname;
+    });
+    return payload;
+  }
+
   function refreshOrderUi() {
     const rows = rosterRows();
     rows.forEach((row, index) => {
@@ -241,6 +267,7 @@
       if (down) down.disabled = index === rows.length - 1;
     });
     if (hid) hid.value = JSON.stringify(currentPersonOrder());
+    if (hidNicknames) hidNicknames.value = JSON.stringify(collectRosterNicknames());
   }
 
   function applyAutoSort(sortKey) {
@@ -250,6 +277,11 @@
       if (sortKey === 'enrollment') {
         const av = a.getAttribute('data-enrollment-start') || sortSentinelDate;
         const bv = b.getAttribute('data-enrollment-start') || sortSentinelDate;
+        const cmp = av.localeCompare(bv);
+        if (cmp !== 0) return cmp;
+      } else if (sortKey === 'enrollmentEnd') {
+        const av = a.getAttribute('data-enrollment-end') || sortSentinelDate;
+        const bv = b.getAttribute('data-enrollment-end') || sortSentinelDate;
         const cmp = av.localeCompare(bv);
         if (cmp !== 0) return cmp;
       } else if (sortKey === 'firstName') {
@@ -362,6 +394,11 @@
       const next = row.nextElementSibling;
       if (next?.classList.contains('attendance-order-row')) tbody.insertBefore(next, row);
     }
+    refreshOrderUi();
+  });
+
+  tbody.addEventListener('input', (event) => {
+    if (!event.target.closest('.js-attendance-order-nickname')) return;
     refreshOrderUi();
   });
 

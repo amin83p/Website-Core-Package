@@ -266,6 +266,15 @@
         <% } %>
         <button type="button"
           class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
+          id="btn_gmMatrixRosterNicknames"
+          disabled
+          aria-label="Show roster nicknames"
+          title="Load the matrix first"
+          aria-pressed="false">
+          <i class="bi bi-person-vcard" aria-hidden="true"></i>
+        </button>
+        <button type="button"
+          class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
           id="btn_gmMatrixHelp"
           data-bs-toggle="modal"
           data-bs-target="#gmMatrixHelpModal"
@@ -392,6 +401,7 @@
 <%- include('partials/modal_GenericPicker') %>
 <%- include('../report/partials/reportMessageHelpers') %>
 <%- include('partials/tablePages-end') %>
+<%- include('../partials/rosterNicknameMatrixClient') %>
 <script src="/scripts/schoolDateRangeShortcuts.js"></script>
 <script src="/scripts/schoolMatrixExpandedView.js"></script>
 <% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
@@ -430,6 +440,19 @@ document.addEventListener('DOMContentLoaded', () => {
     buttonId: 'gmEvalToggleBtn',
     iconId: 'gmEvalToggleIcon'
   });
+
+  const gmRosterNickBtn = document.getElementById('btn_gmMatrixRosterNicknames');
+  if (gmRosterNickBtn && window.SchoolRosterNicknameMatrix) {
+    window.SchoolRosterNicknameMatrix.bindToggleButton({
+      button: gmRosterNickBtn,
+      storageKey: 'school.matrixShowRosterNicknames.grades',
+      defaultShow: false,
+      onChange: (show) => {
+        window.__gmShowRosterNicknames = show;
+        refreshGmStudentNameCells();
+      }
+    });
+  }
 
   const INITIAL = <%- JSON.stringify({
     classId: typeof initialClassId !== 'undefined' ? initialClassId : '',
@@ -641,11 +664,52 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  window.__gmShowRosterNicknames = window.SchoolRosterNicknameMatrix
+    ? window.SchoolRosterNicknameMatrix.readShowPreference('school.matrixShowRosterNicknames.grades', false)
+    : false;
+
+  function gmStudentDisplayName(row) {
+    const show = window.__gmShowRosterNicknames === true;
+    if (window.SchoolRosterNicknameMatrix) {
+      return window.SchoolRosterNicknameMatrix.resolveStudentDisplayName(row, show);
+    }
+    return String(row?.name || '').trim();
+  }
+
+  function gmStudentNameInnerHtml(row) {
+    const display = gmStudentDisplayName(row);
+    return typeof schoolRenderStudentNameHtml === 'function'
+      ? schoolRenderStudentNameHtml(display, row.studentRecordId)
+      : display;
+  }
+
+  function refreshGmStudentNameCells() {
+    const matrix = window.currentGradesMatrixData?.matrix;
+    if (!Array.isArray(matrix)) return;
+    const byId = new Map(matrix.map((row) => [String(row?.personId || '').trim(), row]));
+    document.querySelectorAll('#gm_tbody tr[data-person-id]').forEach((tr) => {
+      const personId = String(tr.dataset.personId || '').trim();
+      const row = byId.get(personId);
+      if (!row) return;
+      const td = tr.querySelector('td.gm-sticky-name');
+      if (!td) return;
+      td.innerHTML = wrapGmEnrollmentClaimName(gmStudentNameInnerHtml(row), row.personId, row.studentRecordId);
+    });
+  }
+
   function setGradesPrintEnabled(enabled) {
     const btn = document.getElementById('btn_printGradesMatrix');
     if (!btn) return;
     btn.disabled = !enabled;
     btn.title = enabled ? 'Print grades matrix for the loaded range' : 'Load the matrix first';
+    const nickBtn = document.getElementById('btn_gmMatrixRosterNicknames');
+    if (nickBtn) {
+      nickBtn.disabled = !enabled;
+      if (!enabled) {
+        nickBtn.title = 'Load the matrix first';
+        nickBtn.setAttribute('aria-label', 'Show roster nicknames');
+      }
+    }
     if (window.EnrollmentClaimToggle) {
       window.EnrollmentClaimToggle.setReady(Boolean(enabled));
     }
@@ -1334,7 +1398,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (reg) tr.dataset.registrationMode = reg;
     if (row.name) tr.dataset.studentName = String(row.name);
     const fp = row.finalPercent != null ? `<span class="fw-bold">${formatGmPercent(row.finalPercent)}</span>` : '—';
-    const nameInner = typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(row.name, row.studentRecordId) : row.name;
+    const nameInner = gmStudentNameInnerHtml(row);
     let html = `<td class="gm-sticky-final text-center small">${fp}</td><td class="gm-sticky-name ps-3">${wrapGmEnrollmentClaimName(nameInner, row.personId, row.studentRecordId)}</td><td class="gm-sticky-calc">${renderGmGradeCalcButton(row.personId)}</td>`;
     row.cells.forEach((cell, idx) => {
       const col = columns[idx];
@@ -1489,7 +1553,7 @@ document.addEventListener('DOMContentLoaded', () => {
           if (reg) tr.dataset.registrationMode = reg;
           if (row.name) tr.dataset.studentName = String(row.name);
           const fp = formatGmPercent(row.finalPercent);
-          tr.innerHTML = `<td class="gm-sticky-final text-center small">${fp}</td><td class="gm-sticky-name ps-3">${wrapGmEnrollmentClaimName(typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(row.name, row.studentRecordId) : row.name, row.personId, row.studentRecordId)}</td><td class="gm-sticky-calc">${renderGmGradeCalcButton(row.personId)}</td><td class="text-muted">—</td>`;
+          tr.innerHTML = `<td class="gm-sticky-final text-center small">${fp}</td><td class="gm-sticky-name ps-3">${wrapGmEnrollmentClaimName(gmStudentNameInnerHtml(row), row.personId, row.studentRecordId)}</td><td class="gm-sticky-calc">${renderGmGradeCalcButton(row.personId)}</td><td class="text-muted">—</td>`;
           tbody.appendChild(tr);
         });
         document.getElementById('gm_results').classList.remove('d-none');

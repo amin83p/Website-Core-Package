@@ -43,6 +43,7 @@ const attendanceExcuseReasonPolicyModel = require('../../models/school/attendanc
 const reportFunderDocxService = require('../../services/school/reportFunderDocxService');
 const schoolSemiMonthlyReportByFunderService = require('../../services/school/schoolSemiMonthlyReportByFunderService');
 const sessionManagementService = require('../../services/school/sessionManagementService');
+const classAttendanceRosterOrderService = require('../../services/school/classAttendanceRosterOrderService');
 const attendanceOperationPolicyService = require('../../services/school/attendanceOperationPolicyService');
 const attendanceEnrollmentNaLockService = require('../../services/school/attendanceEnrollmentNaLockService');
 const sessionAttendanceTimingDetailService = require('../../services/school/sessionAttendanceTimingDetailService');
@@ -891,14 +892,20 @@ async function buildAttendanceMatrixPayload(req, options = {}) {
                 .map((row) => [String(row?.id || '').trim(), row])
                 .filter(([id]) => id)
         );
+        const rosterNicknamesByPerson = classAttendanceRosterOrderService.normalizeAttendanceRosterNicknames(
+            classData?.attendanceRosterNicknames
+        );
 
         let studentList = Array.from(activePersonIds).map(uid => {
             const person = personById.get(String(uid || '').trim());
             const firstName = String(person?.name?.first || '').trim();
             const lastName = String(person?.name?.last || '').trim();
-            const name = person
-                ? `${firstName} ${lastName}`.trim() || `Person ${uid}`
+            const legalName = person
+                ? (classAttendanceRosterOrderService.readPersonLegalName(person)
+                  || `${firstName} ${lastName}`.trim()
+                  || `Person ${uid}`)
                 : `Person ${uid}`;
+            const name = legalName;
             const studentRecordId = schoolStudentProfileLinkService.resolveStudentRecordId({
                 personId: uid,
                 personToStudentMap
@@ -916,6 +923,8 @@ async function buildAttendanceMatrixPayload(req, options = {}) {
             return {
                 personId: uid,
                 name,
+                legalName,
+                rosterNickname: String(rosterNicknamesByPerson[uid] || '').trim(),
                 firstName,
                 lastName,
                 email: readPersonEmail(person || {}),
@@ -1062,7 +1071,10 @@ async function buildAttendanceMatrixPayload(req, options = {}) {
                 : String(enrollmentSnapshot?.source || 'legacy'),
             enrollmentUsedFallback: Boolean(enrollmentSnapshot?.usedFallback),
             window: buildPlan.window,
-            accessDateWindow: policyWindow
+            accessDateWindow: policyWindow,
+            rosterNicknames: classAttendanceRosterOrderService.normalizeAttendanceRosterNicknames(
+                classData?.attendanceRosterNicknames
+            )
         };
 
         const rolledUp = matrixRollupService.recomputeAttendanceMatrixRollups(payload, {

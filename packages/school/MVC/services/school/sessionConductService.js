@@ -348,8 +348,12 @@ function buildReportConductRoster({
   sessionRoster = [],
   prefetchedStudents = [],
   prefetchedPersons = [],
-  attendanceRosterPersonOrder = []
+  attendanceRosterPersonOrder = [],
+  attendanceRosterNicknames = {}
 } = {}) {
+  const rosterNicknames = classAttendanceRosterOrderService.normalizeAttendanceRosterNicknames(
+    attendanceRosterNicknames
+  );
   const sessionRosterByPerson = new Map();
   (Array.isArray(sessionRoster) ? sessionRoster : []).forEach((row) => {
     const pid = personKey(row?.personId);
@@ -393,11 +397,12 @@ function buildReportConductRoster({
     if (rosterRow) {
       const student = studentsByPerson.get(pid);
       const person = personsByPerson.get(pid);
-      const resolvedName = schoolPersonAccessService.formatPersonName(
-        person,
-        String(rosterRow?.name || student?.name || student?.firstName || '').trim()
-      );
-      const displayName = resolvedName || pid;
+      const legalName = classAttendanceRosterOrderService.readPersonLegalName(person)
+        || String(rosterRow?.legalName || rosterRow?.name || student?.name || student?.firstName || '').trim();
+      const displayName = classAttendanceRosterOrderService.formatRosterNameWithNickname({
+        legalName,
+        nickname: rosterNicknames[pid] || ''
+      }) || legalName || pid;
       result.push({
         ...rosterRow,
         personId: pid,
@@ -408,13 +413,15 @@ function buildReportConductRoster({
     }
     const student = studentsByPerson.get(pid);
     const person = personsByPerson.get(pid);
-    const resolvedName = schoolPersonAccessService.formatPersonName(
-      person,
-      String(student?.name || student?.firstName || pid).trim()
-    );
+    const legalName = classAttendanceRosterOrderService.readPersonLegalName(person)
+      || String(student?.name || student?.firstName || pid).trim();
+    const displayName = classAttendanceRosterOrderService.formatRosterNameWithNickname({
+      legalName,
+      nickname: rosterNicknames[pid] || ''
+    }) || legalName;
     result.push({
       personId: pid,
-      name: resolvedName,
+      name: displayName,
       studentRecordId: String(student?.id || '').trim() || undefined,
       classEffortPercent: null,
       classParticipationPercent: null,
@@ -718,7 +725,8 @@ async function buildSessionReportConductUiPayload({
     prefetchedPersons,
     attendanceRosterPersonOrder: classAttendanceRosterOrderService.normalizeAttendanceRosterPersonOrder(
       classData?.attendanceRosterPersonOrder
-    )
+    ),
+    attendanceRosterNicknames: classData?.attendanceRosterNicknames
   });
   const persistedSession = (Array.isArray(sessions) ? sessions : []).find((row) => (
     idsEqual(row?.sessionId, sessionId) || String(row?.sessionId || '').trim() === String(sessionId || '').trim()

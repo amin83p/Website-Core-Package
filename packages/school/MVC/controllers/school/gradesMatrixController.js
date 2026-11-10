@@ -25,6 +25,7 @@ const matrixRollupService = require('../../services/school/matrixRollupService')
 const gradebookWeightService = require('../../services/school/gradebookWeightService');
 const gradesMatrixWeightSaveService = require('../../services/school/gradesMatrixWeightSaveService');
 const sessionGradebookMakeupService = require('../../services/school/sessionGradebookMakeupService');
+const classAttendanceRosterOrderService = require('../../services/school/classAttendanceRosterOrderService');
 
 function normalizeDateOnly(value) {
   const token = String(value || '').trim();
@@ -518,10 +519,14 @@ async function loadGradesMatrixSharedContext(req, query) {
 
   let studentList = Array.from(activePersonIds).map((uid) => {
     const person = personById.get(String(uid || '').trim());
-    const name = person ? schoolPersonAccessService.formatPersonName(person, `Person ${uid}`) : `Person ${uid}`;
+    const legalName = person
+      ? (classAttendanceRosterOrderService.readPersonLegalName(person)
+        || schoolPersonAccessService.formatPersonName(person, `Person ${uid}`))
+      : `Person ${uid}`;
     return {
       personId: uid,
-      name,
+      name: legalName,
+      legalName,
       studentRecordId: schoolStudentProfileLinkService.resolveStudentRecordId({
         personId: uid,
         personToStudentMap
@@ -529,6 +534,12 @@ async function loadGradesMatrixSharedContext(req, query) {
     };
   });
   studentList.sort((a, b) => a.name.localeCompare(b.name));
+  const rosterNicknamePack = classAttendanceRosterOrderService.enrichStudentListWithRosterNicknames(
+    studentList,
+    classData,
+    personById
+  );
+  studentList = rosterNicknamePack.studentList;
 
   const orgIdForPolicy = String(req.user?.activeOrgId || classData?.orgId || '').trim();
   const [orgPolicyCatalog, orgPolicyLayer] = await Promise.all([
@@ -570,7 +581,8 @@ async function loadGradesMatrixSharedContext(req, query) {
     attendancePolicy,
     enabledAttendanceStatuses,
     forceNotApplicableSessionKeys,
-    getApplicabilityForSession
+    getApplicabilityForSession,
+    rosterNicknames: rosterNicknamePack.rosterNicknames
   };
 }
 
@@ -697,6 +709,8 @@ async function buildGradesMatrixPayload(req, query, options = {}) {
     return {
       personId: stu.personId,
       name: stu.name,
+      legalName: stu.legalName || stu.name,
+      rosterNickname: stu.rosterNickname || '',
       studentRecordId: stu.studentRecordId,
       attendancePct,
       attendanceSummary: attSummary,
@@ -723,7 +737,8 @@ async function buildGradesMatrixPayload(req, query, options = {}) {
     enrollmentSource: String(enrollmentSnapshot?.source || 'canonical'),
     attendancePolicyNote: 'Attendance % uses the same session credit rules as the attendance matrix.',
     includeAttendanceInFinal,
-    window: buildPlan.window
+    window: buildPlan.window,
+    rosterNicknames: ctx.rosterNicknames || {}
   };
 
   return matrixRollupService.recomputeGradesMatrixRollups(payload, {

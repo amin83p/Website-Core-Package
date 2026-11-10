@@ -103,6 +103,125 @@ function normalizeSortDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(token) ? token : '';
 }
 
+const OPEN_END_SORT_SENTINEL = '9999-99-99';
+const NICKNAME_MAX_LENGTH = 60;
+
+function enrollmentPeriodIncludesDate(periodStart, periodEnd, dateValue) {
+  const day = normalizeSortDate(dateValue);
+  if (!day) return false;
+  const pStart = normalizeSortDate(periodStart);
+  if (!pStart) return false;
+  const pEnd = normalizeSortDate(periodEnd) || '9999-12-31';
+  return pStart <= day && pEnd >= day;
+}
+
+function readPersonLegalName(person = {}) {
+  const first = readPersonFirstName(person);
+  const last = readPersonLastName(person);
+  const legal = [first, last].filter(Boolean).join(' ').trim();
+  if (legal) return legal;
+  return String(
+    person?.organizationProfile?.legalName
+    || person?.organizationLegalName
+    || person?.displayName
+    || ''
+  ).trim();
+}
+
+function formatRosterNameWithNickname({ legalName = '', nickname = '', wrap = true } = {}) {
+  const legal = String(legalName || '').trim();
+  const nick = String(nickname || '').trim();
+  if (!nick) return legal;
+  if (!legal) return nick;
+  return wrap ? `${legal} (${nick})` : `${legal} ${nick}`;
+}
+
+function normalizeAttendanceRosterNicknames(raw) {
+  if (raw === undefined || raw === null || raw === '') return {};
+  if (typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const out = {};
+  let count = 0;
+  Object.entries(raw).forEach(([key, value]) => {
+    const personId = cleanPersonId(key);
+    const nickname = String(value ?? '').trim().slice(0, NICKNAME_MAX_LENGTH);
+    if (!personId || !nickname || out[personId]) return;
+    out[personId] = nickname;
+    count += 1;
+    if (count >= MAX_ORDER_LENGTH) return;
+  });
+  return out;
+}
+
+function normalizeNicknamesForSave({ nicknames = {}, eligiblePersonIdSet = null } = {}) {
+  const eligible = eligiblePersonIdSet instanceof Set ? eligiblePersonIdSet : new Set();
+  const normalized = normalizeAttendanceRosterNicknames(nicknames);
+  if (!eligible.size) return normalized;
+  const out = {};
+  Object.entries(normalized).forEach(([personId, nickname]) => {
+    for (const candidate of eligible) {
+      if (idsEqual(candidate, personId)) {
+        out[personId] = nickname;
+        break;
+      }
+    }
+  });
+  return out;
+}
+
+function buildRosterNicknameMapForPersonIds(rosterNicknames = {}, personIds = []) {
+  const source = normalizeAttendanceRosterNicknames(rosterNicknames);
+  const map = {};
+  (Array.isArray(personIds) ? personIds : []).forEach((rawId) => {
+    const personId = cleanPersonId(rawId);
+    if (!personId || !source[personId]) return;
+    map[personId] = source[personId];
+  });
+  return map;
+}
+
+function enrichStudentListWithRosterNicknames(studentList = [], classData = {}, personById = new Map()) {
+  const rosterNicknames = normalizeAttendanceRosterNicknames(classData?.attendanceRosterNicknames);
+  const list = (Array.isArray(studentList) ? studentList : []).map((row) => {
+    const personId = cleanPersonId(row?.personId);
+    const person = personById instanceof Map ? personById.get(String(personId || '')) : null;
+    const legalName = readPersonLegalName(person)
+      || String(row?.legalName || row?.name || '').trim();
+    const rosterNickname = personId ? String(rosterNicknames[personId] || '').trim() : '';
+    return {
+      ...row,
+      personId,
+      legalName,
+      rosterNickname,
+      name: legalName || String(row?.name || '').trim()
+    };
+  });
+  return { studentList: list, rosterNicknames };
+}
+
+function decorateRowWithRosterNickname(row = {}, rosterNicknames = {}, options = {}) {
+  const personId = cleanPersonId(row?.personId);
+  const nickname = personId ? String(rosterNicknames[personId] || '').trim() : '';
+  const legalName = String(
+    row?.legalName
+    || (options.preferLegal !== false && row?.name && !nickname ? row.name : '')
+    || row?.name
+    || ''
+  ).trim();
+  const next = {
+    ...row,
+    legalName: legalName || String(row?.name || '').trim(),
+    rosterNickname: nickname
+  };
+  if (options.applyDisplayName !== false) {
+    next.name = formatRosterNameWithNickname({
+      legalName: next.legalName,
+      nickname,
+      wrap: options.wrapNickname !== false
+    }) || next.legalName;
+  }
+  return next;
+}
+
 function readPersonFirstName(person = {}) {
   return String(person?.name?.first || person?.firstName || person?.first_name || '').trim();
 }
@@ -134,6 +253,31 @@ function buildEarliestClassEnrollmentStartByPersonId({
     if (!start) return;
     const existing = map.get(personId);
     if (!existing || start < existing) map.set(personId, start);
+  });
+  return map;
+}
+
+function buildSoonestClassEnrollmentEndByPersonId({
+  periodRows = [],
+  classId = '',
+  studentToPersonMap = new Map(),
+  activeOrgId = '',
+  orgToday = ''
+} = {}) {
+  const map = new Map();
+  const targetClassId = toPublicId(classId);
+  const today = normalizeSortDate(orgToday);
+  (Array.isArray(periodRows) ? periodRows : []).forEach((row) => {
+    if (!idsEqual(row?.classId, targetClassId)) return;
+    if (activeOrgId && !idsEqual(row?.orgId, activeOrgId)) return;
+    if (today && !enrollmentPeriodIncludesDate(row?.startDate, row?.endDate, today)) return;
+    const studentId = toPublicId(row?.studentId);
+    if (!studentId) return;
+    const personId = cleanPersonId(studentToPersonMap.get(studentId));
+    if (!personId) return;
+    const end = normalizeSortDate(row?.endDate) || OPEN_END_SORT_SENTINEL;
+    const existing = map.get(personId);
+    if (!existing || end < existing) map.set(personId, end);
   });
   return map;
 }
@@ -180,20 +324,31 @@ async function listEligibleRosterRowsForToday({
     studentToPersonMap,
     activeOrgId
   });
+  const enrollmentEndByPersonId = buildSoonestClassEnrollmentEndByPersonId({
+    periodRows,
+    classId,
+    studentToPersonMap,
+    activeOrgId,
+    orgToday
+  });
+  const rosterNicknames = normalizeAttendanceRosterNicknames(classData?.attendanceRosterNicknames);
 
   const rows = [];
   personIds.forEach((rawPersonId) => {
     const personId = cleanPersonId(rawPersonId);
     if (!personId) return;
     const person = personRows.find((row) => idsEqual(row?.id, personId)) || null;
-    const name = schoolPersonAccessService.formatPersonName(person, '') || 'Unknown Student';
+    const legalName = readPersonLegalName(person) || schoolPersonAccessService.formatPersonName(person, '') || 'Unknown Student';
     rows.push({
       personId,
-      name,
+      name: legalName,
+      legalName,
+      nickname: rosterNicknames[personId] || '',
       firstName: readPersonFirstName(person),
       lastName: readPersonLastName(person),
       dateOfBirth: readPersonDateOfBirth(person),
       enrollmentStartDate: enrollmentStartByPersonId.get(personId) || '',
+      enrollmentEndDate: enrollmentEndByPersonId.get(personId) || '',
       studentRecordId: schoolStudentProfileLinkService.resolveStudentRecordId({
         personId,
         personToStudentMap
@@ -217,5 +372,15 @@ module.exports = {
   listEligibleRosterRowsForToday,
   resolveOrgToday,
   buildEarliestClassEnrollmentStartByPersonId,
-  normalizeSortDate
+  buildSoonestClassEnrollmentEndByPersonId,
+  normalizeSortDate,
+  OPEN_END_SORT_SENTINEL,
+  normalizeAttendanceRosterNicknames,
+  normalizeNicknamesForSave,
+  readPersonLegalName,
+  formatRosterNameWithNickname,
+  buildRosterNicknameMapForPersonIds,
+  decorateRowWithRosterNickname,
+  enrichStudentListWithRosterNicknames,
+  enrollmentPeriodIncludesDate
 };

@@ -87,3 +87,75 @@ test('buildEarliestClassEnrollmentStartByPersonId picks earliest start per perso
   assert.equal(map.get('PERSON_A'), '2026-01-15');
   assert.equal(map.get('PERSON_B'), '2026-03-01');
 });
+
+test('buildSoonestClassEnrollmentEndByPersonId picks soonest end among active periods', () => {
+  const studentToPersonMap = new Map([
+    ['STU_A', 'PERSON_A'],
+    ['STU_B', 'PERSON_B']
+  ]);
+  const map = classAttendanceRosterOrderService.buildSoonestClassEnrollmentEndByPersonId({
+    classId: 'CLS_1',
+    studentToPersonMap,
+    orgToday: '2026-06-01',
+    periodRows: [
+      { classId: 'CLS_1', studentId: 'STU_A', startDate: '2026-01-01', endDate: '2026-12-31' },
+      { classId: 'CLS_1', studentId: 'STU_A', startDate: '2026-05-01', endDate: '2026-08-01' },
+      { classId: 'CLS_1', studentId: 'STU_B', startDate: '2026-01-01', endDate: '2026-04-01' },
+      { classId: 'CLS_1', studentId: 'STU_B', startDate: '2026-06-01', endDate: '' },
+      { classId: 'CLS_2', studentId: 'STU_A', startDate: '2025-01-01', endDate: '2025-06-01' }
+    ]
+  });
+  assert.equal(map.get('PERSON_A'), '2026-08-01');
+  assert.equal(map.get('PERSON_B'), classAttendanceRosterOrderService.OPEN_END_SORT_SENTINEL);
+});
+
+test('buildSoonestClassEnrollmentEndByPersonId ignores periods not overlapping orgToday', () => {
+  const studentToPersonMap = new Map([['STU_A', 'PERSON_A']]);
+  const map = classAttendanceRosterOrderService.buildSoonestClassEnrollmentEndByPersonId({
+    classId: 'CLS_1',
+    studentToPersonMap,
+    orgToday: '2026-03-01',
+    periodRows: [
+      { classId: 'CLS_1', studentId: 'STU_A', startDate: '2026-04-01', endDate: '2026-06-01' }
+    ]
+  });
+  assert.equal(map.get('PERSON_A'), undefined);
+});
+
+test('normalizeAttendanceRosterNicknames trims and caps entries', () => {
+  const normalized = classAttendanceRosterOrderService.normalizeAttendanceRosterNicknames({
+    ' P_1 ': '  Nick  ',
+    P_2: '',
+    bad: 'x'.repeat(80),
+    '': 'ignored'
+  });
+  assert.equal(normalized.P_1, 'Nick');
+  assert.equal(normalized.P_2, undefined);
+  assert.equal(normalized.bad.length, 60);
+});
+
+test('normalizeNicknamesForSave keeps only eligible person ids', () => {
+  const eligible = new Set(['P_1', 'P_2']);
+  const saved = classAttendanceRosterOrderService.normalizeNicknamesForSave({
+    nicknames: { P_1: 'Alpha', P_9: 'Ghost' },
+    eligiblePersonIdSet: eligible
+  });
+  assert.deepEqual(saved, { P_1: 'Alpha' });
+});
+
+test('formatRosterNameWithNickname wraps nickname in parentheses', () => {
+  assert.equal(
+    classAttendanceRosterOrderService.formatRosterNameWithNickname({
+      legalName: 'Jane Doe',
+      nickname: 'JJ'
+    }),
+    'Jane Doe (JJ)'
+  );
+  assert.equal(
+    classAttendanceRosterOrderService.formatRosterNameWithNickname({
+      legalName: 'Jane Doe',
+      nickname: ''
+    }),
+    'Jane Doe'
+  );
+});

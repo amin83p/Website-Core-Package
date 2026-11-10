@@ -451,6 +451,33 @@ function buildProgress(rows = []) {
   };
 }
 
+async function loadStudentIdToPersonIdMap(studentIds = [], reqUser = null) {
+  const ids = [...new Set((Array.isArray(studentIds) ? studentIds : []).map((id) => clean(id)).filter(Boolean))];
+  if (!ids.length || !reqUser) return new Map();
+  const studentRows = await schoolDataService.fetchData('students', {
+    id__in: ids,
+    page: 1,
+    limit: Math.max(ids.length, 1)
+  }, reqUser);
+  return new Map(
+    (Array.isArray(studentRows) ? studentRows : [])
+      .map((row) => [clean(row?.id), toPublicId(row?.personId)])
+      .filter(([studentId, personId]) => Boolean(studentId && personId))
+  );
+}
+
+function applyRosterNicknamesToReportMatrixRows(rows = [], rosterNicknames = {}, studentIdToPersonId = new Map()) {
+  const nicknameMap = classAttendanceRosterOrderService.normalizeAttendanceRosterNicknames(rosterNicknames);
+  if (!Object.keys(nicknameMap).length) return;
+  (Array.isArray(rows) ? rows : []).forEach((row) => {
+    const personId = studentIdToPersonId.get(clean(row?.studentId)) || clean(row?.studentId);
+    const nickname = String(nicknameMap[personId] || '').trim();
+    if (!nickname) return;
+    const legalName = clean(row?.studentName);
+    row.studentName = classAttendanceRosterOrderService.formatRosterNameWithNickname({ legalName, nickname });
+  });
+}
+
 async function buildMatrixContext({
   assignmentId,
   assignmentRowId = '',
@@ -476,29 +503,14 @@ async function buildMatrixContext({
   const attendanceRosterPersonOrder = classAttendanceRosterOrderService.normalizeAttendanceRosterPersonOrder(
     classData?.attendanceRosterPersonOrder
   );
-  let studentIdToPersonId = new Map();
-  if (attendanceRosterPersonOrder.length) {
-    const studentIds = [...targetStudentIds].map((studentId) => clean(studentId)).filter(Boolean);
-    if (studentIds.length) {
-      const studentRows = await schoolDataService.fetchData('students', {
-        id__in: studentIds,
-        page: 1,
-        limit: Math.max(studentIds.length, 1)
-      }, reqUser);
-      studentIdToPersonId = new Map(
-        (Array.isArray(studentRows) ? studentRows : [])
-          .map((row) => [clean(row?.id), toPublicId(row?.personId)])
-          .filter(([studentId, personId]) => Boolean(studentId && personId))
-      );
-    }
-  }
+  const sortedStudentIds = [...targetStudentIds]
+    .map((studentId) => clean(studentId))
+    .filter(Boolean);
+  const studentIdToPersonId = await loadStudentIdToPersonIdMap(sortedStudentIds, reqUser);
   const resolveMatrixRowPersonId = (studentId) => {
     const token = clean(studentId);
     return studentIdToPersonId.get(token) || token;
   };
-  const sortedStudentIds = [...targetStudentIds]
-    .map((studentId) => clean(studentId))
-    .filter(Boolean);
   if (attendanceRosterPersonOrder.length) {
     const orderMap = classAttendanceRosterOrderService.buildAttendancePersonOrderMap(attendanceRosterPersonOrder);
     sortedStudentIds.sort((left, right) => classAttendanceRosterOrderService.compareByAttendancePersonOrder(
@@ -528,6 +540,7 @@ async function buildMatrixContext({
     reqUser,
     treatSubmittedAsLocked
   })));
+  applyRosterNicknamesToReportMatrixRows(allRows, classData?.attendanceRosterNicknames, studentIdToPersonId);
   if (attendanceRosterPersonOrder.length) {
     const orderMap = classAttendanceRosterOrderService.buildAttendancePersonOrderMap(attendanceRosterPersonOrder);
     allRows.sort((a, b) => {

@@ -108,6 +108,24 @@ function sanitizeAttendanceRosterPersonOrder(value) {
   return out.length > ATTENDANCE_ROSTER_ORDER_MAX ? out.slice(0, ATTENDANCE_ROSTER_ORDER_MAX) : out;
 }
 
+function sanitizeAttendanceRosterNicknames(value) {
+  if (value === undefined || value === null || value === '') return {};
+  if (typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('Attendance roster nicknames must be an object.');
+  }
+  const out = {};
+  let count = 0;
+  Object.entries(value).forEach(([key, rawNickname]) => {
+    const personId = cleanId(key, { max: 64, allowEmpty: true });
+    const nickname = cleanString(rawNickname, { max: 60, allowEmpty: true });
+    if (!personId || !nickname || out[personId]) return;
+    out[personId] = nickname;
+    count += 1;
+    if (count >= ATTENDANCE_ROSTER_ORDER_MAX) return;
+  });
+  return out;
+}
+
 function sanitizeClassBasic(item) {
   if (!item || typeof item !== 'object') throw new Error('Invalid class payload.');
   const registrationMode = normalizeRegistrationMode(item.registrationMode);
@@ -139,7 +157,8 @@ function sanitizeClassBasic(item) {
     skillIds: sanitizeSkillIds(item.skillIds),
     allowedProgramTerms,
     officialFinalGrades,
-    attendanceRosterPersonOrder: sanitizeAttendanceRosterPersonOrder(item.attendanceRosterPersonOrder)
+    attendanceRosterPersonOrder: sanitizeAttendanceRosterPersonOrder(item.attendanceRosterPersonOrder),
+    attendanceRosterNicknames: sanitizeAttendanceRosterNicknames(item.attendanceRosterNicknames)
   };
 }
 /* ============================================================

@@ -22,6 +22,7 @@ const reportInstanceSaveService = require('../../services/school/reportInstanceS
 const reportPrefillRefreshPreviewService = require('../../services/school/reportPrefillRefreshPreviewService');
 const reportInstanceLivePrefillResetService = require('../../services/school/reportInstanceLivePrefillResetService');
 const reportMatrixService = require('../../services/school/reportMatrixService');
+const classAttendanceRosterOrderService = require('../../services/school/classAttendanceRosterOrderService');
 const reportGenerationEngineService = require('../../services/school/reportGenerationEngineService');
 const matrixWindowService = require('../../services/school/matrixWindowService');
 const reportFunderDocxService = require('../../services/school/reportFunderDocxService');
@@ -90,7 +91,23 @@ function buildReportInstanceDetailsForView(inst, {
   }
 
   const teacherName = formatPersonDisplayName(teacherPerson);
-  const studentName = formatPersonDisplayName(studentPerson);
+  let studentName = formatPersonDisplayName(studentPerson);
+  const studentPersonId = toPublicId(
+    studentPerson?.id
+    || studentRegistry?.personId
+    || ''
+  );
+  const rosterNicknames = classAttendanceRosterOrderService.normalizeAttendanceRosterNicknames(
+    classData?.attendanceRosterNicknames
+  );
+  const rosterNickname = studentPersonId ? String(rosterNicknames[studentPersonId] || '').trim() : '';
+  if (rosterNickname) {
+    const legalName = classAttendanceRosterOrderService.readPersonLegalName(studentPerson) || studentName;
+    studentName = classAttendanceRosterOrderService.formatRosterNameWithNickname({
+      legalName,
+      nickname: rosterNickname
+    });
+  }
 
   const targetKeyRaw = String(inst.targetKey || '').trim();
   let targetLabel = '';

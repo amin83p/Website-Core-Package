@@ -1,0 +1,72 @@
+<script>
+(function () {
+  if (window.SchoolRosterNicknameMatrix) return;
+
+  function formatDisplayName(legalName, nickname, showNicknames) {
+    const legal = String(legalName || '').trim();
+    const nick = String(nickname || '').trim();
+    if (!showNicknames || !nick) return legal || nick;
+    if (!legal) return nick;
+    return `${legal} (${nick})`;
+  }
+
+  function readShowPreference(storageKey, defaultShow) {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      if (raw === '1') return true;
+      if (raw === '0') return false;
+    } catch (_) { /* ignore */ }
+    return defaultShow === true;
+  }
+
+  function writeShowPreference(storageKey, show) {
+    try {
+      localStorage.setItem(storageKey, show ? '1' : '0');
+    } catch (_) { /* ignore */ }
+  }
+
+  function resolveStudentDisplayName(row, showNicknames) {
+    if (!row || typeof row !== 'object') return '';
+    const legal = String(row.legalName || row.name || '').trim();
+    const nick = String(row.rosterNickname || '').trim();
+    return formatDisplayName(legal, nick, showNicknames);
+  }
+
+  function bindToggleButton({
+    button,
+    storageKey,
+    defaultShow = false,
+    onChange
+  } = {}) {
+    if (!button || button.dataset.rosterNicknameToggleBound === '1') return;
+    button.dataset.rosterNicknameToggleBound = '1';
+    let show = readShowPreference(storageKey, defaultShow);
+
+    const paint = () => {
+      button.classList.toggle('active', show);
+      button.setAttribute('aria-pressed', show ? 'true' : 'false');
+      button.title = show ? 'Hide roster nicknames' : 'Show roster nicknames';
+      button.setAttribute('aria-label', show ? 'Hide roster nicknames' : 'Show roster nicknames');
+    };
+
+    paint();
+    button.addEventListener('click', () => {
+      show = !show;
+      writeShowPreference(storageKey, show);
+      paint();
+      if (typeof onChange === 'function') onChange(show);
+    });
+    return {
+      isShowing: () => show,
+      refresh: paint
+    };
+  }
+
+  window.SchoolRosterNicknameMatrix = {
+    formatDisplayName,
+    resolveStudentDisplayName,
+    bindToggleButton,
+    readShowPreference
+  };
+})();
+</script>

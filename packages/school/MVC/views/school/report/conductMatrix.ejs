@@ -199,6 +199,15 @@
         <button type="button" id="btn_toggleEnrollmentClaims" class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn" disabled aria-label="Show claim numbers" title="Load the matrix first"><i class="bi bi-card-text" aria-hidden="true"></i></button>
         <% } %>
         <button type="button"
+          class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
+          id="btn_cmMatrixRosterNicknames"
+          disabled
+          aria-label="Show roster nicknames"
+          title="Load the matrix first"
+          aria-pressed="false">
+          <i class="bi bi-person-vcard" aria-hidden="true"></i>
+        </button>
+        <button type="button"
           class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn cm-session-view-btn active"
           id="cm_btnShowAllSessions"
           aria-label="Show all sessions"
@@ -339,4 +348,5 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
 <script src="/scripts/enrollmentClaimToggle.js"></script>
 <% } %>
 <script src="/scripts/conductRatingCell.js"></script>
+<%- include('../partials/rosterNicknameMatrixClient') %>
 <script src="/scripts/conductMatrixClient.js"></script>

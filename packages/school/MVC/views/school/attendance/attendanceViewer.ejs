@@ -374,6 +374,15 @@
                 <button type="button" id="btn_toggleEnrollmentClaims" class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn" disabled aria-label="Show claim numbers" title="Load the matrix first"><i class="bi bi-card-text" aria-hidden="true"></i></button>
                 <% } %>
                 <button type="button"
+                    class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn"
+                    id="btn_attendanceMatrixRosterNicknames"
+                    disabled
+                    aria-label="Show roster nicknames"
+                    title="Load the matrix first"
+                    aria-pressed="false">
+                    <i class="bi bi-person-vcard" aria-hidden="true"></i>
+                </button>
+                <button type="button"
                     class="btn btn-sm btn-outline-secondary attendance-legend-icon-btn attendance-history-toggle-btn"
                     id="btn_attendanceMatrixHistory"
                     aria-label="Toggle change history"
@@ -691,6 +700,7 @@
 <%- include('partials/attendanceExcuseReasonPickerModal') %>
 <%- include('../report/partials/reportMessageHelpers') %>
 <%- include('partials/tablePages-end') %>
+<%- include('../partials/rosterNicknameMatrixClient') %>
 <script src="/scripts/schoolDateRangeShortcuts.js"></script>
 <script src="/scripts/schoolMatrixExpandedView.js"></script>
 <script src="/scripts/sessionAttendanceTimingDetailClient.js"></script>
@@ -2032,6 +2042,36 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    window.__attShowRosterNicknames = window.SchoolRosterNicknameMatrix
+        ? window.SchoolRosterNicknameMatrix.readShowPreference('school.matrixShowRosterNicknames.attendance', false)
+        : false;
+
+    function attendanceMatrixStudentDisplayName(stu) {
+        const show = window.__attShowRosterNicknames === true;
+        if (window.SchoolRosterNicknameMatrix) {
+            return window.SchoolRosterNicknameMatrix.resolveStudentDisplayName(stu, show);
+        }
+        return String(stu?.name || '').trim();
+    }
+
+    function refreshAttendanceMatrixStudentNameCells() {
+        const matrix = window.currentMatrixData?.matrix;
+        if (!Array.isArray(matrix)) return;
+        const byId = new Map(matrix.map((row) => [String(row?.personId || '').trim(), row]));
+        document.querySelectorAll('#matrixBody tr.matrix-student-row').forEach((tr) => {
+            const personId = String(tr.getAttribute('data-person-id') || '').trim();
+            const stu = byId.get(personId);
+            if (!stu) return;
+            const td = tr.querySelector('td.matrix-sticky-name');
+            if (!td) return;
+            const displayName = attendanceMatrixStudentDisplayName(stu);
+            const nameHtml = typeof schoolRenderStudentNameHtml === 'function'
+                ? schoolRenderStudentNameHtml(displayName, stu.studentRecordId, { className: 'text-decoration-none fw-bold' })
+                : attEscapeHtml(displayName);
+            td.innerHTML = wrapAttendanceEnrollmentClaimName(nameHtml, personId, stu.studentRecordId);
+        });
+    }
+
     function setAttendancePrintEnabled(enabled) {
         const printBtn = document.getElementById('btn_printAttendanceMatrix');
         if (printBtn) {
@@ -2042,6 +2082,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (exportBtn) {
             exportBtn.disabled = !enabled;
             exportBtn.title = enabled ? 'Export attendance matrix to Excel for the loaded range' : 'Load the matrix first';
+        }
+        const nickBtn = document.getElementById('btn_attendanceMatrixRosterNicknames');
+        if (nickBtn) {
+            nickBtn.disabled = !enabled;
+            if (!enabled) {
+                nickBtn.title = 'Load the matrix first';
+                nickBtn.setAttribute('aria-label', 'Show roster nicknames');
+            }
         }
         if (window.EnrollmentClaimToggle) {
             window.EnrollmentClaimToggle.setReady(Boolean(enabled));
@@ -2498,6 +2546,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function buildAttendanceStudentRowHtml(stu) {
         const personId = String(stu?.personId || '').trim();
         const registrationMode = String(window.currentMatrixData?.registrationMode || '').trim();
+        const displayName = attendanceMatrixStudentDisplayName(stu);
         const studentName = String(stu?.name || '').trim();
         const s = stu.summary || {};
         const p = Number(s.totalPresentSessions) || 0;
@@ -2516,7 +2565,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div><span class="text-success fw-semibold">${p}</span><span class="text-muted"> / </span><span class="text-danger fw-semibold">${a}</span>${na ? `<span class="text-muted"> / </span><span class="text-secondary fw-semibold">${na}</span>` : ''}</div>
             <div class="fw-bold text-primary mt-1" style="font-size: 0.9rem;">${pctStr}</div>
           </td>
-          <td class="ps-3 matrix-sticky-name">${wrapAttendanceEnrollmentClaimName(typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(stu.name, stu.studentRecordId, { className: 'text-decoration-none fw-bold' }) : stu.name, personId, stu.studentRecordId)}</td>`;
+          <td class="ps-3 matrix-sticky-name">${wrapAttendanceEnrollmentClaimName(typeof schoolRenderStudentNameHtml === 'function' ? schoolRenderStudentNameHtml(displayName, stu.studentRecordId, { className: 'text-decoration-none fw-bold' }) : displayName, personId, stu.studentRecordId)}</td>`;
         (stu.records || []).forEach((rec) => {
             rowHtml += buildAttendanceRecordCell(stu, rec);
         });
@@ -3012,6 +3061,18 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn_attendanceMatrixLegend')?.addEventListener('click', () => {
         openAttendanceMatrixLegendModal();
     });
+    const attRosterNickBtn = document.getElementById('btn_attendanceMatrixRosterNicknames');
+    if (attRosterNickBtn && window.SchoolRosterNicknameMatrix) {
+        window.SchoolRosterNicknameMatrix.bindToggleButton({
+            button: attRosterNickBtn,
+            storageKey: 'school.matrixShowRosterNicknames.attendance',
+            defaultShow: false,
+            onChange: (show) => {
+                window.__attShowRosterNicknames = show;
+                refreshAttendanceMatrixStudentNameCells();
+            }
+        });
+    }
 
     // --- 3b. Attendance Matrix Print ---
     const ATT_PRINT_STATUS_LETTER = {

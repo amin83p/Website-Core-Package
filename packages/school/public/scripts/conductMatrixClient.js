@@ -14,6 +14,9 @@
   let matrixData = null;
   let conductOnlyFilter = false;
   let modalContext = null;
+  let showRosterNicknames = global.SchoolRosterNicknameMatrix
+    ? global.SchoolRosterNicknameMatrix.readShowPreference('school.matrixShowRosterNicknames.conduct', false)
+    : false;
 
   function escapeHtml(value) {
     return String(value ?? '')
@@ -316,8 +319,28 @@
     return nameHtml;
   }
 
+  function cmStudentDisplayName(stu) {
+    if (global.SchoolRosterNicknameMatrix) {
+      return global.SchoolRosterNicknameMatrix.resolveStudentDisplayName(stu, showRosterNicknames);
+    }
+    return String(stu?.name || stu?.personId || '').trim();
+  }
+
+  function refreshConductMatrixStudentNameCells() {
+    if (!matrixData || !Array.isArray(matrixData.students)) return;
+    const byId = new Map(matrixData.students.map((row) => [String(row?.personId || '').trim(), row]));
+    document.querySelectorAll('#cm_tbody tr.cm-student-row[data-person-id]').forEach((tr) => {
+      const personId = String(tr.getAttribute('data-person-id') || '').trim();
+      const stu = byId.get(personId);
+      if (!stu) return;
+      const td = tr.querySelector('td.cm-sticky-name');
+      if (!td) return;
+      td.innerHTML = buildStudentNameCell(stu);
+    });
+  }
+
   function buildStudentNameCell(stu) {
-    const name = escapeHtml(stu.name || stu.personId);
+    const name = escapeHtml(cmStudentDisplayName(stu));
     const recordId = String(stu.studentRecordId || '').trim();
     const nameHtml = recordId
       ? `<a href="/school/students/edit/${encodeURIComponent(recordId)}" target="_blank" rel="noopener noreferrer" class="text-decoration-none">${name}</a>`
@@ -336,6 +359,14 @@
     if (!btn) return;
     btn.disabled = !enabled;
     btn.title = enabled ? 'Print class conduct matrix for the loaded range' : 'Load the matrix first';
+    const nickBtn = document.getElementById('btn_cmMatrixRosterNicknames');
+    if (nickBtn) {
+      nickBtn.disabled = !enabled;
+      if (!enabled) {
+        nickBtn.title = 'Load the matrix first';
+        nickBtn.setAttribute('aria-label', 'Show roster nicknames');
+      }
+    }
     if (global.EnrollmentClaimToggle) {
       global.EnrollmentClaimToggle.setReady(Boolean(enabled));
     }
@@ -879,7 +910,7 @@
 
     const modalReadOnly = isCellLockedByReport(cell);
     modalContext = { personId, sessionId, session, student, cell, modalReadOnly };
-    document.getElementById('cmModalStudent').textContent = student.name || personId;
+    document.getElementById('cmModalStudent').textContent = cmStudentDisplayName(student) || personId;
     document.getElementById('cmModalSession').textContent = session.label || session.date || sessionId;
     buildModalDimensionFields(cell, modalReadOnly);
     renderConductLegendHosts();
@@ -1182,6 +1213,19 @@
     }
     initFromUrl();
     syncCmRollingClassAnchors();
+
+    const cmRosterNickBtn = document.getElementById('btn_cmMatrixRosterNicknames');
+    if (cmRosterNickBtn && global.SchoolRosterNicknameMatrix) {
+      global.SchoolRosterNicknameMatrix.bindToggleButton({
+        button: cmRosterNickBtn,
+        storageKey: 'school.matrixShowRosterNicknames.conduct',
+        defaultShow: false,
+        onChange: (show) => {
+          showRosterNicknames = show;
+          refreshConductMatrixStudentNameCells();
+        }
+      });
+    }
 
     if (global.SchoolRollingEnrollmentDeepLink) {
       global.SchoolRollingEnrollmentDeepLink.initRollingEnrollmentContextMenu({
