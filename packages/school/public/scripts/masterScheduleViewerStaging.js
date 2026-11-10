@@ -7,12 +7,14 @@
         const SCHEDULE_STAGE_DEFAULT_WEEKDAYS = [1, 2, 3, 4];
         const SCHEDULE_STAGE_COUNT_MIN = 1;
         const SCHEDULE_STAGE_COUNT_MAX = 72;
+        const SCHEDULE_REVIEW_ALL_CLASSES_ID = '__schedule_review_all_classes__';
         let scheduleStageModalBound = false;
         let scheduleThroughDatePreviewDelegated = false;
         let scheduleStageContext = null;
         let scheduleStageClassContext = null;
         let scheduleStageClassPickerItems = [];
         let scheduleClassPickerModalInstance = null;
+        let scheduleClassPickerPickHandler = null;
     
         function nearestScheduleStageDurationChip(hours) {
             const value = Number(hours || 0);
@@ -382,6 +384,24 @@
             return raw.replace(/_/g, ' ').replace(/\b\w/g, (char) => char.toUpperCase());
         }
     
+        function isScheduleReviewAllClassesId(classId) {
+            return String(classId || '').trim() === SCHEDULE_REVIEW_ALL_CLASSES_ID;
+        }
+
+        function renderScheduleClassPickerAllClassesItem() {
+            return `<button type="button" class="schedule-class-picker-item schedule-class-picker-item--all" role="option"
+              data-class-id="${SCHEDULE_REVIEW_ALL_CLASSES_ID}"
+              data-class-title="All classes"
+              data-search="all classes">
+              <span class="schedule-class-picker-item-icon" aria-hidden="true"><i class="bi bi-collection"></i></span>
+              <span class="schedule-class-picker-item-main">
+                <span class="schedule-class-picker-item-title d-block">All classes</span>
+                <span class="schedule-class-picker-item-meta d-block">Saved sessions from every class in the loaded range</span>
+              </span>
+              <i class="bi bi-chevron-right schedule-class-picker-item-chevron" aria-hidden="true"></i>
+            </button>`;
+        }
+
         function renderScheduleClassPickerItem(item) {
             const title = deps.escapeHtml(item.title || item.id);
             const code = String(item.code || '').trim();
@@ -470,6 +490,13 @@
                     cycleStartDate: String(picked?.cycleStartDate || picked?.lifecycle?.cycleStartDate || '').trim(),
                     registrationMode: String(picked?.registrationMode || picked?.lifecycle?.registrationMode || '').trim()
                 };
+                if (typeof scheduleClassPickerPickHandler === 'function') {
+                    const handler = scheduleClassPickerPickHandler;
+                    scheduleClassPickerPickHandler = null;
+                    getScheduleClassPickerModal()?.hide();
+                    try { handler(); } catch (err) { console.error(err); }
+                    return;
+                }
                 getScheduleClassPickerModal()?.hide();
                 openScheduleStageModal(scheduleStageContext);
             });
@@ -1010,6 +1037,421 @@
         }
     
         let scheduleStageEditAttemptId = '';
+
+        function collectDraftClassIdsForPerson(personId) {
+            const pid = String(personId || '').trim();
+            if (!pid) return [];
+            const drafts = Array.isArray(deps.scheduleState.draftEventsByPersonId?.[pid])
+                ? deps.scheduleState.draftEventsByPersonId[pid]
+                : [];
+            const ids = new Set();
+            drafts.forEach((ev) => {
+                if (ev?.isDraft !== true) return;
+                const classId = String(ev?.classId || '').trim();
+                if (classId) ids.add(classId);
+            });
+            return Array.from(ids);
+        }
+
+        function draftScheduleEventToStagedSessionRow(ev) {
+            return {
+                sessionId: String(ev?.sessionId || ev?.id || '').trim(),
+                classId: String(ev?.classId || '').trim(),
+                classLabel: String(ev?.className || ev?.classLabel || ev?.title || '').trim(),
+                date: String(ev?.date || '').trim(),
+                startTime: String(ev?.start || ev?.startTime || '').trim(),
+                endTime: String(ev?.end || ev?.endTime || '').trim(),
+                durationHours: Number(ev?.duration || ev?.scheduledDuration || 0),
+                stagingAttemptId: String(ev?.stagingAttemptId || '').trim()
+            };
+        }
+
+        function resolveScheduleStageClassContextForId(classId) {
+            const cid = String(classId || '').trim();
+            if (!cid) return null;
+            const filtered = resolveScheduleStageClassFromActiveFilter();
+            if (filtered?.classId === cid) return filtered;
+            const activeMatch = (deps.scheduleState.activeClasses || []).find((row) => String(row?.id || '').trim() === cid);
+            if (activeMatch) {
+                return {
+                    classId: cid,
+                    classLabel: String(activeMatch.title || activeMatch.id || cid).trim(),
+                    lifecycle: activeMatch.lifecycle || {},
+                    cycleEndDate: String(activeMatch.cycleEndDate || activeMatch.lifecycle?.cycleEndDate || '').trim(),
+                    cycleStartDate: String(activeMatch.cycleStartDate || activeMatch.lifecycle?.cycleStartDate || '').trim(),
+                    registrationMode: String(activeMatch.registrationMode || activeMatch.lifecycle?.registrationMode || '').trim()
+                };
+            }
+            const person = deps.activeSchedulePerson();
+            const batches = getDraftBatchesForPerson(person?.id || '', cid);
+            const batch = batches[0];
+            return {
+                classId: cid,
+                classLabel: String(batch?.classLabel || cid).trim(),
+                lifecycle: {},
+                cycleEndDate: '',
+                cycleStartDate: '',
+                registrationMode: ''
+            };
+        }
+
+        function isSavedClassSessionEvent(ev) {
+            if (!ev || ev.isDraft === true) return false;
+            const eventType = String(ev?.eventType || ev?.targetType || '').trim().toLowerCase();
+            if (eventType && eventType !== 'class_session' && eventType !== 'session') return false;
+            return Boolean(String(ev?.classId || '').trim());
+        }
+
+        function collectClassIdsWithSavedSessions(personId) {
+            const pid = String(personId || '').trim();
+            if (!pid) return [];
+            const events = deps.getScheduleEventsForPerson(pid).filter(isSavedClassSessionEvent);
+            const ids = new Set();
+            events.forEach((ev) => {
+                const classId = String(ev?.classId || '').trim();
+                if (classId) ids.add(classId);
+            });
+            return Array.from(ids);
+        }
+
+        function collectClassIdsWithNoEnrollmentSavedSessions(personId) {
+            const pid = String(personId || '').trim();
+            if (!pid) return [];
+            const events = deps.getScheduleEventsForPerson(pid)
+                .filter(isSavedClassSessionEvent)
+                .filter((ev) => ev?.hasExpectedEnrollment === false);
+            const ids = new Set();
+            events.forEach((ev) => {
+                const classId = String(ev?.classId || '').trim();
+                if (classId) ids.add(classId);
+            });
+            return Array.from(ids);
+        }
+
+        let reviewClassScheduleOpenOptions = { filterNoEnrollmentOnly: false };
+
+        function openPartialStagedSessionsReviewModal({
+            sessionsToCreate,
+            stagingAttempts,
+            startDate,
+            endDate,
+            viewRange,
+            applyToTimelineFirst,
+            partialClassScheduleReview,
+            filterNoEnrollmentOnly
+        } = {}) {
+            if (!scheduleStageClassContext?.classId) return false;
+            if (!window.SessionEnrollmentCalendarModal?.buildPartialPickerData) {
+                if (typeof deps.uiAlert === 'function') deps.uiAlert('Calendar modal is not available on this page.', 'Review staged sessions', { icon: 'warning' });
+                return false;
+            }
+            const person = deps.activeSchedulePerson();
+            const sessions = Array.isArray(sessionsToCreate) ? sessionsToCreate : [];
+            const attempts = Array.isArray(stagingAttempts) ? stagingAttempts : [];
+            const stagedPaddingOptions = typeof deps.getStagedViewPaddingRangeOptions === 'function'
+                ? deps.getStagedViewPaddingRangeOptions()
+                : {};
+            if (applyToTimelineFirst) {
+                applyDraftStagedSessionsToSchedule({
+                    sessionsToCreate: sessions,
+                    stagingAttempts: attempts,
+                    viewRange
+                });
+            }
+            const allClassesReview = isScheduleReviewAllClassesId(scheduleStageClassContext.classId);
+            const partialSessions = sessions.map((row) => ({
+                ...row,
+                sessionId: String(row?.sessionId || '').trim()
+            }));
+            const existingEvents = deps.getScheduleEventsForPerson(person?.id || '')
+                .filter((ev) => ev?.isDraft !== true)
+                .filter((ev) => allClassesReview
+                    ? isSavedClassSessionEvent(ev)
+                    : (String(ev?.classId || '') === scheduleStageClassContext.classId));
+            const conflictScheduleEvents = collectScheduleConflictSessionsForPerson(person?.id || '');
+            const prefetchedPickerData = window.SessionEnrollmentCalendarModal.buildPartialPickerData({
+                classId: scheduleStageClassContext.classId,
+                classLabel: scheduleStageClassContext.classLabel,
+                sessionsToCreate: partialSessions,
+                existingEvents,
+                startDate,
+                endDate,
+                allClassesReview,
+                ...stagedPaddingOptions
+            });
+            const onClose = typeof deps.promptNavigateToPartialModalWeek === 'function'
+                ? deps.promptNavigateToPartialModalWeek
+                : (closeInfo) => {
+                    const date = (closeInfo && typeof closeInfo === 'object')
+                        ? (closeInfo.anchorDate || closeInfo.firstStagedDate)
+                        : closeInfo;
+                    deps.focusScheduleTimelineOnFirstStagedSession(date);
+                };
+            window.SessionEnrollmentCalendarModal.open({
+                mode: 'partial',
+                classId: scheduleStageClassContext.classId,
+                classLabel: scheduleStageClassContext.classLabel,
+                startDate,
+                endDate,
+                cycleEndDate: String(scheduleStageClassContext.cycleEndDate || '').trim(),
+                ...stagedPaddingOptions,
+                sessionsToCreate: sessions,
+                stagingAttempts: attempts,
+                existingEvents,
+                conflictScheduleEvents,
+                prefetchedPickerData,
+                onSave: (payload) => applyDraftStagedSessionsToSchedule(payload),
+                onStagedSessionsChange: syncTimelineFromPartialModalDrafts,
+                onClose,
+                partialClassScheduleReview: partialClassScheduleReview === true,
+                partialAllClassesReview: allClassesReview,
+                filterNoEnrollmentOnly: filterNoEnrollmentOnly === true
+            });
+            return true;
+        }
+
+        function openReviewStagedSessionsForCurrentClass() {
+            const person = deps.activeSchedulePerson();
+            const classId = String(scheduleStageClassContext?.classId || '').trim();
+            if (!person?.id || !classId) return;
+            const drafts = (Array.isArray(deps.scheduleState.draftEventsByPersonId?.[person.id])
+                ? deps.scheduleState.draftEventsByPersonId[person.id]
+                : []).filter((ev) => ev?.isDraft === true && String(ev?.classId || '').trim() === classId);
+            if (!drafts.length) {
+                if (typeof deps.uiAlert === 'function') deps.uiAlert('No staged sessions found for this class.', 'Review staged sessions', { icon: 'info' });
+                return;
+            }
+            const sessionsToCreate = drafts.map(draftScheduleEventToStagedSessionRow);
+            const stagingAttempts = getDraftBatchesForPerson(person.id, classId);
+            const stagedPaddingOptions = typeof deps.getStagedViewPaddingRangeOptions === 'function'
+                ? deps.getStagedViewPaddingRangeOptions()
+                : {};
+            const paddedRange = deps.scheduleCalendarCore.computeStagedSessionsViewRange(sessionsToCreate, {
+                ...stagedPaddingOptions
+            });
+            openPartialStagedSessionsReviewModal({
+                sessionsToCreate,
+                stagingAttempts,
+                startDate: paddedRange.startDate,
+                endDate: paddedRange.endDate,
+                viewRange: paddedRange,
+                applyToTimelineFirst: false
+            });
+        }
+
+        async function openReviewStagedSessionsClassPicker(classIds) {
+            const person = deps.activeSchedulePerson();
+            if (!person?.id || !Array.isArray(classIds) || !classIds.length) return;
+            scheduleClassPickerPickHandler = () => {
+                openReviewStagedSessionsForCurrentClass();
+            };
+            bindScheduleClassPickerList();
+            const listEl = document.getElementById('scheduleClassPickerList');
+            const emptyEl = document.getElementById('scheduleClassPickerEmpty');
+            const searchEl = document.getElementById('scheduleClassPickerSearch');
+            const subtitleEl = document.getElementById('scheduleClassPickerSubtitle');
+            if (!listEl) return;
+            listEl.innerHTML = '<div class="schedule-class-picker-loading text-center text-muted"><div class="spinner-border spinner-border-sm text-primary mb-2" role="status" aria-hidden="true"></div><div class="small">Loading classes...</div></div>';
+            if (emptyEl) emptyEl.classList.add('d-none');
+            if (searchEl) searchEl.value = '';
+            if (subtitleEl) subtitleEl.textContent = 'Choose a class to review staged sessions.';
+            const allowed = new Set(classIds.map((id) => String(id || '').trim()).filter(Boolean));
+            try {
+                let items = await fetchInstructorClassesForPerson(person.id);
+                items = items.filter((item) => allowed.has(String(item?.id || '').trim()));
+                allowed.forEach((cid) => {
+                    if (items.some((item) => String(item?.id || '').trim() === cid)) return;
+                    const ctx = resolveScheduleStageClassContextForId(cid);
+                    items.push({
+                        id: cid,
+                        title: ctx?.classLabel || cid,
+                        lifecycle: ctx?.lifecycle || {},
+                        cycleEndDate: ctx?.cycleEndDate || '',
+                        cycleStartDate: ctx?.cycleStartDate || '',
+                        registrationMode: ctx?.registrationMode || ''
+                    });
+                });
+                scheduleStageClassPickerItems = items;
+                if (!items.length) {
+                    listEl.innerHTML = '';
+                    if (emptyEl) emptyEl.classList.remove('d-none');
+                } else {
+                    if (emptyEl) emptyEl.classList.add('d-none');
+                    listEl.innerHTML = items.map((item) => renderScheduleClassPickerItem(item)).join('');
+                }
+                getScheduleClassPickerModal()?.show();
+            } catch (err) {
+                scheduleClassPickerPickHandler = null;
+                if (typeof deps.uiAlert === 'function') deps.uiAlert(err.message || 'Unable to load classes.', 'Review staged sessions', { icon: 'error' });
+            }
+        }
+
+        function openReviewClassScheduleForCurrentClass() {
+            const person = deps.activeSchedulePerson();
+            const classId = String(scheduleStageClassContext?.classId || '').trim();
+            if (!person?.id || !classId) return;
+            const filterNoEnrollmentOnly = reviewClassScheduleOpenOptions.filterNoEnrollmentOnly === true;
+            const allClassesReview = isScheduleReviewAllClassesId(classId);
+            let savedEvents = deps.getScheduleEventsForPerson(person.id)
+                .filter(isSavedClassSessionEvent)
+                .filter((ev) => allClassesReview || String(ev?.classId || '').trim() === classId);
+            if (filterNoEnrollmentOnly) {
+                savedEvents = savedEvents.filter((ev) => ev?.hasExpectedEnrollment === false);
+            }
+            if (!savedEvents.length) {
+                const message = filterNoEnrollmentOnly
+                    ? 'No saved sessions without expected enrollment in the loaded date range.'
+                    : 'No saved class sessions found for this class in the loaded date range.';
+                if (typeof deps.uiAlert === 'function') deps.uiAlert(message, 'Review class schedule', { icon: 'info' });
+                return;
+            }
+            const drafts = (Array.isArray(deps.scheduleState.draftEventsByPersonId?.[person.id])
+                ? deps.scheduleState.draftEventsByPersonId[person.id]
+                : []).filter((ev) => ev?.isDraft === true && (allClassesReview || String(ev?.classId || '').trim() === classId));
+            const sessionsToCreate = drafts.map(draftScheduleEventToStagedSessionRow);
+            const stagingAttempts = allClassesReview
+                ? getDraftBatchesForPerson(person.id)
+                : getDraftBatchesForPerson(person.id, classId);
+            const stagedPaddingOptions = typeof deps.getStagedViewPaddingRangeOptions === 'function'
+                ? deps.getStagedViewPaddingRangeOptions()
+                : {};
+            const paddedRange = deps.scheduleCalendarCore.computeStagedSessionsViewRange(
+                savedEvents.map((ev) => ({ date: ev.date })),
+                { ...stagedPaddingOptions }
+            );
+            openPartialStagedSessionsReviewModal({
+                sessionsToCreate,
+                stagingAttempts,
+                startDate: paddedRange.startDate,
+                endDate: paddedRange.endDate,
+                viewRange: paddedRange,
+                applyToTimelineFirst: false,
+                partialClassScheduleReview: true,
+                filterNoEnrollmentOnly
+            });
+        }
+
+        async function openReviewClassScheduleClassPicker(classIds) {
+            const person = deps.activeSchedulePerson();
+            if (!person?.id || !Array.isArray(classIds) || !classIds.length) return;
+            bindScheduleClassPickerList();
+            const listEl = document.getElementById('scheduleClassPickerList');
+            const emptyEl = document.getElementById('scheduleClassPickerEmpty');
+            const searchEl = document.getElementById('scheduleClassPickerSearch');
+            const subtitleEl = document.getElementById('scheduleClassPickerSubtitle');
+            if (!listEl) return;
+            listEl.innerHTML = '<div class="schedule-class-picker-loading text-center text-muted"><div class="spinner-border spinner-border-sm text-primary mb-2" role="status" aria-hidden="true"></div><div class="small">Loading classes...</div></div>';
+            if (emptyEl) emptyEl.classList.add('d-none');
+            if (searchEl) searchEl.value = '';
+            if (subtitleEl) subtitleEl.textContent = 'Choose a class to review saved sessions.';
+            const allowed = new Set(classIds.map((id) => String(id || '').trim()).filter(Boolean));
+            try {
+                let items = await fetchInstructorClassesForPerson(person.id);
+                items = items.filter((item) => allowed.has(String(item?.id || '').trim()));
+                allowed.forEach((cid) => {
+                    if (items.some((item) => String(item?.id || '').trim() === cid)) return;
+                    const ctx = resolveScheduleStageClassContextForId(cid);
+                    items.push({
+                        id: cid,
+                        title: ctx?.classLabel || cid,
+                        lifecycle: ctx?.lifecycle || {},
+                        cycleEndDate: ctx?.cycleEndDate || '',
+                        cycleStartDate: ctx?.cycleStartDate || '',
+                        registrationMode: ctx?.registrationMode || ''
+                    });
+                });
+                scheduleStageClassPickerItems = items;
+                if (!items.length) {
+                    listEl.innerHTML = '';
+                    if (emptyEl) emptyEl.classList.remove('d-none');
+                } else {
+                    if (emptyEl) emptyEl.classList.add('d-none');
+                    const allItem = classIds.length > 1 ? renderScheduleClassPickerAllClassesItem() : '';
+                    listEl.innerHTML = `${allItem}${items.map((item) => renderScheduleClassPickerItem(item)).join('')}`;
+                }
+                getScheduleClassPickerModal()?.show();
+            } catch (err) {
+                scheduleClassPickerPickHandler = null;
+                if (typeof deps.uiAlert === 'function') deps.uiAlert(err.message || 'Unable to load classes.', 'Review class schedule', { icon: 'error' });
+            }
+        }
+
+        async function openReviewClassScheduleModal(options = {}) {
+            if (window.SessionEnrollmentCalendarModal?.isOpen?.()) return;
+            const filterNoEnrollmentOnly = options?.filterNoEnrollmentOnly === true;
+            reviewClassScheduleOpenOptions = { filterNoEnrollmentOnly };
+            const alertTitle = filterNoEnrollmentOnly
+                ? 'Sessions with no enrollment'
+                : 'Review class schedule';
+            const person = deps.activeSchedulePerson();
+            if (!person?.id) {
+                if (typeof deps.uiAlert === 'function') {
+                    deps.uiAlert('Load a teacher schedule before reviewing class sessions.', alertTitle, { icon: 'info' });
+                }
+                return;
+            }
+            if (!deps.scheduleState.loadedPersonIds.has(person.id)) {
+                if (typeof deps.uiAlert === 'function') {
+                    deps.uiAlert('Load the schedule first, then review class sessions.', alertTitle, { icon: 'info' });
+                }
+                return;
+            }
+            const classIds = filterNoEnrollmentOnly
+                ? collectClassIdsWithNoEnrollmentSavedSessions(person.id)
+                : collectClassIdsWithSavedSessions(person.id);
+            if (!classIds.length) {
+                const message = filterNoEnrollmentOnly
+                    ? 'No saved sessions without expected enrollment in the loaded date range.'
+                    : 'No saved class sessions in the loaded date range.';
+                if (typeof deps.uiAlert === 'function') deps.uiAlert(message, alertTitle, { icon: 'info' });
+                return;
+            }
+            const filterId = String(deps.scheduleState.activeClassFilterId || '').trim();
+            if (filterId && classIds.includes(filterId)) {
+                scheduleStageClassContext = resolveScheduleStageClassContextForId(filterId);
+                openReviewClassScheduleForCurrentClass();
+                return;
+            }
+            if (classIds.length === 1) {
+                scheduleStageClassContext = resolveScheduleStageClassContextForId(classIds[0]);
+                openReviewClassScheduleForCurrentClass();
+                return;
+            }
+            scheduleClassPickerPickHandler = () => {
+                openReviewClassScheduleForCurrentClass();
+            };
+            await openReviewClassScheduleClassPicker(classIds);
+        }
+
+        async function openReviewStagedSessionsModal() {
+            if (window.SessionEnrollmentCalendarModal?.isOpen?.()) return;
+            const person = deps.activeSchedulePerson();
+            if (!person?.id) {
+                if (typeof deps.uiAlert === 'function') deps.uiAlert('Load a teacher schedule before reviewing staged sessions.', 'Review staged sessions', { icon: 'info' });
+                return;
+            }
+            if (!deps.scheduleState.loadedPersonIds.has(person.id)) {
+                if (typeof deps.uiAlert === 'function') deps.uiAlert('Load the schedule first, then review staged sessions.', 'Review staged sessions', { icon: 'info' });
+                return;
+            }
+            const classIds = collectDraftClassIdsForPerson(person.id);
+            if (!classIds.length) {
+                if (typeof deps.uiAlert === 'function') deps.uiAlert('There are no staged sessions to review.', 'Review staged sessions', { icon: 'info' });
+                return;
+            }
+            const filterId = String(deps.scheduleState.activeClassFilterId || '').trim();
+            if (filterId && classIds.includes(filterId)) {
+                scheduleStageClassContext = resolveScheduleStageClassContextForId(filterId);
+                openReviewStagedSessionsForCurrentClass();
+                return;
+            }
+            if (classIds.length === 1) {
+                scheduleStageClassContext = resolveScheduleStageClassContextForId(classIds[0]);
+                openReviewStagedSessionsForCurrentClass();
+                return;
+            }
+            await openReviewStagedSessionsClassPicker(classIds);
+        }
     
         async function commitScheduleStageCreate() {
             if (!scheduleStageContext || !scheduleStageClassContext?.classId) return;
@@ -1128,44 +1570,13 @@
                 })];
                 scheduleStageEditAttemptId = '';
                 hideScheduleStageModal();
-                if (!window.SessionEnrollmentCalendarModal?.buildPartialPickerData) {
-                    if (typeof deps.uiAlert === 'function') deps.uiAlert('Calendar modal is not available on this page.', 'Stage Sessions', { icon: 'warning' });
-                    return;
-                }
-                applyDraftStagedSessionsToSchedule({
+                openPartialStagedSessionsReviewModal({
                     sessionsToCreate: sessionsWithAttempt,
                     stagingAttempts,
-                    viewRange: paddedRange
-                });
-                const existingEvents = deps.getScheduleEventsForPerson(person?.id || '')
-                    .filter((ev) => String(ev?.classId || '') === scheduleStageClassContext.classId)
-                    .filter((ev) => ev?.isDraft !== true);
-                const conflictScheduleEvents = collectScheduleConflictSessionsForPerson(person?.id || '');
-                const prefetchedPickerData = window.SessionEnrollmentCalendarModal.buildPartialPickerData({
-                    classId: scheduleStageClassContext.classId,
-                    classLabel: scheduleStageClassContext.classLabel,
-                    sessionsToCreate: result.sessions,
-                    existingEvents,
                     startDate,
                     endDate,
-                    ...stagedPaddingOptions
-                });
-                window.SessionEnrollmentCalendarModal.open({
-                    mode: 'partial',
-                    classId: scheduleStageClassContext.classId,
-                    classLabel: scheduleStageClassContext.classLabel,
-                    startDate,
-                    endDate,
-                    cycleEndDate: String(scheduleStageClassContext.cycleEndDate || '').trim(),
-                    ...stagedPaddingOptions,
-                    sessionsToCreate: sessionsWithAttempt,
-                    stagingAttempts,
-                    existingEvents,
-                    conflictScheduleEvents,
-                    prefetchedPickerData,
-                    onSave: (payload) => applyDraftStagedSessionsToSchedule(payload),
-                    onStagedSessionsChange: syncTimelineFromPartialModalDrafts,
-                    onClose: (firstStagedDate) => deps.focusScheduleTimelineOnFirstStagedSession(firstStagedDate)
+                    viewRange: paddedRange,
+                    applyToTimelineFirst: true
                 });
             } finally {
                 if (createBtn) {
@@ -2511,7 +2922,9 @@
       hideScheduleDraftEditOverlay,
       hideScheduleDraftMoveOverlay,
       openScheduleSavedSessionEditOverlay,
-      openScheduleSavedSessionMoveOverlay
+      openScheduleSavedSessionMoveOverlay,
+      openReviewStagedSessionsModal,
+      openReviewClassScheduleModal
     };
   }
 

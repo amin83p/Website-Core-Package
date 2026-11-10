@@ -766,6 +766,40 @@ body.is-schedule-draft-moving [data-event-type="schedule_draft"][data-session-id
   background: #f8f9fa;
 }
 
+.session-enrollment-calendar-dialog--class-schedule-review .session-cal-positioned-session .vertical-event-block,
+.session-enrollment-calendar-dialog--class-schedule-review .session-cal-positioned-session .event-block {
+  cursor: context-menu;
+}
+
+.session-enrollment-calendar-dialog--class-schedule-review .is-partial-class-review-compact {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 3px;
+  text-align: center;
+}
+
+.session-enrollment-calendar-dialog--class-schedule-review .session-cal-class-review-time,
+.session-enrollment-calendar-dialog--class-schedule-review .session-cal-class-review-list-time {
+  font-size: 0.62rem;
+  line-height: 1.15;
+  font-weight: 600;
+  width: 100%;
+}
+
+.session-enrollment-calendar-dialog--class-schedule-review .session-cal-class-review-list-card {
+  padding: 0.35rem 0.5rem;
+  cursor: context-menu;
+}
+
+body.session-enrollment-calendar-modal-open #scheduleSessionContextInfoModal.show,
+body.session-enrollment-calendar-modal-open #scheduleSessionAttendanceModal.show,
+body.session-enrollment-calendar-modal-open #scheduleSessionEnrollmentModal.show,
+body.session-enrollment-calendar-modal-open #scheduleSessionBulkSelectModal.show,
+body.session-enrollment-calendar-modal-open #scheduleBulkSessionDeleteModal.show {
+  z-index: 2350 !important;
+}
+
 .session-enrollment-block .session-block-teacher {
   font-weight: 600;
   white-space: nowrap;

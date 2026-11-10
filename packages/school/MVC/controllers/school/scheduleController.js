@@ -2054,15 +2054,16 @@ async function buildEventsForPersonAndRange({
             const detailsUrl = sessionId
                 ? sessionNavigationService.buildManageSessionHref(classId, { sessionId, date: sessionDate })
                 : '';
+            const expectedPersonIds = classSessionCapacityService.resolveSessionEnrollmentPersonIds({
+                classData: classDef,
+                session,
+                studentToPersonMap: scheduleStudentToPersonMap,
+                statusMap: effectiveStatusMap,
+                rollingApplicability
+            });
+            const hasExpectedEnrollment = expectedPersonIds.size > 0;
             let soloStudent = resolveSoloStudentForSession(classDef, sessionDate);
             if (soloStudent && rollingApplicability) {
-                const expectedPersonIds = classSessionCapacityService.resolveSessionEnrollmentPersonIds({
-                    classData: classDef,
-                    session,
-                    studentToPersonMap: scheduleStudentToPersonMap,
-                    statusMap: effectiveStatusMap,
-                    rollingApplicability
-                });
                 const expectedOnSession = Array.from(expectedPersonIds).some((personId) => (
                     idsEqual(personId, soloStudent.soloStudentPersonId)
                 ));
@@ -2104,6 +2105,7 @@ async function buildEventsForPersonAndRange({
                 hasOverlap: false,
                 eventType: 'class_session',
                 detailsUrl,
+                hasExpectedEnrollment,
                 isOneOnOneClass: Boolean(soloStudent),
                 soloStudentId: soloStudent?.soloStudentId || '',
                 soloStudentPersonId: soloStudent?.soloStudentPersonId || '',

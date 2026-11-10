@@ -79,6 +79,7 @@ test('schedule routes expose instructor-classes endpoint', () => {
   assert.match(controller, /listInstructorClassesForSchedule/);
   assert.match(controller, /buildRouteAccessContext\(req\)/);
   assert.match(controller, /isUserInstructorOnClass/);
+  assert.match(controller, /hasExpectedEnrollment/);
 });
 
 test('person schedule wires class picker, partial calendar, and draft events', () => {
@@ -157,12 +158,12 @@ test('commitScheduleStageCreate syncs master schedule before opening partial mod
   const staging = read('public/scripts/masterScheduleViewerStaging.js');
   const fnMatch = staging.match(/async function commitScheduleStageCreate\(\) \{[\s\S]*?\n        \}/);
   assert.ok(fnMatch, 'commitScheduleStageCreate should exist');
-  const body = fnMatch[0];
-  const applyIdx = body.indexOf('applyDraftStagedSessionsToSchedule');
-  const openIdx = body.indexOf('SessionEnrollmentCalendarModal.open');
-  assert.ok(applyIdx > -1, 'commitScheduleStageCreate should call applyDraftStagedSessionsToSchedule');
-  assert.ok(openIdx > -1, 'commitScheduleStageCreate should open partial modal');
-  assert.ok(applyIdx < openIdx, 'master schedule sync should happen before partial modal open');
+  assert.match(fnMatch[0], /openPartialStagedSessionsReviewModal/);
+  assert.match(fnMatch[0], /applyToTimelineFirst:\s*true/);
+  assert.match(
+    staging,
+    /function openPartialStagedSessionsReviewModal[\s\S]*applyToTimelineFirst[\s\S]*applyDraftStagedSessionsToSchedule[\s\S]*SessionEnrollmentCalendarModal\.open/
+  );
 });
 
 test('applyDraftStagedSessionsToSchedule clears preset range chip for padded dates', () => {
@@ -182,11 +183,12 @@ test('buildPartialPickerData excludes synced draft events from existingEvents', 
   assert.match(fnMatch[0], /ev\?\.isDraft !== true/);
 });
 
-test('commitScheduleStageCreate passes non-draft existing events to partial modal', () => {
+test('openPartialStagedSessionsReviewModal passes non-draft existing events to partial modal', () => {
   const staging = read('public/scripts/masterScheduleViewerStaging.js');
-  const fnMatch = staging.match(/async function commitScheduleStageCreate\(\) \{[\s\S]*?\n        \}/);
-  assert.ok(fnMatch, 'commitScheduleStageCreate should exist');
-  assert.match(fnMatch[0], /filter\(\(ev\) => ev\?\.isDraft !== true\)/);
+  assert.match(
+    staging,
+    /function openPartialStagedSessionsReviewModal[\s\S]*filter\(\(ev\) => ev\?\.isDraft !== true\)/
+  );
 });
 
 test('master schedule keeps stacked multi-week height for padded staged ranges', () => {
@@ -197,15 +199,27 @@ test('master schedule keeps stacked multi-week height for padded staged ranges',
   assert.doesNotMatch(source, /schedule-week-grid-multi-week/);
 });
 
-test('partial modal scrolls to first staged session week on open and focuses master schedule on close', () => {
+test('partial modal scrolls to first staged session week on open and prompts master schedule week navigation on close', () => {
   const modalSource = read('public/scripts/sessionEnrollmentCalendarModal.js');
   assert.match(modalSource, /function scrollPartialToFirstStagedSession\(/);
   assert.match(modalSource, /scrollPartialToFirstStagedSession\(\)/);
   assert.match(modalSource, /onClose: options\.onClose/);
-  assert.match(modalSource, /setTimeout\(\(\) => \{[\s\S]*onClose\(closeDate\)/);
+  assert.match(modalSource, /onClose\(closeInfo\)/);
+  assert.match(modalSource, /anchorDate/);
+  assert.match(modalSource, /partialClassScheduleReview === true[\s\S]*MasterScheduleViewerSessionContext/);
+  assert.match(modalSource, /buildPartialClassScheduleReviewBlockHtml/);
+  assert.match(modalSource, /filterNoEnrollmentOnly/);
+  assert.match(modalSource, /hasExpectedEnrollment === false/);
+  assert.match(modalSource, /hasExpectedEnrollment: ev\?\.hasExpectedEnrollment !== false/);
   const source = readMasterScheduleViewerJs();
+  const staging = read('public/scripts/masterScheduleViewerStaging.js');
+  assert.match(source, /function promptNavigateToPartialModalWeek/);
   assert.match(source, /focusScheduleTimelineOnFirstStagedSession/);
   assert.match(source, /focusStagedSessionOnNextLayout/);
   assert.match(source, /scrollSchedulePageToWeekRow/);
-  assert.match(source, /onClose:[\s\S]*focusScheduleTimelineOnFirstStagedSession/);
+  assert.match(staging, /promptNavigateToPartialModalWeek/);
+  assert.match(staging, /function openReviewStagedSessionsModal/);
+  assert.match(staging, /function openPartialStagedSessionsReviewModal/);
+  assert.match(staging, /collectClassIdsWithNoEnrollmentSavedSessions/);
+  assert.match(staging, /filterNoEnrollmentOnly/);
 });

@@ -446,12 +446,19 @@
     const manage = isManageMode();
     const onHoldPreview = isOnHoldPreviewMode();
     const partial = isPartialMode();
+    const classScheduleReview = partial && state?.partialClassScheduleReview === true;
+    const allClassesReview = partial && state?.partialAllClassesReview === true;
+    const filterNoEnrollment = classScheduleReview && state?.filterNoEnrollmentOnly === true;
     if (titleEl) {
+      const classReviewTitle = allClassesReview ? 'Review schedule (all classes)' : 'Review class schedule';
+      const classReviewFilteredTitle = `${classReviewTitle} (no enrollment)`;
       titleEl.textContent = onHoldPreview
         ? 'On-hold session preview'
         : (manage
           ? 'Manage enrollment sessions'
-          : (partial ? 'Review staged sessions' : 'Select sessions'));
+          : (classScheduleReview
+            ? (filterNoEnrollment ? classReviewFilteredTitle : classReviewTitle)
+            : (partial ? 'Review staged sessions' : 'Select sessions')));
     }
     if (hintEl) {
       hintEl.classList.toggle('d-none', false);
@@ -459,13 +466,22 @@
         ? 'Highlighted sessions will be marked N/A on attendance. Warning sessions have attendance conflicts.'
         : (manage
           ? 'Click sessions to stage N/A mark or unmark changes, then click Save changes.'
-          : (partial
-            ? 'Click empty grid space to stage sessions; adjust staged sessions, then click Apply to schedule.'
-            : 'Click empty grid space to stage sessions; click sessions to include or exclude.'));
+          : (classScheduleReview
+            ? (filterNoEnrollment
+              ? 'Showing saved sessions with no expected enrollment. Staged drafts remain visible.'
+              : (allClassesReview
+                ? 'Saved sessions from all classes in the loaded range. Pick a single class to stage new sessions from the grid.'
+                : 'Saved class sessions for this class. Staged drafts and empty grid staging still work when enabled.'))
+            : (partial
+              ? 'Click empty grid space to stage sessions; adjust staged sessions, then click Apply to schedule.'
+              : 'Click empty grid space to stage sessions; click sessions to include or exclude.')));
     }
     if (saveBtn) saveBtn.textContent = partial ? 'Apply to schedule' : 'Save selection';
     clearBtn?.classList.toggle('d-none', manage || onHoldPreview);
-    saveBtn?.classList.toggle('d-none', manage || onHoldPreview);
+    const hidePartialSave = partial && (
+      (classScheduleReview && (!(Array.isArray(state?.sessionsToCreate) && state.sessionsToCreate.length) || allClassesReview))
+    );
+    saveBtn?.classList.toggle('d-none', manage || onHoldPreview || hidePartialSave);
     doneBtn?.classList.toggle('d-none', !manage);
     bulkNaBtn?.classList.toggle('d-none', !manage);
     const quadScroll = isQuadScrollCalendarView();
@@ -504,10 +520,14 @@
   function renderPartialSessionsLegend() {
     const modalBody = qs('sessionEnrollmentCalendarLegendModalBody');
     if (!modalBody) return;
+    const filterNoEnrollment = state?.partialClassScheduleReview === true && state?.filterNoEnrollmentOnly === true;
     modalBody.innerHTML = ''
       + '<div class="session-enrollment-legend-items">'
       +   '<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch is-attendance" aria-hidden="true"></span><span>Staged session (draft)</span></div>'
       +   '<div class="session-enrollment-legend-item"><span class="session-enrollment-legend-swatch is-open" aria-hidden="true"></span><span>Existing class session</span></div>'
+      +   (filterNoEnrollment
+        ? '<div class="session-enrollment-legend-item session-enrollment-legend-hint text-muted"><i class="bi bi-funnel" aria-hidden="true"></i><span>Only sessions with no expected enrollment are shown</span></div>'
+        : '')
       +   '<div class="session-enrollment-legend-item session-enrollment-legend-hint text-muted"><i class="bi bi-mouse2" aria-hidden="true"></i><span>Click empty grid space to add more staged sessions</span></div>'
       + '</div>';
   }
@@ -2148,6 +2168,25 @@
       return;
     }
 
+    if (
+      isPartialMode()
+      && state?.partialClassScheduleReview === true
+      && eventRow
+      && eventRow.isStaged !== true
+      && sessionId
+      && global.MasterScheduleViewerSessionContext?.showFromPartialModal
+    ) {
+      event.preventDefault();
+      event.stopPropagation();
+      hideContextMenu();
+      const shown = global.MasterScheduleViewerSessionContext.showFromPartialModal({
+        sessionId,
+        classId: String(eventRow.classId || state.classId || '').trim(),
+        date: eventRow.date
+      }, event);
+      if (shown) return;
+    }
+
     const calendarDate = resolveContextMenuCalendarDate(event, sessionId);
     const weekdayAnchorDate = core.normalizeDateOnly(calendarDate);
     const showWeekdayBulkMenu = supportsWeekdayBulkContextMenu()
@@ -2625,9 +2664,23 @@
     return dates[0] || '';
   }
 
+  function resolvePartialInitialScrollDate() {
+    const staged = resolveFirstStagedSessionDate(state?.sessionsToCreate);
+    if (staged) return staged;
+    if (state?.partialClassScheduleReview === true) {
+      const dates = (Array.isArray(allEvents) ? allEvents : [])
+        .filter((row) => row?.isStaged !== true)
+        .map((row) => core.normalizeDateOnly(row?.date))
+        .filter(Boolean)
+        .sort();
+      if (dates[0]) return dates[0];
+    }
+    return core.normalizeDateOnly(state?.anchorDate || state?.viewRange?.startDate || '');
+  }
+
   function scrollPartialToFirstStagedSession() {
     if (!isPartialMode()) return false;
-    const targetDate = resolveFirstStagedSessionDate(state?.sessionsToCreate);
+    const targetDate = resolvePartialInitialScrollDate();
     if (!targetDate) return false;
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
@@ -3693,10 +3746,17 @@
         visibleIds.add(id);
       }
     });
+    let visible = inRange;
     if (enrollStart) {
-      return inRange.filter((row) => !row?.date || row.date >= enrollStart);
+      visible = visible.filter((row) => !row?.date || row.date >= enrollStart);
     }
-    return inRange;
+    if (state?.partialClassScheduleReview === true && state?.filterNoEnrollmentOnly === true) {
+      visible = visible.filter((row) => {
+        if (row?.isStaged === true) return true;
+        return row?.hasExpectedEnrollment === false;
+      });
+    }
+    return visible;
   }
 
   function captureScrollPositions() {
@@ -3760,6 +3820,38 @@
       const mode = String(btn.getAttribute('data-session-picker-view') || '').trim();
       btn.classList.toggle('active', mode === state.viewMode);
     });
+  }
+
+  function buildPartialClassScheduleReviewBlockHtml(ev, layout = {}) {
+    if (ev?.isStaged === true) {
+      return buildPartialEnrollmentBlockHtml(ev);
+    }
+    const resolved = global.MasterScheduleViewerSessionContext?.resolveSavedSession?.({
+      sessionId: ev?.sessionId,
+      classId: ev?.classId,
+      date: ev?.date
+    });
+    const build = global.MasterScheduleViewerSessionContext?.buildPositionedBlockHtml;
+    if (resolved && typeof build === 'function') {
+      return build(resolved, layout);
+    }
+    return buildPartialEnrollmentBlockHtml(ev);
+  }
+
+  function buildPartialClassScheduleReviewListDayCardHtml(ev) {
+    if (ev?.isStaged === true) {
+      return buildPartialListDayCardHtml(ev);
+    }
+    const resolved = global.MasterScheduleViewerSessionContext?.resolveSavedSession?.({
+      sessionId: ev?.sessionId,
+      classId: ev?.classId,
+      date: ev?.date
+    });
+    const build = global.MasterScheduleViewerSessionContext?.buildListDayCardHtml;
+    if (resolved && typeof build === 'function') {
+      return build(resolved);
+    }
+    return buildPartialListDayCardHtml(ev);
   }
 
   function buildPartialEnrollmentBlockHtml(ev) {
@@ -3965,8 +4057,10 @@
     }
     const quadView = isQuadScrollCalendarView();
     hostEl.classList.toggle('session-cal-four-week-quad', quadView);
+    hostEl.classList.toggle('session-cal-class-schedule-review', state?.partialClassScheduleReview === true);
     const dialogEl = qs('sessionEnrollmentCalendarModal')?.querySelector('.modal-dialog');
     dialogEl?.classList.toggle('session-enrollment-calendar-dialog--quad', quadView);
+    dialogEl?.classList.toggle('session-enrollment-calendar-dialog--class-schedule-review', state?.partialClassScheduleReview === true);
     syncAutoDayWidthMode();
     applyAutoDayWidthIfNeeded({ dayCount: getVisibleDayCountForState() });
     syncDayWidthControlVisibility();
@@ -3981,14 +4075,19 @@
       enrollmentStartDate: state.startDate || '',
       hourHeight: quadView ? 20 : undefined,
       hideTimeGutter: quadView || isStagingCalendarMode(),
-      enableTimeHover: isStagingCalendarMode()
+      enableTimeHover: isStagingCalendarMode() && state?.partialClassScheduleReview !== true
     };
     if (isManageLikeMode()) {
       calendarOptions.buildPositionedBlockHtml = (ev) => buildManageEnrollmentBlockHtml(ev);
       calendarOptions.buildListDayCardHtml = (ev) => buildManageListDayCardHtml(ev);
     } else if (isPartialMode()) {
-      calendarOptions.buildPositionedBlockHtml = (ev) => buildPartialEnrollmentBlockHtml(ev);
-      calendarOptions.buildListDayCardHtml = (ev) => buildPartialListDayCardHtml(ev);
+      if (state?.partialClassScheduleReview === true) {
+        calendarOptions.buildPositionedBlockHtml = buildPartialClassScheduleReviewBlockHtml;
+        calendarOptions.buildListDayCardHtml = buildPartialClassScheduleReviewListDayCardHtml;
+      } else {
+        calendarOptions.buildPositionedBlockHtml = (ev) => buildPartialEnrollmentBlockHtml(ev);
+        calendarOptions.buildListDayCardHtml = (ev) => buildPartialListDayCardHtml(ev);
+      }
     }
     core.renderEnrollmentCalendar(hostEl, getVisibleEvents(), calendarOptions);
     if (quadView) {
@@ -4372,21 +4471,26 @@
     bindHostResizeObserver();
 
     modalEl?.addEventListener('shown.bs.modal', () => {
+      document.body.classList.add('session-enrollment-calendar-modal-open');
       scheduleCalendarAutoFit();
     });
 
     modalEl?.addEventListener('hidden.bs.modal', () => {
+      document.body.classList.remove('session-enrollment-calendar-modal-open');
       hideStageQuickModalLayer();
       hideMarkModalLayer();
       hideBulkNaModalLayer();
       setStageOverlayLock(false);
       const onClose = state?.onClose;
       const firstStagedDate = resolveFirstStagedSessionDate(state?.sessionsToCreate);
+      const anchorDate = core.normalizeDateOnly(
+        state?.anchorDate || state?.viewRange?.anchorDate || state?.viewRange?.startDate || ''
+      );
       if (typeof onClose === 'function') {
-        const closeDate = firstStagedDate;
+        const closeInfo = { firstStagedDate, anchorDate };
         requestAnimationFrame(() => {
           setTimeout(() => {
-            try { onClose(closeDate); } catch (err) { console.error(err); }
+            try { onClose(closeInfo); } catch (err) { console.error(err); }
           }, 50);
         });
       }
@@ -4423,6 +4527,7 @@
   function buildPartialPickerData(options = {}) {
     const classId = String(options.classId || '').trim();
     const classLabel = String(options.classLabel || '').trim();
+    const allClassesReview = options.allClassesReview === true;
     const sessionsToCreate = Array.isArray(options.sessionsToCreate) ? options.sessionsToCreate : [];
     const existingEvents = Array.isArray(options.existingEvents) ? options.existingEvents : [];
     const viewRange = core.computeStagedSessionsViewRange(sessionsToCreate, {
@@ -4437,9 +4542,13 @@
       sessionsToCreate.map((row) => String(row?.sessionId || '').trim()).filter(Boolean)
     );
     const stagedSessionIds = new Set(selectedSet);
-    const stagedEvents = sessionsToCreate.map((row) => mapStagedRowToPartialEvent(row, classId, classLabel, selectedSet));
+    const stagedEvents = sessionsToCreate.map((row) => {
+      const rowClassId = String(row?.classId || classId || '').trim();
+      const rowLabel = String(row?.classLabel || row?.className || classLabel || '').trim();
+      return mapStagedRowToPartialEvent(row, rowClassId, rowLabel, selectedSet);
+    });
     const persistedEvents = existingEvents
-      .filter((ev) => String(ev?.classId || '').trim() === classId)
+      .filter((ev) => allClassesReview || String(ev?.classId || '').trim() === classId)
       .filter((ev) => ev?.isDraft !== true)
       .filter((ev) => !stagedSessionIds.has(String(ev?.sessionId || ev?.id || '').trim()))
       .filter((ev) => {
@@ -4448,16 +4557,17 @@
       })
       .map((ev) => ({
         sessionId: String(ev?.sessionId || ev?.id || '').trim(),
-        classId,
+        classId: String(ev?.classId || classId || '').trim(),
         date: core.normalizeDateOnly(ev?.date),
         start: String(ev?.start || ev?.startTime || '').trim(),
         end: String(ev?.end || ev?.endTime || '').trim(),
         durationHours: Number(ev?.duration || ev?.durationHours || 0),
         teacherName: String(ev?.teacherName || '').trim() || 'Teacher',
-        title: String(ev?.className || classLabel || '').trim(),
+        title: String(ev?.className || ev?.title || classLabel || '').trim(),
         manageable: false,
         selectable: false,
-        isStaged: false
+        isStaged: false,
+        hasExpectedEnrollment: ev?.hasExpectedEnrollment !== false
       }));
     const allPickerEvents = [...persistedEvents, ...stagedEvents];
     return {
@@ -4575,7 +4685,10 @@
         });
         return map;
       })(),
-      holdPreviewKind: String(options.previewKind || 'projected').trim()
+      holdPreviewKind: String(options.previewKind || 'projected').trim(),
+      partialClassScheduleReview: options.partialClassScheduleReview === true,
+      partialAllClassesReview: options.partialAllClassesReview === true,
+      filterNoEnrollmentOnly: options.filterNoEnrollmentOnly === true
     };
 
     if (mode === 'partial') {

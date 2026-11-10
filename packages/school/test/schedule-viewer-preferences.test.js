@@ -346,6 +346,15 @@ test('personSchedule wires workspace save and user-settings restore', () => {
   assert.doesNotMatch(source, /!canSelectAnyPerson \? buildScheduleWorkspace/);
 
   assert.match(source, /data-schedule-save-drafts/);
+  assert.match(source, /data-schedule-review-staged-sessions/);
+  assert.match(source, /data-schedule-review-class-calendar/);
+  assert.match(source, /buildScheduleReviewStagedButtonHtml/);
+  assert.match(source, /buildScheduleReviewClassCalendarButtonHtml/);
+  assert.match(source, /openReviewStagedSessionsModal/);
+  assert.match(source, /openReviewClassScheduleModal/);
+  assert.match(source, /review-no-enrollment-sessions/);
+  assert.match(source, /filterNoEnrollmentOnly: true/);
+  assert.match(source, /schedule-view-icon-btn schedule-review-class-calendar-btn/);
   assert.match(source, /data-schedule-day-size-toggle/);
   assert.match(source, /schedule-day-size-popover/);
   assert.match(source, /data-schedule-time-range-toggle/);

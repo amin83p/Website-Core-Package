@@ -1495,9 +1495,55 @@
         return scrollSchedulePageToWeekRow(weekRow);
     }
 
+    function isDateWithinScheduleRange(dateStr) {
+        const date = normalizeBulkSelectIsoDate(dateStr);
+        if (!date) return false;
+        const range = getScheduleRange();
+        const start = normalizeBulkSelectIsoDate(range.startDate);
+        const end = normalizeBulkSelectIsoDate(range.endDate);
+        if (!start || !end) return false;
+        return date >= start && date <= end;
+    }
+
+    async function promptNavigateToPartialModalWeek(closeInfo) {
+        const closePayload = (closeInfo && typeof closeInfo === 'object') ? closeInfo : { firstStagedDate: closeInfo };
+        const anchor = scheduleCalendarCore?.normalizeDateOnly?.(closePayload.anchorDate)
+            || scheduleCalendarCore?.normalizeDateOnly?.(closePayload.firstStagedDate)
+            || '';
+        if (!anchor) return;
+        const weekStart = scheduleCalendarCore?.mondayOfWeek?.(anchor) || anchor;
+        const weekEnd = scheduleCalendarCore?.addDaysIso?.(weekStart, 6) || anchor;
+        const weekLabel = scheduleCalendarCore?.formatWeekLabel
+            ? scheduleCalendarCore.formatWeekLabel(weekStart, weekEnd)
+            : anchor;
+        const confirmed = typeof uiConfirm === 'function'
+            ? await uiConfirm(
+                `Go to the week of ${weekLabel} on the master schedule?`,
+                'Review staged sessions',
+                {
+                    icon: 'info',
+                    cancelText: 'Not now',
+                    confirmText: 'Go to week',
+                    confirmClass: 'btn-primary btn-md'
+                }
+            )
+            : false;
+        if (!confirmed) return;
+        if (!isDateWithinScheduleRange(anchor)) {
+            await ensureScheduleViewRangeForBulkSelect({ startDate: weekStart, endDate: weekEnd, mode: 'draft' });
+        }
+        scheduleState.pendingStagedScrollDate = anchor;
+        scheduleState.focusStagedSessionOnNextLayout = true;
+        focusScheduleTimelineOnFirstStagedSession(anchor);
+    }
+
     function focusScheduleTimelineOnFirstStagedSession(firstStagedDate) {
         const person = activeSchedulePerson();
-        const date = scheduleCalendarCore?.normalizeDateOnly?.(firstStagedDate)
+        const date = scheduleCalendarCore?.normalizeDateOnly?.(
+            (firstStagedDate && typeof firstStagedDate === 'object')
+                ? (firstStagedDate.anchorDate || firstStagedDate.firstStagedDate)
+                : firstStagedDate
+        )
             || scheduleCalendarCore?.normalizeDateOnly?.(scheduleState.pendingStagedScrollDate)
             || getFirstDraftStagedSessionDate(person?.id)
             || '';
@@ -1549,6 +1595,8 @@
     let hideScheduleDraftMoveOverlay = function hideScheduleDraftMoveOverlay() {};
     let openScheduleSavedSessionEditOverlay = function openScheduleSavedSessionEditOverlay() {};
     let openScheduleSavedSessionMoveOverlay = function openScheduleSavedSessionMoveOverlay() {};
+    let openReviewStagedSessionsModal = function openReviewStagedSessionsModal() {};
+    let openReviewClassScheduleModal = function openReviewClassScheduleModal() {};
     let scheduleAdminUi = null;
 
     if (canDragCreateSessions && global.MasterScheduleViewerStaging && typeof global.MasterScheduleViewerStaging.install === 'function') {
@@ -1557,6 +1605,7 @@
         setDateRangeFromIso, setActiveRangeChip, schedulePersistDraftBackup,
         fetchWithScheduleTimeout, SCHEDULE_COMMIT_STAGED_API, countAllPendingDraftSessions,
         clearScheduleDraftBackup, getScheduleEventsForPerson, focusScheduleTimelineOnFirstStagedSession,
+        promptNavigateToPartialModalWeek,
         canDragCreateSessions, isScheduleOnScreenManageEnabled, SCHEDULE_DRAGGABLE_BLOCK_SELECTOR, getEventTitle,
         formatScheduleClockRange, timeToMinutes, calculatePosition, normalizeSessionStatus,
         sessionStatusMetaMap, getStatusMeta, activeSchedulePerson, refreshScheduleActiveView,
@@ -1609,6 +1658,8 @@
         if (typeof stagingExports.hideScheduleDraftMoveOverlay === 'function') hideScheduleDraftMoveOverlay = stagingExports.hideScheduleDraftMoveOverlay;
         if (typeof stagingExports.openScheduleSavedSessionEditOverlay === 'function') openScheduleSavedSessionEditOverlay = stagingExports.openScheduleSavedSessionEditOverlay;
         if (typeof stagingExports.openScheduleSavedSessionMoveOverlay === 'function') openScheduleSavedSessionMoveOverlay = stagingExports.openScheduleSavedSessionMoveOverlay;
+        if (typeof stagingExports.openReviewStagedSessionsModal === 'function') openReviewStagedSessionsModal = stagingExports.openReviewStagedSessionsModal;
+        if (typeof stagingExports.openReviewClassScheduleModal === 'function') openReviewClassScheduleModal = stagingExports.openReviewClassScheduleModal;
       }
     }
 
@@ -1636,12 +1687,34 @@
         return Array.isArray(drafts) ? drafts.length : 0;
     }
 
+    function countSavedClassSessionsForActivePerson() {
+        const person = activeSchedulePerson();
+        if (!person?.id || !scheduleState.loadedPersonIds.has(person.id)) return 0;
+        return getScheduleEventsForPerson(person.id).filter(isClassSessionScheduleEvent).length;
+    }
+
     function buildScheduleSaveDraftsButtonHtml() {
         if (!canDragCreateSessions) return '';
         const count = countActivePersonDraftSessions();
         if (!count) return '';
         const label = count === 1 ? 'Save changes' : `Save changes (${count})`;
         return `<button type="button" class="btn btn-success btn-sm schedule-save-drafts-btn" data-schedule-save-drafts title="Save staged sessions to class schedules" aria-label="${escapeHtml(label)}"><i class="bi bi-check2-circle" aria-hidden="true"></i><span>${escapeHtml(label)}</span></button>`;
+    }
+
+    function buildScheduleReviewStagedButtonHtml() {
+        if (!canDragCreateSessions) return '';
+        const count = countActivePersonDraftSessions();
+        if (!count) return '';
+        const label = 'Review staged sessions';
+        return `<button type="button" class="btn btn-outline-primary btn-sm schedule-review-staged-btn" data-schedule-review-staged-sessions title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}"><i class="bi bi-calendar2-week" aria-hidden="true"></i><span>${escapeHtml(label)}</span></button>`;
+    }
+
+    function buildScheduleReviewClassCalendarButtonHtml() {
+        if (!canDragCreateSessions) return '';
+        const savedCount = countSavedClassSessionsForActivePerson();
+        if (!savedCount) return '';
+        const label = 'Review class schedule';
+        return `<button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn schedule-review-class-calendar-btn" data-schedule-review-class-calendar title="${escapeHtml(label)}" aria-label="${escapeHtml(label)}"><i class="bi bi-calendar2-range" aria-hidden="true"></i></button>`;
     }
 
     function saveScheduleViewMode(mode) {
@@ -1886,6 +1959,33 @@
         return events.find((row) => String(row?.classId || '').trim() === classId
             && String(row?.sessionId || '').trim() === sessionId
             && String(row?.date || '').trim() === sessionDate) || null;
+    }
+
+    function resolveScheduleContextEventBySessionRef(ref = {}) {
+        const person = activeSchedulePerson();
+        if (!person?.id) return null;
+        const sessionId = String(ref.sessionId || '').trim();
+        if (!sessionId) return null;
+        const classId = String(ref.classId || '').trim();
+        const date = String(ref.date || '').trim();
+        const events = getScheduleEventsForPerson(person.id);
+        return events.find((row) => {
+            if (row?.isDraft === true) return false;
+            const sid = String(row?.sessionId || row?.id || '').trim();
+            if (sid !== sessionId) return false;
+            if (classId && String(row?.classId || '').trim() !== classId) return false;
+            if (date && String(row?.date || '').trim() !== date) return false;
+            return isClassSessionScheduleEvent(row) || isWorkSessionScheduleEvent(row);
+        }) || null;
+    }
+
+    function showScheduleSessionContextMenuFromPartialModal(ref, mouseEvent) {
+        const event = resolveScheduleContextEventBySessionRef(ref);
+        if (!event) return false;
+        hideScheduleSessionContextMenu();
+        if (typeof hideScheduleDraftSessionContextMenu === 'function') hideScheduleDraftSessionContextMenu();
+        showScheduleSessionContextMenu(event, mouseEvent);
+        return true;
     }
 
     function normalizeScheduleStatusAccessType(value) {
@@ -3109,7 +3209,7 @@
         if (!modalEl || !body || !event || !window.bootstrap?.Modal) return;
         if (subtitle) subtitle.textContent = String(event.className || event.title || '').trim();
         body.innerHTML = buildScheduleSessionContextInfoHtml(event) || '<p class="text-muted mb-0">No details are available for this item.</p>';
-        window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        showScheduleBootstrapModal(modalEl);
     }
 
     function showScheduleSessionContextMenu(event, mouseEvent) {
@@ -3149,6 +3249,7 @@
             bulkDivider?.classList.remove('d-none');
             document.getElementById('btn_scheduleSessionContextEdit')?.classList.add('d-none');
             document.getElementById('btn_scheduleSessionContextMove')?.classList.add('d-none');
+            document.getElementById('btn_scheduleSessionContextDelete')?.classList.add('d-none');
             document.getElementById('btn_scheduleSessionContextAttendance')?.classList.add('d-none');
             document.getElementById('btn_scheduleSessionContextEnrollment')?.classList.add('d-none');
             document.getElementById('btn_scheduleSessionContextAssignReport')?.classList.add('d-none');
@@ -3183,6 +3284,10 @@
             const canMoveDate = isClass && canScheduleSessionChangeDate(event);
             document.getElementById('btn_scheduleSessionContextEdit')?.classList.toggle('d-none', !quickEdit);
             document.getElementById('btn_scheduleSessionContextMove')?.classList.toggle('d-none', !(quickEdit && canMoveDate));
+            const showDelete = canDeleteClassSessions
+                && isClass
+                && readSessionManagementPolicy(event).canDelete !== false;
+            document.getElementById('btn_scheduleSessionContextDelete')?.classList.toggle('d-none', !showDelete);
             document.getElementById('btn_scheduleSessionContextAttendance')?.classList.toggle('d-none', !isClass);
             document.getElementById('btn_scheduleSessionContextEnrollment')?.classList.toggle('d-none', !isClass);
             const showAssignReport = canAssignSessionReports && isClass && event?.isDraft !== true;
@@ -3203,12 +3308,16 @@
             document.getElementById('btn_scheduleSessionContextInfo')?.classList.remove('d-none');
             document.getElementById('scheduleSessionContextStatusList')?.classList.remove('d-none');
             const mutable = isScheduleEventMutableUnderClassFocus(event);
-            ['btn_scheduleSessionContextEdit', 'btn_scheduleSessionContextMove'].forEach((btnId) => {
+            const classFilterAllowed = isScheduleSessionDeleteAllowedForClassFilter(event);
+            ['btn_scheduleSessionContextEdit', 'btn_scheduleSessionContextMove', 'btn_scheduleSessionContextDelete'].forEach((btnId) => {
                 const btn = document.getElementById(btnId);
                 if (!btn || btn.classList.contains('d-none')) return;
-                btn.disabled = !mutable;
-                btn.classList.toggle('disabled', !mutable);
-                btn.setAttribute('aria-disabled', mutable ? 'false' : 'true');
+                const allowed = btnId === 'btn_scheduleSessionContextDelete'
+                    ? (mutable && classFilterAllowed)
+                    : mutable;
+                btn.disabled = !allowed;
+                btn.classList.toggle('disabled', !allowed);
+                btn.setAttribute('aria-disabled', allowed ? 'false' : 'true');
             });
         }
         const menuWidth = 280;
@@ -3260,7 +3369,7 @@
         }
         if (openSessionEl) openSessionEl.href = buildSessionManagerUrlForEvent(event);
         if (openMatrixEl) openMatrixEl.href = buildAttendanceMatrixUrlForSession(event);
-        scheduleSessionAttendanceModalInstance?.show();
+        showScheduleBootstrapModal(modalEl);
         try {
             await loadScheduleSessionAttendanceModal(event);
         } catch (error) {
@@ -3324,7 +3433,7 @@
             scheduleSessionEnrollmentModalInstance = window.bootstrap.Modal.getOrCreateInstance(modalEl);
         }
         if (openSessionEl) openSessionEl.href = buildSessionManagerUrlForEvent(event);
-        scheduleSessionEnrollmentModalInstance?.show();
+        showScheduleBootstrapModal(modalEl);
         try {
             await loadScheduleSessionEnrollmentModal(event, { useCurrentDate: false });
         } catch (error) {
@@ -3525,6 +3634,15 @@
             clickEvent.preventDefault();
             hideScheduleSessionContextMenu();
             void openScheduleBulkSessionDeleteModal();
+        });
+        document.getElementById('btn_scheduleSessionContextDelete')?.addEventListener('click', (clickEvent) => {
+            clickEvent.preventDefault();
+            const event = scheduleSessionContextEvent;
+            hideScheduleSessionContextMenu();
+            if (!event) return;
+            const payload = buildSavedSessionDeletePayloadFromEvent(event);
+            if (!payload) return;
+            void openScheduleBulkSessionDeleteModal({ payload });
         });
         document.getElementById('btn_scheduleSessionContextInfo')?.addEventListener('click', (clickEvent) => {
             clickEvent.preventDefault();
@@ -4088,7 +4206,7 @@
         if (!scheduleSessionBulkSelectModalInstance && window.bootstrap?.Modal) {
             scheduleSessionBulkSelectModalInstance = window.bootstrap.Modal.getOrCreateInstance(modalEl);
         }
-        scheduleSessionBulkSelectModalInstance?.show();
+        showScheduleBootstrapModal(modalEl);
     }
 
     async function applyScheduleSessionBulkSelectModal() {
@@ -4234,6 +4352,25 @@
         }).filter((row) => row.sessionId);
         if (!classId || !sessions.length) return null;
         return { classId, sessions };
+    }
+
+    function buildSavedSessionDeletePayloadFromEvent(event) {
+        if (!isClassSessionScheduleEvent(event)) return null;
+        const classId = String(event?.classId || '').trim();
+        const sessionId = String(event?.sessionId || event?.id || '').trim();
+        const sessionDate = String(event?.date || event?.sessionDate || '').trim();
+        if (!classId || !sessionId || !sessionDate) return null;
+        return {
+            classId,
+            sessions: [{ sessionId, sessionDate }]
+        };
+    }
+
+    function isScheduleSessionDeleteAllowedForClassFilter(event) {
+        const filterId = String(scheduleState.activeClassFilterId || '').trim();
+        const eventClassId = String(event?.classId || '').trim();
+        if (!filterId) return true;
+        return Boolean(eventClassId && eventClassId === filterId);
     }
 
     function buildScheduleSelectionChipHtml() {
@@ -4383,8 +4520,7 @@
         confirmBtn.disabled = true;
         confirmBtn.onclick = null;
 
-        const bsModal = window.bootstrap?.Modal ? window.bootstrap.Modal.getOrCreateInstance(modalEl) : null;
-        bsModal?.show();
+        showScheduleBootstrapModal(modalEl);
 
         let previewPayload = null;
         let actionStateId = '';
@@ -4445,7 +4581,7 @@
                             await acknowledgeLocalScheduleMutation(person);
                             refreshScheduleActiveView();
                         }
-                        bsModal?.hide();
+                        hideScheduleBootstrapModal(modalEl);
                         const summaryMessage = String(deletePayload.message || 'Selected sessions deleted.');
                         const blocked = Array.isArray(result.blocked) ? result.blocked : [];
                         if (typeof uiAlert === 'function') {
@@ -4461,7 +4597,7 @@
                             bodyEl.innerHTML = renderBulkSessionDeletePreviewHtml(blockedPlan);
                             confirmBtn.classList.add('d-none');
                             confirmBtn.disabled = true;
-                            bsModal?.show();
+                            showScheduleBootstrapModal(modalEl);
                         } else {
                             refreshScheduleActiveView();
                         }
@@ -4794,8 +4930,36 @@
         });
     }
 
+    const SCHEDULE_CHILD_MODAL_ABOVE_ENROLLMENT_Z = 2350;
+
+    function isSessionEnrollmentCalendarModalOpen() {
+        if (typeof global.SessionEnrollmentCalendarModal?.isOpen === 'function') {
+            return global.SessionEnrollmentCalendarModal.isOpen();
+        }
+        const calendarEl = document.getElementById('sessionEnrollmentCalendarModal');
+        return Boolean(calendarEl && calendarEl.classList.contains('show'));
+    }
+
+    function elevateScheduleChildModalAboveEnrollmentCalendar(modalEl) {
+        if (!modalEl || !isSessionEnrollmentCalendarModalOpen()) return;
+        const calendarEl = document.getElementById('sessionEnrollmentCalendarModal');
+        const calendarZ = Number.parseInt(window.getComputedStyle(calendarEl || modalEl).zIndex, 10);
+        const baseZ = Number.isFinite(calendarZ) && calendarZ > 0 ? calendarZ : 1055;
+        const modalZ = Math.max(baseZ + 20, SCHEDULE_CHILD_MODAL_ABOVE_ENROLLMENT_Z);
+        modalEl.style.zIndex = String(modalZ);
+        const backdrops = document.querySelectorAll('.modal-backdrop');
+        const backdropEl = backdrops.length ? backdrops[backdrops.length - 1] : null;
+        const backdropZ = modalZ - 10;
+        if (backdropEl) backdropEl.style.zIndex = String(backdropZ);
+    }
+
     function showScheduleBootstrapModal(modalEl) {
         if (!modalEl || !window.bootstrap?.Modal) return;
+        if (isSessionEnrollmentCalendarModalOpen()) {
+            modalEl.addEventListener('shown.bs.modal', () => {
+                elevateScheduleChildModalAboveEnrollmentCalendar(modalEl);
+            }, { once: true });
+        }
         window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
     }
 
@@ -6128,6 +6292,10 @@
             if (action === 'manage-enrollment' && typeof manageEnrollmentRailHandler === 'function') {
                 void manageEnrollmentRailHandler();
             }
+            if (action === 'review-no-enrollment-sessions') {
+                void openReviewClassScheduleModal({ filterNoEnrollmentOnly: true });
+                return;
+            }
             if (action === 'move-enrollments' && typeof moveSessionsRailHandler === 'function') {
                 void moveSessionsRailHandler();
             }
@@ -6510,7 +6678,7 @@
     }
 
     function scheduleGridToolbarControlsHtml() {
-        return buildScheduleSaveDraftsButtonHtml();
+        return `${buildScheduleReviewStagedButtonHtml()}${buildScheduleSaveDraftsButtonHtml()}`;
     }
 
     function scheduleLegendItemsForMode(mode) {
@@ -6615,6 +6783,7 @@
             ? scheduleStagedPaddingPopoverHostHtml()
             : '';
         const hideEmptyDaysButton = showWeekGridControls ? scheduleHideEmptyDaysButtonHtml() : '';
+        const classCalendarReviewButton = showWeekGridControls ? buildScheduleReviewClassCalendarButtonHtml() : '';
         const row2RightControls = showWeekGridControls
             ? `<div class="schedule-viewbar-grid-controls">${scheduleGridToolbarControlsHtml()}</div>`
             : '';
@@ -6632,6 +6801,7 @@
                     ${daySizeControl}
                     ${switchButtons}
                         ${hideEmptyDaysButton}
+                        ${classCalendarReviewButton}
                         <button type="button" class="btn btn-sm btn-outline-secondary schedule-view-icon-btn" data-schedule-open-legend aria-label="Legend" title="Legend"><i class="bi bi-info-circle" aria-hidden="true"></i></button>
                     </div>
                 </div>
@@ -7661,6 +7831,20 @@ if (canLoadAllSchedules) {
             clearAllScheduleSelections();
             return;
         }
+        const reviewClassCalendarButton = event.target.closest('[data-schedule-review-class-calendar]');
+        if (reviewClassCalendarButton) {
+            event.preventDefault();
+            if (window.SessionEnrollmentCalendarModal?.isOpen?.()) return;
+            void openReviewClassScheduleModal();
+            return;
+        }
+        const reviewStagedButton = event.target.closest('[data-schedule-review-staged-sessions]');
+        if (reviewStagedButton) {
+            event.preventDefault();
+            if (window.SessionEnrollmentCalendarModal?.isOpen?.()) return;
+            void openReviewStagedSessionsModal();
+            return;
+        }
         const saveDraftsButton = event.target.closest('[data-schedule-save-drafts]');
         if (saveDraftsButton) {
             event.preventDefault();
@@ -7983,7 +8167,63 @@ if (canLoadAllSchedules) {
                 `;
     }
 
+    function buildSchedulePartialClassReviewCompactInner(ev, layout = {}, orientation = 'vertical') {
+        const scd = window.ScheduleCompletionDisplay;
+        const cssClass = scheduleEventRoleClass(ev);
+        const scan = scd ? scd.resolveScheduleCompletionScan(ev, sessionStatusMetaMap) : null;
+        const isTimeline = orientation === 'timeline';
+        const baseTag = isTimeline ? 'event-block' : 'vertical-event-block';
+        const overlapLaneClass = Number(layout?.trackCount || 1) > 1 ? ' is-schedule-overlap-lane' : '';
+        const blockClasses = scd
+            ? scd.buildScheduleBlockClasses(scan, `${baseTag} ${cssClass}${overlapLaneClass} is-partial-class-review-compact`)
+            : `${baseTag} ${cssClass}${overlapLaneClass} is-partial-class-review-compact`;
+        const unselectableClass = buildScheduleSessionUnselectableClass(ev);
+        const mutedClass = buildScheduleClassFilterMutedClass(ev);
+        const clickHandler = buildScheduleSessionBlockClickHandler(ev);
+        const tipLabel = buildScheduleEventTooltip(ev, sessionStatusMetaMap, scan);
+        const tipStyle = scheduleStatusTipStyle(ev, sessionStatusMetaMap);
+        const inset = isTimeline ? 'position:absolute;inset:2px 2px 2px 2px;' : 'position:absolute;inset:2px;';
+        return `
+            <div class="${blockClasses}${unselectableClass}${mutedClass}"
+                 style="${mergeScheduleBlockLayoutStyle(inset, scan)}"
+                 ${buildScheduleSessionContextDataAttrs(ev)}
+                 data-tip="${escapeHtml(tipLabel)}"
+                 data-tip-bg="${escapeHtml(tipStyle.bg)}"
+                 data-tip-fg="${escapeHtml(tipStyle.fg)}"
+                 data-tip-border="${escapeHtml(tipStyle.border)}"
+                 aria-label="${escapeHtml(tipLabel)}"
+                 tabindex="0"
+                 ${clickHandler}>
+                <div class="event-meta session-cal-class-review-time">${buildScheduleEventTimeRangeHtml(ev.start, ev.end)}</div>
+            </div>
+        `;
+    }
+
+    function buildSchedulePartialClassReviewListDayCardHtml(ev) {
+        const scd = window.ScheduleCompletionDisplay;
+        const cssClass = scheduleEventRoleClass(ev);
+        const scan = scd ? scd.resolveScheduleCompletionScan(ev, sessionStatusMetaMap) : null;
+        const rowClasses = scd
+            ? scd.buildScheduleBlockClasses(scan, `session-day-card session-cal-class-review-list-card ${cssClass} is-partial-class-review-compact`)
+            : `session-day-card session-cal-class-review-list-card ${cssClass} is-partial-class-review-compact`;
+        const unselectableClass = buildScheduleSessionUnselectableClass(ev);
+        const mutedClass = buildScheduleClassFilterMutedClass(ev);
+        const tipLabel = buildScheduleEventTooltip(ev, sessionStatusMetaMap, scan);
+        return `
+            <div class="${rowClasses}${unselectableClass}${mutedClass}"
+                 ${buildScheduleSessionContextDataAttrs(ev)}
+                 aria-label="${escapeHtml(tipLabel)}"
+                 tabindex="0">
+                <div class="session-cal-class-review-list-time">${escapeHtml(formatScheduleClockRange(ev?.start, ev?.end))}</div>
+            </div>
+        `;
+    }
+
     function buildSchedulePositionedBlockHtml(ev, layout = {}) {
+        if (layout?.partialClassReviewCompact === true) {
+            const mode = String(layout?.mode || '').trim();
+            return buildSchedulePartialClassReviewCompactInner(ev, layout, mode === 'timeline' ? 'timeline' : 'vertical');
+        }
         const mode = String(layout?.mode || '').trim();
         if (mode === 'timeline') return buildScheduleHorizontalBlockInner(ev, layout);
         return buildScheduleVerticalBlockInner(ev, layout);
@@ -8701,6 +8941,17 @@ if (canLoadAllSchedules) {
     bindScheduleAdminWeekRail();
     syncScheduleOnScreenManageRailButton();
     if (typeof bindScheduleDraftUnloadGuard === 'function') bindScheduleDraftUnloadGuard();
+  if (canSelectAnyPerson || canDragCreateSessions) {
+        global.MasterScheduleViewerSessionContext = {
+            showFromPartialModal: showScheduleSessionContextMenuFromPartialModal,
+            resolveSavedSession: resolveScheduleContextEventBySessionRef,
+            buildPositionedBlockHtml: (ev, layout = {}) => buildSchedulePositionedBlockHtml(ev, {
+                ...layout,
+                partialClassReviewCompact: true
+            }),
+            buildListDayCardHtml: buildSchedulePartialClassReviewListDayCardHtml
+        };
+    }
     void initializeScheduleViewer();
 
 

@@ -142,6 +142,7 @@ test('personSchedule includes master schedule person note script', () => {
   const adminView = readPersonScheduleAdminBundle();
   const selfView = readPersonScheduleSelfBundle();
   assert.match(adminView, /data-schedule-admin-action="person-schedule-note"/);
+  assert.match(adminView, /data-schedule-admin-action="review-no-enrollment-sessions"/);
   assert.match(adminView, /masterSchedulePersonNote\.js/);
   assert.doesNotMatch(selfView, /masterSchedulePersonNote\.js/);
 });

@@ -37,6 +37,12 @@
       <span>Move session</span>
     </button>
     <% } %>
+    <% if (canDeleteClassSessions) { %>
+    <button type="button" class="schedule-session-context-action d-none" id="btn_scheduleSessionContextDelete" role="menuitem">
+      <i class="bi bi-trash3" aria-hidden="true"></i>
+      <span>Delete session</span>
+    </button>
+    <% } %>
     <button type="button" class="schedule-session-context-action" id="btn_scheduleSessionContextAttendance" role="menuitem">
       <i class="bi bi-clipboard2-check" aria-hidden="true"></i>
       <span>Attendance List</span>

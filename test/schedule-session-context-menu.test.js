@@ -28,6 +28,9 @@ test('person schedule includes session context menu and modal hooks', () => {
   assert.match(view, /btn_scheduleSessionEnrollmentRefreshCurrent/);
   assert.match(view, /attendanceMarkAppearanceClient\.js/);
   assert.match(view, /data-event-type="class_session"/);
+  assert.match(view, /id="btn_scheduleSessionContextDelete"/);
+  assert.match(view, /buildSavedSessionDeletePayloadFromEvent/);
+  assert.match(view, /btn_scheduleSessionContextDelete/);
 });
 
 test('schedule routes register session context list APIs', () => {
