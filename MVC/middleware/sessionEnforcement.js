@@ -84,9 +84,8 @@ function shouldUpdateCurrentPath(session = {}, currentPath = '', now = new Date(
     if (heartbeatDue) return true;
     if (nextPath === previousPath) return false;
 
-    const lastUpdated = toValidDate(session.currentPathUpdatedAt);
-    if (!lastUpdated) return true;
-    return (now - lastUpdated) >= CURRENT_PATH_UPDATE_THROTTLE_MS;
+    // Always record real navigations (different path) so Active Users reflects the current screen.
+    return true;
 }
 
 function shouldTrackCurrentPathForRequest(req) {

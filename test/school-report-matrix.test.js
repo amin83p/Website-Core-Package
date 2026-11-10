@@ -10,6 +10,9 @@ const reportInstanceSaveService = require('../packages/school/MVC/services/schoo
 const reportIntegrityService = require('../packages/school/MVC/services/school/reportIntegrityService');
 const schoolDataService = require('../packages/school/MVC/services/school/schoolDataService');
 const sessionReportInstanceService = require('../packages/school/MVC/services/school/sessionReportInstanceService');
+const reportViewService = require('../packages/school/MVC/services/school/reportViewService');
+const reportInstanceLivePrefillResetService = require('../packages/school/MVC/services/school/reportInstanceLivePrefillResetService');
+const sessionConductService = require('../packages/school/MVC/services/school/sessionConductService');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 
@@ -592,6 +595,8 @@ test('report matrix routes and UI expose bulk actions, grouping, and accessible 
   assert.match(read('packages/school/MVC/controllers/school/reportController.js'), /matrixAction === 'lock'[\s\S]*reportMatrixService\.lockMatrixRows/);
   assert.match(routes, /\/instances\/matrix\/:assignmentId\/prefill-preview/);
   assert.match(routes, /\/instances\/matrix\/:assignmentId\/prefill-apply/);
+  assert.match(routes, /\/instances\/matrix\/:assignmentId\/reset-from-live/);
+  assert.match(routes, /\/instances\/edit\/:id\/reset-from-live/);
   assert.match(routes, /\/instances\/matrix\/:assignmentId\/export/);
   assert.match(routes, /requireReportMatrixEditorAccess/);
   assert.match(matrixView, /matrix-student-col/);
@@ -616,6 +621,8 @@ test('report matrix routes and UI expose bulk actions, grouping, and accessible 
   assert.doesNotMatch(matrixView, /data-matrix-bulk-summary/);
   assert.ok(matrixView.indexOf('id="reportMatrixActions"') > matrixView.indexOf('id="reportMatrixStudentReports"'));
   assert.match(matrixView, /Preview Prefill Updates/);
+  assert.match(matrixView, /btnMatrixResetFromLive/);
+  assert.match(matrixView, /Reset from live data/);
   assert.match(matrixView, /Export DOCX/);
   assert.match(matrixView, /Export Payload/);
   assert.match(matrixView, /reportMatrixPrefillModal/);
@@ -703,4 +710,51 @@ test('report matrix EJS renders supported controls and locked row state', async 
   assert.match(html, /data-tip="Enter the session score/);
   const matrixThead = html.match(/<thead class="table-light">[\s\S]*?<\/thead>/)?.[0] || '';
   assert.doesNotMatch(matrixThead, /data-matrix-field-id="prefill_only"[\s\S]*js-matrix-column-apply-all/);
+});
+
+test('matrix reset from live skips locked rows and resets editable draft instances', async () => {
+  const assignment = {
+    id: 'ASN-1', assignmentRowId: 'ROW-1', orgId: '900000', classId: 'CLS-1', sessionId: 'SES-1',
+    sessionDate: '2026-07-14', reportScope: 'selected_students', templateId: 'TPL-1', sharedAnswers: {}
+  };
+  const template = {
+    id: 'TPL-1', title: 'Progress', schema: { fields: [{ id: 'comment', type: 'text', prefillKey: 'note' }] }
+  };
+  const instances = [
+    { id: 'INS-1', assignmentId: 'ASN-1', assignmentRowId: 'ROW-1', teacherId: 'TEACHER-1', studentId: 'STU-1', targetKey: 'student:STU-1', status: 'draft', answers: { comment: 'stale' }, prefillSnapshot: { note: 'old' } },
+    { id: 'INS-2', assignmentId: 'ASN-1', assignmentRowId: 'ROW-1', teacherId: 'TEACHER-1', studentId: 'STU-2', targetKey: 'student:STU-2', status: 'locked', answers: {}, prefillSnapshot: {} }
+  ];
+  const resetIds = [];
+  await withPatched(reportIntegrityService, {
+    resolveStartInstanceContext: async () => ({
+      assignment, assignmentRow: { rowId: 'ROW-1' }, template, classData: { id: 'CLS-1', title: 'Class A' },
+      teacherId: 'TEACHER-1', targetStudentIds: ['STU-1', 'STU-2', 'STU-3']
+    })
+  }, async () => {
+    await withPatched(sessionConductService, {
+      assertAssignmentSessionConductReadyOrThrow: async () => {}
+    }, async () => {
+    await withPatched(schoolDataService, {
+      fetchData: async () => instances
+    }, async () => {
+      await withPatched(reportViewService, {
+        canEditReportInstanceAnswers: async (instance) => String(instance.status || '').toLowerCase() !== 'locked'
+      }, async () => {
+        await withPatched(reportInstanceLivePrefillResetService, {
+          applyFullLivePrefillToInstance: async ({ instance }) => {
+            resetIds.push(instance.id);
+          }
+        }, async () => {
+          const result = await reportMatrixService.resetMatrixFromLivePrefill({
+            assignmentId: 'ASN-1', assignmentRowId: 'ROW-1', teacherId: 'TEACHER-1', reqUser: { id: 'USER-1', activeOrgId: '900000' }
+          });
+          assert.deepEqual(result.summary, { total: 3, succeeded: 1, skipped: 2, failed: 0 });
+          assert.equal(resetIds.length, 1);
+          assert.equal(resetIds[0], 'INS-1');
+          assert.equal(result.results.find((row) => row.studentId === 'STU-2').status, 'skipped');
+        });
+      });
+    });
+    });
+  });
 });

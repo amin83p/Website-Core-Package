@@ -88,6 +88,7 @@ function isHtmlNavigationRequest(req) {
   const pathname = sanitizeCurrentPath(req?.originalUrl || req?.url || req?.path || '');
   if (!pathname) return false;
   if (pathname.startsWith('/uploads/')) return false;
+  if (pathname === '/chat' || pathname.startsWith('/chat/')) return false;
   const ext = getExtension(pathname);
   return !STATIC_PATH_EXTENSIONS.has(ext);
 }

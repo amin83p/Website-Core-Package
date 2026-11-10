@@ -12,6 +12,7 @@ const { getPrefillValue } = require('./reportPrefillKeyUtils');
 const matrixWindowService = require('./matrixWindowService');
 const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
 const classAttendanceRosterOrderService = require('./classAttendanceRosterOrderService');
+const reportInstanceLivePrefillResetService = require('./reportInstanceLivePrefillResetService');
 
 const VISUAL_TYPES = new Set(['section', 'subheader', 'row_break']);
 const STUDENT_NAME_KEYS = new Set([
@@ -1009,6 +1010,68 @@ async function applyMatrixPrefill({ assignmentId, assignmentRowId = '', teacherI
   return { results, matrix, summary: { total: requested.length, succeeded: results.filter((r) => r.status === 'success').length, skipped: results.filter((r) => r.status === 'skipped').length, failed: results.filter((r) => r.status === 'error').length } };
 }
 
+async function resetMatrixFromLivePrefill({ assignmentId, assignmentRowId = '', teacherId = '', reqUser } = {}) {
+  const source = await resolveMatrixData({ assignmentId, assignmentRowId, teacherId, reqUser });
+  const results = [];
+  for (const studentId of source.targetStudentIds) {
+    const instance = findMatchingInstance(source.instances, {
+      assignmentId: source.assignment.id,
+      assignmentRowId: source.assignmentRowId,
+      teacherId: source.resolvedTeacherId,
+      studentId
+    });
+    if (!instance) {
+      results.push({ studentId, status: 'skipped', message: 'Pending student has no stored report instance.' });
+      continue;
+    }
+    const statusLower = clean(instance.status).toLowerCase();
+    if (statusLower === 'locked') {
+      results.push({ studentId, status: 'skipped', message: 'Locked report instance was skipped.' });
+      continue;
+    }
+    const allowed = await reportViewService.canEditReportInstanceAnswers(instance, reqUser);
+    if (!allowed) {
+      results.push({
+        studentId,
+        status: 'skipped',
+        message: statusLower === 'submitted'
+          ? 'Submitted report instance was skipped.'
+          : 'This report instance cannot be edited.'
+      });
+      continue;
+    }
+    try {
+      await reportInstanceLivePrefillResetService.applyFullLivePrefillToInstance({
+        instance,
+        template: source.template,
+        assignment: source.assignment,
+        reqUser,
+        persist: true
+      });
+      results.push({ studentId, status: 'success' });
+    } catch (error) {
+      results.push({ studentId, status: 'error', message: error?.message || 'Reset failed.' });
+    }
+  }
+  const matrix = await buildMatrixContext({
+    assignmentId,
+    assignmentRowId: source.assignmentRowId,
+    teacherId: source.resolvedTeacherId,
+    reqUser,
+    windowParams: { applyWindow: false }
+  });
+  return {
+    results,
+    matrix,
+    summary: {
+      total: source.targetStudentIds.length,
+      succeeded: results.filter((r) => r.status === 'success').length,
+      skipped: results.filter((r) => r.status === 'skipped').length,
+      failed: results.filter((r) => r.status === 'error').length
+    }
+  };
+}
+
 async function buildMatrixExportPayload({ assignmentId, assignmentRowId = '', teacherId = '', reqUser } = {}) {
   const source = await resolveMatrixData({ assignmentId, assignmentRowId, teacherId, reqUser });
   const matrix = await buildMatrixContext({
@@ -1102,5 +1165,6 @@ module.exports = {
   lockMatrixRows,
   buildMatrixPrefillPreview,
   applyMatrixPrefill,
+  resetMatrixFromLivePrefill,
   buildMatrixExportPayload
 };

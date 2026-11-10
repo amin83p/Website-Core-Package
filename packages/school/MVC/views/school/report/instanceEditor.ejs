@@ -2,6 +2,8 @@
   const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
   const reportScopeToken = String(assignment?.reportScope || '').trim().toLowerCase();
   const studentTargetedScope = reportScopeToken === 'each_student' || reportScopeToken === 'selected_students';
+  const requestedEditorVariant = String(typeof editorVariant === 'undefined' ? '' : editorVariant).trim().toLowerCase();
+  const isV2 = requestedEditorVariant === 'v2';
   const orderedFieldsList = fields;
   const hasSharedFields = studentTargetedScope && fields.some((f) => f?.sharedAcrossStudents === true);
   const validation = (typeof validationSummary !== 'undefined' && validationSummary && typeof validationSummary === 'object')
@@ -62,8 +64,6 @@
   const allocNum = Number(assignment?.allocatedHours);
   const allocDisplay = tsReflect && Number.isFinite(allocNum) && allocNum > 0 ? Number(allocNum.toFixed(2)) : '';
   const dtl = typeof instanceDetails !== 'undefined' && instanceDetails && typeof instanceDetails === 'object' ? instanceDetails : {};
-  const requestedEditorVariant = String(typeof editorVariant === 'undefined' ? '' : editorVariant).trim().toLowerCase();
-  const isV2 = requestedEditorVariant === 'v2';
   const reviewNav = (typeof reportReviewNavigator !== 'undefined' && reportReviewNavigator && typeof reportReviewNavigator === 'object')
     ? reportReviewNavigator
     : { rows: [], currentIndex: -1, olderCount: 0, olderHref: '', newerHref: '' };
@@ -690,7 +690,7 @@
 
     <div class="card border-0 shadow-sm">
       <div class="card-body py-2">
-        <div class="d-flex flex-wrap align-items-center gap-2">
+        <div class="d-flex flex-wrap align-items-center gap-2 w-100">
           <% const saveDraftDisabled = isSubmitted || isLocked || isReadOnly; %>
           <% const submitDisabled = isLocked || isReadOnly; %>
           <% const lockDisabled = isLocked || isReadOnly; %>
@@ -769,6 +769,14 @@
               <% } %>
             </div>
           </div>
+          <% if (!isReadOnly && !isLocked) { %>
+            <button
+              type="button"
+              class="btn btn-outline-danger btn-sm ms-md-auto"
+              id="btnInstanceResetFromLive"
+              title="Reload prefill-linked fields from current session and attendance data"
+            ><i class="bi bi-arrow-clockwise me-1"></i>Reset from live data</button>
+          <% } %>
         </div>
       </div>
     </div>
@@ -1318,6 +1326,55 @@
         });
       }
     }
+
+    async function resetInstanceFromLiveData() {
+      const confirmed = window.ReportMessaging?.confirmReportAction
+        ? await window.ReportMessaging.confirmReportAction({
+          title: 'Reset from live data?',
+          message: 'Unsaved edits on this form will be lost. Prefill-linked fields will be overwritten from current session and attendance data.',
+          confirmText: 'Reset from live data',
+          confirmClass: 'btn-danger'
+        })
+        : window.confirm('Reset this report from live data? Unsaved form edits will be lost.');
+      if (!confirmed) return;
+      const resetBtn = document.getElementById('btnInstanceResetFromLive');
+      if (resetBtn) resetBtn.disabled = true;
+      const token = showLoadingToken({
+        title: 'Resetting from Live Data',
+        note: 'Please wait while report fields are reloaded.',
+        operation: 'Report Instance'
+      });
+      try {
+        const actionStateId = String(document.getElementById('reportInstanceActionStateId')?.value || '').trim();
+        const response = await fetch(`/school/reports/instances/edit/${encodeURIComponent(instanceId)}/reset-from-live`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-AJAX-Request': 'true',
+            Accept: 'application/json',
+            'x-action-state-id': actionStateId
+          },
+          body: JSON.stringify({ actionStateId })
+        });
+        const result = await readJsonResponse(response, 'Could not reset from live data.');
+        hideLoadingToken(token);
+        await showReportInstanceMessage({
+          title: 'Reset from Live Data',
+          icon: 'success',
+          message: result.message || 'Report fields were reset from live data.'
+        });
+        window.location.reload();
+      } catch (error) {
+        hideLoadingToken(token);
+        await showReportInstanceMessage({
+          title: 'Reset from Live Data Failed',
+          icon: 'error',
+          message: error.message || 'Could not reset from live data.'
+        });
+        if (resetBtn) resetBtn.disabled = false;
+      }
+    }
+    document.getElementById('btnInstanceResetFromLive')?.addEventListener('click', resetInstanceFromLiveData);
 
     function isVisualOnlyField(field) {
       const t = String(field?.type || '').trim().toLowerCase();

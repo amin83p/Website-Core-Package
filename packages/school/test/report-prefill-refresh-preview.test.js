@@ -2,6 +2,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const reportPrefillRefreshPreviewService = require('../MVC/services/school/reportPrefillRefreshPreviewService');
+const reportInstanceLivePrefillResetService = require('../MVC/services/school/reportInstanceLivePrefillResetService');
+const reportIntegrityService = require('../MVC/services/school/reportIntegrityService');
+const schoolDataService = require('../MVC/services/school/schoolDataService');
 const reportService = require('../MVC/services/school/reportService');
 
 const previewTemplate = {
@@ -63,4 +66,87 @@ test('prefill preview diffs live merge ignoring renderCache', async (t) => {
   const sub = row.fields[0];
   assert.equal(sub.currentValue, 'Saved title');
   assert.equal(sub.newValue, 'Fresh title');
+});
+
+function withPatched(target, replacements, callback) {
+  const originals = {};
+  Object.entries(replacements).forEach(([key, value]) => {
+    originals[key] = target[key];
+    target[key] = value;
+  });
+  return Promise.resolve()
+    .then(callback)
+    .finally(() => {
+      Object.entries(originals).forEach(([key, value]) => {
+        target[key] = value;
+      });
+    });
+}
+
+test('resetInstanceFromLivePrefill rejects locked instances', async () => {
+  await withPatched(reportIntegrityService, {
+    getEditableInstanceOrThrow: async () => {
+      const error = new Error('This report is locked and cannot be edited.');
+      error.statusCode = 403;
+      throw error;
+    }
+  }, async () => {
+    await assert.rejects(
+      () => reportInstanceLivePrefillResetService.resetInstanceFromLivePrefill({
+        instanceId: 'RINS_LOCKED',
+        reqUser: { id: 'u1' }
+      }),
+      (err) => err.statusCode === 403
+    );
+  });
+});
+
+test('resetInstanceFromLivePrefill updates draft instance from live prefill merge', async () => {
+  const instance = {
+    id: 'RINS_RESET_1',
+    templateId: 'TPL_PRE_1',
+    assignmentId: 'ASG_P1',
+    studentId: 'STU-1',
+    teacherId: 'T1',
+    status: 'draft',
+    answers: { title_field: 'Stale answer' },
+    prefillSnapshot: { report_title: 'Saved title' },
+    audit: {}
+  };
+  const updates = [];
+  await withPatched(reportIntegrityService, {
+    getEditableInstanceOrThrow: async () => instance
+  }, async () => {
+    await withPatched(schoolDataService, {
+      getDataById: async (entityType, id) => {
+        if (entityType === 'reportTemplates') {
+          return previewTemplate;
+        }
+        if (entityType === 'reportAssignments') {
+          return assignment;
+        }
+        return null;
+      },
+      updateData: async (entityType, id, payload) => {
+        updates.push({ entityType, id, payload });
+        return payload;
+      }
+    }, async () => {
+      const origBuild = reportService.buildPrefillSnapshot;
+      reportService.buildPrefillSnapshot = async () => ({ report_title: 'Fresh title' });
+      try {
+        const result = await reportInstanceLivePrefillResetService.resetInstanceFromLivePrefill({
+          instanceId: instance.id,
+          reqUser: { id: 'u1' }
+        });
+        assert.equal(result.status, 'success');
+        assert.equal(updates.length, 1);
+        assert.equal(updates[0].payload.answers.title_field, 'Fresh title');
+        assert.equal(updates[0].payload.prefillSnapshot.report_title, 'Fresh title');
+        assert.ok(updates[0].payload.audit.prefillRefreshedAt);
+      } finally {
+        reportService.buildPrefillSnapshot = origBuild;
+      }
+    });
+  });
 });

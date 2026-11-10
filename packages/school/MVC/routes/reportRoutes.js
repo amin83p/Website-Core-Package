@@ -826,6 +826,15 @@ router.post('/instances/matrix/:assignmentId/prefill-apply',
   trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, { requireToken: true, allowOperationTokenFallback: true, allowInactiveTokenFallback: true }),
   ctrl.applyReportMatrixPrefill);
 
+router.post('/instances/matrix/:assignmentId/reset-from-live',
+  requireReportMatrixEditorAccess,
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  ctrl.resetReportMatrixFromLive);
+
 router.get('/instances/matrix/:assignmentId/export-docx-preview',
   requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
   trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.EXPORT),
@@ -884,6 +893,15 @@ router.post('/instances/edit/:id/prefill-apply',
     allowInactiveTokenFallback: true
   }),
   ctrl.applyInstancePrefillRefresh);
+
+router.post('/instances/edit/:id/reset-from-live',
+  requireReportInstanceEditorAccess,
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  ctrl.resetInstanceFromLive);
 
 router.post('/instances/lock/:id',
   requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),

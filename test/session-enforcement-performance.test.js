@@ -49,7 +49,7 @@ test('session current path updates are throttled between heartbeat writes', () =
   assert.equal(sessionEnforcement.shouldUpdateCurrentPath({
     currentPath: '/dashboard',
     currentPathUpdatedAt: '2026-08-23T11:59:50.000Z'
-  }, '/profile', now), false);
+  }, '/profile', now), true);
   assert.equal(sessionEnforcement.shouldUpdateCurrentPath({
     currentPath: '/dashboard',
     currentPathUpdatedAt: '2026-08-23T11:56:30.000Z'
@@ -68,6 +68,11 @@ test('html navigation tracks current path while skipping ajax and static assets'
   };
 
   assert.equal(sessionEnforcement.shouldTrackCurrentPathForRequest(baseRequest), true);
+  assert.equal(sessionEnforcement.shouldTrackCurrentPathForRequest({
+    method: 'GET',
+    originalUrl: '/chat/conversations',
+    headers: { accept: '*/*' }
+  }), false);
   assert.equal(sessionEnforcement.shouldTrackCurrentPathForRequest({
     ...baseRequest,
     headers: { accept: 'application/json', 'x-ajax-request': 'true' }

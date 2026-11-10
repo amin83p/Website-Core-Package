@@ -679,7 +679,7 @@
 
   <div class="card border-0 shadow-sm mt-4" id="reportMatrixActions">
     <div class="card-body py-2">
-      <div class="d-flex flex-wrap align-items-center gap-2">
+      <div class="d-flex flex-wrap align-items-center gap-2 w-100">
         <button type="button" class="btn btn-primary btn-sm js-matrix-bulk-action" data-action="save" <%= hasEditableRows ? '' : 'disabled' %>><i class="bi bi-save me-1"></i>Save All Drafts</button>
         <button type="button" class="btn btn-success btn-sm js-matrix-bulk-action" data-action="submit" <%= hasEditableRows ? '' : 'disabled' %>><i class="bi bi-send-check me-1"></i>Submit All Reports</button>
         <button type="button" class="btn btn-outline-dark btn-sm js-matrix-bulk-action" data-action="lock" <%= hasEditableRows ? '' : 'disabled' %>><i class="bi bi-lock me-1"></i>Lock All Reports</button>
@@ -692,6 +692,13 @@
         <% if (showBulkUnlock) { %>
           <button type="button" class="btn btn-warning btn-sm" id="btnMatrixUnlockAll" title="Unlock every locked report in this matrix back to submitted"><i class="bi bi-unlock me-1"></i>Unlock All Reports</button>
         <% } %>
+        <button
+          type="button"
+          class="btn btn-outline-danger btn-sm ms-md-auto"
+          id="btnMatrixResetFromLive"
+          title="Reload prefill-linked fields from current session and attendance data"
+          <%= hasEditableRows ? '' : 'disabled' %>
+        ><i class="bi bi-arrow-clockwise me-1"></i>Reset from live data</button>
       </div>
     </div>
   </div>
@@ -1698,6 +1705,56 @@
     }
     document.getElementById('btnMatrixPrefillPreview')?.addEventListener('click', loadPrefillPreview);
     applyPrefillButton?.addEventListener('click', applyPrefillUpdates);
+
+    async function resetMatrixFromLiveData() {
+      const confirmed = window.ReportMessaging?.confirmReportAction
+        ? await window.ReportMessaging.confirmReportAction({
+          title: 'Reset from live data?',
+          message: 'Unsaved edits in this grid will be lost. Prefill-linked fields on editable student rows will be overwritten from current session and attendance data. Locked and submitted rows are skipped. Shared fields on the assignment row are not changed until you save them.',
+          confirmText: 'Reset from live data',
+          confirmClass: 'btn-danger'
+        })
+        : window.confirm('Reset editable reports from live data? Unsaved grid edits will be lost.');
+      if (!confirmed) return;
+      const resetBtn = document.getElementById('btnMatrixResetFromLive');
+      if (resetBtn) resetBtn.disabled = true;
+      const body = {
+        assignmentRowId: matrixState.assignmentRowId,
+        teacherId: matrixState.teacherId,
+        actionStateId: String(document.getElementById('reportMatrixActionStateId')?.value || '')
+      };
+      try {
+        const response = await fetch('/school/reports/instances/matrix/' + encodeURIComponent(matrixState.assignmentId) + '/reset-from-live', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'x-ajax-request': 'true',
+            'x-action-state-id': body.actionStateId
+          },
+          body: JSON.stringify(body)
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok || !['success', 'partial'].includes(result.status)) {
+          throw new Error(result.message || 'Unable to reset from live data.');
+        }
+        dirtyStudents.clear();
+        sharedDirty = false;
+        if (result.matrix) applyMatrixState(result.matrix, null);
+        await showReportMatrixMessage({
+          title: 'Reset from Live Data',
+          icon: result.status === 'partial' ? 'warning' : 'success',
+          message: result.message || 'Reports were reset from live data.'
+        });
+        if (!result.matrix) window.location.reload();
+      } catch (error) {
+        await showReportMatrixMessage({ title: 'Unable to Reset from Live Data', icon: 'error', message: error.message });
+      } finally {
+        const hasEditable = (matrixState.rows || []).some((row) => !row.locked);
+        if (resetBtn) resetBtn.disabled = !hasEditable;
+      }
+    }
+    document.getElementById('btnMatrixResetFromLive')?.addEventListener('click', resetMatrixFromLiveData);
 
     document.getElementById('reportMatrixTable')?.addEventListener('click', (event) => {
       const applyAllBtn = event.target.closest('.js-matrix-column-apply-all');

@@ -20,6 +20,7 @@ const semiMonthlyReportAssignmentWizardService = require('../../services/school/
 const reportRuleEngineService = require('../../services/school/reportRuleEngineService');
 const reportInstanceSaveService = require('../../services/school/reportInstanceSaveService');
 const reportPrefillRefreshPreviewService = require('../../services/school/reportPrefillRefreshPreviewService');
+const reportInstanceLivePrefillResetService = require('../../services/school/reportInstanceLivePrefillResetService');
 const reportMatrixService = require('../../services/school/reportMatrixService');
 const reportGenerationEngineService = require('../../services/school/reportGenerationEngineService');
 const matrixWindowService = require('../../services/school/matrixWindowService');
@@ -2950,6 +2951,59 @@ async function applyReportMatrixPrefill(req, res) {
   }
 }
 
+async function resetReportMatrixFromLive(req, res) {
+  let guardKey = '';
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    guardKey = idempotencyGuardService.createGuardKey([
+      'report_matrix_reset_from_live',
+      activeOrgId,
+      req.params.assignmentId,
+      body.assignmentRowId || '',
+      body.teacherId || ''
+    ]);
+    const guardResult = idempotencyGuardService.beginGuard({
+      key: guardKey,
+      runningTtlMs: 120000,
+      replayTtlMs: 15000
+    });
+    if (sendGuardedResponse(res, guardResult, 'A reset from live data is already in progress. Please wait.')) return;
+    const result = await reportMatrixService.resetMatrixFromLivePrefill({
+      assignmentId: req.params.assignmentId,
+      assignmentRowId: body.assignmentRowId || '',
+      teacherId: body.teacherId || '',
+      reqUser: req.user
+    });
+    const payload = {
+      status: result.summary.failed ? 'partial' : 'success',
+      message: String(result.summary.succeeded) + ' student report(s) reset from live data; '
+        + String(result.summary.skipped) + ' skipped.',
+      summary: result.summary,
+      results: result.results,
+      matrix: result.matrix
+    };
+    idempotencyGuardService.completeGuard(guardKey, payload);
+    return res.json(payload);
+  } catch (error) {
+    if (guardKey) idempotencyGuardService.failGuard(guardKey);
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function resetInstanceFromLive(req, res) {
+  try {
+    const result = await reportInstanceLivePrefillResetService.resetInstanceFromLivePrefill({
+      instanceId: req.params.id,
+      reqUser: req.user
+    });
+    return res.json(result);
+  } catch (error) {
+    const status = Number(error?.statusCode) || 400;
+    return res.status(status).json({ status: 'error', message: error.message });
+  }
+}
+
 async function previewReportMatrixDocxExport(req, res) {
   try {
     const payload = await reportMatrixService.buildMatrixExportPayload({
@@ -3289,12 +3343,14 @@ module.exports = {
   saveReportMatrixRows,
   previewReportMatrixPrefill,
   applyReportMatrixPrefill,
+  resetReportMatrixFromLive,
   previewReportMatrixDocxExport,
   previewReportMatrixPdfExport,
   exportReportMatrix,
   saveInstance,
   previewInstancePrefillRefresh,
   applyInstancePrefillRefresh,
+  resetInstanceFromLive,
   lockInstance,
   unlockInstance,
   reopenInstance,
