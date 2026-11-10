@@ -325,6 +325,8 @@ function formatInstantInTimezone(value, timeZone = FALLBACK_TIMEZONE, options = 
   const ms = coerceInstantMs(value);
   if (!Number.isFinite(ms)) return '-';
   const normalized = normalizeTimezoneToken(timeZone, FALLBACK_TIMEZONE);
+  const includeTime = Object.prototype.hasOwnProperty.call(options, 'hour')
+    || Object.prototype.hasOwnProperty.call(options, 'minute');
   const {
     weekday,
     year = 'numeric',
@@ -340,12 +342,14 @@ function formatInstantInTimezone(value, timeZone = FALLBACK_TIMEZONE, options = 
       timeZone: normalized,
       year,
       month,
-      day,
-      hour,
-      minute,
-      hour12
+      day
     };
-    if (second) formatOptions.second = second;
+    if (includeTime) {
+      formatOptions.hour = hour;
+      formatOptions.minute = minute;
+      formatOptions.hour12 = hour12;
+      if (second) formatOptions.second = second;
+    }
     if (weekday) formatOptions.weekday = weekday;
     return new Intl.DateTimeFormat('en-US', formatOptions).format(new Date(ms));
   } catch (_) {
@@ -361,10 +365,7 @@ function formatDateKeyInTimezone(dateKey, timeZone = FALLBACK_TIMEZONE, options 
     weekday: options.weekday,
     year: options.year || 'numeric',
     month: options.month || 'short',
-    day: options.day || 'numeric',
-    hour: undefined,
-    minute: undefined,
-    hour12: undefined
+    day: options.day || 'numeric'
   });
 }
 

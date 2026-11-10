@@ -76,6 +76,7 @@ test('school package pass7 owns holidayRoutes implementation', () => {
   assert.match(routeSource, /ctrl\.listHolidays/);
   assert.match(routeSource, /ctrl\.listHolidaysInRange/);
   assert.match(routeSource, /ctrl\.saveHoliday/);
+  assert.match(routeSource, /ctrl\.copyHolidaysFromYear/);
   assert.match(routeSource, /ctrl\.deleteHoliday/);
 });
 

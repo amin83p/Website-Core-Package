@@ -31,4 +31,20 @@ test('holiday list provides year-view modal trigger and renderer', () => {
 test('holiday controller passes full year data to list view', () => {
   const controller = read('packages/school/MVC/controllers/school/holidayController.js');
   assert.match(controller, /yearHolidayData:\s*filteredHolidays/);
+  assert.match(controller, /holidayYearsWithData/);
+  assert.match(controller, /copyHolidaysFromYear/);
+});
+
+test('holiday list provides copy-year modal and toolbar control', () => {
+  const view = read('packages/school/MVC/views/school/holiday/holidays.ejs');
+  assert.match(view, /id="btnOpenHolidayCopyYear"/);
+  assert.match(view, /id="holidayCopyYearModal"/);
+  assert.match(view, /holidayCopyDuplicateMode/);
+  assert.match(view, /\/school\/holidays\/copy-year/);
+});
+
+test('holiday routes expose copy-year endpoint', () => {
+  const routes = read('packages/school/MVC/routes/holidayRoutes.js');
+  assert.match(routes, /\/copy-year/);
+  assert.match(routes, /ctrl\.copyHolidaysFromYear/);
 });

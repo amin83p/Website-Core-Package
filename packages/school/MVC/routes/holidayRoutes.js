@@ -30,6 +30,15 @@ router.post('/save',
   }),
   ctrl.saveHoliday);
 
+router.post('/copy-year',
+  requireAccess(SECTIONS.SCHOOL_HOLIDAYS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_HOLIDAYS, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  ctrl.copyHolidaysFromYear);
+
 router.get('/delete/:id',
   requireAccess(SECTIONS.SCHOOL_HOLIDAYS, OPERATIONS.DELETE),
   trackActionState(SECTIONS.SCHOOL_HOLIDAYS, OPERATIONS.DELETE),

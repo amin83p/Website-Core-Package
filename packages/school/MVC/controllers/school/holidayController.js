@@ -10,6 +10,7 @@ const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { respondSchoolDeleteError } = require('../../utils/schoolDeleteErrorResponse');
 const { resolveOrgYearFromRequest, resolveOrgTodayFromRequest } = requireCoreModule('MVC/utils/timezoneUtils');
+const holidayCopyYearService = require('../../services/school/holidayCopyYearService');
 
 function getActiveOrgIdOrThrow(reqUser) {
     const activeOrgId = reqUser?.activeOrgId ? String(reqUser.activeOrgId) : '';
@@ -86,6 +87,8 @@ async function listHolidays(req, res) {
         const filteredHolidays = allHolidays.filter(h => h.date && h.date.startsWith(targetYear));
 
         const { data, pagination } = paginate(filteredHolidays, query.page, query.limit);
+        const holidayYearsWithData = holidayCopyYearService.listDistinctHolidayYears(allHolidays);
+        const holidayYearCounts = holidayCopyYearService.countHolidaysByYear(allHolidays);
 
         if (isAjax(req)) {
             return res.json({ status: 'success', results: data, pagination });
@@ -95,6 +98,8 @@ async function listHolidays(req, res) {
             title: 'School Holidays & Off Days',
             data,
             yearHolidayData: filteredHolidays,
+            holidayYearsWithData,
+            holidayYearCounts,
             searchableFields,
             currentYear: targetYear,
             orgToday,
@@ -141,7 +146,7 @@ async function saveHoliday(req, res) {
             assertHolidayOrgAccess(existing, activeOrgId, req.user);
 
             // Update via Data Service
-            await schoolDataService.updateData('holidays', id, {
+            const holiday = await schoolDataService.updateData('holidays', id, {
                 orgId: existing?.orgId || activeOrgId,
                 date,
                 title,
@@ -149,12 +154,12 @@ async function saveHoliday(req, res) {
                 notes,
                 statutoryHolidayPayable: statutoryHolidayPayable === true || statutoryHolidayPayable === 'true'
             }, req.user);
-            const payloadOut = { status: 'success', message: 'Holiday updated successfully.' };
+            const payloadOut = { status: 'success', message: 'Holiday updated successfully.', holiday };
             idempotencyGuardService.completeGuard(guardKey, payloadOut);
             return res.json(payloadOut);
         } else {
             // Add via Data Service
-            await schoolDataService.addData('holidays', {
+            const holiday = await schoolDataService.addData('holidays', {
                 orgId: activeOrgId,
                 date,
                 title,
@@ -162,7 +167,7 @@ async function saveHoliday(req, res) {
                 notes,
                 statutoryHolidayPayable: statutoryHolidayPayable === true || statutoryHolidayPayable === 'true'
             }, req.user);
-            const payloadOut = { status: 'success', message: 'Holiday added successfully.' };
+            const payloadOut = { status: 'success', message: 'Holiday added successfully.', holiday };
             idempotencyGuardService.completeGuard(guardKey, payloadOut);
             return res.json(payloadOut);
         }
@@ -232,10 +237,76 @@ async function listHolidaysInRange(req, res) {
     }
 }
 
+async function copyHolidaysFromYear(req, res) {
+    let guardKey = '';
+    try {
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const sourceYear = String(req.body?.sourceYear || '').trim();
+        const targetYear = String(req.body?.targetYear || req.query?.year || '').trim()
+            || resolveOrgYearFromRequest(req);
+        const duplicateMode = req.body?.duplicateMode;
+
+        holidayCopyYearService.normalizeDuplicateMode(duplicateMode);
+
+        guardKey = idempotencyGuardService.createGuardKey([
+            'holiday_copy_year',
+            String(activeOrgId),
+            sourceYear,
+            targetYear,
+            duplicateMode
+        ]);
+        const guardResult = idempotencyGuardService.beginGuard({
+            key: guardKey,
+            runningTtlMs: 120000,
+            replayTtlMs: 15000
+        });
+        if (sendGuardedResponse(req, res, guardResult, 'Holiday copy is already in progress. Please wait.')) return;
+
+        const allHolidays = await schoolDataService.fetchAllData('holidays', {}, req.user);
+        const summary = await holidayCopyYearService.copyHolidaysFromYear({
+            holidays: allHolidays,
+            orgId: activeOrgId,
+            sourceYear,
+            targetYear,
+            duplicateMode,
+            addFn: (payload) => schoolDataService.addData('holidays', payload, req.user),
+            updateFn: (id, payload) => schoolDataService.updateData('holidays', id, payload, req.user)
+        });
+
+        const parts = [];
+        if (summary.created) parts.push(`${summary.created} created`);
+        if (summary.updated) parts.push(`${summary.updated} updated`);
+        if (summary.skipped) parts.push(`${summary.skipped} skipped`);
+        if (summary.failed) parts.push(`${summary.failed} failed`);
+        const detail = parts.length ? parts.join(', ') : 'No holidays were copied';
+        const message = summary.failed
+            ? `<b>Copy completed with warnings</b><br>${detail}.`
+            : `<b>Copy complete</b><br>${detail}.`;
+
+        const payloadOut = {
+            status: summary.failed ? 'warning' : 'success',
+            message,
+            summary: {
+                ...summary,
+                sourceYear,
+                targetYear,
+                duplicateMode
+            }
+        };
+        idempotencyGuardService.completeGuard(guardKey, payloadOut);
+        const statusCode = summary.failed ? 207 : 200;
+        return res.status(statusCode).json(payloadOut);
+    } catch (error) {
+        if (guardKey) idempotencyGuardService.failGuard(guardKey);
+        const statusCode = Number(error?.statusCode) === 409 ? 409 : 400;
+        return res.status(statusCode).json({ status: 'error', message: error.message });
+    }
+}
 
 module.exports = {
     listHolidays,
     saveHoliday,
     deleteHoliday,
-    listHolidaysInRange
+    listHolidaysInRange,
+    copyHolidaysFromYear
 };

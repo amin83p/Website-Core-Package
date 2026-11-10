@@ -1,5 +1,9 @@
 <%
   const holidayYearRows = Array.isArray(yearHolidayData) ? yearHolidayData : [];
+  const copySourceYears = (Array.isArray(holidayYearsWithData) ? holidayYearsWithData : [])
+    .map((y) => String(y || '').trim())
+    .filter((y) => /^\d{4}$/.test(y) && y !== String(currentYear));
+  const holidayYearCountMap = holidayYearCounts && typeof holidayYearCounts === 'object' ? holidayYearCounts : {};
 %>
 
 <%- include('partials/tablePages-start', {
@@ -37,9 +41,19 @@
           </select>
       </form>
     </div>
-    <button type="button" class="btn btn-outline-danger btn-sm fw-bold" id="btnOpenHolidayYearView">
-      <i class="bi bi-calendar3 me-1"></i>Year View
-    </button>
+    <div class="d-flex align-items-center gap-2">
+      <button
+        type="button"
+        class="btn btn-outline-primary btn-sm fw-bold"
+        id="btnOpenHolidayCopyYear"
+        <%= copySourceYears.length ? '' : 'disabled' %>
+        title="<%= copySourceYears.length ? 'Copy holidays from another year' : 'No other years with holiday data' %>">
+        <i class="bi bi-copy me-1"></i>Copy Year
+      </button>
+      <button type="button" class="btn btn-outline-danger btn-sm fw-bold" id="btnOpenHolidayYearView">
+        <i class="bi bi-calendar3 me-1"></i>Year View
+      </button>
+    </div>
 </div>
 
 <div class="table-scroll-wrapper" data-floating-row-actions="true">
@@ -59,11 +73,12 @@
                 <tr><td colspan="6" class="text-center py-5 text-muted">No holidays recorded for <%= currentYear %>.</td></tr>
             <% } else { %>
                 <% data.forEach(item => { 
+                    const holidayDateKey = String(item.date || '').trim().slice(0, 10);
                     const displayDate = (typeof formatOrgDate === 'function')
-                      ? formatOrgDate(item.date, { weekday: 'short', month: 'short', day: 'numeric' })
-                      : String(item.date || '');
+                      ? formatOrgDate(holidayDateKey, { weekday: 'short', month: 'short', day: 'numeric' })
+                      : holidayDateKey;
                 %>
-                <tr>
+                <tr data-holiday-id="<%= item.id %>">
                     <td class="ps-4 fw-bold text-dark" data-sort-value="<%= item.date %>"><%= displayDate %></td>
                     <td class="fw-bold text-primary"><%= item.title %></td>
                     <td>
@@ -165,6 +180,56 @@
     </div>
 </div>
 
+<div class="modal fade" id="holidayCopyYearModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-primary text-white">
+        <h5 class="modal-title fw-bold">
+          <i class="bi bi-copy me-2"></i>Copy Holidays to <%= currentYear %>
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-3">
+          Copying into <strong><%= currentYear %></strong>. Dates keep the same month and day; Feb 29 becomes Feb 28 in non-leap years.
+        </p>
+        <div class="mb-3">
+          <label for="holidayCopySourceYear" class="form-label fw-bold">Source year</label>
+          <select id="holidayCopySourceYear" class="form-select" <%= copySourceYears.length ? '' : 'disabled' %>>
+            <% if (!copySourceYears.length) { %>
+              <option value="">No other years available</option>
+            <% } else { %>
+              <% copySourceYears.forEach((y) => { %>
+                <option value="<%= y %>"><%= y %> (<%= Number(holidayYearCountMap[y] || 0) %> holidays)</option>
+              <% }) %>
+            <% } %>
+          </select>
+        </div>
+        <p class="small mb-3" id="holidayCopySourcePreview"></p>
+        <fieldset class="mb-2">
+          <legend class="form-label fw-bold mb-2">If a matching holiday already exists</legend>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="holidayCopyDuplicateMode" id="holidayCopyModeSkip" value="skip" checked>
+            <label class="form-check-label" for="holidayCopyModeSkip">Skip existing (copy only new rows)</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="holidayCopyDuplicateMode" id="holidayCopyModeReplace" value="replace">
+            <label class="form-check-label" for="holidayCopyModeReplace">Replace existing (update type, notes, statutory pay)</label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="radio" name="holidayCopyDuplicateMode" id="holidayCopyModeAbort" value="abort">
+            <label class="form-check-label" for="holidayCopyModeAbort">Cancel entire copy if any match exists</label>
+          </div>
+        </fieldset>
+      </div>
+      <div class="modal-footer bg-light">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary fw-bold" id="btn_holidayCopyYearSubmit" <%= copySourceYears.length ? '' : 'disabled' %>>Copy Holidays</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="holidayYearViewModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
@@ -202,12 +267,21 @@
 <script>
 let modalInstance = null;
 let holidayYearModalInstance = null;
+let holidayCopyYearModalInstance = null;
+const holidayYearCountByYear = <%- JSON.stringify(holidayYearCountMap || {}).replace(/</g, '\\u003c') %>;
+const holidayCopyTargetYear = '<%= currentYear %>';
 const DEFAULT_STAT_PAYABLE_TYPES = ['National Holiday', 'Observance Paid'];
-const holidayYearData = <%- JSON.stringify(holidayYearRows || []).replace(/</g, '\\u003c') %>;
+let holidayYearData = <%- JSON.stringify(holidayYearRows || []).replace(/</g, '\\u003c') %>;
 const selectedHolidayYear = Number('<%= currentYear %>') || Number('<%= String(orgToday || currentYear || "").slice(0, 4) %>');
 
-function formatHolidayDateKey(dateKey, options = {}) {
+function normalizeHolidayDateKey(dateKey) {
     const token = String(dateKey || '').trim();
+    if (/^\d{4}-\d{2}-\d{2}/.test(token)) return token.slice(0, 10);
+    return token;
+}
+
+function formatHolidayDateKey(dateKey, options = {}) {
+    const token = normalizeHolidayDateKey(dateKey);
     if (!token) return '-';
     if (window.AppOrgDateTime && typeof window.AppOrgDateTime.formatDateKey === 'function') {
         return window.AppOrgDateTime.formatDateKey(token, options);
@@ -450,6 +524,92 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof bootstrap !== 'undefined') {
         modalInstance = new bootstrap.Modal(document.getElementById('holidayModal'));
         holidayYearModalInstance = new bootstrap.Modal(document.getElementById('holidayYearViewModal'));
+        holidayCopyYearModalInstance = new bootstrap.Modal(document.getElementById('holidayCopyYearModal'));
+    }
+
+    function updateHolidayCopySourcePreview() {
+        const selectEl = document.getElementById('holidayCopySourceYear');
+        const previewEl = document.getElementById('holidayCopySourcePreview');
+        if (!selectEl || !previewEl) return;
+        const year = String(selectEl.value || '').trim();
+        const count = year ? Number(holidayYearCountByYear[year] || 0) : 0;
+        previewEl.textContent = year
+            ? `${count} holiday${count === 1 ? '' : 's'} in ${year} will be considered for copy.`
+            : '';
+    }
+
+    const holidayCopySourceSelect = document.getElementById('holidayCopySourceYear');
+    if (holidayCopySourceSelect) {
+        holidayCopySourceSelect.addEventListener('change', updateHolidayCopySourcePreview);
+        updateHolidayCopySourcePreview();
+    }
+
+    const openCopyYearBtn = document.getElementById('btnOpenHolidayCopyYear');
+    if (openCopyYearBtn) {
+        openCopyYearBtn.addEventListener('click', () => {
+            updateHolidayCopySourcePreview();
+            if (holidayCopyYearModalInstance) holidayCopyYearModalInstance.show();
+        });
+    }
+
+    const holidayCopySubmitBtn = document.getElementById('btn_holidayCopyYearSubmit');
+    if (holidayCopySubmitBtn) {
+        holidayCopySubmitBtn.addEventListener('click', async () => {
+            const sourceYear = String(document.getElementById('holidayCopySourceYear')?.value || '').trim();
+            const duplicateMode = document.querySelector('input[name="holidayCopyDuplicateMode"]:checked')?.value || 'skip';
+            if (!sourceYear) {
+                if (typeof showMessageModal === 'function') {
+                    await showMessageModal({ title: 'Source year required', icon: 'warning', message: 'Select a source year to copy from.', buttons: [{ text: 'OK', class: 'btn-warning' }] });
+                }
+                return;
+            }
+
+            const originalText = holidayCopySubmitBtn.innerHTML;
+            holidayCopySubmitBtn.disabled = true;
+            holidayCopySubmitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Copying...';
+
+            try {
+                const res = await fetch('/school/holidays/copy-year', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+                    body: JSON.stringify({
+                        sourceYear,
+                        targetYear: holidayCopyTargetYear,
+                        duplicateMode,
+                        actionStateId
+                    })
+                });
+                const result = await res.json();
+                const guarded = typeof window.applyGuardedApiResult === 'function'
+                    ? await window.applyGuardedApiResult(result, { busyTitle: 'Copy In Progress', replayTitle: 'Copy Already Processed' })
+                    : { stop: false };
+                if (guarded.stop) return;
+
+                if (holidayCopyYearModalInstance) holidayCopyYearModalInstance.hide();
+
+                const icon = result.status === 'success' ? 'success' : (result.status === 'warning' ? 'warning' : 'error');
+                if (typeof showMessageModal === 'function') {
+                    await showMessageModal({
+                        title: result.status === 'success' ? 'Copy complete' : (result.status === 'warning' ? 'Copy finished with warnings' : 'Copy failed'),
+                        icon,
+                        message: result.message || 'Holiday copy finished.',
+                        buttons: [{ text: 'OK', class: icon === 'success' ? 'btn-success' : (icon === 'warning' ? 'btn-warning' : 'btn-danger') }]
+                    });
+                    if (result.status === 'success' || result.status === 'warning') window.location.reload();
+                } else {
+                    alert(result.message || 'Holiday copy finished.');
+                    if (result.status === 'success' || result.status === 'warning') window.location.reload();
+                }
+            } catch (error) {
+                console.error(error);
+                if (typeof showMessageModal === 'function') {
+                    await showMessageModal({ title: 'System Error', icon: 'error', message: 'A network error occurred.', buttons: [{ text: 'Close', class: 'btn-secondary' }] });
+                } else { alert('A network error occurred.'); }
+            } finally {
+                holidayCopySubmitBtn.disabled = false;
+                holidayCopySubmitBtn.innerHTML = originalText;
+            }
+        });
     }
 
     // 2. Intercept the standard "Add" button from tablePages-start
@@ -485,8 +645,9 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
+        const previousHolidayId = String(document.getElementById('hol_id').value || '').trim();
         const payload = {
-            id: document.getElementById('hol_id').value,
+            id: previousHolidayId,
             date: document.getElementById('hol_date').value,
             title: document.getElementById('hol_title').value,
             type: document.getElementById('hol_type').value,
@@ -514,17 +675,22 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (modalInstance) modalInstance.hide();
 
+            if (result.status === 'success') {
+                const savedHoliday = result.holiday && typeof result.holiday === 'object'
+                    ? result.holiday
+                    : { ...payload, id: previousHolidayId || payload.id };
+                applyHolidaySaveToTable(savedHoliday, previousHolidayId);
+            }
+
             if (typeof showMessageModal === 'function') {
-                await showMessageModal({ 
-                    title: result.status === 'success' ? 'Success' : 'Error', 
-                    icon: result.status === 'success' ? 'success' : 'error', 
-                    message: result.message, 
-                    buttons: [{ text: 'OK', class: result.status === 'success' ? 'btn-success' : 'btn-danger' }] 
+                await showMessageModal({
+                    title: result.status === 'success' ? 'Success' : 'Error',
+                    icon: result.status === 'success' ? 'success' : 'error',
+                    message: result.message,
+                    buttons: [{ text: 'OK', class: result.status === 'success' ? 'btn-success' : 'btn-danger' }]
                 });
-                if (result.status === 'success') window.location.reload();
             } else {
                 alert(result.message);
-                if (result.status === 'success') window.location.reload();
             }
         } catch (error) {
             console.error(error);
@@ -539,6 +705,143 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // --- Helper Functions ---
+
+function escapeHolidayHtml(value) {
+    return String(value ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
+function escapeHolidayJsString(value) {
+    return String(value ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+function holidayTypeBadgeClass(type) {
+    const token = String(type || '');
+    if (token === 'National Holiday') return 'bg-primary';
+    if (token === 'Observance Paid') return 'bg-success';
+    if (token === 'School Break') return 'bg-info text-dark';
+    if (token === 'Weather Emergency') return 'bg-danger';
+    return 'bg-secondary';
+}
+
+function holidayStatPayHtml(statutoryHolidayPayable) {
+    if (statutoryHolidayPayable === true) {
+        return '<span class="badge bg-success-subtle text-success border border-success">Payable</span>';
+    }
+    if (statutoryHolidayPayable === false) {
+        return '<span class="badge bg-light text-muted border">Not payable</span>';
+    }
+    return '<span class="badge bg-secondary-subtle text-secondary border">By type</span>';
+}
+
+function formatHolidayTableDate(dateKey) {
+    return formatHolidayDateKey(normalizeHolidayDateKey(dateKey), {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric'
+    });
+}
+
+function holidayBelongsToSelectedYear(dateKey) {
+    const token = String(dateKey || '').trim();
+    return token.startsWith(`${selectedHolidayYear}-`);
+}
+
+function syncHolidayYearDataEntry(holiday, { removeId = '' } = {}) {
+    const id = String(holiday?.id || '').trim();
+    const dropIds = new Set([String(removeId || '').trim(), id].filter(Boolean));
+    holidayYearData = (Array.isArray(holidayYearData) ? holidayYearData : []).filter((row) => !dropIds.has(String(row?.id || '')));
+    if (holiday && id && holidayBelongsToSelectedYear(holiday.date)) {
+        holidayYearData.push({
+            id,
+            date: holiday.date,
+            title: holiday.title,
+            type: holiday.type,
+            notes: holiday.notes
+        });
+    }
+}
+
+function buildHolidayTableRowHtml(item) {
+    const id = String(item?.id || '').trim();
+    const date = String(item?.date || '').trim();
+    const title = String(item?.title || '').trim();
+    const type = String(item?.type || 'Holiday').trim();
+    const notes = String(item?.notes || '').trim();
+    const payable = item?.statutoryHolidayPayable;
+    const payableArg = payable === true ? 'true' : (payable === false ? 'false' : 'null');
+    const displayDate = formatHolidayTableDate(date);
+  return `<tr data-holiday-id="${escapeHolidayHtml(id)}">
+    <td class="ps-4 fw-bold text-dark" data-sort-value="${escapeHolidayHtml(date)}">${escapeHolidayHtml(displayDate)}</td>
+    <td class="fw-bold text-primary">${escapeHolidayHtml(title)}</td>
+    <td><span class="badge ${holidayTypeBadgeClass(type)}">${escapeHolidayHtml(type)}</span></td>
+    <td>${holidayStatPayHtml(payable)}</td>
+    <td class="text-muted small text-truncate" style="max-width: 250px;">${escapeHolidayHtml(notes || '-')}</td>
+    <td class="table-actions text-end pe-4">
+      <div class="row-actions-wrap">
+        <button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="${escapeHolidayHtml(id)}" title="Holiday Actions">
+          <i class="bi bi-three-dots-vertical"></i>
+        </button>
+        <div class="row-actions-menu d-none" data-row-actions-id="${escapeHolidayHtml(id)}">
+          <button class="btn btn-outline-info btn-sm" onclick="openHolidayModal('${escapeHolidayJsString(id)}', '${escapeHolidayJsString(date)}', '${escapeHolidayJsString(title)}', '${escapeHolidayJsString(type)}', '${escapeHolidayJsString(notes)}', ${payableArg})">
+            <i class="bi bi-pencil-square me-2"></i>Edit
+          </button>
+          <button class="btn btn-outline-danger btn-sm delete-btn" data-id="${escapeHolidayHtml(id)}">
+            <i class="bi bi-trash me-2"></i>Delete
+          </button>
+        </div>
+      </div>
+    </td>
+  </tr>`;
+}
+
+function getHolidayTableBody() {
+    return document.querySelector('#first-table tbody');
+}
+
+function clearHolidayEmptyStateRow(tbody) {
+    if (!tbody) return;
+    const emptyRow = tbody.querySelector('tr:not([data-holiday-id])');
+    if (emptyRow) emptyRow.remove();
+}
+
+function ensureHolidayEmptyStateRow(tbody) {
+    if (!tbody) return;
+    if (tbody.querySelector('[data-holiday-id]')) return;
+    tbody.innerHTML = `<tr><td colspan="6" class="text-center py-5 text-muted">No holidays recorded for ${selectedHolidayYear}.</td></tr>`;
+}
+
+function applyHolidaySaveToTable(holiday, previousId = '') {
+    const tbody = getHolidayTableBody();
+    if (!tbody || !holiday) return;
+
+    const id = String(holiday.id || previousId || '').trim();
+    const inYear = holidayBelongsToSelectedYear(holiday.date);
+    const priorId = String(previousId || id).trim();
+    const existingRow = priorId
+        ? Array.from(tbody.querySelectorAll('tr[data-holiday-id]')).find((row) => row.dataset.holidayId === priorId)
+        : null;
+
+    syncHolidayYearDataEntry(holiday, { removeId: priorId });
+
+    if (!inYear) {
+        if (existingRow) existingRow.remove();
+        ensureHolidayEmptyStateRow(tbody);
+        return;
+    }
+
+    const rowHtml = buildHolidayTableRowHtml({ ...holiday, id });
+    if (existingRow) {
+        existingRow.outerHTML = rowHtml;
+    } else {
+        clearHolidayEmptyStateRow(tbody);
+        tbody.insertAdjacentHTML('beforeend', rowHtml);
+    }
+}
 
 function openHolidayModal(id = '', date = '', title = '', type = 'National Holiday', notes = '', statutoryHolidayPayable = null) {
     document.getElementById('holidayModalTitle').innerText = id ? 'Edit Holiday' : 'Add Holiday';

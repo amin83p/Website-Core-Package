@@ -45,11 +45,23 @@ test('formatInstantInTimezone formats a known UTC instant into a target zone', (
   const formatted = timezoneUtils.formatInstantInTimezone(
     '2026-01-15T18:30:00.000Z',
     'America/Edmonton',
-    { hour12: false }
+    { hour: '2-digit', minute: '2-digit', hour12: false }
   );
   assert.match(formatted, /Jan/);
   assert.match(formatted, /15/);
   assert.match(formatted, /11:30/);
+});
+
+test('formatDateKeyInTimezone omits time for date-only keys', () => {
+  const formatted = timezoneUtils.formatDateKeyInTimezone(
+    '2026-07-15',
+    'America/Edmonton',
+    { weekday: 'short', month: 'short', day: 'numeric' }
+  );
+  assert.match(formatted, /Jul/);
+  assert.match(formatted, /15/);
+  assert.doesNotMatch(formatted, /:/);
+  assert.doesNotMatch(formatted, /\bAM\b|\bPM\b/i);
 });
 
 test('authService attaches activeOrgTimeZone and orgToday during hydration', () => {
