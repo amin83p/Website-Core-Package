@@ -1710,7 +1710,7 @@
       const confirmed = window.ReportMessaging?.confirmReportAction
         ? await window.ReportMessaging.confirmReportAction({
           title: 'Reset from live data?',
-          message: 'Unsaved edits in this grid will be lost. Prefill-linked fields on editable student rows will be overwritten from current session and attendance data. Locked and submitted rows are skipped. Shared fields on the assignment row are not changed until you save them.',
+          message: 'Unsaved edits in this grid will be lost. Private (student-specific) prefill-linked fields on editable rows will be overwritten from current session and attendance data. Shared fields stay unchanged. Locked and submitted rows are skipped.',
           confirmText: 'Reset from live data',
           confirmClass: 'btn-danger'
         })

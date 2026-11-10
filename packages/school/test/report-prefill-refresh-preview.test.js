@@ -150,3 +150,82 @@ test('resetInstanceFromLivePrefill updates draft instance from live prefill merg
     });
   });
 });
+
+test('resetInstanceFromLivePrefill refreshes private fields only on student-targeted assignments', async () => {
+  const studentTemplate = {
+    id: 'TPL_SHARED_1',
+    version: 1,
+    schema: {
+      fields: [
+        {
+          id: 'shared_title',
+          label: 'Class title',
+          type: 'text',
+          sharedAcrossStudents: true,
+          prefillKey: 'report_title',
+          valueMode: 'manual'
+        },
+        {
+          id: 'student_hours',
+          label: 'Hours',
+          type: 'text',
+          prefillKey: 'attendance_hours',
+          valueMode: 'manual'
+        }
+      ]
+    }
+  };
+  const studentAssignment = {
+    id: 'ASG_STU',
+    reportScope: 'each_student',
+    sharedAnswers: { shared_title: 'Shared unchanged' }
+  };
+  const instance = {
+    id: 'RINS_RESET_SHARED',
+    templateId: studentTemplate.id,
+    assignmentId: studentAssignment.id,
+    studentId: 'STU-1',
+    teacherId: 'T1',
+    status: 'draft',
+    answers: { student_hours: 'Old hours' },
+    prefillSnapshot: { report_title: 'Old shared snapshot', attendance_hours: 'Old hours snap' },
+    audit: {}
+  };
+  const updates = [];
+  await withPatched(reportIntegrityService, {
+    getEditableInstanceOrThrow: async () => instance
+  }, async () => {
+    await withPatched(schoolDataService, {
+      getDataById: async (entityType) => {
+        if (entityType === 'reportTemplates') return studentTemplate;
+        if (entityType === 'reportAssignments') return studentAssignment;
+        return null;
+      },
+      updateData: async (entityType, id, payload) => {
+        updates.push({ entityType, id, payload });
+        return payload;
+      }
+    }, async () => {
+      const origBuild = reportService.buildPrefillSnapshot;
+      reportService.buildPrefillSnapshot = async () => ({
+        report_title: 'Fresh shared title',
+        attendance_hours: 'Fresh hours'
+      });
+      try {
+        await reportInstanceLivePrefillResetService.resetInstanceFromLivePrefill({
+          instanceId: instance.id,
+          reqUser: { id: 'u1' }
+        });
+        assert.equal(updates.length, 1);
+        assert.equal(updates[0].entityType, 'reportInstances');
+        assert.equal(updates[0].payload.answers.shared_title, undefined);
+        assert.equal(updates[0].payload.answers.student_hours, 'Fresh hours');
+        assert.equal(updates[0].payload.prefillSnapshot.report_title, 'Old shared snapshot');
+        assert.equal(updates[0].payload.prefillSnapshot.attendance_hours, 'Fresh hours');
+        assert.equal(studentAssignment.sharedAnswers.shared_title, 'Shared unchanged');
+      } finally {
+        reportService.buildPrefillSnapshot = origBuild;
+      }
+    });
+  });
+});

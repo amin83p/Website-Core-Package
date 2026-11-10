@@ -1,8 +1,5 @@
 'use strict';
 
-const fs = require('fs');
-const path = require('path');
-
 const schoolDataService = require('./schoolDataService');
 const sessionConductService = require('./sessionConductService');
 const schoolAdminAccessService = require('./schoolAdminAccessService');
@@ -17,27 +14,6 @@ const CONDUCT_LOCK_FIELDS = Object.freeze([
   'conductLockedByReportAt',
   'conductLockedByReportInstanceId'
 ]);
-
-const DEBUG_LOG_PATH = path.join(__dirname, '../../../../../.cursor/debug-81b8ef.log');
-
-// #region agent log
-function debugConductLockLog(location, message, data = {}, hypothesisId = 'H0') {
-  try {
-    const line = `${JSON.stringify({
-      sessionId: '81b8ef',
-      location,
-      message,
-      data,
-      hypothesisId,
-      timestamp: Date.now(),
-      runId: 'conduct-lock'
-    })}\n`;
-    fs.appendFileSync(DEBUG_LOG_PATH, line, { encoding: 'utf8' });
-  } catch (_) {
-    /* ignore */
-  }
-}
-// #endregion
 
 function personKey(value) {
   return String(toPublicId(value) || value || '').trim();
@@ -88,19 +64,6 @@ async function buildSubmittedConductLockPersonIdSet({
     const personId = await resolvePersonIdForInstanceStudent(instance?.studentId, reqUser);
     if (personId) lockedPersonIds.add(personKey(personId));
   }
-  // #region agent log
-  debugConductLockLog(
-    'sessionConductReportLockService:buildSubmittedConductLockPersonIdSet',
-    'computed submitted conduct lock set',
-  {
-    classId: cleanClassId,
-    sessionId: cleanSessionId,
-    instanceCount: Array.isArray(instances) ? instances.length : 0,
-    lockedCount: lockedPersonIds.size
-  },
-    'H2'
-  );
-  // #endregion
   return lockedPersonIds;
 }
 
@@ -157,19 +120,10 @@ async function lockConductForSubmittedReport({
   reqUser = null
 } = {}) {
   if (!instance || !assignment) {
-    const out = { applied: false, reason: 'missing_context' };
-    debugConductLockLog('sessionConductReportLockService:lockConductForSubmittedReport', 'lock skipped', out, 'H1');
-    return out;
+    return { applied: false, reason: 'missing_context' };
   }
   if (!instanceLinksConductForLock(assignment, instance)) {
-    const out = { applied: false, reason: 'not_linked' };
-    debugConductLockLog('sessionConductReportLockService:lockConductForSubmittedReport', 'lock skipped', {
-      ...out,
-      assignmentId: toPublicId(assignment?.id),
-      sessionId: sessionConductService.resolveSessionIdFromAssignmentContext(assignment, instance),
-      conductRequired: assignment?.conductRequiredBeforeFill
-    }, 'H3');
-    return out;
+    return { applied: false, reason: 'not_linked' };
   }
   const classId = toPublicId(assignment?.classId || instance?.classId);
   const sessionId = sessionConductService.resolveSessionIdFromAssignmentContext(assignment, instance);
@@ -190,12 +144,6 @@ async function lockConductForSubmittedReport({
   if (rowIndex < 0) {
     roster.push({ personId });
     rowIndex = roster.length - 1;
-    debugConductLockLog(
-      'sessionConductReportLockService:lockConductForSubmittedReport',
-      'upserted missing roster row for lock',
-      { classId, sessionId, personId },
-      'H1'
-    );
   }
 
   const existing = roster[rowIndex] || {};
@@ -217,11 +165,7 @@ async function lockConductForSubmittedReport({
   });
   sessions[sessionIndex] = { ...session, roster };
   await schoolDataService.saveClassSessions(classId, sessions, reqUser);
-  const result = { applied: true, classId, sessionId, personId };
-  // #region agent log
-  debugConductLockLog('sessionConductReportLockService:lockConductForSubmittedReport', 'lock applied', result, 'H1');
-  // #endregion
-  return result;
+  return { applied: true, classId, sessionId, personId };
 }
 
 async function unlockConductForReopenedReport({
@@ -333,14 +277,6 @@ async function assertCanEditRosterConduct({
   const overrideAllowed = await canOverrideReportLinkedConductLock(reqUser, ipAddress);
   if (overrideAllowed) return;
   if (incomingRow && !conductPayloadDiffers(existingRow, incomingRow)) return;
-  // #region agent log
-  debugConductLockLog(
-    'sessionConductReportLockService:assertCanEditRosterConduct',
-    'blocked conduct edit',
-    { personId, classId: toPublicId(classId), sessionId: String(sessionId || '').trim() },
-    'H4'
-  );
-  // #endregion
   const err = new Error('Class conduct for this student is locked because a linked report was submitted.');
   err.code = 'CONDUCT_LOCKED_BY_REPORT';
   err.statusCode = 403;
@@ -360,6 +296,5 @@ module.exports = {
   assertCanEditRosterConduct,
   applyLockFieldsToRosterRow,
   clearLockFieldsFromRosterRow,
-  conductPayloadDiffers,
-  debugConductLockLog
+  conductPayloadDiffers
 };

@@ -16,6 +16,41 @@ function isVisualOnlyField(field = {}) {
   return type === 'section' || type === 'subheader' || type === 'row_break';
 }
 
+function isSharedReportField(field = {}, assignment = null) {
+  return reportService.isStudentTargetedScope(assignment?.reportScope)
+    && field?.sharedAcrossStudents === true;
+}
+
+function buildSharedExclusivePrefillKeySet(fields = [], assignment = null) {
+  const countsByKey = new Map();
+  (Array.isArray(fields) ? fields : []).forEach((field) => {
+    if (isVisualOnlyField(field) || !field?.id) return;
+    const key = reportService.normalizePrefillKey(field?.prefillKey || '');
+    if (!key) return;
+    const row = countsByKey.get(key) || { shared: 0, private: 0 };
+    if (isSharedReportField(field, assignment)) row.shared += 1;
+    else row.private += 1;
+    countsByKey.set(key, row);
+  });
+  const exclusive = new Set();
+  countsByKey.forEach((counts, key) => {
+    if (counts.shared > 0 && counts.private === 0) exclusive.add(key);
+  });
+  return exclusive;
+}
+
+function preserveSharedOnlyPrefillSnapshotKeys(nextPrefill, previousPrefill, exclusiveKeys) {
+  if (!(exclusiveKeys instanceof Set) || !exclusiveKeys.size) return nextPrefill;
+  const out = { ...(nextPrefill && typeof nextPrefill === 'object' ? nextPrefill : {}) };
+  const prior = previousPrefill && typeof previousPrefill === 'object' ? previousPrefill : {};
+  exclusiveKeys.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(prior, key)) {
+      out[key] = prior[key];
+    }
+  });
+  return out;
+}
+
 /**
  * Replace prefill snapshot and prefill-linked answers from live data; recompute calculated fields.
  */
@@ -55,6 +90,10 @@ async function applyFullLivePrefillToInstance({
     : {};
   const scopeCtx = reportService.resolveSnapshotScopeContext(template);
   const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  const sharedExclusivePrefillKeys = buildSharedExclusivePrefillKeySet(fields, effectiveAssignment);
+  const previousPrefillSnapshot = instance?.prefillSnapshot && typeof instance.prefillSnapshot === 'object'
+    ? instance.prefillSnapshot
+    : {};
 
   const refreshedMerged = reportService.mergeTemplateDataLivePersisted(
     template,
@@ -68,7 +107,11 @@ async function applyFullLivePrefillToInstance({
     { scopeOptions: editorMergeOptions }
   );
 
-  const nextPrefill = { ...refreshedPrefill };
+  const nextPrefill = preserveSharedOnlyPrefillSnapshotKeys(
+    refreshedPrefill,
+    previousPrefillSnapshot,
+    sharedExclusivePrefillKeys
+  );
   const nextAnswers = {};
   const nextDerivedOverrides = {};
 
@@ -77,6 +120,9 @@ async function applyFullLivePrefillToInstance({
     if (!field?.id || isVisualOnlyField(field)) return;
     if (scopeCtx.active
       && !reportService.fieldIsInSnapshotScope(field, scopeCtx.baseLowerSet, scopeCtx.placeholderMap)) {
+      return;
+    }
+    if (isSharedReportField(field, effectiveAssignment)) {
       return;
     }
 
@@ -122,6 +168,9 @@ async function applyFullLivePrefillToInstance({
     if (!field?.id || isVisualOnlyField(field)) return;
     if (scopeCtx.active
       && !reportService.fieldIsInSnapshotScope(field, scopeCtx.baseLowerSet, scopeCtx.placeholderMap)) {
+      return;
+    }
+    if (isSharedReportField(field, effectiveAssignment)) {
       return;
     }
     if (reportRuleEngineService.normalizeValueMode(field?.valueMode) !== 'calculated') return;
@@ -217,11 +266,13 @@ async function resetInstanceFromLivePrefill({ instanceId, reqUser }) {
   return {
     status: 'success',
     instanceId: toPublicId(instance.id) || instance.id,
-    message: 'Report fields were reset from live data.'
+    message: 'Private report fields were reset from live data. Shared fields were not changed.'
   };
 }
 
 module.exports = {
   applyFullLivePrefillToInstance,
-  resetInstanceFromLivePrefill
+  resetInstanceFromLivePrefill,
+  isSharedReportField,
+  buildSharedExclusivePrefillKeySet
 };

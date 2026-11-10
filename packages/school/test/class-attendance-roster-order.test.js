@@ -159,3 +159,23 @@ test('formatRosterNameWithNickname wraps nickname in parentheses', () => {
     'Jane Doe'
   );
 });
+
+test('mongo class update must replace attendanceRosterNicknames map (not deep-merge)', () => {
+  const { deepMerge } = require('../../../MVC/repositories/backend/mongoRepositoryUtils');
+  const existing = {
+    attendanceRosterNicknames: { P_1: 'Old', P_2: 'Keep' }
+  };
+  const incoming = {
+    attendanceRosterNicknames: { P_2: 'Keep' }
+  };
+  const broken = deepMerge({ ...existing }, incoming);
+  assert.equal(broken.attendanceRosterNicknames.P_1, 'Old');
+
+  const replaceObjectFields = new Set(['attendanceRosterNicknames']);
+  const mergeBase = { ...existing };
+  for (const field of replaceObjectFields) {
+    if (Object.prototype.hasOwnProperty.call(incoming, field)) delete mergeBase[field];
+  }
+  const fixed = deepMerge(mergeBase, incoming);
+  assert.deepEqual(fixed.attendanceRosterNicknames, { P_2: 'Keep' });
+});

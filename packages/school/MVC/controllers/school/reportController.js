@@ -2994,8 +2994,8 @@ async function resetReportMatrixFromLive(req, res) {
     });
     const payload = {
       status: result.summary.failed ? 'partial' : 'success',
-      message: String(result.summary.succeeded) + ' student report(s) reset from live data; '
-        + String(result.summary.skipped) + ' skipped.',
+      message: String(result.summary.succeeded) + ' student report(s) had private fields reset from live data; '
+        + String(result.summary.skipped) + ' skipped. Shared fields were not changed.',
       summary: result.summary,
       results: result.results,
       matrix: result.matrix

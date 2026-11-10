@@ -203,28 +203,13 @@ async function persistInstanceAnswers({
       }
     }, reqUser);
     try {
-      const lockResult = await sessionConductReportLockService.lockConductForSubmittedReport({
+      await sessionConductReportLockService.lockConductForSubmittedReport({
         instance: { ...instance, ...updatedInstance, audit: { ...(instance.audit || {}), ...(updatedInstance?.audit || {}), submittedAt: submittedAtIso } },
         assignment,
         reqUser
       });
-      sessionConductReportLockService.debugConductLockLog(
-        'reportInstanceSaveService.persistInstanceAnswers',
-        'post-submit conduct lock',
-        {
-          instanceId: String(instance?.id || '').trim(),
-          applied: Boolean(lockResult?.applied),
-          reason: String(lockResult?.reason || '')
-        },
-        'H1'
-      );
-    } catch (lockError) {
-      sessionConductReportLockService.debugConductLockLog(
-        'reportInstanceSaveService.persistInstanceAnswers',
-        'post-submit conduct lock error',
-        { message: String(lockError?.message || lockError) },
-        'H1'
-      );
+    } catch (_) {
+      /* conduct lock is best-effort */
     }
   } else {
     updatedInstance = await schoolDataService.updateData('reportInstances', instance.id, {

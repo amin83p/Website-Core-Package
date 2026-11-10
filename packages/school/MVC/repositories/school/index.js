@@ -1330,6 +1330,8 @@ const schoolRepositories = {
     generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueClassId),
     defaultSearchFields: ['id', 'title', 'code', 'description', 'status'],
     assignmentScopeKind: 'instructor',
+    // Whole-map replacement: partial nickname payloads must drop cleared person ids (not deep-merge keys).
+    replaceObjectFields: ['attendanceRosterNicknames'],
     transformList: (rows) => normalizeRows(rows).map((row) => normalizeClassDataContract(row)),
     transformItem: (row) => normalizeClassDataContract(row)
   }),

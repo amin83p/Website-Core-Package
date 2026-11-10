@@ -1331,7 +1331,7 @@
       const confirmed = window.ReportMessaging?.confirmReportAction
         ? await window.ReportMessaging.confirmReportAction({
           title: 'Reset from live data?',
-          message: 'Unsaved edits on this form will be lost. Prefill-linked fields will be overwritten from current session and attendance data.',
+          message: 'Unsaved edits on this form will be lost. Student-specific (private) prefill-linked fields will be overwritten from current session and attendance data. Shared fields stay unchanged.',
           confirmText: 'Reset from live data',
           confirmClass: 'btn-danger'
         })
