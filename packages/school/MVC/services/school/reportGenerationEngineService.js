@@ -617,6 +617,86 @@ async function buildStudentPayload({
   };
 }
 
+async function prepareLocalDocxRenderTarget(request = {}, reqUser) {
+  const context = await resolveGenerationContext(request, reqUser);
+  const {
+    template,
+    assignment,
+    teacherId,
+    targetStudentIds
+  } = context;
+  const studentId = targetStudentIds[0];
+  if (!studentId) {
+    throw new Error('prepareLocalDocxRenderTarget requires exactly one target student.');
+  }
+  const dataCache = request?.exportBatchCache || null;
+  const instance = await buildSyntheticInstance({
+    template,
+    assignment,
+    teacherId,
+    studentId,
+    reqUser,
+    dataCache
+  });
+  const studentPayload = await buildStudentPayload({
+    template,
+    assignment,
+    instance,
+    reqUser,
+    options: { format: 'docx', dataCache }
+  });
+  const selectionByStudent = new Map(
+    (Array.isArray(request?.selections) ? request.selections : [])
+      .map((row) => [String(row?.studentId || '').trim(), row])
+      .filter(([id]) => id)
+  );
+  const suggestions = await reportFunderDocxService.buildExportDocxSuggestions({
+    template,
+    assignment: {
+      ...assignment,
+      reportStartDate: assignment?.reportStartDate,
+      reportDueDate: assignment?.reportDueDate,
+      classId: assignment?.classId
+    },
+    reqUser,
+    students: [{
+      studentId,
+      personId: studentId,
+      instanceId: instance?.id || '',
+      studentName: studentPayload.studentName
+    }]
+  });
+  const suggestedByStudent = new Map(
+    (suggestions?.rows || []).map((row) => [String(row.studentId), row.suggestedDocxKey])
+  );
+  const selection = selectionByStudent.get(String(studentId)) || {};
+  const docxKey = resolveStudentExportKey(
+    studentId,
+    selection.docxKey || request?.docxKey,
+    suggestedByStudent
+  );
+  const resolved = reportFunderDocxService.resolveDocxTemplateForFunder({
+    template,
+    funderKey: docxKey
+  });
+  if (!resolved.docxTemplate) {
+    throw new Error('No DOCX template available for this student.');
+  }
+  const templateRefKey = `${String(template?.id || '').trim()}|${String(resolved.docxKey || 'default').trim() || 'default'}`;
+  const safeName = String(studentPayload.studentName || studentId)
+    .trim()
+    .replace(/[^A-Za-z0-9_-]+/g, '_')
+    .slice(0, 60);
+  return {
+    templateRefKey,
+    placeholders: studentPayload.placeholders || {},
+    collections: studentPayload.collections || {},
+    fileName: `${safeName || 'student'}_report.docx`,
+    warnings: studentPayload.warnings || [],
+    docxTemplate: resolved.docxTemplate
+  };
+}
+
 async function renderStudentDocx({
   template,
   assignment,
@@ -936,5 +1016,6 @@ module.exports = {
   buildStudentPayload,
   renderStudentDocx,
   renderStudentPdf,
-  generateReportOutput
+  generateReportOutput,
+  prepareLocalDocxRenderTarget
 };

@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const PizZip = require('pizzip');
 
 const reportDocxRenderService = require('../MVC/services/school/reportDocxRenderService');
+const reportDocxRenderCore = require('../MVC/services/school/reportDocxRenderCore');
 const reportExportBatchCacheService = require('../MVC/services/school/reportExportBatchCacheService');
 const studentAttendanceReportGenerationService = require('../MVC/services/school/studentAttendanceReportGenerationService');
 
@@ -79,6 +80,15 @@ test('extractDocumentBodyInner keeps content after an in-body sectPr (WCB-style)
   assert.match(outXml, /WCB attendance table content/);
   assert.match(outXml, /Header line/);
   assert.match(outXml, /Second student segment/);
+});
+
+test('reportDocxRenderCore.mergeReportInstanceDocxBuffers matches service wrapper', () => {
+  const first = buildMinimalDocx('Alpha');
+  const second = buildMinimalDocx('Beta');
+  const viaCore = reportDocxRenderCore.mergeReportInstanceDocxBuffers([first, second]);
+  const viaService = reportDocxRenderService.mergeReportInstanceDocxBuffers([first, second]);
+  assert.equal(viaCore.length, viaService.length);
+  reportDocxRenderService.assertValidDocxPackage(viaCore, 'core merge');
 });
 
 test('mergeReportInstanceDocxBuffers combines two minimal documents', () => {

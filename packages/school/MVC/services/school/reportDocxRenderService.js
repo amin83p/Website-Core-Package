@@ -3,6 +3,7 @@ const fsSync = require('fs');
 const path = require('path');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
+const reportDocxRenderCore = require('./reportDocxRenderCore');
 
 function normalizeTokenKey(rawToken) {
   const clean = String(rawToken || '').trim();
@@ -280,38 +281,21 @@ async function renderReportInstanceDocx({
   if (!template || !instance) throw new Error('Template and report instance are required.');
 
   const docxTemplate = docxTemplateOverride || template.docxTemplate || {};
-  const { PizZip, Docxtemplater } = getDocxDependencies();
   const { binary, filePath } = await readDocxTemplateBuffer(docxTemplate, { exportBatchCache });
-
-  const renderData = buildRenderData(placeholders, collections);
-
-  let doc;
-  try {
-    const zip = new PizZip(binary);
-    doc = new Docxtemplater(zip, {
-      delimiters: { start: '{{', end: '}}' },
-      paragraphLoop: true,
-      linebreaks: true,
-      nullGetter: () => ''
-    });
-    doc.render(renderData);
-  } catch (error) {
-    const reason = extractDocxRenderError(error);
-    throw new Error(`DOCX render failed: ${reason}`);
-  }
 
   const titlePart = sanitizeFileNamePart(template.title || template.id || 'template');
   const instancePart = sanitizeFileNamePart(instance.id || 'instance');
   const fileName = `${instancePart}_${titlePart || 'report'}.docx`;
-  const buffer = doc.getZip().generate({
-    type: 'nodebuffer',
-    compression: 'DEFLATE'
+  const rendered = reportDocxRenderCore.renderDocxFromTemplateBuffer(binary, {
+    placeholders,
+    collections,
+    fileName
   });
 
   return {
-    buffer,
-    fileName,
-    renderData,
+    buffer: rendered.buffer,
+    fileName: rendered.fileName,
+    renderData: rendered.renderData,
     templatePath: filePath
   };
 }
@@ -662,93 +646,7 @@ function appendMediaRelationshipsFromZip({
 }
 
 function mergeReportInstanceDocxBuffers(buffers = []) {
-  const sourceBuffers = (Array.isArray(buffers) ? buffers : []).filter(Boolean);
-  if (!sourceBuffers.length) throw new Error('No rendered report documents were available to combine.');
-  const { PizZip } = getDocxDependencies();
-  const baseZip = new PizZip(sourceBuffers[0]);
-  const baseXml = baseZip.file('word/document.xml')?.asText();
-  if (!baseXml) throw new Error('Rendered DOCX is missing word/document.xml.');
-  const baseBounds = findDocumentBodySliceBounds(baseXml);
-  let combinedBody = '';
-  let relsXml = baseZip.file('word/_rels/document.xml.rels')?.asText() || '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>';
-  let contentTypesXml = baseZip.file('[Content_Types].xml')?.asText() || '';
-  let maxRid = maxRelationshipNumericId(relsXml);
-
-  for (let index = 0; index < sourceBuffers.length; index += 1) {
-    const zip = index === 0 ? baseZip : new PizZip(sourceBuffers[index]);
-    const xml = index === 0 ? baseXml : zip.file('word/document.xml')?.asText();
-    if (!xml) throw new Error('Rendered DOCX is missing word/document.xml.');
-    if (index > 0) {
-      combinedBody += '<w:p><w:r><w:br w:type="page"/></w:r></w:p>';
-      cloneStudentWordParts(zip, baseZip, index);
-      rewriteClonedPartRelationshipTargets(baseZip, index);
-      contentTypesXml = registerContentTypesForClonedParts(baseZip, index, contentTypesXml);
-    }
-    let mediaMerge = { relsXml, nextRid: maxRid, ridMap: new Map(), copiedMediaNames: [] };
-    if (index > 0) {
-      mediaMerge = appendMediaRelationshipsFromZip({
-        sourceZip: zip,
-        baseZip,
-        mergeIndex: index,
-        baseRelsXml: relsXml,
-        maxRid
-      });
-      relsXml = mediaMerge.relsXml;
-      maxRid = mediaMerge.nextRid;
-      (mediaMerge.copiedMediaNames || []).forEach((name) => {
-        contentTypesXml = ensureContentTypesForMedia(contentTypesXml, name);
-      });
-    }
-    let body = extractDocumentBodyInner(xml);
-    if (index > 0) {
-      body = remapRelationshipIdsInXml(body, mediaMerge.ridMap);
-    }
-    let sectPr = extractSectPrFromDocument(xml);
-    if (index > 0 && sectPr) {
-      const hfMerge = remapSectionHeaderFooterParts({
-        sourceZip: zip,
-        baseZip,
-        mergeIndex: index,
-        sectPrXml: sectPr,
-        relsXml,
-        maxRid,
-        contentTypesXml
-      });
-      sectPr = hfMerge.sectPrXml;
-      relsXml = hfMerge.relsXml;
-      maxRid = hfMerge.maxRid;
-      contentTypesXml = hfMerge.contentTypesXml;
-    }
-    combinedBody += body;
-    if (sectPr) combinedBody += sectPr;
-  }
-  if (baseZip.file('word/_rels/document.xml.rels')) {
-    baseZip.file('word/_rels/document.xml.rels', relsXml);
-  }
-  if (contentTypesXml && baseZip.file('[Content_Types].xml')) {
-    baseZip.file('[Content_Types].xml', contentTypesXml);
-  }
-  baseZip.file(
-    'word/document.xml',
-    baseXml.slice(0, baseBounds.openEnd) + combinedBody + baseXml.slice(baseBounds.bodyEnd)
-  );
-  const merged = baseZip.generate({ type: 'nodebuffer', compression: 'DEFLATE' });
-  assertValidDocxPackage(merged, 'merged DOCX');
-  const sumBodyInnerChars = sourceBuffers.reduce((sum, buf) => {
-    try {
-      const zip = new PizZip(buf);
-      const xml = zip.file('word/document.xml')?.asText() || '';
-      if (!xml) return sum;
-      return sum + extractDocumentBodyInner(xml).length;
-    } catch {
-      return sum;
-    }
-  }, 0);
-  const bodyInnerThreshold = Math.floor(sumBodyInnerChars * 0.85);
-  if (sumBodyInnerChars > 0 && combinedBody.length < bodyInnerThreshold) {
-    throw new Error('Merged DOCX document body is unexpectedly small; merge may be incomplete.');
-  }
-  return merged;
+  return reportDocxRenderCore.mergeReportInstanceDocxBuffers(buffers);
 }
 
 function mergeReportInstanceDocxPaths(paths = []) {
@@ -799,7 +697,7 @@ module.exports = {
   isDocxZipBuffer,
   assertValidDocxPackage,
   summarizeDocxFileBuffers,
-  mergeReportInstanceDocxBuffers,
+  mergeReportInstanceDocxBuffers: reportDocxRenderCore.mergeReportInstanceDocxBuffers,
   mergeReportInstanceDocxPaths,
   zipReportInstanceDocxFiles
 };

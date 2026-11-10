@@ -395,6 +395,7 @@ async function buildStudentAttendanceReportPayload(req, options = {}) {
     onProgress({ processed: 0, total: matrixTotal, phase: 'classMatrix' });
   }
 
+  const classMatrixPayloadsByClassId = {};
   const matrixResults = await runWithConcurrency(matrixJobs, matrixConcurrency, async (job) => {
     try {
       const matrixReq = {
@@ -407,8 +408,19 @@ async function buildStudentAttendanceReportPayload(req, options = {}) {
       };
       const payload = await buildAttendanceMatrixPayload(matrixReq, {
         applyWindow: false,
-        filterPersonIds: job.matchedPersonIds.join(',')
+        filterPersonIds: job.matchedPersonIds.join(','),
+        retainExportSessions: Boolean(options.retainClassPayloads)
       });
+      if (options.retainClassPayloads) {
+        const exportSessions = Array.isArray(payload?.exportSessions) ? payload.exportSessions : [];
+        classMatrixPayloadsByClassId[job.classId] = {
+          classData: payload?.classDataForExport || job.classRow,
+          sessions: exportSessions.length
+            ? exportSessions
+            : (Array.isArray(payload?.sessions) ? payload.sessions : []),
+          matrixPayload: payload
+        };
+      }
       return { ...job, payload };
     } finally {
       matrixProcessed += 1;
@@ -467,13 +479,17 @@ async function buildStudentAttendanceReportPayload(req, options = {}) {
     return String(a.name || '').localeCompare(String(b.name || ''));
   });
 
-  return {
+  const result = {
     startDate,
     endDate,
     days,
     students,
     enabledAttendanceStatuses: attendanceMatrixMetricsService.ALL_ATTENDANCE_STATUSES_ORDERED
   };
+  if (options.retainClassPayloads) {
+    result.classMatrixPayloadsByClassId = classMatrixPayloadsByClassId;
+  }
+  return result;
 }
 
 async function collectStudentClassMatrixPayloadsForExport(req, options = {}) {

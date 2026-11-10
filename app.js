@@ -413,8 +413,15 @@ app.use('/uploads', async (req, res, next) => {
 });
 app.use(packageAssetRuntimeRouter);
 
-// Increase limit to 50MB (or more if needed)
-app.use(express.json({ limit: '5mb' }));
+const jsonBodyParserDefault = express.json({ limit: '5mb' });
+const jsonBodyParserLargeSarLocal = express.json({ limit: '50mb' });
+app.use((req, res, next) => {
+  const path = String(req.path || '');
+  if (path.includes('/school/attendances/report/api/local-export/')) {
+    return jsonBodyParserLargeSarLocal(req, res, next);
+  }
+  return jsonBodyParserDefault(req, res, next);
+});
 app.use(express.urlencoded({ limit: '5mb', extended: true }));
 app.use(cookieParser(SESSION_SECRET)); // Use session secret for signed cookies if needed
 app.use(expressSession({

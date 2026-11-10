@@ -1552,6 +1552,10 @@ async function generateStudentAttendanceReports(req, options = {}) {
 module.exports = {
   sortClasses,
   parseTargets,
+  loadGenerationContext,
+  resolveTeacherIdForClass,
+  resolveEligibleOverallTemplateForTarget,
+  collectTargetClassIds,
   buildSourceRunsForStudent,
   buildClassExportRowsForStudent,
   buildOverallExportBlock,

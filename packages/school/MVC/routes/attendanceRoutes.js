@@ -74,6 +74,26 @@ router.post('/report/api/export',
   trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT, { keepActive: true }),
   ctrl.exportStudentAttendanceReport);
 
+router.post('/report/api/export-render-bundle',
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT, { keepActive: true }),
+  ctrl.exportStudentAttendanceRenderBundle);
+
+router.post('/report/api/export-raw-snapshot',
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT, { keepActive: true }),
+  ctrl.exportStudentAttendanceRawSnapshot);
+
+router.post('/report/api/local-export/templates',
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT, { keepActive: true }),
+  ctrl.postLocalExportTemplates);
+
+router.post('/report/api/local-export/prepare-from-snapshot',
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT, { keepActive: true }),
+  ctrl.prepareLocalExportFromSnapshot);
+
 router.get('/report/api/report-jobs/:jobId',
   requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.READ),
   trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.READ, { keepActive: true }),

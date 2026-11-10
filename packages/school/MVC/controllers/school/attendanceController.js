@@ -1077,11 +1077,21 @@ async function buildAttendanceMatrixPayload(req, options = {}) {
             )
         };
 
+        if (options.retainExportSessions) {
+            payload.exportSessions = matrixSessions;
+            payload.classDataForExport = classData;
+        }
+
         const rolledUp = matrixRollupService.recomputeAttendanceMatrixRollups(payload, {
             classData,
             orgPolicyCatalog
         });
-        return attendanceOperationPolicyService.filterMatrixPayloadForScope(rolledUp, attendanceAccess);
+        const filtered = attendanceOperationPolicyService.filterMatrixPayloadForScope(rolledUp, attendanceAccess);
+        if (options.retainExportSessions) {
+            filtered.exportSessions = matrixSessions;
+            filtered.classDataForExport = classData;
+        }
+        return filtered;
 }
 
 async function getAttendanceData(req, res) {
@@ -1942,6 +1952,113 @@ function shouldRunSarExportAsync(body = {}, targetCount = 0) {
     return targetCount >= sarExportConfigService.getAsyncExportMinTargets();
 }
 
+async function exportStudentAttendanceRawSnapshot(req, res) {
+    try {
+        const reportAccess = await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip);
+        if (!reportAccess.canExportReport) {
+            return res.status(403).json({
+                status: 'error',
+                message: 'You do not have permission to export student attendance reports.'
+            });
+        }
+        const sarRawSnapshotService = require('../../services/school/sarRawSnapshotService');
+        const fauxReq = buildStudentAttendanceReportExportFauxReq(req);
+        const snapshot = await sarRawSnapshotService.buildSarRawSnapshot(fauxReq);
+        const file = sarRawSnapshotService.snapshotToDownloadBuffer(snapshot);
+        res.setHeader('Content-Type', file.contentType);
+        res.setHeader('Content-Disposition', `attachment; filename="${String(file.fileName).replace(/"/g, '')}"`);
+        res.setHeader('Content-Length', String(file.buffer.length));
+        return res.send(file.buffer);
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            message: error.message || 'Could not export attendance snapshot.'
+        });
+    }
+}
+
+async function postLocalExportTemplates(req, res) {
+    try {
+        const reportAccess = await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip);
+        if (!reportAccess.canExportReport) {
+            return res.status(403).json({
+                status: 'error',
+                message: 'You do not have permission to export student attendance reports.'
+            });
+        }
+        const sarLocalExportTemplatesService = require('../../services/school/sarLocalExportTemplatesService');
+        const body = req.body && typeof req.body === 'object' ? req.body : {};
+        const pack = body.snapshot
+            ? await sarLocalExportTemplatesService.fetchLocalExportTemplatesForSnapshot(req, body.snapshot)
+            : await sarLocalExportTemplatesService.fetchLocalExportTemplates(req, body);
+        return res.json({ status: 'success', ...pack });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            message: error.message || 'Could not load DOCX templates.'
+        });
+    }
+}
+
+async function prepareLocalExportFromSnapshot(req, res) {
+    try {
+        const reportAccess = await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip);
+        if (!reportAccess.canExportReport) {
+            return res.status(403).json({
+                status: 'error',
+                message: 'You do not have permission to export student attendance reports.'
+            });
+        }
+        const body = req.body && typeof req.body === 'object' ? req.body : {};
+        const snapshot = body.snapshot;
+        const targets = body.targets;
+        const docxTemplates = body.docxTemplates || body.templates || {};
+        const mergeMode = body.mergeMode || body.bundleMode || '';
+        const sarSnapshotLocalPrepareService = require('../../services/school/sarSnapshotLocalPrepareService');
+        const bundle = await sarSnapshotLocalPrepareService.prepareVirtualBundleFromSnapshot(snapshot, targets, {
+            reqUser: req.user,
+            docxTemplates,
+            mergeMode
+        });
+        return res.json({ status: 'success', bundle });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            message: error.message || 'Could not prepare local export from snapshot.'
+        });
+    }
+}
+
+async function exportStudentAttendanceRenderBundle(req, res) {
+    try {
+        const reportAccess = await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip);
+        if (!reportAccess.canExportReport) {
+            return res.status(403).json({
+                status: 'error',
+                message: 'You do not have permission to export student attendance reports.'
+            });
+        }
+        const sarLocalRenderBundleService = require('../../services/school/sarLocalRenderBundleService');
+        const fauxReq = buildStudentAttendanceReportExportFauxReq(req);
+        const result = await sarLocalRenderBundleService.buildSarLocalRenderBundleZip(fauxReq);
+        const buffer = Buffer.isBuffer(result.buffer)
+            ? result.buffer
+            : Buffer.from(result.buffer || []);
+        if (!buffer.length) {
+            throw new Error('Render bundle completed but no file data was produced.');
+        }
+        res.setHeader('Content-Type', result.contentType || 'application/zip');
+        res.setHeader('Content-Disposition', `attachment; filename="${String(result.fileName || 'student_attendance_render_bundle.sarbundle.zip').replace(/"/g, '')}"`);
+        res.setHeader('Content-Length', String(buffer.length));
+        return res.send(buffer);
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            message: error.message || 'Could not build the local render bundle.'
+        });
+    }
+}
+
 async function exportStudentAttendanceReport(req, res) {
     try {
         const reportAccess = await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip);
@@ -2210,6 +2327,10 @@ module.exports = {
     generateStudentAttendanceReport,
     getStudentAttendanceReportExportPlan,
     exportStudentAttendanceReport,
+    exportStudentAttendanceRenderBundle,
+    exportStudentAttendanceRawSnapshot,
+    postLocalExportTemplates,
+    prepareLocalExportFromSnapshot,
     getStudentAttendanceReportExportJob,
     downloadStudentAttendanceReportExportJob,
     exportStudentAttendanceReportExcel,

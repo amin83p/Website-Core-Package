@@ -220,6 +220,11 @@
     }
     .sar-export-class-name { font-weight: 600; font-size: 0.88rem; color: #212529; }
     .sar-export-template-label { font-size: 0.78rem; color: #6c757d; }
+    #sarExportModal .js-sar-bulk-export[data-format="pdf"].sar-export-pdf-local-disabled,
+    #sarExportModal .js-sar-row-export[data-format="pdf"].sar-export-pdf-local-disabled {
+        opacity: 0.55;
+        cursor: not-allowed;
+    }
     #sarExportModal .modal-header { border-bottom: 1px solid #e9ecef; }
     #sarExportModal .modal-footer { border-top: 1px solid #e9ecef; background: #f8f9fa; }
     .attendance-legend-icon-btn {
@@ -628,6 +633,32 @@
     </div>
 </div>
 
+<div class="modal fade" id="sarExportModeChoiceModal" tabindex="-1" aria-labelledby="sarExportModeChoiceModalLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header py-3">
+                <h5 class="modal-title fw-bold" id="sarExportModeChoiceModalLabel">
+                    <i class="bi bi-download me-2 text-primary"></i>Export reports
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close" id="sarExportModeChoiceCloseBtn"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-2">Choose where files are generated. <strong>Local</strong> downloads an attendance snapshot and Word templates to this device first; you then pick reports in the export checklist. <strong>Server</strong> generates files in the app and downloads them when ready.</p>
+                <p class="small text-muted mb-0">For <strong>more than 8</strong> export items, we recommend <strong>local</strong> export, since large server runs place extra load on the app. If you are working on the site during <strong>working hours</strong>, use local export when you can. <strong>After hours</strong>, server export is usually acceptable.</p>
+            </div>
+            <div class="modal-footer py-2 flex-wrap gap-2 justify-content-end">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal" id="sarExportModeChoiceCancelBtn">Cancel</button>
+                <button type="button" class="btn btn-outline-primary btn-sm" id="sarExportModeChoiceLocalBtn">
+                    <i class="bi bi-pc-display me-1"></i>Export on this device
+                </button>
+                <button type="button" class="btn btn-primary btn-sm" id="sarExportModeChoiceServerBtn">
+                    <i class="bi bi-cloud-download me-1"></i>Export on server
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="sarExportModal" tabindex="-1" aria-labelledby="sarExportModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-xl modal-dialog-scrollable">
         <div class="modal-content">
@@ -641,6 +672,9 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body pt-3">
+                <div class="alert alert-warning py-2 small mb-3 d-none" id="sarExportLocalBanner">
+                    Contains sensitive attendance data from your snapshot. PDF export is not available in local mode.
+                </div>
                 <div class="row g-3 mb-3" id="sarExportTemplateCards">
                     <div class="col-md-6">
                         <div class="sar-export-template-card h-100">
@@ -729,7 +763,7 @@
 
                 <div id="sarExportLoading" class="text-center text-muted py-5 d-none">
                     <div class="spinner-border spinner-border-sm text-primary me-2" role="status" aria-hidden="true"></div>
-                    Loading export options…
+                    <span id="sarExportLoadingText">Loading export options…</span>
                 </div>
                 <div id="sarExportEmpty" class="text-center text-muted py-5 d-none">
                     <i class="bi bi-inbox d-block fs-3 mb-2 opacity-50"></i>
@@ -864,6 +898,10 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
 </script>
 <script src="/scripts/schoolRollingEnrollmentDeepLink.js"></script>
 <% } %>
+<% if (typeof canExportReport !== 'undefined' && canExportReport) { %>
+<script src="/scripts/sarLocalExportCore.browser.js"></script>
+<script src="/scripts/sarLocalExportWizard.js?v=local-export-4"></script>
+<% } %>
 
 <script>
 (() => {
@@ -886,6 +924,10 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
     let sarCurrentMatrixUrl = '';
     let sarExportPlan = null;
     let sarExportModalInstance = null;
+    let sarExportMode = 'server';
+    let sarExportModeChoiceResolver = null;
+    let sarLocalRawSnapshot = null;
+    const SAR_LOCAL_PDF_TOOLTIP = 'PDF export is not available in local mode. Use server export or save DOCX and convert locally.';
     let sarReportLoadToken = null;
     let sarReportLoadWaitingPoll = null;
     let sarHideDaysWithoutSession = true;
@@ -1320,6 +1362,34 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
             operation: patch.operation,
             progress: patch.progress
         });
+    }
+
+    function beginSarLocalPreparePseudoProgress(loadingToken, {
+        total = 1,
+        startPct = 30,
+        endPct = 56,
+        startedAt = Date.now()
+    } = {}) {
+        const totalCount = Math.max(1, Number(total) || 1);
+        const estimatedMs = Math.max(4000, totalCount * 2800);
+        let lastProcessed = 0;
+        const timer = window.setInterval(() => {
+            const elapsed = Date.now() - startedAt;
+            const ratio = Math.min(0.92, elapsed / estimatedMs);
+            const pseudoProcessed = Math.min(totalCount, Math.max(lastProcessed, Math.ceil(ratio * totalCount)));
+            lastProcessed = pseudoProcessed;
+            const pct = startPct + Math.round(ratio * (endPct - startPct));
+            updateSarLoadingProgress(loadingToken, {
+                progress: pct,
+                note: formatSarProgressNote({
+                    processed: pseudoProcessed,
+                    total: totalCount,
+                    startedAt,
+                    unitLabel: 'reports'
+                }) || `Preparing render data from snapshot…`
+            });
+        }, 450);
+        return () => window.clearInterval(timer);
     }
 
     function applySarJobProgressToLoading(loadingToken, job = {}, { unitLabel = 'items' } = {}) {
@@ -2250,7 +2320,7 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
     }
 
     async function generateStudentAttendanceReport() {
-        return openStudentAttendanceExportPanel();
+        return beginStudentAttendanceExport();
     }
 
     function getSarFilterParams() {
@@ -3034,6 +3104,7 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
         students.forEach((student) => updateOverallEligibilityUi(student.personId));
         updateSarApplyAllPanel(plan);
         refreshSarExportTemplatePlanList();
+        applySarExportLocalModeUi();
     }
 
     function refreshSarExportTemplatePlanList() {
@@ -3146,6 +3217,7 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
         if (token === 'docx') return 'Word (DOCX)';
         if (token === 'pdf') return 'PDF';
         if (token === 'json') return 'Payload (JSON)';
+        if (token === 'bundle') return 'render bundle';
         return 'report';
     }
 
@@ -3249,6 +3321,424 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
         throw new Error('Export is taking longer than expected. Try again with fewer reports or check server logs.');
     }
 
+    function getSarLocalExportCore() {
+        return typeof window.SarLocalExportCore !== 'undefined' ? window.SarLocalExportCore : null;
+    }
+
+    function getSarLocalWizardApi() {
+        return typeof window.SarLocalExportWizard !== 'undefined' ? window.SarLocalExportWizard : null;
+    }
+
+    function defaultSarLocalConcurrency() {
+        const cores = Number(navigator.hardwareConcurrency) || 4;
+        return Math.max(1, Math.min(cores - 1, 8));
+    }
+
+    function promptSarExportModeChoice() {
+        const modalEl = document.getElementById('sarExportModeChoiceModal');
+        if (!modalEl || !window.bootstrap?.Modal) {
+            return Promise.resolve('server');
+        }
+        return new Promise((resolve) => {
+            sarExportModeChoiceResolver = resolve;
+            const instance = window.bootstrap.Modal.getOrCreateInstance(modalEl);
+            instance.show();
+        });
+    }
+
+    function resolveSarExportModeChoice(mode) {
+        const next = mode === 'local' ? 'local' : (mode === 'server' ? 'server' : null);
+        const modalEl = document.getElementById('sarExportModeChoiceModal');
+        if (modalEl && window.bootstrap?.Modal) {
+            window.bootstrap.Modal.getOrCreateInstance(modalEl).hide();
+        }
+        if (typeof sarExportModeChoiceResolver === 'function') {
+            sarExportModeChoiceResolver(next);
+            sarExportModeChoiceResolver = null;
+        }
+    }
+
+    function syncSarExportModeUi() {
+        const isLocal = sarExportMode === 'local';
+        document.getElementById('sarExportLocalBanner')?.classList.toggle('d-none', !isLocal);
+        applySarExportLocalModeUi();
+    }
+
+    async function prefetchSarLocalDocxTemplates(snapshot) {
+        const wizard = getSarLocalWizardApi();
+        if (!wizard?.cacheTemplatesFromSnapshot) {
+            return { refCount: 0, cachedCount: 0, skipReason: 'no_cacheTemplatesFromSnapshot' };
+        }
+        const orgId = snapshot.manifest?.orgId || '';
+        const result = await wizard.cacheTemplatesFromSnapshot(orgId, snapshot);
+        return { refCount: result.cachedCount, cachedCount: result.cachedCount };
+    }
+
+    function applySarExportLocalModeUi() {
+        const root = getSarExportRoot();
+        if (!root) return;
+        const isLocal = sarExportMode === 'local';
+        root.querySelectorAll('.js-sar-bulk-export[data-format="pdf"], .js-sar-row-export[data-format="pdf"]').forEach((btn) => {
+            if (isLocal) {
+                btn.disabled = true;
+                btn.setAttribute('aria-disabled', 'true');
+                btn.title = SAR_LOCAL_PDF_TOOLTIP;
+                btn.classList.add('sar-export-pdf-local-disabled');
+            } else {
+                btn.disabled = false;
+                btn.removeAttribute('aria-disabled');
+                btn.removeAttribute('title');
+                btn.classList.remove('sar-export-pdf-local-disabled');
+            }
+        });
+    }
+
+    function loadSarLocalRawSnapshot(snapshot) {
+        if (!snapshot || Number(snapshot.schemaVersion) !== 1) {
+            throw new Error('Invalid snapshot file (expected schemaVersion 1).');
+        }
+        sarLocalRawSnapshot = snapshot;
+    }
+
+    async function fetchSarLocalRawSnapshot(filters) {
+        const wizard = getSarLocalWizardApi();
+        if (wizard?.downloadAndParseSnapshot) {
+            const { snapshot, fileName, rawText } = await wizard.downloadAndParseSnapshot({
+                actionStateId: sarActionStateId,
+                startDate: filters.startDate,
+                endDate: filters.endDate,
+                studentIds: filters.studentIds
+            });
+            loadSarLocalRawSnapshot(snapshot);
+            await downloadSarExportBlob(new Blob([rawText], { type: 'application/json' }), fileName);
+            return snapshot;
+        }
+        const params = new URLSearchParams({
+            actionStateId: sarActionStateId,
+            startDate: filters.startDate,
+            endDate: filters.endDate,
+            studentIds: filters.studentIds.join(',')
+        });
+        const response = await fetch('/school/attendances/report/api/export-raw-snapshot', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+                Accept: 'application/json',
+                'X-AJAX-Request': 'true'
+            },
+            body: params.toString()
+        });
+        if (!response.ok) {
+            const payload = await response.json().catch(() => null);
+            throw new Error(payload?.message || `Snapshot download failed (${response.status}).`);
+        }
+        const text = await response.text();
+        const snapshot = JSON.parse(text);
+        loadSarLocalRawSnapshot(snapshot);
+        const disposition = response.headers.get('Content-Disposition') || '';
+        const fileNameMatch = disposition.match(/filename="([^"]+)"/i);
+        const fileName = fileNameMatch?.[1] || `student_attendance_${filters.startDate}_${filters.endDate}.sarraw.json`;
+        await downloadSarExportBlob(new Blob([text], { type: 'application/json' }), fileName);
+        return snapshot;
+    }
+
+    function formatSarExportPlanDateRange(filters, extraNote = '') {
+        const base = `${filters.startDate} → ${filters.endDate}`;
+        return extraNote ? `${base} · ${extraNote}` : base;
+    }
+
+    function resetSarExportPlanPanels() {
+        const loadingEl = document.getElementById('sarExportLoading');
+        loadingEl?.classList.remove('d-none');
+        document.getElementById('sarExportEmpty')?.classList.add('d-none');
+        document.getElementById('sarExportTableWrap')?.classList.add('d-none');
+        document.getElementById('sarExportClassBulkPanel')?.classList.add('d-none');
+        document.getElementById('sarExportOverallBulkPanel')?.classList.add('d-none');
+        document.getElementById('sarExportApplyAllPanel')?.classList.add('d-none');
+        document.getElementById('sarExportTemplatePlanPanel')?.classList.add('d-none');
+    }
+
+    async function loadSarServerExportPlan(filters) {
+        const loadingText = document.getElementById('sarExportLoadingText');
+        if (loadingText) loadingText.textContent = 'Loading export options…';
+        const params = new URLSearchParams();
+        params.set('startDate', filters.startDate);
+        params.set('endDate', filters.endDate);
+        params.set('studentIds', filters.studentIds.join(','));
+        const response = await fetch(`/school/attendances/report/api/report-plan?${params.toString()}`, {
+            credentials: 'same-origin',
+            headers: { 'X-AJAX-Request': 'true' }
+        });
+        if (!response.ok) {
+            const payload = await response.json().catch(() => null);
+            throw new Error(payload?.message || `Could not load export options (${response.status}).`);
+        }
+        const payload = await response.json();
+        if (payload.status !== 'success') {
+            throw new Error(payload.message || 'Could not load export options.');
+        }
+        const dateRangeEl = document.getElementById('sarExportDateRange');
+        if (dateRangeEl) dateRangeEl.textContent = formatSarExportPlanDateRange(filters, 'server export');
+        renderSarExportPlan(payload.plan || {});
+    }
+
+    async function loadSarLocalExportPlan(filters, progressHook = null) {
+        if (typeof progressHook === 'function') {
+            progressHook('Building attendance snapshot and downloading file…');
+        }
+        const loadingText = document.getElementById('sarExportLoadingText');
+        if (loadingText) loadingText.textContent = 'Building attendance snapshot…';
+        const snapshot = await fetchSarLocalRawSnapshot(filters);
+        if (typeof progressHook === 'function') {
+            progressHook('Caching Word templates for local export…');
+        }
+        if (loadingText) loadingText.textContent = 'Caching Word templates…';
+        await prefetchSarLocalDocxTemplates(snapshot);
+        const m = snapshot.manifest || {};
+        const dateRangeEl = document.getElementById('sarExportDateRange');
+        const snapNote = m.createdAt
+            ? `local export · snapshot ${formatSchoolInstant(m.createdAt)}`
+            : 'local export';
+        if (dateRangeEl) dateRangeEl.textContent = formatSarExportPlanDateRange(filters, snapNote);
+        sarExportPlan = snapshot.exportPlan || null;
+        renderSarExportPlan(snapshot.exportPlan || {});
+    }
+
+    async function loadSarExportPlanForSession(filters, progressHook = null) {
+        if (sarExportMode === 'local') {
+            await loadSarLocalExportPlan(filters, progressHook);
+        } else {
+            sarLocalRawSnapshot = null;
+            if (typeof progressHook === 'function') progressHook('Loading export options…');
+            await loadSarServerExportPlan(filters);
+        }
+    }
+
+    async function beginStudentAttendanceExport() {
+        const filters = validateSarFilters();
+        if (!filters) return;
+
+        const mode = await promptSarExportModeChoice();
+        if (!mode) return;
+
+        sarExportMode = mode;
+        syncSarExportModeUi();
+
+        const exportBtn = document.getElementById('btn_exportSar');
+        if (exportBtn) exportBtn.disabled = true;
+        const exportPlanLoadingToken = typeof window.showLoading === 'function'
+            ? window.showLoading({
+                title: mode === 'local' ? 'Preparing local export' : 'Loading export options',
+                note: mode === 'local'
+                    ? 'Downloading attendance snapshot…'
+                    : 'Preparing export choices for the selected students…',
+                operation: 'Student Attendance Report',
+                progress: 5
+            })
+            : null;
+
+        try {
+            await loadSarExportPlanForSession(filters, (note) => {
+                updateSarLoadingProgress(exportPlanLoadingToken, { note, progress: 55 });
+            });
+            document.getElementById('sarExportLoading')?.classList.add('d-none');
+            showSarExportModal();
+        } catch (error) {
+            showReportMessage({ icon: 'error', message: formatSarFetchError(error, 'Could not load export options.') });
+        } finally {
+            if (exportPlanLoadingToken && typeof window.hideLoading === 'function') {
+                window.hideLoading(exportPlanLoadingToken);
+            }
+            if (exportBtn && canGenerateReport && canExportReport) exportBtn.disabled = false;
+        }
+    }
+
+    function dispatchSarFormatExport(format, targets, exportOptions = {}) {
+        const normalizedFormat = String(format || '').trim().toLowerCase();
+        if (sarExportMode === 'local') {
+            if (normalizedFormat === 'pdf') return;
+            if (normalizedFormat === 'docx') {
+                runSarLocalExportRender(targets, exportOptions).catch((error) => {
+                    showReportMessage({ icon: 'error', message: error.message || 'Local export failed.' });
+                });
+                return;
+            }
+            if (normalizedFormat === 'json') {
+                runSarLocalJsonExport(targets, exportOptions).catch((error) => {
+                    showReportMessage({ icon: 'error', message: error.message || 'Local export failed.' });
+                });
+                return;
+            }
+        }
+        runSarExport(format, targets, exportOptions).catch((error) => {
+            showReportMessage({ icon: 'error', message: error.message || 'Export failed.' });
+        });
+    }
+
+    async function runSarLocalJsonExport(targets, exportOptions = {}) {
+        const wizard = getSarLocalWizardApi();
+        if (!wizard?.prepareBundleFromSnapshot || !sarLocalRawSnapshot) {
+            showReportMessage({ icon: 'warning', message: 'Open export in local mode and wait for the snapshot to load.' });
+            return;
+        }
+        if (!targets.length) {
+            showReportMessage({ icon: 'warning', message: 'Select at least one report that supports payload export.' });
+            return;
+        }
+        const loadingToken = showSarExportWaiting('json', targets.length);
+        try {
+            const orgId = sarLocalRawSnapshot.manifest?.orgId || '';
+            const refs = wizard.refsFromWizardTargets(targets, sarLocalRawSnapshot.exportPlan);
+            updateSarLoadingProgress(loadingToken, { progress: 15, note: 'Loading templates…' });
+            const docxTemplates = await wizard.resolveDocxTemplates(orgId, refs);
+            const mergeMode = String(exportOptions.bundleMode || '').trim().toLowerCase();
+            const prepareStartedAt = Date.now();
+            const stopPreparePseudo = beginSarLocalPreparePseudoProgress(loadingToken, {
+                total: targets.length,
+                startPct: 35,
+                endPct: 54,
+                startedAt: prepareStartedAt
+            });
+            let virtualBundle;
+            try {
+                virtualBundle = await wizard.prepareBundleFromSnapshot(
+                    sarLocalRawSnapshot,
+                    targets,
+                    docxTemplates,
+                    mergeMode
+                );
+            } finally {
+                stopPreparePseudo();
+            }
+            updateSarLoadingProgress(loadingToken, {
+                progress: 55,
+                note: formatSarProgressNote({
+                    processed: virtualBundle.targets?.length || targets.length,
+                    total: targets.length,
+                    unitLabel: 'reports'
+                }) || 'Prepared payload from snapshot.'
+            });
+            const payloads = (virtualBundle.targets || []).map((row) => {
+                const baseName = String(row.fileName || 'payload').replace(/\.docx$/i, '');
+                return {
+                    id: row.id,
+                    type: row.type,
+                    studentId: row.studentId,
+                    fileName: `${baseName}.json`,
+                    placeholders: row.placeholders || {},
+                    collections: row.collections || {},
+                    warnings: row.warnings || []
+                };
+            });
+            const filters = validateSarFilters();
+            const stem = `student_attendance_payloads_${filters?.startDate || 'export'}_${filters?.endDate || 'export'}`;
+            let blob;
+            let fileName;
+            if (payloads.length === 1) {
+                fileName = payloads[0].fileName || `${stem}.json`;
+                blob = new Blob([JSON.stringify(payloads[0], null, 2)], { type: 'application/json' });
+            } else {
+                fileName = `${stem}.json`;
+                blob = new Blob([JSON.stringify({ version: 1, exports: payloads }, null, 2)], { type: 'application/json' });
+            }
+            updateSarLoadingProgress(loadingToken, { progress: 100, note: 'Download starting…' });
+            await downloadSarExportBlob(blob, fileName);
+            showReportMessage({ icon: 'success', message: 'Payload export saved successfully.' });
+        } catch (error) {
+            showReportMessage({ icon: 'error', message: error.message || 'Local export failed.' });
+        } finally {
+            hideSarExportWaiting(loadingToken);
+        }
+    }
+
+    async function runSarLocalExportRender(targets, exportOptions = {}) {
+        const core = getSarLocalExportCore();
+        const wizard = getSarLocalWizardApi();
+        if (!core?.exportBundleLocally || !sarLocalRawSnapshot || !wizard) {
+            showReportMessage({ icon: 'warning', message: 'Open export in local mode and wait for the snapshot to load.' });
+            return;
+        }
+        if (!targets.length) {
+            showReportMessage({ icon: 'warning', message: 'Select at least one DOCX report.' });
+            return;
+        }
+        let mergeMode = String(exportOptions.bundleMode || '').trim().toLowerCase();
+        if (!mergeMode && targets.every((row) => row.type === 'overall')) mergeMode = 'merge';
+        const concurrency = defaultSarLocalConcurrency();
+        const loadingToken = showSarExportWaiting('docx', targets.length);
+        try {
+            const orgId = sarLocalRawSnapshot.manifest?.orgId || '';
+            const refs = wizard.refsFromWizardTargets(targets, sarLocalRawSnapshot.exportPlan);
+            updateSarLoadingProgress(loadingToken, { progress: 10, note: 'Loading templates…' });
+            const docxTemplates = await wizard.resolveDocxTemplates(orgId, refs);
+            const prepareStartedAt = Date.now();
+            const stopPreparePseudo = beginSarLocalPreparePseudoProgress(loadingToken, {
+                total: targets.length,
+                startPct: 30,
+                endPct: 56,
+                startedAt: prepareStartedAt
+            });
+            let virtualBundle;
+            try {
+                virtualBundle = await wizard.prepareBundleFromSnapshot(
+                    sarLocalRawSnapshot,
+                    targets,
+                    docxTemplates,
+                    mergeMode
+                );
+            } finally {
+                stopPreparePseudo();
+            }
+            const total = virtualBundle.targets.length;
+            updateSarLoadingProgress(loadingToken, {
+                progress: 58,
+                note: formatSarProgressNote({
+                    processed: total,
+                    total: Math.max(total, targets.length),
+                    unitLabel: 'reports'
+                }) || `Prepared ${total} reports. Rendering…`
+            });
+            const result = await core.exportBundleLocally(virtualBundle, {
+                concurrency,
+                workerScriptUrl: '/scripts/sarLocalExport.worker.js',
+                onProgress: (event) => {
+                    if (event?.phase === 'render') {
+                        const batchTotal = Number(event.total) || total;
+                        const done = Number.isFinite(Number(event.index)) ? Number(event.index) + 1 : 0;
+                        const pct = 58 + Math.round((done / Math.max(batchTotal, 1)) * 32);
+                        const shortName = String(event.fileName || '').trim();
+                        updateSarLoadingProgress(loadingToken, {
+                            progress: pct,
+                            note: formatSarProgressNote({
+                                processed: done,
+                                total: batchTotal,
+                                unitLabel: 'documents'
+                            }) + (shortName ? ` · ${shortName}` : '')
+                        });
+                    } else if (event?.phase === 'merge') {
+                        updateSarLoadingProgress(loadingToken, { progress: 92, note: 'Merging into one file…' });
+                    } else if (event?.phase === 'complete') {
+                        updateSarLoadingProgress(loadingToken, { progress: 98, note: 'Saving…' });
+                    }
+                }
+            });
+            const bytes = result.buffer instanceof ArrayBuffer
+                ? result.buffer
+                : (result.buffer?.buffer
+                    ? result.buffer.buffer.slice(result.buffer.byteOffset, result.buffer.byteOffset + result.buffer.byteLength)
+                    : new Uint8Array(result.buffer || []).buffer);
+            const blob = new Blob([bytes], { type: result.contentType || 'application/octet-stream' });
+            updateSarLoadingProgress(loadingToken, { progress: 100, note: 'Download starting…' });
+            await downloadSarExportBlob(blob, result.fileName || 'student_attendance_export.docx');
+            showReportMessage({ icon: 'success', message: 'Local export saved successfully.' });
+        } catch (error) {
+            showReportMessage({ icon: 'error', message: error.message || 'Local export failed.' });
+        } finally {
+            hideSarExportWaiting(loadingToken);
+        }
+    }
+
     async function runSarExport(format, targets = [], exportOptions = {}) {
         const filters = validateSarFilters();
         if (!filters) return;
@@ -3314,61 +3804,7 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
     }
 
     async function openStudentAttendanceExportPanel() {
-        const filters = validateSarFilters();
-        if (!filters) return;
-
-        const loadingEl = document.getElementById('sarExportLoading');
-        const exportBtn = document.getElementById('btn_exportSar');
-
-        showSarExportModal();
-        loadingEl?.classList.remove('d-none');
-        document.getElementById('sarExportEmpty')?.classList.add('d-none');
-        document.getElementById('sarExportTableWrap')?.classList.add('d-none');
-        document.getElementById('sarExportClassBulkPanel')?.classList.add('d-none');
-        document.getElementById('sarExportOverallBulkPanel')?.classList.add('d-none');
-
-        const dateRangeEl = document.getElementById('sarExportDateRange');
-        if (dateRangeEl) {
-            dateRangeEl.textContent = `${filters.startDate} → ${filters.endDate} · loading…`;
-        }
-
-        if (exportBtn) exportBtn.disabled = true;
-        const exportPlanLoadingToken = typeof window.showLoading === 'function'
-            ? window.showLoading({
-                title: 'Loading Export Options',
-                note: 'Preparing export choices for the selected students…',
-                operation: 'Student Attendance Report',
-                progress: 0
-            })
-            : null;
-        try {
-            const params = new URLSearchParams();
-            params.set('startDate', filters.startDate);
-            params.set('endDate', filters.endDate);
-            params.set('studentIds', filters.studentIds.join(','));
-
-            const response = await fetch(`/school/attendances/report/api/report-plan?${params.toString()}`, {
-                credentials: 'same-origin',
-                headers: { 'X-AJAX-Request': 'true' }
-            });
-            if (!response.ok) {
-                const payload = await response.json().catch(() => null);
-                throw new Error(payload?.message || `Could not load export options (${response.status}).`);
-            }
-            const payload = await response.json();
-            if (payload.status !== 'success') {
-                throw new Error(payload.message || 'Could not load export options.');
-            }
-            renderSarExportPlan(payload.plan || {});
-        } catch (error) {
-            showReportMessage({ icon: 'error', message: formatSarFetchError(error, 'Could not load export options.') });
-        } finally {
-            loadingEl?.classList.add('d-none');
-            if (exportPlanLoadingToken && typeof window.hideLoading === 'function') {
-                window.hideLoading(exportPlanLoadingToken);
-            }
-            if (exportBtn && canGenerateReport && canExportReport) exportBtn.disabled = false;
-        }
+        return beginStudentAttendanceExport();
     }
 
     document.getElementById('studentReportSections').addEventListener('click', (event) => {
@@ -3418,8 +3854,25 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
     document.getElementById('btn_copyReportLink')?.addEventListener('click', () => {
         copySarShareLink().catch((error) => showReportMessage({ icon: 'error', message: error.message || 'Could not copy link.' }));
     });
+    document.getElementById('sarExportModeChoiceServerBtn')?.addEventListener('click', () => resolveSarExportModeChoice('server'));
+    document.getElementById('sarExportModeChoiceLocalBtn')?.addEventListener('click', () => resolveSarExportModeChoice('local'));
+    document.getElementById('sarExportModeChoiceCancelBtn')?.addEventListener('click', () => resolveSarExportModeChoice(null));
+    document.getElementById('sarExportModeChoiceCloseBtn')?.addEventListener('click', () => resolveSarExportModeChoice(null));
+    document.getElementById('sarExportModeChoiceModal')?.addEventListener('hidden.bs.modal', () => {
+        if (typeof sarExportModeChoiceResolver === 'function') {
+            sarExportModeChoiceResolver(null);
+            sarExportModeChoiceResolver = null;
+        }
+    });
+
+    document.getElementById('sarExportModal')?.addEventListener('hidden.bs.modal', () => {
+        sarExportMode = 'server';
+        sarLocalRawSnapshot = null;
+        document.getElementById('sarExportLocalBanner')?.classList.add('d-none');
+    });
+
     document.getElementById('btn_exportSar')?.addEventListener('click', () => {
-        openStudentAttendanceExportPanel().catch((error) => showReportMessage({ icon: 'error', message: error.message || 'Export failed.' }));
+        beginStudentAttendanceExport().catch((error) => showReportMessage({ icon: 'error', message: error.message || 'Export failed.' }));
     });
     document.getElementById('btn_openStudentPicker').addEventListener('click', openStudentPicker);
     document.getElementById('btn_openSchoolStudentPicker')?.addEventListener('click', openHierarchicalStudentPicker);
@@ -3459,6 +3912,7 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
         const exportBtn = event.target.closest('.js-sar-row-export');
         if (exportBtn) {
             event.preventDefault();
+            if (exportBtn.disabled || exportBtn.getAttribute('aria-disabled') === 'true') return;
             const format = String(exportBtn.getAttribute('data-format') || 'json').trim().toLowerCase();
             const rowHost = exportBtn.closest('.sar-export-class-row, .js-sar-overall-cell');
             const checkbox = rowHost?.querySelector('.js-sar-export-check');
@@ -3487,15 +3941,14 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
                 });
                 targets.push({ type: 'overall', studentId, overallTemplateId, templateVariantKey, classIds });
             }
-            runSarExport(format, targets).catch((error) => {
-                showReportMessage({ icon: 'error', message: error.message || 'Export failed.' });
-            });
+            dispatchSarFormatExport(format, targets);
             return;
         }
 
         const bulkBtn = event.target.closest('.js-sar-bulk-export');
         if (bulkBtn) {
             event.preventDefault();
+            if (bulkBtn.disabled || bulkBtn.getAttribute('aria-disabled') === 'true') return;
             const format = String(bulkBtn.getAttribute('data-format') || 'json').trim().toLowerCase();
             const scope = String(bulkBtn.getAttribute('data-export-scope') || 'all').trim().toLowerCase();
             const targets = gatherSarExportTargets(format, scope);
@@ -3508,9 +3961,9 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
             const bundleMode = scope === 'overall' && (normalizedFormat === 'docx' || normalizedFormat === 'pdf')
                 ? 'merge'
                 : '';
-            runSarExport(format, targets, { bundleMode, forceAsync: true }).catch((error) => {
-                showReportMessage({ icon: 'error', message: error.message || 'Export failed.' });
-            });
+            const exportOptions = { bundleMode };
+            if (sarExportMode === 'server') exportOptions.forceAsync = true;
+            dispatchSarFormatExport(format, targets, exportOptions);
         }
     });
 
