@@ -9,6 +9,26 @@ function resolveRepositoryBackendMode(options = {}) {
   return normalizeBackendMode(getActiveDataBackendMode());
 }
 
+async function runMongoRepositoryHandler(handlers, context, options = {}) {
+  if (typeof handlers.mongo !== 'function') {
+    throw new Error(`[${context}] Mongo backend is selected but this repository method is not implemented yet.`);
+  }
+
+  try {
+    return await handlers.mongo();
+  } catch (error) {
+    if (options?.backendMode || !dataBackendRuntimeService.isRecoverableMongoError(error)) {
+      throw error;
+    }
+    if (typeof handlers.json !== 'function') {
+      await dataBackendRuntimeService.recoverFromMongoRepositoryFailure(error);
+      throw error;
+    }
+    await dataBackendRuntimeService.recoverFromMongoRepositoryFailure(error);
+    return handlers.json();
+  }
+}
+
 async function runByRepositoryBackend(options = {}, handlers = {}, context = 'repository') {
   if (!options?.backendMode) {
     await dataBackendRuntimeService.syncActiveDataBackendForRepositoryAccess();
@@ -16,8 +36,7 @@ async function runByRepositoryBackend(options = {}, handlers = {}, context = 're
   const mode = resolveRepositoryBackendMode(options);
 
   if (mode === 'mongo') {
-    if (typeof handlers.mongo === 'function') return handlers.mongo();
-    throw new Error(`[${context}] Mongo backend is selected but this repository method is not implemented yet.`);
+    return runMongoRepositoryHandler(handlers, context, options);
   }
 
   if (typeof handlers.json === 'function') return handlers.json();

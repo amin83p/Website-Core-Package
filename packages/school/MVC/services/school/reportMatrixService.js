@@ -13,6 +13,7 @@ const matrixWindowService = require('./matrixWindowService');
 const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
 const classAttendanceRosterOrderService = require('./classAttendanceRosterOrderService');
 const reportInstanceLivePrefillResetService = require('./reportInstanceLivePrefillResetService');
+const reportPrefillRefreshPreviewService = require('./reportPrefillRefreshPreviewService');
 
 const VISUAL_TYPES = new Set(['section', 'subheader', 'row_break']);
 const STUDENT_NAME_KEYS = new Set([
@@ -905,6 +906,24 @@ async function lockMatrixRows({
 }
 
 
+function simulateMatrixClientRecalcDisplay(row, template) {
+  const calculationBase = row?.calculationAnswers && typeof row.calculationAnswers === 'object'
+    ? row.calculationAnswers
+    : (row?.answers && typeof row.answers === 'object' ? row.answers : {});
+  const calculationPrefill = row?.calculationPrefill && typeof row.calculationPrefill === 'object'
+    ? row.calculationPrefill
+    : {};
+  const prepared = reportRuleEngineService.prepareReportAnswersForUI({
+    template,
+    mergedAnswers: calculationBase,
+    prefill: calculationPrefill,
+    skipRecalculation: false
+  });
+  return prepared.displayAnswers && typeof prepared.displayAnswers === 'object'
+    ? prepared.displayAnswers
+    : {};
+}
+
 function coerceMatrixPrefillValue(field, value) {
   if (value === undefined || value === null) return '';
   const type = clean(field?.type).toLowerCase();
@@ -926,8 +945,6 @@ async function resolveMatrixData({ assignmentId, assignmentRowId = '', teacherId
 
 async function buildMatrixPrefillPreview({ assignmentId, assignmentRowId = '', teacherId = '', reqUser } = {}) {
   const source = await resolveMatrixData({ assignmentId, assignmentRowId, teacherId, reqUser });
-  const fields = (Array.isArray(source.template?.schema?.fields) ? source.template.schema.fields : [])
-    .filter((field) => field?.id && !isVisualField(field) && reportService.normalizePrefillKey(field?.prefillKey || ''));
   const students = [];
   for (const studentId of source.targetStudentIds) {
     const instance = findMatchingInstance(source.instances, { assignmentId: source.assignment.id, assignmentRowId: source.assignmentRowId, teacherId: source.resolvedTeacherId, studentId });
@@ -936,28 +953,17 @@ async function buildMatrixPrefillPreview({ assignmentId, assignmentRowId = '', t
       students.push({ studentId: row.studentId, studentName: row.studentName, status: 'pending', locked: false, pending: true, changes: [] });
       continue;
     }
-    const oldPrefill = instance.prefillSnapshot && typeof instance.prefillSnapshot === 'object' ? instance.prefillSnapshot : {};
-    const refreshedPrefill = await reportService.buildPrefillSnapshot({
+    const gridDisplayAnswers = simulateMatrixClientRecalcDisplay(row, source.template);
+    const preview = await reportPrefillRefreshPreviewService.buildPrefillRefreshPreview({
+      instance,
+      template: source.template,
       assignment: source.assignment,
-      teacherId: source.resolvedTeacherId,
-      studentId,
       reqUser,
-      requiredKeys: reportService.resolveTemplateFillKeys(source.template)
+      gridDisplayAnswers
     });
-    const merged = reportService.mergeTemplateData(source.template, instance, source.assignment);
-    const changes = new Map();
-    for (const field of fields) {
-      const key = reportService.normalizePrefillKey(field.prefillKey || '');
-      const oldResolved = getPrefillValue(oldPrefill, key);
-      const newResolved = getPrefillValue(refreshedPrefill, key);
-      const oldValue = oldResolved.found ? oldResolved.value : undefined;
-      const newValue = newResolved.found ? newResolved.value : undefined;
-      if (stableValueToken(oldValue) === stableValueToken(newValue) || !newResolved.found) continue;
-      if (!changes.has(key)) changes.set(key, { prefillKey: key, oldRawValue: oldValue, newRawValue: newValue, fields: [] });
-      changes.get(key).fields.push({ fieldId: String(field.id), label: String(field.label || field.id), type: clean(field.type).toLowerCase(), oldValue: coerceMatrixPrefillValue(field, oldValue), newValue: coerceMatrixPrefillValue(field, newValue), currentValue: merged[field.id], oldRawValue: oldValue, newRawValue: newValue });
-    }
+    const changes = Array.isArray(preview?.changes) ? preview.changes : [];
     const status = clean(instance.status || 'draft').toLowerCase();
-    students.push({ studentId: row.studentId, studentName: row.studentName, status, locked: status === 'locked', pending: false, changes: Array.from(changes.values()) });
+    students.push({ studentId: row.studentId, studentName: row.studentName, status, locked: status === 'locked', pending: false, changes });
   }
   return { status: 'success', assignmentId: toPublicId(source.assignment.id), assignmentRowId: source.assignmentRowId, students, summary: { total: students.length, changed: students.filter((s) => s.changes.length).length, locked: students.filter((s) => s.locked).length, pending: students.filter((s) => s.pending).length } };
 }
@@ -977,8 +983,22 @@ async function applyMatrixPrefill({ assignmentId, assignmentRowId = '', teacherI
     if (!changes.length) { results.push({ studentId, status: 'skipped', message: 'No selected prefill changes remain.' }); continue; }
     const nextPrefill = { ...(instance.prefillSnapshot || {}) };
     const nextAnswers = { ...(instance.answers || {}) };
-    changes.forEach((change) => { nextPrefill[change.prefillKey] = change.newRawValue; (change.fields || []).forEach((field) => { nextAnswers[field.fieldId] = field.newValue; }); });
-    const merged = reportService.mergeTemplateData(source.template, { ...instance, prefillSnapshot: nextPrefill, answers: nextAnswers }, source.assignment);
+    const nextDerivedOverrides = { ...(instance.derivedOverrides || {}) };
+    changes.forEach((change) => {
+      if (!change?.expressionDriven) {
+        nextPrefill[change.prefillKey] = change.newRawValue;
+      }
+      (change.fields || []).forEach((field) => {
+        if (!field?.fieldId) return;
+        nextAnswers[field.fieldId] = field.newValue;
+        nextDerivedOverrides[field.fieldId] = false;
+      });
+    });
+    const merged = reportService.mergeTemplateData(
+      source.template,
+      { ...instance, prefillSnapshot: nextPrefill, answers: nextAnswers, derivedOverrides: nextDerivedOverrides },
+      source.assignment
+    );
     const prepared = reportRuleEngineService.prepareReportAnswersForUI({
       template: source.template,
       mergedAnswers: merged,
@@ -989,7 +1009,7 @@ async function applyMatrixPrefill({ assignmentId, assignmentRowId = '', teacherI
       .forEach((field) => { nextAnswers[field.id] = prepared.calculationAnswers[field.id]; });
     const mergedForRenderCache = reportService.mergeTemplateData(
       source.template,
-      { ...instance, prefillSnapshot: nextPrefill, answers: nextAnswers },
+      { ...instance, prefillSnapshot: nextPrefill, answers: nextAnswers, derivedOverrides: nextDerivedOverrides },
       source.assignment
     );
     const cacheAt = new Date().toISOString();
@@ -1003,6 +1023,7 @@ async function applyMatrixPrefill({ assignmentId, assignmentRowId = '', teacherI
     await schoolDataService.updateData('reportInstances', instance.id, {
       prefillSnapshot: nextPrefill,
       answers: nextAnswers,
+      derivedOverrides: nextDerivedOverrides,
       renderCache,
       audit: {
         lastUpdateUser: reqUser?.id || '',

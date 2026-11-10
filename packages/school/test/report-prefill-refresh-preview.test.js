@@ -64,8 +64,121 @@ test('prefill preview diffs live merge ignoring renderCache', async (t) => {
   const row = preview.changes.find((c) => c.prefillKey === 'report_title');
   assert.ok(row, 'expected a change for report_title');
   const sub = row.fields[0];
-  assert.equal(sub.currentValue, 'Saved title');
+  assert.equal(sub.currentValue, 'Cached wrong');
   assert.equal(sub.newValue, 'Fresh title');
+});
+
+test('prefill preview diffs frozen renderCache display vs live refreshed merge', async (t) => {
+  const template = {
+    id: 'TPL_PRE_2',
+    version: 1,
+    schema: {
+      fields: [
+        {
+          id: 'punctuality_label',
+          label: 'Punctuality',
+          type: 'text',
+          prefillKey: 'student_punctuality_span_label',
+          valueMode: 'manual'
+        }
+      ]
+    }
+  };
+  const assignment = { id: 'ASG_P2', reportScope: 'each_student', classId: 'CLS1' };
+  const instance = {
+    id: 'RINS_PRE_2',
+    studentId: 'STU1',
+    teacherId: 'T1',
+    status: 'draft',
+    answers: {},
+    audit: { firstSavedAt: '2025-01-01T00:00:00.000Z' },
+    prefillSnapshot: { student_punctuality_span_label: '90% (live)' },
+    renderCache: {
+      templateId: 'TPL_PRE_2',
+      templateVersion: 1,
+      capturedAt: '2025-01-02T00:00:00.000Z',
+      mergedAnswers: { punctuality_label: '80% (stale cache)' }
+    }
+  };
+
+  const origBuild = reportService.buildPrefillSnapshot;
+  reportService.buildPrefillSnapshot = async () => ({ student_punctuality_span_label: '90% (live)' });
+
+  t.after(() => {
+    reportService.buildPrefillSnapshot = origBuild;
+  });
+
+  const preview = await reportPrefillRefreshPreviewService.buildPrefillRefreshPreview({
+    instance,
+    template,
+    assignment,
+    reqUser: { id: 'u1' }
+  });
+
+  const row = preview.changes.find((c) => c.prefillKey === 'student_punctuality_span_label');
+  assert.ok(row, 'expected display vs refreshed diff for punctuality');
+  const sub = row.fields[0];
+  assert.equal(sub.currentValue, '80% (stale cache)');
+  assert.equal(sub.newValue, '90% (live)');
+});
+
+test('prefill preview recalculates calculated fields for refreshed side when matrix uses frozen cache', async (t) => {
+  const template = {
+    id: 'TPL_PRE_3',
+    version: 1,
+    schema: {
+      fields: [
+        {
+          id: 'Punctuality',
+          label: 'Punctuality',
+          type: 'number',
+          valueMode: 'calculated',
+          calculationRule: {
+            enabled: true,
+            expression: 'prefill.student_punctuality_span_percent',
+            onError: 'keep_last'
+          }
+        }
+      ]
+    }
+  };
+  const assignment = { id: 'ASG_P3', reportScope: 'each_student', classId: 'CLS1' };
+  const instance = {
+    id: 'RINS_PRE_3',
+    studentId: 'STU1',
+    teacherId: 'T1',
+    status: 'draft',
+    answers: {},
+    audit: { firstSavedAt: '2025-01-01T00:00:00.000Z' },
+    prefillSnapshot: { student_punctuality_span_percent: 100 },
+    renderCache: {
+      templateId: 'TPL_PRE_3',
+      templateVersion: 1,
+      capturedAt: '2025-01-02T00:00:00.000Z',
+      mergedAnswers: { Punctuality: 100 }
+    }
+  };
+
+  const origBuild = reportService.buildPrefillSnapshot;
+  reportService.buildPrefillSnapshot = async () => ({ student_punctuality_span_percent: 75 });
+
+  t.after(() => {
+    reportService.buildPrefillSnapshot = origBuild;
+  });
+
+  const preview = await reportPrefillRefreshPreviewService.buildPrefillRefreshPreview({
+    instance,
+    template,
+    assignment,
+    reqUser: { id: 'u1' }
+  });
+
+  const row = preview.changes.find((item) => item.prefillKey === '__field__Punctuality');
+  assert.ok(row, 'expected calculated punctuality diff when cache is frozen');
+  assert.equal(row.expressionDriven, true);
+  const sub = row.fields[0];
+  assert.equal(sub.currentValue, 100);
+  assert.equal(sub.newValue, 75);
 });
 
 function withPatched(target, replacements, callback) {

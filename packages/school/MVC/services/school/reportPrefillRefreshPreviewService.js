@@ -1,7 +1,7 @@
 const reportService = require('./reportService');
 const reportRuleEngineService = require('./reportRuleEngineService');
 const reportGenerationEngineService = require('./reportGenerationEngineService');
-const { getPrefillValue } = require('./reportPrefillKeyUtils');
+const { getPrefillValue, isAutoRefreshPrefillKey } = require('./reportPrefillKeyUtils');
 
 function isVisualOnlyField(field = {}) {
   const type = String(field?.type || '').trim().toLowerCase();
@@ -37,10 +37,55 @@ function buildAssignmentSnapshotFallback(instance, assignment) {
   };
 }
 
+function collectChangedPrefillKeys(oldPrefill = {}, refreshedPrefill = {}) {
+  const keys = new Set([...Object.keys(oldPrefill), ...Object.keys(refreshedPrefill)]);
+  const changed = [];
+  keys.forEach((key) => {
+    if (stableValueToken(oldPrefill[key]) !== stableValueToken(refreshedPrefill[key])) {
+      changed.push(key);
+    }
+  });
+  return changed;
+}
+
+function fieldUsesPrefillKey(field, prefillKey) {
+  const normalized = reportService.normalizePrefillKey(field?.prefillKey || '');
+  if (normalized && normalized === prefillKey) return true;
+  const expression = String(field?.calculationRule?.expression || '');
+  return expression.includes(`prefill.${prefillKey}`);
+}
+
+function pickRenderCacheMerged(template, renderCache) {
+  const tid = String(template?.id || '').trim();
+  if (!renderCache?.mergedAnswers || typeof renderCache.mergedAnswers !== 'object') return null;
+  if (tid && String(renderCache.templateId || '').trim() !== tid) return null;
+  return { ...renderCache.mergedAnswers };
+}
+
+function resolvePrefillPreviewBaselineMerged(template, instance, assignment, editorMergeOptions) {
+  const fromLiveCache = pickRenderCacheMerged(template, instance?.renderCache);
+  if (fromLiveCache) return { merged: fromLiveCache, source: 'renderCache', skipRecalculation: true };
+  const fromReopenBaseline = pickRenderCacheMerged(template, instance?.audit?.prefillPreviewBaselineCache);
+  if (fromReopenBaseline) {
+    return { merged: fromReopenBaseline, source: 'reopenBaseline', skipRecalculation: true };
+  }
+  return {
+    merged: reportService.mergeTemplateDataLivePersisted(
+      template,
+      instance,
+      assignment,
+      { scopeOptions: editorMergeOptions }
+    ),
+    source: 'livePersisted',
+    skipRecalculation: false
+  };
+}
+
 /**
- * Compare live merge baseline (stored answers + prefill) vs full merge after fresh prefill.
+ * Compare last-saved display (render cache when present) vs merge after fresh prefill,
+ * keeping stored private answers (selective prefill refresh — not full live reset).
  */
-async function buildPrefillRefreshPreview({ instance, template, assignment, reqUser }) {
+async function buildPrefillRefreshPreview({ instance, template, assignment, reqUser, gridDisplayAnswers = null }) {
   const oldPrefill = instance?.prefillSnapshot && typeof instance.prefillSnapshot === 'object'
     ? instance.prefillSnapshot
     : {};
@@ -57,13 +102,19 @@ async function buildPrefillRefreshPreview({ instance, template, assignment, reqU
     ? { respectSnapshotKeys: true }
     : {};
 
-  const baselineMerged = reportService.mergeTemplateDataLivePersisted(
+  const baselineResolved = resolvePrefillPreviewBaselineMerged(template, instance, assignment, editorMergeOptions);
+  const baselinePrepared = reportRuleEngineService.prepareReportAnswersForUI({
     template,
-    instance,
-    assignment,
-    { scopeOptions: editorMergeOptions }
-  );
-  const refreshedMerged = reportService.mergeTemplateDataLivePersisted(
+    mergedAnswers: baselineResolved.merged,
+    prefill: oldPrefill,
+    skipRecalculation: baselineResolved.skipRecalculation
+  });
+  const persistedDisplayAnswers = baselinePrepared.displayAnswers || {};
+  const gridDisplay = gridDisplayAnswers && typeof gridDisplayAnswers === 'object'
+    ? gridDisplayAnswers
+    : null;
+
+  const targetMergedRaw = reportService.mergeTemplateDataLivePersisted(
     template,
     {
       ...instance,
@@ -72,6 +123,16 @@ async function buildPrefillRefreshPreview({ instance, template, assignment, reqU
     assignment,
     { scopeOptions: editorMergeOptions }
   );
+  const targetPrepared = reportRuleEngineService.prepareReportAnswersForUI({
+    template,
+    mergedAnswers: targetMergedRaw,
+    prefill: refreshedPrefill,
+    skipRecalculation: false
+  });
+  const refreshedAnswers = targetPrepared.displayAnswers || {};
+
+  const changedPrefillKeys = collectChangedPrefillKeys(oldPrefill, refreshedPrefill);
+  const changedAutoRefreshKeys = changedPrefillKeys.filter((key) => isAutoRefreshPrefillKey(key));
 
   const changesByKey = new Map();
 
@@ -85,12 +146,23 @@ async function buildPrefillRefreshPreview({ instance, template, assignment, reqU
 
     const fieldId = String(field.id);
     const valueMode = reportRuleEngineService.normalizeValueMode(field?.valueMode);
-    const baselineVal = baselineMerged[fieldId];
-    const refreshedVal = refreshedMerged[fieldId];
+    const persistedVal = persistedDisplayAnswers[fieldId];
+    const gridVal = gridDisplay ? gridDisplay[fieldId] : undefined;
+    const refreshedVal = refreshedAnswers[fieldId];
+    const baselineVersusTarget = stableValueToken(persistedVal) !== stableValueToken(refreshedVal);
+    const gridVersusTarget = gridDisplay && stableValueToken(gridVal) !== stableValueToken(refreshedVal);
+
+    const prefillKey = reportService.normalizePrefillKey(field?.prefillKey || '');
+    const oldResolved = prefillKey ? getPrefillValue(oldPrefill, prefillKey) : { found: false };
+    const newResolved = prefillKey ? getPrefillValue(refreshedPrefill, prefillKey) : { found: false };
+    const prefillRawChanged = prefillKey && newResolved.found
+      && stableValueToken(oldResolved.found ? oldResolved.value : undefined) !== stableValueToken(newResolved.value);
+
+    if (!baselineVersusTarget && !gridVersusTarget) {
+      return;
+    }
 
     if (valueMode === 'calculated' || valueMode === 'derived_editable') {
-      if (stableValueToken(baselineVal) === stableValueToken(refreshedVal)) return;
-
       const oldExprValue = evaluateExpressionFieldValue(field, instance?.answers || {}, oldPrefill);
       const newExprValue = evaluateExpressionFieldValue(field, instance?.answers || {}, refreshedPrefill);
       const changeKey = `__field__${fieldId}`;
@@ -109,7 +181,7 @@ async function buildPrefillRefreshPreview({ instance, template, assignment, reqU
           type,
           oldValue: coerceExpressionValueForField(field, oldExprValue),
           newValue: refreshedVal,
-          currentValue: baselineVal,
+          currentValue: persistedVal !== undefined ? persistedVal : gridVal,
           oldRawValue: oldExprValue,
           newRawValue: newExprValue,
           skippedDueToOverride
@@ -118,45 +190,50 @@ async function buildPrefillRefreshPreview({ instance, template, assignment, reqU
       return;
     }
 
-    const prefillKey = reportService.normalizePrefillKey(field?.prefillKey || '');
-    if (!prefillKey) return;
-
-    const oldResolved = getPrefillValue(oldPrefill, prefillKey);
-    const newResolved = getPrefillValue(refreshedPrefill, prefillKey);
-    if (!newResolved.found) return;
-
-    const oldRawValue = oldResolved.found ? oldResolved.value : undefined;
-    const newRawValue = newResolved.value;
-    const oldValue = coercePrefillValueForField(field, oldRawValue);
-    const baselineVersusRefreshed = stableValueToken(baselineVal) !== stableValueToken(refreshedVal);
-    const prefillRawChanged = stableValueToken(oldRawValue) !== stableValueToken(newRawValue);
-    if (!baselineVersusRefreshed && !prefillRawChanged) return;
-
-    if (!changesByKey.has(prefillKey)) {
-      changesByKey.set(prefillKey, {
-        prefillKey,
+    const oldRawValue = prefillKey && oldResolved.found ? oldResolved.value : undefined;
+    const newRawValue = prefillKey && newResolved.found ? newResolved.value : undefined;
+    const oldValue = prefillKey ? coercePrefillValueForField(field, oldRawValue) : persistedVal;
+    const changeKey = prefillKey || `__field__${fieldId}`;
+    if (!changesByKey.has(changeKey)) {
+      changesByKey.set(changeKey, {
+        prefillKey: changeKey,
+        expressionDriven: false,
         oldRawValue,
         newRawValue,
         fields: []
       });
     }
-
-    changesByKey.get(prefillKey).fields.push({
+    changesByKey.get(changeKey).fields.push({
       fieldId,
       label: String(field.label || field.id || ''),
       type,
       oldValue,
       newValue: refreshedVal,
-      currentValue: baselineVal,
+      currentValue: persistedVal !== undefined ? persistedVal : gridVal,
       oldRawValue,
       newRawValue,
       skippedDueToOverride: instance?.derivedOverrides?.[fieldId] === true
     });
   });
 
+  function fieldDisplayWouldChange(fieldId) {
+    const persisted = persistedDisplayAnswers[fieldId];
+    const grid = gridDisplay ? gridDisplay[fieldId] : undefined;
+    const refreshed = refreshedAnswers[fieldId];
+    return stableValueToken(persisted) !== stableValueToken(refreshed)
+      || (gridDisplay && stableValueToken(grid) !== stableValueToken(refreshed));
+  }
+
+  const changes = Array.from(changesByKey.values())
+    .map((change) => ({
+      ...change,
+      fields: (change.fields || []).filter((field) => fieldDisplayWouldChange(field.fieldId))
+    }))
+    .filter((change) => change.fields.length > 0);
+
   return {
     refreshedPrefill,
-    changes: Array.from(changesByKey.values())
+    changes
   };
 }
 

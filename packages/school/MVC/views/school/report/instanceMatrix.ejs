@@ -1664,7 +1664,13 @@
       prefillRowsEl.innerHTML = students.map((student) => {
         const disabled = student.locked || student.pending || !student.changes?.length;
         const status = student.pending ? 'pending (no stored snapshot)' : (student.locked ? 'locked' : student.status);
-        const changes = (student.changes || []).map((change) => '<label class="d-flex gap-2 align-items-start border rounded p-2 mb-2"><input type="checkbox" class="form-check-input js-matrix-prefill-key mt-1" data-student-id="' + escapeHtml(student.studentId) + '" data-prefill-key="' + escapeHtml(change.prefillKey) + '" ' + (disabled ? 'disabled' : '') + '><span><strong>' + escapeHtml(change.prefillKey) + '</strong><br><span class="small text-muted">' + (change.fields || []).map((field) => escapeHtml(field.label) + ': ' + escapeHtml(field.currentValue) + ' ? ' + escapeHtml(field.newValue)).join('<br>') + '</span></span></label>').join('');
+        const changes = (student.changes || []).map((change) => {
+          const fieldLabels = (change.fields || []).map((field) => field.label || field.fieldId).filter(Boolean);
+          const changeTitle = (change.expressionDriven || String(change.prefillKey || '').startsWith('__field__'))
+            ? (fieldLabels.join(', ') || change.prefillKey)
+            : (change.prefillKey || fieldLabels.join(', ') || 'Prefill key');
+          return '<label class="d-flex gap-2 align-items-start border rounded p-2 mb-2"><input type="checkbox" class="form-check-input js-matrix-prefill-key mt-1" data-student-id="' + escapeHtml(student.studentId) + '" data-prefill-key="' + escapeHtml(change.prefillKey) + '" ' + (disabled ? 'disabled' : '') + '><span><strong>' + escapeHtml(changeTitle) + '</strong><br><span class="small text-muted">' + (change.fields || []).map((field) => escapeHtml(field.label) + ': ' + escapeHtml(field.currentValue) + ' → ' + escapeHtml(field.newValue)).join('<br>') + '</span></span></label>';
+        }).join('');
         return '<div class="card mb-3"><div class="card-header py-2 d-flex justify-content-between"><strong>' + escapeHtml(student.studentName || student.studentId) + '</strong><span class="badge bg-light text-secondary border">' + escapeHtml(status) + '</span></div><div class="card-body py-2">' + (changes || '<span class="small text-muted">No applicable updates.</span>') + '</div></div>';
       }).join('');
       prefillRowsEl.querySelectorAll('.js-matrix-prefill-key').forEach((item) => item.addEventListener('change', updatePrefillApplyState));

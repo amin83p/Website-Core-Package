@@ -2703,10 +2703,14 @@ async function reopenInstance(req, res) {
       status: 'draft',
       renderCache: null,
       audit: {
+        ...(instance.audit && typeof instance.audit === 'object' ? instance.audit : {}),
         lastUpdateUser: req.user?.id || '',
         lastUpdateDateTime: now,
         reopenedAt: now,
-        reopenedBy: toPublicId(req.user?.id || '')
+        reopenedBy: toPublicId(req.user?.id || ''),
+        prefillPreviewBaselineCache: instance.renderCache && typeof instance.renderCache === 'object'
+          ? instance.renderCache
+          : (instance.audit?.prefillPreviewBaselineCache || null)
       }
     }, req.user);
 

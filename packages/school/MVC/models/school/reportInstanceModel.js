@@ -146,7 +146,17 @@ function sanitizeAudit(v, existingAudit = {}) {
     firstSavedAt: cleanString(raw.firstSavedAt || existingAudit.firstSavedAt, { max: 60, allowEmpty: true }),
     lastDraftSavedAt: cleanString(raw.lastDraftSavedAt || existingAudit.lastDraftSavedAt, { max: 60, allowEmpty: true }),
     prefillHydratedAt: cleanString(raw.prefillHydratedAt || existingAudit.prefillHydratedAt, { max: 60, allowEmpty: true }),
-    prefillRefreshedAt: cleanString(raw.prefillRefreshedAt || existingAudit.prefillRefreshedAt, { max: 60, allowEmpty: true })
+    prefillRefreshedAt: cleanString(raw.prefillRefreshedAt || existingAudit.prefillRefreshedAt, { max: 60, allowEmpty: true }),
+    reopenedAt: cleanString(raw.reopenedAt || existingAudit.reopenedAt, { max: 60, allowEmpty: true }),
+    reopenedBy: cleanString(raw.reopenedBy || existingAudit.reopenedBy, { max: 80, allowEmpty: true }),
+    prefillPreviewBaselineCache: raw.prefillPreviewBaselineCache === null
+      ? null
+      : sanitizeRenderCache(
+        raw.prefillPreviewBaselineCache !== undefined
+          ? raw.prefillPreviewBaselineCache
+          : existingAudit.prefillPreviewBaselineCache,
+        existingAudit.prefillPreviewBaselineCache
+      )
   };
 }
 

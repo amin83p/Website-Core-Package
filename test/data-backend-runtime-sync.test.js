@@ -176,6 +176,50 @@ test('runByRepositoryBackend uses mongo handler after successful sync', async ()
   }
 });
 
+test('runByRepositoryBackend falls back to json when mongo handler fails with network error', async () => {
+  const previousEnv = {
+    DATA_BACKEND: process.env.DATA_BACKEND,
+    DATA_BACKEND_STRICT: process.env.DATA_BACKEND_STRICT
+  };
+  process.env.DATA_BACKEND = 'mongo';
+  delete process.env.DATA_BACKEND_STRICT;
+
+  const modules = loadRuntimeModules({
+    connectMongoImpl: async () => {}
+  });
+
+  try {
+    const { setActiveDataBackendConfig } = modules;
+    setActiveDataBackendConfig({
+      mode: 'mongo',
+      requested: 'mongo',
+      mongo: { ready: true, uri: 'mongodb://127.0.0.1:27017/test' },
+      fallback: { active: false },
+      runtime: { requestedMode: 'mongo', activeMode: 'mongo' }
+    });
+
+    const mongoError = new Error('connection <monitor> closed');
+    mongoError.name = 'MongoServerSelectionError';
+
+    const outcome = await modules.runByRepositoryBackend({}, {
+      json: async () => 'json-fallback',
+      mongo: async () => {
+        throw mongoError;
+      }
+    }, 'test.mongo-fallback');
+
+    assert.equal(outcome, 'json-fallback');
+    assert.equal(modules.dataBackendRuntimeService.isRecoveryModeActive(), true);
+    assert.equal(modules.dataBackendRuntimeService.getPublicBackendStatus().mode, 'json');
+  } finally {
+    if (previousEnv.DATA_BACKEND === undefined) delete process.env.DATA_BACKEND;
+    else process.env.DATA_BACKEND = previousEnv.DATA_BACKEND;
+    if (previousEnv.DATA_BACKEND_STRICT === undefined) delete process.env.DATA_BACKEND_STRICT;
+    else process.env.DATA_BACKEND_STRICT = previousEnv.DATA_BACKEND_STRICT;
+    modules.restore();
+  }
+});
+
 test('backend change listener is invoked when sync restores mongo', async () => {
   const modules = loadRuntimeModules({
     connectMongoImpl: async () => {}

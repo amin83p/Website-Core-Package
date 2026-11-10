@@ -4,8 +4,47 @@ const {
   getActiveDataBackendConfig,
   isDataBackendRecoveryModeActive
 } = require('../infrastructure/runtime/dataBackendRuntime');
-const { connectMongo } = require('../infrastructure/mongo/mongoConnection');
+const { connectMongo, disconnectMongo, pingMongo, getMongoDbOrNull } = require('../infrastructure/mongo/mongoConnection');
 const startupLogger = require('../utils/startupLogger');
+
+function isRecoverableMongoError(error) {
+  if (!error) return false;
+  const name = String(error.name || '');
+  if (['MongoServerSelectionError', 'MongoNetworkError', 'MongoTimeoutError'].includes(name)) return true;
+  const causeName = String(error.cause?.name || '');
+  if (['MongoServerSelectionError', 'MongoNetworkError', 'MongoTimeoutError'].includes(causeName)) return true;
+  if (error.errorLabelSet && typeof error.errorLabelSet.has === 'function' && error.errorLabelSet.has('ResetPool')) {
+    return true;
+  }
+  const message = String(error.message || '').toLowerCase();
+  return message.includes('server selection') || (message.includes('connection') && message.includes('closed'));
+}
+
+async function isMongoConnectionHealthy() {
+  if (!getMongoDbOrNull()) return false;
+  try {
+    return await pingMongo();
+  } catch (_) {
+    return false;
+  }
+}
+
+async function recoverFromMongoRepositoryFailure(error, env = process.env) {
+  const requestedConfig = resolveDataBackendConfig(env);
+  if (requestedConfig?.strict?.enabled) {
+    throw error;
+  }
+  if (!isRecoverableMongoError(error)) {
+    throw error;
+  }
+  await disconnectMongo().catch(() => {});
+  return activateJsonFallback(
+    requestedConfig,
+    'mongo_operation_failed',
+    'Mongo operation failed. Running in JSON recovery mode.',
+    error
+  );
+}
 
 function maskMongoUri(uri = '') {
   const raw = String(uri || '').trim();
@@ -277,7 +316,10 @@ async function syncActiveDataBackendForRepositoryAccess({ force = false, env = p
     }
 
     if (previousMode === 'mongo' && !recoveryActive) {
-      return { mode: 'mongo', changed: false, recoveryActive: false, skipped: false };
+      if (await isMongoConnectionHealthy()) {
+        return { mode: 'mongo', changed: false, recoveryActive: false, skipped: false };
+      }
+      await disconnectMongo().catch(() => {});
     }
 
     const now = Date.now();
@@ -365,6 +407,8 @@ module.exports = {
   retryMongoConnection,
   getPublicBackendStatus,
   isRecoveryModeActive,
+  isRecoverableMongoError,
+  recoverFromMongoRepositoryFailure,
   maskMongoUri,
   setBackendChangeListener,
   syncActiveDataBackendForRepositoryAccess,
