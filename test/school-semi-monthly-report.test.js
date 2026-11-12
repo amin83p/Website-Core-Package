@@ -116,6 +116,8 @@ test('semi-monthly report viewer includes Report By Funder modal and API', () =>
   assert.match(view, /apiUrl: '\/school\/reports\/semi-monthly\/api\/funder-students'/);
   assert.match(modalPartial, /id="reportByFunderModal"/);
   assert.match(modalPartial, /report-by-funder-range-chip/);
+  assert.match(modalPartial, /data-range="thisMonth"/);
+  assert.match(modalPartial, /data-range="lastMonth"/);
   assert.match(modalPartial, /js-report-by-funder-sort/);
   assert.match(modalJs, /defaultOpenDateRange/);
   assert.match(modalJs, /report-by-funder-modal-dialog--expanded/);
@@ -149,6 +151,12 @@ test('Report By Funder modal date range helpers use calendar half-months', () =>
   const lastSecond = api.resolveRangeChip('lastMonthSecondHalf', ref);
   assert.equal(lastSecond.start, '2026-09-16');
   assert.equal(lastSecond.end, '2026-09-30');
+  const thisMonth = api.resolveRangeChip('thisMonth', ref);
+  assert.equal(thisMonth.start, '2026-10-01');
+  assert.equal(thisMonth.end, '2026-10-31');
+  const lastMonth = api.resolveRangeChip('lastMonth', ref);
+  assert.equal(lastMonth.start, '2026-09-01');
+  assert.equal(lastMonth.end, '2026-09-30');
 });
 
 test('semi-monthly report viewer wires picker and data API', () => {

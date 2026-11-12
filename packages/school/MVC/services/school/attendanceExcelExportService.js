@@ -898,7 +898,30 @@ function fitColumnWidthToContent(sheet, colIndex, { min = 8, max = 48, padding =
 
 function mergeHeaderBlock(sheet, row, startCol, endCol) {
   if (endCol <= startCol) return;
-  sheet.mergeCells(`${colLetter(startCol)}${row}:${colLetter(endCol)}${row}`);
+  const range = `${colLetter(startCol)}${row}:${colLetter(endCol)}${row}`;
+  const merges = sheet.model?.merges;
+  if (Array.isArray(merges)) {
+    [...merges].forEach((existing) => {
+      const parts = String(existing).split(':');
+      if (parts.length !== 2) return;
+      const cellA = sheet.getCell(parts[0]);
+      const cellB = sheet.getCell(parts[1]);
+      if (cellA.row !== row || cellB.row !== row) return;
+      if (cellA.col <= endCol && cellB.col >= startCol) {
+        try {
+          sheet.unMergeCells(existing);
+        } catch (_) { /* ignore */ }
+      }
+    });
+  }
+  try {
+    sheet.mergeCells(range);
+  } catch (firstError) {
+    try {
+      sheet.unMergeCells(range);
+    } catch (_) { /* ignore */ }
+    sheet.mergeCells(range);
+  }
 }
 
 const STUDENT_EXCEL_MONTH_GAP_ROWS = 1;
@@ -1240,6 +1263,23 @@ const OFFICIAL_APPENDIX_DATETIME_COLOR_ARGB = 'FF0563C1';
 const OFFICIAL_APPENDIX_NOTE_COLOR_ARGB = DARK_TEXT_ARGB;
 const OFFICIAL_APPENDIX_CLASS_DIVIDER_FILL_ARGB = 'FFDEE2E6';
 const OFFICIAL_APPENDIX_CLASS_DIVIDER_ROW_HEIGHT = 5;
+const OFFICIAL_MONTH_BLOCK_SEPARATOR_FILL_ARGB = 'FF495057';
+const OFFICIAL_MONTH_BLOCK_SEPARATOR_ROW_HEIGHT = 4;
+const OFFICIAL_MONTH_BLOCK_SEPARATOR_TRAILING_COLS = 3;
+const OFFICIAL_MONTH_BLOCK_BLANK_ROWS_AFTER_TABLE = 1;
+const OFFICIAL_MONTH_BLOCK_BLANK_ROWS_BEFORE_NEXT_TITLE = 1;
+
+function resolveOfficialNextMonthBlockStartRow(endRow) {
+  return endRow
+    + OFFICIAL_MONTH_BLOCK_BLANK_ROWS_AFTER_TABLE
+    + 1
+    + OFFICIAL_MONTH_BLOCK_BLANK_ROWS_BEFORE_NEXT_TITLE
+    + 1;
+}
+
+function resolveOfficialMonthBlockSeparatorRow(endRow) {
+  return endRow + OFFICIAL_MONTH_BLOCK_BLANK_ROWS_AFTER_TABLE + 1;
+}
 const OFFICIAL_SESSION_COLUMN_WIDTH = STUDENT_SAR_SESSION_COLUMN_WIDTH;
 const OFFICIAL_ATTENDANCE_ROW_HEIGHT = STUDENT_SAR_ATTENDANCE_ROW_HEIGHT;
 const OFFICIAL_TEACHER_COLUMN_WIDTH = 12;
@@ -1619,6 +1659,17 @@ function mergeOfficialClassColumns(sheet, row, classStartCol = OFFICIAL_CLASS_ST
   mergeHeaderBlock(sheet, row, classStartCol, classEndCol);
 }
 
+function applyOfficialMonthBlockSeparatorRow(sheet, row, startCol, endCol) {
+  if (row < 1 || endCol < startCol) return;
+  sheet.getRow(row).height = OFFICIAL_MONTH_BLOCK_SEPARATOR_ROW_HEIGHT;
+  for (let col = startCol; col <= endCol; col += 1) {
+    const cell = sheet.getCell(row, col);
+    cell.value = '';
+    cell.border = {};
+    applySolidFill(cell, OFFICIAL_MONTH_BLOCK_SEPARATOR_FILL_ARGB);
+  }
+}
+
 function applyStyleAcrossMergedColumns(sheet, row, startCol, endCol, applyStyle) {
   for (let col = startCol; col <= endCol; col += 1) {
     applyStyle(sheet.getCell(row, col));
@@ -1684,7 +1735,9 @@ function writeOfficialStudentAttendanceBlockOnce(sheet, exportModel = {}, option
   const applySessionColumnWidthsOnly = options.applySessionColumnWidthsOnly === true;
   const applyColumnWidths = options.applyColumnWidths !== false && !applySessionColumnWidthsOnly;
   const includeTeacherName = options.includeTeacherName !== false;
-  const monthBlockHeaderMode = options.monthBlockHeaderMode === 'compact' ? 'compact' : 'full';
+  let monthBlockHeaderMode = 'full';
+  if (options.monthBlockHeaderMode === 'compact') monthBlockHeaderMode = 'compact';
+  else if (options.monthBlockHeaderMode === 'repeatMeta') monthBlockHeaderMode = 'repeatMeta';
   const rowAt = (relativeOneBased) => startRow + relativeOneBased - 1;
 
   const unionSessionDates = Array.isArray(exportModel.unionSessionDates) ? exportModel.unionSessionDates : [];
@@ -1713,6 +1766,10 @@ function writeOfficialStudentAttendanceBlockOnce(sheet, exportModel = {}, option
   const firstSessionCol = includeTeacherName ? teacherCol + 1 : classEndCol + 1;
   const appendixStartCol = classStartCol;
   const mergeEndCol = Math.max(firstSessionCol + unionSessionDates.length - 1, firstSessionCol + 2);
+  const titleMergeEndColOverride = Number(options.titleMergeEndCol);
+  const titleMergeEndCol = Number.isFinite(titleMergeEndColOverride) && titleMergeEndColOverride > firstSessionCol
+    ? titleMergeEndColOverride
+    : mergeEndCol;
 
   let headerRowIndex;
   let weekdayRowIndex;
@@ -1724,38 +1781,46 @@ function writeOfficialStudentAttendanceBlockOnce(sheet, exportModel = {}, option
     sheet.getCell(rowAt(1), firstSessionCol).value = title;
     sheet.getCell(rowAt(1), firstSessionCol).font = { ...OFFICIAL_REPORT_TITLE_FONT };
     sheet.getCell(rowAt(1), firstSessionCol).alignment = { vertical: 'middle' };
-    mergeHeaderBlock(sheet, rowAt(1), firstSessionCol, mergeEndCol);
+    mergeHeaderBlock(sheet, rowAt(1), firstSessionCol, titleMergeEndCol);
 
     sheet.getCell(rowAt(2), firstSessionCol).value = `Student: ${studentName}`;
     sheet.getCell(rowAt(2), firstSessionCol).font = { ...OFFICIAL_REPORT_META_FONT };
     sheet.getCell(rowAt(2), firstSessionCol).alignment = { vertical: 'middle' };
-    mergeHeaderBlock(sheet, rowAt(2), firstSessionCol, mergeEndCol);
+    mergeHeaderBlock(sheet, rowAt(2), firstSessionCol, titleMergeEndCol);
 
     if (claimLine) {
       sheet.getCell(rowAt(3), firstSessionCol).value = claimLine;
       sheet.getCell(rowAt(3), firstSessionCol).font = { ...OFFICIAL_REPORT_META_FONT };
       sheet.getCell(rowAt(3), firstSessionCol).alignment = { vertical: 'middle' };
-      mergeHeaderBlock(sheet, rowAt(3), firstSessionCol, mergeEndCol);
+      mergeHeaderBlock(sheet, rowAt(3), firstSessionCol, titleMergeEndCol);
     }
 
-    legend.forEach((entry, idx) => {
-      const row = rowAt(idx + 1);
-      const codeCell = sheet.getCell(row, legendCodeCol);
-      const labelCell = sheet.getCell(row, legendLabelCol);
-      const spacerCell = sheet.getCell(row, legendSpacerCol);
-      codeCell.value = entry.code;
-      labelCell.value = entry.label;
-      spacerCell.value = '';
-      applyLegendCellStyle(codeCell, entry);
-      applyLegendCellStyle(labelCell, entry);
-      applyVerticalMiddle(codeCell, { horizontal: 'center' });
-      applyVerticalMiddle(labelCell);
-      applyVerticalMiddle(spacerCell);
-    });
+    if (monthBlockHeaderMode === 'full') {
+      legend.forEach((entry, idx) => {
+        const row = rowAt(idx + 1);
+        const codeCell = sheet.getCell(row, legendCodeCol);
+        const labelCell = sheet.getCell(row, legendLabelCol);
+        const spacerCell = sheet.getCell(row, legendSpacerCol);
+        codeCell.value = entry.code;
+        labelCell.value = entry.label;
+        spacerCell.value = '';
+        applyLegendCellStyle(codeCell, entry);
+        applyLegendCellStyle(labelCell, entry);
+        applyVerticalMiddle(codeCell, { horizontal: 'center' });
+        applyVerticalMiddle(labelCell);
+        applyVerticalMiddle(spacerCell);
+      });
+    }
 
-    const legendBottom = Math.max(legend.length, 3);
-    headerRowIndex = rowAt(legendBottom + 2);
-    weekdayRowIndex = headerRowIndex + 1;
+    if (monthBlockHeaderMode === 'repeatMeta') {
+      const lastTitleRow = claimLine ? 3 : 2;
+      headerRowIndex = rowAt(lastTitleRow + 2);
+      weekdayRowIndex = headerRowIndex + 1;
+    } else {
+      const legendBottom = Math.max(legend.length, 3);
+      headerRowIndex = rowAt(legendBottom + 2);
+      weekdayRowIndex = headerRowIndex + 1;
+    }
   }
   mergeOfficialClassColumns(sheet, headerRowIndex, classStartCol, classEndCol);
   const classHeaderCell = sheet.getCell(headerRowIndex, classStartCol);
@@ -1905,6 +1970,18 @@ function writeOfficialStudentAttendanceBlock(sheet, exportModel = {}, options = 
   let firstSessionCol = null;
   const threadedCommentTargets = [];
   let endRow = startRow;
+  const includeTeacherName = options.includeTeacherName !== false;
+  const classEndCol = OFFICIAL_CLASS_END_COL;
+  const teacherCol = classEndCol + 1;
+  const firstSessionColForTitle = includeTeacherName ? teacherCol + 1 : classEndCol + 1;
+  const maxMonthSessionCount = monthChunks.reduce(
+    (max, chunk) => Math.max(max, chunk.dates.length),
+    unionSessionDates.length
+  );
+  const globalTitleMergeEndCol = Math.max(
+    firstSessionColForTitle + maxMonthSessionCount - 1,
+    firstSessionColForTitle + 2
+  );
 
   monthChunks.forEach((chunk, index) => {
     const chunkModel = {
@@ -1913,12 +1990,13 @@ function writeOfficialStudentAttendanceBlock(sheet, exportModel = {}, options = 
       startDate: chunk.startDate,
       endDate: chunk.endDate
     };
-    const monthBlockHeaderMode = index === 0 ? 'full' : 'compact';
+    const monthBlockHeaderMode = index === 0 ? 'full' : 'repeatMeta';
     const widthsEnabled = options.applyColumnWidths !== false;
     const result = writeOfficialStudentAttendanceBlockOnce(sheet, chunkModel, {
       ...options,
       startRow,
       monthBlockHeaderMode,
+      titleMergeEndCol: globalTitleMergeEndCol,
       applyColumnWidths: widthsEnabled && index === 0,
       applySessionColumnWidthsOnly: widthsEnabled && index > 0
     });
@@ -1930,7 +2008,14 @@ function writeOfficialStudentAttendanceBlock(sheet, exportModel = {}, options = 
     threadedCommentTargets.push(...(result.threadedCommentTargets || []));
     endRow = result.endRow;
     if (index < monthChunks.length - 1) {
-      startRow = endRow + STUDENT_EXCEL_MONTH_GAP_ROWS + 1;
+      const separatorEndCol = globalTitleMergeEndCol + OFFICIAL_MONTH_BLOCK_SEPARATOR_TRAILING_COLS;
+      applyOfficialMonthBlockSeparatorRow(
+        sheet,
+        resolveOfficialMonthBlockSeparatorRow(endRow),
+        OFFICIAL_CLASS_START_COL,
+        separatorEndCol
+      );
+      startRow = resolveOfficialNextMonthBlockStartRow(endRow);
     }
   });
 

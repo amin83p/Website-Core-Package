@@ -110,6 +110,33 @@ function collectWorksheetText(worksheet) {
   return parts.join('\n');
 }
 
+function firstWorksheetRowMatching(worksheet, pattern, afterRow = 0) {
+  let matchRow = null;
+  worksheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    if (rowNumber <= afterRow || matchRow != null) return;
+    row.eachCell({ includeEmpty: false }, (cell) => {
+      if (matchRow != null) return;
+      const text = cellValueAsText(cell);
+      if (pattern.test(text)) matchRow = rowNumber;
+    });
+  });
+  return matchRow;
+}
+
+function titleHeaderMergeSpanOnRow(worksheet, rowNumber, minStartCol = 5) {
+  const merges = worksheet.model?.merges || [];
+  let maxSpan = 0;
+  merges.forEach((range) => {
+    const [startCell, endCell] = String(range).split(':');
+    const cellA = worksheet.getCell(startCell);
+    const cellB = worksheet.getCell(endCell);
+    if (cellA.row !== rowNumber || cellB.row !== rowNumber) return;
+    if (cellA.col < minStartCol) return;
+    maxSpan = Math.max(maxSpan, cellB.col - cellA.col + 1);
+  });
+  return maxSpan;
+}
+
 test('buildStudentAttendanceExcelWorkbook singleSheet stacks all classes on one worksheet', async () => {
   const { buffer } = await attendanceExcelExportService.buildStudentAttendanceExcelWorkbook([
     { payload: sampleClassPayload('Alpha Class', '2026-09-08'), sheetName: 'Alpha Class' },
@@ -255,12 +282,92 @@ test('buildOfficialStudentAttendanceExcelWorkbook splits consolidated table by c
 
   const workbook = new ExcelJS.Workbook();
   await workbook.xlsx.load(buffer);
-  const text = collectWorksheetText(workbook.getWorksheet(1));
+  const sheet = workbook.getWorksheet(1);
+  const text = collectWorksheetText(sheet);
   assert.match(text, /Attendance Report - September 28, 2026 - September 28, 2026/);
-  assert.doesNotMatch(text, /Attendance Report - October 05, 2026/);
+  assert.match(text, /Attendance Report - October 05, 2026 - October 05, 2026/);
+  const titleLines = [...new Set(text.split('\n').filter((line) => /^Attendance Report - /.test(line)))];
+  assert.equal(titleLines.length, 2);
+  const octoberTitleRow = firstWorksheetRowMatching(
+    sheet,
+    /Attendance Report - October 05, 2026/
+  );
+  const octoberClassHeaderRow = firstWorksheetRowMatching(sheet, /^Class$/, octoberTitleRow);
+  assert.ok(octoberTitleRow);
+  assert.ok(octoberClassHeaderRow);
+  assert.equal(
+    octoberClassHeaderRow - octoberTitleRow,
+    3,
+    'repeatMeta month: one blank row after title lines, then column headers'
+  );
+  assert.match(text, /Student: Ada Lovelace/);
   assert.match(text, /\b28\b/);
   assert.match(text, /\b5\b/);
   assert.equal(text.split('Not Applicable').length - 1, 1);
+});
+
+test('buildOfficialStudentAttendanceExcelWorkbook merges title rows for three month blocks', async () => {
+  const month1Dates = Array.from({ length: 12 }, (_, i) => `2026-09-${String(i + 1).padStart(2, '0')}`);
+  const month2Dates = Array.from({ length: 8 }, (_, i) => `2026-10-${String(i + 1).padStart(2, '0')}`);
+  const month3Dates = ['2026-11-04', '2026-11-05', '2026-11-06'];
+  const unionSessionDates = [...month1Dates, ...month2Dates, ...month3Dates];
+  const exportModel = {
+    student: { name: 'Ada Lovelace' },
+    claimHeaderDisplay: 'WCB Claim Number: 717 0954',
+    startDate: '2026-09-01',
+    endDate: '2026-11-30',
+    enabledAttendanceStatuses: ['present', 'absent', 'not_applicable'],
+    unionSessionDates,
+    classRows: [{
+      className: 'Alpha Class',
+      teacherName: 'Fatima Majoka',
+      studentRow: {},
+      sessionDateSet: new Set(unionSessionDates),
+      sessionsByDate: new Map(
+        unionSessionDates.map((date) => [date, { date, startTime: '09:00', endTime: '12:00' }])
+      ),
+      recordsByDate: new Map(
+        unionSessionDates.map((date, i) => [date, { status: 'present', sessionId: `s${i}` }])
+      )
+    }]
+  };
+
+  const { buffer } = await attendanceExcelExportService.buildOfficialStudentAttendanceExcelWorkbook(exportModel, {
+    studentName: 'Ada Lovelace',
+    startDate: '2026-09-01',
+    endDate: '2026-11-30',
+    includeTeacherName: true
+  });
+
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  const sheet = workbook.getWorksheet(1);
+  const titleRows = [];
+  sheet.eachRow({ includeEmpty: false }, (row, rowNumber) => {
+    row.eachCell({ includeEmpty: false }, (cell) => {
+      const text = cellValueAsText(cell);
+      if (/^Attendance Report - /.test(text)) titleRows.push(rowNumber);
+    });
+  });
+  const uniqueTitleRows = [...new Set(titleRows)];
+  assert.equal(uniqueTitleRows.length, 3);
+  const mergeSpans = uniqueTitleRows.map((rowNumber) => titleHeaderMergeSpanOnRow(sheet, rowNumber));
+  const expectedSpan = mergeSpans[0];
+  assert.ok(expectedSpan >= 12, 'first month title should span the widest session grid');
+  mergeSpans.forEach((span, index) => {
+    assert.equal(span, expectedSpan, `month block ${index + 1} title merge span should match`);
+  });
+
+  const month2TitleRow = uniqueTitleRows[1];
+  const separatorRow = month2TitleRow - 2;
+  const blankBeforeTitleRow = month2TitleRow - 1;
+  const blankAfterTableRow = month2TitleRow - 3;
+  assert.equal(sheet.getRow(separatorRow).height, 4);
+  assert.equal(sheet.getCell(separatorRow, 1).fill?.fgColor?.argb, 'FF495057');
+  const sepEndCol = 5 + 12 - 1 + 3;
+  assert.equal(sheet.getCell(separatorRow, sepEndCol).fill?.fgColor?.argb, 'FF495057');
+  assert.notEqual(sheet.getCell(blankAfterTableRow, 1).fill?.fgColor?.argb, 'FF495057');
+  assert.notEqual(sheet.getCell(blankBeforeTitleRow, 1).fill?.fgColor?.argb, 'FF495057');
 });
 
 test('buildUnionSessionDatesFromExportEntries dedupes and sorts session dates', () => {

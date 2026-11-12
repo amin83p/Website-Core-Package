@@ -86,6 +86,12 @@
         return monthHalfRange(year, month, 1);
       case 'currentMonthSecondHalf':
         return monthHalfRange(year, month, 2);
+      case 'thisMonth':
+        return fullMonthRange(year, month);
+      case 'lastMonth': {
+        const d = new Date(year, month - 1, 1);
+        return fullMonthRange(d.getFullYear(), d.getMonth());
+      }
       default:
         return defaultOpenDateRange(ref);
     }
