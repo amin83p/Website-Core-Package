@@ -77,7 +77,11 @@ function flexTwoClassPresence(amPresence, pmPresence, pmSlotActive) {
 }
 
 function flexTwoClassNote(amPresence, amNote, pmPresence, pmNote, pmSlotActive) {
-  if (!pmSlotActive) return String(amNote ?? '').trim();
+  if (!pmSlotActive) {
+    const am = normalizePresence(amPresence);
+    if (am === 'X') return '';
+    return String(amNote ?? '').trim();
+  }
   return mergeTwoClassNote(amPresence, amNote, pmPresence, pmNote);
 }
 

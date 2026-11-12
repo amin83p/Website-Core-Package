@@ -56,6 +56,30 @@ test('flexTwoClassNote uses T1 note only when pm slot is inactive', () => {
   );
 });
 
+test('flexTwoClassNote is empty for no-class days when pm slot is inactive', () => {
+  assert.equal(twoClassAttendanceMergeService.flexTwoClassNote('X', 'No Class', '', '', false), '');
+  assert.equal(twoClassAttendanceMergeService.flexTwoClassNote('X', 'No Class', 'X', 'No Class', true), '');
+});
+
+test('flexTwoClassNote expression matches when T2 slot is empty vs populated', () => {
+  const expr = [
+    'flexTwoClassNote(',
+    'source("T1", "attendance_presence_01"), source("T1", "attendance_note_01"),',
+    'source("T2", "attendance_presence_01"), source("T2", "attendance_note_01"),',
+    'sourceSlotPopulated("T2"))'
+  ].join(' ');
+  const noClass = {
+    T1: { attendance_presence_01: 'X', attendance_note_01: 'No Class', class_name: 'AM' },
+    T2: { attendance_presence_01: 'X', attendance_note_01: 'No Class' }
+  };
+  assert.equal(reportRuleEngineService.evaluateSafeExpression(expr, { sources: noClass }), '');
+  const t1Only = {
+    T1: { attendance_presence_01: 'X', attendance_note_01: 'No Class', class_name: 'AM' },
+    T2: {}
+  };
+  assert.equal(reportRuleEngineService.evaluateSafeExpression(expr, { sources: t1Only }), '');
+});
+
 test('flexTwoClassPresence expression avoids Y/X when T2 slot is empty', () => {
   const expr = 'flexTwoClassPresence(source("T1", "attendance_presence_01"), source("T2", "attendance_presence_01"), sourceSlotPopulated("T2"))';
   const sources = {
