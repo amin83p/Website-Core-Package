@@ -2430,7 +2430,10 @@
           <div id="undo_close_restoreEndDate"></div>
         </div>
         <div>
-          <label class="form-label">Reason for Undo *</label>
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
+            <label class="form-label mb-0" for="undo_close_reason">Reason for Undo *</label>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnPickUndoCloseReason" title="Pick a frequent enrollment close reason"><i class="bi bi-ui-checks-grid me-1"></i>Pick reason</button>
+          </div>
           <textarea id="undo_close_reason" class="form-control" rows="2"></textarea>
         </div>
         <div id="undo_close_preview" class="alert alert-light border mt-3 mb-0">
@@ -2481,7 +2484,10 @@
               <input type="text" id="move_close_status" class="form-control bg-light" value="Completed (moved)" readonly>
             </div>
             <div class="col-12">
-              <label class="form-label" for="move_close_reason">Close Reason *</label>
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
+                <label class="form-label mb-0" for="move_close_reason">Close Reason *</label>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnPickMoveCloseReason" title="Pick a frequent enrollment close reason"><i class="bi bi-ui-checks-grid me-1"></i>Pick reason</button>
+              </div>
               <textarea id="move_close_reason" class="form-control" rows="2" placeholder="Why is this enrollment being closed?"></textarea>
             </div>
           </div>
@@ -2624,7 +2630,10 @@
               <input type="text" class="form-control bg-light" value="Completed" readonly>
             </div>
             <div class="col-md-12">
-              <label class="form-label" for="classMove_closeReason">Reason *</label>
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
+                <label class="form-label mb-0" for="classMove_closeReason">Reason *</label>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnPickClassMoveCloseReason" title="Pick a frequent enrollment close reason"><i class="bi bi-ui-checks-grid me-1"></i>Pick reason</button>
+              </div>
               <textarea id="classMove_closeReason" class="form-control" rows="2" placeholder="Why are these enrollments being closed and moved?"></textarea>
             </div>
           </div>
@@ -3040,8 +3049,10 @@
 <%- include('partials/modal_GenericPicker') %>
 <%- include('school/partials/sessionEnrollmentCalendarModal') %>
 <%- include('school/partials/personProfileEditModal') %>
+<%- include('../partials/enrollmentCloseReasonPickerModal') %>
 
 <link rel="stylesheet" href="/styles/session-calendar.css">
+<script src="/scripts/enrollmentCloseReasonPickerClient.js"></script>
 <script src="/scripts/sessionCalendarCore.js"></script>
 <script src="/scripts/sessionEnrollmentCalendarModal.js"></script>
 <script src="/scripts/rollingEnrollmentAlignmentClient.js"></script>
@@ -14317,6 +14328,37 @@
       syncPriorRepairModalGroupModeUi({});
     }
   });
+  if (typeof installEnrollmentCloseReasonPicker === 'function') {
+    const rollingCloseReasonPicker = installEnrollmentCloseReasonPicker({
+      textareaId: 'close_reasonEnd',
+      pickButtonId: 'btnPickCloseReasonEnd',
+      initialReasons: <%- jsonForScript(Array.isArray(typeof enrollmentCloseReasons !== 'undefined' ? enrollmentCloseReasons : null) ? enrollmentCloseReasons : []) %>,
+      canManageCatalog: <%= (typeof canManageEnrollmentCloseReasons !== 'undefined' && canManageEnrollmentCloseReasons) ? 'true' : 'false' %>,
+      getActionStateId: () => String(actionStateId || ''),
+      messageBox: async (opts) => {
+        if (typeof window.showMessageModal === 'function') {
+          return window.showMessageModal({
+            title: opts?.title,
+            icon: opts?.icon,
+            message: opts?.message,
+            html: Boolean(opts?.html),
+            buttons: opts?.buttons
+          });
+        }
+        await showMsg(opts?.title || 'Notice', opts?.icon || 'info', opts?.message || '', {
+          html: Boolean(opts?.html),
+          buttons: opts?.buttons
+        });
+        return opts?.buttons?.[0]?.text || 'OK';
+      }
+    });
+    rollingCloseReasonPicker.bindPickButton('btnPickMoveCloseReason', 'move_close_reason');
+    rollingCloseReasonPicker.bindPickButton('btnPickUndoCloseReason', 'undo_close_reason');
+    rollingCloseReasonPicker.bindPickButton('btnPickEditCloseReasonEnd', 'edit_closeReasonEnd');
+    rollingCloseReasonPicker.bindPickButton('btnPickClassMoveCloseReason', 'classMove_closeReason');
+    window.rollingCloseReasonPicker = rollingCloseReasonPicker;
+  }
+
   qs('btn_confirmClosePeriod')?.addEventListener('click', submitClosePeriod);
   qs('btn_previewClosePeriod')?.addEventListener('click', previewClosePeriod);
   qs('btn_previewMoveEnrollment')?.addEventListener('click', previewMoveEnrollmentAction);

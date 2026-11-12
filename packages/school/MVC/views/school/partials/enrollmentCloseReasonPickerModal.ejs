@@ -1,0 +1,73 @@
+<style>
+    .attendance-excuse-reason-tile {
+        display: flex;
+        align-items: flex-start;
+        justify-content: flex-start;
+        width: 100%;
+        min-height: 3.25rem;
+        padding: 0.65rem 0.75rem;
+        border: 1px solid #dee2e6;
+        border-radius: 10px;
+        background: #fff;
+        color: #212529;
+        text-align: left;
+        font-size: 0.875rem;
+        line-height: 1.35;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+    }
+    .attendance-excuse-reason-tile:hover,
+    .attendance-excuse-reason-tile:focus-visible {
+        border-color: #86b7fe;
+        background: #f8fbff;
+        box-shadow: 0 0 0 0.15rem rgba(13, 110, 253, 0.15);
+    }
+    .attendance-excuse-reason-tile-manage {
+        position: relative;
+        padding-right: 2.25rem;
+    }
+    .attendance-excuse-reason-tile-remove {
+        position: absolute;
+        top: 0.35rem;
+        right: 0.35rem;
+        width: 1.65rem;
+        height: 1.65rem;
+        padding: 0;
+        line-height: 1;
+    }
+    #enrollmentCloseReasonPickerModal {
+        z-index: 1065;
+    }
+</style>
+<div class="modal fade" id="enrollmentCloseReasonPickerModal" tabindex="-1" aria-labelledby="enrollmentCloseReasonPickerModalTitle" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-light">
+                <h5 class="modal-title fw-bold" id="enrollmentCloseReasonPickerModalTitle">Frequent enrollment close reasons</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <% if (typeof canManageEnrollmentCloseReasons !== 'undefined' && canManageEnrollmentCloseReasons) { %>
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                    <button type="button" class="btn btn-sm btn-outline-secondary" id="btnToggleEnrollmentCloseReasonManage" aria-pressed="false">Manage reasons</button>
+                </div>
+                <div class="d-none border rounded p-3 mb-3 bg-light-subtle" id="enrollmentCloseReasonManagePanel">
+                    <label class="form-label small fw-bold mb-1" for="inpNewEnrollmentCloseReason">Add reason</label>
+                    <div class="input-group input-group-sm mb-2">
+                        <input type="text" class="form-control" id="inpNewEnrollmentCloseReason" maxlength="200" placeholder="Type a new close reason">
+                        <button type="button" class="btn btn-outline-primary" id="btnAddEnrollmentCloseReason">Add</button>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-secondary" id="btnCancelEnrollmentCloseReasonManage">Cancel</button>
+                        <button type="button" class="btn btn-sm btn-primary" id="btnSaveEnrollmentCloseReasons">Save</button>
+                    </div>
+                </div>
+                <% } %>
+                <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-2" id="enrollmentCloseReasonTileGrid" role="list"></div>
+                <div class="small text-muted text-center py-3 d-none" id="enrollmentCloseReasonTileEmpty">No reasons configured.</div>
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>

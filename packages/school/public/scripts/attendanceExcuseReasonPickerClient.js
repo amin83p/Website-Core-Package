@@ -52,9 +52,11 @@
     let modalInstance = null;
     let manageDraft = null;
     let manageActive = false;
+    let activeTextareaId = textareaId;
 
     function getTextarea() {
-      return document.getElementById(textareaId);
+      const id = String(activeTextareaId || textareaId || '').trim();
+      return id ? document.getElementById(id) : null;
     }
 
     function getPickButton() {
@@ -64,6 +66,16 @@
     function setPickButtonDisabled(disabled) {
       const btn = getPickButton();
       if (btn) btn.disabled = Boolean(disabled);
+    }
+
+    function bindPickButton(buttonId, targetTextareaId) {
+      const btn = document.getElementById(String(buttonId || '').trim());
+      const targetId = String(targetTextareaId || '').trim();
+      if (!btn || !targetId) return;
+      btn.addEventListener('click', () => {
+        activeTextareaId = targetId;
+        openPickerModal();
+      });
     }
 
     function closePickerModal() {
@@ -173,7 +185,10 @@
       }
     }
 
-    getPickButton()?.addEventListener('click', () => openPickerModal());
+    getPickButton()?.addEventListener('click', () => {
+      activeTextareaId = textareaId;
+      openPickerModal();
+    });
 
     document.getElementById('excuseReasonTileGrid')?.addEventListener('click', (event) => {
       const removeBtn = event.target.closest('[data-excuse-reason-remove-idx]');
@@ -266,6 +281,7 @@
 
     return {
       setPickButtonDisabled,
+      bindPickButton,
       setReasons(next) {
         reasonsState = sortReasons(next);
         renderTiles();

@@ -306,6 +306,9 @@ test('manage enrollment is wired to the schedule admin rail only', () => {
   assert.match(script, /enrollment-periods\/\$\{encodeURIComponent\(periodId\)\}\/close/);
 
   assert.match(rolling, /enrollmentPeriodCloseModal/);
+  assert.match(rolling, /btnPickCloseReasonEnd/);
+  assert.match(rolling, /enrollmentCloseReasonPickerClient\.js/);
+  assert.match(rolling, /installEnrollmentCloseReasonPicker/);
   assert.match(rolling, /enrollmentPeriodEditModal/);
   assert.doesNotMatch(rolling, /id="editPeriodModal"/);
   assert.doesNotMatch(rolling, /id="closePeriodModal"/);

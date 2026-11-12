@@ -312,6 +312,16 @@ router.post('/api/:classId/teacher-assignment-impact',
   classCtrl.previewTeacherAssignmentImpact);
 
 // --- Class Enrollment Periods & Rolling Cycle API ---
+router.get('/api/enrollment-close-reasons',
+  requireAccess(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.READ_ALL, { keepActive: true }),
+  rollingCtrl.getEnrollmentCloseReasons);
+
+router.put('/api/enrollment-close-reasons',
+  requireAccess(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, { requireToken: true }),
+  rollingCtrl.saveEnrollmentCloseReasons);
+
 router.get('/api/:classId/enrollment-periods',
   requireAccess(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.READ_ALL, { keepActive: true }),

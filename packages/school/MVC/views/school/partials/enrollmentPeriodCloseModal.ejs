@@ -21,7 +21,10 @@
           </select>
         </div>
         <div>
-          <label class="form-label">Reason *</label>
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
+            <label class="form-label mb-0" for="close_reasonEnd">Reason *</label>
+            <button type="button" class="btn btn-outline-secondary btn-sm" id="btnPickCloseReasonEnd" title="Pick a frequent enrollment close reason"><i class="bi bi-ui-checks-grid me-1"></i>Pick reason</button>
+          </div>
           <textarea id="close_reasonEnd" class="form-control" rows="2"></textarea>
         </div>
         <div id="close_statusPreview" class="alert alert-light border mt-3 mb-0">

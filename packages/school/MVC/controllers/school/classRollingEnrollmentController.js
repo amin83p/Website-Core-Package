@@ -81,6 +81,7 @@ const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignme
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const attendanceMatrixMetricsService = require('../../services/school/attendanceMatrixMetricsService');
 const attendanceAccessService = require('../../services/school/attendanceAccessService');
+const enrollmentCloseReasonPolicyModel = require('../../models/school/enrollmentCloseReasonPolicyModel');
 const PERSON_QUERY_OPTIONS = Object.freeze({ enrichment: { includeSchoolRoles: false } });
 
 function roundMoney(value) {
@@ -1533,6 +1534,17 @@ async function showRollingEnrollmentPage(req, res) {
       resolveOrgTodayFromRequest(req)
     );
 
+    const orgIdForPolicies = String(classData?.orgId || req.user?.activeOrgId || '').trim();
+    const enrollmentCloseReasonPolicy = await enrollmentCloseReasonPolicyModel.getPolicyForOrg(orgIdForPolicies);
+    const enrollmentCloseReasons = Array.isArray(enrollmentCloseReasonPolicy?.reasons)
+      ? enrollmentCloseReasonPolicy.reasons
+      : [];
+    const canManageEnrollmentCloseReasons = isSchoolRequestAdmin(
+      req.user,
+      SECTIONS.SCHOOL_CLASSES,
+      OPERATIONS.UPDATE
+    );
+
     res.render('school/class/rollingEnrollment', {
       title: `Rolling Enrollment: ${classData?.title || classData?.id || ''}`,
       classData,
@@ -1559,7 +1571,9 @@ async function showRollingEnrollmentPage(req, res) {
       canManageEnrollmentOffice: isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE),
       canEditStudentClb: await canAccessSchoolOperation(req.user, SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE),
       canViewStudentAcademicOverview: await canAccessSchoolOperation(req.user, SECTIONS.SCHOOL_ACADEMIC_LEDGER, OPERATIONS.READ_ALL),
-      canOpenStudentAttendanceReport: (await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip)).canOpenReport
+      canOpenStudentAttendanceReport: (await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip)).canOpenReport,
+      enrollmentCloseReasons,
+      canManageEnrollmentCloseReasons
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', error, message: error.message, user: req.user });
@@ -5842,9 +5856,55 @@ async function applyEnrollmentMove(req, res) {
   }
 }
 
+async function getEnrollmentCloseReasons(req, res) {
+  try {
+    const activeOrgId = String(req.user?.activeOrgId || '').trim();
+    if (!activeOrgId) throw new Error('Active organization is required.');
+    const policy = await enrollmentCloseReasonPolicyModel.getPolicyForOrg(activeOrgId);
+    const reasons = Array.isArray(policy?.reasons) ? policy.reasons : [];
+    return res.json({
+      status: 'success',
+      reasons,
+      canManage: isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE)
+    });
+  } catch (error) {
+    const status = error.statusCode || 400;
+    return res.status(status).json({ status: 'error', message: error.message });
+  }
+}
+
+async function saveEnrollmentCloseReasons(req, res) {
+  try {
+    if (!isSchoolRequestAdmin(req.user, SECTIONS.SCHOOL_CLASSES, OPERATIONS.UPDATE)) {
+      const error = new Error('You do not have permission to manage enrollment close reasons.');
+      error.statusCode = 403;
+      throw error;
+    }
+    const activeOrgId = String(req.user?.activeOrgId || '').trim();
+    if (!activeOrgId) throw new Error('Active organization is required.');
+    const raw = req.body?.reasons;
+    const patch = { reasons: Array.isArray(raw) ? raw : [] };
+    const saved = await enrollmentCloseReasonPolicyModel.savePolicyForOrg(
+      activeOrgId,
+      patch,
+      req.user?.id || req.user?._id || 'system'
+    );
+    return res.json({
+      status: 'success',
+      reasons: Array.isArray(saved?.reasons) ? saved.reasons : [],
+      usesCustomList: saved?.usesCustomList === true
+    });
+  } catch (error) {
+    const status = error.statusCode || 400;
+    return res.status(status).json({ status: 'error', message: error.message });
+  }
+}
+
 module.exports = {
   listRollingEnrollmentClasses,
   showRollingEnrollmentPage,
+  getEnrollmentCloseReasons,
+  saveEnrollmentCloseReasons,
   showCycleRolloverWizard,
   previewCycleRollover,
   listClassEnrollmentPeriods,
