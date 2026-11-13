@@ -3,22 +3,29 @@ const assert = require('node:assert/strict');
 
 const studentAttendanceReportGenerationService = require('../packages/school/MVC/services/school/studentAttendanceReportGenerationService');
 
-test('sortClasses orders by class name then class id', () => {
-  const sorted = studentAttendanceReportGenerationService.sortClasses([
+test('sortClasses uses session start when present else class name', () => {
+  const bySchedule = studentAttendanceReportGenerationService.sortClasses([
+    { classId: 'C2', className: 'Beta', earliestSessionStartMinutes: 13 * 60 },
+    { classId: 'C1', className: 'Alpha', earliestSessionStartMinutes: 9 * 60 }
+  ]);
+  assert.equal(bySchedule[0].classId, 'C1');
+  assert.equal(bySchedule[1].classId, 'C2');
+
+  const byName = studentAttendanceReportGenerationService.sortClasses([
     { classId: 'C2', className: 'Beta' },
     { classId: 'C1', className: 'Alpha' }
   ]);
-  assert.equal(sorted[0].classId, 'C1');
-  assert.equal(sorted[1].classId, 'C2');
+  assert.equal(byName[0].classId, 'C1');
+  assert.equal(byName[1].classId, 'C2');
 });
 
-test('buildSourceRunsForStudent maps sorted classes to overall slots by index', () => {
+test('buildSourceRunsForStudent maps schedule-sorted classes to overall slots by index', () => {
   const student = {
     personId: 'PERSON-1',
     name: 'Alice',
     classes: [
-      { classId: 'C2', className: 'Beta', teacherId: 'TEACH-2' },
-      { classId: 'C1', className: 'Alpha', teacherId: 'TEACH-1' }
+      { classId: 'C2', className: 'Beta', teacherId: 'TEACH-2', earliestSessionStartMinutes: 9 * 60 },
+      { classId: 'C1', className: 'Alpha', teacherId: 'TEACH-1', earliestSessionStartMinutes: 13 * 60 }
     ]
   };
   const overallTemplate = {
@@ -37,11 +44,11 @@ test('buildSourceRunsForStudent maps sorted classes to overall slots by index', 
   assert.equal(warnings.length, 0);
   assert.equal(sourceRuns.length, 2);
   assert.equal(sourceRuns[0].slotKey, 'T1');
-  assert.equal(sourceRuns[0].classId, 'C1');
-  assert.equal(sourceRuns[0].teacherId, 'TEACH-1');
+  assert.equal(sourceRuns[0].classId, 'C2');
+  assert.equal(sourceRuns[0].teacherId, 'TEACH-2');
   assert.equal(sourceRuns[0].targetStudentIds[0], 'PERSON-1');
   assert.equal(sourceRuns[1].slotKey, 'T2');
-  assert.equal(sourceRuns[1].classId, 'C2');
+  assert.equal(sourceRuns[1].classId, 'C1');
 });
 
 test('buildSourceRunsForStudent without overall creates one run per class', () => {

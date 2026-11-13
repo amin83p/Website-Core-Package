@@ -12,6 +12,8 @@ const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { runWithConcurrency } = require('../../utils/asyncPool');
 const sarExportConfigService = require('./sarExportConfigService');
+const studentAttendanceReportClassOrderService = require('./studentAttendanceReportClassOrderService');
+const sessionUncompletedNotificationService = require('./sessionUncompletedNotificationService');
 
 function normalizeDateOnly(value = '') {
   const token = String(value || '').trim();
@@ -260,7 +262,7 @@ function finalizeStudentSummary(studentRow = {}, orgPolicyCatalog = {}) {
     notesExist: rollupRecords.some((record) => recordHasNotes(record))
   };
   delete studentRow._rollupRecords;
-  studentRow.classes.sort((a, b) => String(a.className || '').localeCompare(String(b.className || '')));
+  studentRow.classes = studentAttendanceReportClassOrderService.sortStudentAttendanceReportClasses(studentRow.classes);
   return studentRow;
 }
 
@@ -443,7 +445,7 @@ async function buildStudentAttendanceReportPayload(req, options = {}) {
         ? matrixRow.summary
         : computeAttendanceRollupSummary(rollupRecords, classRow, orgPolicyCatalog);
       studentRow._rollupRecords.push(...rollupRecords);
-      studentRow.classes.push({
+      const classEntry = {
         classId: payload.classId,
         className: payload.className,
         registrationMode: payload.registrationMode || registrationModeKeyFromClassRow(classRow),
@@ -454,7 +456,14 @@ async function buildStudentAttendanceReportPayload(req, options = {}) {
           ? payload.fieldVisibility
           : null,
         days: buildClassDayCells(days, rollupRecords)
+      };
+      const matrixSessions = Array.isArray(payload?.sessions) ? payload.sessions : [];
+      studentAttendanceReportClassOrderService.attachScheduleSortFields(classEntry, matrixSessions, {
+        startDate,
+        endDate,
+        rollupRecords
       });
+      studentRow.classes.push(classEntry);
     });
   });
 
@@ -567,14 +576,20 @@ async function collectStudentClassMatrixPayloadsForExport(req, options = {}) {
     const matrix = Array.isArray(filteredPayload?.matrix) ? filteredPayload.matrix : [];
     if (!sessions.length || !matrix.length) continue;
 
-    entries.push({
+    const className = String(filteredPayload.className || resolveAttendanceClassDisplayName(classRow, classId)).trim();
+    const entry = {
       classId,
-      className: String(filteredPayload.className || resolveAttendanceClassDisplayName(classRow, classId)).trim(),
+      className,
       payload: filteredPayload
+    };
+    studentAttendanceReportClassOrderService.attachScheduleSortFields(entry, sessions, {
+      startDate,
+      endDate
     });
+    entries.push(entry);
   }
 
-  entries.sort((a, b) => String(a.className || '').localeCompare(String(b.className || '')));
+  studentAttendanceReportClassOrderService.sortStudentAttendanceReportClasses(entries);
 
   return {
     student,
@@ -1015,6 +1030,25 @@ async function buildStudentAttendanceReportExportContextPayload(req, options = {
     });
   }
 
+  const sessionsByClassId = new Map();
+  const uniqueClassMatches = [];
+  const seenClassIdsForSessions = new Set();
+  classMatches.forEach((match) => {
+    const classId = String(match?.classId || '').trim();
+    if (!classId || seenClassIdsForSessions.has(classId)) return;
+    seenClassIdsForSessions.add(classId);
+    uniqueClassMatches.push(match);
+  });
+  await runWithConcurrency(uniqueClassMatches, 6, async (match) => {
+    const classId = String(match?.classId || '').trim();
+    if (!classId) return;
+    const sessions = await sessionUncompletedNotificationService.listClassSessions(match.classRow, req.user);
+    sessionsByClassId.set(
+      classId,
+      studentAttendanceReportClassOrderService.filterSessionsInDateWindow(sessions, startDate, endDate)
+    );
+  });
+
   classMatches.forEach(({ classRow, classId, matchedStudentIds }) => {
     matchedStudentIds.forEach((studentRecordId) => {
       const personId = selectedStudents
@@ -1022,7 +1056,7 @@ async function buildStudentAttendanceReportExportContextPayload(req, options = {
       if (!personId || !studentMap.has(personId)) return;
       const studentRow = studentMap.get(personId);
       const teacherId = String(classRow?.instructors?.[0]?.personId || classRow?.instructors?.[0]?.id || '').trim();
-      studentRow.classes.push({
+      const classEntry = {
         classId,
         className: resolveAttendanceClassDisplayName(classRow, classId),
         registrationMode: registrationModeKeyFromClassRow(classRow),
@@ -1039,7 +1073,13 @@ async function buildStudentAttendanceReportExportContextPayload(req, options = {
           notesExist: false
         },
         days: emptyDayCells
-      });
+      };
+      studentAttendanceReportClassOrderService.attachScheduleSortFields(
+        classEntry,
+        sessionsByClassId.get(classId) || [],
+        { startDate, endDate }
+      );
+      studentRow.classes.push(classEntry);
     });
   });
 

@@ -74,6 +74,11 @@ router.get('/api/merge-admissions/preview-progress',
   trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
   ctrl.previewAdmissionMergeProgress);
 
+router.get('/api/merge-admissions/execute-progress',
+  requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
+  ctrl.executeAdmissionMergeProgress);
+
 router.post('/api/merge-admissions/preview',
   requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),

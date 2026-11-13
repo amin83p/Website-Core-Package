@@ -179,6 +179,22 @@
     </div>
   </div>
 </div>
+<div class="modal fade" id="mergeAdmissionsExecuteModal" tabindex="-1" aria-labelledby="mergeAdmissionsExecuteModalLabel" aria-hidden="true" data-bs-backdrop="static" data-bs-keyboard="false">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold" id="mergeAdmissionsExecuteModalLabel">Merging admissions</h5>
+      </div>
+      <div class="modal-body">
+        <p id="mergeAdmissionsExecuteSummary" class="mb-3">Working through the merge steps.</p>
+        <div id="mergeAdmissionsExecuteSteps" class="vstack gap-2"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" id="mergeAdmissionsExecuteClose" disabled>Close</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="modal fade" id="mergeAdmissionsReadFirstModal" tabindex="-1" aria-labelledby="mergeAdmissionsReadFirstLabel" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
@@ -193,7 +209,7 @@
         <h6 class="fw-bold">2. Student directory</h6>
         <p>The extra admissions disappear from the student list. Claim numbers, notes, and the earliest enrollment date are copied onto the primary admission when they are missing there. The extra student record is removed. This cannot be undone.</p>
         <h6 class="fw-bold">3. Programs, terms, and class enrollment</h6>
-        <p>Program registrations, term registrations, and class enrollments move to the primary admission. If both copies are actively registered in the same program or the same term, the merge stops until you close one of them. When both were enrolled in the same class, the earlier start is kept.</p>
+        <p>Program registrations, term registrations, and class enrollments move to the primary admission. If both copies are actively registered in the same program or the same term, the merge stops until you close one of them. When both were enrolled in the same class, the earlier start is kept. Void registrations, void enrollments, and any other void record are not moved. They are deleted from the active records.</p>
         <h6 class="fw-bold">4. Classes, attendance, and grades</h6>
         <p>Class lists, attendance, nicknames, and grades that belonged to the extra person are moved to the primary person. If the same class session has different attendance or conduct for both copies, the merge stops so you can fix that session first.</p>
         <h6 class="fw-bold">5. Reports and exams</h6>
@@ -371,13 +387,55 @@ function initializeMergeStudentAdmissionsModal() {
   if (modalEl.parentElement !== document.body) document.body.appendChild(modalEl);
   const readFirstEl = document.getElementById('mergeAdmissionsReadFirstModal');
   const previewModalEl = document.getElementById('mergeAdmissionsPreviewModal');
+  const executeModalEl = document.getElementById('mergeAdmissionsExecuteModal');
   if (readFirstEl && readFirstEl.parentElement !== document.body) document.body.appendChild(readFirstEl);
   if (previewModalEl && previewModalEl.parentElement !== document.body) document.body.appendChild(previewModalEl);
+  if (executeModalEl && executeModalEl.parentElement !== document.body) document.body.appendChild(executeModalEl);
   const modalApi = window.bootstrap && window.bootstrap.Modal;
   if (!modalApi) return;
   const modal = modalApi.getOrCreateInstance(modalEl);
   const readFirstModal = readFirstEl ? modalApi.getOrCreateInstance(readFirstEl) : null;
   const previewResultModal = previewModalEl ? modalApi.getOrCreateInstance(previewModalEl) : null;
+  const executeModal = executeModalEl ? modalApi.getOrCreateInstance(executeModalEl) : null;
+  const executeStepsEl = document.getElementById('mergeAdmissionsExecuteSteps');
+  const executeSummaryEl = document.getElementById('mergeAdmissionsExecuteSummary');
+  const executeCloseBtn = document.getElementById('mergeAdmissionsExecuteClose');
+  const initialExecuteSteps = [
+    'Confirm the preview is still valid',
+    'Combine the primary admission profile',
+    'Move active program, term, and class enrollments',
+    'Delete void and duplicate records',
+    'Repoint other student records',
+    'Repoint person records',
+    'Update class session rosters',
+    'Save the merged records',
+    'Update class session files and gradebooks',
+    'Verify nothing still points at the extra admission',
+    'Rebuild class indexes',
+    'Remove the extra admission'
+  ].map((label) => ({ label, status: 'waiting', detail: '' }));
+  function executeStepIcon(status) {
+    if (status === 'success') return '<i class="bi bi-check-circle-fill text-success" aria-hidden="true"></i>';
+    if (status === 'failed') return '<i class="bi bi-x-circle-fill text-danger" aria-hidden="true"></i>';
+    if (status === 'running') return '<span class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></span>';
+    return '<i class="bi bi-hourglass-split text-muted" aria-hidden="true"></i>';
+  }
+  function renderExecuteSteps(steps) {
+    if (!executeStepsEl) return;
+    const rows = Array.isArray(steps) && steps.length ? steps : initialExecuteSteps;
+    executeStepsEl.innerHTML = rows.map((step) => `
+      <div class="d-flex gap-2 align-items-start border rounded p-2">
+        <div class="pt-1">${executeStepIcon(step.status)}</div>
+        <div>
+          <div class="fw-semibold">${escapeHtml(step.label || '')}</div>
+          <div class="small text-muted">${escapeHtml(step.detail || '')}</div>
+        </div>
+      </div>
+    `).join('');
+  }
+  if (executeCloseBtn && executeModal) {
+    executeCloseBtn.addEventListener('click', () => executeModal.hide());
+  }
   if (previewModalEl) {
     previewModalEl.addEventListener('shown.bs.modal', () => {
       previewModalEl.style.zIndex = '1070';
@@ -527,10 +585,16 @@ function initializeMergeStudentAdmissionsModal() {
     const program = data.registrationPlan?.program || {};
     const periods = data.registrationPlan?.periods || {};
     const students = Array.isArray(data.students) ? data.students : [];
+    const term = data.registrationPlan?.term || {};
+    const deleteLines = [
+      ...(program.deletes || []).map((row) => `The registration for program ${row.programLabel || row.programId} will be deleted and not moved.`),
+      ...(term.deletes || []).map((row) => `Term registration ${row.id} will be deleted and not moved.`),
+      ...(periods.deletes || []).map((row) => `Class ${row.classLabel || row.classId}: the void enrollment will be deleted and not moved.`),
+      ...(Array.isArray(data.voidDeletes) ? data.voidDeletes : []).map((row) => `${row.label || 'Record'} ${row.id} will be deleted and not moved.`)
+    ];
     const programLines = [
       ...(program.dateUpdates || []).map((row) => `Program ${row.programLabel || row.programId}: primary registration date becomes ${row.registrationDate || 'the oldest date'}.`),
-      ...(program.adopts || []).map((row) => `Program ${row.programLabel || row.programId} is added to the primary admission with date ${row.registrationDate || 'the oldest date'}.`),
-      ...(program.voids || []).map((row) => `The extra registration for program ${row.programLabel || row.programId} will be voided after enrollments move.`)
+      ...(program.adopts || []).map((row) => `Program ${row.programLabel || row.programId} is added to the primary admission with date ${row.registrationDate || 'the oldest date'}.`)
     ];
     const enrollmentLines = [
       ...(periods.moves || []).map((row) => `Class ${row.classLabel || row.classId}: enrollment moves to the primary admission.`),
@@ -546,6 +610,8 @@ function initializeMergeStudentAdmissionsModal() {
       ${listItems(programLines, 'No program registration changes.')}
       <h6 class="fw-bold mt-3">Class enrollments</h6>
       ${listItems(enrollmentLines, 'No class enrollment changes.')}
+      <h6 class="fw-bold mt-3">Records that will be deleted</h6>
+      ${listItems(deleteLines, 'No void or duplicate records will be deleted.')}
       <h6 class="fw-bold mt-3">Conflicts</h6>
       ${listItems(conflictLines, 'No conflicts.')}
       <h6 class="fw-bold mt-3">Notes</h6>
@@ -695,11 +761,30 @@ function initializeMergeStudentAdmissionsModal() {
       return;
     }
     submitBtn.disabled = true;
-    const waitingToken = typeof window.showLoading === 'function'
-      ? window.showLoading({ title: 'Merging admissions', message: 'Repointing references and verifying. Please wait...' })
-      : null;
+    const executeJobId = `merge-execute-${Date.now()}`;
+    renderExecuteSteps(initialExecuteSteps);
+    if (executeSummaryEl) executeSummaryEl.textContent = 'Working through the merge steps.';
+    if (executeCloseBtn) executeCloseBtn.disabled = true;
+    if (executeModal) executeModal.show();
+    let progressTimer = 0;
+    let executeStopped = false;
+    const readExecuteProgress = async () => {
+      if (executeStopped) return;
+      try {
+        const progressResponse = await fetch(`/school/students/api/merge-admissions/execute-progress?jobId=${encodeURIComponent(executeJobId)}`, {
+          headers: { Accept: 'application/json', 'X-Ajax-Request': 'true' }
+        });
+        const progressResult = await progressResponse.json().catch(() => ({}));
+        if (executeStopped) return;
+        const steps = progressResult.data?.steps;
+        if (Array.isArray(steps) && steps.length) renderExecuteSteps(steps);
+      } catch (_) {
+        // The merge request still completes if a progress check fails.
+      }
+    };
     try {
-      const result = await readJson(await fetch('/school/students/api/merge-admissions/execute', {
+      progressTimer = window.setInterval(readExecuteProgress, 400);
+      const response = await fetch('/school/students/api/merge-admissions/execute', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Ajax-Request': 'true' },
         body: JSON.stringify({
@@ -708,15 +793,34 @@ function initializeMergeStudentAdmissionsModal() {
           previewToken,
           confirmation: confirmEl.value.trim(),
           confirmationMainStudentId: confirmMainEl.value.trim(),
-          actionStateId
+          actionStateId,
+          executeJobId
         })
-      }));
+      });
+      const result = await response.json().catch(() => ({}));
+      executeStopped = true;
+      if (progressTimer) window.clearInterval(progressTimer);
+      const steps = Array.isArray(result.steps) ? result.steps : (Array.isArray(result.data?.steps) ? result.data.steps : []);
+      if (steps.length) renderExecuteSteps(steps);
+      if (!response.ok || result.status === 'error') {
+        const restored = result.rollbackStatus === 'restored'
+          ? ' The merge was undone and the records are back to their previous state.'
+          : (result.rollbackStatus === 'failed' ? ' The undo did not finish. Review the failed step before trying again.' : '');
+        if (executeSummaryEl) executeSummaryEl.textContent = `${result.message || 'The merge failed.'}${restored}`;
+        if (executeCloseBtn) executeCloseBtn.disabled = false;
+        showAlert(result.message || 'The merge failed.');
+        submitBtn.disabled = false;
+        return;
+      }
+      if (executeSummaryEl) executeSummaryEl.textContent = 'Merge finished.';
       window.location.href = result.redirectTo || result.data?.redirectTo || '/school/students';
     } catch (error) {
+      executeStopped = true;
+      if (progressTimer) window.clearInterval(progressTimer);
+      if (executeSummaryEl) executeSummaryEl.textContent = error.message || 'The merge failed.';
+      if (executeCloseBtn) executeCloseBtn.disabled = false;
       showAlert(error.message);
       submitBtn.disabled = false;
-    } finally {
-      if (waitingToken && typeof window.hideLoading === 'function') window.hideLoading(waitingToken);
     }
   });
 }

@@ -5,6 +5,7 @@ const studentSystemIdMigrationService = require('./studentSystemIdMigrationServi
 const { getEntityDefinition } = require('./schoolDeletionRuleRegistry');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual: idsEqualCore, toPublicId: toPublicIdCore } = requireCoreModule('MVC/utils/idAdapter');
+const { isVoidRecord } = require('../../models/school/voidRecordMetadata');
 
 function idsEqual(left, right) {
   return idsEqualCore(left, right);
@@ -137,6 +138,23 @@ function deepReplaceIdFields(value, oldId, newId, countRef, scalarKeys, arrayKey
   return output;
 }
 
+function mapSkippingVoidRows(inputRows, transformMovable) {
+  const sourceRows = Array.isArray(inputRows) ? inputRows : [];
+  const movable = [];
+  const movableSlots = [];
+  sourceRows.forEach((row, index) => {
+    if (row && typeof row === 'object' && isVoidRecord(row)) return;
+    movable.push(row);
+    movableSlots.push(index);
+  });
+  const transformed = transformMovable(movable);
+  const nextRows = sourceRows.slice();
+  movableSlots.forEach((index, cursor) => {
+    nextRows[index] = transformed.rows[cursor];
+  });
+  return { rows: nextRows, count: transformed.count || 0 };
+}
+
 function transformOverallReportInstances(rows, oldStudentId, newStudentId, orgId) {
   let count = 0;
   const output = (Array.isArray(rows) ? rows : []).map((source) => {
@@ -153,39 +171,43 @@ function transformOverallReportInstances(rows, oldStudentId, newStudentId, orgId
 }
 
 function transformStudentIdRows(key, inputRows, oldStudentId, newStudentId, orgId = '') {
-  if (key === 'overallReportInstances' || key === 'overallReportManagementSessions') {
-    return transformOverallReportInstances(inputRows, oldStudentId, newStudentId, orgId);
-  }
-  const base = studentSystemIdMigrationService.transformRows(key, inputRows, oldStudentId, newStudentId, orgId);
-  let extra = 0;
-  const rows = base.rows.map((row) => {
-    if (!row || typeof row !== 'object') return row;
-    const rowOrgId = String(row.orgId || '').trim();
-    if (orgId && rowOrgId && !idsEqual(rowOrgId, orgId)) return row;
-    const countRef = { count: 0 };
-    const next = deepReplaceIdFields(row, oldStudentId, newStudentId, countRef, STUDENT_RECORD_SCALAR_KEYS, STUDENT_RECORD_ARRAY_KEYS);
-    extra += countRef.count;
-    return next;
+  return mapSkippingVoidRows(inputRows, (movable) => {
+    if (key === 'overallReportInstances' || key === 'overallReportManagementSessions') {
+      return transformOverallReportInstances(movable, oldStudentId, newStudentId, orgId);
+    }
+    const base = studentSystemIdMigrationService.transformRows(key, movable, oldStudentId, newStudentId, orgId);
+    let extra = 0;
+    const rows = base.rows.map((row) => {
+      if (!row || typeof row !== 'object') return row;
+      const rowOrgId = String(row.orgId || '').trim();
+      if (orgId && rowOrgId && !idsEqual(rowOrgId, orgId)) return row;
+      const countRef = { count: 0 };
+      const next = deepReplaceIdFields(row, oldStudentId, newStudentId, countRef, STUDENT_RECORD_SCALAR_KEYS, STUDENT_RECORD_ARRAY_KEYS);
+      extra += countRef.count;
+      return next;
+    });
+    return { rows, count: base.count + extra };
   });
-  return { rows, count: base.count + extra };
 }
 
 function transformPersonIdRows(key, inputRows, oldPersonId, newPersonId, orgId = '') {
   if (key === 'schedulePersonNotes') {
     return transformSchedulePersonNotesDoc(inputRows, oldPersonId, newPersonId, orgId);
   }
-  let count = 0;
-  const output = (Array.isArray(inputRows) ? inputRows : []).map((source) => {
-    const row = source && typeof source === 'object' ? { ...source } : source;
-    if (!row || typeof row !== 'object') return row;
-    const rowOrgId = String(row.orgId || '').trim();
-    if (orgId && rowOrgId && !idsEqual(rowOrgId, orgId)) return row;
-    const countRef = { count: 0 };
-    const next = deepReplaceIdFields(row, oldPersonId, newPersonId, countRef, PERSON_SCALAR_KEYS, PERSON_ARRAY_KEYS);
-    count += countRef.count;
-    return next;
+  return mapSkippingVoidRows(inputRows, (movable) => {
+    let count = 0;
+    const output = movable.map((source) => {
+      const row = source && typeof source === 'object' ? { ...source } : source;
+      if (!row || typeof row !== 'object') return row;
+      const rowOrgId = String(row.orgId || '').trim();
+      if (orgId && rowOrgId && !idsEqual(rowOrgId, orgId)) return row;
+      const countRef = { count: 0 };
+      const next = deepReplaceIdFields(row, oldPersonId, newPersonId, countRef, PERSON_SCALAR_KEYS, PERSON_ARRAY_KEYS);
+      count += countRef.count;
+      return next;
+    });
+    return { rows: output, count };
   });
-  return { rows: output, count };
 }
 
 function transformSchedulePersonNotesDoc(doc, oldPersonId, newPersonId, orgId = '') {

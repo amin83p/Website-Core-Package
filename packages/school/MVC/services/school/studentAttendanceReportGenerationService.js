@@ -17,6 +17,7 @@ const reportExportBatchCacheService = require('./reportExportBatchCacheService')
 const { requireCoreModule } = require('./schoolCoreContracts');
 const sarExportTimingService = require('./sarExportTimingService');
 const sarExportConfigService = require('./sarExportConfigService');
+const studentAttendanceReportClassOrderService = require('./studentAttendanceReportClassOrderService');
 const { runWithConcurrency } = require('../../utils/asyncPool');
 const fs = require('fs');
 const path = require('path');
@@ -32,11 +33,7 @@ function safeFileToken(value = '', fallback = 'export') {
 }
 
 function sortClasses(classes = []) {
-  return [...(Array.isArray(classes) ? classes : [])].sort((left, right) => {
-    const nameCompare = String(left?.className || '').localeCompare(String(right?.className || ''));
-    if (nameCompare !== 0) return nameCompare;
-    return String(left?.classId || '').localeCompare(String(right?.classId || ''));
-  });
+  return studentAttendanceReportClassOrderService.sortStudentAttendanceReportClasses(classes);
 }
 
 function resolveTeacherIdForClass(classRow = {}) {

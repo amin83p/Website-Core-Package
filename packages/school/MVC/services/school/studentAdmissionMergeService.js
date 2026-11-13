@@ -20,7 +20,7 @@ const studentSystemIdMigrationLockService = require('./studentSystemIdMigrationL
 const { buildUploadTargetsForClass } = require('./classFolderPaths');
 const classModel = require('../../models/school/classModel');
 const schoolIndexService = require('./schoolIndexService');
-const { buildVoidPatch } = require('../../models/school/voidRecordMetadata');
+const { isVoidRecord } = require('../../models/school/voidRecordMetadata');
 const {
   MERGE_STUDENT_ID_REGISTRY,
   MERGE_PERSON_FLAT_REGISTRY,
@@ -330,12 +330,24 @@ function resolveSelection(students = [], mainStudentId = '', mergeStudentIds = [
 }
 
 function buildTermRegistrationPlan(main, secondaries, termRows = []) {
-  const plan = { moves: [], blocks: [] };
+  const plan = { moves: [], deletes: [], blocks: [] };
   const orgId = toPublicId(main?.orgId);
   const mainId = toPublicId(main?.id);
   const rows = (Array.isArray(termRows) ? termRows : []).filter((row) => idsEqual(row?.orgId, orgId));
-  const activeByStudentProgramTerm = new Map();
+  const selectedIds = new Set([mainId, ...secondaries.map((row) => toPublicId(row.id))]);
   rows.forEach((row) => {
+    if (!isVoidRecord(row) || !selectedIds.has(toPublicId(row.studentId))) return;
+    plan.deletes.push({
+      id: row.id,
+      programId: toPublicId(row.programId),
+      termId: toPublicId(row.termId),
+      fromStudentId: toPublicId(row.studentId),
+      reason: 'void'
+    });
+  });
+  const liveRows = rows.filter((row) => !isVoidRecord(row));
+  const activeByStudentProgramTerm = new Map();
+  liveRows.forEach((row) => {
     const studentId = toPublicId(row.studentId);
     const programId = toPublicId(row.programId);
     const termId = toPublicId(row.termId);
@@ -346,7 +358,7 @@ function buildTermRegistrationPlan(main, secondaries, termRows = []) {
   });
   secondaries.forEach((stu) => {
     const secId = toPublicId(stu.id);
-    rows.filter((row) => idsEqual(row.studentId, secId)).forEach((row) => {
+    liveRows.filter((row) => idsEqual(row.studentId, secId)).forEach((row) => {
       const programId = toPublicId(row.programId);
       const termId = toPublicId(row.termId);
       const mainKey = `${mainId}::${programId}::${termId}`;
@@ -366,7 +378,7 @@ function buildTermRegistrationPlan(main, secondaries, termRows = []) {
       });
     });
   });
-  const mainRegs = rows.filter((row) => idsEqual(row.studentId, mainId));
+  const mainRegs = liveRows.filter((row) => idsEqual(row.studentId, mainId));
   const earliestByProgramTerm = new Map();
   [...mainRegs, ...plan.moves.map((m) => ({ programId: m.programId, termId: m.termId, registrationDate: m.registrationDate }))].forEach((row) => {
     const key = `${toPublicId(row.programId)}::${toPublicId(row.termId)}`;
@@ -409,13 +421,14 @@ function annotateMergePreviewLabels(previewParts, { programNameById, classTitleB
   programPlan.dateUpdates = (programPlan.dateUpdates || []).map(tagProgram);
   programPlan.adopts = (programPlan.adopts || []).map(tagProgram);
   programPlan.moves = (programPlan.moves || []).map(tagProgram);
-  programPlan.voids = (programPlan.voids || []).map(tagProgram);
+  programPlan.deletes = (programPlan.deletes || []).map(tagProgram);
   programPlan.blocks = (programPlan.blocks || []).map((message) => replaceIdsWithLabels(message, new Map(
     [...programNameById.entries()].map(([id, name]) => [id, programLabel(id)])
   )));
   const periodPlan = previewParts.periodPlan || {};
   periodPlan.moves = (periodPlan.moves || []).map(tagClass);
   periodPlan.merges = (periodPlan.merges || []).map(tagClass);
+  periodPlan.deletes = (periodPlan.deletes || []).map(tagClass);
   periodPlan.conflicts = (periodPlan.conflicts || []).map((row) => ({
     ...tagClass(row),
     message: replaceIdsWithLabels(row.message, new Map([
@@ -427,26 +440,35 @@ function annotateMergePreviewLabels(previewParts, { programNameById, classTitleB
 }
 
 function buildProgramRegistrationPlan(main, secondaries, programRows = [], periodRows = []) {
-  const plan = { moves: [], adopts: [], dateUpdates: [], voids: [], blocks: [] };
+  const plan = { moves: [], adopts: [], dateUpdates: [], deletes: [], blocks: [] };
   const orgId = toPublicId(main?.orgId);
   const mainId = toPublicId(main?.id);
   const mainPersonId = toPublicId(main?.personId);
   const selectedIds = new Set([mainId, ...secondaries.map((row) => toPublicId(row.id))]);
   const rows = (Array.isArray(programRows) ? programRows : []).filter((row) => idsEqual(row?.orgId, orgId));
+  const periods = (Array.isArray(periodRows) ? periodRows : []).filter((row) => idsEqual(row?.orgId, orgId) && !isVoidRecord(row));
   const neededPrograms = new Set();
   rows.forEach((row) => {
     if (selectedIds.has(toPublicId(row.studentId)) && toPublicId(row.programId)) neededPrograms.add(toPublicId(row.programId));
   });
-  (Array.isArray(periodRows) ? periodRows : []).forEach((row) => {
-    if (!idsEqual(row?.orgId, orgId)) return;
+  periods.forEach((row) => {
     if (selectedIds.has(toPublicId(row.studentId)) && toPublicId(row.programId)) neededPrograms.add(toPublicId(row.programId));
   });
 
   neededPrograms.forEach((programId) => {
     const related = rows.filter((row) => idsEqual(row.programId, programId) && selectedIds.has(toPublicId(row.studentId)));
-    const oldest = oldestDate(related.map((row) => row.registrationDate));
-    const mainActive = related.find((row) => idsEqual(row.studentId, mainId) && isActiveRegistrationStatus(row.status));
-    const secondaryRelated = related.filter((row) => !idsEqual(row.studentId, mainId) && String(row.status || '').toLowerCase() !== 'void');
+    related.filter((row) => isVoidRecord(row)).forEach((row) => {
+      plan.deletes.push({
+        id: row.id,
+        programId,
+        fromStudentId: toPublicId(row.studentId),
+        reason: 'void'
+      });
+    });
+    const liveRelated = related.filter((row) => !isVoidRecord(row));
+    const oldest = oldestDate(liveRelated.map((row) => row.registrationDate));
+    const mainActive = liveRelated.find((row) => idsEqual(row.studentId, mainId) && isActiveRegistrationStatus(row.status));
+    const secondaryRelated = liveRelated.filter((row) => !idsEqual(row.studentId, mainId));
     if (mainActive) {
       if (oldest) {
         plan.dateUpdates.push({
@@ -457,7 +479,12 @@ function buildProgramRegistrationPlan(main, secondaries, programRows = [], perio
         });
       }
       secondaryRelated.forEach((row) => {
-        plan.voids.push({ id: row.id, programId, fromStudentId: toPublicId(row.studentId) });
+        plan.deletes.push({
+          id: row.id,
+          programId,
+          fromStudentId: toPublicId(row.studentId),
+          reason: 'duplicate'
+        });
       });
       return;
     }
@@ -465,7 +492,12 @@ function buildProgramRegistrationPlan(main, secondaries, programRows = [], perio
       .slice()
       .sort((left, right) => String(left.registrationDate || '9999-99-99').localeCompare(String(right.registrationDate || '9999-99-99')))[0];
     if (!source) {
-      plan.blocks.push(`A class enrollment needs program ${programId}, but none of the selected admissions has that program registration.`);
+      const liveEnrollmentNeedsProgram = periods.some((row) => (
+        idsEqual(row.programId, programId) && selectedIds.has(toPublicId(row.studentId))
+      ));
+      if (liveEnrollmentNeedsProgram) {
+        plan.blocks.push(`A class enrollment needs program ${programId}, but none of the selected admissions has that program registration.`);
+      }
       return;
     }
     const adopt = {
@@ -479,7 +511,12 @@ function buildProgramRegistrationPlan(main, secondaries, programRows = [], perio
     plan.moves.push(adopt);
     secondaryRelated.forEach((row) => {
       if (idsEqual(row.id, source.id)) return;
-      plan.voids.push({ id: row.id, programId, fromStudentId: toPublicId(row.studentId) });
+      plan.deletes.push({
+        id: row.id,
+        programId,
+        fromStudentId: toPublicId(row.studentId),
+        reason: 'duplicate'
+      });
     });
   });
   plan.earliestProgramDates = {};
@@ -494,20 +531,30 @@ function buildEnrollmentPeriodPlan(main, secondaries, periodRows = []) {
   const orgId = toPublicId(main?.orgId);
   const mainId = toPublicId(main?.id);
   const rows = (Array.isArray(periodRows) ? periodRows : []).filter((row) => idsEqual(row?.orgId, orgId));
-  const byStudentClass = new Map();
+  const selectedIds = new Set([mainId, ...secondaries.map((row) => toPublicId(row.id))]);
+  const plan = { moves: [], merges: [], deletes: [], conflicts: [], classIds: new Set() };
   rows.forEach((row) => {
+    if (!isVoidRecord(row) || !selectedIds.has(toPublicId(row.studentId))) return;
+    plan.deletes.push({
+      type: 'enrollmentPeriod',
+      id: row.id,
+      classId: toPublicId(row.classId),
+      reason: 'void'
+    });
+  });
+  const liveRows = rows.filter((row) => !isVoidRecord(row));
+  const byStudentClass = new Map();
+  liveRows.forEach((row) => {
     const key = `${toPublicId(row.studentId)}::${toPublicId(row.classId)}`;
     if (!key.includes('::') || key.startsWith('::')) return;
     if (!byStudentClass.has(key)) byStudentClass.set(key, []);
     byStudentClass.get(key).push(row);
   });
-  const plan = { moves: [], merges: [], conflicts: [], classIds: new Set() };
   secondaries.forEach((stu) => {
     const secId = toPublicId(stu.id);
-    rows.filter((row) => idsEqual(row.studentId, secId)).forEach((row) => {
+    liveRows.filter((row) => idsEqual(row.studentId, secId)).forEach((row) => {
       const classId = toPublicId(row.classId);
       const mainKey = `${mainId}::${classId}`;
-      const secKey = `${secId}::${classId}`;
       const mainRows = byStudentClass.get(mainKey) || [];
       if (!mainRows.length) {
         plan.moves.push({ type: 'enrollmentPeriod', id: row.id, classId });
@@ -734,6 +781,11 @@ async function buildAdmissionMergePreview({ mainStudentId, mergeStudentIds = [],
   };
   report(100, 'Preparing the summary');
   const previewToken = buildPreviewToken(previewPayload);
+  const voidDeletes = listOwnedVoidRecords(datasets, {
+    studentIds: [main.id, ...secondaries.map((row) => row.id)],
+    personIds: [main.personId, ...secondaries.map((row) => row.personId)],
+    orgId
+  }).filter((row) => !PLANNED_DELETE_KEYS.has(row.key));
 
   return {
     ready: blockers.length === 0,
@@ -754,6 +806,7 @@ async function buildAdmissionMergePreview({ mainStudentId, mergeStudentIds = [],
     }),
     impacts: { ...impacts, sessionTouchCount },
     registrationPlan: { program: programPlan, term: termPlan, periods: periodPlan },
+    voidDeletes,
     affectedClassIds,
     sessionCollisions,
     blockers,
@@ -863,17 +916,82 @@ async function applyRegistrationPlanToDatasets(datasets, main, programPlan, term
     if (dropIdx >= 0) periodRows.splice(dropIdx, 1);
   });
   datasets.classEnrollmentPeriods.rows = periodRows;
-  (programPlan.voids || []).forEach((entry) => {
-    const idx = programRows.findIndex((row) => idsEqual(row.id, entry.id));
-    if (idx < 0) return;
-    programRows[idx] = buildVoidPatch(
-      programRows[idx],
-      { id: 'admission-merge' },
-      'Voided after this admission was merged into the primary student.'
-    );
-  });
   datasets.studentProgramRegistrations.rows = programRows;
 }
+
+function rowsWithoutIds(rows, ids) {
+  const drop = ids instanceof Set ? ids : new Set((ids || []).map((id) => toPublicId(id)).filter(Boolean));
+  return (Array.isArray(rows) ? rows : []).filter((row) => !drop.has(toPublicId(row?.id)));
+}
+
+function deletePlannedMergeRecords(datasets, { programPlan = {}, termPlan = {}, periodPlan = {} } = {}) {
+  const programIds = new Set((programPlan.deletes || []).map((row) => toPublicId(row.id)).filter(Boolean));
+  const termIds = new Set((termPlan.deletes || []).map((row) => toPublicId(row.id)).filter(Boolean));
+  const periodIds = new Set((periodPlan.deletes || []).map((row) => toPublicId(row.id)).filter(Boolean));
+  if (datasets.studentProgramRegistrations) {
+    datasets.studentProgramRegistrations.rows = rowsWithoutIds(datasets.studentProgramRegistrations.rows, programIds);
+  }
+  if (datasets.studentTermRegistrations) {
+    datasets.studentTermRegistrations.rows = rowsWithoutIds(datasets.studentTermRegistrations.rows, termIds);
+  }
+  if (datasets.classEnrollmentPeriods) {
+    datasets.classEnrollmentPeriods.rows = rowsWithoutIds(datasets.classEnrollmentPeriods.rows, periodIds);
+  }
+  return {
+    deleted: programIds.size + termIds.size + periodIds.size
+  };
+}
+
+function listOwnedVoidRecords(datasets, { studentIds = [], personIds = [], orgId = '' } = {}) {
+  const students = new Set((studentIds || []).map((id) => toPublicId(id)).filter(Boolean));
+  const persons = new Set((personIds || []).map((id) => toPublicId(id)).filter(Boolean));
+  const found = [];
+  const seen = new Set();
+  listMergeStores().forEach((entry) => {
+    if (entry.shape === 'document' || entry.key === 'students' || entry.key === 'classes') return;
+    const rows = datasets[entry.key]?.rows || [];
+    rows.forEach((row) => {
+      if (!row || typeof row !== 'object' || !isVoidRecord(row)) return;
+      const rowOrgId = toPublicId(row.orgId);
+      if (orgId && rowOrgId && !idsEqual(rowOrgId, orgId)) return;
+      const studentId = toPublicId(row.studentId);
+      const personId = toPublicId(row.personId);
+      const owned = (studentId && students.has(studentId)) || (personId && persons.has(personId));
+      if (!owned) return;
+      const id = toPublicId(row.id);
+      const token = `${entry.key}::${id}`;
+      if (!id || seen.has(token)) return;
+      seen.add(token);
+      found.push({
+        key: entry.key,
+        id,
+        label: entry.label || entry.key,
+        reason: 'void'
+      });
+    });
+  });
+  return found;
+}
+
+function removeOwnedVoidRecords(datasets, selection) {
+  const found = listOwnedVoidRecords(datasets, selection);
+  const idsByKey = new Map();
+  found.forEach((row) => {
+    if (!idsByKey.has(row.key)) idsByKey.set(row.key, new Set());
+    idsByKey.get(row.key).add(row.id);
+  });
+  idsByKey.forEach((ids, key) => {
+    if (!datasets[key]) return;
+    datasets[key].rows = rowsWithoutIds(datasets[key].rows, ids);
+  });
+  return found;
+}
+
+const PLANNED_DELETE_KEYS = new Set([
+  'studentProgramRegistrations',
+  'studentTermRegistrations',
+  'classEnrollmentPeriods'
+]);
 
 function applyClassSessionMergesToDatasets({ datasets, orgId, mainPersonId, secondaries, classIds }) {
   const personMap = new Map();
@@ -1013,47 +1131,147 @@ function verifyNoSecondaryReferences(datasets, secondaries, orgId) {
   return remaining;
 }
 
-async function purgeSecondaryStudent(student, reqUser, warnings) {
-  const dataService = requireCoreModule('MVC/services/dataService');
-  const activeOrgId = toPublicId(student.orgId);
-  const personId = toPublicId(student.personId);
+const MERGE_EXECUTE_STEPS = Object.freeze([
+  { id: 'confirm', label: 'Confirm the preview is still valid' },
+  { id: 'profile', label: 'Combine the primary admission profile' },
+  { id: 'enrollments', label: 'Move active program, term, and class enrollments' },
+  { id: 'deleteVoids', label: 'Delete void and duplicate records' },
+  { id: 'studentRefs', label: 'Repoint other student records' },
+  { id: 'personRefs', label: 'Repoint person records' },
+  { id: 'sessions', label: 'Update class session rosters' },
+  { id: 'save', label: 'Save the merged records' },
+  { id: 'classFiles', label: 'Update class session files and gradebooks' },
+  { id: 'verify', label: 'Verify nothing still points at the extra admission' },
+  { id: 'indexes', label: 'Rebuild class indexes' },
+  { id: 'remove', label: 'Remove the extra admission' }
+]);
 
-  let roleResult = null;
-  try {
-    roleResult = await schoolPersonAccessService.removePersonSchoolRole({
-      personId,
-      orgId: activeOrgId,
-      role: 'school_student',
-      reqUser
-    });
-  } catch (error) {
-    warnings.push(`Could not remove the school student role for person ${personId}: ${error.message}`);
-  }
+function cloneJson(value) {
+  return value ? JSON.parse(JSON.stringify(value)) : null;
+}
 
-  const linkedAccountId = String(student?.studentAccountId || '').trim();
-  if (linkedAccountId) {
+async function runMergeExecuteSteps(handlers = {}, { onProgress, rollback } = {}) {
+  const steps = MERGE_EXECUTE_STEPS.map((step) => ({
+    id: step.id,
+    label: step.label,
+    status: 'waiting',
+    detail: ''
+  }));
+  const publish = () => {
+    if (typeof onProgress === 'function') onProgress({ steps: steps.map((step) => ({ ...step })) });
+  };
+  publish();
+  for (const step of steps) {
+    step.status = 'running';
+    step.detail = 'Starting...';
+    publish();
     try {
-      await dataService.purgeData('schoolAccounts', linkedAccountId, reqUser, { skipDeletionGuard: true });
+      const handler = handlers[step.id];
+      if (typeof handler !== 'function') throw new Error(`Merge step ${step.label} is not available.`);
+      const detail = await handler((message) => {
+        step.detail = String(message || '').trim() || step.detail;
+        publish();
+      });
+      step.status = 'success';
+      step.detail = String(detail || 'Done.').trim();
+      publish();
     } catch (error) {
-      warnings.push(`Could not purge school account ${linkedAccountId}: ${error.message}`);
+      step.status = 'failed';
+      step.detail = error.message || 'This step failed.';
+      const undo = {
+        id: 'undo',
+        label: 'Undo the merge',
+        status: 'running',
+        detail: 'Restoring records...'
+      };
+      steps.push(undo);
+      publish();
+      try {
+        if (typeof rollback === 'function') await rollback();
+        undo.status = 'success';
+        undo.detail = 'Records restored to the previous state.';
+        error.rollbackStatus = 'restored';
+      } catch (rollbackError) {
+        undo.status = 'failed';
+        undo.detail = rollbackError.message || 'Restore failed.';
+        error.rollbackStatus = 'failed';
+      }
+      publish();
+      error.mergeSteps = steps.map((row) => ({ ...row }));
+      throw error;
     }
   }
+  return steps;
+}
 
-  let personPurged = false;
-  if (personId) {
-    const otherStudents = await schoolDataService.fetchData('students', { personId__eq: personId, page: 1, limit: 5 }, reqUser);
-    if (otherStudents.length) {
-      warnings.push(`Person ${personId} still has another student admission and was kept.`);
-    } else {
-      try {
-        await dataService.deleteData('persons', personId, reqUser);
-        personPurged = true;
-      } catch (error) {
-        warnings.push(`Person ${personId} was not deleted: ${error.message}`);
+async function removeSecondaryAdmission(student, reqUser) {
+  const dataService = requireCoreModule('MVC/services/dataService');
+  const personId = toPublicId(student.personId);
+  const accountId = String(student?.studentAccountId || '').trim();
+  const snapshot = {
+    person: null,
+    account: null,
+    personRemoved: false,
+    accountRemoved: false,
+    roleChanged: false
+  };
+  try {
+    if (personId) {
+      snapshot.person = cloneJson(await dataService.getDataById('persons', personId, reqUser));
+      const roleResult = await schoolPersonAccessService.removePersonSchoolRole({
+        personId,
+        orgId: toPublicId(student.orgId),
+        role: 'school_student',
+        reqUser
+      });
+      snapshot.roleChanged = Boolean(roleResult?.changed);
+    }
+    if (accountId) {
+      snapshot.account = cloneJson(await schoolDataService.getDataById('schoolAccounts', accountId, reqUser));
+      if (snapshot.account) {
+        await schoolDataService.purgeData('schoolAccounts', accountId, reqUser, { skipDeletionGuard: true });
+        snapshot.accountRemoved = true;
       }
     }
+    let warning = '';
+    if (personId) {
+      const otherStudents = await schoolDataService.fetchData('students', { personId__eq: personId, page: 1, limit: 5 }, reqUser);
+      if (otherStudents.length) {
+        warning = `Person ${personId} still has another student admission and was kept.`;
+      } else {
+        await dataService.deleteData('persons', personId, reqUser);
+        snapshot.personRemoved = true;
+      }
+    }
+    return {
+      snapshot,
+      warning,
+      personPurged: snapshot.personRemoved,
+      personId
+    };
+  } catch (error) {
+    error.removalSnapshot = snapshot;
+    throw error;
   }
-  return { personPurged, removedRole: Boolean(roleResult?.changed) };
+}
+
+async function restoreRemovalSnapshot(snapshot, reqUser) {
+  if (!snapshot) return;
+  const dataService = requireCoreModule('MVC/services/dataService');
+  if (snapshot.person && (snapshot.personRemoved || snapshot.roleChanged)) {
+    const personId = toPublicId(snapshot.person.id || snapshot.person.personId);
+    const existing = personId ? await dataService.getDataById('persons', personId, reqUser).catch(() => null) : null;
+    if (!existing) await dataService.addData('persons', snapshot.person, reqUser);
+    else await dataService.updateData('persons', personId, snapshot.person, reqUser);
+  }
+  if (snapshot.accountRemoved && snapshot.account) {
+    const accountId = toPublicId(snapshot.account.id);
+    const existing = accountId
+      ? await schoolDataService.getDataById('schoolAccounts', accountId, reqUser).catch(() => null)
+      : null;
+    if (!existing) await schoolDataService.addData('schoolAccounts', snapshot.account, reqUser);
+    else await schoolDataService.updateData('schoolAccounts', accountId, snapshot.account, reqUser);
+  }
 }
 
 async function writeMergeAudit(record) {
@@ -1077,96 +1295,197 @@ async function executeAdmissionMerge({
   previewToken = '',
   confirmation = '',
   reqUser,
-  actor = ''
+  actor = '',
+  onProgress
 } = {}) {
-  if (String(confirmation || '').trim().toUpperCase() !== 'MERGE') {
-    throw new Error('Type MERGE to confirm this operation.');
-  }
-  const preview = await buildAdmissionMergePreview({ mainStudentId, mergeStudentIds, reqUser });
-  if (!preview.ready) {
-    throw new Error(preview.blockers[0] || 'Merge is blocked. Refresh the preview.');
-  }
-  if (previewToken && previewToken !== preview.previewToken) {
-    throw new Error('Preview is stale. Run preview again before merging.');
-  }
-
-  const students = await schoolDataService.fetchAllData('students', {}, reqUser);
-  const { main, secondaries, orgId } = resolveSelection(students, mainStudentId, mergeStudentIds);
-  await studentSystemIdMigrationLockService.assertWriteAllowed('students', orgId);
-
-  const datasets = await loadMergeDatasetMap();
   const journalToken = crypto.randomBytes(6).toString('hex');
-
-  const mainId = toPublicId(main.id);
-  const mainPersonId = toPublicId(main.personId);
-
+  let preview = null;
+  let datasets = null;
+  let main = null;
+  let secondaries = [];
+  let orgId = '';
+  let mainId = '';
+  let mainPersonId = '';
   let persisted = null;
   let workspacePatch = null;
   let studentUpdates = 0;
   let personUpdates = 0;
   const warnings = [];
   const personsNotPurged = [];
-  const affectedClassIds = preview.affectedClassIds || [];
+  const removalApplied = [];
+  let affectedClassIds = [];
 
-  try {
-    datasets.students.rows = applyProfileUnionToStudentRows(datasets.students.rows, main, secondaries);
-
-    await applyRegistrationPlanToDatasets(
-      datasets,
-      main,
-      preview.registrationPlan.program,
-      preview.registrationPlan.term,
-      preview.registrationPlan.periods
-    );
-
-    studentUpdates = applyStudentIdMergesToDatasets(datasets, mainId, secondaries, orgId);
-    personUpdates = applyPersonIdMergesToDatasets(datasets, mainPersonId, secondaries, orgId);
-    applyClassSessionMergesToDatasets({
-      datasets,
-      orgId,
-      mainPersonId,
-      secondaries,
-      classIds: affectedClassIds
-    });
-
-    persisted = await persistMergeDataset(datasets, { token: journalToken });
-    workspacePatch = await patchClassWorkspaceFiles({
-      classRows: datasets.classes?.rows || [],
-      classIds: affectedClassIds,
-      mainPersonId,
-      secondaries
-    });
-
-    const verifyDatasets = await loadMergeDatasetMap();
-    const remaining = verifyNoSecondaryReferences(verifyDatasets, secondaries, orgId);
-    if (remaining.length) {
-      const error = new Error('Post-merge verification failed: references remain on secondary admissions.');
-      error.remaining = remaining;
-      throw error;
-    }
-
-    for (const classId of affectedClassIds) {
+  const rollbackMerge = async () => {
+    for (const snapshot of [...removalApplied].reverse()) {
       // eslint-disable-next-line no-await-in-loop
-      await schoolIndexService.rebuildIndexesForClass(classId);
+      await restoreRemovalSnapshot(snapshot, reqUser);
     }
-
-    for (const stu of secondaries) {
-      try {
-        const purgeResult = await purgeSecondaryStudent(stu, reqUser, warnings);
-        if (!purgeResult.personPurged && toPublicId(stu.personId)) {
-          personsNotPurged.push(toPublicId(stu.personId));
-        }
-      } catch (error) {
-        warnings.push(`Secondary admission ${toPublicId(stu.id)} could not be fully purged: ${error.message}`);
-        if (toPublicId(stu.personId)) personsNotPurged.push(toPublicId(stu.personId));
-      }
-    }
-
-    if (persisted?.cleanupBackups) await persisted.cleanupBackups();
-  } catch (error) {
     if (workspacePatch?.rollback) await workspacePatch.rollback();
     if (persisted?.rollback) await persisted.rollback();
-    throw error;
+    if (persisted || workspacePatch) {
+      for (const classId of affectedClassIds) {
+        // eslint-disable-next-line no-await-in-loop
+        await schoolIndexService.rebuildIndexesForClass(classId);
+      }
+    }
+  };
+
+  const steps = await runMergeExecuteSteps({
+    confirm: async (detail) => {
+      detail('Checking the confirmation and the saved preview');
+      if (String(confirmation || '').trim().toUpperCase() !== 'MERGE') {
+        throw new Error('Type MERGE to confirm this operation.');
+      }
+      preview = await buildAdmissionMergePreview({ mainStudentId, mergeStudentIds, reqUser });
+      if (!preview.ready) throw new Error(preview.blockers[0] || 'Merge is blocked. Refresh the preview.');
+      if (previewToken && previewToken !== preview.previewToken) {
+        throw new Error('Preview is stale. Run preview again before merging.');
+      }
+      const students = await schoolDataService.fetchAllData('students', {}, reqUser);
+      const selection = resolveSelection(students, mainStudentId, mergeStudentIds);
+      main = selection.main;
+      secondaries = selection.secondaries;
+      orgId = selection.orgId;
+      mainId = toPublicId(main.id);
+      mainPersonId = toPublicId(main.personId);
+      affectedClassIds = preview.affectedClassIds || [];
+      await studentSystemIdMigrationLockService.assertWriteAllowed('students', orgId);
+      datasets = await loadMergeDatasetMap();
+      return 'Preview is still valid.';
+    },
+    profile: async (detail) => {
+      detail('Copying claim numbers, notes, and the earliest enrollment date onto the primary admission');
+      datasets.students.rows = applyProfileUnionToStudentRows(datasets.students.rows, main, secondaries);
+      return 'Primary admission profile combined.';
+    },
+    enrollments: async (detail) => {
+      const program = preview.registrationPlan?.program || {};
+      const periods = preview.registrationPlan?.periods || {};
+      (program.dateUpdates || []).forEach((row) => {
+        detail(`Updating program ${row.programLabel || row.programId}`);
+      });
+      (program.adopts || []).forEach((row) => {
+        detail(`Adding program ${row.programLabel || row.programId} to the primary admission`);
+      });
+      (periods.moves || []).forEach((row) => {
+        detail(`Moving class ${row.classLabel || row.classId}`);
+      });
+      (periods.merges || []).forEach((row) => {
+        detail(`Combining class ${row.classLabel || row.classId}`);
+      });
+      await applyRegistrationPlanToDatasets(
+        datasets,
+        main,
+        program,
+        preview.registrationPlan?.term || {},
+        periods
+      );
+      return 'Active program, term, and class enrollments moved.';
+    },
+    deleteVoids: async (detail) => {
+      const planned = [
+        ...(preview.registrationPlan?.program?.deletes || []),
+        ...(preview.registrationPlan?.term?.deletes || []),
+        ...(preview.registrationPlan?.periods?.deletes || [])
+      ];
+      planned.forEach((row) => {
+        detail(`Deleting ${row.programLabel || row.classLabel || row.label || row.id}`);
+      });
+      const plannedResult = deletePlannedMergeRecords(datasets, {
+        programPlan: preview.registrationPlan?.program || {},
+        termPlan: preview.registrationPlan?.term || {},
+        periodPlan: preview.registrationPlan?.periods || {}
+      });
+      const removed = removeOwnedVoidRecords(datasets, {
+        studentIds: [main.id, ...secondaries.map((row) => row.id)],
+        personIds: [main.personId, ...secondaries.map((row) => row.personId)],
+        orgId
+      });
+      removed.forEach((row) => detail(`Deleting ${row.label} ${row.id}`));
+      return `Deleted ${plannedResult.deleted + removed.length} void or duplicate records.`;
+    },
+    studentRefs: async (detail) => {
+      detail('Repointing student records to the primary admission');
+      studentUpdates = applyStudentIdMergesToDatasets(datasets, mainId, secondaries, orgId);
+      return `Repointed ${studentUpdates} student references.`;
+    },
+    personRefs: async (detail) => {
+      detail('Repointing person records to the primary person');
+      personUpdates = applyPersonIdMergesToDatasets(datasets, mainPersonId, secondaries, orgId);
+      return `Repointed ${personUpdates} person references.`;
+    },
+    sessions: async (detail) => {
+      detail('Updating class session rosters');
+      applyClassSessionMergesToDatasets({
+        datasets,
+        orgId,
+        mainPersonId,
+        secondaries,
+        classIds: affectedClassIds
+      });
+      return 'Class session rosters updated.';
+    },
+    save: async (detail) => {
+      detail('Writing the merged records');
+      persisted = await persistMergeDataset(datasets, { token: journalToken });
+      return 'Merged records saved.';
+    },
+    classFiles: async (detail) => {
+      detail('Updating class session files and gradebooks');
+      workspacePatch = await patchClassWorkspaceFiles({
+        classRows: datasets.classes?.rows || [],
+        classIds: affectedClassIds,
+        mainPersonId,
+        secondaries
+      });
+      return 'Class files updated.';
+    },
+    verify: async (detail) => {
+      detail('Checking that the extra admission is no longer referenced');
+      const verifyDatasets = await loadMergeDatasetMap();
+      const remaining = verifyNoSecondaryReferences(verifyDatasets, secondaries, orgId);
+      const leftoverVoids = listOwnedVoidRecords(verifyDatasets, {
+        studentIds: [main.id, ...secondaries.map((row) => row.id)],
+        personIds: [main.personId, ...secondaries.map((row) => row.personId)],
+        orgId
+      });
+      if (remaining.length || leftoverVoids.length) {
+        const error = new Error('Post-merge verification failed: references remain on secondary admissions.');
+        error.remaining = remaining;
+        throw error;
+      }
+      return 'No leftover references.';
+    },
+    indexes: async (detail) => {
+      for (const classId of affectedClassIds) {
+        detail(`Rebuilding indexes for class ${classId}`);
+        // eslint-disable-next-line no-await-in-loop
+        await schoolIndexService.rebuildIndexesForClass(classId);
+      }
+      return affectedClassIds.length ? 'Class indexes rebuilt.' : 'No class indexes needed rebuilding.';
+    },
+    remove: async (detail) => {
+      for (const stu of secondaries) {
+        detail(`Removing admission ${toPublicId(stu.id)}`);
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          const outcome = await removeSecondaryAdmission(stu, reqUser);
+          removalApplied.push(outcome.snapshot);
+          if (outcome.warning) warnings.push(outcome.warning);
+          if (!outcome.personPurged && outcome.personId) personsNotPurged.push(outcome.personId);
+        } catch (error) {
+          if (error.removalSnapshot) removalApplied.push(error.removalSnapshot);
+          throw error;
+        }
+      }
+      return 'Extra admissions removed.';
+    }
+  }, { onProgress, rollback: rollbackMerge });
+
+  try {
+    if (persisted?.cleanupBackups) await persisted.cleanupBackups();
+  } catch (error) {
+    warnings.push(`Merge backups were kept: ${error.message}`);
   }
 
   const auditId = `SAM-${Date.now()}-${crypto.randomBytes(4).toString('hex')}`;
@@ -1192,7 +1511,9 @@ async function executeAdmissionMerge({
     warnings,
     personsNotPurged,
     studentReferenceUpdates: studentUpdates,
-    personReferenceUpdates: personUpdates
+    personReferenceUpdates: personUpdates,
+    steps,
+    rollbackStatus: 'not_required'
   };
 }
 
@@ -1203,5 +1524,8 @@ module.exports = {
   buildProgramRegistrationPlan,
   buildTermRegistrationPlan,
   buildEnrollmentPeriodPlan,
-  applyProfileUnionToStudentRows
+  applyProfileUnionToStudentRows,
+  deletePlannedMergeRecords,
+  runMergeExecuteSteps,
+  MERGE_EXECUTE_STEPS
 };

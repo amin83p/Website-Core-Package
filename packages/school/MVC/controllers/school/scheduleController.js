@@ -1289,15 +1289,66 @@ function normalizeDateOnly(value) {
     return parsed.toISOString().slice(0, 10);
 }
 
-function isOpenCanonicalEnrollmentPeriod(row, referenceDate = '', orgToday = '') {
-    const status = String(row?.status || '').trim().toLowerCase();
-    if (!['active', 'planned'].includes(status)) return false;
-    const day = normalizeDateOnly(referenceDate) || normalizeDateOnly(orgToday) || resolveOrgTodayFromContext({ orgToday });
-    const start = normalizeDateOnly(row?.startDate);
-    const end = normalizeDateOnly(row?.endDate);
-    if (start && start > day && status !== 'planned') return false;
-    if (end && end < day) return false;
-    return true;
+function scheduleEnrollmentAllowedStatuses(registrationMode = '') {
+    const mode = String(registrationMode || '').trim().toLowerCase();
+    return mode === 'rolling'
+        ? classEnrollmentSessionApplicabilityService.ROLLING_ATTENDANCE_WINDOW_STATUSES
+        : classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES;
+}
+
+function enrollmentPeriodOverlapsScheduleRange(period = {}, rangeStart = '', rangeEnd = '') {
+    const status = String(period?.status || '').trim().toLowerCase();
+    const visible = classEnrollmentSessionApplicabilityService.ROLLING_ATTENDANCE_WINDOW_STATUSES.has(status)
+        || classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES.has(status);
+    if (!visible) return false;
+    const start = normalizeDateOnly(period?.startDate);
+    const end = classEnrollmentSessionApplicabilityService.periodEffectiveEndDate(period);
+    const rangeStartNorm = normalizeDateOnly(rangeStart);
+    const rangeEndNorm = normalizeDateOnly(rangeEnd);
+    if (!rangeStartNorm || !rangeEndNorm) return false;
+    return (!start || start <= rangeEndNorm) && (!end || end >= rangeStartNorm);
+}
+
+/** Match attendance/SAR eligibility: historical enrollment windows still show schedule sessions. */
+function isEnrollmentPeriodEligibleForScheduleSession({
+    period = {},
+    sessionDate = '',
+    session = null,
+    classRow = null,
+    activeOrgId = '',
+    studentToPersonMap = new Map(),
+    personId = ''
+} = {}) {
+    if (activeOrgId && !idsEqual(period?.orgId, activeOrgId)) return false;
+
+    const registrationMode = String(classRow?.registrationMode || '').trim().toLowerCase();
+    const allowedStatuses = scheduleEnrollmentAllowedStatuses(registrationMode);
+    const status = String(period?.status || '').trim().toLowerCase();
+    if (!allowedStatuses.has(status)) return false;
+
+    const normalizedSessionDate = normalizeDateOnly(sessionDate);
+    if (!normalizedSessionDate) return false;
+
+    if (registrationMode === 'rolling') {
+        const sessionRef = session && normalizeDateOnly(session?.date) === normalizedSessionDate
+            ? session
+            : { date: normalizedSessionDate };
+        const window = classEnrollmentSessionApplicabilityService.resolveRollingEnrollmentWindowForPerson({
+            periodRows: [period],
+            studentToPersonMap,
+            personId,
+            session: sessionRef,
+            activeOrgId,
+            allowedStatuses
+        });
+        return Boolean(window?.withinEnrollmentWindow);
+    }
+
+    return classEnrollmentSessionApplicabilityService.periodCoversSession(
+        period,
+        { date: normalizedSessionDate },
+        { honorCompletion: true }
+    );
 }
 
 function isAllowedSessionEmbeddedReportOverlap(leftEvent, rightEvent) {
@@ -1745,7 +1796,6 @@ async function buildEventsForPersonAndRange({
         .filter(Boolean);
 
     const canonicalPeriodsByStudent = new Map();
-    let hasCanonicalPeriods = false;
     if (linkedStudentIds.length) {
         const canonicalRowsByStudent = await Promise.all(linkedStudentIds.map(async (studentId) => {
             const rows = await schoolDataService.getClassEnrollmentPeriodsByStudentId(studentId, reqUser, {
@@ -1760,15 +1810,26 @@ async function buildEventsForPersonAndRange({
 
         canonicalRowsByStudent.forEach(({ studentId, rows }) => {
             canonicalPeriodsByStudent.set(studentId, rows);
-            if (rows.length) hasCanonicalPeriods = true;
             rows.forEach((row) => {
                 const classId = normalizeId(row?.classId);
                 if (!classId) return;
-                const start = normalizeDateOnly(row?.startDate);
-                const end = normalizeDateOnly(row?.endDate);
-                const overlapsVisibleRange = (!start || start <= endDate) && (!end || end >= startDate);
-                if (overlapsVisibleRange) studentClassIds.add(classId);
+                if (enrollmentPeriodOverlapsScheduleRange(row, startDate, endDate)) {
+                    studentClassIds.add(classId);
+                }
             });
+        });
+    }
+
+    const scheduleStudentToPersonMap = new Map();
+    if (normalizedPersonId) {
+        linkedStudentIds.forEach((studentId) => {
+            const sid = normalizeId(studentId);
+            if (sid) scheduleStudentToPersonMap.set(sid, normalizedPersonId);
+        });
+        allStudents.forEach((row) => {
+            const sid = normalizeId(row?.id);
+            const pid = normalizeId(row?.personId);
+            if (sid && pid) scheduleStudentToPersonMap.set(sid, pid);
         });
     }
 
@@ -1781,27 +1842,31 @@ async function buildEventsForPersonAndRange({
         const cacheKey = `${normalizedClassId}::${normalizedDate}`;
         if (studentActiveCache.has(cacheKey)) return studentActiveCache.get(cacheKey);
 
+        const sessionOnDate = (Array.isArray(sessions) ? sessions : []).find(
+            (row) => normalizeDateOnly(row?.date) === normalizedDate
+        );
+        const classDef = classRow || classMap.get(normalizedClassId) || null;
+
         let isActive = false;
-        if (linkedStudentIds.length && hasCanonicalPeriods) {
+        if (linkedStudentIds.length) {
             for (const studentId of linkedStudentIds) {
-                const rows = canonicalPeriodsByStudent.get(studentId) || [];
-                if (rows.some((row) => idsEqual(row?.classId, normalizedClassId) && isOpenCanonicalEnrollmentPeriod(row, normalizedDate, reqUser?.orgToday))) {
-                    isActive = true;
-                    break;
+                let periodRows = canonicalPeriodsByStudent.get(studentId) || [];
+                periodRows = periodRows.filter((row) => idsEqual(row?.classId, normalizedClassId));
+                if (!periodRows.length) {
+                    // eslint-disable-next-line no-await-in-loop
+                    const fetched = await schoolDataService.getClassEnrollmentPeriodsByClassId(normalizedClassId, reqUser);
+                    periodRows = (Array.isArray(fetched) ? fetched : [])
+                        .filter((row) => idsEqual(row?.studentId, studentId));
                 }
-            }
-        } else if (linkedStudentIds.length) {
-            for (const studentId of linkedStudentIds) {
-                // eslint-disable-next-line no-await-in-loop
-                const result = await classEnrollmentReadService.hasActiveEnrollmentForStudentInClass({
-                    classId: normalizedClassId,
-                    studentId,
-                    classItem: classRow,
-                    reqUser,
+                if (periodRows.some((period) => isEnrollmentPeriodEligibleForScheduleSession({
+                    period,
+                    sessionDate: normalizedDate,
+                    session: sessionOnDate,
+                    classRow: classDef,
                     activeOrgId,
-                    referenceDate: normalizedDate
-                });
-                if (Boolean(result?.exists)) {
+                    studentToPersonMap: scheduleStudentToPersonMap,
+                    personId: normalizedPersonId
+                }))) {
                     isActive = true;
                     break;
                 }
@@ -1810,8 +1875,7 @@ async function buildEventsForPersonAndRange({
             isActive = studentClassIds.has(normalizedClassId);
         }
 
-        const canUseStudentIndexFallback = !linkedStudentIds.length || !hasCanonicalPeriods;
-        const indexFallbackHit = !isActive && canUseStudentIndexFallback && studentClassIds.has(normalizedClassId);
+        const indexFallbackHit = !isActive && !linkedStudentIds.length && studentClassIds.has(normalizedClassId);
         if (indexFallbackHit) {
             isActive = true;
         }
@@ -1965,12 +2029,6 @@ async function buildEventsForPersonAndRange({
     const classIdsToScan = candidateClassIds.size
         ? [...candidateClassIds]
         : [...classMap.keys()];
-
-    const scheduleStudentToPersonMap = new Map(
-        (Array.isArray(allStudents) ? allStudents : [])
-            .map((row) => [normalizeId(row?.id), normalizeId(row?.personId)])
-            .filter(([studentId, personId]) => Boolean(studentId && personId))
-    );
 
     const events = [];
 
@@ -3941,6 +3999,8 @@ module.exports = {
     buildActiveClassesForSchedulePerson,
     collectClassIdsWithSessionsInEvents,
     isActiveClassForSchedulePicker,
+    isEnrollmentPeriodEligibleForScheduleSession,
+    enrollmentPeriodOverlapsScheduleRange,
     collectClassIdsFromTeacherIndexForRange,
     collectClassIdsFromTeacherIndex,
     collectClassIdsWithSessionDeliveryInRange,

@@ -35,7 +35,7 @@ test('transformStudentIdRows updates reportInstances.studentId and targetKey', (
   assert.equal(result.rows[0].targetKey, 'student:STU-A');
 });
 
-test('buildProgramRegistrationPlan keeps the oldest date and voids the extra registration', () => {
+test('buildProgramRegistrationPlan keeps the oldest date and deletes the extra registration', () => {
   const main = { id: 'STU-A', orgId: 'ORG-1', personId: 'P-A' };
   const secondaries = [{ id: 'STU-B', orgId: 'ORG-1', personId: 'P-B' }];
   const programRows = [
@@ -47,7 +47,8 @@ test('buildProgramRegistrationPlan keeps the oldest date and voids the extra reg
   ]);
   assert.equal(plan.blocks.length, 0);
   assert.equal(plan.dateUpdates[0].registrationDate, '2020-01-15');
-  assert.equal(plan.voids[0].id, 'PR-2');
+  assert.equal(plan.deletes[0].id, 'PR-2');
+  assert.equal(plan.deletes[0].reason, 'duplicate');
 });
 
 test('buildProgramRegistrationPlan adopts a missing program using the oldest date', () => {
@@ -61,7 +62,7 @@ test('buildProgramRegistrationPlan adopts a missing program using the oldest dat
   ]);
   assert.equal(plan.adopts[0].id, 'PR-2');
   assert.equal(plan.adopts[0].registrationDate, '2021-03-01');
-  assert.equal(plan.voids.length, 0);
+  assert.equal(plan.deletes.length, 0);
 });
 
 test('buildEnrollmentPeriodPlan keeps earliest start when both have same class', () => {
@@ -173,4 +174,116 @@ test('patchClassRosterMaps moves nickname from secondary person key to main', ()
   assert.equal(patched.changed, true);
   assert.equal(patched.classRow.attendanceRosterNicknames['P-A'], 'Bee');
   assert.equal(patched.classRow.attendanceRosterNicknames['P-B'], undefined);
+});
+
+test('transformStudentIdRows leaves a void record on the original student', () => {
+  const rows = [{
+    id: 'RI-VOID',
+    orgId: 'ORG-1',
+    studentId: 'STU-B',
+    targetKey: 'student:STU-B',
+    status: 'void'
+  }];
+  const result = transformStudentIdRows('reportInstances', rows, 'STU-B', 'STU-A', 'ORG-1');
+  assert.equal(result.count, 0);
+  assert.equal(result.rows[0].studentId, 'STU-B');
+  assert.equal(result.rows[0].targetKey, 'student:STU-B');
+});
+
+test('buildProgramRegistrationPlan deletes a void registration instead of adopting it', () => {
+  const main = { id: 'STU-A', orgId: 'ORG-1', personId: 'P-A' };
+  const secondaries = [{ id: 'STU-B', orgId: 'ORG-1', personId: 'P-B' }];
+  const plan = mergeService.buildProgramRegistrationPlan(main, secondaries, [
+    { id: 'PR-VOID', orgId: 'ORG-1', studentId: 'STU-B', programId: 'PROG-9', status: 'void', registrationDate: '2020-01-01' }
+  ], []);
+  assert.equal(plan.adopts.length, 0);
+  assert.equal(plan.moves.length, 0);
+  assert.equal(plan.blocks.length, 0);
+  assert.equal(plan.deletes[0].id, 'PR-VOID');
+  assert.equal(plan.deletes[0].reason, 'void');
+});
+
+test('buildEnrollmentPeriodPlan does not move a void enrollment', () => {
+  const main = { id: 'STU-A', orgId: 'ORG-1', personId: 'P-A' };
+  const secondaries = [{ id: 'STU-B', orgId: 'ORG-1', personId: 'P-B' }];
+  const plan = mergeService.buildEnrollmentPeriodPlan(main, secondaries, [
+    { id: 'CEP-VOID', orgId: 'ORG-1', studentId: 'STU-B', classId: 'CLS-9', status: 'void', startDate: '2024-01-01' },
+    { id: 'CEP-LIVE', orgId: 'ORG-1', studentId: 'STU-B', classId: 'CLS-1', status: 'active', startDate: '2024-02-01' }
+  ]);
+  assert.equal(plan.moves.length, 1);
+  assert.equal(plan.moves[0].id, 'CEP-LIVE');
+  assert.equal(plan.deletes[0].id, 'CEP-VOID');
+});
+
+test('deletePlannedMergeRecords hard-deletes the duplicate registration', () => {
+  const main = { id: 'STU-A', orgId: 'ORG-1', personId: 'P-A' };
+  const secondaries = [{ id: 'STU-B', orgId: 'ORG-1', personId: 'P-B' }];
+  const rows = [
+    { id: 'PR-1', orgId: 'ORG-1', studentId: 'STU-A', programId: 'PROG-1', status: 'registered', registrationDate: '2024-05-01' },
+    { id: 'PR-2', orgId: 'ORG-1', studentId: 'STU-B', programId: 'PROG-1', status: 'registered', registrationDate: '2020-01-15' }
+  ];
+  const plan = mergeService.buildProgramRegistrationPlan(main, secondaries, rows, []);
+  const datasets = { studentProgramRegistrations: { rows: rows.map((row) => ({ ...row })) } };
+  mergeService.deletePlannedMergeRecords(datasets, { programPlan: plan, termPlan: { deletes: [] }, periodPlan: { deletes: [] } });
+  assert.equal(datasets.studentProgramRegistrations.rows.length, 1);
+  assert.equal(datasets.studentProgramRegistrations.rows[0].id, 'PR-1');
+  assert.equal(datasets.studentProgramRegistrations.rows[0].status, 'registered');
+});
+
+test('runMergeExecuteSteps marks a failed verify step and records a successful rollback', async () => {
+  let restored = false;
+  await assert.rejects(async () => {
+    await mergeService.runMergeExecuteSteps({
+      confirm: async () => 'Preview is still valid.',
+      profile: async () => 'Primary admission profile combined.',
+      enrollments: async () => 'Moved.',
+      deleteVoids: async () => 'Deleted.',
+      studentRefs: async () => 'Repointed.',
+      personRefs: async () => 'Repointed.',
+      sessions: async () => 'Updated.',
+      save: async () => 'Saved.',
+      classFiles: async () => 'Updated.',
+      verify: async () => {
+        throw new Error('references remain');
+      },
+      indexes: async () => 'Rebuilt.',
+      remove: async () => 'Removed.'
+    }, {
+      rollback: async () => {
+        restored = true;
+      }
+    });
+  }, /references remain/);
+  assert.equal(restored, true);
+});
+
+test('runMergeExecuteSteps stores the failed step and undo result on the error', async () => {
+  try {
+    await mergeService.runMergeExecuteSteps({
+      confirm: async () => 'ok',
+      profile: async () => 'ok',
+      enrollments: async () => 'ok',
+      deleteVoids: async () => 'ok',
+      studentRefs: async () => 'ok',
+      personRefs: async () => 'ok',
+      sessions: async () => 'ok',
+      save: async () => 'ok',
+      classFiles: async () => 'ok',
+      verify: async () => {
+        throw new Error('references remain');
+      },
+      indexes: async () => 'ok',
+      remove: async () => 'ok'
+    }, { rollback: async () => {} });
+    assert.fail('verify failure should reject');
+  } catch (error) {
+    assert.equal(error.rollbackStatus, 'restored');
+    const verify = error.mergeSteps.find((step) => step.id === 'verify');
+    const undo = error.mergeSteps.find((step) => step.id === 'undo');
+    const indexes = error.mergeSteps.find((step) => step.id === 'indexes');
+    assert.equal(verify.status, 'failed');
+    assert.equal(undo.status, 'success');
+    assert.equal(undo.detail, 'Records restored to the previous state.');
+    assert.equal(indexes.status, 'waiting');
+  }
 });

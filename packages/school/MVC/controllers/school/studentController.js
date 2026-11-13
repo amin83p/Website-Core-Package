@@ -1661,6 +1661,7 @@ exports.generateStudentSystemId = async (req, res) => {
 };
 
 const admissionMergePreviewJobs = new Map();
+const admissionMergeExecuteJobs = new Map();
 
 function setAdmissionMergePreviewProgress(jobId, progress, operation) {
     const id = String(jobId || '').trim();
@@ -1679,6 +1680,28 @@ exports.previewAdmissionMergeProgress = async (req, res) => {
         return res.json({
             status: 'success',
             data: job || { progress: 0, operation: 'Starting the review' }
+        });
+    } catch (error) {
+        return res.status(error.status || 400).json({ status: 'error', message: error.message });
+    }
+};
+
+function setAdmissionMergeExecuteProgress(jobId, payload = {}) {
+    const id = String(jobId || '').trim();
+    if (!id) return;
+    admissionMergeExecuteJobs.set(id, {
+        steps: Array.isArray(payload.steps) ? payload.steps : [],
+        updatedAt: Date.now()
+    });
+}
+
+exports.executeAdmissionMergeProgress = async (req, res) => {
+    try {
+        await assertCanChangeStudentSystemId(req);
+        const job = admissionMergeExecuteJobs.get(String(req.query.jobId || '').trim());
+        return res.json({
+            status: 'success',
+            data: job || { steps: [] }
         });
     } catch (error) {
         return res.status(error.status || 400).json({ status: 'error', message: error.message });
@@ -1711,6 +1734,7 @@ exports.previewAdmissionMerge = async (req, res) => {
 
 exports.executeAdmissionMerge = async (req, res) => {
     let guardKey = '';
+    const executeJobId = String(req.body?.executeJobId || '').trim();
     try {
         await assertCanChangeStudentSystemId(req);
         const orgId = getActiveOrgIdOrThrow(req.user);
@@ -1744,7 +1768,8 @@ exports.executeAdmissionMerge = async (req, res) => {
             previewToken,
             confirmation,
             reqUser: req.user,
-            actor: toPublicId(req.user?.id) || String(req.user?.username || 'system')
+            actor: toPublicId(req.user?.id) || String(req.user?.username || 'system'),
+            onProgress: (payload) => setAdmissionMergeExecuteProgress(executeJobId, payload)
         });
         const payload = {
             status: 'success',
@@ -1757,7 +1782,16 @@ exports.executeAdmissionMerge = async (req, res) => {
     } catch (error) {
         if (guardKey) idempotencyGuardService.failGuard(guardKey);
         console.error('[STUDENT_ADMISSION_MERGE]', error);
-        return res.status(error.status || 400).json({ status: 'error', message: error.message });
+        return res.status(error.status || 400).json({
+            status: 'error',
+            message: error.message,
+            rollbackStatus: error.rollbackStatus || '',
+            steps: error.mergeSteps || admissionMergeExecuteJobs.get(executeJobId)?.steps || []
+        });
+    } finally {
+        if (executeJobId) {
+            setTimeout(() => admissionMergeExecuteJobs.delete(executeJobId), 15000);
+        }
     }
 };
 
