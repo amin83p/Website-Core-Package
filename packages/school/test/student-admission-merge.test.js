@@ -287,3 +287,20 @@ test('runMergeExecuteSteps stores the failed step and undo result on the error',
     assert.equal(indexes.status, 'waiting');
   }
 });
+
+test('splitMergeBackupSnapshots divides a large undo copy into pieces that recombine', () => {
+  const rows = Array.from({ length: 5 }, (_, index) => ({ id: `R${index}`, note: 'x'.repeat(1000) }));
+  const parts = mergeService.splitMergeBackupSnapshots([{
+    key: 'classes',
+    collection: 'schoolClasses',
+    shape: 'array',
+    before: rows
+  }], 2500);
+  assert.ok(parts.length > 1);
+  parts.forEach((part) => {
+    assert.ok(part.before.length < rows.length);
+  });
+  const combined = mergeService.combineMergeBackupParts(parts.map((part, partIndex) => ({ ...part, partIndex })));
+  assert.equal(combined.length, 1);
+  assert.deepEqual(combined[0].before.map((row) => row.id), rows.map((row) => row.id));
+});

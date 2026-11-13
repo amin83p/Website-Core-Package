@@ -41,6 +41,7 @@ const {
 const DATA_DIR = path.join(resolveCoreRoot(), 'data/school');
 const AUDIT_FILE = 'studentAdmissionMerges.json';
 const MONGO_BACKUP_COLLECTION = 'schoolStudentAdmissionMergeBackups';
+const MERGE_BACKUP_CHUNK_BYTES = 6 * 1024 * 1024;
 
 function idsEqual(left, right) {
   return String(left || '') === String(right || '');
@@ -242,6 +243,109 @@ async function restoreMongoStores(snapshots) {
   }
 }
 
+function jsonByteLength(value) {
+  return Buffer.byteLength(JSON.stringify(value), 'utf8');
+}
+
+function splitMergeBackupSnapshots(snapshots = [], maxBytes = MERGE_BACKUP_CHUNK_BYTES) {
+  const parts = [];
+  (Array.isArray(snapshots) ? snapshots : []).forEach((snapshot) => {
+    const rows = snapshot?.shape === 'document' || !Array.isArray(snapshot?.before) ? null : snapshot.before;
+    if (!rows) {
+      parts.push({ ...snapshot, chunkIndex: 0, chunkCount: 1 });
+      return;
+    }
+    const chunks = [];
+    let current = [];
+    let currentBytes = 2;
+    rows.forEach((row) => {
+      const rowBytes = jsonByteLength(row) + 1;
+      if (current.length && currentBytes + rowBytes > maxBytes) {
+        chunks.push(current);
+        current = [];
+        currentBytes = 2;
+      }
+      current.push(row);
+      currentBytes += rowBytes;
+    });
+    if (current.length || !chunks.length) chunks.push(current);
+    chunks.forEach((before, chunkIndex) => {
+      parts.push({
+        key: snapshot.key,
+        collection: snapshot.collection,
+        shape: snapshot.shape,
+        mongoId: snapshot.mongoId,
+        before,
+        chunkIndex,
+        chunkCount: chunks.length
+      });
+    });
+  });
+  return parts;
+}
+
+function combineMergeBackupParts(parts = []) {
+  const grouped = new Map();
+  [...parts].sort((left, right) => Number(left.partIndex || 0) - Number(right.partIndex || 0)).forEach((part) => {
+    const key = part.key || part.collection;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key).push(part);
+  });
+  return [...grouped.values()].map((chunks) => {
+    const first = chunks[0];
+    const before = first.shape === 'document'
+      ? first.before
+      : chunks.flatMap((chunk) => (Array.isArray(chunk.before) ? chunk.before : []));
+    return {
+      key: first.key,
+      collection: first.collection,
+      shape: first.shape,
+      mongoId: first.mongoId,
+      before
+    };
+  });
+}
+
+async function deleteMergeBackupDocuments(journalId) {
+  await getMongoCollection(MONGO_BACKUP_COLLECTION).deleteMany({
+    $or: [{ id: journalId }, { journalId }]
+  });
+}
+
+async function writeStandaloneMergeBackup(journalId, snapshots) {
+  const parts = splitMergeBackupSnapshots(snapshots);
+  const backupCollection = getMongoCollection(MONGO_BACKUP_COLLECTION);
+  await backupCollection.insertOne({
+    id: journalId,
+    status: 'applying',
+    topology: 'standalone',
+    partCount: parts.length,
+    keys: snapshots.map((row) => row.key),
+    createdAt: new Date().toISOString()
+  });
+  try {
+    for (let index = 0; index < parts.length; index += 1) {
+      const part = parts[index];
+      // eslint-disable-next-line no-await-in-loop
+      await backupCollection.insertOne({
+        id: `${journalId}:part:${index}`,
+        journalId,
+        partIndex: index,
+        key: part.key,
+        collection: part.collection,
+        shape: part.shape,
+        mongoId: part.mongoId || '',
+        chunkIndex: part.chunkIndex,
+        chunkCount: part.chunkCount,
+        before: part.before
+      });
+    }
+  } catch (error) {
+    await deleteMergeBackupDocuments(journalId);
+    throw error;
+  }
+}
+
 async function persistMongoMergeDataset(map, options = {}) {
   const journalId = options.token || crypto.randomBytes(6).toString('hex');
   const snapshots = Object.values(map).filter((meta) => meta?.collection && storeChanged(meta)).map((meta) => ({
@@ -269,13 +373,7 @@ async function persistMongoMergeDataset(map, options = {}) {
       }
     };
   }
-  await getMongoCollection(MONGO_BACKUP_COLLECTION).insertOne({
-    id: journalId,
-    status: 'applying',
-    topology: 'standalone',
-    snapshots,
-    createdAt: new Date().toISOString()
-  });
+  await writeStandaloneMergeBackup(journalId, snapshots);
   try {
     await writeMongoStores(map);
   } catch (error) {
@@ -289,7 +387,7 @@ async function persistMongoMergeDataset(map, options = {}) {
       await getMongoCollection(MONGO_BACKUP_COLLECTION).updateOne({ id: journalId }, { $set: { status: 'rolled_back' } });
     },
     cleanupBackups: async () => {
-      await getMongoCollection(MONGO_BACKUP_COLLECTION).deleteOne({ id: journalId });
+      await deleteMergeBackupDocuments(journalId);
     }
   };
 }
@@ -1534,5 +1632,7 @@ module.exports = {
   applyProfileUnionToStudentRows,
   deletePlannedMergeRecords,
   runMergeExecuteSteps,
-  MERGE_EXECUTE_STEPS
+  MERGE_EXECUTE_STEPS,
+  splitMergeBackupSnapshots,
+  combineMergeBackupParts
 };
