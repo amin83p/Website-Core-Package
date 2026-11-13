@@ -1336,7 +1336,14 @@ async function executeAdmissionMerge({
       if (String(confirmation || '').trim().toUpperCase() !== 'MERGE') {
         throw new Error('Type MERGE to confirm this operation.');
       }
-      preview = await buildAdmissionMergePreview({ mainStudentId, mergeStudentIds, reqUser });
+      preview = await buildAdmissionMergePreview({
+        mainStudentId,
+        mergeStudentIds,
+        reqUser,
+        onProgress: ({ operation }) => {
+          if (operation) detail(operation);
+        }
+      });
       if (!preview.ready) throw new Error(preview.blockers[0] || 'Merge is blocked. Refresh the preview.');
       if (previewToken && previewToken !== preview.previewToken) {
         throw new Error('Preview is stale. Run preview again before merging.');

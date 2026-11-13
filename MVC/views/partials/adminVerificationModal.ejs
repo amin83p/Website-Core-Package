@@ -209,24 +209,26 @@
       }
     }
 
-    async function requestProtectedAction(actionFn) {
+    async function requestProtectedAction(actionFn, options = {}) {
       if (await hasServerApproval()) {
         if (typeof actionFn === 'function') actionFn();
         return true;
       }
 
-      const confirmVerify = await showModalMessage({
-        title: 'Admin Operation',
-        message: 'This operation requires <b>Administrator Privileges</b>.<br><br>You must verify your Admin Code to proceed.',
-        icon: 'warning',
-        buttons: [
-          { text: 'Cancel', class: 'btn-secondary' },
-          { text: 'Verify', class: 'btn-warning' }
-        ]
-      });
+      if (options.skipPrompt !== true) {
+        const confirmVerify = await showModalMessage({
+          title: 'Admin Operation',
+          message: 'This operation requires <b>Administrator Privileges</b>.<br><br>You must verify your Admin Code to proceed.',
+          icon: 'warning',
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary' },
+            { text: 'Verify', class: 'btn-warning' }
+          ]
+        });
 
-      if (confirmVerify !== 'Verify') {
-        throw createCancelError();
+        if (confirmVerify !== 'Verify') {
+          throw createCancelError();
+        }
       }
 
       return new Promise((resolve, reject) => {

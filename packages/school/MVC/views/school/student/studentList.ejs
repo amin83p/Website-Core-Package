@@ -166,7 +166,7 @@
   </div>
 </div>
 <div class="modal fade" id="mergeAdmissionsPreviewModal" tabindex="-1" aria-labelledby="mergeAdmissionsPreviewModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title fw-bold" id="mergeAdmissionsPreviewModalLabel">Merge preview</h5>
@@ -436,6 +436,66 @@ function initializeMergeStudentAdmissionsModal() {
   if (executeCloseBtn && executeModal) {
     executeCloseBtn.addEventListener('click', () => executeModal.hide());
   }
+  function raiseModalAboveMerge(el, zIndex) {
+    if (!el) return;
+    if (el.parentElement !== document.body) document.body.appendChild(el);
+    const apply = () => {
+      el.style.zIndex = String(zIndex);
+      const backdrops = document.querySelectorAll('.modal-backdrop');
+      const topBackdrop = backdrops[backdrops.length - 1];
+      if (topBackdrop) topBackdrop.style.zIndex = String(zIndex - 5);
+    };
+    el.addEventListener('shown.bs.modal', apply);
+    apply();
+  }
+  function restoreMergeModalStack() {
+    const approvalIds = new Set(['adminVerifyModal', 'messageModal']);
+    const openModals = [...document.querySelectorAll('.modal.show')].filter((el) => !approvalIds.has(el.id));
+    const backdrops = [...document.querySelectorAll('.modal-backdrop')];
+    if (!openModals.length) {
+      backdrops.forEach((backdrop) => backdrop.remove());
+      document.body.classList.remove('modal-open');
+      document.body.style.removeProperty('padding-right');
+      document.body.style.removeProperty('overflow');
+      return;
+    }
+    while (backdrops.length > openModals.length) backdrops.pop().remove();
+    if (document.querySelectorAll('.modal-backdrop').length < openModals.length) {
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-backdrop fade show';
+      document.body.appendChild(backdrop);
+    }
+    const topModal = openModals[openModals.length - 1];
+    const modalZ = Number.parseInt(window.getComputedStyle(topModal).zIndex, 10) || 1055;
+    const backdropList = [...document.querySelectorAll('.modal-backdrop')];
+    const topBackdrop = backdropList[backdropList.length - 1];
+    if (topBackdrop) topBackdrop.style.zIndex = String(Math.max(modalZ - 5, 1050));
+    document.body.classList.add('modal-open');
+  }
+  function placeModalAboveBackdrops(el) {
+    if (!el) return;
+    const apply = () => {
+      const openModals = [...document.querySelectorAll('.modal.show')];
+      const backdrops = [...document.querySelectorAll('.modal-backdrop')];
+      while (backdrops.length > Math.max(openModals.length, 1)) backdrops.pop().remove();
+      const backdropZs = [...document.querySelectorAll('.modal-backdrop')].map((backdrop) => Number.parseInt(window.getComputedStyle(backdrop).zIndex, 10) || 0);
+      let maxZ = 1055;
+      openModals.forEach((modal) => {
+        if (modal === el) return;
+        const z = Number.parseInt(window.getComputedStyle(modal).zIndex, 10);
+        if (Number.isFinite(z)) maxZ = Math.max(maxZ, z);
+      });
+      backdropZs.forEach((z) => { if (z > maxZ) maxZ = z; });
+      const modalZ = maxZ + 20;
+      el.style.zIndex = String(modalZ);
+      document.querySelectorAll('.modal-backdrop').forEach((backdrop, index, list) => {
+        backdrop.style.zIndex = String(index === list.length - 1 ? modalZ - 10 : 1040);
+      });
+      document.body.classList.add('modal-open');
+    };
+    el.addEventListener('shown.bs.modal', apply);
+    apply();
+  }
   if (previewModalEl) {
     previewModalEl.addEventListener('shown.bs.modal', () => {
       previewModalEl.style.zIndex = '1070';
@@ -574,10 +634,30 @@ function initializeMergeStudentAdmissionsModal() {
   function mergeIdList() {
     return [...selected.keys()];
   }
-  function listItems(rows, emptyText) {
-    const items = Array.isArray(rows) ? rows.filter(Boolean) : [];
-    if (!items.length) return `<div class="text-muted">${escapeHtml(emptyText)}</div>`;
-    return `<ul class="mb-0">${items.map((row) => `<li>${escapeHtml(row)}</li>`).join('')}</ul>`;
+  function previewSection(title, count, bodyHtml, tone) {
+    const border = tone === 'danger' ? 'border-danger-subtle' : (tone === 'warning' ? 'border-warning-subtle' : 'border-light-subtle');
+    return `
+      <section class="border ${border} rounded-3 p-3 mb-3 bg-body">
+        <div class="d-flex justify-content-between align-items-center gap-2 mb-2">
+          <h6 class="fw-bold mb-0">${escapeHtml(title)}</h6>
+          <span class="badge text-bg-light border">${Number(count || 0)}</span>
+        </div>
+        ${bodyHtml}
+      </section>
+    `;
+  }
+  function previewRows(rows, emptyText) {
+    const items = Array.isArray(rows) ? rows.filter((row) => row && (row.title || row.detail)) : [];
+    if (!items.length) return `<div class="text-muted small">${escapeHtml(emptyText)}</div>`;
+    return `<div class="vstack gap-2">${items.map((row) => `
+      <div class="d-flex justify-content-between align-items-start gap-3 border rounded-2 px-3 py-2 bg-body-tertiary">
+        <div>
+          <div class="fw-semibold">${escapeHtml(row.title || '')}</div>
+          ${row.detail ? `<div class="small text-muted">${escapeHtml(row.detail)}</div>` : ''}
+        </div>
+        ${row.badge ? `<span class="badge ${escapeHtml(row.badgeClass || 'text-bg-secondary')} flex-shrink-0">${escapeHtml(row.badge)}</span>` : ''}
+      </div>
+    `).join('')}</div>`;
   }
   function renderPreviewModal(data, cols) {
     const body = document.getElementById('mergeAdmissionsPreviewModalBody');
@@ -586,38 +666,95 @@ function initializeMergeStudentAdmissionsModal() {
     const periods = data.registrationPlan?.periods || {};
     const students = Array.isArray(data.students) ? data.students : [];
     const term = data.registrationPlan?.term || {};
-    const deleteLines = [
-      ...(program.deletes || []).map((row) => `The registration for program ${row.programLabel || row.programId} will be deleted and not moved.`),
-      ...(term.deletes || []).map((row) => `Term registration ${row.id} will be deleted and not moved.`),
-      ...(periods.deletes || []).map((row) => `Class ${row.classLabel || row.classId}: the void enrollment will be deleted and not moved.`),
-      ...(Array.isArray(data.voidDeletes) ? data.voidDeletes : []).map((row) => `${row.label || 'Record'} ${row.id} will be deleted and not moved.`)
+    const programRows = [
+      ...(program.dateUpdates || []).map((row) => ({
+        title: row.programLabel || row.programId || 'Program',
+        detail: `Primary registration date becomes ${row.registrationDate || 'the oldest date'}.`,
+        badge: 'Date',
+        badgeClass: 'text-bg-primary'
+      })),
+      ...(program.adopts || []).map((row) => ({
+        title: row.programLabel || row.programId || 'Program',
+        detail: `Added to the primary admission with date ${row.registrationDate || 'the oldest date'}.`,
+        badge: 'Added',
+        badgeClass: 'text-bg-success'
+      }))
     ];
-    const programLines = [
-      ...(program.dateUpdates || []).map((row) => `Program ${row.programLabel || row.programId}: primary registration date becomes ${row.registrationDate || 'the oldest date'}.`),
-      ...(program.adopts || []).map((row) => `Program ${row.programLabel || row.programId} is added to the primary admission with date ${row.registrationDate || 'the oldest date'}.`)
+    const enrollmentRows = [
+      ...(periods.moves || []).map((row) => ({
+        title: row.classLabel || row.classId || 'Class',
+        detail: 'Enrollment moves to the primary admission.',
+        badge: 'Move',
+        badgeClass: 'text-bg-primary'
+      })),
+      ...(periods.merges || []).map((row) => ({
+        title: row.classLabel || row.classId || 'Class',
+        detail: 'Both enrollments are combined. The earlier start is kept.',
+        badge: 'Combine',
+        badgeClass: 'text-bg-info'
+      }))
     ];
-    const enrollmentLines = [
-      ...(periods.moves || []).map((row) => `Class ${row.classLabel || row.classId}: enrollment moves to the primary admission.`),
-      ...(periods.merges || []).map((row) => `Class ${row.classLabel || row.classId}: both enrollments are combined. The earlier start is kept.`)
+    const deleteRows = [
+      ...(program.deletes || []).map((row) => ({
+        title: row.programLabel || row.programId || 'Program registration',
+        detail: 'Deleted and not moved.',
+        badge: 'Delete',
+        badgeClass: 'text-bg-danger'
+      })),
+      ...(term.deletes || []).map((row) => ({
+        title: `Term registration ${row.id || ''}`.trim(),
+        detail: 'Deleted and not moved.',
+        badge: 'Delete',
+        badgeClass: 'text-bg-danger'
+      })),
+      ...(periods.deletes || []).map((row) => ({
+        title: row.classLabel || row.classId || 'Class enrollment',
+        detail: 'Void enrollment is deleted and not moved.',
+        badge: 'Delete',
+        badgeClass: 'text-bg-danger'
+      })),
+      ...(Array.isArray(data.voidDeletes) ? data.voidDeletes : []).map((row) => ({
+        title: `${row.label || 'Record'} ${row.id || ''}`.trim(),
+        detail: 'Deleted and not moved.',
+        badge: 'Delete',
+        badgeClass: 'text-bg-danger'
+      }))
     ];
-    const conflictLines = Array.isArray(data.blockers) ? data.blockers : [];
-    const warningLines = Array.isArray(data.warnings) ? data.warnings : [];
+    const studentRows = students.map((row) => ({
+      title: row.admissionLabel || row.name || row.studentId || 'Admission',
+      detail: row.isMain ? 'Records are gathered onto this admission.' : 'This copy is removed after its records move.',
+      badge: row.isMain ? 'Primary' : 'Merge',
+      badgeClass: row.isMain ? 'text-bg-success' : 'text-bg-secondary'
+    }));
+    const conflictRows = (Array.isArray(data.blockers) ? data.blockers : []).map((row) => ({
+      title: row,
+      badge: 'Block',
+      badgeClass: 'text-bg-danger'
+    }));
+    const noteRows = (Array.isArray(data.warnings) ? data.warnings : []).map((row) => ({
+      title: row,
+      badge: 'Note',
+      badgeClass: 'text-bg-warning'
+    }));
+    const recordChips = cols.length
+      ? `<div class="d-flex flex-wrap gap-2">${cols.map((row) => `<span class="badge rounded-pill text-bg-light border px-3 py-2">${escapeHtml(row.label || row.key)} <span class="fw-bold">${Number(row.count || 0)}</span></span>`).join('')}</div>`
+      : '<div class="text-muted small">No other counted records.</div>';
+    const ready = Boolean(data.ready);
     body.innerHTML = `
-      <p>${data.ready ? 'Nothing is blocking this merge. Review the summary, then go back and confirm.' : 'This merge cannot continue until the conflicts below are resolved.'}</p>
-      <h6 class="fw-bold">Admissions</h6>
-      ${listItems(students.map((row) => `${row.admissionLabel || row.name || row.studentId}${row.isMain ? ' — primary' : ''}`), 'No admissions.')}
-      <h6 class="fw-bold mt-3">Program registrations</h6>
-      ${listItems(programLines, 'No program registration changes.')}
-      <h6 class="fw-bold mt-3">Class enrollments</h6>
-      ${listItems(enrollmentLines, 'No class enrollment changes.')}
-      <h6 class="fw-bold mt-3">Records that will be deleted</h6>
-      ${listItems(deleteLines, 'No void or duplicate records will be deleted.')}
-      <h6 class="fw-bold mt-3">Conflicts</h6>
-      ${listItems(conflictLines, 'No conflicts.')}
-      <h6 class="fw-bold mt-3">Notes</h6>
-      ${listItems(warningLines, 'No extra notes.')}
-      <h6 class="fw-bold mt-3">Other records</h6>
-      ${cols.length ? `<ul class="mb-0">${cols.map((row) => `<li>${escapeHtml(row.label || row.key)}: ${Number(row.count || 0)}</li>`).join('')}</ul>` : '<div class="text-muted">No other counted records.</div>'}
+      <div class="alert ${ready ? 'alert-success' : 'alert-danger'} d-flex align-items-start gap-2" role="status">
+        <i class="bi ${ready ? 'bi-check-circle-fill' : 'bi-exclamation-octagon-fill'} mt-1"></i>
+        <div>
+          <div class="fw-semibold">${ready ? 'Ready to merge' : 'Merge is blocked'}</div>
+          <div class="small mb-0">${ready ? 'Review each section, then go back and confirm.' : 'Resolve the conflicts below before this merge can continue.'}</div>
+        </div>
+      </div>
+      ${previewSection('Admissions', studentRows.length, previewRows(studentRows, 'No admissions.'))}
+      ${previewSection('Program registrations', programRows.length, previewRows(programRows, 'No program registration changes.'))}
+      ${previewSection('Class enrollments', enrollmentRows.length, previewRows(enrollmentRows, 'No class enrollment changes.'))}
+      ${previewSection('Records that will be deleted', deleteRows.length, previewRows(deleteRows, 'No void or duplicate records will be deleted.'), 'danger')}
+      ${previewSection('Conflicts', conflictRows.length, previewRows(conflictRows, 'No conflicts.'), conflictRows.length ? 'danger' : '')}
+      ${previewSection('Notes', noteRows.length, previewRows(noteRows, 'No extra notes.'), noteRows.length ? 'warning' : '')}
+      ${previewSection('Other records', cols.length, recordChips)}
     `;
   }
   document.getElementById('mergeAdmissionsAddStudent').addEventListener('click', () => {
@@ -761,11 +898,33 @@ function initializeMergeStudentAdmissionsModal() {
       return;
     }
     submitBtn.disabled = true;
+    if (typeof window.requestProtectedAction === 'function') {
+      raiseModalAboveMerge(document.getElementById('adminVerifyModal'), 13100);
+      const adminModalEl = document.getElementById('adminVerifyModal');
+      let approvalOpened = false;
+      let approvalClosed = false;
+      const approvalClosedPromise = new Promise((resolve) => {
+        if (!adminModalEl) return resolve();
+        adminModalEl.addEventListener('shown.bs.modal', () => { approvalOpened = true; }, { once: true });
+        adminModalEl.addEventListener('hidden.bs.modal', () => { approvalClosed = true; resolve(); }, { once: true });
+      });
+      try {
+        await window.requestProtectedAction(() => {}, { skipPrompt: true });
+        if (approvalOpened && !approvalClosed) await approvalClosedPromise;
+      } catch (error) {
+        restoreMergeModalStack();
+        submitBtn.disabled = false;
+        if (error?.code !== 'ADMIN_VERIFICATION_CANCELLED') showAlert(error.message || 'Admin approval is required.');
+        return;
+      }
+      restoreMergeModalStack();
+    }
     const executeJobId = `merge-execute-${Date.now()}`;
     renderExecuteSteps(initialExecuteSteps);
     if (executeSummaryEl) executeSummaryEl.textContent = 'Working through the merge steps.';
     if (executeCloseBtn) executeCloseBtn.disabled = true;
     if (executeModal) executeModal.show();
+    placeModalAboveBackdrops(executeModalEl);
     let progressTimer = 0;
     let executeStopped = false;
     const readExecuteProgress = async () => {
@@ -800,6 +959,13 @@ function initializeMergeStudentAdmissionsModal() {
       const result = await response.json().catch(() => ({}));
       executeStopped = true;
       if (progressTimer) window.clearInterval(progressTimer);
+      if (response.status === 403 && result.status === 'admin_required') {
+        if (executeModal) executeModal.hide();
+        restoreMergeModalStack();
+        submitBtn.disabled = false;
+        showAlert('Admin approval expired before the merge started. Start the merge again and enter the code.');
+        return;
+      }
       const steps = Array.isArray(result.steps) ? result.steps : (Array.isArray(result.data?.steps) ? result.data.steps : []);
       if (steps.length) renderExecuteSteps(steps);
       if (!response.ok || result.status === 'error') {
