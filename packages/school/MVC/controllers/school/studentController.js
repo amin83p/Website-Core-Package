@@ -31,6 +31,7 @@ const schoolLinkedPersonProfileService = require('../../services/school/schoolLi
 const personDenormalizedNameSyncService = require('../../services/school/personDenormalizedNameSyncService');
 const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
 const studentSystemIdMigrationService = require('../../services/school/studentSystemIdMigrationService');
+const studentAdmissionMergeService = require('../../services/school/studentAdmissionMergeService');
 const programRegistrationApplyService = require('../../services/school/programRegistrationApplyService');
 const programRegistrationViewService = require('../../services/school/programRegistrationViewService');
 const termRegistrationViewService = require('../../services/school/termRegistrationViewService');
@@ -627,6 +628,7 @@ exports.listStudents = async (req, res) => {
             newUrl: 'school/students',
             newLabel: canCreateStudents ? 'Admit Student' : null,
             canChangeStudentSystemId,
+            canMergeStudentAdmissions: canChangeStudentSystemId,
             data,
             searchableFields,
             includeModal: true,
@@ -1654,6 +1656,107 @@ exports.generateStudentSystemId = async (req, res) => {
         const id = await studentSystemIdMigrationService.generateStudentSystemId();
         return res.json({ status: 'success', data: { id }, actionStateId: req.actionStateId || '' });
     } catch (error) {
+        return res.status(error.status || 400).json({ status: 'error', message: error.message });
+    }
+};
+
+const admissionMergePreviewJobs = new Map();
+
+function setAdmissionMergePreviewProgress(jobId, progress, operation) {
+    const id = String(jobId || '').trim();
+    if (!id) return;
+    admissionMergePreviewJobs.set(id, {
+        progress: Math.max(0, Math.min(100, Number(progress) || 0)),
+        operation: String(operation || '').trim(),
+        updatedAt: Date.now()
+    });
+}
+
+exports.previewAdmissionMergeProgress = async (req, res) => {
+    try {
+        await assertCanChangeStudentSystemId(req);
+        const job = admissionMergePreviewJobs.get(String(req.query.jobId || '').trim());
+        return res.json({
+            status: 'success',
+            data: job || { progress: 0, operation: 'Starting the review' }
+        });
+    } catch (error) {
+        return res.status(error.status || 400).json({ status: 'error', message: error.message });
+    }
+};
+
+exports.previewAdmissionMerge = async (req, res) => {
+    const previewJobId = String(req.body?.previewJobId || '').trim();
+    try {
+        await assertCanChangeStudentSystemId(req);
+        getActiveOrgIdOrThrow(req.user);
+        const mainStudentId = toPublicId(req.body?.mainStudentId || '');
+        const mergeStudentIds = Array.isArray(req.body?.mergeStudentIds)
+            ? req.body.mergeStudentIds.map((id) => toPublicId(id)).filter(Boolean)
+            : [];
+        setAdmissionMergePreviewProgress(previewJobId, 5, 'Starting the review');
+        const preview = await studentAdmissionMergeService.buildAdmissionMergePreview({
+            mainStudentId,
+            mergeStudentIds,
+            reqUser: req.user,
+            onProgress: ({ progress, operation }) => setAdmissionMergePreviewProgress(previewJobId, progress, operation)
+        });
+        return res.json({ status: 'success', data: preview, actionStateId: req.actionStateId || '' });
+    } catch (error) {
+        return res.status(error.status || 400).json({ status: 'error', message: error.message });
+    } finally {
+        if (previewJobId) admissionMergePreviewJobs.delete(previewJobId);
+    }
+};
+
+exports.executeAdmissionMerge = async (req, res) => {
+    let guardKey = '';
+    try {
+        await assertCanChangeStudentSystemId(req);
+        const orgId = getActiveOrgIdOrThrow(req.user);
+        const mainStudentId = toPublicId(req.body?.mainStudentId || '');
+        const mergeStudentIds = Array.isArray(req.body?.mergeStudentIds)
+            ? req.body.mergeStudentIds.map((id) => toPublicId(id)).filter(Boolean)
+            : [];
+        const previewToken = String(req.body?.previewToken || '').trim();
+        const confirmation = String(req.body?.confirmation || '').trim();
+        const expectedMainId = String(req.body?.confirmationMainStudentId || req.body?.mainStudentId || '').trim();
+        if (expectedMainId && !idsEqual(expectedMainId, mainStudentId)) {
+            throw new Error('Confirmation main student id must match the selected primary admission.');
+        }
+        const sortedMerge = [...new Set(mergeStudentIds)].sort().join(',');
+        guardKey = idempotencyGuardService.createGuardKey([
+            'student_admission_merge',
+            orgId,
+            mainStudentId,
+            sortedMerge,
+            previewToken
+        ]);
+        const guardResult = idempotencyGuardService.beginGuard({
+            key: guardKey,
+            runningTtlMs: 300000,
+            replayTtlMs: 30000
+        });
+        if (sendGuardedResponse(req, res, guardResult, 'Student admission merge is already in progress.')) return;
+        const result = await studentAdmissionMergeService.executeAdmissionMerge({
+            mainStudentId,
+            mergeStudentIds,
+            previewToken,
+            confirmation,
+            reqUser: req.user,
+            actor: toPublicId(req.user?.id) || String(req.user?.username || 'system')
+        });
+        const payload = {
+            status: 'success',
+            message: 'Student admissions merged successfully.',
+            data: result,
+            redirectTo: result.redirectTo
+        };
+        idempotencyGuardService.completeGuard(guardKey, payload);
+        return res.json(payload);
+    } catch (error) {
+        if (guardKey) idempotencyGuardService.failGuard(guardKey);
+        console.error('[STUDENT_ADMISSION_MERGE]', error);
         return res.status(error.status || 400).json({ status: 'error', message: error.message });
     }
 };
