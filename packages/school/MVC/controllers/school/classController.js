@@ -1891,9 +1891,104 @@ async function buildEnrichedSessionRosterForMutation({
     return filteredRoster;
 }
 
-async function buildClassEnrollmentPeriodMetrics(reqUser, classIds = [], orgToday = '') {
+function classMaxCapacityValue(classRow = {}) {
+    const raw = classRow?.enrollment?.maxCapacity ?? classRow?.maxCapacity;
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : 0;
+}
+
+function periodRecency(row = {}) {
+    const endDate = String(row?.endDate || '').trim();
+    const startDate = String(row?.startDate || '').trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(endDate)) return { date: endDate, kind: 'ended' };
+    if (/^\d{4}-\d{2}-\d{2}$/.test(startDate)) return { date: startDate, kind: 'started' };
+    return { date: '', kind: '' };
+}
+
+function selectRecentEnrollmentStudents(periodRows = [], classIds = new Set()) {
+    const skippedStatuses = new Set(['void', 'voided', 'cancelled', 'canceled']);
+    const byClass = new Map();
+    (Array.isArray(periodRows) ? periodRows : []).forEach((row) => {
+        const classId = toPublicId(row?.classId);
+        if (!classId || (classIds.size && !classIds.has(classId))) return;
+        const status = String(row?.status || '').trim().toLowerCase();
+        if (skippedStatuses.has(status)) return;
+        const studentId = toPublicId(row?.studentId);
+        const personId = toPublicId(row?.personId);
+        const studentKey = studentId || personId;
+        const recency = periodRecency(row);
+        if (!studentKey || !recency.date) return;
+        const list = byClass.get(classId) || [];
+        list.push({ studentKey, studentId, personId, date: recency.date, kind: recency.kind });
+        byClass.set(classId, list);
+    });
+    const picks = new Map();
+    byClass.forEach((list, classId) => {
+        list.sort((left, right) => right.date.localeCompare(left.date));
+        const seen = new Set();
+        const top = [];
+        list.forEach((item) => {
+            if (seen.has(item.studentKey) || top.length >= 3) return;
+            seen.add(item.studentKey);
+            top.push(item);
+        });
+        if (top.length) picks.set(classId, top);
+    });
+    return picks;
+}
+
+async function buildCapacityOneRecentStudentLabels(classes = [], periodRows = [], reqUser = null) {
+    const capacityOneIds = new Set();
+    (Array.isArray(classes) ? classes : []).forEach((row) => {
+        if (classMaxCapacityValue(row) !== 1) return;
+        const classId = toPublicId(row?.id);
+        if (classId) capacityOneIds.add(classId);
+    });
+    if (!capacityOneIds.size) return new Map();
+
+    const picks = selectRecentEnrollmentStudents(periodRows, capacityOneIds);
+    const missingStudentIds = new Set();
+    picks.forEach((rows) => {
+        rows.forEach((row) => {
+            if (!row.personId && row.studentId) missingStudentIds.add(row.studentId);
+        });
+    });
+    if (missingStudentIds.size) {
+        const students = await schoolDataService.fetchAllData('students', {}, reqUser);
+        const personByStudentId = new Map();
+        (Array.isArray(students) ? students : []).forEach((student) => {
+            const studentId = toPublicId(student?.id);
+            const personId = toPublicId(student?.personId);
+            if (studentId && personId && missingStudentIds.has(studentId)) personByStudentId.set(studentId, personId);
+        });
+        picks.forEach((rows) => {
+            rows.forEach((row) => {
+                if (!row.personId && row.studentId) row.personId = personByStudentId.get(row.studentId) || '';
+            });
+        });
+    }
+
+    const personIds = [];
+    picks.forEach((rows) => rows.forEach((row) => { if (row.personId) personIds.push(row.personId); }));
+    const personById = await schoolPersonAccessService.buildPersonByIdMap({ reqUser, personIds });
+    const labels = new Map();
+    picks.forEach((rows, classId) => {
+        const parts = rows.map((row) => {
+            const person = row.personId ? personById.get(row.personId) : null;
+            const name = schoolPersonAccessService.formatPersonName(person, '') || row.studentId || row.personId;
+            const when = row.kind === 'ended' ? `ended ${row.date}` : `started ${row.date}`;
+            return `${name} (${when})`;
+        }).filter(Boolean);
+        if (parts.length) labels.set(classId, `Recent students: ${parts.join(', ')}`);
+    });
+    return labels;
+}
+
+async function buildClassEnrollmentPeriodMetrics(reqUser, classIds = [], orgToday = '', prefetchedRows = null) {
     const idSet = new Set((Array.isArray(classIds) ? classIds : []).map((id) => toPublicId(id)).filter(Boolean));
-    const rows = await schoolDataService.getAccessibleClassEnrollmentPeriods(reqUser);
+    const rows = Array.isArray(prefetchedRows)
+        ? prefetchedRows
+        : await schoolDataService.getAccessibleClassEnrollmentPeriods(reqUser);
     const periodRows = Array.isArray(rows) ? rows : [];
     const today = String(orgToday || '').trim() || resolveOrgTodayFromContext({ orgToday });
     const map = new Map();
@@ -3110,7 +3205,10 @@ async function listClasses(req, res) {
     const classes = paged.rows;
     const orgs = await dataService.fetchData('organizations', {}, req.user);
     const classIds = (Array.isArray(classes) ? classes : []).map((row) => toPublicId(row?.id)).filter(Boolean);
-    const periodMetricsMap = await buildClassEnrollmentPeriodMetrics(req.user, classIds, resolveOrgTodayFromRequest(req));
+    const accessiblePeriods = await schoolDataService.getAccessibleClassEnrollmentPeriods(req.user);
+    const periodRows = Array.isArray(accessiblePeriods) ? accessiblePeriods : [];
+    const periodMetricsMap = await buildClassEnrollmentPeriodMetrics(req.user, classIds, resolveOrgTodayFromRequest(req), periodRows);
+    const recentStudentLabels = await buildCapacityOneRecentStudentLabels(classes, periodRows, req.user);
     const searchableFields = await inferSearchableFields(classes, { exclude: ['audit', 'attachments'] });
     const classTitleMap = new Map((Array.isArray(classes) ? classes : []).map((row) => [toPublicId(row?.id), String(row?.title || '').trim()]));
 
@@ -3126,7 +3224,8 @@ async function listClasses(req, res) {
             activePeriodCount: Number(metrics.activePeriodCount || 0),
             openPeriodCount: Number(metrics.openPeriodCount || 0),
             previousClassTitle: previousClassId ? (classTitleMap.get(previousClassId) || previousClassId) : '',
-            nextClassTitle: nextClassId ? (classTitleMap.get(nextClassId) || nextClassId) : ''
+            nextClassTitle: nextClassId ? (classTitleMap.get(nextClassId) || nextClassId) : '',
+            recentStudentsLabel: recentStudentLabels.get(classId) || ''
         };
     });
 

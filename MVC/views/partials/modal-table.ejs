@@ -123,3 +123,15 @@
       searchableFields: _isDefined? searchableFields : []
     }) %>
   </script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const modalEl = document.getElementById('tableSearchModal');
+      const queryEl = document.getElementById('tsmQuery');
+      if (!modalEl || !queryEl || modalEl.dataset.searchFocusBound === 'true') return;
+      modalEl.dataset.searchFocusBound = 'true';
+      modalEl.addEventListener('shown.bs.modal', () => {
+        queryEl.focus();
+        if (queryEl.value) queryEl.select();
+      });
+    });
+  </script>

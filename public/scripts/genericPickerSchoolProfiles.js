@@ -94,6 +94,9 @@
       if (status) bits.push(utils.toLabel ? utils.toLabel(status) : status);
       if (capacity !== undefined && capacity !== null && capacity !== '') bits.push(`Capacity: ${capacity}`);
       return bits.join(' | ') || 'Class record';
+    },
+    getHighlight(item) {
+      return String(item?.recentStudentsLabel || '').trim();
     }
   });
 

@@ -230,6 +230,10 @@
     const title = escapeHtml((profile.getTitle ? profile.getTitle(item, helpers) : defaultTitle(resource, item)) || 'Untitled');
     const summaryText = (profile.getSummary ? profile.getSummary(item, helpers) : defaultSummary(resource, item)) || 'No summary available';
     const summary = escapeHtml(summaryText);
+    const highlightText = profile.getHighlight ? String(profile.getHighlight(item, helpers) || '').trim() : '';
+    const highlight = highlightText
+      ? `<div class="small fw-semibold mt-1 text-wrap" style="color:#b45309; line-height:1.35;">${escapeHtml(highlightText)}</div>`
+      : '';
     const statusBadge = profile.getStatusBadge ? profile.getStatusBadge(item, helpers) : defaultStatusBadge(resource, item);
     const orgMeta = profile.getOrgMeta ? profile.getOrgMeta(item, helpers) : defaultOrgMeta(resource, item);
     const iconClass = profile.icon || defaultIcon(resource);
@@ -244,6 +248,7 @@
           <div class="overflow-hidden">
             <div class="fw-bold text-dark text-truncate">${title}</div>
             <div class="text-muted small text-truncate" style="max-width: 420px;" title="${summary}">${summary}</div>
+            ${highlight}
             ${orgMeta}
           </div>
         </div>
