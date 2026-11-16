@@ -48,6 +48,7 @@ const attendanceOperationPolicyService = require('../../services/school/attendan
 const attendanceEnrollmentNaLockService = require('../../services/school/attendanceEnrollmentNaLockService');
 const sessionAttendanceTimingDetailService = require('../../services/school/sessionAttendanceTimingDetailService');
 const schoolRollingEnrollmentAccessService = require('../../services/school/schoolRollingEnrollmentAccessService');
+const rollingEnrollmentFunderService = require('../../services/school/rollingEnrollmentFunderService');
 
 function buildAttendanceRouteAccessContext(req) {
     return schoolDataService.buildRouteAccessContext(req);
@@ -895,6 +896,19 @@ async function buildAttendanceMatrixPayload(req, options = {}) {
         const rosterNicknamesByPerson = classAttendanceRosterOrderService.normalizeAttendanceRosterNicknames(
             classData?.attendanceRosterNicknames
         );
+        const activeFunders = activeOrgId
+            ? await reportFunderDocxService.loadActiveFunderOptions(req.user, activeOrgId).catch(() => [])
+            : [];
+        const funderLabelById = new Map(
+            (Array.isArray(activeFunders) ? activeFunders : []).map((row) => [
+                String(row?.id || '').trim(),
+                String(row?.label || row?.id || '').trim()
+            ]).filter(([id]) => id)
+        );
+        funderLabelById.set(
+            String(reportFunderDocxService.SELF_FUNDER_KEY || 'self').trim() || 'self',
+            'Self Fund'
+        );
 
         let studentList = Array.from(activePersonIds).map(uid => {
             const person = personById.get(String(uid || '').trim());
@@ -933,6 +947,10 @@ async function buildAttendanceMatrixPayload(req, options = {}) {
                 enrollmentEndDate,
                 funderType,
                 funderId,
+                funderLabel: rollingEnrollmentFunderService.resolveEnrollmentFunderLabel(
+                    { funderType, funderId },
+                    funderLabelById
+                ),
                 clbCurrent,
                 clbGoal
             };

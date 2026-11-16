@@ -1620,6 +1620,12 @@
     .session-panel { display: none; animation: sessionPanelIn 0.2s ease; }
     .session-panel.active { display: block; }
     .session-inactive-workspace .session-panel { display: none !important; }
+    .session-inactive-workspace.session-inactive-workspace--reports-enabled #session-panel-assignments.session-panel.active {
+        display: block !important;
+    }
+    .session-inactive-workspace.session-inactive-workspace--reports-enabled.session-reports-panel-active > .session-placeholder-card {
+        display: none;
+    }
     @keyframes sessionPanelIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 
     .session-report-workflow-header-row {
@@ -2217,6 +2223,8 @@
             ? 'Session status cannot be changed after the completed session edit window has ended. Contact an administrator.'
             : '';
         const isInstructionalInactive = isMakeupRequiredInactive || isMergedSessionInactive;
+        const reportsPanelEnabledWhenMakeupLocked = isMakeupRequiredInactive && !isMergedSessionInactive;
+        const reportsNavDisabled = isMergedSessionInactive;
         const mergedPartnerReference = (typeof mergedPartnerSessionReference !== 'undefined' && mergedPartnerSessionReference && typeof mergedPartnerSessionReference === 'object')
             ? mergedPartnerSessionReference
             : null;
@@ -2820,7 +2828,7 @@
                     <i class="bi bi-folder2-open fs-5"></i><span class="session-manager-nav-label">Content</span>
                 </button>
                 <% } %>
-                <button type="button" class="session-manager-nav-item" data-session-panel="assignments" <%= isInstructionalInactive ? 'disabled title="Inactive original session"' : '' %>>
+                <button type="button" class="session-manager-nav-item" data-session-panel="assignments" <%= reportsNavDisabled ? 'disabled title="Inactive original session"' : (reportsPanelEnabledWhenMakeupLocked ? 'title="Session reports stay on this original session while make-up is required"' : '') %>>
                     <i class="bi bi-clipboard-check fs-5"></i><span class="session-manager-nav-label">Reports</span>
                     <%
                       const reportNavInstanceCount = sessionReportRowsInitial.length;
@@ -2854,13 +2862,16 @@
             </nav>
         </aside>
 
-        <main class="session-manager-main <%= isInstructionalInactive ? 'session-inactive-workspace' : '' %>">
+        <main class="session-manager-main <%= isInstructionalInactive ? 'session-inactive-workspace' : '' %><%= reportsPanelEnabledWhenMakeupLocked ? ' session-inactive-workspace--reports-enabled' : '' %>" id="sessionManagerMain">
             <% if (isMakeupRequiredInactive) { %>
-                <div class="session-placeholder-card">
+                <div class="session-placeholder-card" id="sessionMakeupInactivePlaceholder">
                     <i class="bi bi-calendar-plus fs-1 text-warning d-block mb-3"></i>
                     <h5 class="fw-bold text-dark mb-2">Instructional work is paused for this original session</h5>
                     <p class="text-muted mb-3">
-                        Attendance, class conduct, gradebook, content, assignments, and student cases belong on the make-up session, not this original session.
+                        Attendance, class conduct, gradebook, content, and student cases belong on the make-up session, not this original session.
+                        <% if (reportsPanelEnabledWhenMakeupLocked) { %>
+                        Open the <strong>Reports</strong> section to view or fill reports still assigned to this session.
+                        <% } %>
                     </p>
                     <% if (canCreateMakeupSession) { %>
                         <button type="button" class="btn btn-warning fw-bold" id="btnCreateMakeupSessionInline"><i class="bi bi-calendar-plus me-1"></i>Create make-up session</button>
@@ -4576,6 +4587,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sessionCanDeleteMakeupSessions = <%- jsonForScript(typeof canDeleteMakeupSessions !== 'undefined' && canDeleteMakeupSessions === true) %>;
     const sessionCanOverrideMakeupDuration = <%- jsonForScript(Boolean(typeof canOverrideMakeupDuration !== 'undefined' && canOverrideMakeupDuration === true)) %>;
     const sessionInstructionalInactive = <%- jsonForScript(Boolean(isInstructionalInactive)) %>;
+    const sessionReportsPanelEnabledWhenMakeupLocked = <%- jsonForScript(Boolean(reportsPanelEnabledWhenMakeupLocked)) %>;
     const sessionIsMergedRow = <%- jsonForScript(Boolean(isMergedSessionRow)) %>;
     const sessionStatusFrozen = <%- jsonForScript(Boolean(isMergedSessionRow)) %>;
     const sessionCanUndoMerge = <%- jsonForScript(Boolean(canUndoSessionMergeFlag)) %>;
@@ -7539,7 +7551,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let sessionReportAssignmentClient = null;
     if (sessionCanAssignReports && typeof installSessionReportAssignmentClient === 'function') {
         sessionReportAssignmentClient = installSessionReportAssignmentClient({
-            initialActionStateId: actionStateId,
+            initialActionStateId: '',
             escapeHtml: scEscapeHtml,
             showMessage: (title, message, icon) => showStudentCaseMessage(title, message, icon),
             showLoading: (message) => {
@@ -7568,8 +7580,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 return Array.isArray(result.rows) ? result.rows : [];
             },
             onSuccess: async (result) => {
-                const token = String(result?.actionStateId || '').trim();
-                if (token) actionStateId = token;
                 if (Array.isArray(result.rows)) {
                     revealSessionReportsAssignedPanel();
                     sessionReportInstancesState = result.rows;
@@ -8333,6 +8343,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function syncMakeupReportsPlaceholderVisibility(panelId) {
+        const mainEl = document.getElementById('sessionManagerMain');
+        if (!mainEl || !sessionReportsPanelEnabledWhenMakeupLocked) return;
+        mainEl.classList.toggle('session-reports-panel-active', panelId === 'assignments');
+    }
+
     function setActivePanel(panelId) {
         document.querySelectorAll('.session-manager-nav-item[data-session-panel]').forEach((btn) => {
             const id = btn.getAttribute('data-session-panel');
@@ -8344,6 +8360,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const match = panel.id === 'session-panel-' + panelId;
             panel.classList.toggle('active', match);
         });
+        syncMakeupReportsPlaceholderVisibility(panelId);
     }
 
     document.querySelectorAll('.session-manager-nav-item[data-session-panel]').forEach((btn) => {
@@ -12111,8 +12128,10 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const submitSessionSave = async (savePayload) => {
+        const saveToken = String((savePayload && savePayload.actionStateId) || actionStateId || '').trim();
         const payloadWithCsrf = {
             ...(savePayload || {}),
+            actionStateId: saveToken,
             _csrf: csrfToken || undefined
         };
         const response = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/save`, {

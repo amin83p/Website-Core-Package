@@ -46,6 +46,7 @@ test('matrix payload builder enriches enrollment dates and CLB maps', () => {
   assert.match(controller, /enrollmentStartDate/);
   assert.match(controller, /enrollmentEndDate/);
   assert.match(controller, /funderType/);
+  assert.match(controller, /funderLabel/);
   assert.match(controller, /authorEmail/);
   assert.match(controller, /enrichAttendanceComments/);
   assert.match(controller, /clbCurrent/);
@@ -379,9 +380,20 @@ test('CLB and enrollment formatters include current, goal, start, and end', () =
 
 test('formatFunderType maps enrollment funder types', () => {
   assert.equal(attendanceExcelExportService.formatFunderType({ funderType: 'self' }), 'Self Fund');
-  assert.equal(attendanceExcelExportService.formatFunderType({ funderType: 'funder' }), 'Funder');
   assert.equal(attendanceExcelExportService.formatFunderType({ funderId: 'self' }), 'Self Fund');
   assert.equal(attendanceExcelExportService.formatFunderType({ funderLabel: 'IRCC' }), 'IRCC');
+  assert.equal(
+    attendanceExcelExportService.formatFunderType({ funderType: 'funder', funderId: 'FUN_WCB' }),
+    'funder / FUN_WCB'
+  );
+  assert.equal(
+    attendanceExcelExportService.formatFunderType({
+      funderType: 'funder',
+      funderId: 'FUN_WCB',
+      funderLabel: 'Workers Compensation Board'
+    }),
+    'Workers Compensation Board'
+  );
 });
 
 test('filterMatrixByPersonIds keeps only requested students', () => {
@@ -486,6 +498,8 @@ test('workbook layout: Att %, banding, title/class/teacher, Fatima fills, notes,
         firstName: 'Foroozan',
         lastName: 'Haidari',
         funderType: 'funder',
+        funderId: 'FUN_IRCC',
+        funderLabel: 'IRCC',
         email: 'foroozan@example.com',
         enrollmentStartDate: '2026-01-15',
         enrollmentEndDate: '2026-07-24',
@@ -596,7 +610,7 @@ test('workbook layout: Att %, banding, title/class/teacher, Fatima fills, notes,
   assert.equal(sheet.getCell(10, 5).fill?.fgColor?.argb, 'FFFBE5D6');
   assert.equal(sheet.getCell(10, 6).value, 'Tue');
 
-  assert.equal(sheet.getCell(11, 1).value, 'Funder');
+  assert.equal(sheet.getCell(11, 1).value, 'IRCC');
   assert.equal(sheet.getCell(11, 2).value, 1);
   assert.equal(sheet.getCell(11, 3).value, 'Haidari');
   assert.equal(sheet.getCell(11, 4).value, 'Foroozan');

@@ -15,6 +15,15 @@ test('session manager keeps save button available for non-readonly sessions', ()
   assert.doesNotMatch(source, /!isReadOnly && !isMakeupRequiredInactive/);
 });
 
+test('session manager keeps reports section available when status requires make-up', () => {
+  const source = read('packages/school/MVC/views/school/class/sessionManager.ejs');
+  assert.match(source, /const reportsPanelEnabledWhenMakeupLocked = isMakeupRequiredInactive && !isMergedSessionInactive;/);
+  assert.match(source, /data-session-panel="assignments" <%= reportsNavDisabled \? 'disabled/);
+  assert.match(source, /session-inactive-workspace--reports-enabled/);
+  assert.match(source, /#session-panel-assignments\.session-panel\.active/);
+  assert.match(source, /Open the <strong>Reports<\/strong> section to view or fill reports still assigned to this session/);
+});
+
 test('session manager sends status-only payload when current or selected status requires make-up', () => {
   const source = read('packages/school/MVC/views/school/class/sessionManager.ejs');
   assert.match(source, /function isSessionStatusMakeupRequired\(statusCode\)/);

@@ -389,4 +389,6 @@ test('session manager renders report instances tab, refresh control, and client 
   assert.match(src, /sourceMode:\s*'local'/);
   assert.match(src, /\/report-assignments/);
   assert.doesNotMatch(src, /sessionReportAssignmentRows/);
+  assert.match(src, /initialActionStateId: ''/);
+  assert.doesNotMatch(src, /onSuccess: async \(result\) => \{[\s\S]{0,200}if \(token\) actionStateId = token;/);
 });

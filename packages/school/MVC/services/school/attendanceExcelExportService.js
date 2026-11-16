@@ -2,6 +2,7 @@
 const ExcelJS = require('exceljs');
 const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
 const attendanceExcelThreadedComments = require('./attendanceExcelThreadedComments');
+const rollingEnrollmentFunderService = require('./rollingEnrollmentFunderService');
 
 const {
   ATTENDANCE_STATUS,
@@ -747,11 +748,10 @@ function formatAttendancePercentCell(summary = {}, records = []) {
 function formatFunderType({ funderType, funderId, funderLabel } = {}) {
   const label = clean(funderLabel);
   if (label) return label;
-  const type = clean(funderType).toLowerCase();
-  const id = clean(funderId).toLowerCase();
-  if (type === 'self' || id === 'self' || (!type && !id)) return 'Self Fund';
-  if (type === 'funder') return 'Funder';
-  return clean(funderType) || clean(funderId) || '';
+  return rollingEnrollmentFunderService.resolveEnrollmentFunderLabel(
+    { funderType, funderId },
+    new Map()
+  );
 }
 
 function formatClbSkills(skills = {}) {
