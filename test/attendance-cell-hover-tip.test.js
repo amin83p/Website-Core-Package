@@ -166,6 +166,43 @@ test('buildQuickStatusMenuItems omits status actions when roster edit is blocked
   assert.equal(items.length, 0);
 });
 
+test('buildContextMenuHtml includes reset attendance for marked cells', () => {
+  tip.initAttendanceCellHoverTip({
+    cellSelector: '.att-cell',
+    root: false,
+    resolveEnabledStatuses: () => ['present', 'absent', 'acf'],
+    resolveAccess: () => fullAccess
+  });
+  const model = tip.buildAttendanceCellTipModel({ status: 'present' }, fullAccess);
+  const html = tip.buildContextMenuHtml(model, {
+    record: { status: 'present', sessionId: 'SES-1' },
+    fieldVisibility: fullVisibility
+  });
+  assert.match(html, /data-att-reset-attendance="1"/);
+  assert.match(html, /Reset attendance/);
+});
+
+test('buildContextMenuHtml omits reset attendance when cell is unmarked', () => {
+  tip.initAttendanceCellHoverTip({
+    cellSelector: '.att-cell',
+    root: false,
+    resolveEnabledStatuses: () => ['present', 'absent', 'acf']
+  });
+  const model = tip.buildAttendanceCellTipModel({ status: '' }, fullAccess);
+  const html = tip.buildContextMenuHtml(model, {
+    record: { status: '', sessionId: 'SES-1' },
+    fieldVisibility: fullVisibility
+  });
+  assert.doesNotMatch(html, /data-att-reset-attendance="1"/);
+});
+
+test('shouldOfferResetAttendance is false when roster edit is blocked', () => {
+  assert.equal(tip.shouldOfferResetAttendance(
+    { status: 'present' },
+    { ...fullAccess, canEditRoster: false }
+  ), false);
+});
+
 test('buildAttendanceCellTipModel uses unmark labels when excuse flags are set', () => {
   const model = tip.buildAttendanceCellTipModel({
     status: 'absent',

@@ -101,6 +101,8 @@ const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { resolveOrgTodayFromRequest, resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const sessionReportInstanceService = require('../../services/school/sessionReportInstanceService');
+const reportIntegrityService = require('../../services/school/reportIntegrityService');
+const classReferenceSyncService = require('../../services/school/classReferenceSyncService');
 const schoolRecordAccessService = require('../../services/school/schoolRecordAccessService');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
 const conductRatingScalePolicyModel = require('../../models/school/conductRatingScalePolicyModel');
@@ -5542,6 +5544,34 @@ async function deleteSessionBookCoveringEntry(req, res) {
     }
 }
 
+async function deleteSessionReportInstance(req, res) {
+    try {
+        const { id: classId, sessionId, instanceId } = req.params;
+        const sessionDate = resolveSessionDateFromRequest(req);
+        const { classData, sessions } = await loadSessionManageScope(classId, req, {
+            sessionId,
+            sessionDate
+        });
+        const { session } = findSessionInList(sessions, sessionId, sessionDate);
+        if (!session) throw new Error('Session not found.');
+        assertSessionScopeForRequest(req, classData, session, 'manageSession');
+
+        const instance = await reportIntegrityService.assertInstanceDeletable(instanceId, req.user);
+        if (!idsEqual(instance.classId, classId) || !idsEqual(instance.sessionId, sessionId)) {
+            throw new Error('This report instance does not belong to this session.');
+        }
+        await schoolDataService.deleteData('reportInstances', instanceId, req.user);
+        await classReferenceSyncService.notifyAfterReportDelete({ record: instance, reqUser: req.user });
+        return res.json({
+            status: 'success',
+            message: 'Report instance deleted.',
+            actionStateId: req.actionStateId || ''
+        });
+    } catch (error) {
+        return schoolDeletionGuardService.handleDeleteError(req, res, error);
+    }
+}
+
 async function listSessionReportInstances(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
@@ -8005,7 +8035,7 @@ module.exports = {
   getClassTemplate,
   checkConflicts,
   previewTeacherAssignmentImpact,
-  saveSession, saveSessionGradebooks, getGradebookMakeupSources, getGradebookMakeupActivities, postGradebookMakeupFrom, manageSession, showAttendanceRosterOrderEditor, saveAttendanceRosterOrder, resetAttendanceRosterOrder, previewClassSessionDelete, uploadSessionFile, createMakeupSession, deleteLinkedMakeupSession, listMergeEligibleTeachers, previewSessionMerge, executeSessionMerge, unmergeSession, prepareSessionReportAssignment, assignReportToSession, getBookCoveringSummaryForSession, createBookCoveringForSession, deleteBookCoveringForSession, listSessionBookCoveringAssignedBooks, getSessionBookCoveringAssignedBookDetail, upsertSessionBookCoveringEntry, deleteSessionBookCoveringEntry, listSessionReportInstances, getSessionReportGradebookSkillCoverage, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
+  saveSession, saveSessionGradebooks, getGradebookMakeupSources, getGradebookMakeupActivities, postGradebookMakeupFrom, manageSession, showAttendanceRosterOrderEditor, saveAttendanceRosterOrder, resetAttendanceRosterOrder, previewClassSessionDelete, uploadSessionFile, createMakeupSession, deleteLinkedMakeupSession, listMergeEligibleTeachers, previewSessionMerge, executeSessionMerge, unmergeSession, prepareSessionReportAssignment, assignReportToSession, getBookCoveringSummaryForSession, createBookCoveringForSession, deleteBookCoveringForSession, listSessionBookCoveringAssignedBooks, getSessionBookCoveringAssignedBookDetail, upsertSessionBookCoveringEntry, deleteSessionBookCoveringEntry, listSessionReportInstances, deleteSessionReportInstance, getSessionReportGradebookSkillCoverage, listSessionStudentCases, saveSessionStudentCase, updateSessionStudentCaseStatus, deleteSessionStudentCase, deleteClassSession,
   saveSessionConduct,
   setSessionLock,
   showFinalGradesPage,

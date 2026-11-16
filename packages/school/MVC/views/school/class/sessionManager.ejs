@@ -4600,6 +4600,7 @@ document.addEventListener('DOMContentLoaded', () => {
     })()) %>;
     const sessionMakeupDefaultPercent = <%- jsonForScript(Number(currentSessionStatusMeta?.makeupDurationPercent || 100)) %>;
     const sessionCanAssignReports = <%- jsonForScript(Boolean(canAssignSessionReports)) %>;
+    const sessionCanRemoveReportInstances = <%- jsonForScript(Boolean(!isReadOnly)) %>;
     const sessionCanCreateBookCoveringReport = <%- jsonForScript(Boolean(canCreateBookCoveringReport)) %>;
     const sessionCanViewBookCoveringReport = <%- jsonForScript(Boolean(typeof canViewBookCoveringReport !== 'undefined' ? canViewBookCoveringReport : canCreateBookCoveringReport)) %>;
     const sessionCanDeleteBookCoveringReport = <%- jsonForScript(Boolean(typeof canDeleteBookCoveringReport !== 'undefined' ? canDeleteBookCoveringReport : false)) %>;
@@ -7359,11 +7360,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const orphanRows = (item.orphanedInstances || []).map((orphan) => {
                 const studentName = scEscapeHtml(orphan.studentName || orphan.studentId || 'Student');
                 const instanceId = scEscapeHtml(orphan.instanceId || '');
+                const removeButton = sessionCanRemoveReportInstances
+                    ? `<button type="button" class="btn btn-sm btn-outline-danger orphan-delete-btn js-delete-session-report-instance" data-instance-id="${instanceId}" data-student-name="${studentName}" data-report-title="${templateTitle}" title="Remove report instance"><i class="bi bi-trash"></i></button>`
+                    : '';
                 return `<li class="d-flex align-items-center justify-content-between gap-2 py-1">
                     <span>${studentName}</span>
-                    <button type="button" class="btn btn-sm btn-outline-danger orphan-delete-btn js-delete-orphan-report-instance" data-instance-id="${instanceId}" title="Delete report instance">
-                        <i class="bi bi-trash"></i>
-                    </button>
+                    ${removeButton}
                 </li>`;
             }).join('');
             const dismissKey = scEscapeHtml([item.assignmentId, item.assignmentRowId || ''].join('|'));
@@ -7384,33 +7386,39 @@ document.addEventListener('DOMContentLoaded', () => {
         }).join('');
     }
 
-    async function deleteOrphanReportInstance(instanceId) {
+    async function deleteSessionReportInstance(instanceId, labels = {}) {
         const id = String(instanceId || '').trim();
-        if (!id) return;
+        if (!id || !sessionCanRemoveReportInstances) return;
+        const studentName = String(labels.studentName || 'this student').trim() || 'this student';
+        const reportTitle = String(labels.reportTitle || 'this report').trim() || 'this report';
         const confirmed = await sessionConfirmBox({
-            title: 'Delete report instance?',
-            message: 'This will permanently delete the report instance for a student no longer assigned to this report target row.',
+            title: 'Remove report instance?',
             icon: 'warning',
-            confirmText: 'Delete',
+            html: true,
+            message: `<p class="mb-0">Permanently delete <strong>${scEscapeHtml(reportTitle)}</strong> for <strong>${scEscapeHtml(studentName)}</strong>? The report content cannot be restored.</p>`,
+            confirmText: 'Remove',
             confirmClass: 'btn-danger'
         });
         if (!confirmed) return;
-        if (typeof window.showLoading === 'function') window.showLoading('Deleting report instance...');
+        if (typeof window.showLoading === 'function') window.showLoading('Removing report instance...');
         try {
-            const res = await fetch(`/school/reports/instances/delete/${encodeURIComponent(id)}`, {
-                method: 'GET',
+            const res = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/report-instances/${encodeURIComponent(id)}/delete`, {
+                method: 'POST',
                 headers: {
+                    'Content-Type': 'application/json',
                     'x-ajax-request': 'true',
-                    'X-Requested-With': 'XMLHttpRequest',
                     Accept: 'application/json'
                 },
-                credentials: 'same-origin'
+                credentials: 'same-origin',
+                body: JSON.stringify({ actionStateId })
             });
             const result = await res.json().catch(() => ({}));
-            if (!res.ok || result.status === 'error') throw new Error(result.message || 'Could not delete report instance.');
+            if (!res.ok || result.status === 'error') throw new Error(result.message || 'Could not remove report instance.');
+            const token = String(result.actionStateId || '').trim();
+            if (token) actionStateId = token;
             await refreshSessionReportInstances();
         } catch (error) {
-            await showStudentCaseMessage('Delete Failed', error.message || 'Could not delete report instance.', 'error');
+            await showStudentCaseMessage('Remove Failed', error.message || 'Could not remove report instance.', 'error');
         } finally {
             if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
         }
@@ -7486,13 +7494,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     : (blockReason === 'skills'
                         ? `<button type="button" class="btn btn-sm btn-outline-primary js-report-action-requires-gradebook-skills" title="Log gradebook activities for required skills first"><i class="bi bi-box-arrow-up-right me-1"></i>${scEscapeHtml(actionLabel)}</button>`
                         : `<a href="${scEscapeHtml(href)}" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer"><i class="bi bi-box-arrow-up-right me-1"></i>${scEscapeHtml(actionLabel)}</a>`);
+                const statusToken = String(row.status || '').trim().toLowerCase();
+                const instanceId = String(row.id || '').trim();
+                const removeBtn = sessionCanRemoveReportInstances && instanceId && statusToken !== 'locked'
+                    ? `<button type="button" class="btn btn-sm btn-outline-danger js-delete-session-report-instance" data-instance-id="${scEscapeHtml(row.id)}" data-student-name="${scEscapeHtml(row.studentName || 'this student')}" data-report-title="${scEscapeHtml(row.templateTitle || 'this report')}" title="Remove report instance"><i class="bi bi-trash"></i><span class="visually-hidden">Remove</span></button>`
+                    : '';
                 return `
                     <tr data-report-instance-id="${scEscapeHtml(row.id)}">
                         <td class="ps-4"><span class="text-muted small">Individual report</span></td>
                         <td class="fw-semibold">${scEscapeHtml(row.studentName)}${studentSub}</td>
                         <td>${scEscapeHtml(row.teacherName)}</td>
                         <td><span class="badge ${badgeClass} text-capitalize">${scEscapeHtml(statusLabel)}</span></td>
-                        <td class="pe-4 text-end">${actionBtn}</td>
+                        <td class="pe-4 text-end"><div class="d-inline-flex gap-1 justify-content-end">${actionBtn}${removeBtn}</div></td>
                     </tr>`;
             }).join('');
             return groupHeader + instanceRows;
@@ -7731,12 +7744,26 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btnRefreshSessionReportInstances')?.addEventListener('click', () => {
         refreshSessionReportInstances().catch((error) => showStudentCaseMessage('Refresh Failed', error.message, 'error'));
     });
+    document.getElementById('sessionReportInstancesBody')?.addEventListener('click', (event) => {
+        const deleteBtn = event.target.closest('.js-delete-session-report-instance');
+        if (!deleteBtn) return;
+        event.preventDefault();
+        deleteSessionReportInstance(deleteBtn.dataset.instanceId, {
+            studentName: deleteBtn.dataset.studentName,
+            reportTitle: deleteBtn.dataset.reportTitle
+        }).catch((error) => {
+            showStudentCaseMessage('Remove Failed', error.message, 'error');
+        });
+    });
     document.getElementById('sessionReportRosterReconciliationHost')?.addEventListener('click', (event) => {
-        const deleteBtn = event.target.closest('.js-delete-orphan-report-instance');
+        const deleteBtn = event.target.closest('.js-delete-session-report-instance');
         if (deleteBtn) {
             event.preventDefault();
-            deleteOrphanReportInstance(deleteBtn.dataset.instanceId).catch((error) => {
-                showStudentCaseMessage('Delete Failed', error.message, 'error');
+            deleteSessionReportInstance(deleteBtn.dataset.instanceId, {
+                studentName: deleteBtn.dataset.studentName,
+                reportTitle: deleteBtn.dataset.reportTitle
+            }).catch((error) => {
+                showStudentCaseMessage('Remove Failed', error.message, 'error');
             });
             return;
         }

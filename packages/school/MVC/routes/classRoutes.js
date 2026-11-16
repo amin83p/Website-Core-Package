@@ -658,6 +658,10 @@ router.get('/:id/sessions/:sessionId/cases',
 router.get('/:id/sessions/:sessionId/report-instances',
   requireClassSessionManagePageAccess(),
   classCtrl.listSessionReportInstances);
+router.post('/:id/sessions/:sessionId/report-instances/:instanceId/delete',
+  requireAccess(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_SESSIONS, OPERATIONS.UPDATE, sessionManagerMutationActionState),
+  classCtrl.deleteSessionReportInstance);
 router.get('/:id/sessions/:sessionId/report-gradebook-skill-coverage',
   requireClassSessionManagePageAccess(),
   classCtrl.getSessionReportGradebookSkillCoverage);

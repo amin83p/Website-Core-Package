@@ -1414,9 +1414,10 @@ async function updateAttendanceRosterCell(req, res) {
             const n = Number(v);
             return Number.isFinite(n) && n >= 0 ? Math.floor(n) : 0;
         };
+        const attendanceProvided = req.body != null && Object.prototype.hasOwnProperty.call(req.body, 'attendance');
         const nextRowFromRequest = {
             ...(existingRosterRecord || {}),
-            attendance: req.body?.attendance,
+            attendance: attendanceProvided ? req.body.attendance : previousAttendance,
             lateMinutes: req.body?.lateMinutes !== undefined
                 ? parseNonNegIntForLock(req.body.lateMinutes)
                 : existingRosterRecord?.lateMinutes,
@@ -1435,7 +1436,7 @@ async function updateAttendanceRosterCell(req, res) {
             session,
             studentPersonId,
             priorAttendance: previousAttendance,
-            nextAttendance: req.body?.attendance,
+            nextAttendance: attendanceProvided ? req.body.attendance : previousAttendance,
             nextRow: nextRowFromRequest,
             attendanceAccess
         });
@@ -1454,12 +1455,14 @@ async function updateAttendanceRosterCell(req, res) {
         const canEditStudentRosterNote = Boolean(attendanceAccess.canEditStudentRosterNote);
         const canEditExcuseText = canMarkAttendanceExcused || canEditExcuseReference;
         const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
-        const normalizedAttendance = attendanceMatrixMetricsService.assertAttendanceStatusAllowedForSave({
-            status: req.body?.attendance,
-            enabledStatuses: enabledAttendanceStatuses,
-            previousStatus: previousAttendance,
-            allowSystemNotApplicable: true
-        });
+        const normalizedAttendance = attendanceProvided
+            ? attendanceMatrixMetricsService.assertAttendanceStatusAllowedForSave({
+                status: req.body.attendance,
+                enabledStatuses: enabledAttendanceStatuses,
+                previousStatus: previousAttendance,
+                allowSystemNotApplicable: true
+            })
+            : attendanceMatrixMetricsService.normalizeAttendanceStatusForSave(previousAttendance, '');
 
         if (!session.roster) session.roster = [];
         let rosterRecord = session.roster.find((r) => idsEqual(r.personId, studentPersonId));
@@ -1474,7 +1477,9 @@ async function updateAttendanceRosterCell(req, res) {
             session.roster.push(rosterRecord);
         }
 
-        rosterRecord.attendance = normalizedAttendance;
+        if (attendanceProvided || !existingRosterRecord) {
+            rosterRecord.attendance = normalizedAttendance;
+        }
 
         const parseNonNegInt = (v) => {
             const n = Number(v);
@@ -1607,6 +1612,16 @@ async function updateAttendanceRosterCell(req, res) {
             rosterRecord.attendance,
             enabledAttendanceStatuses
         );
+        const priorUnmarked = attendanceMatrixMetricsService.isUnmarkedAttendanceStatus(previousAttendance);
+        const explicitUnmark = attendanceProvided
+            && attendanceMatrixMetricsService.isUnmarkedAttendanceStatus(req.body.attendance);
+        if (priorUnmarked || explicitUnmark) {
+            const timingTotals = attendanceMatrixMetricsService.normalizeAttendanceTimingFields(rosterRecord);
+            if ((timingTotals.lateMinutes || 0) === 0 && (timingTotals.earlyLeaveMinutes || 0) === 0
+                && attendanceMatrixMetricsService.isAbsentLikeStatus(rosterRecord.attendance)) {
+                rosterRecord.attendance = '';
+            }
+        }
 
         await schoolDataService.saveClassSessions(classId, sessions, req.user, routeAccessContext);
 

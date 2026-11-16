@@ -241,6 +241,146 @@ test('addAttendanceComment rejects makeup-required session', async () => {
   })));
 });
 
+test('updateAttendanceRosterCell preserves attendance when notes change without attendance in body', async () => {
+  let savedSessions = null;
+  const originals = {
+    getDataById: schoolDataService.getDataById,
+    getClassSessions: schoolDataService.getClassSessions,
+    saveClassSessions: schoolDataService.saveClassSessions,
+    getClassEnrollmentPeriodsByClassId: schoolDataService.getClassEnrollmentPeriodsByClassId,
+    getStatusMap: sessionStatusPolicyService.getStatusMap,
+    shouldForceNotApplicableAttendanceByMap: sessionStatusPolicyService.shouldForceNotApplicableAttendanceByMap,
+    isAdminForRequestAsync: adminChekersService.isAdminForRequestAsync,
+    isAdminForRequestAsyncAuthority: adminAuthorityService.isAdminForRequestAsync,
+    getPolicyForOrg: attendanceMatrixPolicyModel.getPolicyForOrg,
+    getPolicyCatalogForOrg: attendanceMatrixPolicyModel.getPolicyCatalogForOrg,
+    recompute: classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass
+  };
+
+  schoolDataService.getDataById = async () => sampleClass;
+  schoolDataService.getClassSessions = async () => ([
+    {
+      sessionId: 'SES-1',
+      date: '2026-06-01',
+      status: 'completed',
+      locked: false,
+      roster: [{ personId: 'PER-1', attendance: 'present', notes: '', comments: [] }]
+    }
+  ]);
+  schoolDataService.saveClassSessions = async (_classId, sessions) => {
+    savedSessions = sessions;
+  };
+  schoolDataService.getClassEnrollmentPeriodsByClassId = async () => [];
+  sessionStatusPolicyService.getStatusMap = async () => new Map();
+  sessionStatusPolicyService.shouldForceNotApplicableAttendanceByMap = () => false;
+  adminChekersService.isAdminForRequestAsync = async () => true;
+  adminAuthorityService.isAdminForRequestAsync = async () => true;
+  attendanceMatrixPolicyModel.getPolicyForOrg = async () => ({});
+  attendanceMatrixPolicyModel.getPolicyCatalogForOrg = async () => ({});
+  classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass = async () => {};
+
+  try {
+    const req = createReq({
+      _attendanceAccess: { canEditStudentRosterNote: true, canOverrideSessionLock: true },
+      body: {
+        classId: 'CLS-1',
+        sessionId: 'SES-1',
+        studentPersonId: 'PER-1',
+        notes: 'Teacher note only'
+      }
+    });
+    const res = createRes();
+    await attendanceController.updateAttendanceRosterCell(req, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.payload.status, 'success');
+    const row = savedSessions?.[0]?.roster?.find((r) => String(r.personId) === 'PER-1');
+    assert.equal(row?.attendance, 'present');
+    assert.equal(row?.notes, 'Teacher note only');
+  } finally {
+    schoolDataService.getDataById = originals.getDataById;
+    schoolDataService.getClassSessions = originals.getClassSessions;
+    schoolDataService.saveClassSessions = originals.saveClassSessions;
+    schoolDataService.getClassEnrollmentPeriodsByClassId = originals.getClassEnrollmentPeriodsByClassId;
+    sessionStatusPolicyService.getStatusMap = originals.getStatusMap;
+    sessionStatusPolicyService.shouldForceNotApplicableAttendanceByMap = originals.shouldForceNotApplicableAttendanceByMap;
+    adminChekersService.isAdminForRequestAsync = originals.isAdminForRequestAsync;
+    adminAuthorityService.isAdminForRequestAsync = originals.isAdminForRequestAsyncAuthority;
+    attendanceMatrixPolicyModel.getPolicyForOrg = originals.getPolicyForOrg;
+    attendanceMatrixPolicyModel.getPolicyCatalogForOrg = originals.getPolicyCatalogForOrg;
+    classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass = originals.recompute;
+  }
+});
+
+test('updateAttendanceRosterCell preserves unmarked attendance when adding first roster note', async () => {
+  let savedSessions = null;
+  const originals = {
+    getDataById: schoolDataService.getDataById,
+    getClassSessions: schoolDataService.getClassSessions,
+    saveClassSessions: schoolDataService.saveClassSessions,
+    getClassEnrollmentPeriodsByClassId: schoolDataService.getClassEnrollmentPeriodsByClassId,
+    getStatusMap: sessionStatusPolicyService.getStatusMap,
+    shouldForceNotApplicableAttendanceByMap: sessionStatusPolicyService.shouldForceNotApplicableAttendanceByMap,
+    isAdminForRequestAsync: adminChekersService.isAdminForRequestAsync,
+    isAdminForRequestAsyncAuthority: adminAuthorityService.isAdminForRequestAsync,
+    getPolicyForOrg: attendanceMatrixPolicyModel.getPolicyForOrg,
+    getPolicyCatalogForOrg: attendanceMatrixPolicyModel.getPolicyCatalogForOrg,
+    recompute: classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass
+  };
+
+  schoolDataService.getDataById = async () => sampleClass;
+  schoolDataService.getClassSessions = async () => ([
+    {
+      sessionId: 'SES-1',
+      date: '2026-06-01',
+      status: 'completed',
+      locked: false,
+      roster: []
+    }
+  ]);
+  schoolDataService.saveClassSessions = async (_classId, sessions) => {
+    savedSessions = sessions;
+  };
+  schoolDataService.getClassEnrollmentPeriodsByClassId = async () => [];
+  sessionStatusPolicyService.getStatusMap = async () => new Map();
+  sessionStatusPolicyService.shouldForceNotApplicableAttendanceByMap = () => false;
+  adminChekersService.isAdminForRequestAsync = async () => true;
+  adminAuthorityService.isAdminForRequestAsync = async () => true;
+  attendanceMatrixPolicyModel.getPolicyForOrg = async () => ({});
+  attendanceMatrixPolicyModel.getPolicyCatalogForOrg = async () => ({});
+  classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass = async () => {};
+
+  try {
+    const req = createReq({
+      _attendanceAccess: { canEditStudentRosterNote: true, canOverrideSessionLock: true },
+      body: {
+        classId: 'CLS-1',
+        sessionId: 'SES-1',
+        studentPersonId: 'PER-1',
+        attendance: '',
+        notes: 'Note before mark'
+      }
+    });
+    const res = createRes();
+    await attendanceController.updateAttendanceRosterCell(req, res);
+    assert.equal(res.statusCode, 200);
+    const row = savedSessions?.[0]?.roster?.find((r) => String(r.personId) === 'PER-1');
+    assert.equal(row?.attendance, '');
+    assert.equal(row?.notes, 'Note before mark');
+  } finally {
+    schoolDataService.getDataById = originals.getDataById;
+    schoolDataService.getClassSessions = originals.getClassSessions;
+    schoolDataService.saveClassSessions = originals.saveClassSessions;
+    schoolDataService.getClassEnrollmentPeriodsByClassId = originals.getClassEnrollmentPeriodsByClassId;
+    sessionStatusPolicyService.getStatusMap = originals.getStatusMap;
+    sessionStatusPolicyService.shouldForceNotApplicableAttendanceByMap = originals.shouldForceNotApplicableAttendanceByMap;
+    adminChekersService.isAdminForRequestAsync = originals.isAdminForRequestAsync;
+    adminAuthorityService.isAdminForRequestAsync = originals.isAdminForRequestAsyncAuthority;
+    attendanceMatrixPolicyModel.getPolicyForOrg = originals.getPolicyForOrg;
+    attendanceMatrixPolicyModel.getPolicyCatalogForOrg = originals.getPolicyCatalogForOrg;
+    classEnrollmentSessionApplicabilityService.recomputeSessionCappedEnrollmentCompletionsForClass = originals.recompute;
+  }
+});
+
 test('addAttendanceComment rejects locked session without admin override', async () => {
   await withPatched(schoolDataService, {
     getDataById: async () => sampleClass,

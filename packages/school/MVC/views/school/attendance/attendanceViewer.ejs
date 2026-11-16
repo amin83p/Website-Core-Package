@@ -686,11 +686,16 @@
                 </div>
 
             </div>
-            <div class="modal-footer bg-light">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <div class="modal-footer bg-light d-flex justify-content-between align-items-center flex-wrap gap-2">
                 <% if (typeof canEditAttendanceRoster !== 'undefined' && canEditAttendanceRoster) { %>
-                <button type="button" class="btn btn-primary fw-bold" id="btn_saveAttendance">Save attendance</button>
+                <button type="button" class="btn btn-outline-warning" id="btn_reset_cell_attendance" title="Clear this student back to not marked">Reset attendance</button>
                 <% } %>
+                <div class="d-flex gap-2 ms-auto">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                    <% if (typeof canEditAttendanceRoster !== 'undefined' && canEditAttendanceRoster) { %>
+                    <button type="button" class="btn btn-primary fw-bold" id="btn_saveAttendance">Save attendance</button>
+                    <% } %>
+                </div>
             </div>
         </div>
     </div>
@@ -727,6 +732,7 @@ let detailsModalInstance = null;
 let detailsModalAllowClose = false;
 let detailsModalSnapshot = null;
 let attendanceMatrixBusyToken = null;
+let matrixCellModalBaselineStatus = '';
 let attendanceMatrixBusyDepth = 0;
 let attendanceScopedRollupTimer = null;
 const attendanceScopedRollupQueue = new Set();
@@ -1569,6 +1575,133 @@ function readCellAttendanceTimingSavePayload() {
     };
 }
 
+function resolveCellModalSaveAttendance() {
+    const checked = document.querySelector('input[name="modal_cell_attendance"]:checked')?.value;
+    if (checked) return String(checked).trim().toLowerCase();
+    return String(matrixCellModalBaselineStatus || '').trim().toLowerCase();
+}
+
+function buildMatrixAttendanceResetPayload(classId, sessionId, studentPersonId) {
+    return {
+        classId: String(classId || '').trim(),
+        sessionId: String(sessionId || '').trim(),
+        studentPersonId: String(studentPersonId || '').trim(),
+        attendance: '',
+        attendanceArrivalTime: '',
+        attendanceLeaveTime: '',
+        breakLateMinutes: 0,
+        breakEarlyLeaveMinutes: 0,
+        lateMinutes: 0,
+        earlyLeaveMinutes: 0,
+        lateExcused: false,
+        earlyLeaveExcused: false,
+        absenceExcused: false,
+        actionStateId: typeof resolveAttendanceActionStateId === 'function' ? resolveAttendanceActionStateId() : ''
+    };
+}
+
+async function confirmMatrixResetAttendance() {
+    if (typeof showMessageModal === 'function') {
+        const res = await showMessageModal({
+            title: 'Reset attendance?',
+            icon: 'warning',
+            message: '<p class="mb-0">Clear this student\'s attendance mark back to <strong>not marked</strong>?</p>',
+            buttons: [
+                { text: 'Cancel', class: 'btn-secondary', value: false },
+                { text: 'Reset attendance', class: 'btn-warning', value: true }
+            ]
+        });
+        return res === true || (res && res.value === true) || res === 'Reset attendance';
+    }
+    return window.confirm('Clear this student\'s attendance mark back to not marked?');
+}
+
+function applyClearedAttendanceToCellModal() {
+    matrixCellModalBaselineStatus = '';
+    document.querySelectorAll('input[name="modal_cell_attendance"]').forEach((el) => {
+        el.checked = false;
+    });
+    const emptyTimingRecord = {
+        lateMinutes: 0,
+        earlyLeaveMinutes: 0,
+        breakLateMinutes: 0,
+        breakEarlyLeaveMinutes: 0,
+        attendanceArrivalTime: '',
+        attendanceLeaveTime: ''
+    };
+    initCellAttendanceTimingFromRecord(emptyTimingRecord);
+    setCellAttendanceTimingError('');
+    const lateExcusedInput = document.getElementById('inp_cellLateExcused');
+    const earlyLeaveExcusedInput = document.getElementById('inp_cellEarlyLeaveExcused');
+    const absenceExcusedInput = document.getElementById('inp_cellAbsenceExcused');
+    if (lateExcusedInput) lateExcusedInput.checked = false;
+    if (earlyLeaveExcusedInput) earlyLeaveExcusedInput.checked = false;
+    if (absenceExcusedInput) absenceExcusedInput.checked = false;
+    recalculateCellAttendanceTimingTotals();
+    syncTimingExcuseControls();
+    syncAbsenceExcuseControl();
+}
+
+async function postMatrixAttendanceRosterCellUpdate(payload, options = {}) {
+    const res = await fetch('/school/attendances/api/update-roster-cell', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+        body: JSON.stringify(payload)
+    });
+    const result = await res.json();
+    hydrateAttendanceBudgetFromApi(res, result, {
+        estimateAttempt: true,
+        source: options.source || 'cell-save'
+    });
+    const guarded = typeof window.applyGuardedApiResult === 'function'
+        ? await window.applyGuardedApiResult(result, {
+            busyTitle: options.busyTitle || 'Save In Progress',
+            replayTitle: options.replayTitle || 'Save Already Completed'
+        })
+        : { stop: false };
+    if (guarded.stop) return { stop: true, res, result };
+    if (result.status !== 'success') {
+        const handled = await handleAttendanceActionStateFailure(result);
+        if (handled) throw new Error(ATTENDANCE_ACTION_STATE_HANDLED_ERROR);
+        throw new Error(result.message || 'Save failed.');
+    }
+    return { stop: false, res, result };
+}
+
+async function resetMatrixAttendanceCell({ classId, sessionId, studentPersonId, busyTitle, anchorEl, refreshModal }) {
+    if (!(await ensureAttendanceRequestBudgetAvailable())) return false;
+    if (!(await confirmMatrixResetAttendance())) return false;
+    showAttendanceMatrixBusy({
+        title: busyTitle || 'Resetting Attendance',
+        note: 'Please wait while attendance is cleared.',
+        operation: 'Attendance Matrix'
+    });
+    try {
+        const payload = buildMatrixAttendanceResetPayload(classId, sessionId, studentPersonId);
+        const { stop, result } = await postMatrixAttendanceRosterCellUpdate(payload, {
+            source: 'cell-reset',
+            busyTitle: 'Reset In Progress',
+            replayTitle: 'Reset Already Completed'
+        });
+        if (stop) return false;
+        window.patchAttendanceMatrixCellAfterSave?.({
+            studentPersonId,
+            sessionId,
+            payload,
+            serverRecord: result.record
+        });
+        if (refreshModal) {
+            applyClearedAttendanceToCellModal();
+            detailsModalSnapshot = captureAttendanceDetailsModalSnapshot();
+        }
+        return true;
+    } finally {
+        hideAttendanceMatrixBusy();
+    }
+}
+
+window.resetMatrixAttendanceCell = resetMatrixAttendanceCell;
+
 function attendanceCanMarkExcused() {
     return window.CAN_MARK_ATTENDANCE_EXCUSED === true;
 }
@@ -1817,6 +1950,39 @@ function isAttendanceDetailsModalDirty() {
     if (!detailsModalSnapshot) return false;
     const current = captureAttendanceDetailsModalSnapshot();
     return Object.keys(current).some((key) => current[key] !== detailsModalSnapshot[key]);
+}
+
+const CELL_MODAL_ATTENDANCE_SNAPSHOT_KEYS = [
+    'attendance',
+    'arrival',
+    'breakLate',
+    'leave',
+    'breakEarly',
+    'late',
+    'early',
+    'lateExcused',
+    'earlyLeaveExcused',
+    'absenceExcused'
+];
+
+function isCellModalAttendanceSectionDirty() {
+    if (!detailsModalSnapshot) return true;
+    const current = captureAttendanceDetailsModalSnapshot();
+    return CELL_MODAL_ATTENDANCE_SNAPSHOT_KEYS.some((key) => current[key] !== detailsModalSnapshot[key]);
+}
+
+function isCellModalRosterNoteOrExcuseOnlySave() {
+    if (!detailsModalSnapshot) return false;
+    const current = captureAttendanceDetailsModalSnapshot();
+    const noteDirty = current.rosterNote !== detailsModalSnapshot.rosterNote;
+    const excuseDirty = current.excuse !== detailsModalSnapshot.excuse
+        || current.excuseFileSelected !== detailsModalSnapshot.excuseFileSelected;
+    if (!noteDirty && !excuseDirty) return false;
+    const baselineUnmarked = String(matrixCellModalBaselineStatus || '').trim() === '';
+    const noStatusSelected = !document.querySelector('input[name="modal_cell_attendance"]:checked');
+    if (baselineUnmarked && noStatusSelected) return true;
+    if (isCellModalAttendanceSectionDirty()) return false;
+    return noteDirty || excuseDirty;
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -2647,7 +2813,14 @@ document.addEventListener('DOMContentLoaded', () => {
             return parsed;
         };
         const hasKey = (obj, key) => Object.prototype.hasOwnProperty.call(obj || {}, key);
-        const nextStatus = String(resultRecord.attendance || payload?.attendance || oldRecord.status || '').trim().toLowerCase();
+        let nextStatus = '';
+        if (hasKey(resultRecord, 'attendance')) {
+            nextStatus = String(resultRecord.attendance ?? '').trim().toLowerCase();
+        } else if (hasKey(payload, 'attendance')) {
+            nextStatus = String(payload.attendance ?? '').trim().toLowerCase();
+        } else {
+            nextStatus = String(oldRecord.status ?? '').trim().toLowerCase();
+        }
         const nextLateMinutes = parseNonNegInt(
             hasKey(resultRecord, 'lateMinutes') ? resultRecord.lateMinutes : payload?.lateMinutes,
             oldRecord.lateMinutes
@@ -2681,7 +2854,7 @@ document.addEventListener('DOMContentLoaded', () => {
         );
         return {
             ...oldRecord,
-            status: nextStatus || oldRecord.status || 'absent',
+            status: nextStatus,
             attendanceArrivalTime: nextArrival,
             attendanceLeaveTime: nextLeaveTime,
             breakLateMinutes: nextBreakLate,
@@ -2719,6 +2892,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return true;
     }
+    window.patchAttendanceMatrixCellAfterSave = patchAttendanceMatrixCellAfterSave;
 
     async function refreshAttendanceDisplayRollups(options = {}) {
         if (window.CAN_VIEW_ATTENDANCE_ROLLUPS !== true) return false;
@@ -3815,19 +3989,44 @@ document.addEventListener('DOMContentLoaded', () => {
         el.addEventListener('change', () => syncTimingExcuseControls());
     });
 
+    const btnResetCellAttendance = document.getElementById('btn_reset_cell_attendance');
+    if (btnResetCellAttendance) {
+        btnResetCellAttendance.addEventListener('click', async () => {
+            const classId = document.getElementById('modal_classId')?.value;
+            const sessionId = document.getElementById('modal_sessionId')?.value;
+            const personId = document.getElementById('modal_personId')?.value;
+            if (!classId || !sessionId || !personId) return;
+            if (btnResetCellAttendance.disabled) return;
+            try {
+                await resetMatrixAttendanceCell({
+                    classId,
+                    sessionId,
+                    studentPersonId: personId,
+                    refreshModal: true
+                });
+            } catch (error) {
+                if (error && error.message === ATTENDANCE_ACTION_STATE_HANDLED_ERROR) return;
+                if (typeof showMessageModal === 'function') {
+                    showMessageModal({
+                        title: 'Reset failed',
+                        icon: 'error',
+                        message: error?.message || 'Could not reset attendance.',
+                        buttons: [{ text: 'Close', class: 'btn-secondary' }]
+                    });
+                } else {
+                    alert(error?.message || 'Could not reset attendance.');
+                }
+            }
+        });
+    }
+
     const btnSaveAttendance = document.getElementById('btn_saveAttendance');
     if (btnSaveAttendance) {
         btnSaveAttendance.addEventListener('click', async () => {
             const classId = document.getElementById('modal_classId').value;
             const sessionId = document.getElementById('modal_sessionId').value;
             const personId = document.getElementById('modal_personId').value;
-            const attendance = document.querySelector('input[name="modal_cell_attendance"]:checked')?.value;
-            if (!attendance) {
-                if (typeof showMessageModal === 'function') {
-                    showMessageModal({ title: 'Attendance', icon: 'warning', message: 'Select a status (Present, Late/Leave Early, Absent, ACF, or N/A).', buttons: [{ text: 'OK', class: 'btn-primary' }] });
-                } else { alert('Select an attendance status.'); }
-                return;
-            }
+            const attendance = resolveCellModalSaveAttendance();
             if (attendance === 'late' && hasCellAttendanceTimingValidationError()) {
                 if (typeof showMessageModal === 'function') {
                     showMessageModal({ title: 'Attendance timing', icon: 'warning', message: document.getElementById('cell_modalAttendanceTimingError')?.textContent || 'Fix timing fields before saving.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
@@ -3852,24 +4051,39 @@ document.addEventListener('DOMContentLoaded', () => {
             try {
                 if (!(await ensureAttendanceRequestBudgetAvailable())) return;
                 const timingPayload = readCellAttendanceTimingSavePayload();
+                const rosterNoteOrExcuseOnly = isCellModalRosterNoteOrExcuseOnlySave();
                 const payload = {
                     classId,
                     sessionId,
                     studentPersonId: personId,
-                    attendance,
-                    ...timingPayload,
-                    notes: document.getElementById('inp_rosterStudentNote').value,
                     actionStateId: resolveAttendanceActionStateId()
                 };
-                if (attendanceCanMarkExcused()) {
-                    payload.lateExcused = parseAttendanceMinutesInputValue('inp_cellLateMins') > 0 && document.getElementById('inp_cellLateExcused')?.checked === true;
-                    payload.earlyLeaveExcused = parseAttendanceMinutesInputValue('inp_cellLeaveMins') > 0 && document.getElementById('inp_cellEarlyLeaveExcused')?.checked === true;
-                    payload.absenceExcused = isAbsentLikeAttendanceStatus(attendance) && document.getElementById('inp_cellAbsenceExcused')?.checked === true;
-                }
-                if (attendanceCanEditExcuseNotes()) {
-                    payload.excuseRef = document.getElementById('inp_cellExcuseRef').value;
-                    if (window.CAN_UPLOAD_ATTENDANCE_FILES === true) {
-                        payload.excuseAttachment = await uploadAttendanceFile(document.getElementById('inp_cellExcuseFile'), 'excuse', classId, sessionId, personId) || window.currentAttendanceExcuseAttachment || null;
+                if (rosterNoteOrExcuseOnly) {
+                    if (attendanceCanEditStudentRosterNote()) {
+                        payload.notes = document.getElementById('inp_rosterStudentNote').value;
+                    }
+                    if (attendanceCanEditExcuseNotes()) {
+                        payload.excuseRef = document.getElementById('inp_cellExcuseRef').value;
+                        if (window.CAN_UPLOAD_ATTENDANCE_FILES === true) {
+                            payload.excuseAttachment = await uploadAttendanceFile(document.getElementById('inp_cellExcuseFile'), 'excuse', classId, sessionId, personId) || window.currentAttendanceExcuseAttachment || null;
+                        }
+                    }
+                } else {
+                    payload.attendance = attendance;
+                    Object.assign(payload, timingPayload);
+                    if (attendanceCanMarkExcused()) {
+                        payload.lateExcused = parseAttendanceMinutesInputValue('inp_cellLateMins') > 0 && document.getElementById('inp_cellLateExcused')?.checked === true;
+                        payload.earlyLeaveExcused = parseAttendanceMinutesInputValue('inp_cellLeaveMins') > 0 && document.getElementById('inp_cellEarlyLeaveExcused')?.checked === true;
+                        payload.absenceExcused = isAbsentLikeAttendanceStatus(attendance) && document.getElementById('inp_cellAbsenceExcused')?.checked === true;
+                    }
+                    if (attendanceCanEditExcuseNotes()) {
+                        payload.excuseRef = document.getElementById('inp_cellExcuseRef').value;
+                        if (window.CAN_UPLOAD_ATTENDANCE_FILES === true) {
+                            payload.excuseAttachment = await uploadAttendanceFile(document.getElementById('inp_cellExcuseFile'), 'excuse', classId, sessionId, personId) || window.currentAttendanceExcuseAttachment || null;
+                        }
+                    }
+                    if (attendanceCanEditStudentRosterNote()) {
+                        payload.notes = document.getElementById('inp_rosterStudentNote').value;
                     }
                 }
                 if (!attendanceCanEditStudentRosterNote()) {
@@ -4108,6 +4322,32 @@ document.addEventListener('DOMContentLoaded', () => {
             },
             onOpenCellDetails: ({ context }) => {
                 openInteractiveModal(context.personId, context.sessionId);
+            },
+            resetAttendanceCell: async ({ context, anchorEl }) => {
+                const classId = String(context?.classId || window.currentMatrixData?.classId || '').trim();
+                const sessionId = String(context?.sessionId || context?.record?.sessionId || '').trim();
+                const personId = String(context?.personId || '').trim();
+                if (!classId || !sessionId || !personId) return false;
+                try {
+                    return await resetMatrixAttendanceCell({
+                        classId,
+                        sessionId,
+                        studentPersonId: personId,
+                        anchorEl,
+                        refreshModal: false
+                    });
+                } catch (error) {
+                    if (error && error.message === ATTENDANCE_ACTION_STATE_HANDLED_ERROR) return false;
+                    if (typeof showMessageModal === 'function') {
+                        showMessageModal({
+                            title: 'Reset failed',
+                            icon: 'error',
+                            message: error?.message || 'Could not reset attendance.',
+                            buttons: [{ text: 'Close', class: 'btn-secondary' }]
+                        });
+                    }
+                    return false;
+                }
             }
         });
     }
@@ -4168,8 +4408,9 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
 
     const allowed = getMatrixEnabledAttendanceStatuses(window.currentMatrixData);
     const known = ['present', 'late', 'absent', 'acf', 'not_applicable'];
-    let effStatus = known.includes(record.status) ? record.status : 'absent';
+    let effStatus = known.includes(record.status) ? record.status : '';
     if (record.status === 'excused') effStatus = 'absent';
+    matrixCellModalBaselineStatus = effStatus;
     syncModalAttendanceOptions(allowed, effStatus);
     document.querySelectorAll('input[name="modal_cell_attendance"]').forEach((el) => {
         el.checked = el.value === effStatus;
@@ -4276,6 +4517,12 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
     const saveAttBtn = document.getElementById('btn_saveAttendance');
     if (saveAttBtn) {
         saveAttBtn.disabled = !allowSaveAttendance;
+    }
+    const resetAttBtn = document.getElementById('btn_reset_cell_attendance');
+    if (resetAttBtn) {
+        const hasMarkedStatus = Boolean(String(effStatus || '').trim());
+        resetAttBtn.disabled = !allowStatusEdit || !hasMarkedStatus;
+        resetAttBtn.classList.toggle('d-none', !allowStatusEdit);
     }
     const allowAdminDiscussionEdit = allowEditBase;
     ['inp_newComment', 'btn_saveComment', 'btn_mentionUser'].forEach((id) => {

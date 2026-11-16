@@ -170,6 +170,9 @@
     margin: 0.35rem 0;
     background: rgba(0, 0, 0, 0.1);
 }
+.att-cell-context-menu-item--reset {
+    color: #b45309;
+}
 .att-cell-context-menu-item--muted {
     font-weight: 500;
     color: #6c757d;

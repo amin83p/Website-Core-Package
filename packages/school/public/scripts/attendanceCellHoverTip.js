@@ -381,6 +381,26 @@
     return `<button type="button" class="att-cell-context-menu-item att-cell-context-menu-item--status att-cell-context-menu-item--status-${status}" role="menuitem" data-att-quick-status="${status}">${label}</button>`;
   }
 
+  function recordHasResettableAttendance(record) {
+    const rec = record || {};
+    const status = String(rec.status || '').trim().toLowerCase();
+    if (status === 'not_applicable') return false;
+    if (status && status !== 'excused') return true;
+    if (status === 'excused') return true;
+    const lateMinutes = Number(rec.lateMinutes) || 0;
+    const earlyMinutes = Number(rec.earlyLeaveMinutes) || 0;
+    return lateMinutes > 0
+      || earlyMinutes > 0
+      || flagIsTrue(rec.lateExcused)
+      || flagIsTrue(rec.earlyLeaveExcused)
+      || flagIsTrue(rec.absenceExcused);
+  }
+
+  function shouldOfferResetAttendance(record, context) {
+    if (cellRosterEditBlocked(record, context)) return false;
+    return recordHasResettableAttendance(record);
+  }
+
   function buildContextMenuAccessContext(ctx) {
     const access = resolveAccessFlags();
     return {
@@ -405,6 +425,13 @@
     }
     if (excuseItems.length) {
       excuseItems.forEach((btn) => parts.push(buildContextMenuItemHtml(btn)));
+    }
+    const showReset = shouldOfferResetAttendance(ctx?.record, menuAccess);
+    if (showReset) {
+      if (parts.length) {
+        parts.push('<div class="att-cell-context-menu-divider" role="separator" aria-hidden="true"></div>');
+      }
+      parts.push('<button type="button" class="att-cell-context-menu-item att-cell-context-menu-item--reset" role="menuitem" data-att-reset-attendance="1">Reset attendance</button>');
     }
     if (parts.length) {
       parts.push('<div class="att-cell-context-menu-divider" role="separator" aria-hidden="true"></div>');
@@ -517,6 +544,18 @@
       hideContextMenu();
       if (typeof initOptions.onOpenCellDetails === 'function' && anchor && ctx) {
         initOptions.onOpenCellDetails({ anchorEl: anchor, context: ctx });
+      }
+      return;
+    }
+    const resetBtn = event.target.closest('[data-att-reset-attendance]');
+    if (resetBtn) {
+      event.preventDefault();
+      event.stopPropagation();
+      const anchor = contextMenuAnchor;
+      const ctx = contextMenuContext;
+      hideContextMenu();
+      if (typeof initOptions.resetAttendanceCell === 'function' && anchor && ctx) {
+        void initOptions.resetAttendanceCell({ anchorEl: anchor, context: ctx });
       }
       return;
     }
@@ -689,7 +728,7 @@
       return;
     }
     const record = ctx.record;
-    const attendance = String(record.status || '').trim().toLowerCase() || 'absent';
+    const attendance = String(record.status || '').trim().toLowerCase();
     const payload = {
       classId: String(ctx.classId || '').trim(),
       sessionId: String(record.sessionId || ctx.sessionId || '').trim(),
@@ -802,7 +841,9 @@
   function initAttendanceCellHoverTip(options) {
     initOptions = options || {};
     if (!initOptions.cellSelector) return;
-    bindHoverTipRoot(initOptions.root || document);
+    if (initOptions.root === false) return;
+    const root = initOptions.root || (typeof document !== 'undefined' ? document : null);
+    if (root) bindHoverTipRoot(root);
   }
 
   function setAttendanceCellHoverTipRoot(rootEl) {
@@ -814,11 +855,15 @@
     setAttendanceCellHoverTipRoot,
     buildAttendanceCellTipModel,
     buildTipHtmlFromModel,
+    buildContextMenuHtml,
     buildExcuseContextMenuItems,
     buildQuickStatusMenuItems,
     canShowExcuseToggle,
     cellEditBlocked,
     cellRosterEditBlocked,
+    shouldOfferResetAttendance,
+    recordHasResettableAttendance,
+    hideContextMenu,
     escapeHtml,
     flagIsTrue,
     isAbsentLikeStatus
