@@ -2,9 +2,11 @@ const schoolDataService = require('./schoolDataService');
 const reportIntegrityService = require('./reportIntegrityService');
 const classReferenceSyncService = require('./classReferenceSyncService');
 const reportScopePolicy = require('./reportScopePolicy');
+const reportRosterService = require('./reportRosterService');
 const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
 const schoolRepositories = require('../../repositories/school');
 const { requireCoreModule } = require('./schoolCoreContracts');
+const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 function clean(value) {
@@ -680,6 +682,156 @@ function summarizeSessionTargetRowsForPreview(rows = []) {
   }));
 }
 
+async function resolveEffectiveRowStudentIds(assignment, targetRow, {
+  classData = null,
+  session = null,
+  sessions = [],
+  sessionRoster = [],
+  reqUser
+} = {}) {
+  const configured = reportRosterService.resolveConfiguredTargetStudentIds(assignment, targetRow);
+  if (configured.length) return configured;
+  const scope = reportAssignmentSessionUtils.inferAssignmentReportScope(assignment);
+  if (scope !== 'each_student') return [];
+  return reportRosterService.resolveEachStudentTargetPersonIds({
+    assignment,
+    targetRow,
+    classData,
+    sessions,
+    session,
+    sessionRoster,
+    reqUser
+  });
+}
+
+async function removeStudentFromSessionReportAssignment({
+  assignmentId,
+  assignmentRowId = '',
+  studentId,
+  classData,
+  session,
+  sessions = [],
+  sessionRoster = [],
+  reqUser
+} = {}) {
+  const cleanAssignmentId = toPublicId(assignmentId);
+  const cleanStudentId = toPublicId(studentId);
+  if (!cleanAssignmentId || !cleanStudentId) {
+    throw new Error('Assignment and student are required.');
+  }
+
+  const assignment = await schoolDataService.getDataById('reportAssignments', cleanAssignmentId, reqUser);
+  if (!assignment) throw new Error('Report assignment not found.');
+
+  const scope = reportAssignmentSessionUtils.inferAssignmentReportScope(assignment);
+  if (scope !== 'each_student' && scope !== 'selected_students') {
+    throw new Error('This report type cannot remove individual students from the session list.');
+  }
+
+  const rowIdToken = clean(assignmentRowId);
+  const sessionContext = {
+    classId: toPublicId(classData?.id || assignment.classId),
+    sessionId: toPublicId(session?.sessionId || session?.id),
+    sessionDate: clean(session?.date)
+  };
+  const effectiveRows = reportAssignmentModel.getEffectiveTargetRows(assignment);
+  const rowsToUpdate = rowIdToken
+    ? effectiveRows.filter((row) => clean(row?.rowId) === rowIdToken)
+    : effectiveRows.filter((row) => reportAssignmentSessionUtils.reportAssignmentMatchesSession({
+      ...assignment,
+      sessionId: row?.sessionId,
+      sessionDate: row?.sessionDate || row?.reportDueDate || row?.dueDate
+    }, sessionContext));
+
+  if (!rowsToUpdate.length) {
+    throw new Error('Report assignment target row not found for this session.');
+  }
+
+  const updateRowIds = new Set(rowsToUpdate.map((row) => clean(row?.rowId)));
+
+  const instanceRows = await schoolDataService.fetchData(
+    'reportInstances',
+    { page: 1, limit: 10000, assignmentId__eq: cleanAssignmentId },
+    reqUser
+  );
+  const instanceIdsToDelete = (Array.isArray(instanceRows) ? instanceRows : [])
+    .filter((row) => idsEqual(row?.studentId, cleanStudentId))
+    .filter((row) => {
+      const instanceRowId = clean(row?.assignmentRowId);
+      if (!updateRowIds.size) return true;
+      return [...updateRowIds].some((rowId) => !rowId || rowId === instanceRowId);
+    })
+    .map((row) => toPublicId(row?.id))
+    .filter(Boolean);
+  if (instanceIdsToDelete.length) {
+    const cleanup = await classReferenceSyncService.deleteReportInstancesByIds({
+      instanceIds: instanceIdsToDelete,
+      reqUser,
+      orgId: assignment.orgId,
+      classId: assignment.classId,
+      reason: `session_report_student_removed:${cleanAssignmentId}`
+    });
+    if (cleanup.errors.length) throw new Error(cleanup.errors.join('; '));
+  }
+
+  const previousAssignment = JSON.parse(JSON.stringify(assignment));
+  let studentRemoved = false;
+  const nextTargetRows = [];
+
+  for (const row of effectiveRows) {
+    const rowId = clean(row?.rowId);
+    if (!updateRowIds.has(rowId)) {
+      nextTargetRows.push(row);
+      continue;
+    }
+    // eslint-disable-next-line no-await-in-loop
+    const currentIds = await resolveEffectiveRowStudentIds(assignment, row, {
+      classData,
+      session,
+      sessions,
+      sessionRoster,
+      reqUser
+    });
+    if (!currentIds.some((id) => idsEqual(id, cleanStudentId))) {
+      throw new Error('Student is not assigned to this report for this session.');
+    }
+    studentRemoved = true;
+    const nextIds = currentIds.filter((id) => !idsEqual(id, cleanStudentId));
+    nextTargetRows.push({
+      ...row,
+      targetStudentIds: nextIds
+    });
+  }
+
+  if (!studentRemoved) throw new Error('Student is not assigned to this report for this session.');
+
+  const now = new Date().toISOString();
+  const nextAssignment = {
+    ...assignment,
+    targetRows: nextTargetRows,
+    audit: {
+      ...(assignment.audit || {}),
+      lastUpdateUser: reqUser?.id || '',
+      lastUpdateDateTime: now
+    }
+  };
+
+  await schoolDataService.updateData('reportAssignments', cleanAssignmentId, nextAssignment, reqUser);
+  await classReferenceSyncService.cleanupReportInstancesForRemovedTargetStudents({
+    assignmentId: cleanAssignmentId,
+    previousAssignment,
+    nextAssignment,
+    reqUser
+  });
+  await classReferenceSyncService.notifyClassReferencesChanged({
+    classId: toPublicId(classData?.id || assignment.classId),
+    reason: `session_report_student_removed:${cleanAssignmentId}`,
+    reqUser
+  });
+
+  return { assignment: nextAssignment };
+}
+
 module.exports = {
   addMinutes,
   buildSessionTargetRow,
@@ -695,5 +847,6 @@ module.exports = {
   resolveTeacherId,
   resolveTeacherName,
   resolveWizardRowStudentIds,
+  removeStudentFromSessionReportAssignment,
   upsertSessionTargetRowForAssignment
 };

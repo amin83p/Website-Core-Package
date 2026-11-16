@@ -1219,7 +1219,10 @@ const reportIntegrityService = {
   },
 
   async getAccessibleInstanceOrThrow(instanceId, reqUser) {
-    const instance = await schoolRepositories.reportInstances.getById(instanceId);
+    const cleanId = toPublicId(instanceId);
+    const instance = cleanId
+      ? await schoolDataService.getDataById('reportInstances', cleanId, reqUser)
+      : null;
     if (!instance) throw new Error('Report instance not found.');
     if (isArchivedInstance(instance)) {
       throw new Error('This report instance has been archived and cannot be opened.');

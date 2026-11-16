@@ -27,15 +27,18 @@ function withPatched(target, replacements, callback) {
 }
 
 test('report instance access blocks archived instances before editing', async () => {
-  await withPatched(schoolRepositories.reportInstances, {
-    getById: async () => ({
-      id: 'INST-ARCHIVED',
-      orgId: '900000',
-      assignmentId: 'ASN-1',
-      classId: 'CLASS-1',
-      templateId: 'TPL-1',
-      status: 'archived'
-    })
+  await withPatched(schoolDataService, {
+    getDataById: async (entityType, id) => {
+      if (entityType !== 'reportInstances' || id !== 'INST-ARCHIVED') return null;
+      return {
+        id: 'INST-ARCHIVED',
+        orgId: '900000',
+        assignmentId: 'ASN-1',
+        classId: 'CLASS-1',
+        templateId: 'TPL-1',
+        status: 'archived'
+      };
+    }
   }, async () => {
     await assert.rejects(
       reportIntegrityService.getAccessibleInstanceOrThrow('INST-ARCHIVED', reqUser),
@@ -54,8 +57,8 @@ test('report instance access blocks missing or mismatched assignment context', a
     status: 'draft'
   };
 
-  await withPatched(schoolRepositories.reportInstances, {
-    getById: async () => instance
+  await withPatched(schoolDataService, {
+    getDataById: async (entityType, id) => (entityType === 'reportInstances' && id === instance.id ? instance : null)
   }, async () => {
     await withPatched(schoolRepositories.reportAssignments, {
       getById: async () => null

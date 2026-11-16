@@ -5547,7 +5547,13 @@ async function deleteSessionBookCoveringEntry(req, res) {
 async function deleteSessionReportInstance(req, res) {
     try {
         const { id: classId, sessionId, instanceId } = req.params;
+        const normalizedInstanceId = String(instanceId || '').trim();
         const sessionDate = resolveSessionDateFromRequest(req);
+        const body = req.body && typeof req.body === 'object' ? req.body : {};
+        let assignmentId = toPublicId(body.assignmentId);
+        let assignmentRowId = String(body.assignmentRowId || '').trim();
+        let studentId = toPublicId(body.studentId);
+
         const { classData, sessions } = await loadSessionManageScope(classId, req, {
             sessionId,
             sessionDate
@@ -5555,16 +5561,41 @@ async function deleteSessionReportInstance(req, res) {
         const { session } = findSessionInList(sessions, sessionId, sessionDate);
         if (!session) throw new Error('Session not found.');
         assertSessionScopeForRequest(req, classData, session, 'manageSession');
+        const enrichedRoster = await buildEnrichedSessionRosterForMutation({
+            classData,
+            session,
+            reqUser: req.user
+        });
 
-        const instance = await reportIntegrityService.assertInstanceDeletable(instanceId, req.user);
-        if (!idsEqual(instance.classId, classId) || !idsEqual(instance.sessionId, sessionId)) {
-            throw new Error('This report instance does not belong to this session.');
+        const isPendingSlot = normalizedInstanceId.startsWith('pending-');
+        if (!isPendingSlot) {
+            const instance = await reportIntegrityService.assertInstanceDeletable(normalizedInstanceId, req.user);
+            if (!idsEqual(instance.classId, classId) || !idsEqual(instance.sessionId, sessionId)) {
+                throw new Error('This report instance does not belong to this session.');
+            }
+            assignmentId = assignmentId || toPublicId(instance.assignmentId);
+            assignmentRowId = assignmentRowId || String(instance.assignmentRowId || '').trim();
+            studentId = studentId || toPublicId(instance.studentId);
+            await schoolDataService.deleteData('reportInstances', normalizedInstanceId, req.user);
+            await classReferenceSyncService.notifyAfterReportDelete({ record: instance, reqUser: req.user });
+        } else if (!assignmentId || !studentId) {
+            throw new Error('Assignment context is required to remove this report from the session.');
         }
-        await schoolDataService.deleteData('reportInstances', instanceId, req.user);
-        await classReferenceSyncService.notifyAfterReportDelete({ record: instance, reqUser: req.user });
+
+        await sessionReportAssignmentService.removeStudentFromSessionReportAssignment({
+            assignmentId,
+            assignmentRowId,
+            studentId,
+            classData,
+            session,
+            sessions,
+            sessionRoster: enrichedRoster,
+            reqUser: req.user
+        });
+
         return res.json({
             status: 'success',
-            message: 'Report instance deleted.',
+            message: 'Report removed from this session.',
             actionStateId: req.actionStateId || ''
         });
     } catch (error) {

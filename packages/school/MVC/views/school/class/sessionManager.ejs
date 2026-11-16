@@ -7667,7 +7667,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const studentName = scEscapeHtml(orphan.studentName || orphan.studentId || 'Student');
                 const instanceId = scEscapeHtml(orphan.instanceId || '');
                 const removeButton = sessionCanRemoveReportInstances
-                    ? `<button type="button" class="btn btn-sm btn-outline-danger orphan-delete-btn js-delete-session-report-instance" data-instance-id="${instanceId}" data-student-name="${studentName}" data-report-title="${templateTitle}" title="Remove report instance"><i class="bi bi-trash"></i></button>`
+                    ? `<button type="button" class="btn btn-sm btn-outline-danger orphan-delete-btn js-delete-session-report-instance" data-instance-id="${instanceId}" data-student-id="${scEscapeHtml(orphan.studentId || '')}" data-assignment-id="${scEscapeHtml(item.assignmentId || '')}" data-assignment-row-id="${scEscapeHtml(item.assignmentRowId || '')}" data-student-name="${studentName}" data-report-title="${templateTitle}" title="Remove report from session"><i class="bi bi-trash"></i></button>`
                     : '';
                 return `<li class="d-flex align-items-center justify-content-between gap-2 py-1">
                     <span>${studentName}</span>
@@ -7697,17 +7697,21 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!id || !sessionCanRemoveReportInstances) return;
         const studentName = String(labels.studentName || 'this student').trim() || 'this student';
         const reportTitle = String(labels.reportTitle || 'this report').trim() || 'this report';
+        const assignmentId = String(labels.assignmentId || '').trim();
+        const assignmentRowId = String(labels.assignmentRowId || '').trim();
+        const studentId = String(labels.studentId || '').trim();
         const confirmed = await sessionConfirmBox({
-            title: 'Remove report instance?',
+            title: 'Remove report from session?',
             icon: 'warning',
             html: true,
-            message: `<p class="mb-0">Permanently delete <strong>${scEscapeHtml(reportTitle)}</strong> for <strong>${scEscapeHtml(studentName)}</strong>? The report content cannot be restored.</p>`,
+            message: `<p class="mb-0">Remove <strong>${scEscapeHtml(reportTitle)}</strong> for <strong>${scEscapeHtml(studentName)}</strong> from this session?</p><p class="mb-0 mt-2 small text-muted">Any saved draft is deleted and the student is unassigned for this report period. This cannot be undone.</p>`,
             confirmText: 'Remove',
             confirmClass: 'btn-danger'
         });
         if (!confirmed) return;
-        if (typeof window.showLoading === 'function') window.showLoading('Removing report instance...');
+        if (typeof window.showLoading === 'function') window.showLoading('Removing report from session...');
         try {
+            const sessionDateToken = String(document.getElementById('sessionDate')?.value || sessionDefaultDate || '').trim();
             const res = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/report-instances/${encodeURIComponent(id)}/delete`, {
                 method: 'POST',
                 headers: {
@@ -7716,13 +7720,20 @@ document.addEventListener('DOMContentLoaded', () => {
                     Accept: 'application/json'
                 },
                 credentials: 'same-origin',
-                body: JSON.stringify({ actionStateId })
+                body: JSON.stringify({
+                    actionStateId,
+                    sessionDate: sessionDateToken,
+                    assignmentId,
+                    assignmentRowId,
+                    studentId
+                })
             });
             const result = await res.json().catch(() => ({}));
             if (!res.ok || result.status === 'error') throw new Error(result.message || 'Could not remove report instance.');
             const token = String(result.actionStateId || '').trim();
             if (token) actionStateId = token;
             await refreshSessionReportInstances();
+            await showStudentCaseMessage('Report Removed', result.message || 'Report removed from this session.', 'success');
         } catch (error) {
             await showStudentCaseMessage('Remove Failed', error.message || 'Could not remove report instance.', 'error');
         } finally {
@@ -7803,7 +7814,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const statusToken = String(row.status || '').trim().toLowerCase();
                 const instanceId = String(row.id || '').trim();
                 const removeBtn = sessionCanRemoveReportInstances && instanceId && statusToken !== 'locked'
-                    ? `<button type="button" class="btn btn-sm btn-outline-danger js-delete-session-report-instance" data-instance-id="${scEscapeHtml(row.id)}" data-student-name="${scEscapeHtml(row.studentName || 'this student')}" data-report-title="${scEscapeHtml(row.templateTitle || 'this report')}" title="Remove report instance"><i class="bi bi-trash"></i><span class="visually-hidden">Remove</span></button>`
+                    ? `<button type="button" class="btn btn-sm btn-outline-danger js-delete-session-report-instance" data-instance-id="${scEscapeHtml(row.id)}" data-assignment-id="${scEscapeHtml(row.assignmentId || '')}" data-assignment-row-id="${scEscapeHtml(row.assignmentRowId || '')}" data-student-id="${scEscapeHtml(row.studentId || '')}" data-student-name="${scEscapeHtml(row.studentName || 'this student')}" data-report-title="${scEscapeHtml(row.templateTitle || 'this report')}" title="Remove report from session"><i class="bi bi-trash"></i><span class="visually-hidden">Remove</span></button>`
                     : '';
                 return `
                     <tr data-report-instance-id="${scEscapeHtml(row.id)}">
@@ -7826,7 +7837,11 @@ document.addEventListener('DOMContentLoaded', () => {
         if (btn) btn.disabled = true;
         if (typeof window.showLoading === 'function') window.showLoading('Refreshing report instances...');
         try {
-            const res = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/report-instances`, {
+            const sessionDateToken = String(document.getElementById('sessionDate')?.value || sessionDefaultDate || '').trim();
+            const querySuffix = sessionDateToken
+                ? `?sessionDate=${encodeURIComponent(sessionDateToken)}`
+                : '';
+            const res = await fetch(`/school/classes/${encodeURIComponent(String(sessionManagerClassId))}/sessions/${encodeURIComponent(String(sessionManagerSessionId))}/report-instances${querySuffix}`, {
                 headers: { 'x-ajax-request': 'true', 'Accept': 'application/json' }
             });
             const result = await res.json().catch(() => ({}));
@@ -8054,7 +8069,10 @@ document.addEventListener('DOMContentLoaded', () => {
         event.preventDefault();
         deleteSessionReportInstance(deleteBtn.dataset.instanceId, {
             studentName: deleteBtn.dataset.studentName,
-            reportTitle: deleteBtn.dataset.reportTitle
+            reportTitle: deleteBtn.dataset.reportTitle,
+            assignmentId: deleteBtn.dataset.assignmentId,
+            assignmentRowId: deleteBtn.dataset.assignmentRowId,
+            studentId: deleteBtn.dataset.studentId
         }).catch((error) => {
             showStudentCaseMessage('Remove Failed', error.message, 'error');
         });
@@ -8065,7 +8083,10 @@ document.addEventListener('DOMContentLoaded', () => {
             event.preventDefault();
             deleteSessionReportInstance(deleteBtn.dataset.instanceId, {
                 studentName: deleteBtn.dataset.studentName,
-                reportTitle: deleteBtn.dataset.reportTitle
+                reportTitle: deleteBtn.dataset.reportTitle,
+                assignmentId: deleteBtn.dataset.assignmentId,
+                assignmentRowId: deleteBtn.dataset.assignmentRowId,
+                studentId: deleteBtn.dataset.studentId
             }).catch((error) => {
                 showStudentCaseMessage('Remove Failed', error.message, 'error');
             });
