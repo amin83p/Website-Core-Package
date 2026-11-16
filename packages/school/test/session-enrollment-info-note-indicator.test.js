@@ -31,6 +31,24 @@ test('session manager supports enrollment finish alert button styling', () => {
   assert.match(viewSource, /btn-danger text-white enrollment-info-trigger-alert/);
 });
 
+test('session manager highlights enrollment info button for continuation with green broadcast', () => {
+  assert.match(viewSource, /enrollment-info-trigger-continuing/);
+  assert.match(viewSource, /enrollment-info-trigger--broadcast/);
+  assert.match(viewSource, /enrollment-info-trigger-rings/);
+});
+
+test('session manager uses dual red-green styling when finishing and continuation overlap', () => {
+  assert.match(viewSource, /enrollment-info-trigger-dual/);
+  assert.match(viewSource, /enrollmentFinishAlertActive && hasUpcomingEnrollmentPeriods/);
+});
+
+test('session manager wires upcoming enrollment in info modal', () => {
+  assert.match(viewSource, /data-enrollment-upcoming-periods/);
+  assert.match(viewSource, /id="attendanceEnrollmentInfoUpcomingSection"/);
+  assert.match(viewSource, /function renderEnrollmentUpcomingPeriods/);
+  assert.match(viewSource, /Continuing in this class/);
+});
+
 test('enrollment info modal shows current CLB only', () => {
   const block = viewSource.slice(
     viewSource.indexOf('function renderEnrollmentClbGrid'),

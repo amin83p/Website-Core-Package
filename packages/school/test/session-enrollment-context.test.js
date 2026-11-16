@@ -153,6 +153,173 @@ test('buildRosterEnrollmentContextBatch exposes closing and closed-on dates', as
   assert.equal(context.enrollmentClosedOnDate, '2026-10-08');
 });
 
+test('listRelatedEnrollmentsForSession includes linked extension and excludes current period', () => {
+  const current = {
+    id: 'ENR_CUR',
+    classId: 'CLS_1',
+    orgId: 'ORG_1',
+    studentId: 'STU_1',
+    status: 'active',
+    startDate: '2026-01-01',
+    endDate: '2026-06-30',
+    enrollmentExtensions: [{ extensionPeriodId: 'ENR_EXT', extensionKind: 'additional_sessions' }]
+  };
+  const periodRows = [
+    current,
+    {
+      id: 'ENR_EXT',
+      classId: 'CLS_1',
+      orgId: 'ORG_1',
+      studentId: 'STU_1',
+      enrollmentKind: 'extension',
+      extensionOfPeriodId: 'ENR_CUR',
+      status: 'active',
+      startDate: '2026-04-01',
+      endDate: '2026-10-01',
+      targetSessionCount: 4,
+      reasonStart: 'Extension (Additional 4 sessions): Student continuing'
+    }
+  ];
+  const students = [{ id: 'STU_1', personId: 'PER_1' }];
+  const studentToPersonMap = new Map([['STU_1', 'PER_1']]);
+  const rows = sessionEnrollmentContextService.listRelatedEnrollmentsForSession({
+    personId: 'PER_1',
+    currentPeriodId: 'ENR_CUR',
+    currentPeriod: current,
+    session: { date: '2026-03-15', sessionId: 'SES_1' },
+    classData: { id: 'CLS_1' },
+    periodRows,
+    studentToPersonMap,
+    sessions: [],
+    statusMap: {},
+    activeOrgId: 'ORG_1'
+  });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].periodId, 'ENR_EXT');
+  assert.equal(rows[0].typeLabel, 'Extension');
+});
+
+test('listRelatedEnrollmentsForSession includes future standard enrollment as new enrollment', () => {
+  const current = {
+    id: 'ENR_CUR',
+    classId: 'CLS_1',
+    orgId: 'ORG_1',
+    studentId: 'STU_1',
+    status: 'active',
+    startDate: '2026-01-01',
+    endDate: '2026-03-31'
+  };
+  const periodRows = [
+    current,
+    {
+      id: 'ENR_NEXT',
+      classId: 'CLS_1',
+      orgId: 'ORG_1',
+      studentId: 'STU_1',
+      enrollmentKind: 'standard',
+      status: 'planned',
+      startDate: '2026-04-15',
+      endDate: '2026-12-31'
+    }
+  ];
+  const studentToPersonMap = new Map([['STU_1', 'PER_1']]);
+  const rows = sessionEnrollmentContextService.listRelatedEnrollmentsForSession({
+    personId: 'PER_1',
+    currentPeriodId: 'ENR_CUR',
+    currentPeriod: current,
+    session: { date: '2026-03-15' },
+    classData: { id: 'CLS_1' },
+    periodRows,
+    studentToPersonMap,
+    sessions: [],
+    statusMap: {},
+    activeOrgId: 'ORG_1'
+  });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].periodId, 'ENR_NEXT');
+  assert.equal(rows[0].typeLabel, 'New enrollment');
+  assert.equal(rows[0].status, 'planned');
+});
+
+test('listRelatedEnrollmentsForSession excludes overlapping period that covers session', () => {
+  const current = {
+    id: 'ENR_CUR',
+    classId: 'CLS_1',
+    orgId: 'ORG_1',
+    studentId: 'STU_1',
+    status: 'active',
+    startDate: '2026-01-01',
+    endDate: '2026-06-30'
+  };
+  const periodRows = [
+    current,
+    {
+      id: 'ENR_OTHER',
+      classId: 'CLS_1',
+      orgId: 'ORG_1',
+      studentId: 'STU_1',
+      status: 'active',
+      startDate: '2026-03-01',
+      endDate: '2026-12-31'
+    }
+  ];
+  const studentToPersonMap = new Map([['STU_1', 'PER_1']]);
+  const rows = sessionEnrollmentContextService.listRelatedEnrollmentsForSession({
+    personId: 'PER_1',
+    currentPeriodId: 'ENR_CUR',
+    currentPeriod: current,
+    session: { date: '2026-03-15' },
+    classData: { id: 'CLS_1' },
+    periodRows,
+    studentToPersonMap,
+    sessions: [],
+    statusMap: {},
+    activeOrgId: 'ORG_1'
+  });
+  assert.equal(rows.length, 0);
+});
+
+test('buildRosterEnrollmentContextBatch attaches upcoming periods for rolling classes', async () => {
+  const map = await sessionEnrollmentContextService.buildRosterEnrollmentContextBatch({
+    personIds: ['PER_1'],
+    session: { date: '2026-03-15' },
+    classData: { registrationMode: 'rolling', id: 'CLS_1', orgId: 'ORG_1' },
+    periodRows: [
+      {
+        id: 'ENR_1',
+        classId: 'CLS_1',
+        orgId: 'ORG_1',
+        studentId: 'STU_1',
+        status: 'active',
+        startDate: '2026-01-01',
+        endDate: '2026-03-31',
+        enrollmentExtensions: [{ extensionPeriodId: 'ENR_2', extensionKind: 'additional_sessions' }]
+      },
+      {
+        id: 'ENR_2',
+        classId: 'CLS_1',
+        orgId: 'ORG_1',
+        studentId: 'STU_1',
+        enrollmentKind: 'extension',
+        extensionOfPeriodId: 'ENR_1',
+        status: 'active',
+        startDate: '2026-04-01',
+        endDate: '2026-08-01',
+        targetSessionCount: 6
+      }
+    ],
+    students: [{ id: 'STU_1', personId: 'PER_1' }],
+    sessions: [],
+    reqUser: { activeOrgId: 'ORG_1' },
+    registrationMode: 'rolling'
+  });
+  const context = map.get('PER_1');
+  assert.ok(context);
+  assert.ok(Array.isArray(context.enrollmentUpcomingPeriods));
+  assert.equal(context.enrollmentUpcomingPeriods.length, 1);
+  assert.equal(context.enrollmentUpcomingPeriods[0].periodId, 'ENR_2');
+});
+
 test('buildRosterEnrollmentContextBatch attaches CLB for term classes without enrollment fields', async () => {
   const map = await sessionEnrollmentContextService.buildRosterEnrollmentContextBatch({
     personIds: ['PER_1'],
@@ -179,4 +346,5 @@ test('buildRosterEnrollmentContextBatch attaches CLB for term classes without en
   assert.equal(context.enrollmentPeriodId, '');
   assert.equal(context.enrollmentNotes, '');
   assert.equal(context.enrollmentClbCurrent.listening, '2');
+  assert.deepEqual(context.enrollmentUpcomingPeriods, []);
 });

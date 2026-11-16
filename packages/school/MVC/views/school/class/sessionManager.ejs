@@ -392,6 +392,11 @@
         flex-direction: column;
         gap: 1rem;
     }
+    .enrollment-info-modal-body > .enrollment-info-section,
+    .enrollment-info-modal-body > .enrollment-info-student-banner,
+    .enrollment-info-modal-body > .enrollment-info-alert-banner {
+        flex-shrink: 0;
+    }
     .enrollment-info-student-banner {
         display: flex;
         align-items: center;
@@ -423,7 +428,51 @@
         border: 1px solid #e9ecef;
         border-radius: 10px;
         background: #fff;
-        overflow: hidden;
+        overflow: visible;
+    }
+    .enrollment-info-alert-banner {
+        border-radius: 10px;
+        border: 1px solid #f1aeb5;
+        background: linear-gradient(135deg, #fff8f8 0%, #fff1f2 100%);
+        padding: 0.65rem 0.75rem;
+        margin-bottom: 0 !important;
+    }
+    .enrollment-info-alert-banner .enrollment-info-alert-icon {
+        color: #dc3545;
+        font-size: 1.05rem;
+        margin-top: 0.1rem;
+        flex-shrink: 0;
+    }
+    .enrollment-info-alert-title {
+        font-size: 0.88rem;
+        font-weight: 700;
+        color: #842029;
+        line-height: 1.25;
+    }
+    .enrollment-info-alert-chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        margin-top: 0.45rem;
+    }
+    .enrollment-info-alert-chip {
+        display: inline-flex;
+        align-items: center;
+        font-size: 0.72rem;
+        font-weight: 600;
+        line-height: 1.2;
+        padding: 0.2rem 0.45rem;
+        border-radius: 999px;
+        border: 1px solid #f1aeb5;
+        background: #fff;
+        color: #b02a37;
+    }
+    .enrollment-info-section-body--compact {
+        padding-top: 0.5rem;
+        padding-bottom: 0.65rem;
+    }
+    .enrollment-info-section-body--flush {
+        padding: 0;
     }
     .enrollment-info-section-header {
         display: flex;
@@ -534,6 +583,119 @@
         font-weight: 500;
         color: #6c757d;
         font-size: 0.92rem;
+    }
+    .enrollment-info-upcoming-list {
+        display: flex;
+        flex-direction: column;
+        gap: 0.65rem;
+        padding: 0.75rem 0.85rem;
+    }
+    .enrollment-info-upcoming-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
+        padding: 0.65rem 0.75rem;
+        background: #f8fafc;
+    }
+    .enrollment-info-upcoming-card-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.45rem;
+        margin-bottom: 0.35rem;
+    }
+    .enrollment-info-upcoming-type {
+        font-size: 0.72rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.03em;
+    }
+    .enrollment-info-upcoming-dates {
+        font-size: 0.88rem;
+        font-weight: 600;
+        color: #1f2a37;
+    }
+    .enrollment-info-upcoming-meta {
+        font-size: 0.78rem;
+        color: #6c757d;
+        margin-bottom: 0.2rem;
+    }
+    .enrollment-info-upcoming-reason {
+        font-size: 0.78rem;
+        color: #495057;
+        margin-top: 0.35rem;
+        margin-bottom: 0;
+    }
+    .enrollment-info-trigger--broadcast {
+        position: relative;
+        isolation: isolate;
+        overflow: visible;
+        z-index: 0;
+    }
+    .enrollment-info-trigger--broadcast > i.bi {
+        position: relative;
+        z-index: 2;
+        line-height: 1;
+    }
+    .enrollment-info-trigger-rings {
+        position: absolute;
+        inset: -3px;
+        pointer-events: none;
+        z-index: 1;
+        display: none;
+    }
+    .enrollment-info-trigger-rings span {
+        position: absolute;
+        inset: 0;
+        border: 2px solid rgba(25, 135, 84, 0.55);
+        border-radius: 50%;
+        opacity: 0;
+        animation: enrollment-info-broadcast 2.4s ease-out infinite;
+    }
+    .enrollment-info-trigger-rings span:nth-child(2) {
+        animation-delay: 0.8s;
+    }
+    .enrollment-info-trigger-rings span:nth-child(3) {
+        animation-delay: 1.6s;
+    }
+    .enrollment-info-trigger--broadcast .enrollment-info-trigger-rings {
+        display: block;
+    }
+    @keyframes enrollment-info-broadcast {
+        0% {
+            transform: scale(0.55);
+            opacity: 0.75;
+        }
+        70% {
+            opacity: 0.2;
+        }
+        100% {
+            transform: scale(1.85);
+            opacity: 0;
+        }
+    }
+    .enrollment-info-trigger-continuing {
+        color: #fff;
+        background: linear-gradient(145deg, #198754 0%, #157347 100%);
+        border-color: #146c43;
+    }
+    .enrollment-info-trigger-continuing .enrollment-info-trigger-rings span {
+        border-color: rgba(25, 135, 84, 0.65);
+    }
+    .enrollment-info-trigger-alert.enrollment-info-trigger--broadcast .enrollment-info-trigger-rings span {
+        border-color: rgba(220, 53, 69, 0.65);
+    }
+    .enrollment-info-trigger-dual {
+        color: #fff;
+        border-color: #495057;
+        background: linear-gradient(135deg, #dc3545 0%, #dc3545 46%, #198754 54%, #198754 100%);
+        box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+    }
+    .enrollment-info-trigger-dual .enrollment-info-trigger-rings span:nth-child(1),
+    .enrollment-info-trigger-dual .enrollment-info-trigger-rings span:nth-child(3) {
+        border-color: rgba(220, 53, 69, 0.7);
+    }
+    .enrollment-info-trigger-dual .enrollment-info-trigger-rings span:nth-child(2) {
+        border-color: rgba(25, 135, 84, 0.7);
     }
     .enrollment-info-section-note .enrollment-info-section-body {
         padding-top: 0.65rem;
@@ -3053,16 +3215,27 @@
                                                     <% const hasEnrollmentNote = String(student.enrollmentNotes || '').trim().length > 0; %>
                                                     <% const enrollmentFinishAlertActive = student.enrollmentFinishAlertActive === true; %>
                                                     <% const enrollmentAlertDetailsJson = encodeURIComponent(JSON.stringify(Array.isArray(student.enrollmentFinishAlertDetails) ? student.enrollmentFinishAlertDetails : [])); %>
+                                                    <% const enrollmentUpcomingPeriodsJson = encodeURIComponent(JSON.stringify(Array.isArray(student.enrollmentUpcomingPeriods) ? student.enrollmentUpcomingPeriods : [])); %>
+                                                    <% const hasUpcomingEnrollmentPeriods = Array.isArray(student.enrollmentUpcomingPeriods) && student.enrollmentUpcomingPeriods.length > 0; %>
                                                     <% let enrollmentInfoBtnClass = 'btn-outline-secondary'; %>
-                                                    <% if (enrollmentFinishAlertActive) { %>
-                                                        <% enrollmentInfoBtnClass = 'btn-danger text-white enrollment-info-trigger-alert'; %>
-                                                    <% } else if (hasEnrollmentNote) { %>
-                                                        <% enrollmentInfoBtnClass = 'btn-warning text-dark enrollment-info-trigger-has-note'; %>
-                                                    <% } %>
+                                                    <% let enrollmentInfoBtnTitle = 'Enrollment info'; %>
+                                                    <% if (enrollmentFinishAlertActive && hasUpcomingEnrollmentPeriods) {
+                                                        enrollmentInfoBtnClass = 'enrollment-info-trigger-dual enrollment-info-trigger--broadcast text-white';
+                                                        enrollmentInfoBtnTitle = 'Enrollment nearing finish; continuation scheduled';
+                                                    } else if (enrollmentFinishAlertActive) {
+                                                        enrollmentInfoBtnClass = 'btn-danger text-white enrollment-info-trigger-alert enrollment-info-trigger--broadcast';
+                                                        enrollmentInfoBtnTitle = 'Enrollment nearing finish (see info)';
+                                                    } else if (hasUpcomingEnrollmentPeriods) {
+                                                        enrollmentInfoBtnClass = 'enrollment-info-trigger-continuing enrollment-info-trigger--broadcast text-white';
+                                                        enrollmentInfoBtnTitle = 'Enrollment info (continuation scheduled)';
+                                                    } else if (hasEnrollmentNote) {
+                                                        enrollmentInfoBtnClass = 'btn-warning text-dark enrollment-info-trigger-has-note';
+                                                        enrollmentInfoBtnTitle = 'Enrollment info (note on file)';
+                                                    } %>
                                                     <button type="button"
                                                             class="btn btn-sm py-0 px-1 js-enrollment-info-trigger <%= enrollmentInfoBtnClass %>"
-                                                            title="<%= enrollmentFinishAlertActive ? 'Enrollment nearing finish (see info)' : (hasEnrollmentNote ? 'Enrollment info (note on file)' : 'Enrollment info') %>"
-                                                            aria-label="<%= enrollmentFinishAlertActive ? 'Enrollment nearing finish for ' : (hasEnrollmentNote ? 'Enrollment info (note on file) for ' : 'Enrollment info for ') %><%= student.name %>"
+                                                            title="<%= enrollmentInfoBtnTitle %>"
+                                                            aria-label="<%= enrollmentInfoBtnTitle %> for <%= student.name %>"
                                                             data-enrollment-period-id="<%= student.enrollmentPeriodId || '' %>"
                                                             data-enrollment-finish-date="<%= student.enrollmentExpectedFinishDate || '' %>"
                                                             data-enrollment-closing-date="<%= student.enrollmentClosingDate || '' %>"
@@ -3072,8 +3245,10 @@
                                                             data-enrollment-clb-current="<%= encodeURIComponent(JSON.stringify(student.enrollmentClbCurrent || {})) %>"
                                                             data-enrollment-clb-goal="<%= encodeURIComponent(JSON.stringify(student.enrollmentClbGoal || {})) %>"
                                                             data-enrollment-alert-active="<%= enrollmentFinishAlertActive ? 'true' : 'false' %>"
-                                                            data-enrollment-alert-details="<%= enrollmentAlertDetailsJson %>">
-                                                        <i class="bi <%= (enrollmentFinishAlertActive || hasEnrollmentNote) ? 'bi-info-circle-fill' : 'bi-info-circle' %>"></i>
+                                                            data-enrollment-alert-details="<%= enrollmentAlertDetailsJson %>"
+                                                            data-enrollment-upcoming-periods="<%= enrollmentUpcomingPeriodsJson %>">
+                                                        <span class="enrollment-info-trigger-rings" aria-hidden="true"><span></span><span></span><span></span></span>
+                                                        <i class="bi <%= (enrollmentFinishAlertActive || hasUpcomingEnrollmentPeriods || hasEnrollmentNote) ? 'bi-info-circle-fill' : 'bi-info-circle' %>"></i>
                                                     </button>
                                                     <button type="button"
                                                             class="btn btn-sm btn-details <%= hasDetails ? 'btn-warning text-dark' : 'btn-outline-secondary' %>"
@@ -3862,8 +4037,13 @@
             </div>
             <div class="modal-body enrollment-info-modal-body">
                 <div class="alert alert-danger d-none enrollment-info-alert-banner mb-3" id="attendanceEnrollmentInfoAlert" role="alert">
-                    <div class="fw-semibold" id="attendanceEnrollmentInfoAlertMessage"></div>
-                    <ul class="mb-0 mt-2 small ps-3" id="attendanceEnrollmentInfoAlertDetails"></ul>
+                    <div class="d-flex align-items-start gap-2">
+                        <i class="bi bi-exclamation-circle-fill enrollment-info-alert-icon" aria-hidden="true"></i>
+                        <div class="flex-grow-1 min-w-0">
+                            <div class="enrollment-info-alert-title" id="attendanceEnrollmentInfoAlertMessage"></div>
+                            <div class="enrollment-info-alert-chips" id="attendanceEnrollmentInfoAlertDetails"></div>
+                        </div>
+                    </div>
                 </div>
                 <div class="enrollment-info-student-banner">
                     <i class="bi bi-person-badge" aria-hidden="true"></i>
@@ -3889,12 +4069,27 @@
                         <i class="bi bi-calendar-check" aria-hidden="true"></i>
                         <span>Enrollment closing date</span>
                     </div>
-                    <div class="enrollment-info-finish-value" id="attendanceEnrollmentInfoFinishDate">
-                        <i class="bi bi-calendar-event" aria-hidden="true"></i>
-                        <span id="attendanceEnrollmentInfoFinishDateText">—</span>
+                    <div class="enrollment-info-section-body enrollment-info-section-body--compact">
+                        <div class="enrollment-info-finish-value py-0 px-0" id="attendanceEnrollmentInfoFinishDate">
+                            <i class="bi bi-calendar-event" aria-hidden="true"></i>
+                            <span id="attendanceEnrollmentInfoFinishDateText">—</span>
+                        </div>
+                        <div class="small text-muted d-none" id="attendanceEnrollmentInfoClosedOnWrap">
+                            Closed on <span id="attendanceEnrollmentInfoClosedOnText">—</span>
+                        </div>
                     </div>
-                    <div class="small text-muted mt-1 d-none" id="attendanceEnrollmentInfoClosedOnWrap">
-                        Closed on <span id="attendanceEnrollmentInfoClosedOnText">—</span>
+                </section>
+
+                <section class="enrollment-info-section" id="attendanceEnrollmentInfoUpcomingSection" aria-labelledby="attendanceEnrollmentInfoUpcomingHeading">
+                    <div class="enrollment-info-section-header" id="attendanceEnrollmentInfoUpcomingHeading">
+                        <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+                        <span>Continuing in this class</span>
+                    </div>
+                    <div class="enrollment-info-section-body enrollment-info-section-body--flush">
+                        <div id="attendanceEnrollmentInfoUpcomingEmpty" class="enrollment-info-finish-value is-muted small text-muted">
+                            No additional enrollments scheduled for this class.
+                        </div>
+                        <div id="attendanceEnrollmentInfoUpcomingList" class="enrollment-info-upcoming-list d-none" role="list"></div>
                     </div>
                 </section>
 
@@ -5936,28 +6131,103 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
+    function parseEnrollmentUpcomingPeriodsAttr(value) {
+        if (!value) return [];
+        try {
+            const decoded = decodeURIComponent(String(value));
+            const parsed = JSON.parse(decoded);
+            return Array.isArray(parsed) ? parsed : [];
+        } catch (_) {
+            return [];
+        }
+    }
+
+    function formatEnrollmentPeriodStatusLabel(status) {
+        const token = String(status || 'active').trim().toLowerCase();
+        const labels = {
+            active: 'Active',
+            planned: 'Planned',
+            to_be_confirmed: 'To be confirmed',
+            waiting_list: 'Waiting list'
+        };
+        return labels[token] || token.replace(/_/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase());
+    }
+
+    function formatEnrollmentPeriodDateRange(row) {
+        const start = formatEnrollmentFinishDate(row?.startDate);
+        const endToken = String(row?.closingDate || row?.endDate || '').trim();
+        const end = endToken ? formatEnrollmentFinishDate(endToken) : '';
+        if (start === 'Not available' && !end) return 'Dates not set';
+        if (start !== 'Not available' && end && end !== 'Not available') return `${start} – ${end}`;
+        if (start !== 'Not available') return `${start} onward`;
+        return end;
+    }
+
+    function renderEnrollmentUpcomingPeriods(rows) {
+        const sectionEl = document.getElementById('attendanceEnrollmentInfoUpcomingSection');
+        const listEl = document.getElementById('attendanceEnrollmentInfoUpcomingList');
+        const emptyEl = document.getElementById('attendanceEnrollmentInfoUpcomingEmpty');
+        const items = Array.isArray(rows) ? rows : [];
+        if (!sectionEl || !listEl || !emptyEl) return;
+
+        if (!items.length) {
+            emptyEl.classList.remove('d-none');
+            listEl.classList.add('d-none');
+            listEl.innerHTML = '';
+            return;
+        }
+
+        emptyEl.classList.add('d-none');
+        listEl.classList.remove('d-none');
+        listEl.innerHTML = items.map((row) => {
+            const typeLabel = conductEscapeHtml(String(row?.typeLabel || 'Enrollment'));
+            const statusLabel = conductEscapeHtml(formatEnrollmentPeriodStatusLabel(row?.status));
+            const dateRange = conductEscapeHtml(formatEnrollmentPeriodDateRange(row));
+            const summary = String(row?.summaryLine || '').trim();
+            const reason = String(row?.reasonSnippet || '').trim();
+            const badgeClass = String(row?.enrollmentKind || '').toLowerCase() === 'extension' ? 'text-success' : 'text-primary';
+            const summaryHtml = summary
+                ? `<div class="enrollment-info-upcoming-meta">${conductEscapeHtml(summary)}</div>`
+                : '';
+            const reasonHtml = reason
+                ? `<p class="enrollment-info-upcoming-reason">${conductEscapeHtml(reason)}</p>`
+                : '';
+            return `<div class="enrollment-info-upcoming-card" role="listitem">
+                <div class="enrollment-info-upcoming-card-header">
+                    <span class="enrollment-info-upcoming-type ${badgeClass}">${typeLabel}</span>
+                    <span class="badge bg-light text-dark border text-capitalize">${statusLabel}</span>
+                </div>
+                <div class="enrollment-info-upcoming-dates">${dateRange}</div>
+                ${summaryHtml}
+                ${reasonHtml}
+            </div>`;
+        }).join('');
+    }
+
+    function formatEnrollmentAlertHeadline(message) {
+        const token = String(message || '').trim();
+        if (!token) return 'Enrollment ending soon';
+        if (/about to finish|nearing|finish soon/i.test(token)) return 'Enrollment ending soon';
+        if (token.length > 48) return `${token.slice(0, 46).trim()}…`;
+        return token;
+    }
+
     function formatEnrollmentAlertDetailLine(detail) {
         const row = detail && typeof detail === 'object' ? detail : {};
         const reason = String(row.reason || '').trim();
         if (reason === 'days') {
             const days = Number(row.daysUntilFinish);
             const threshold = Number(row.threshold);
-            const finishDate = formatEnrollmentFinishDate(row.finishDate);
-            if (!Number.isFinite(days)) return 'Enrollment closing date threshold met.';
-            const dayLabel = Math.abs(days) === 1 ? 'day' : 'days';
-            if (days < 0) {
-                return `Enrollment closing date (${finishDate}) was ${Math.abs(days)} ${dayLabel} before this session (threshold: ${threshold} ${dayLabel}).`;
-            }
-            if (days === 0) {
-                return `Enrollment closing date is this session date (threshold: within ${threshold} ${dayLabel}).`;
-            }
-            return `Enrollment closing date is ${days} ${dayLabel} after this session (threshold: within ${threshold} ${dayLabel}).`;
+            if (!Number.isFinite(days)) return 'Closing date in alert window';
+            if (days < 0) return `${Math.abs(days)}d before session · ${threshold}d window`;
+            if (days === 0) return `Closes this session · ${threshold}d window`;
+            return `+${days}d after session · ${threshold}d window`;
         }
         if (reason === 'sessions') {
-            return `Remaining sessions: ${row.remainingSessionCount} (threshold: ${row.threshold} or fewer).`;
+            return `${row.remainingSessionCount} sessions left · ≤${row.threshold}`;
         }
         if (reason === 'hours') {
-            return `Remaining hours: ${row.remainingHours} (threshold: ${row.threshold} or fewer).`;
+            return `${row.remainingHours}h left · ≤${row.threshold}h`;
         }
         return '';
     }
@@ -5965,10 +6235,26 @@ document.addEventListener('DOMContentLoaded', () => {
     function syncEnrollmentInfoTriggerStyle(trigger, notes) {
         if (!trigger) return;
         const alertActive = String(trigger.dataset.enrollmentAlertActive || '').trim() === 'true';
+        const hasUpcoming = parseEnrollmentUpcomingPeriodsAttr(trigger.dataset.enrollmentUpcomingPeriods).length > 0;
         const hasNote = Boolean(String(notes ?? trigger.dataset.enrollmentNotes ?? '').trim());
-        trigger.classList.remove('btn-outline-secondary', 'btn-warning', 'text-dark', 'enrollment-info-trigger-has-note', 'btn-danger', 'text-white', 'enrollment-info-trigger-alert');
-        if (alertActive) {
-            trigger.classList.add('btn-danger', 'text-white', 'enrollment-info-trigger-alert');
+        trigger.classList.remove(
+            'btn-outline-secondary',
+            'btn-warning',
+            'text-dark',
+            'text-white',
+            'enrollment-info-trigger-has-note',
+            'btn-danger',
+            'enrollment-info-trigger-alert',
+            'enrollment-info-trigger-continuing',
+            'enrollment-info-trigger-dual',
+            'enrollment-info-trigger--broadcast'
+        );
+        if (alertActive && hasUpcoming) {
+            trigger.classList.add('enrollment-info-trigger-dual', 'enrollment-info-trigger--broadcast', 'text-white');
+        } else if (alertActive) {
+            trigger.classList.add('btn-danger', 'text-white', 'enrollment-info-trigger-alert', 'enrollment-info-trigger--broadcast');
+        } else if (hasUpcoming) {
+            trigger.classList.add('enrollment-info-trigger-continuing', 'enrollment-info-trigger--broadcast', 'text-white');
         } else if (hasNote) {
             trigger.classList.add('btn-warning', 'text-dark', 'enrollment-info-trigger-has-note');
         } else {
@@ -5976,13 +6262,16 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         const icon = trigger.querySelector('i.bi');
         if (icon) {
-            icon.classList.toggle('bi-info-circle-fill', alertActive || hasNote);
-            icon.classList.toggle('bi-info-circle', !(alertActive || hasNote));
+            const filled = alertActive || hasUpcoming || hasNote;
+            icon.classList.toggle('bi-info-circle-fill', filled);
+            icon.classList.toggle('bi-info-circle', !filled);
         }
         const row = trigger.closest('.roster-row');
         const studentName = String(row?.dataset?.studentName || row?.getAttribute('data-student-name') || 'Student').trim() || 'Student';
         let title = 'Enrollment info';
-        if (alertActive) title = 'Enrollment nearing finish (see info)';
+        if (alertActive && hasUpcoming) title = 'Enrollment nearing finish; continuation scheduled';
+        else if (alertActive) title = 'Enrollment nearing finish (see info)';
+        else if (hasUpcoming) title = 'Enrollment info (continuation scheduled)';
         else if (hasNote) title = 'Enrollment info (note on file)';
         trigger.title = title;
         trigger.setAttribute('aria-label', `${title} for ${studentName}`);
@@ -6008,6 +6297,7 @@ document.addEventListener('DOMContentLoaded', () => {
             clbGoal: parseEnrollmentInfoJsonAttr(trigger.dataset.enrollmentClbGoal),
             alertActive: String(trigger.dataset.enrollmentAlertActive || '').trim() === 'true',
             alertDetails: parseEnrollmentAlertDetailsAttr(trigger.dataset.enrollmentAlertDetails),
+            upcomingPeriods: parseEnrollmentUpcomingPeriodsAttr(trigger.dataset.enrollmentUpcomingPeriods),
             trigger
         };
     }
@@ -6063,17 +6353,21 @@ document.addEventListener('DOMContentLoaded', () => {
             notesEl.disabled = Boolean(<%= attendanceReadOnly ? 'true' : 'false' %>);
         }
         if (periodEl) periodEl.value = payload.periodId;
+        renderEnrollmentUpcomingPeriods(payload.upcomingPeriods);
         if (alertBannerEl && alertMessageEl && alertDetailsEl) {
             const policyMessage = String(window.__enrollmentFinishAlertMessage__ || '').trim();
             if (payload.alertActive) {
-                alertMessageEl.textContent = policyMessage || 'This enrollment is nearing its expected finish based on your organization settings.';
+                alertMessageEl.textContent = formatEnrollmentAlertHeadline(
+                    policyMessage || 'This enrollment is nearing its expected finish based on your organization settings.'
+                );
                 alertDetailsEl.innerHTML = '';
                 (Array.isArray(payload.alertDetails) ? payload.alertDetails : []).forEach((detail) => {
                     const line = formatEnrollmentAlertDetailLine(detail);
                     if (!line) return;
-                    const li = document.createElement('li');
-                    li.textContent = line;
-                    alertDetailsEl.appendChild(li);
+                    const chip = document.createElement('span');
+                    chip.className = 'enrollment-info-alert-chip';
+                    chip.textContent = line;
+                    alertDetailsEl.appendChild(chip);
                 });
                 alertBannerEl.classList.remove('d-none');
             } else {

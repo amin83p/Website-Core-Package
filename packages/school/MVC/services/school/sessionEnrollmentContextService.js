@@ -48,6 +48,11 @@ function findStudentByPersonId(students = [], personId = '') {
 const readLastCloseSnapshot = classEnrollmentSessionApplicabilityService.readLastCloseSnapshot;
 const resolveScheduledClosingDate = classEnrollmentSessionApplicabilityService.resolveScheduledClosingDate;
 const isScheduledEnrollmentClose = classEnrollmentSessionApplicabilityService.isScheduledEnrollmentClose;
+const periodCoversSession = classEnrollmentSessionApplicabilityService.periodCoversSession;
+const resolveStudentPersonId = classEnrollmentSessionApplicabilityService.resolveStudentPersonId;
+
+const UPCOMING_OPEN_STATUSES = new Set(['active', 'planned', 'to_be_confirmed', 'waiting_list']);
+const UPCOMING_EXCLUDED_STATUSES = new Set(['completed', 'cancelled', 'error', 'voided']);
 
 function closedOnDateFromPeriod(period = {}) {
   const snap = readLastCloseSnapshot(period);
@@ -107,8 +112,181 @@ function emptyEnrollmentContext() {
     enrollmentRemainingHours: null,
     enrollmentFinishAlertActive: false,
     enrollmentFinishAlertReasons: [],
-    enrollmentFinishAlertDetails: []
+    enrollmentFinishAlertDetails: [],
+    enrollmentUpcomingPeriods: []
   };
+}
+
+function getSessionDateOnly(session = {}) {
+  const token = String(session?.date || session?.sessionDate || '').trim();
+  return normalizeDateOnly(token);
+}
+
+function isPeriodLinkedAsExtension(period = {}, currentPeriod = {}) {
+  const currentId = toPublicId(currentPeriod?.id);
+  const periodId = toPublicId(period?.id);
+  if (!currentId || !periodId) return false;
+  if (idsEqual(period?.extensionOfPeriodId, currentId)) return true;
+  const extensions = Array.isArray(currentPeriod?.enrollmentExtensions) ? currentPeriod.enrollmentExtensions : [];
+  return extensions.some((row) => idsEqual(row?.extensionPeriodId, periodId));
+}
+
+function enrollmentTypeLabel(period = {}, linkedExtension = false) {
+  const kind = String(period?.enrollmentKind || 'standard').trim().toLowerCase();
+  if (linkedExtension || kind === 'extension') return 'Extension';
+  return 'New enrollment';
+}
+
+function buildUpcomingSummaryLine({
+  remainingSessionCount = null,
+  remainingHours = null,
+  targetSessionCount = 0,
+  targetHours = 0,
+  expectedFinishDate = ''
+} = {}) {
+  const parts = [];
+  if (Number.isFinite(remainingSessionCount) && remainingSessionCount !== null) {
+    const n = Number(remainingSessionCount);
+    parts.push(`${n} session${n === 1 ? '' : 's'} remaining`);
+  } else if (targetSessionCount > 0) {
+    parts.push(`${targetSessionCount} session target`);
+  }
+  if (Number.isFinite(remainingHours) && remainingHours !== null) {
+    const h = Number(remainingHours);
+    parts.push(`${h} hour${h === 1 ? '' : 's'} remaining`);
+  } else if (targetHours > 0) {
+    parts.push(`${targetHours} hour target`);
+  }
+  const finish = normalizeDateOnly(expectedFinishDate);
+  if (finish) parts.push(`ends ~${finish}`);
+  return parts.join(' · ');
+}
+
+function mapPeriodToUpcomingDto({
+  period = {},
+  enrichedPeriod = null,
+  currentPeriod = {},
+  sessions = [],
+  statusMap = {}
+} = {}) {
+  const periodId = toPublicId(period?.id);
+  const enriched = enrichedPeriod || period;
+  const linked = isPeriodLinkedAsExtension(period, currentPeriod);
+  const targetSessionCount = classEnrollmentSessionApplicabilityService.normalizeTargetSessionCount(period?.targetSessionCount);
+  const targetHours = classEnrollmentSessionApplicabilityService.normalizeTargetHours(period?.targetHours);
+  const expectedFinishDate = resolveExpectedFinishDate({
+    period,
+    sessions,
+    statusMap,
+    enrichedPeriodRow: enriched
+  });
+  const remainingSessionCount = enriched?.remainingSessionCount ?? null;
+  const remainingHours = enriched?.remainingHours ?? null;
+  const startDate = normalizeDateOnly(period?.startDate);
+  const endDate = normalizeDateOnly(period?.endDate);
+  const closingDate = isScheduledEnrollmentClose(period)
+    ? resolveScheduledClosingDate(period)
+    : endDate;
+  const reasonSnippet = String(period?.reasonStart || period?.notes || '').trim().slice(0, 280);
+  return {
+    periodId,
+    enrollmentKind: String(period?.enrollmentKind || 'standard').trim().toLowerCase() || 'standard',
+    typeLabel: enrollmentTypeLabel(period, linked),
+    status: String(period?.status || 'active').trim().toLowerCase(),
+    startDate,
+    endDate,
+    closingDate,
+    targetSessionCount,
+    targetHours,
+    remainingSessionCount,
+    remainingHours,
+    expectedFinishDate,
+    summaryLine: buildUpcomingSummaryLine({
+      remainingSessionCount,
+      remainingHours,
+      targetSessionCount,
+      targetHours,
+      expectedFinishDate
+    }),
+    reasonSnippet
+  };
+}
+
+function isRelatedEnrollmentCandidate({
+  period = {},
+  currentPeriod = {},
+  session = {},
+  personId = '',
+  studentToPersonMap = new Map(),
+  classId = '',
+  activeOrgId = ''
+} = {}) {
+  const periodId = toPublicId(period?.id);
+  const currentPeriodId = toPublicId(currentPeriod?.id);
+  if (!periodId || !currentPeriodId || idsEqual(periodId, currentPeriodId)) return false;
+  if (classId && period?.classId && !idsEqual(period.classId, classId)) return false;
+  if (activeOrgId && period?.orgId && !idsEqual(period.orgId, activeOrgId)) return false;
+  const status = String(period?.status || '').trim().toLowerCase();
+  if (UPCOMING_EXCLUDED_STATUSES.has(status)) return false;
+  const targetPersonId = cleanPersonId(personId);
+  if (!targetPersonId) return false;
+  if (!idsEqual(resolveStudentPersonId(period, studentToPersonMap), targetPersonId)) return false;
+
+  if (isPeriodLinkedAsExtension(period, currentPeriod)) return true;
+
+  if (!UPCOMING_OPEN_STATUSES.has(status)) return false;
+  const sessionDate = getSessionDateOnly(session);
+  const startDate = normalizeDateOnly(period?.startDate);
+  if (!startDate || !sessionDate) return false;
+  if (startDate < sessionDate) return false;
+  if (periodCoversSession(period, session, { honorCompletion: true })) return false;
+  return true;
+}
+
+function listRelatedEnrollmentsForSession({
+  personId = '',
+  currentPeriodId = '',
+  currentPeriod = null,
+  session = {},
+  classData = {},
+  periodRows = [],
+  studentToPersonMap = new Map(),
+  sessions = [],
+  statusMap = {},
+  progressByPeriodId = new Map(),
+  activeOrgId = ''
+} = {}) {
+  const currentId = toPublicId(currentPeriodId);
+  const classId = toPublicId(classData?.id);
+  const current = currentPeriod
+    || (Array.isArray(periodRows) ? periodRows : []).find((row) => idsEqual(row?.id, currentId))
+    || null;
+  if (!currentId || !current) return [];
+
+  const candidates = (Array.isArray(periodRows) ? periodRows : [])
+    .filter((period) => isRelatedEnrollmentCandidate({
+      period,
+      currentPeriod: current,
+      session,
+      personId,
+      studentToPersonMap,
+      classId,
+      activeOrgId
+    }))
+    .map((period) => {
+      const periodId = toPublicId(period?.id);
+      const enriched = progressByPeriodId.get(periodId) || period;
+      return mapPeriodToUpcomingDto({
+        period,
+        enrichedPeriod: enriched,
+        currentPeriod: current,
+        sessions,
+        statusMap
+      });
+    })
+    .sort((a, b) => String(a.startDate || '').localeCompare(String(b.startDate || '')));
+
+  return candidates;
 }
 
 async function buildRosterEnrollmentContextBatch({
@@ -152,6 +330,7 @@ async function buildRosterEnrollmentContextBatch({
   const progressByPeriodId = new Map();
 
   const relevantPeriodIds = new Set();
+  const currentPeriodIdByPerson = new Map();
   people.forEach((personId) => {
     const window = classEnrollmentSessionApplicabilityService.resolveRollingEnrollmentWindowForPerson({
       periodRows,
@@ -161,7 +340,31 @@ async function buildRosterEnrollmentContextBatch({
       activeOrgId,
       allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES
     });
-    if (window?.periodId) relevantPeriodIds.add(window.periodId);
+    const periodToken = toPublicId(window?.periodId);
+    if (periodToken) {
+      relevantPeriodIds.add(periodToken);
+      currentPeriodIdByPerson.set(personId, periodToken);
+    }
+  });
+
+  currentPeriodIdByPerson.forEach((currentPeriodId, personId) => {
+    const currentPeriod = (Array.isArray(periodRows) ? periodRows : []).find((row) => idsEqual(row?.id, currentPeriodId)) || null;
+    const upcomingRows = listRelatedEnrollmentsForSession({
+      personId,
+      currentPeriodId,
+      currentPeriod,
+      session,
+      classData,
+      periodRows,
+      studentToPersonMap,
+      sessions,
+      statusMap,
+      progressByPeriodId: new Map(),
+      activeOrgId
+    });
+    upcomingRows.forEach((row) => {
+      if (row?.periodId) relevantPeriodIds.add(row.periodId);
+    });
   });
 
   const relevantPeriods = (Array.isArray(periodRows) ? periodRows : [])
@@ -221,6 +424,19 @@ async function buildRosterEnrollmentContextBatch({
     });
     const closingDate = resolveScheduledClosingDate(period);
     const closedOnDate = closedOnDateFromPeriod(period);
+    const enrollmentUpcomingPeriods = listRelatedEnrollmentsForSession({
+      personId,
+      currentPeriodId: periodId,
+      currentPeriod: period,
+      session,
+      classData,
+      periodRows,
+      studentToPersonMap,
+      sessions,
+      statusMap,
+      progressByPeriodId,
+      activeOrgId
+    });
     map.set(personId, {
       ...clbContext,
       enrollmentPeriodId: periodId,
@@ -232,7 +448,8 @@ async function buildRosterEnrollmentContextBatch({
       enrollmentRemainingHours: remainingHours,
       enrollmentFinishAlertActive: alertEvaluation.active === true,
       enrollmentFinishAlertReasons: Array.isArray(alertEvaluation.reasons) ? alertEvaluation.reasons : [],
-      enrollmentFinishAlertDetails: Array.isArray(alertEvaluation.details) ? alertEvaluation.details : []
+      enrollmentFinishAlertDetails: Array.isArray(alertEvaluation.details) ? alertEvaluation.details : [],
+      enrollmentUpcomingPeriods
     });
   });
 
@@ -281,6 +498,7 @@ module.exports = {
   readLastCloseSnapshot,
   buildRosterEnrollmentContextForPerson,
   buildRosterEnrollmentContextBatch,
+  listRelatedEnrollmentsForSession,
   updateEnrollmentPeriodNotes,
   sanitizeEnrollmentNotes,
   emptyEnrollmentContext
