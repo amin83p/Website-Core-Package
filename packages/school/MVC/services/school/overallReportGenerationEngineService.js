@@ -327,31 +327,46 @@ async function generateSourceBatch(request = {}, reqUser) {
   const warnings = [];
 
   const results = await runWithConcurrency(sourceRuns, concurrency, async (run) => {
-    const engineResult = await reportGenerationEngineService.generateReportOutput({
-      templateId: run.templateId,
-      classId: run.classId,
-      teacherId: run.teacherId,
-      reportStartDate: run.reportStartDate,
-      reportDueDate: run.reportDueDate,
-      reportScope: run.reportScope,
-      targetStudentIds: run.targetStudentIds,
-      sessionId: run.sessionId,
-      sessionDate: run.sessionDate,
-      dueDate: run.dueDate,
-      taskStartTime: run.taskStartTime,
-      taskEndTime: run.taskEndTime,
-      sharedAnswers: run.sharedAnswers,
-      assignmentId: run.assignmentId,
-      assignmentRowId: run.assignmentRowId,
-      studentIds: globalStudentIds,
-      format: run.format || 'json',
-      docxMode: run.docxMode,
-      docxKey: run.docxKey,
-      pdfKey: run.pdfKey,
-      exportBatchCache
-    }, {}, reqUser);
-
-    (engineResult.warnings || []).forEach((warning) => warnings.push(warning));
+    const segmentRuns = Array.isArray(run.segments) && run.segments.length > 1 ? run.segments : [run];
+    const engineResults = [];
+    for (const segment of segmentRuns) {
+      // eslint-disable-next-line no-await-in-loop
+      const engineResult = await reportGenerationEngineService.generateReportOutput({
+        templateId: segment.templateId || run.templateId,
+        classId: segment.classId,
+        teacherId: segment.teacherId || run.teacherId,
+        reportStartDate: segment.reportStartDate,
+        reportDueDate: segment.reportDueDate,
+        reportScope: segment.reportScope || run.reportScope,
+        targetStudentIds: segment.targetStudentIds || run.targetStudentIds,
+        sessionId: run.sessionId,
+        sessionDate: run.sessionDate,
+        dueDate: run.dueDate,
+        taskStartTime: run.taskStartTime,
+        taskEndTime: run.taskEndTime,
+        sharedAnswers: run.sharedAnswers,
+        assignmentId: run.assignmentId,
+        assignmentRowId: run.assignmentRowId,
+        studentIds: globalStudentIds,
+        format: run.format || 'json',
+        docxMode: run.docxMode,
+        docxKey: run.docxKey,
+        pdfKey: run.pdfKey,
+        exportBatchCache
+      }, {}, reqUser);
+      (engineResult.warnings || []).forEach((warning) => warnings.push(warning));
+      require('./studentAttendanceReportOverallFeedService').blankPlaceholderDaysOutside(
+        engineResult,
+        request?.filterStartDate,
+        request?.filterEndDate,
+        segment.reportStartDate,
+        segment.reportDueDate
+      );
+      engineResults.push(engineResult);
+    }
+    const engineResult = engineResults.length > 1
+      ? require('./studentAttendanceReportOverallFeedService').mergeEngineResults(engineResults)
+      : engineResults[0];
 
     return {
       slotKey: clean(run.slotKey).toUpperCase(),

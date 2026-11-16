@@ -18,6 +18,7 @@ const { requireCoreModule } = require('./schoolCoreContracts');
 const sarExportTimingService = require('./sarExportTimingService');
 const sarExportConfigService = require('./sarExportConfigService');
 const studentAttendanceReportClassOrderService = require('./studentAttendanceReportClassOrderService');
+const studentAttendanceReportOverallFeedService = require('./studentAttendanceReportOverallFeedService');
 const { runWithConcurrency } = require('../../utils/asyncPool');
 const fs = require('fs');
 const path = require('path');
@@ -100,55 +101,21 @@ function buildSourceRunsForStudent({
   }
 
   const slots = sortOverallSlots(overallTemplate);
-  const sourceRuns = [];
-
   if (slots.length) {
-    slots.forEach((slot, index) => {
-      const classRow = classes[index];
-      const optional = isOptionalSlot(slot);
-      const classTemplateId = clean(policy.reportTemplateId);
-      const slotTemplateId = clean(slot.templateId) || classTemplateId;
-      if (!classRow) {
-        if (!optional) {
-          warnings.push(`No class available for overall slot ${slot.slotKey || index + 1} (${student.name || personId}).`);
-        }
-        return;
-      }
-      const classId = clean(classRow.classId);
-      if (slotTemplateId && classTemplateId && slotTemplateId !== classTemplateId) {
-        if (!optional) {
-          warnings.push(`Class ${classRow.className || classId} uses template ${classTemplateId}, but slot ${slot.slotKey || index + 1} requires ${slotTemplateId}.`);
-        }
-        return;
-      }
-      if (selectedSet && !selectedSet.has(classId)) {
-        if (!optional) {
-          warnings.push(`Class ${classRow.className || classId} is not selected for overall slot ${slot.slotKey || index + 1}.`);
-        }
-        return;
-      }
-      const teacherId = resolveTeacherIdForClass(classRow);
-      if (!teacherId) {
-        if (!optional) {
-          warnings.push(`Class ${classRow.className || classRow.classId} has no teacher for slot ${slot.slotKey || index + 1}.`);
-        }
-        return;
-      }
-      sourceRuns.push({
-        slotKey: clean(slot.slotKey).toUpperCase(),
-        templateId: classTemplateId || slotTemplateId,
-        classId,
-        teacherId,
-        reportStartDate: startDate,
-        reportDueDate: endDate,
-        reportScope: 'selected_students',
-        targetStudentIds: [personId],
-        format: 'json'
-      });
+    const templateId = clean(policy.reportTemplateId);
+    const fed = studentAttendanceReportOverallFeedService.buildOverallSlotRuns({
+      classes,
+      slots,
+      startDate,
+      endDate,
+      personId,
+      templateId,
+      selectedClassIds: selectedSet
     });
-    return { sourceRuns, warnings };
+    return { sourceRuns: fed.sourceRuns, warnings: warnings.concat(fed.warnings) };
   }
 
+  const sourceRuns = [];
   classes.forEach((classRow) => {
     const classId = clean(classRow.classId);
     if (selectedSet && !selectedSet.has(classId)) return;
@@ -336,6 +303,22 @@ function collectTargetClassIds(targets = []) {
   return set;
 }
 
+async function attachEnrollmentWindowsToStudents(students = [], startDate = '', endDate = '', reqUser = null) {
+  const prepared = [];
+  for (const student of students) {
+    // eslint-disable-next-line no-await-in-loop
+    const classes = await studentAttendanceReportOverallFeedService.attachEnrollmentWindows(
+      student.classes,
+      student,
+      startDate,
+      endDate,
+      reqUser
+    );
+    prepared.push({ ...student, classes });
+  }
+  return prepared;
+}
+
 async function loadGenerationContext(req, options = {}) {
   const activeOrgId = clean(req.user?.activeOrgId);
   if (!activeOrgId) {
@@ -384,7 +367,7 @@ async function loadGenerationContext(req, options = {}) {
     overallTemplates,
     overallTemplateMap,
     payload,
-    students,
+    students: await attachEnrollmentWindowsToStudents(students, payload.startDate, payload.endDate, req.user),
     startDate: payload.startDate,
     endDate: payload.endDate
   };
@@ -1244,9 +1227,10 @@ async function exportStudentAttendanceReportSelections(req, options = {}) {
 
   const exportTimer = sarExportTimingService.createTimer('sar.exportStudentAttendanceReportSelections');
   const exportBatchCache = reportExportBatchCacheService.createExportBatchCache();
+  const includesOverall = targets.some((target) => clean(target?.type).toLowerCase() === 'overall');
   const ctx = await loadGenerationContext(req, {
     ...options,
-    skipAttendanceMatrix: options.skipAttendanceMatrix !== false,
+    skipAttendanceMatrix: includesOverall ? false : options.skipAttendanceMatrix !== false,
     targetClassIds: collectTargetClassIds(targets)
   });
   exportTimer.mark('loadGenerationContext', { targetCount: targets.length });
@@ -1383,6 +1367,36 @@ async function exportStudentAttendanceReportSelections(req, options = {}) {
   } finally {
     removeSarExportScratchDir(scratchDir);
   }
+}
+
+async function previewOverallClassSlots(req, personId = '') {
+  const ctx = await loadGenerationContext(req, { skipAttendanceMatrix: false });
+  const wanted = clean(personId);
+  const student = ctx.students.find((row) => clean(row.personId) === wanted || clean(row.studentRecordId) === wanted);
+  if (!student) {
+    const error = new Error('That student is not in the selected report.');
+    error.statusCode = 404;
+    throw error;
+  }
+  const template = ctx.overallTemplate;
+  if (!template) {
+    const error = new Error('No overall report template is configured.');
+    error.statusCode = 400;
+    throw error;
+  }
+  const { sourceRuns, warnings } = buildSourceRunsForStudent({
+    student,
+    policy: ctx.policy,
+    overallTemplate: template,
+    startDate: ctx.startDate,
+    endDate: ctx.endDate
+  });
+  return {
+    startDate: ctx.startDate,
+    endDate: ctx.endDate,
+    slots: studentAttendanceReportOverallFeedService.describeOverallClassSlots(sourceRuns, student.classes),
+    warnings
+  };
 }
 
 async function generateDocxForStudentWithoutOverall(student, policy, startDate, endDate, reqUser) {
@@ -1561,6 +1575,7 @@ module.exports = {
   enrichOverallExportOptionsForStudent,
   enrichClassExportRowsWithFunderSuggestions,
   buildStudentAttendanceReportExportPlan,
+  previewOverallClassSlots,
   exportClassTarget,
   buildDocxTemplateLoadPlan,
   exportStudentAttendanceReportSelections,

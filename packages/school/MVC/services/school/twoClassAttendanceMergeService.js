@@ -6,9 +6,19 @@ function normalizePresence(value) {
   return text;
 }
 
+function slotPresence(value) {
+  const marks = [...new Set(String(value ?? '')
+    .split(/[\n/]/)
+    .map((part) => part.trim().toUpperCase())
+    .filter((part) => part && part !== 'X'))];
+  if (!marks.length) return 'X';
+  if (marks.length === 1) return marks[0];
+  return marks.join('/');
+}
+
 function mergeTwoClassPresence(amPresence, pmPresence) {
-  const am = normalizePresence(amPresence);
-  const pm = normalizePresence(pmPresence);
+  const am = slotPresence(amPresence);
+  const pm = slotPresence(pmPresence);
   if (am === 'X' && pm === 'X') return 'X';
   if (am === pm) return am;
   return `${am}/${pm}`;
@@ -71,18 +81,36 @@ function isSourceSlotPopulated(slotBag) {
   return Object.values(slotBag).some((value) => String(value ?? '').trim() !== '');
 }
 
+function hasClassThatDay(presence) {
+  return slotPresence(presence) !== 'X';
+}
+
 function flexTwoClassPresence(amPresence, pmPresence, pmSlotActive) {
-  if (!pmSlotActive) return collapsePresence(normalizePresence(amPresence));
-  return mergeTwoClassPresence(amPresence, pmPresence);
+  if (!pmSlotActive) return slotPresence(amPresence);
+  const amActive = hasClassThatDay(amPresence);
+  const pmActive = hasClassThatDay(pmPresence);
+  if (amActive && pmActive) return mergeTwoClassPresence(amPresence, pmPresence);
+  if (pmActive) return slotPresence(pmPresence);
+  if (amActive) return slotPresence(amPresence);
+  return 'X';
+}
+
+function cleanAttendanceNote(note) {
+  return String(note ?? '').replace(/not in the report date range/ig, '').trim();
 }
 
 function flexTwoClassNote(amPresence, amNote, pmPresence, pmNote, pmSlotActive) {
   if (!pmSlotActive) {
     const am = normalizePresence(amPresence);
     if (am === 'X') return '';
-    return String(amNote ?? '').trim();
+    return cleanAttendanceNote(amNote);
   }
-  return mergeTwoClassNote(amPresence, amNote, pmPresence, pmNote);
+  const amActive = hasClassThatDay(amPresence);
+  const pmActive = hasClassThatDay(pmPresence);
+  if (amActive && pmActive) return mergeTwoClassNote(amPresence, cleanAttendanceNote(amNote), pmPresence, cleanAttendanceNote(pmNote));
+  if (pmActive) return cleanAttendanceNote(pmNote);
+  if (amActive) return cleanAttendanceNote(amNote);
+  return '';
 }
 
 module.exports = {

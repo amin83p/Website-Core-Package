@@ -1690,7 +1690,7 @@ function buildOverallAttendanceDayPrefill({ sessions, studentPersonId, statusMap
     out[`attendance_day_${suffix}`] = dayNo;
     if (!inReportRange) {
       out[`attendance_presence_${suffix}`] = 'X';
-      out[`attendance_note_${suffix}`] = 'Not in the report date range';
+      out[`attendance_note_${suffix}`] = '';
     } else if (!selectedEntry || selectedEntry.status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) {
       out[`attendance_presence_${suffix}`] = 'X';
       out[`attendance_note_${suffix}`] = 'No Class';

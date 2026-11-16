@@ -122,7 +122,7 @@ function buildOverallAttendanceFields() {
         id: `attendance_note_${suffix}`,
         label: `Note ${dayNo}`,
         prefillKey: `attendance_note_${suffix}`,
-        helpText: 'Present, Absent, Absent Camera Off, Late, Late Excused, Left Early, Left Early Excused, Late - Left Early (with excused variants), No Class, Not in the report date range, or Not Marked as applicable.'
+        helpText: 'Present, Absent, Absent Camera Off, Late, Late Excused, Left Early, Left Early Excused, Late - Left Early (with excused variants), No Class, or Not Marked as applicable. Days outside the report date range stay blank.'
       }),
       visualField(`__row_break_attendance_${suffix}`, `End Attendance Day ${dayNo}`, 'row_break')
     );

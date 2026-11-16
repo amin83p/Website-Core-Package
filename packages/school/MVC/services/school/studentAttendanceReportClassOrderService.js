@@ -42,6 +42,28 @@ function filterSessionsInDateWindow(sessions = [], startDate = '', endDate = '')
   });
 }
 
+function resolveDominantStartMinutes(sessions = []) {
+  const counts = new Map();
+  let total = 0;
+  (Array.isArray(sessions) ? sessions : []).forEach((session) => {
+    const minutes = parseTimeToMinutes(session?.startTime || session?.start);
+    if (minutes == null) return;
+    total += 1;
+    counts.set(minutes, (counts.get(minutes) || 0) + 1);
+  });
+  if (!total) return null;
+  let bestMinutes = null;
+  let bestCount = 0;
+  counts.forEach((count, minutes) => {
+    if (count > bestCount || (count === bestCount && (bestMinutes == null || minutes < bestMinutes))) {
+      bestMinutes = minutes;
+      bestCount = count;
+    }
+  });
+  if (bestCount / total >= 0.8) return bestMinutes;
+  return computeEarliestSessionStartMinutes(sessions);
+}
+
 function computeEarliestSessionStartMinutes(sessions = []) {
   let earliest = null;
   (Array.isArray(sessions) ? sessions : []).forEach((session) => {
@@ -158,13 +180,20 @@ function attachScheduleSortFields(classRow = {}, sessions = [], options = {}) {
   const scopedSessions = startDate || endDate
     ? filterSessionsInDateWindow(sessions, startDate, endDate)
     : (Array.isArray(sessions) ? sessions : []);
+  const dominantStartMinutes = resolveDominantStartMinutes(scopedSessions);
   const rollupRecords = Array.isArray(options.rollupRecords) ? options.rollupRecords : [];
+  if (dominantStartMinutes != null) {
+    row.dominantStartMinutes = dominantStartMinutes;
+    row.daypartRank = dominantStartMinutes < PM_DAYPART_MINUTES ? DAYPART_RANK.AM : DAYPART_RANK.PM;
+  } else {
+    delete row.dominantStartMinutes;
+    row.daypartRank = inferDaypartRankFromClassName(row.className);
+  }
   const earliest = rollupRecords.length
     ? computeEarliestSessionStartMinutesForStudent(scopedSessions, rollupRecords, row.className)
-    : computeEarliestSessionStartMinutes(scopedSessions);
+    : (dominantStartMinutes != null ? dominantStartMinutes : computeEarliestSessionStartMinutes(scopedSessions));
   if (earliest != null) row.earliestSessionStartMinutes = earliest;
   else delete row.earliestSessionStartMinutes;
-  row.daypartRank = inferDaypartRankFromClassName(row.className);
   return row;
 }
 
@@ -196,6 +225,7 @@ function sortStudentAttendanceReportClasses(classes = []) {
 
 module.exports = {
   DAYPART_RANK,
+  resolveDominantStartMinutes,
   computeEarliestSessionStartMinutes,
   computeEarliestSessionStartMinutesForStudent,
   inferDaypartRankFromClassName,

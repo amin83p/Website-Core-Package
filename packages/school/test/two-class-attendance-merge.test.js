@@ -43,6 +43,21 @@ test('isSourceSlotPopulated is true when anchor keys or any value is set', () =>
   assert.equal(twoClassAttendanceMergeService.isSourceSlotPopulated({ attendance_presence_01: 'Y' }), true);
 });
 
+test('flexTwoClassPresence collapses extra no-class marks in one slot', () => {
+  assert.equal(twoClassAttendanceMergeService.flexTwoClassPresence('Y\nX\nX\nX', 'X', true), 'Y');
+  assert.equal(twoClassAttendanceMergeService.flexTwoClassPresence('X/X', 'X/X', true), 'X');
+  assert.equal(twoClassAttendanceMergeService.flexTwoClassPresence('Y\nX', 'N\nX', true), 'Y/N');
+  assert.equal(twoClassAttendanceMergeService.flexTwoClassPresence('Y\nX', 'Y\nX', true), 'Y');
+  assert.equal(twoClassAttendanceMergeService.flexTwoClassPresence('N\nX', 'N', true), 'N');
+});
+
+test('flexTwoClassPresence uses one class when the other slot has no class that day', () => {
+  assert.equal(twoClassAttendanceMergeService.flexTwoClassPresence('Y', 'X', true), 'Y');
+  assert.equal(twoClassAttendanceMergeService.flexTwoClassPresence('X', 'Y', true), 'Y');
+  assert.equal(twoClassAttendanceMergeService.flexTwoClassNote('Y', 'On time', 'X', 'No Class', true), 'On time');
+  assert.equal(twoClassAttendanceMergeService.flexTwoClassNote('X', 'No Class', 'Y', 'On time', true), 'On time');
+});
+
 test('flexTwoClassPresence uses T1 only when pm slot is inactive', () => {
   assert.equal(twoClassAttendanceMergeService.flexTwoClassPresence('Y', '', false), 'Y');
   assert.equal(twoClassAttendanceMergeService.flexTwoClassPresence('Y', 'N', true), 'Y/N');

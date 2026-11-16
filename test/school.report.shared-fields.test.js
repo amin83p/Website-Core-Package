@@ -426,10 +426,10 @@ test('buildPrefillSnapshot uses attendance matrix percent and counts unmarked se
           assert.equal(snapshot.report_period_month_name, 'June');
           assert.equal(snapshot.attendance_day_01, 1);
           assert.equal(snapshot.attendance_presence_01, 'X');
-          assert.equal(snapshot.attendance_note_01, 'Not in the report date range');
+          assert.equal(snapshot.attendance_note_01, '');
           assert.equal(snapshot.attendance_day_15, 15);
           assert.equal(snapshot.attendance_presence_15, 'X');
-          assert.equal(snapshot.attendance_note_15, 'Not in the report date range');
+          assert.equal(snapshot.attendance_note_15, '');
           assert.equal(snapshot.attendance_day_16, 16);
           assert.equal(snapshot.attendance_presence_16, 'Y');
           assert.equal(snapshot.attendance_note_16, 'Present');
@@ -447,10 +447,10 @@ test('buildPrefillSnapshot uses attendance matrix percent and counts unmarked se
           assert.equal(snapshot.attendance_note_20, 'No Class');
           assert.equal(snapshot.attendance_day_21, 21);
           assert.equal(snapshot.attendance_presence_21, 'X');
-          assert.equal(snapshot.attendance_note_21, 'Not in the report date range');
+          assert.equal(snapshot.attendance_note_21, '');
           assert.equal(snapshot.attendance_day_31, 31);
           assert.equal(snapshot.attendance_presence_31, 'X');
-          assert.equal(snapshot.attendance_note_31, 'Not in the report date range');
+          assert.equal(snapshot.attendance_note_31, '');
         });
       });
     });

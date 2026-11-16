@@ -69,6 +69,11 @@ router.get('/report/api/report-plan',
   trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT, { keepActive: true }),
   ctrl.getStudentAttendanceReportExportPlan);
 
+router.post('/report/api/overall-slots',
+  requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.READ),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.READ, { keepActive: true }),
+  ctrl.getStudentAttendanceOverallSlots);
+
 router.post('/report/api/export',
   requireAccess(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT),
   trackActionState(SECTIONS.SCHOOL_ATTENDANCE_REPORT, OPERATIONS.EXPORT, { keepActive: true }),

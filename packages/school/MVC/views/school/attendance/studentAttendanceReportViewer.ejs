@@ -554,6 +554,20 @@
     </div>
 </div>
 
+<div class="modal fade" id="sarSlotCheckModal" tabindex="-1" aria-labelledby="sarSlotCheckModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="sarSlotCheckModalLabel">Overall class slots</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="sarSlotCheckBody">
+                <p class="text-muted mb-0">Loading the two class slots…</p>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div class="modal fade" id="sarExcelExportModal" tabindex="-1" aria-labelledby="sarExcelExportModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
@@ -1281,6 +1295,64 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
         mergeSelectedStudentsFromReportPayload(students);
         patchSarAttendanceCellsForHistoryMode();
     }
+
+    function formatSlotDateRange(startDate, endDate) {
+        const start = String(startDate || '').trim();
+        const end = String(endDate || '').trim();
+        if (!start) return '';
+        if (!end || end === start) return start;
+        return `${start} to ${end}`;
+    }
+
+    function renderSlotCheckBody(preview) {
+        const slots = Array.isArray(preview?.slots) ? preview.slots : [];
+        if (!slots.length) return '<p class="text-muted mb-0">No class slots were built for this student.</p>';
+        return slots.map((slot) => {
+            const segments = Array.isArray(slot.segments) ? slot.segments : [];
+            const rows = segments.length
+                ? segments.map((segment) => `<li><span class="fw-semibold">${escapeHtml(segment.className || segment.classId)}</span> <span class="text-muted">${escapeHtml(formatSlotDateRange(segment.startDate, segment.endDate))}</span></li>`).join('')
+                : '<li class="text-muted">No class</li>';
+            return `<div class="mb-3"><div class="fw-semibold">${escapeHtml(slot.label || slot.slotKey)}</div><ul class="mb-0">${rows}</ul></div>`;
+        }).join('') + '<p class="small text-muted mb-0">N/A and days with no session are skipped. The first class with a status fills slot 1. A second class with a status fills slot 2.</p>';
+    }
+
+    document.addEventListener('click', async (event) => {
+        const button = event.target.closest('.js-sar-slot-check');
+        if (!button) return;
+        event.preventDefault();
+        event.stopPropagation();
+        const personId = String(button.getAttribute('data-person-id') || '').trim();
+        const payload = sarLastReportPayload;
+        const body = document.getElementById('sarSlotCheckBody');
+        const modalEl = document.getElementById('sarSlotCheckModal');
+        if (!personId || !payload || !body || !modalEl) return;
+        body.innerHTML = '<p class="text-muted mb-0">Loading the two class slots…</p>';
+        window.bootstrap?.Modal?.getOrCreateInstance(modalEl)?.show();
+        try {
+            const response = await fetch('/school/attendances/report/api/overall-slots', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    Accept: 'application/json',
+                    'X-AJAX-Request': 'true'
+                },
+                body: new URLSearchParams({
+                    startDate: payload.startDate || '',
+                    endDate: payload.endDate || '',
+                    personId,
+                    studentIds: personId
+                }).toString()
+            });
+            const result = await response.json().catch(() => null);
+            if (!response.ok || result?.status !== 'success') {
+                throw new Error(result?.message || 'Could not build the class slots.');
+            }
+            body.innerHTML = renderSlotCheckBody(result.preview);
+        } catch (error) {
+            body.innerHTML = `<p class="text-danger mb-0">${escapeHtml(error?.message || 'Could not build the class slots.')}</p>`;
+        }
+    });
 
     function showSarReportWaiting(options = {}) {
         const studentCount = Number(options.studentCount) || 0;
@@ -2137,6 +2209,7 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
         const studentExcelExportBtn = canExportStudentMatrixExcel
             ? `<button type="button" class="btn btn-filled btn-success btn-sm flex-shrink-0 js-sar-student-excel-export" data-person-id="${escapeHtml(personId)}" title="Export attendance matrix Excel for all classes"><i class="bi bi-cloud-download me-1"></i> Export</button>`
             : '';
+        const slotCheckBtn = `<button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0 js-sar-slot-check" data-person-id="${escapeHtml(personId)}" title="Show the two class slots fed to the overall report">Check</button>`;
         const weekBoundaryFlags = buildWeekBoundaryFlagsForDays(visibleDays);
 
         let classRows = '';
@@ -2210,6 +2283,7 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
                                 </div>
                             </div>
                         </button>
+                        ${slotCheckBtn}
                         ${studentExcelExportBtn}
                     </div>
                 </div>

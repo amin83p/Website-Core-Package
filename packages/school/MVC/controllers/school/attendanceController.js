@@ -1889,6 +1889,40 @@ async function getStudentAttendanceReportExportPlan(req, res) {
     }
 }
 
+async function getStudentAttendanceOverallSlots(req, res) {
+    try {
+        const reportAccess = await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip);
+        if (!reportAccess.canOpenReport) {
+            return res.status(403).json({
+                status: 'error',
+                message: 'You do not have permission to view this student attendance report.'
+            });
+        }
+        const body = req.body && typeof req.body === 'object' ? req.body : {};
+        const personId = String(body.personId || req.query?.personId || '').trim();
+        const studentIds = String(body.studentIds || personId || '').trim();
+        if (!personId) {
+            return res.status(400).json({ status: 'error', message: 'Select a student first.' });
+        }
+        const studentAttendanceReportGenerationService = require('../../services/school/studentAttendanceReportGenerationService');
+        const fauxReq = {
+            user: req.user,
+            query: {
+                startDate: body.startDate || req.query?.startDate,
+                endDate: body.endDate || req.query?.endDate,
+                studentIds
+            }
+        };
+        const preview = await studentAttendanceReportGenerationService.previewOverallClassSlots(fauxReq, personId);
+        return res.json({ status: 'success', preview });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({
+            status: 'error',
+            message: error.message || 'Could not build the class slots.'
+        });
+    }
+}
+
 async function exportStudentAttendanceReportExcel(req, res) {
     try {
         const reportAccess = await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip);
@@ -2326,6 +2360,7 @@ module.exports = {
     showStudentAttendanceReportPage,
     generateStudentAttendanceReport,
     getStudentAttendanceReportExportPlan,
+    getStudentAttendanceOverallSlots,
     exportStudentAttendanceReport,
     exportStudentAttendanceRenderBundle,
     exportStudentAttendanceRawSnapshot,
