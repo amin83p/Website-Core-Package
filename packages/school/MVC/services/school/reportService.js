@@ -938,6 +938,7 @@ function collectPeriodGradeColumns(periodSessions) {
         weight: gradebookWeightService.resolveActivityWeight(gb),
         includeInCalc: gb?.includeInGradeCalculation !== false,
         includeInGradeCalculation: gb?.includeInGradeCalculation !== false,
+        periodPerformanceLog: Boolean(gb?.periodPerformanceLog),
         scores: gb?.scores,
         skills
       });
@@ -1058,14 +1059,10 @@ function computeReportPeriodGradebookSkillStats(periodSessions, studentPersonId,
     roster.forEach((r) => {
       const pid = toPublicId(r?.personId);
       if (!pid) return;
-      const forceNotApplicable = sessionForcesNotApplicableAttendance(ses, effectiveStatusMap);
-      const att = forceNotApplicable ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE : rosterAttendanceLower(ses, pid);
-      const absent = attendanceMatrixMetricsService.isAbsentLikeStatus(att)
-        || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
-      const raw = absent ? null : getScoreFromScoresMap(col.scores, pid);
+      const resolved = resolveGradebookColumnScore(col, pid, effectiveStatusMap, periodSessions);
       const total = col.totalScore > 0 ? col.totalScore : 0;
-      if (!col.includeInCalc || absent || total <= 0) return;
-      const rawValue = raw != null ? Number(raw) : 0;
+      if (!col.includeInCalc || resolved.skip || total <= 0) return;
+      const rawValue = Number(resolved.score);
       const pct = Math.round((rawValue / total) * 1000) / 10;
       const skillShare = gradebookSkillShareCount(col);
       const earnedShare = rawValue / skillShare;
@@ -1135,6 +1132,12 @@ function computeReportPeriodGradebookSkillStats(periodSessions, studentPersonId,
   return { ...flatMap, skillRows };
 }
 
+function gradebookScoreBlockedByAttendance(col, att) {
+  if (Boolean(col?.periodPerformanceLog)) return false;
+  return attendanceMatrixMetricsService.isAbsentLikeStatus(att)
+    || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
+}
+
 function resolveGradebookColumnScore(col, personId, statusMap = null, periodSessions = null) {
   const ses = col?.session;
   const pid = toPublicId(personId);
@@ -1144,10 +1147,8 @@ function resolveGradebookColumnScore(col, personId, statusMap = null, periodSess
   const att = forceNotApplicable
     ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
     : rosterAttendanceLower(ses, pid);
-  const absent = attendanceMatrixMetricsService.isAbsentLikeStatus(att)
-    || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
   const total = Number(col.totalScore) > 0 ? Number(col.totalScore) : 0;
-  if (absent) {
+  if (gradebookScoreBlockedByAttendance(col, att)) {
     if (col.sourceKind === 'gradebook' && Array.isArray(periodSessions)) {
       const overlay = sessionGradebookMakeupService.resolveEffectiveGradebookScoreForStudent({
         allSessions: periodSessions,
@@ -1173,15 +1174,14 @@ function resolveGradebookColumnScoreForSkillAverage(col, personId, statusMap = n
   const ses = col?.session;
   const pid = toPublicId(personId);
   if (!ses || !pid) return { skip: true };
+  if (Boolean(col?.periodPerformanceLog)) return { skip: true };
   const effectiveStatusMap = statusMap instanceof Map ? statusMap : new Map();
   const forceNotApplicable = sessionForcesNotApplicableAttendance(ses, effectiveStatusMap);
   const att = forceNotApplicable
     ? attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE
     : rosterAttendanceLower(ses, pid);
-  const absent = attendanceMatrixMetricsService.isAbsentLikeStatus(att)
-    || att === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE;
   const total = Number(col.totalScore) > 0 ? Number(col.totalScore) : 0;
-  if (absent || total <= 0) return { skip: true };
+  if (!gradebookScoreBlockedByAttendance(col, att) || total <= 0) return { skip: true };
   const raw = getScoreFromScoresMap(col.scores, pid);
   if (raw != null) return { skip: true };
   return { skip: false, score: 0, totalScore: total };

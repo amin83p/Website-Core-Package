@@ -1,0 +1,345 @@
+<style>
+  .prefill-preview-modal .modal-header {
+    background: linear-gradient(135deg, #0b5ed7 0%, #0a58ca 100%);
+    color: #fff;
+    border-bottom: 0;
+    padding: 1rem 1.25rem;
+  }
+  .prefill-preview-modal .modal-header .btn-close {
+    filter: brightness(0) invert(1);
+  }
+  .prefill-preview-modal .modal-body {
+    background: #f4f7fb;
+    padding: 1.25rem;
+  }
+  .prefill-preview-summary {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 0.85rem 1rem;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    color: #475569;
+  }
+  .prefill-preview-summary strong {
+    color: #0b5ed7;
+  }
+  .prefill-preview-student-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    margin-bottom: 1rem;
+    overflow: hidden;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+  }
+  .prefill-preview-student-card__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding: 0.65rem 1rem;
+    background: #f8fafc;
+    border-bottom: 1px solid #e2e8f0;
+  }
+  .prefill-preview-student-card__name {
+    font-weight: 600;
+    color: #0f172a;
+    margin: 0;
+    font-size: 0.95rem;
+  }
+  .prefill-preview-change {
+    padding: 0.85rem 1rem;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .prefill-preview-change:last-child {
+    border-bottom: 0;
+  }
+  .prefill-preview-change__select {
+    display: flex;
+    gap: 0.75rem;
+    align-items: flex-start;
+    cursor: pointer;
+  }
+  .prefill-preview-change__select > span {
+    flex: 1;
+    min-width: 0;
+  }
+  .prefill-preview-change__title {
+    font-weight: 600;
+    color: #1e293b;
+    font-size: 0.9rem;
+    margin-bottom: 0.15rem;
+  }
+  .prefill-preview-change__meta {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+  .prefill-preview-field-block {
+    margin-top: 0.5rem;
+    padding: 0.55rem 0.65rem;
+    background: #f8fafc;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+  }
+  .prefill-preview-field-block + .prefill-preview-field-block {
+    margin-top: 0.4rem;
+  }
+  .prefill-preview-field-name {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #334155;
+    margin-bottom: 0.35rem;
+  }
+  .prefill-preview-value-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem 0.5rem;
+    font-size: 0.82rem;
+  }
+  .prefill-preview-value-pill {
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    padding: 0.2rem 0.5rem;
+    border-radius: 6px;
+    border: 1px solid transparent;
+    word-break: break-word;
+  }
+  .prefill-preview-value-pill--current {
+    background: #fff;
+    border-color: #cbd5e1;
+    color: #475569;
+  }
+  .prefill-preview-value-pill--new {
+    background: #ecfdf5;
+    border-color: #6ee7b7;
+    color: #047857;
+    font-weight: 600;
+  }
+  .prefill-preview-value-pill--stored {
+    background: #fff7ed;
+    border-color: #fdba74;
+    color: #9a3412;
+  }
+  .prefill-preview-value-pill--empty {
+    color: #94a3b8;
+    font-style: italic;
+    background: transparent;
+    border: 1px dashed #cbd5e1;
+  }
+  .prefill-preview-arrow {
+    color: #64748b;
+    font-size: 0.75rem;
+    flex-shrink: 0;
+  }
+  .prefill-preview-table-wrap .table {
+    margin-bottom: 0;
+    background: #fff;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+  }
+  .prefill-preview-table-wrap thead th {
+    background: #f1f5f9;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: #475569;
+    border-bottom: 1px solid #e2e8f0;
+    vertical-align: middle;
+  }
+  .prefill-preview-table-wrap tbody td {
+    vertical-align: top;
+    font-size: 0.875rem;
+  }
+  .prefill-preview-table-title {
+    font-weight: 600;
+    color: #1e293b;
+  }
+  .prefill-preview-table-sub {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    margin-top: 0.15rem;
+    word-break: break-all;
+  }
+</style>
+<script>
+  (function () {
+    function escapeHtml(value) {
+      return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+    }
+
+    function humanizePrefillKey(rawKey) {
+      const key = String(rawKey || '').trim();
+      if (!key || key.startsWith('__field__')) return '';
+      return key
+        .replace(/^_+/, '')
+        .split('_')
+        .filter(Boolean)
+        .map((part) => (part.length <= 3 ? part.toUpperCase() : part.charAt(0).toUpperCase() + part.slice(1).toLowerCase()))
+        .join(' ');
+    }
+
+    function resolveChangeTitle(change) {
+      const serverLabel = String(change?.prefillKeyLabel || '').trim();
+      if (serverLabel && serverLabel !== change?.prefillKey) return serverLabel;
+      const fieldLabels = (Array.isArray(change?.fields) ? change.fields : [])
+        .map((field) => String(field?.label || '').trim())
+        .filter(Boolean);
+      if (change?.expressionDriven || String(change?.prefillKey || '').startsWith('__field__')) {
+        return fieldLabels[0] || serverLabel || 'Calculated field';
+      }
+      if (fieldLabels.length) return fieldLabels.join(', ');
+      return serverLabel || humanizePrefillKey(change?.prefillKey) || 'Report data';
+    }
+
+    function formatPreviewValue(value) {
+      if (value === null || value === undefined || value === '') {
+        return '<span class="prefill-preview-value-pill prefill-preview-value-pill--empty">Empty</span>';
+      }
+      if (typeof value === 'boolean') {
+        return `<span class="prefill-preview-value-pill prefill-preview-value-pill--current">${value ? 'Yes' : 'No'}</span>`;
+      }
+      if (typeof value === 'object') {
+        const text = JSON.stringify(value);
+        const short = text.length > 120 ? `${text.slice(0, 117)}…` : text;
+        return `<span class="prefill-preview-value-pill prefill-preview-value-pill--current" title="${escapeHtml(text)}">${escapeHtml(short)}</span>`;
+      }
+      const text = String(value);
+      const short = text.length > 160 ? `${text.slice(0, 157)}…` : text;
+      return `<span class="prefill-preview-value-pill prefill-preview-value-pill--current" title="${escapeHtml(text)}">${escapeHtml(short)}</span>`;
+    }
+
+    function formatNewValue(value) {
+      const html = formatPreviewValue(value);
+      return html
+        .replace('prefill-preview-value-pill--current', 'prefill-preview-value-pill--new')
+        .replace('prefill-preview-value-pill--empty', 'prefill-preview-value-pill--new');
+    }
+
+    function formatStoredValue(value) {
+      const html = formatPreviewValue(value);
+      return html.replace('prefill-preview-value-pill--current', 'prefill-preview-value-pill--stored');
+    }
+
+    function renderFieldValueTransition(field, mode) {
+      const name = String(field?.label || field?.fieldId || 'Report field').trim();
+      if (mode === 'instance') {
+        return `
+          <div class="prefill-preview-field-block">
+            <div class="prefill-preview-field-name">${escapeHtml(name)}</div>
+            <div class="prefill-preview-value-row">
+              <span class="text-muted small">Report</span>
+              ${formatPreviewValue(field.currentValue)}
+              <span class="prefill-preview-arrow">→</span>
+              <span class="text-muted small">Stored</span>
+              ${formatStoredValue(field.oldValue)}
+              <span class="prefill-preview-arrow">→</span>
+              <span class="text-muted small">New</span>
+              ${formatNewValue(field.newValue)}
+            </div>
+          </div>
+        `;
+      }
+      return `
+        <div class="prefill-preview-field-block">
+          <div class="prefill-preview-field-name">${escapeHtml(name)}</div>
+          <div class="prefill-preview-value-row">
+            <span class="text-muted small">Current</span>
+            ${formatPreviewValue(field.currentValue)}
+            <span class="prefill-preview-arrow">→</span>
+            <span class="text-muted small">Updated</span>
+            ${formatNewValue(field.newValue)}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderMatrixStudentBlock(student, escapeFn) {
+      const esc = typeof escapeFn === 'function' ? escapeFn : escapeHtml;
+      const disabled = student.locked || student.pending || !student.changes?.length;
+      const status = student.pending ? 'Not started' : (student.locked ? 'Locked' : (student.status || 'Draft'));
+      const statusClass = student.locked ? 'bg-secondary' : (student.pending ? 'bg-warning text-dark' : 'bg-light text-secondary border');
+      const changes = (student.changes || []).map((change) => {
+        const title = resolveChangeTitle(change);
+        const keyMeta = change.prefillKey && !String(change.prefillKey).startsWith('__field__')
+          ? `<div class="prefill-preview-change__meta">${esc(change.prefillKey)}</div>`
+          : '';
+        const fieldsHtml = (change.fields || []).map((field) => renderFieldValueTransition(field, 'matrix')).join('');
+        return `
+          <div class="prefill-preview-change">
+            <label class="prefill-preview-change__select mb-0 w-100">
+              <input type="checkbox" class="form-check-input js-matrix-prefill-key mt-1" data-student-id="${esc(student.studentId)}" data-prefill-key="${esc(change.prefillKey)}" ${disabled ? 'disabled' : ''}>
+              <span class="flex-grow-1">
+                <div class="prefill-preview-change__title">${esc(title)}</div>
+                ${keyMeta}
+                ${fieldsHtml}
+              </span>
+            </label>
+          </div>
+        `;
+      }).join('');
+      return `
+        <div class="prefill-preview-student-card">
+          <div class="prefill-preview-student-card__head">
+            <p class="prefill-preview-student-card__name mb-0">${esc(student.studentName || student.studentId)}</p>
+            <span class="badge ${statusClass}">${esc(status)}</span>
+          </div>
+          <div class="prefill-preview-student-card__body">
+            ${changes || '<p class="text-muted small mb-0 px-3 py-2">No applicable updates.</p>'}
+          </div>
+        </div>
+      `;
+    }
+
+    function renderInstanceFieldColumn(fields, valueKey, formatter) {
+      const list = Array.isArray(fields) ? fields : [];
+      if (!list.length) return '<span class="text-muted">—</span>';
+      return list.map((field) => `
+        <div class="prefill-preview-field-block mb-2">
+          <div class="prefill-preview-field-name">${escapeHtml(field.label || field.fieldId || 'Report field')}</div>
+          <div class="prefill-preview-value-row">${formatter(field[valueKey])}</div>
+        </div>
+      `).join('');
+    }
+
+    function renderInstanceTableRows(changes) {
+      const list = Array.isArray(changes) ? changes : [];
+      if (!list.length) {
+        return '<tr><td colspan="5" class="text-center text-muted py-4">No prefill value changes were found.</td></tr>';
+      }
+      return list.map((change) => {
+        const title = resolveChangeTitle(change);
+        const keyLine = change.prefillKey && title !== change.prefillKey && !String(change.prefillKey).startsWith('__field__')
+          ? `<div class="prefill-preview-table-sub">${escapeHtml(change.prefillKey)}</div>`
+          : '';
+        const fields = Array.isArray(change.fields) ? change.fields : [];
+        return `
+          <tr>
+            <td class="text-center">
+              <input type="checkbox" class="form-check-input js-prefill-refresh-key" value="${escapeHtml(change.prefillKey)}" ${change.fields?.some((field) => field.skippedDueToOverride) ? '' : 'checked'}>
+            </td>
+            <td>
+              <div class="prefill-preview-table-title">${escapeHtml(title)}</div>
+              ${keyLine}
+            </td>
+            <td>${renderInstanceFieldColumn(fields, 'currentValue', formatPreviewValue)}</td>
+            <td>${renderInstanceFieldColumn(fields, 'oldValue', formatStoredValue)}</td>
+            <td>${renderInstanceFieldColumn(fields, 'newValue', formatNewValue)}</td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    window.ReportPrefillPreviewUi = {
+      escapeHtml,
+      humanizePrefillKey,
+      resolveChangeTitle,
+      formatPreviewValue,
+      renderMatrixStudentBlock,
+      renderInstanceTableRows
+    };
+  })();
+</script>

@@ -764,14 +764,27 @@
   </div>
 </div>
 
-<div class="modal fade" id="reportMatrixPrefillModal" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content">
-    <div class="modal-header"><h5 class="modal-title"><i class="bi bi-arrow-repeat me-2"></i>Preview Prefill Updates</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
-    <div class="modal-body"><div id="reportMatrixPrefillSummary" class="small text-muted mb-3">Loading...</div><div id="reportMatrixPrefillRows"></div></div>
-    <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-primary" id="btnApplyMatrixPrefill" disabled>Apply Selected Updates</button></div>
+<div class="modal fade prefill-preview-modal" id="reportMatrixPrefillModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content border-0 shadow">
+    <div class="modal-header">
+      <div>
+        <h5 class="modal-title mb-1"><i class="bi bi-arrow-repeat me-2"></i>Preview Prefill Updates</h5>
+        <p class="small mb-0 opacity-75">Review live data changes before updating student reports.</p>
+      </div>
+      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+    <div class="modal-body">
+      <div id="reportMatrixPrefillSummary" class="prefill-preview-summary">Loading…</div>
+      <div id="reportMatrixPrefillRows"></div>
+    </div>
+    <div class="modal-footer bg-white border-top">
+      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+      <button type="button" class="btn btn-primary" id="btnApplyMatrixPrefill" disabled><i class="bi bi-check2-circle me-1"></i>Apply selected updates</button>
+    </div>
   </div></div>
 </div>
 
+<%- include('partials/reportPrefillPreviewUi') %>
 <%- include('partials/calculatedFieldsRuntime') %>
 <%- include('partials/reportMessageHelpers') %>
 <script src="/scripts/reportAssignmentDelete.js"></script>
@@ -1659,20 +1672,17 @@
     function updatePrefillApplyState() { if (applyPrefillButton) applyPrefillButton.disabled = !prefillRowsEl?.querySelector('.js-matrix-prefill-key:checked'); }
     function renderPrefillPreview(result) {
       const students = Array.isArray(result?.students) ? result.students : [];
-      if (prefillSummaryEl) prefillSummaryEl.textContent = students.length ? (String(result.summary?.changed || 0) + ' student(s) have updates. Select individual prefill keys to apply.') : 'No student rows were found.';
+      const changed = Number(result.summary?.changed) || 0;
+      if (prefillSummaryEl) {
+        prefillSummaryEl.innerHTML = students.length
+          ? `<strong>${changed}</strong> of <strong>${students.length}</strong> student${students.length === 1 ? '' : 's'} have updates. Select the items you want to apply to each report.`
+          : 'No student rows were found for this matrix.';
+      }
       if (!prefillRowsEl) return;
-      prefillRowsEl.innerHTML = students.map((student) => {
-        const disabled = student.locked || student.pending || !student.changes?.length;
-        const status = student.pending ? 'pending (no stored snapshot)' : (student.locked ? 'locked' : student.status);
-        const changes = (student.changes || []).map((change) => {
-          const fieldLabels = (change.fields || []).map((field) => field.label || field.fieldId).filter(Boolean);
-          const changeTitle = (change.expressionDriven || String(change.prefillKey || '').startsWith('__field__'))
-            ? (fieldLabels.join(', ') || change.prefillKey)
-            : (change.prefillKey || fieldLabels.join(', ') || 'Prefill key');
-          return '<label class="d-flex gap-2 align-items-start border rounded p-2 mb-2"><input type="checkbox" class="form-check-input js-matrix-prefill-key mt-1" data-student-id="' + escapeHtml(student.studentId) + '" data-prefill-key="' + escapeHtml(change.prefillKey) + '" ' + (disabled ? 'disabled' : '') + '><span><strong>' + escapeHtml(changeTitle) + '</strong><br><span class="small text-muted">' + (change.fields || []).map((field) => escapeHtml(field.label) + ': ' + escapeHtml(field.currentValue) + ' → ' + escapeHtml(field.newValue)).join('<br>') + '</span></span></label>';
-        }).join('');
-        return '<div class="card mb-3"><div class="card-header py-2 d-flex justify-content-between"><strong>' + escapeHtml(student.studentName || student.studentId) + '</strong><span class="badge bg-light text-secondary border">' + escapeHtml(status) + '</span></div><div class="card-body py-2">' + (changes || '<span class="small text-muted">No applicable updates.</span>') + '</div></div>';
-      }).join('');
+      const ui = window.ReportPrefillPreviewUi;
+      prefillRowsEl.innerHTML = students.map((student) => (
+        ui?.renderMatrixStudentBlock ? ui.renderMatrixStudentBlock(student, escapeHtml) : ''
+      )).join('');
       prefillRowsEl.querySelectorAll('.js-matrix-prefill-key').forEach((item) => item.addEventListener('change', updatePrefillApplyState));
       updatePrefillApplyState();
     }

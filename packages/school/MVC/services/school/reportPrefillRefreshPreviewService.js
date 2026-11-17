@@ -225,10 +225,26 @@ async function buildPrefillRefreshPreview({ instance, template, assignment, reqU
   }
 
   const changes = Array.from(changesByKey.values())
-    .map((change) => ({
-      ...change,
-      fields: (change.fields || []).filter((field) => fieldDisplayWouldChange(field.fieldId))
-    }))
+    .map((change) => {
+      const fields = (change.fields || []).filter((field) => fieldDisplayWouldChange(field.fieldId));
+      let prefillKeyLabel = '';
+      if (change.expressionDriven) {
+        prefillKeyLabel = String(fields[0]?.label || '').trim() || 'Calculated field';
+      } else if (String(change.prefillKey || '').startsWith('__field__')) {
+        prefillKeyLabel = String(fields[0]?.label || fields[0]?.fieldId || '').trim();
+      } else {
+        prefillKeyLabel = reportService.resolveSnapshotKeyLabel(template, change.prefillKey);
+      }
+      if (!prefillKeyLabel) {
+        prefillKeyLabel = reportService.getPrefillCatalogLabel(change.prefillKey)
+          || String(change.prefillKey || '').trim();
+      }
+      return {
+        ...change,
+        prefillKeyLabel,
+        fields
+      };
+    })
     .filter((change) => change.fields.length > 0);
 
   return {
