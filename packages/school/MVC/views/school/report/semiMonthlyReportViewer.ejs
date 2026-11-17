@@ -231,6 +231,7 @@
     : '/dashboard/section-nav/SCHOOL_REPORTS';
   const manageBtns = [
     '<button type="button" id="btn_openReportByFunderModal" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-diagram-3 me-1"></i> Report By Funder</button>',
+    '<button type="button" id="btn_openReviewReportsModal" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-clipboard-check me-1"></i> Review Reports</button>',
     '<a href="/school/settings#school-semi-monthly-report" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-gear me-1"></i> Semi-Monthly Settings</a>'
   ];
   const smmrCanExport = typeof canExportReport !== 'undefined' && canExportReport;
@@ -356,6 +357,7 @@
 </div>
 
 <%- include('school/report/partials/reportByFunderModal', { funderPickerOptions: typeof funderPickerOptions !== 'undefined' ? funderPickerOptions : [] }) %>
+<%- include('school/report/partials/reviewReportsModal') %>
 
 <div class="modal fade" id="smmrExportModal" tabindex="-1" aria-labelledby="smmrExportModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
@@ -410,6 +412,7 @@
 <%- include('partials/reportMessageHelpers') %>
 
 <script src="/scripts/reportByFunderModal.js"></script>
+<script src="/scripts/reviewReportsModal.js"></script>
 <% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
 <script src="/scripts/enrollmentClaimToggle.js"></script>
 <% } %>
@@ -1797,6 +1800,23 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
       setDateRange,
       replaceSelectedStudents,
       loadReport: loadSemiMonthlyReport
+    });
+  }
+
+  if (typeof window.ReviewReportsModal !== 'undefined' && typeof window.ReviewReportsModal.init === 'function') {
+    window.ReviewReportsModal.init({
+      apiUrl: '/school/reports/semi-monthly/api/review-assignments',
+      escapeHtml,
+      showReportMessage,
+      getDefaultDateRange() {
+        const start = String(document.getElementById('filter_startDate')?.value || '').trim();
+        const end = String(document.getElementById('filter_endDate')?.value || '').trim();
+        if (start && end) return { start, end };
+        if (typeof window.ReportByFunderModal?.dateRangeApi?.defaultOpenDateRange === 'function') {
+          return window.ReportByFunderModal.dateRangeApi.defaultOpenDateRange();
+        }
+        return { start: '', end: '' };
+      }
     });
   }
 

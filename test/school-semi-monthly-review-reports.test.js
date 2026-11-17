@@ -1,0 +1,77 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const reviewService = require('../packages/school/MVC/services/school/schoolSemiMonthlyReportReviewService');
+const sessionReportInstanceService = require('../packages/school/MVC/services/school/sessionReportInstanceService');
+
+test('periodOverlaps and targetRowOverlapsDateRange respect inclusive ranges', () => {
+  assert.equal(reviewService.periodOverlaps('2026-03-01', '2026-03-15', '2026-03-10', '2026-03-31'), true);
+  assert.equal(reviewService.periodOverlaps('2026-03-01', '2026-03-15', '2026-03-16', '2026-03-31'), false);
+  assert.equal(reviewService.targetRowOverlapsDateRange({
+    reportStartDate: '2026-04-01',
+    reportDueDate: '2026-04-30'
+  }, '2026-04-10', '2026-04-20'), true);
+  assert.equal(reviewService.targetRowOverlapsDateRange({
+    sessionDate: '2026-05-01'
+  }, '2026-05-01', '2026-05-15'), true);
+});
+
+test('sortReviewRowsForTeacherSection orders by class then due date', () => {
+  const sorted = reviewService.sortReviewRowsForTeacherSection([
+    { className: 'Zeta', templateTitle: 'B', reportDueDate: '2026-03-20' },
+    { className: 'Alpha', templateTitle: 'A', reportDueDate: '2026-03-01' },
+    { className: 'Alpha', templateTitle: 'B', reportDueDate: '2026-03-15' }
+  ]);
+  assert.deepEqual(sorted.map((row) => row.className), ['Alpha', 'Alpha', 'Zeta']);
+  assert.equal(sorted[1].reportDueDate, '2026-03-15');
+});
+
+test('tallyInstanceProgress counts pending, draft, submitted, and locked', () => {
+  const progress = reviewService.tallyInstanceProgress([
+    { isPendingAssignment: true },
+    { status: 'draft' },
+    { status: 'submitted' },
+    { status: 'locked' }
+  ]);
+  assert.deepEqual(progress, { pending: 1, draft: 1, submitted: 1, locked: 1, total: 4 });
+  assert.match(reviewService.buildStatusSummary(progress), /not started/);
+  assert.match(reviewService.buildStatusSummary(progress), /locked/);
+});
+
+test('buildAssignmentEditUrl targets assignment edit with rowId query', () => {
+  const url = reviewService.buildAssignmentEditUrl('ASN-1', 'ROW-9');
+  assert.match(url, /\/school\/reports\/assignments\/edit\/ASN-1/);
+  assert.match(url, /[?&]rowId=ROW-9/);
+});
+
+test('review service links Fill Reports matrix for student-scoped assignments', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '../packages/school/MVC/services/school/schoolSemiMonthlyReportReviewService.js'),
+    'utf8'
+  );
+  assert.match(source, /\/school\/reports\/instances\/matrix\//);
+  assert.match(source, /fillReportsUrl/);
+});
+
+test('mapRowToDto builds matrix href for each-student assignments', () => {
+  const assignment = {
+    id: 'ASN-REVIEW',
+    templateId: 'TPL-1',
+    classId: 'CLS-1',
+    reportScope: 'each_student',
+    status: 'active'
+  };
+  const assignmentMap = new Map([[ 'ASN-REVIEW', assignment ]]);
+  const dto = sessionReportInstanceService.mapRowToDto({
+    assignmentId: 'ASN-REVIEW',
+    assignmentRowId: 'ROW-1',
+    teacherId: 'TEA-1',
+    studentId: 'STU-1',
+    status: 'draft'
+  }, assignmentMap);
+  assert.match(dto.matrixHref, /\/school\/reports\/instances\/matrix\/ASN-REVIEW/);
+  assert.match(dto.matrixHref, /assignmentRowId=ROW-1/);
+  assert.match(dto.matrixHref, /teacherId=TEA-1/);
+});

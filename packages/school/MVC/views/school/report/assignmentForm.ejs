@@ -766,7 +766,6 @@
       const index = targetRows.findIndex((row) => String(row?.rowId || '').trim() === cleanRowId);
       if (index < 0) return;
       populateRowModal(targetRows[index], String(index));
-      showTargetRowModal();
       const rowEl = targetRowsBody?.querySelector(`tr[data-target-row-id="${CSS.escape(cleanRowId)}"]`);
       rowEl?.classList.add('table-warning');
       rowEl?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -799,6 +798,8 @@
       await showReportModal({ title: 'Save Failed', icon: 'error', message: raw, buttonClass: 'btn-danger' });
     }
 
+    let targetRowModalOpenedViaFallback = false;
+
     function getTargetRowModalInstance() {
       if (!modalEl || !window.bootstrap?.Modal) return null;
       if (typeof window.bootstrap.Modal.getOrCreateInstance === 'function') {
@@ -807,33 +808,68 @@
       return new window.bootstrap.Modal(modalEl);
     }
 
+    function syncTargetRowModalFallbackBackdrop(visible) {
+      const selector = '.modal-backdrop[data-target-row-fallback-backdrop]';
+      const existing = document.querySelector(selector);
+      if (visible) {
+        if (existing) return;
+        const backdrop = document.createElement('div');
+        backdrop.className = 'modal-backdrop fade show';
+        backdrop.setAttribute('data-target-row-fallback-backdrop', '1');
+        document.body.appendChild(backdrop);
+        return;
+      }
+      document.querySelectorAll(selector).forEach((node) => node.remove());
+    }
+
+    function finalizeTargetRowModalHidden() {
+      if (!modalEl) return;
+      modalEl.classList.remove('show');
+      modalEl.style.display = 'none';
+      modalEl.setAttribute('aria-hidden', 'true');
+      modalEl.removeAttribute('aria-modal');
+      syncTargetRowModalFallbackBackdrop(false);
+      if (!document.querySelector('.modal.show')) {
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('overflow');
+        document.body.style.removeProperty('padding-right');
+      }
+    }
+
     function showTargetRowModal() {
+      targetRowModalOpenedViaFallback = false;
       const modalInstance = getTargetRowModalInstance();
       if (modalInstance) {
         modalInstance.show();
         return;
       }
       if (!modalEl) return;
+      targetRowModalOpenedViaFallback = true;
       modalEl.classList.add('show');
       modalEl.style.display = 'block';
       modalEl.removeAttribute('aria-hidden');
       modalEl.setAttribute('aria-modal', 'true');
       document.body.classList.add('modal-open');
+      syncTargetRowModalFallbackBackdrop(true);
     }
 
     function hideTargetRowModal() {
+      if (targetRowModalOpenedViaFallback) {
+        finalizeTargetRowModalHidden();
+        targetRowModalOpenedViaFallback = false;
+        return;
+      }
       const modalInstance = getTargetRowModalInstance();
       if (modalInstance) {
         modalInstance.hide();
         return;
       }
-      if (!modalEl) return;
-      modalEl.classList.remove('show');
-      modalEl.style.display = 'none';
-      modalEl.setAttribute('aria-hidden', 'true');
-      modalEl.removeAttribute('aria-modal');
-      document.body.classList.remove('modal-open');
+      finalizeTargetRowModalHidden();
     }
+
+    modalEl?.addEventListener('hidden.bs.modal', () => {
+      syncTargetRowModalFallbackBackdrop(false);
+    });
 
     function setSubmitLock(isLocked, activeButton, loadingLabel) {
       const actionButtons = Array.from(formEl?.querySelectorAll('button[type="submit"], #btnVerifyAllRows') || []);
@@ -2309,6 +2345,7 @@
         return false;
       }
 
+      hideTargetRowModal();
       await showReportModal({
         title: 'Saved',
         icon: 'success',
@@ -2498,7 +2535,21 @@
       }
     });
 
+    function applyAssignmentDeepLinkFromQuery() {
+      if (!isEditAssignment) return;
+      const params = new URLSearchParams(window.location.search);
+      const rowId = String(params.get('rowId') || params.get('assignmentRowId') || '').trim();
+      if (!rowId) return;
+      const openDeepLinkedRow = () => openTargetRowEditorByRowId(rowId);
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', openDeepLinkedRow, { once: true });
+      } else {
+        openDeepLinkedRow();
+      }
+    }
+
     renderTargetRows();
+    applyAssignmentDeepLinkFromQuery();
     applyTemplateScopePolicy();
     loadAssignmentTemplatesForClass(String(classIdInput?.value || '').trim(), initialSelectedTemplateId).catch(() => {});
   })();

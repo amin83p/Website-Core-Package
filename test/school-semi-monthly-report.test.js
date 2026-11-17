@@ -84,15 +84,17 @@ test('semi-monthly report header shortcut targets reports dashboard', () => {
   assert.match(view, /aria-keyshortcuts="Alt\+Shift\+R"/);
 });
 
-test('semi-monthly report toolbar second row links Report By Funder and settings only', () => {
+test('semi-monthly report toolbar second row links Report By Funder, Review Reports, and settings', () => {
   const view = fs.readFileSync(
     path.join(__dirname, '../packages/school/MVC/views/school/report/semiMonthlyReportViewer.ejs'),
     'utf8'
   );
   const manageBlock = view.slice(view.indexOf('const manageBtns = ['), view.indexOf('];', view.indexOf('const manageBtns = [')) + 2);
   assert.match(manageBlock, /Report By Funder/);
+  assert.match(manageBlock, /Review Reports/);
   assert.match(manageBlock, /btn btn-outline-primary btn-md mb-2/);
   assert.match(manageBlock, /id="btn_openReportByFunderModal"/);
+  assert.match(manageBlock, /id="btn_openReviewReportsModal"/);
   assert.doesNotMatch(manageBlock, /\/school\/reports\/semi-monthly\/by-funder/);
   assert.doesNotMatch(manageBlock, /Report Instances/);
   assert.doesNotMatch(manageBlock, /School Reports/);
@@ -192,6 +194,32 @@ test('semi-monthly export routes are registered', () => {
   assert.match(routes, /semiMonthlyCtrl\.getSemiMonthlyReportJob/);
   assert.match(routes, /semiMonthlyCtrl\.getFunderStudentSelection/);
   assert.match(routes, /semiMonthlyCtrl\.exportSelections/);
+  assert.match(routes, /\/semi-monthly\/api\/review-assignments/);
+  assert.match(routes, /semiMonthlyCtrl\.getReviewAssignments/);
+});
+
+test('semi-monthly report viewer includes Review Reports modal and API', () => {
+  const view = fs.readFileSync(
+    path.join(__dirname, '../packages/school/MVC/views/school/report/semiMonthlyReportViewer.ejs'),
+    'utf8'
+  );
+  const reviewPartial = fs.readFileSync(
+    path.join(__dirname, '../packages/school/MVC/views/school/report/partials/reviewReportsModal.ejs'),
+    'utf8'
+  );
+  const reviewJs = fs.readFileSync(
+    path.join(__dirname, '../packages/school/public/scripts/reviewReportsModal.js'),
+    'utf8'
+  );
+  assert.match(view, /reviewReportsModal/);
+  assert.match(view, /reviewReportsModal\.js/);
+  assert.match(view, /ReviewReportsModal\.init/);
+  assert.match(view, /apiUrl: '\/school\/reports\/semi-monthly\/api\/review-assignments'/);
+  assert.match(reviewPartial, /id="reviewReportsModal"/);
+  assert.match(reviewPartial, /btn_reviewReportsLoad/);
+  assert.match(reviewJs, /Fill Reports/);
+  assert.match(reviewJs, /review-assignments/);
+  assert.match(reviewJs, /fillReportsUrl/);
 });
 
 test('semi-monthly viewer wires shared-link prompt and report load progress', () => {

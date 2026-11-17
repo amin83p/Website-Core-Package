@@ -223,6 +223,11 @@ router.get('/semi-monthly/api/funder-students',
   trackActionState(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ, { keepActive: true }),
   semiMonthlyCtrl.getFunderStudentSelection);
 
+router.get('/semi-monthly/api/review-assignments',
+  requireAccess(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ),
+  trackActionState(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ, { keepActive: true }),
+  semiMonthlyCtrl.getReviewAssignments);
+
 router.get('/semi-monthly/api/report-plan',
   requireAccess(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ),
   trackActionState(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ, { keepActive: true }),

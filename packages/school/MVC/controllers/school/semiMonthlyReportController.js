@@ -4,6 +4,7 @@ const semiMonthlyReportPolicyModel = require('../../models/school/semiMonthlyRep
 const semiMonthlyReportPolicyService = require('../../services/school/semiMonthlyReportPolicyService');
 const schoolSemiMonthlyReportService = require('../../services/school/schoolSemiMonthlyReportService');
 const schoolSemiMonthlyReportByFunderService = require('../../services/school/schoolSemiMonthlyReportByFunderService');
+const schoolSemiMonthlyReportReviewService = require('../../services/school/schoolSemiMonthlyReportReviewService');
 const schoolSemiMonthlyReportExportService = require('../../services/school/schoolSemiMonthlyReportExportService');
 const studentAttendanceReportService = require('../../services/school/studentAttendanceReportService');
 const reportViewService = require('../../services/school/reportViewService');
@@ -248,6 +249,18 @@ async function exportSelections(req, res) {
   }
 }
 
+async function getReviewAssignments(req, res) {
+  try {
+    const payload = await schoolSemiMonthlyReportReviewService.buildReviewAssignmentsPayload(req);
+    return res.json({ status: 'success', ...payload });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 400).json({
+      status: 'error',
+      message: error.message || 'Could not load review assignments.'
+    });
+  }
+}
+
 module.exports = {
   showSemiMonthlyReportPage,
   getSemiMonthlyReportData,
@@ -255,5 +268,6 @@ module.exports = {
   getSemiMonthlyReportJob,
   getFunderStudentSelection,
   getExportPlan,
-  exportSelections
+  exportSelections,
+  getReviewAssignments
 };
