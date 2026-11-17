@@ -109,6 +109,12 @@
         index += 2;
         continue;
       }
+      // Accept single "=" as equality (matches server-side template expression tokenizer).
+      if (char === '=') {
+        tokens.push({ type: 'operator', value: '==' });
+        index += 1;
+        continue;
+      }
       if (/[0-9]/.test(char) || (char === '.' && /[0-9]/.test(source[index + 1]))) {
         let end = index + 1;
         while (end < source.length && /[0-9.]/.test(source[end])) end += 1;
@@ -165,7 +171,7 @@
         index = end;
         continue;
       }
-      throw new Error('Unsupported character in expression.');
+      throw new Error(`Unsupported character "${char}" in expression.`);
     }
     tokens.push({ type: 'eof', value: '' });
     return tokens;

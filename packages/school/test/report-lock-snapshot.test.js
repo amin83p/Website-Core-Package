@@ -431,6 +431,46 @@ test('mergeTemplateData with respectSnapshotKeys omits out-of-scope field answer
   assert.equal(scoped.class_attendance_present, undefined);
 });
 
+test('mergeTemplateData with snapshot keys still recalculates out-of-scope calculated fields', () => {
+  const template = {
+    ...baseTemplatePayload,
+    snapshotKeys: ['student_full_name'],
+    schema: {
+      version: 1,
+      fields: [
+        ...baseTemplatePayload.schema.fields,
+        {
+          id: 'rubric_a',
+          label: 'Rubric A',
+          type: 'number',
+          readOnly: false,
+          valueMode: 'manual'
+        },
+        {
+          id: 'average_mark',
+          label: 'Average',
+          type: 'number',
+          readOnly: true,
+          valueMode: 'calculated',
+          calculationRule: {
+            enabled: true,
+            expression: '(answers.rubric_a || 0) / 1',
+            onError: 'empty'
+          },
+          calculationDependencies: ['rubric_a']
+        }
+      ]
+    }
+  };
+  const instance = {
+    prefillSnapshot: { student_full_name: 'Ada' },
+    answers: { rubric_a: 8 }
+  };
+  const scoped = reportService.mergeTemplateData(template, instance, null, { respectSnapshotKeys: true });
+  assert.equal(scoped.rubric_a, undefined);
+  assert.equal(scoped.average_mark, 8);
+});
+
 test('buildDocxPlaceholderPayloadDetailed adds snapshotKeyDocxAliases shortcut tokens', () => {
   const template = {
     ...baseTemplatePayload,

@@ -2733,6 +2733,45 @@ function filterTemplateToSnapshotScope(template, ctx = null) {
   };
 }
 
+/**
+ * Snapshot lock keys scope prefill/export fields, but calculated fields must still
+ * recompute when their dependency inputs change even if they are not lock keys.
+ */
+function expandTemplateForSnapshotCalculation(template, ctx = null) {
+  const scope = ctx && ctx.active ? ctx : resolveSnapshotScopeContext(template);
+  if (!scope.active) return template;
+  const scopedTemplate = filterTemplateToSnapshotScope(template, scope);
+  const scopedIds = new Set(
+    (Array.isArray(scopedTemplate?.schema?.fields) ? scopedTemplate.schema.fields : [])
+      .map((field) => String(field?.id || '').trim())
+      .filter(Boolean)
+  );
+  const allFields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  const calculatedFields = allFields.filter((field) => reportRuleEngineService.isCalculatedField(field));
+  const dependencyIds = new Set();
+  calculatedFields.forEach((field) => {
+    const deps = Array.isArray(field?.calculationDependencies) ? field.calculationDependencies : [];
+    deps.forEach((depId) => {
+      const token = String(depId || '').trim();
+      if (token) dependencyIds.add(token);
+    });
+  });
+  const extraFields = allFields.filter((field) => {
+    const fieldId = String(field?.id || '').trim();
+    if (!fieldId || scopedIds.has(fieldId)) return false;
+    if (reportRuleEngineService.isCalculatedField(field)) return true;
+    return dependencyIds.has(fieldId);
+  });
+  if (!extraFields.length) return scopedTemplate;
+  return {
+    ...scopedTemplate,
+    schema: {
+      ...(scopedTemplate?.schema && typeof scopedTemplate.schema === 'object' ? scopedTemplate.schema : {}),
+      fields: [...(scopedTemplate.schema.fields || []), ...extraFields]
+    }
+  };
+}
+
 function findFieldForSnapshotKey(template, rawKey = '') {
   const key = normalizeSnapshotKey(rawKey);
   if (!key) return null;
@@ -2763,7 +2802,9 @@ function stripOutOfScopeMergedAnswers(template, merged, ctx) {
   fields.forEach((field) => {
     const fieldId = String(field?.id || '').trim();
     if (!fieldId) return;
-    if (!fieldIsInSnapshotScope(field, ctx.baseLowerSet, ctx.placeholderMap)) return;
+    const inScope = fieldIsInSnapshotScope(field, ctx.baseLowerSet, ctx.placeholderMap);
+    const calculated = reportRuleEngineService.isCalculatedField(field);
+    if (!inScope && !calculated) return;
     if (Object.prototype.hasOwnProperty.call(merged, fieldId)) {
       out[fieldId] = merged[fieldId];
     }
@@ -3419,7 +3460,7 @@ function mergeTemplateData(template, instance, assignment = null, options = {}) 
     }
   });
 
-  const templateForCalc = useScope ? filterTemplateToSnapshotScope(template, ctx) : template;
+  const templateForCalc = useScope ? expandTemplateForSnapshotCalculation(template, ctx) : template;
   const recalculated = reportRuleEngineService.recomputeCalculatedAnswers({
     template: templateForCalc,
     mergedAnswers: merged,
@@ -4325,6 +4366,7 @@ module.exports = {
   resolveCanonicalSnapshotKeyForField,
   resolveSnapshotScopeContext,
   filterTemplateToSnapshotScope,
+  expandTemplateForSnapshotCalculation,
   resolveTemplateSourceExportKeys,
   resolveAllowedDocxTokens,
   ensureSnapshotDocxShortcuts,

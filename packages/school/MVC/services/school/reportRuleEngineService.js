@@ -1110,7 +1110,7 @@ function templateForSnapshotComputation(template) {
     // eslint-disable-next-line global-require
     const reportService = require('./reportService');
     if (!reportService.templateUsesSnapshotScope(template)) return template;
-    return reportService.filterTemplateToSnapshotScope(template);
+    return reportService.expandTemplateForSnapshotCalculation(template);
   } catch (_) {
     return template;
   }

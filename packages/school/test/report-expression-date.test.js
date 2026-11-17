@@ -2,6 +2,17 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const reportRuleEngineService = require('../MVC/services/school/reportRuleEngineService');
 
+test('evaluateSafeExpression accepts single equals as equality', () => {
+  assert.equal(
+    reportRuleEngineService.evaluateSafeExpression('num(value) = 0', { value: 0 }),
+    true
+  );
+  assert.equal(
+    reportRuleEngineService.evaluateSafeExpression('caseof(true, num(value)=0, "-", "ok")', { value: 0 }),
+    '-'
+  );
+});
+
 test('formatDate converts ISO report dates to dd/mm/yyyy', () => {
   const expr = 'formatDate(source("T1", "report_period_due_date"))';
   const result = reportRuleEngineService.evaluateSafeExpression(expr, {

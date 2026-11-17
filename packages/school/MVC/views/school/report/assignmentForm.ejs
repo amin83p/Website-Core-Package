@@ -31,6 +31,18 @@
     ? assignmentReportScopes
     : assignmentScopeDefinitions.map((scope) => scope.value);
 %>
+<style>
+  #targetRowsTable tr.assignment-row-template-banner > td {
+    background: var(--bs-light, #f8f9fa);
+    border-top-width: 1px;
+  }
+  #targetRowsTable tr.assignment-row-template-banner--override > td {
+    background: var(--bs-warning-bg-subtle, #fff3cd);
+  }
+  #targetRowsTable tr.assignment-row-template-banner + tr > td {
+    border-top: 0;
+  }
+</style>
 <div class="sections-page">
   <div class="row g-2 align-items-start mb-4">
     <div class="col">
@@ -574,6 +586,25 @@
       if (!id) return '';
       const meta = assignmentTemplateCatalog.get(id);
       return String(meta?.title || id).trim();
+    }
+
+    function resolveRowTemplateStamp(row = {}) {
+      const assignmentStamp = getAssignmentTemplateStamp();
+      const templateId = String(row.templateId || assignmentStamp.templateId || '').trim();
+      const rowVersion = Number(row.templateVersion);
+      let templateVersion = Number.isFinite(rowVersion) && rowVersion >= 1
+        ? Math.min(1000, Math.floor(rowVersion))
+        : 0;
+      if (!templateVersion) {
+        const meta = assignmentTemplateCatalog.get(templateId);
+        if (meta?.version != null) templateVersion = Math.max(1, Number(meta.version) || 1);
+        else templateVersion = assignmentStamp.templateVersion;
+      }
+      return {
+        templateId,
+        templateVersion,
+        label: formatAssignmentTemplateLabel(templateId) || templateId || '—'
+      };
     }
 
     function syncAssignmentStructuralLocks() {
@@ -1142,7 +1173,29 @@
         targetRowsBody.innerHTML = '';
         return;
       }
+      const defaultTemplateId = getSelectedAssignmentTemplateId();
       targetRowsBody.innerHTML = targetRows.map((row, index) => {
+        const rowTemplate = resolveRowTemplateStamp(row);
+        const templateDiffers = Boolean(
+          rowTemplate.templateId
+          && defaultTemplateId
+          && rowTemplate.templateId !== defaultTemplateId
+        );
+        const templateBannerClass = templateDiffers
+          ? 'assignment-row-template-banner assignment-row-template-banner--override'
+          : 'assignment-row-template-banner';
+        const templateBannerHtml = [
+          '<tr class="', templateBannerClass, '" data-target-row-template-for="', escapeHtml(String(row.rowId || index)), '">',
+          '<td colspan="8" class="py-1 px-2 small border-bottom-0">',
+          '<i class="bi bi-file-earmark-ruled me-1" aria-hidden="true"></i>',
+          '<span class="text-muted">Template:</span> ',
+          '<strong>', escapeHtml(rowTemplate.label), '</strong>',
+          ' <span class="text-muted">(v', escapeHtml(String(rowTemplate.templateVersion)), ')</span>',
+          templateDiffers
+            ? ' <span class="badge rounded-pill text-bg-warning ms-1">Differs from assignment default</span>'
+            : '',
+          '</td></tr>'
+        ].join('');
         const targetLabel = row.targetType === 'date'
           ? `No session | ${row.dueDate || '-'}`
           : `Session | ${getSessionDisplay(getSessionById(row.sessionId)) || row.sessionId || '-'}`;
@@ -1153,7 +1206,7 @@
         const studentsLabel = isStudentScopedReport()
           ? (studentCount ? `${studentCount} student${studentCount === 1 ? '' : 's'}` : 'None')
           : '-';
-        return `
+        return templateBannerHtml + `
           <tr data-target-row-index="${index}" data-target-row-id="${escapeHtml(String(row.rowId || ''))}">
             <td>${escapeHtml(targetLabel)}</td>
             <td>${escapeHtml(periodLabel)}</td>
@@ -2110,6 +2163,7 @@
 
     templateSelect?.addEventListener('change', () => {
       applyAssignmentTemplateMetaFromSelection();
+      renderTargetRows();
       applyRowSuggestedStartDate().catch(() => {});
     });
 

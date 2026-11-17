@@ -497,7 +497,13 @@ function assertInstanceAssignmentConsistency(instance, assignment) {
   if (!idsEqual(instance?.classId, assignment?.classId)) {
     throw new Error('Report instance no longer matches its assignment class.');
   }
-  if (!idsEqual(instance?.templateId, assignment?.templateId)) {
+  const assignmentRow = reportAssignmentModel.findEffectiveTargetRow(
+    assignment,
+    instance?.assignmentRowId || ''
+  );
+  const rowTemplate = reportAssignmentModel.resolveTargetRowTemplateFields(assignment, assignmentRow);
+  const expectedTemplateId = toPublicId(rowTemplate?.templateId) || toPublicId(assignment?.templateId);
+  if (!idsEqual(instance?.templateId, expectedTemplateId)) {
     throw new Error('Report instance no longer matches its assignment template.');
   }
 }

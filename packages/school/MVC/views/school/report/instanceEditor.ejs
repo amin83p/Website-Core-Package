@@ -1520,6 +1520,7 @@
         if (/\s/.test(ch)) { i += 1; continue; }
         const two = src.slice(i, i + 2);
         if (['&&', '||', '==', '!=', '<=', '>='].includes(two)) { out.push({ t: 'op', v: two }); i += 2; continue; }
+        if (ch === '=') { out.push({ t: 'op', v: '==' }); i += 1; continue; }
         if (['+', '-', '*', '/', '%', '<', '>', '!', '(', ')', ',', '.'].includes(ch)) {
           if (ch === '(' || ch === ')') out.push({ t: 'paren', v: ch });
           else if (ch === ',') out.push({ t: 'comma', v: ch });
@@ -1738,9 +1739,22 @@
     function readFieldValue(field) {
       if (!formEl || !field?.id) return '';
       const name = `field__${field.id}`;
+      const fieldId = String(field.id);
+      const type = String(field.type || '').trim().toLowerCase();
+      if (type === 'select') {
+        const radios = formEl.querySelectorAll(`[name="${CSS.escape(name)}"][data-field-id="${CSS.escape(fieldId)}"]`);
+        if (radios.length) {
+          const checked = Array.from(radios).find((el) => el.type === 'radio' && el.checked);
+          return checked ? String(checked.value).trim() : '';
+        }
+        const selectEl = formEl.elements[name];
+        if (selectEl && String(selectEl.tagName || '').toLowerCase() === 'select') {
+          return String(selectEl.value || '').trim();
+        }
+        return '';
+      }
       const input = formEl.elements[name];
       if (!input) return '';
-      const type = String(field.type || '').trim().toLowerCase();
       if (type === 'checkbox') return input.checked === true;
       if (type === 'number') {
         const raw = String(input.value || '').trim();
@@ -1748,7 +1762,8 @@
         const n = Number(raw);
         return Number.isFinite(n) ? n : '';
       }
-      return String(input.value || '').trim();
+      const rawValue = input.value !== undefined ? input.value : (typeof input.length === 'number' ? input[0]?.value : '');
+      return String(rawValue || '').trim();
     }
 
     function findFieldElementById(fieldId) {
@@ -1898,10 +1913,21 @@
       return nextAnswers;
     }
 
-    function collectAnswers(fields, mergedBefore) {
-      const base = mergedBefore && typeof mergedBefore === 'object' ? { ...mergedBefore } : {};
+    function collectAnswers(fields, mergedBefore, options = {}) {
+      const preferLiveDom = options.preferLiveDom === true;
+      const prefillSafe = options.prefill && typeof options.prefill === 'object' ? options.prefill : {};
+      const base = preferLiveDom
+        ? { ...prefillSafe }
+        : (mergedBefore && typeof mergedBefore === 'object' ? { ...mergedBefore } : {});
       (Array.isArray(fields) ? fields : []).forEach((field) => {
-        if (isVisualOnlyField(field) || !field?.id || field.readOnly === true || isCalculatedField(field)) return;
+        if (isVisualOnlyField(field) || !field?.id) return;
+        if (isCalculatedField(field)) return;
+        if (field.readOnly === true) {
+          if (preferLiveDom && mergedBefore && Object.prototype.hasOwnProperty.call(mergedBefore, field.id)) {
+            base[field.id] = mergedBefore[field.id];
+          }
+          return;
+        }
         base[field.id] = readFieldValue(field);
       });
       return base;
@@ -1964,25 +1990,50 @@
       const scopedIds = parseJsonScript(snapshotComputationFieldIdsEl, null);
       if (!Array.isArray(scopedIds) || !scopedIds.length) return list;
       const allowed = new Set(scopedIds.map((id) => String(id)));
-      return list.filter((field) => field?.id && allowed.has(String(field.id)));
+      const calculatedFields = list.filter((field) => field?.id && isCalculatedField(field));
+      const dependencyIds = new Set();
+      calculatedFields.forEach((field) => {
+        const deps = Array.isArray(field?.calculationDependencies) ? field.calculationDependencies : [];
+        deps.forEach((depId) => {
+          const token = String(depId || '').trim();
+          if (token) dependencyIds.add(token);
+        });
+      });
+      return list.filter((field) => {
+        if (!field?.id) return false;
+        const fieldId = String(field.id);
+        if (allowed.has(fieldId)) return true;
+        if (isCalculatedField(field)) return true;
+        return dependencyIds.has(fieldId);
+      });
+    }
+
+    function refreshCalculatedFieldDisplays(fields, mergedBefore, prefill) {
+      const computationFields = fieldsForSnapshotComputation(fields);
+      const userAnswers = collectAnswers(fields, mergedBefore, {
+        preferLiveDom: useFrozenRenderCache,
+        prefill
+      });
+      const prepared = window.SchoolReportCalculatedFields?.prepareReportAnswersForUI
+        ? window.SchoolReportCalculatedFields.prepareReportAnswersForUI({ fields: computationFields, answers: userAnswers, prefill })
+        : {
+          displayAnswers: recomputeCalculatedAnswers(computationFields, userAnswers, prefill)
+        };
+      computationFields.forEach((field) => {
+        if (!isCalculatedField(field) || !field?.id) return;
+        writeFieldValue(field, prepared.displayAnswers[field.id]);
+      });
     }
 
     function runClientValidation() {
-      if (useFrozenRenderCache) {
-        clearAllFieldIssueSlots();
-        applyServerFieldIssues();
-        return {
-          issuesByField: {},
-          allIssues: [],
-          errors: [],
-          warnings: []
-        };
-      }
       const fields = parseJsonScript(fieldConfigEl, []);
       const computationFields = fieldsForSnapshotComputation(fields);
       const mergedBefore = parseJsonScript(mergedDataEl, {});
       const prefill = parseJsonScript(prefillDataEl, {});
-      const userAnswers = collectAnswers(fields, mergedBefore);
+      const userAnswers = collectAnswers(fields, mergedBefore, {
+        preferLiveDom: useFrozenRenderCache,
+        prefill
+      });
       const prepared = window.SchoolReportCalculatedFields?.prepareReportAnswersForUI
         ? window.SchoolReportCalculatedFields.prepareReportAnswersForUI({ fields: computationFields, answers: userAnswers, prefill })
         : {
@@ -1993,7 +2044,11 @@
         if (!isCalculatedField(field) || !field?.id) return;
         writeFieldValue(field, prepared.displayAnswers[field.id]);
       });
-      const summary = validateFields(computationFields, prepared.calculationAnswers, prefill);
+      const mergedForValidation = prepared.calculationAnswers
+        || prepared.displayAnswers
+        || userAnswers;
+      clearAllFieldIssueSlots();
+      const summary = validateFields(fields, mergedForValidation, prefill);
       Object.keys(summary.issuesByField).forEach((fieldId) => {
         setFieldIssues(fieldId, summary.issuesByField[fieldId]);
       });
@@ -2048,15 +2103,10 @@
           input.addEventListener('input', scheduleClientValidation);
           input.addEventListener('change', scheduleClientValidation);
         });
-        if (useFrozenRenderCache) {
-          applyServerFieldIssues();
-        } else {
-          runClientValidation();
-        }
+        runClientValidation();
 
         formEl.querySelectorAll('button[type="submit"][value="submit"]').forEach((btn) => {
           btn.addEventListener('click', async (event) => {
-            if (useFrozenRenderCache) return;
             const summary = runClientValidation();
             if (!summary.errors.length) return;
             event.preventDefault();
@@ -2081,7 +2131,6 @@
             return;
           }
           if (submitAction === 'submit') {
-            if (useFrozenRenderCache) return;
             const summary = runClientValidation();
             if (summary.errors.length) {
               event.preventDefault();
