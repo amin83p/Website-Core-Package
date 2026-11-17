@@ -1,5 +1,17 @@
 <%
   const canManageAllTasksFlag = canManageAllTasks === true;
+  const hubPrintUser = typeof user !== 'undefined' ? user : {};
+  const hubPrintActiveOrgId = String(hubPrintUser.activeOrgId || hubPrintUser.primaryOrgId || '').trim();
+  const hubPrintActiveOrg = Array.isArray(hubPrintUser.allowedOrgs)
+    ? hubPrintUser.allowedOrgs.find(function (o) { return String(o && o.orgId || '') === hubPrintActiveOrgId; })
+    : null;
+  const hubPrintActiveOrgName = String(
+    (hubPrintActiveOrg && (hubPrintActiveOrg.name || hubPrintActiveOrg.orgName || hubPrintActiveOrg.organizationName)) ||
+    hubPrintUser.activeOrgName ||
+    ''
+  ).trim();
+  const hubPrintBrand = (typeof appBrand !== 'undefined' && appBrand && typeof appBrand === 'object') ? appBrand : {};
+  const hubPrintLogoUrl = String(hubPrintBrand.logoUrl || '/uploads/GLOBAL/logo/Logo1.png').trim();
 %>
 
 <style>
@@ -2126,6 +2138,46 @@
     margin-bottom: 0.75rem;
   }
 
+  .school-master-hub .hub-enrollment-completions-funder-section .hub-weekly-reports-drilldown-summary {
+    margin-bottom: 0.35rem;
+  }
+
+  .school-master-hub .hub-enrollment-completions-funder-section {
+    width: 100%;
+  }
+
+  .school-master-hub .hub-enrollment-completions-funder-section .hub-enrollment-completions-table-wrap {
+    width: 100%;
+  }
+
+  .school-master-hub .hub-enrollment-completions-data-table {
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  .school-master-hub .hub-enrollment-completions-data-table .col-ec-student { width: 19%; }
+  .school-master-hub .hub-enrollment-completions-data-table .col-ec-finish { width: 11%; }
+  .school-master-hub .hub-enrollment-completions-data-table .col-ec-teacher { width: 13%; }
+  .school-master-hub .hub-enrollment-completions-data-table .col-ec-follow-on,
+  .school-master-hub .hub-enrollment-completions-data-table .col-ec-comment { width: 24%; }
+  .school-master-hub .hub-enrollment-completions-data-table .col-ec-clb { width: 14%; }
+
+  .school-master-hub .hub-enrollment-completions-column-toggles {
+    border-top: 1px solid #e9ecef;
+    margin-top: 0.25rem;
+    padding-top: 0.75rem;
+  }
+
+  .school-master-hub .hub-enrollment-completions-comment-cell {
+    min-height: 1.35rem;
+  }
+
+  .school-master-hub .hub-enrollment-completions-follow-on {
+    white-space: normal;
+    word-break: break-word;
+    line-height: 1.3;
+  }
+
   .school-master-hub .hub-weekly-reports-drilldown-modal .hub-weekly-reports-drill-status {
     font-size: 0.75rem;
   }
@@ -2645,6 +2697,38 @@
   .hub-wr-print-doc {
     font-size: 11px;
     color: #111827;
+  }
+
+  .hub-wr-print-identity-block {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    margin-bottom: 0.65rem;
+  }
+
+  .hub-wr-print-identity-block .identity-copy {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  .hub-wr-print-doc .print-logo,
+  .hub-wr-print-doc .hub-wr-print-logo {
+    display: block;
+    flex: 0 0 auto;
+    width: auto;
+    height: 52px;
+    max-width: 170px;
+    object-fit: contain;
+    object-position: right top;
+  }
+
+  .hub-wr-print-organization-name {
+    margin: 0 0 2px;
+    color: #0f172a;
+    font-size: 16px;
+    font-weight: 800;
+    line-height: 1.15;
   }
 
   .hub-wr-print-doc-meta {
@@ -3361,27 +3445,15 @@
       page-break-after: always;
     }
 
-    body.hub-print-enrollment-completions > *:not(#hubEnrollmentCompletionsPrintRoot) {
-      display: none !important;
-    }
-
-    body.hub-print-enrollment-completions #hubEnrollmentCompletionsPrintRoot {
-      display: block !important;
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      width: 100%;
-      margin: 0;
-      padding: 1rem;
-    }
   }
 </style>
 
 <div class="container-fluid school-master-hub pt-3 pb-0 d-flex flex-column"
      style="min-height: calc(100vh - 92px);"
      data-master-hub
-     data-can-manage-all-tasks="<%= canManageAllTasksFlag ? 'true' : 'false' %>">
+     data-can-manage-all-tasks="<%= canManageAllTasksFlag ? 'true' : 'false' %>"
+     data-hub-print-logo-url="<%= hubPrintLogoUrl %>"
+     data-hub-active-org-name="<%= hubPrintActiveOrgName %>">
   <div class="hub-page-header d-flex justify-content-between align-items-start flex-wrap gap-3 mb-3">
     <div>
       <h1 class="h3 mb-1">Report Hub</h1>
@@ -3412,7 +3484,7 @@
         <span><i class="bi bi-graph-up me-1"></i> Student Progress</span>
       </button>
       <button type="button" class="hub-section-segment" data-hub-workspace-section="enrollment-completions">
-        <span><i class="bi bi-calendar-check me-1"></i> Monthly Enrollment Completions</span>
+        <span><i class="bi bi-calendar-check me-1"></i> Enrollment Completion</span>
       </button>
     </div>
   </div>
@@ -3429,6 +3501,9 @@
     </main>
   </div>
 </div>
+
+<span id="printBrandLogoRef" data-url="<%= hubPrintLogoUrl %>" hidden></span>
+<span id="activeOrgNameRef" data-name="<%= hubPrintActiveOrgName %>" hidden></span>
 
 <%- include('partials/modal', { user }) %>
 <%- include('partials/modal_GenericPicker') %>
@@ -3759,7 +3834,7 @@
       icon: 'bi bi-graph-up'
     },
     'enrollment-completions': {
-      label: 'Monthly Enrollment Completions',
+      label: 'Enrollment Completion',
       endpoint: '/school/report-hub/api/workspace/enrollment-completions',
       sourceUrl: '/school/report-hub',
       icon: 'bi bi-calendar-check'
@@ -6672,6 +6747,63 @@
     ].join('');
   }
 
+  function resolveHubPrintBrandLogoUrl() {
+    if (window.AppPrintManager && typeof window.AppPrintManager.resolveBrandLogoUrl === 'function') {
+      const fromManager = String(window.AppPrintManager.resolveBrandLogoUrl() || '').trim();
+      if (fromManager) return fromManager;
+    }
+    const logoRef = document.getElementById('printBrandLogoRef');
+    const refUrl = String(logoRef && logoRef.dataset ? logoRef.dataset.url || '' : '').trim();
+    if (refUrl) return refUrl;
+    const hubRoot = document.querySelector('[data-master-hub]');
+    const hubLogo = hubRoot && hubRoot.dataset ? String(hubRoot.dataset.hubPrintLogoUrl || '').trim() : '';
+    if (hubLogo) return hubLogo;
+    try {
+      const raw = getComputedStyle(document.documentElement).getPropertyValue('--app-brand-logo-url').trim();
+      const match = raw.match(/url\(["']?([^"')]+)["']?\)/i);
+      if (match && match[1]) return String(match[1]).trim();
+    } catch (_) {
+      // ignore
+    }
+    return '/uploads/GLOBAL/logo/Logo1.png';
+  }
+
+  function resolveHubPrintOrgName() {
+    if (window.AppPrintManager && typeof window.AppPrintManager.resolveActiveOrgName === 'function') {
+      const fromManager = String(window.AppPrintManager.resolveActiveOrgName() || '').trim();
+      if (fromManager) return fromManager;
+    }
+    const orgRef = document.getElementById('activeOrgNameRef');
+    const refName = String(orgRef && orgRef.dataset ? orgRef.dataset.name || '' : '').trim();
+    if (refName) return refName;
+    const hubRoot = document.querySelector('[data-master-hub]');
+    const hubOrg = hubRoot && hubRoot.dataset ? String(hubRoot.dataset.hubActiveOrgName || '').trim() : '';
+    if (hubOrg) return hubOrg;
+    const user = window.__GENERIC_PICKER_USER__ || null;
+    const activeOrgId = String(user && (user.activeOrgId || user.primaryOrgId) || '').trim();
+    if (!activeOrgId || !Array.isArray(user && user.allowedOrgs)) return '';
+    const org = user.allowedOrgs.find(function (o) { return String(o && o.orgId || o && o.id || '') === activeOrgId; }) || null;
+    return String(org && (org.name || org.orgName || org.organizationName) || '').trim();
+  }
+
+  function renderHubReportPrintIdentityBlock() {
+    const logoUrl = resolveHubPrintBrandLogoUrl();
+    const orgName = resolveHubPrintOrgName();
+    const logoHtml = logoUrl
+      ? '<img class="print-logo hub-wr-print-logo" src="' + escapeHtml(logoUrl) + '" alt="Organization logo" onerror="this.style.display=\'none\'">'
+      : '';
+    const orgHtml = orgName
+      ? '<div class="hub-wr-print-organization-name">' + escapeHtml(orgName) + '</div>'
+      : '';
+    if (!logoHtml && !orgHtml) return '';
+    return [
+      '<div class="hub-wr-print-identity-block identity-block">',
+      '<div class="identity-copy">', orgHtml, '</div>',
+      logoHtml,
+      '</div>'
+    ].join('');
+  }
+
   function renderWeeklyReportsPrintDocumentMeta(options) {
     const opts = options || {};
     const title = String(opts.title || 'Weekly Reports — Classes').trim() || 'Weekly Reports — Classes';
@@ -6688,6 +6820,7 @@
     if (updated) metaParts.push(escapeHtml(updated));
     if (prepared) metaParts.push(escapeHtml(prepared));
     return [
+      renderHubReportPrintIdentityBlock(),
       '<div class="hub-wr-print-doc-meta">',
       '<div class="hub-wr-print-doc-title">', escapeHtml(title), '</div>',
       '<div class="text-muted small">', metaParts.join(' &nbsp;|&nbsp; '), '</div>',
@@ -14159,16 +14292,90 @@
     syncStudentProgressShareUrl();
   }
 
+  const HUB_ENROLLMENT_COMPLETION_LABEL = 'Enrollment Completion';
+  const HUB_ENROLLMENT_COMPLETIONS_CLB_COLUMN_LABEL = 'CLB Goal/Current/Updated';
+  const HUB_ENROLLMENT_COMPLETIONS_NEW_ENROLLMENT_COLUMN_LABEL = 'New enrollment';
+  const HUB_ENROLLMENT_COMPLETIONS_COMMENT_COLUMN_LABEL = 'Comment';
+
+  function readEnrollmentCompletionsColumnPrefs() {
+    const newEl = document.getElementById('hubEnrollmentCompletionsColNewEnrollment');
+    const clbEl = document.getElementById('hubEnrollmentCompletionsColClb');
+    return {
+      includeNewEnrollment: Boolean(newEl && newEl.checked),
+      includeClb: clbEl ? clbEl.checked !== false : true
+    };
+  }
+
+  function buildEnrollmentCompletionsTableColgroup(prefs) {
+    const columns = prefs || readEnrollmentCompletionsColumnPrefs();
+    const cols = [
+      '<col class="col-ec-student">',
+      '<col class="col-ec-finish">',
+      '<col class="col-ec-teacher">',
+      '<col class="col-ec-teacher">'
+    ];
+    if (columns.includeNewEnrollment) {
+      cols.push('<col class="col-ec-follow-on">');
+    } else {
+      cols.push('<col class="col-ec-comment">');
+    }
+    if (columns.includeClb) cols.push('<col class="col-ec-clb">');
+    return '<colgroup>' + cols.join('') + '</colgroup>';
+  }
+
+  function normalizeEnrollmentCompletionsSortForColumns(prefs) {
+    const columns = prefs || readEnrollmentCompletionsColumnPrefs();
+    const sort = hubEnrollmentCompletionsSortState || { key: 'finishDate', dir: 'asc' };
+    if (sort.key === 'followOn' && !columns.includeNewEnrollment) {
+      hubEnrollmentCompletionsSortState = { key: 'finishDate', dir: 'asc' };
+    }
+    if (sort.key === 'clb' && !columns.includeClb) {
+      hubEnrollmentCompletionsSortState = { key: 'finishDate', dir: 'asc' };
+    }
+  }
+
   let hubEnrollmentCompletionsDepartmentOptions = [];
-  let hubEnrollmentCompletionsProgramOptions = [];
+  let hubEnrollmentCompletionsProgramCatalog = [];
+  let hubEnrollmentCompletionsFunderOptions = [];
   let hubEnrollmentCompletionsLoading = false;
   let hubEnrollmentCompletionsPayload = null;
+  let hubEnrollmentCompletionsSortState = { key: 'finishDate', dir: 'asc' };
 
   function hubEnrollmentCompletionsDefaultMonth() {
     const today = hubTodayDate();
-    const y = today.getFullYear();
-    const m = String(today.getMonth() + 1).padStart(2, '0');
+    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    const y = nextMonth.getFullYear();
+    const m = String(nextMonth.getMonth() + 1).padStart(2, '0');
     return y + '-' + m;
+  }
+
+  function enrollmentCompletionsProgramsForSelectedDepartments() {
+    const departmentIds = readHubMultiSelectValues('hubEnrollmentCompletionsDepartmentIds');
+    if (!departmentIds.length) return [];
+    const deptSet = new Set(departmentIds.map(function (id) { return String(id || '').trim(); }).filter(Boolean));
+    return (Array.isArray(hubEnrollmentCompletionsProgramCatalog) ? hubEnrollmentCompletionsProgramCatalog : []).filter(function (row) {
+      const programDeptId = String(row.departmentId || '').trim();
+      return programDeptId && deptSet.has(programDeptId);
+    });
+  }
+
+  function renderEnrollmentCompletionsProgramSelect() {
+    const departmentIds = readHubMultiSelectValues('hubEnrollmentCompletionsDepartmentIds');
+    const programRows = enrollmentCompletionsProgramsForSelectedDepartments();
+    const previous = readHubMultiSelectValues('hubEnrollmentCompletionsProgramIds');
+    const allowed = new Set(programRows.map(function (row) { return String(row.id || '').trim(); }));
+    const selectedIds = previous.filter(function (id) { return allowed.has(id); });
+    const placeholder = departmentIds.length ? 'Programs (optional)' : 'Select department(s) first';
+    renderEnrollmentCompletionsMultiSelect('hubEnrollmentCompletionsProgramIds', placeholder, programRows, selectedIds);
+  }
+
+  function renderEnrollmentCompletionsFunderSelect() {
+    renderEnrollmentCompletionsMultiSelect(
+      'hubEnrollmentCompletionsFunderIds',
+      'Funders (optional)',
+      hubEnrollmentCompletionsFunderOptions,
+      readHubMultiSelectValues('hubEnrollmentCompletionsFunderIds')
+    );
   }
 
   function readHubMultiSelectValues(selectId) {
@@ -14195,119 +14402,587 @@
     return document.getElementById('hubEnrollmentCompletionsResults');
   }
 
+  function hubEnrollmentCompletionsFiltersExpanded() {
+    return Boolean(hubInputValue('hubEnrollmentCompletionsMonth'))
+      || readHubMultiSelectValues('hubEnrollmentCompletionsDepartmentIds').length
+      || readHubMultiSelectValues('hubEnrollmentCompletionsProgramIds').length
+      || readHubMultiSelectValues('hubEnrollmentCompletionsFunderIds').length;
+  }
+
+  function setHubEnrollmentCompletionsMonthOffset(offsetMonths) {
+    const monthEl = document.getElementById('hubEnrollmentCompletionsMonth');
+    if (!monthEl) return;
+    const base = new Date();
+    base.setUTCDate(1);
+    base.setUTCMonth(base.getUTCMonth() + offsetMonths);
+    const y = base.getUTCFullYear();
+    const m = String(base.getUTCMonth() + 1).padStart(2, '0');
+    monthEl.value = y + '-' + m;
+  }
+
+  function bindEnrollmentCompletionsFilterCollapse() {
+    const collapseEl = document.getElementById('hubEnrollmentCompletionsFilterCollapse');
+    const buttonEl = document.getElementById('hubEnrollmentCompletionsFilterToggleBtn');
+    const iconEl = document.getElementById('hubEnrollmentCompletionsFilterToggleIcon');
+    if (!collapseEl || !buttonEl || !iconEl) return;
+    const setState = function (expanded) {
+      iconEl.classList.remove('bi-chevron-down', 'bi-chevron-up');
+      iconEl.classList.add(expanded ? 'bi-chevron-up' : 'bi-chevron-down');
+      buttonEl.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+      buttonEl.setAttribute('aria-label', expanded ? 'Close filters' : 'Open filters');
+    };
+    setState(collapseEl.classList.contains('show'));
+    collapseEl.addEventListener('shown.bs.collapse', function () { setState(true); });
+    collapseEl.addEventListener('hidden.bs.collapse', function () { setState(false); });
+  }
+
   function renderEnrollmentCompletionsWaitingState() {
     return [
-      '<div class="hub-empty text-muted">',
-      '<div><i class="bi bi-calendar-check display-6 d-block mb-3"></i>',
-      '<div class="fw-semibold">Monthly Enrollment Completions</div>',
-      '<p class="mb-0 small">Choose departments, programs, and a calendar month, then run the report.</p>',
-      '</div></div>'
+      '<div class="hub-empty">',
+      '<div class="text-center text-muted">',
+      '<i class="bi bi-calendar-check display-6 d-block mb-3"></i>',
+      '<div class="fw-semibold text-dark">' + escapeHtml(HUB_ENROLLMENT_COMPLETION_LABEL) + '</div>',
+      '<p class="mb-0 small mt-1">Set filters and choose <strong>Generate</strong> to list students whose enrollment finishes in the selected month.</p>',
+      '</div>',
+      '</div>'
     ].join('');
   }
 
-  function enrollmentCompletionsStatusBadge(status) {
-    const value = String(status || '').trim().toLowerCase();
-    if (value === 'completed') return 'text-bg-success';
-    if (value === 'withdrawn') return 'text-bg-warning';
-    if (value === 'active') return 'text-bg-primary';
-    return 'text-bg-secondary';
+  function formatHubEnrollmentFinishDateHtml(dateValue) {
+    const raw = String(dateValue || '').trim();
+    if (!raw) return '<span class="text-muted">—</span>';
+    const line = formatHubDateKey(raw, {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    }) || raw;
+    return '<span class="hub-table-date-single">' + escapeHtml(line) + '</span>';
+  }
+
+  function renderEnrollmentCompletionsFinishDates(row) {
+    const dates = Array.isArray(row.enrollmentFinishDates) && row.enrollmentFinishDates.length
+      ? row.enrollmentFinishDates
+      : (row.enrollmentFinishDate ? [row.enrollmentFinishDate] : []);
+    if (!dates.length) return '<span class="text-muted">—</span>';
+    return dates.map(function (date) {
+      return formatHubEnrollmentFinishDateHtml(date);
+    }).join('');
   }
 
   function renderEnrollmentCompletionsStudentCell(row) {
     const name = escapeHtml(row.studentName || row.studentPersonId || 'Student');
     const recordId = String(row.studentRecordId || '').trim();
-    if (recordId) {
-      return '<a href="/school/students/' + escapeHtml(recordId) + '" class="fw-semibold text-decoration-none">' + name + '</a>';
-    }
-    return '<span class="fw-semibold">' + name + '</span>';
+    const claim = String(row.claimNumberDisplay || '').trim();
+    const nameHtml = recordId
+      ? '<a href="/school/students/' + escapeHtml(recordId) + '" class="fw-semibold text-decoration-none">' + name + '</a>'
+      : '<span class="fw-semibold">' + name + '</span>';
+    if (!claim) return nameHtml;
+    return nameHtml + '<div class="small text-muted">Claim: ' + escapeHtml(claim) + '</div>';
   }
 
-  function renderEnrollmentCompletionsTable(rows, monthLabel) {
+  function renderEnrollmentCompletionsFollowOnCell(row) {
+    const text = String(row.enrollmentFollowOnNotes || '—').trim() || '—';
+    return '<div class="hub-enrollment-completions-follow-on small">' + escapeHtml(text) + '</div>';
+  }
+
+  function renderEnrollmentCompletionsCommentCell() {
+    return '<div class="hub-enrollment-completions-comment-cell small mb-0" aria-hidden="true">&nbsp;</div>';
+  }
+
+  function enrollmentCompletionsSortFinishKey(row) {
+    const dates = Array.isArray(row && row.enrollmentFinishDates) && row.enrollmentFinishDates.length
+      ? row.enrollmentFinishDates
+      : (row && row.enrollmentFinishDate ? [row.enrollmentFinishDate] : []);
+    if (!dates.length) return '';
+    return dates.slice().sort()[0];
+  }
+
+  function enrollmentCompletionsSortIndicator(key) {
+    const sort = hubEnrollmentCompletionsSortState || { key: 'finishDate', dir: 'asc' };
+    if (sort.key !== key) return '';
+    return sort.dir === 'desc' ? ' <i class="bi bi-sort-down"></i>' : ' <i class="bi bi-sort-up"></i>';
+  }
+
+  function enrollmentCompletionsSortValue(row, key) {
+    if (key === 'studentName') return String(row.studentName || row.studentPersonId || '');
+    if (key === 'finishDate') return enrollmentCompletionsSortFinishKey(row);
+    if (key === 'teacherAm') return String(row.teacherAmNames || row.firstClassTeacherNames || row.teacherNames || '');
+    if (key === 'teacherPm') return String(row.teacherPmNames || row.secondEnrollmentTeacherNames || '');
+    if (key === 'clb') return String(row.clbGoalLabel || '') + '\t' + String(row.clbCurrentLabel || '');
+    if (key === 'followOn') return String(row.enrollmentFollowOnNotes || '');
+    return '';
+  }
+
+  function groupEnrollmentCompletionsRowsByFunder(rows, funderGroups) {
+    const sortedRows = sortEnrollmentCompletionsRows(rows);
+    const byKey = new Map();
+    sortedRows.forEach(function (row) {
+      const key = String(row.funderGroupKey || 'self').trim() || 'self';
+      if (!byKey.has(key)) byKey.set(key, []);
+      byKey.get(key).push(row);
+    });
+    const orderedKeys = [];
+    (Array.isArray(funderGroups) ? funderGroups : []).forEach(function (group) {
+      const key = String(group && group.funderGroupKey || '').trim();
+      if (key && byKey.has(key) && orderedKeys.indexOf(key) === -1) orderedKeys.push(key);
+    });
+    byKey.forEach(function (_rows, key) {
+      if (orderedKeys.indexOf(key) === -1) orderedKeys.push(key);
+    });
+  return orderedKeys.map(function (key) {
+      const groupRows = byKey.get(key) || [];
+      const meta = (Array.isArray(funderGroups) ? funderGroups : []).find(function (g) {
+        return String(g && g.funderGroupKey || '') === key;
+      });
+      return {
+        funderGroupKey: key,
+        funderLabel: String((meta && meta.funderLabel) || (groupRows[0] && groupRows[0].funderLabel) || 'Self Fund').trim() || 'Self Fund',
+        rows: groupRows
+      };
+    }).filter(function (section) { return section.rows.length; });
+  }
+
+  function sortEnrollmentCompletionsRows(rows) {
+    const list = Array.isArray(rows) ? rows.slice() : [];
+    const sort = hubEnrollmentCompletionsSortState || { key: 'finishDate', dir: 'asc' };
+    const dir = sort.dir === 'desc' ? -1 : 1;
+    list.sort(function (a, b) {
+      const left = enrollmentCompletionsSortValue(a, sort.key);
+      const right = enrollmentCompletionsSortValue(b, sort.key);
+      const cmp = left.localeCompare(right, undefined, { sensitivity: 'base', numeric: sort.key === 'finishDate' });
+      if (cmp !== 0) return cmp * dir;
+      const dateCmp = enrollmentCompletionsSortFinishKey(a).localeCompare(enrollmentCompletionsSortFinishKey(b));
+      if (dateCmp !== 0) return dateCmp;
+      return String(a.studentName || '').localeCompare(String(b.studentName || ''));
+    });
+    return list;
+  }
+
+  function getEnrollmentCompletionsDisplayRows() {
+    const rows = hubEnrollmentCompletionsPayload && Array.isArray(hubEnrollmentCompletionsPayload.rows)
+      ? hubEnrollmentCompletionsPayload.rows
+      : [];
+    return sortEnrollmentCompletionsRows(rows);
+  }
+
+  function refreshEnrollmentCompletionsResultsView() {
+    const resultsEl = enrollmentCompletionsResultsEl();
+    if (!resultsEl || !hubEnrollmentCompletionsPayload) return;
+    resultsEl.innerHTML = renderEnrollmentCompletionsResults(hubEnrollmentCompletionsPayload);
+  }
+
+  function renderEnrollmentCompletionsClbCell(row) {
+    return [
+      '<div>', escapeHtml(row.clbGoalLabel || '—'), '</div>',
+      '<div class="text-muted">', escapeHtml(row.clbCurrentLabel || '—'), '</div>'
+    ].join('');
+  }
+
+  function renderEnrollmentCompletionsTable(rows, monthLabel, columnPrefs) {
+    const columns = columnPrefs || readEnrollmentCompletionsColumnPrefs();
     const list = Array.isArray(rows) ? rows : [];
     if (!list.length) {
       return [
-        '<div class="hub-empty text-muted">',
-        '<p class="mb-0">No enrollments with an effective finish in ' + escapeHtml(monthLabel || 'the selected month') + '.</p>',
+        '<div class="hub-empty">',
+        '<div class="text-center text-muted py-2">',
+        '<i class="bi bi-inbox display-6 d-block mb-2"></i>',
+        '<div class="fw-semibold text-dark">No students found</div>',
+        '<p class="mb-0 small">No enrollments with an effective finish in ' + escapeHtml(monthLabel || 'the selected month') + '.</p>',
+        '</div>',
         '</div>'
       ].join('');
     }
     const body = list.map(function (row) {
-      const kindBadge = row.enrollmentKind
-        ? '<span class="badge text-bg-light border ms-1">' + escapeHtml(row.enrollmentKind) + '</span>'
-        : '';
-      const dept = row.departmentName
-        ? '<div class="small text-muted">' + escapeHtml(row.departmentName) + '</div>'
-        : '';
+      const optionalCells = columns.includeNewEnrollment
+        ? ['<td class="small align-middle">', renderEnrollmentCompletionsFollowOnCell(row), '</td>']
+        : ['<td class="small align-middle">', renderEnrollmentCompletionsCommentCell(), '</td>'];
+      const clbCell = columns.includeClb
+        ? ['<td class="small align-middle pe-3">', renderEnrollmentCompletionsClbCell(row), '</td>']
+        : [];
       return [
         '<tr>',
-        '<td>', renderEnrollmentCompletionsStudentCell(row), '</td>',
-        '<td><div class="fw-semibold">' + escapeHtml(row.className || '') + '</div>', dept, '</td>',
-        '<td class="small">' + escapeHtml(row.teacherNames || '—') + '</td>',
-        '<td class="text-nowrap small">' + escapeHtml(row.enrollmentLabel || '—'), kindBadge, '</td>',
-        '<td class="small">' + escapeHtml(row.notes || '—') + '</td>',
-        '<td class="text-nowrap small text-center">' + escapeHtml(row.attendanceLabel || '—') + '</td>',
-        '<td class="text-nowrap"><span class="badge ' + enrollmentCompletionsStatusBadge(row.status) + '">' + escapeHtml(row.status || '—') + '</span></td>',
+        '<td class="ps-3 align-middle">', renderEnrollmentCompletionsStudentCell(row), '</td>',
+        '<td class="align-middle">' + renderEnrollmentCompletionsFinishDates(row) + '</td>',
+        '<td class="small align-middle">' + escapeHtml(row.teacherAmNames || row.firstClassTeacherNames || row.teacherNames || '—') + '</td>',
+        '<td class="small align-middle">' + escapeHtml(row.teacherPmNames || row.secondEnrollmentTeacherNames || '—') + '</td>',
+        optionalCells.join(''),
+        clbCell.join(''),
         '</tr>'
       ].join('');
     }).join('');
+    const optionalHeader = columns.includeNewEnrollment
+      ? '<th class="hub-weekly-reports-list-sort" data-hub-enrollment-completions-sort="followOn">' + escapeHtml(HUB_ENROLLMENT_COMPLETIONS_NEW_ENROLLMENT_COLUMN_LABEL) + enrollmentCompletionsSortIndicator('followOn') + '</th>'
+      : '<th>' + escapeHtml(HUB_ENROLLMENT_COMPLETIONS_COMMENT_COLUMN_LABEL) + '</th>';
+    const clbHeader = columns.includeClb
+      ? '<th class="pe-3 hub-weekly-reports-list-sort" data-hub-enrollment-completions-sort="clb">' + escapeHtml(HUB_ENROLLMENT_COMPLETIONS_CLB_COLUMN_LABEL) + enrollmentCompletionsSortIndicator('clb') + '</th>'
+      : '';
+    const summary = '<div class="hub-weekly-reports-drilldown-summary px-3 pt-3">' + escapeHtml(String(list.length)) + ' student' + (list.length === 1 ? '' : 's') + '</div>';
     return [
-      '<div class="table-responsive">',
-      '<table class="table table-sm table-hover align-middle mb-0" id="hubEnrollmentCompletionsTable">',
+      summary,
+      '<div class="hub-table-wrap border rounded hub-enrollment-completions-table-wrap">',
+      '<table class="table table-sm table-striped table-hover hub-weekly-reports-data-table align-middle mb-0 hub-enrollment-completions-data-table">',
+      buildEnrollmentCompletionsTableColgroup(columns),
       '<thead class="table-light"><tr>',
-      '<th>Student</th><th>Class</th><th>Teachers</th><th>Enrollment</th><th>Notes</th><th class="text-center">Attendance</th><th>Status</th>',
+      '<th class="ps-3 hub-weekly-reports-list-sort" data-hub-enrollment-completions-sort="studentName">Student' + enrollmentCompletionsSortIndicator('studentName') + '</th>',
+      '<th class="hub-weekly-reports-list-sort" data-hub-enrollment-completions-sort="finishDate">Finishing date' + enrollmentCompletionsSortIndicator('finishDate') + '</th>',
+      '<th class="hub-weekly-reports-list-sort" data-hub-enrollment-completions-sort="teacherAm">Teacher AM' + enrollmentCompletionsSortIndicator('teacherAm') + '</th>',
+      '<th class="hub-weekly-reports-list-sort" data-hub-enrollment-completions-sort="teacherPm">Teacher PM' + enrollmentCompletionsSortIndicator('teacherPm') + '</th>',
+      optionalHeader,
+      clbHeader,
       '</tr></thead>',
       '<tbody>', body, '</tbody>',
       '</table></div>'
     ].join('');
   }
 
+  function renderEnrollmentCompletionsFunderSection(section, monthLabel, options) {
+    const opts = options || {};
+    const heading = opts.includeHeading !== false;
+    const rows = section && Array.isArray(section.rows) ? section.rows : [];
+    const label = escapeHtml(String(section && section.funderLabel || 'Self Fund'));
+    const parts = [];
+    if (heading) {
+      parts.push(
+        '<div class="hub-enrollment-completions-funder-section mt-3 mb-2">',
+        '<div class="d-flex align-items-baseline justify-content-between flex-wrap gap-2 px-1">',
+        '<h3 class="h6 fw-bold mb-0">', label, '</h3>',
+        '<span class="small text-muted">', escapeHtml(String(rows.length)), ' student', rows.length === 1 ? '' : 's', '</span>',
+        '</div>'
+      );
+    }
+    parts.push(renderEnrollmentCompletionsTable(rows, monthLabel, opts.columnPrefs));
+    if (heading) parts.push('</div>');
+    return parts.join('');
+  }
+
   function renderEnrollmentCompletionsResults(payload) {
+    const columnPrefs = readEnrollmentCompletionsColumnPrefs();
+    normalizeEnrollmentCompletionsSortForColumns(columnPrefs);
     const summary = payload && payload.summary ? payload.summary : {};
     const monthLabel = payload && payload.monthLabel ? payload.monthLabel : '';
     const totalRows = Number(summary.totalRows || (payload && payload.rows ? payload.rows.length : 0));
+    const totalStudents = summary.totalStudents != null ? Number(summary.totalStudents) : totalRows;
+    const funderGroupCount = summary.funderGroupCount != null
+      ? Number(summary.funderGroupCount)
+      : (Array.isArray(payload && payload.funderGroups) ? payload.funderGroups.length : 0);
+    const statsLine = [
+      '<span class="fw-semibold text-dark">' + escapeHtml(String(totalStudents)) + '</span> student' + (totalStudents === 1 ? '' : 's'),
+      monthLabel ? ('<span class="mx-1">|</span><span>' + escapeHtml(monthLabel) + '</span>') : '',
+      totalRows !== totalStudents ? ('<span class="mx-1">|</span><span>' + escapeHtml(String(totalRows)) + ' row' + (totalRows === 1 ? '' : 's') + '</span>') : '',
+      funderGroupCount > 1 ? ('<span class="mx-1">|</span><span>' + escapeHtml(String(funderGroupCount)) + ' funder sections</span>') : ''
+    ].join('');
     const toolbar = [
-      '<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 hub-no-print">',
-      '<div class="small text-muted">',
-      '<strong>' + escapeHtml(monthLabel) + '</strong>',
-      ' · ' + totalRows + ' row' + (totalRows === 1 ? '' : 's'),
-      summary.totalStudents != null ? (' · ' + summary.totalStudents + ' student' + (summary.totalStudents === 1 ? '' : 's')) : '',
-      '</div>',
+      '<div class="hub-weekly-reports-toolbar hub-no-print">',
+      '<div class="small text-muted d-flex align-items-center flex-wrap gap-1">', statsLine, '</div>',
+      '<div class="d-flex align-items-center gap-2 flex-wrap">',
       '<button type="button" class="btn btn-outline-secondary btn-sm" id="hubEnrollmentCompletionsPrint"><i class="bi bi-printer me-1"></i> Print</button>',
+      '</div>',
       '</div>'
     ].join('');
-    return toolbar + renderEnrollmentCompletionsTable(payload && payload.rows, monthLabel);
+    const allRows = hubEnrollmentCompletionsPayload && Array.isArray(hubEnrollmentCompletionsPayload.rows)
+      ? hubEnrollmentCompletionsPayload.rows
+      : [];
+    const sections = groupEnrollmentCompletionsRowsByFunder(allRows, payload && payload.funderGroups);
+    if (!sections.length) {
+      return toolbar + renderEnrollmentCompletionsTable([], monthLabel, columnPrefs);
+    }
+    return toolbar + sections.map(function (section) {
+      return renderEnrollmentCompletionsFunderSection(section, monthLabel, {
+        includeHeading: sections.length > 1,
+        columnPrefs: columnPrefs
+      });
+    }).join('');
   }
 
-  function renderEnrollmentCompletionsPrintDocument(payload) {
-    const monthLabel = payload && payload.monthLabel ? payload.monthLabel : '';
-    const rows = payload && Array.isArray(payload.rows) ? payload.rows : [];
-    const tableHtml = rows.length
-      ? renderEnrollmentCompletionsTable(rows, monthLabel)
-      : '<p>No rows.</p>';
+  function renderEnrollmentCompletionsPrintStudentCell(row) {
+    const name = escapeHtml(row.studentName || row.studentPersonId || 'Student');
+    const claim = String(row.claimNumberDisplay || '').trim();
+    if (!claim) return '<span class="fw-semibold">' + name + '</span>';
+    return '<span class="fw-semibold">' + name + '</span><div class="text-muted" style="font-weight:500;">Claim: ' + escapeHtml(claim) + '</div>';
+  }
+
+  function renderEnrollmentCompletionsPrintTable(rows, monthLabel, columnPrefs) {
+    const columns = columnPrefs || readEnrollmentCompletionsColumnPrefs();
+    const list = Array.isArray(rows) ? rows : [];
+    if (!list.length) {
+      return '<div class="text-muted small">No enrollments with an effective finish in ' + escapeHtml(monthLabel || 'the selected month') + '.</div>';
+    }
+    const body = list.map(function (row) {
+      const optionalCells = columns.includeNewEnrollment
+        ? ['<td class="align-middle follow-on-col">', renderEnrollmentCompletionsFollowOnCell(row), '</td>']
+        : ['<td class="align-middle comment-col">', renderEnrollmentCompletionsCommentCell(), '</td>'];
+      const clbCell = columns.includeClb
+        ? ['<td class="align-middle pe-2">', renderEnrollmentCompletionsClbCell(row), '</td>']
+        : [];
+      return [
+        '<tr>',
+        '<td class="ps-2 align-middle">', renderEnrollmentCompletionsPrintStudentCell(row), '</td>',
+        '<td class="align-middle">' + renderEnrollmentCompletionsFinishDates(row) + '</td>',
+        '<td class="align-middle">' + escapeHtml(row.teacherAmNames || row.firstClassTeacherNames || row.teacherNames || '—') + '</td>',
+        '<td class="align-middle">' + escapeHtml(row.teacherPmNames || row.secondEnrollmentTeacherNames || '—') + '</td>',
+        optionalCells.join(''),
+        clbCell.join(''),
+        '</tr>'
+      ].join('');
+    }).join('');
+    const optionalHeader = columns.includeNewEnrollment
+      ? '<th>' + escapeHtml(HUB_ENROLLMENT_COMPLETIONS_NEW_ENROLLMENT_COLUMN_LABEL) + '</th>'
+      : '<th>' + escapeHtml(HUB_ENROLLMENT_COMPLETIONS_COMMENT_COLUMN_LABEL) + '</th>';
+    const clbHeader = columns.includeClb ? '<th>' + escapeHtml(HUB_ENROLLMENT_COMPLETIONS_CLB_COLUMN_LABEL) + '</th>' : '';
     return [
-      '<ul class="list-unstyled small text-muted mb-3"><li><strong>Month:</strong> ', escapeHtml(monthLabel), '</li></ul>',
-      tableHtml
+      '<table class="matrix hub-enrollment-completions-print-matrix">',
+      buildEnrollmentCompletionsTableColgroup(columns),
+      '<thead><tr>',
+      '<th>Student</th><th>Finishing date</th><th>Teacher AM</th><th>Teacher PM</th>',
+      optionalHeader,
+      clbHeader,
+      '</tr></thead>',
+      '<tbody>', body, '</tbody>',
+      '</table>'
+    ].join('');
+  }
+
+  function renderEnrollmentCompletionsPrintTablesByFunder(payload, rows, columnPrefs) {
+    const columns = columnPrefs || readEnrollmentCompletionsColumnPrefs();
+    const monthLabel = payload && payload.monthLabel ? payload.monthLabel : '';
+    const list = Array.isArray(rows) ? rows : [];
+    const sections = groupEnrollmentCompletionsRowsByFunder(list, payload && payload.funderGroups);
+    const multiFunder = sections.length > 1;
+    if (!sections.length) {
+      return renderEnrollmentCompletionsPrintTable([], monthLabel, columns);
+    }
+    return sections.map(function (section, index) {
+      const title = multiFunder
+        ? '<h2 class="funder-section-title">' + escapeHtml(section.funderLabel) + ' <span class="funder-section-count">(' + escapeHtml(String(section.rows.length)) + ')</span></h2>'
+        : '';
+      const pageBreakClass = multiFunder && index > 0 ? ' enrollment-completions-funder-print-page' : '';
+      const tableHtml = renderEnrollmentCompletionsPrintTable(section.rows, monthLabel, columns);
+      return '<div class="enrollment-completions-funder-print-sheet' + pageBreakClass + '">' + title + tableHtml + '</div>';
+    }).join('');
+  }
+
+  function buildEnrollmentCompletionsPrintSummary(payload) {
+    const summary = payload && payload.summary ? payload.summary : {};
+    const rowCount = Array.isArray(payload && payload.rows) ? payload.rows.length : 0;
+    const totalStudents = summary.totalStudents != null ? Number(summary.totalStudents) : rowCount;
+    return {
+      monthLabel: payload && payload.monthLabel ? payload.monthLabel : '',
+      totalStudents: totalStudents,
+      rowCount: rowCount,
+      prepared: formatHubInstant(new Date())
+    };
+  }
+
+  function renderEnrollmentCompletionsPrintIdentityBlock(payload, options) {
+    const opts = options || {};
+    const info = buildEnrollmentCompletionsPrintSummary(payload || {});
+    const orgName = String(opts.orgName || resolveHubPrintOrgName() || '').trim();
+    const orgHtml = orgName ? '<div class="org-name">' + escapeHtml(orgName) + '</div>' : '';
+    const metaRows = [];
+    if (info.monthLabel) metaRows.push('<span><strong>Month:</strong> ' + escapeHtml(info.monthLabel) + '</span>');
+    metaRows.push('<span><strong>Students:</strong> ' + escapeHtml(String(info.totalStudents)) + '</span>');
+    metaRows.push('<span><strong>Printed:</strong> ' + escapeHtml(info.prepared) + '</span>');
+    const logoUrl = String(opts.logoUrl || resolveHubPrintBrandLogoUrl() || '').trim();
+    const logoHtml = logoUrl
+      ? '<img class="print-logo" src="' + escapeHtml(logoUrl) + '" alt="Organization logo" onerror="this.style.display=\'none\'">'
+      : '';
+    return [
+      '<div class="identity-block">',
+      '<div class="identity-copy">',
+      '<header class="doc-header">',
+      orgHtml,
+      '<h1>', escapeHtml(HUB_ENROLLMENT_COMPLETION_LABEL), '</h1>',
+      '<div class="meta-row">', metaRows.join(''), '</div>',
+      '</header>',
+      '</div>',
+      logoHtml,
+      '</div>'
+    ].join('');
+  }
+
+  function renderEnrollmentCompletionsPrintSummaryBar(payload) {
+    const info = buildEnrollmentCompletionsPrintSummary(payload || {});
+    const stats = [
+      '<span class="stat"><b>' + escapeHtml(String(info.totalStudents)) + '</b> students</span>'
+    ];
+    if (info.rowCount !== info.totalStudents) {
+      stats.push('<span class="stat"><b>' + escapeHtml(String(info.rowCount)) + '</b> rows</span>');
+    }
+    const funderCount = payload && payload.summary && payload.summary.funderGroupCount != null
+      ? Number(payload.summary.funderGroupCount)
+      : (Array.isArray(payload && payload.funderGroups) ? payload.funderGroups.length : 0);
+    if (funderCount > 1) {
+      stats.push('<span class="stat"><b>' + escapeHtml(String(funderCount)) + '</b> funder sections</span>');
+    }
+    return '<div class="summary">' + stats.join('') + '</div>';
+  }
+
+  function buildEnrollmentCompletionsPrintHtmlDocument(options) {
+    const opts = options || {};
+    const payload = opts.payload || hubEnrollmentCompletionsPayload || {};
+    const monthLabel = payload.monthLabel || '';
+    const rows = Array.isArray(opts.rows) ? opts.rows : getEnrollmentCompletionsDisplayRows();
+    const fallbackSettings = {
+      includeOrg: true,
+      orgName: resolveHubPrintOrgName(),
+      orientation: 'portrait',
+      density: 'compact',
+      logoUrl: resolveHubPrintBrandLogoUrl()
+    };
+    const settings = window.AppPrintManager && typeof window.AppPrintManager.normalizeSettings === 'function'
+      ? window.AppPrintManager.normalizeSettings(Object.assign({}, fallbackSettings, opts.printSettings || {}))
+      : fallbackSettings;
+    const displayOrgName = settings.includeOrg !== false
+      ? String(settings.orgName || resolveHubPrintOrgName() || '').trim()
+      : '';
+    const logoUrl = String(settings.logoUrl || resolveHubPrintBrandLogoUrl() || '').trim();
+    const orientation = String(settings.orientation || 'portrait').trim().toLowerCase() === 'landscape' ? 'landscape' : 'portrait';
+    const density = String(settings.density || 'compact').trim().toLowerCase() === 'normal' ? 'normal' : 'compact';
+    const pageCss = window.PrintDocumentBuilder && typeof window.PrintDocumentBuilder.buildPageCss === 'function'
+      ? window.PrintDocumentBuilder.buildPageCss(orientation)
+      : '@page { margin: 10mm; size: portrait; }';
+    const previewControlsHtml = window.AppPrintManager && typeof window.AppPrintManager.buildPreviewControlsHtml === 'function'
+      ? window.AppPrintManager.buildPreviewControlsHtml(settings)
+      : '<div class="screen-actions no-print"><button type="button" onclick="window.print()">Print</button><button type="button" onclick="window.close()">Close</button></div>';
+    const printNoteHtml = window.AppPrintManager && typeof window.AppPrintManager.buildPrintNoteHtml === 'function'
+      ? window.AppPrintManager.buildPrintNoteHtml(settings)
+      : '';
+    const orientationScript = window.PrintDocumentBuilder && typeof window.PrintDocumentBuilder.buildPreviewOrientationScript === 'function'
+      ? window.PrintDocumentBuilder.buildPreviewOrientationScript({
+        orientation: orientation,
+        sourcePath: location.pathname,
+        mode: 'enrollment-completion'
+      })
+      : '';
+    const identityHtml = renderEnrollmentCompletionsPrintIdentityBlock(payload, {
+      orgName: displayOrgName,
+      logoUrl: logoUrl
+    });
+    const columnPrefs = opts.columnPrefs || readEnrollmentCompletionsColumnPrefs();
+    const tableHtml = rows.length
+      ? renderEnrollmentCompletionsPrintTablesByFunder(payload, rows, columnPrefs)
+      : '<div class="empty-msg">No enrollments with an effective finish in ' + escapeHtml(monthLabel || 'the selected month') + '.</div>';
+    const summaryHtml = renderEnrollmentCompletionsPrintSummaryBar(payload);
+    const footerLabel = 'Generated from Report Hub · ' + escapeHtml(monthLabel || HUB_ENROLLMENT_COMPLETION_LABEL);
+    return [
+      '<!DOCTYPE html>',
+      '<html lang="en">',
+      '<head>',
+      '<meta charset="utf-8">',
+      '<title>', escapeHtml(HUB_ENROLLMENT_COMPLETION_LABEL), '</title>',
+      '<style id="print-page-orientation-css">', pageCss, '</style>',
+      '<style>',
+      '* { box-sizing: border-box; }',
+      'body { margin: 0; font-family: "Segoe UI", Arial, sans-serif; font-size: 10px; color: #111; line-height: 1.25; }',
+      'body.print-density-normal { font-size: 11px; line-height: 1.35; }',
+      '.sheet { padding: 0; }',
+      '.identity-block { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; margin-bottom: 8px; }',
+      '.identity-copy { min-width: 0; flex: 1 1 auto; }',
+      '.print-logo { display: block; flex: 0 0 auto; width: auto; height: 58px; max-width: 180px; object-fit: contain; object-position: right top; }',
+      '.doc-header { margin-bottom: 8px; }',
+      '.doc-header h1 { margin: 0 0 2px 0; font-size: 16px; font-weight: 700; }',
+      '.org-name { font-size: 13px; font-weight: 700; margin: 0 0 4px 0; }',
+      '.print-note { margin: 0 0 8px; border: 1px solid #cfd7e3; background: #f4f7fb; padding: 6px 8px; color: #333; white-space: pre-wrap; }',
+      '.meta-row { display: flex; flex-wrap: wrap; gap: 8px 18px; color: #333; margin-bottom: 6px; }',
+      '.meta-row span strong { font-weight: 600; }',
+      '.summary { display: flex; flex-wrap: wrap; gap: 6px 14px; border: 1px solid #ccc; background: #f8f9fa; padding: 6px 8px; margin-bottom: 8px; border-radius: 2px; }',
+      '.summary .stat { white-space: nowrap; }',
+      '.summary .stat b { font-weight: 700; }',
+      'table.matrix { width: 100%; border-collapse: collapse; table-layout: fixed; }',
+      'table.matrix .col-ec-student { width: 19%; }',
+      'table.matrix .col-ec-finish { width: 11%; }',
+      'table.matrix .col-ec-teacher { width: 13%; }',
+      'table.matrix .col-ec-follow-on, table.matrix .col-ec-comment { width: 24%; }',
+      'table.matrix .col-ec-clb { width: 14%; }',
+      '.comment-col { min-height: 1.1em; }',
+      '.enrollment-completions-funder-print-sheet { page-break-inside: avoid; break-inside: avoid-page; }',
+      '.enrollment-completions-funder-print-page { page-break-before: always; break-before: page; }',
+      'table.matrix th, table.matrix td { border: 1px solid #bbb; padding: 3px 4px; vertical-align: middle; }',
+      'table.matrix thead { display: table-header-group; }',
+      'table.matrix thead th { background: #eef1f4; font-weight: 700; text-align: left; }',
+      'table.matrix tbody tr { page-break-inside: avoid; break-inside: avoid-page; }',
+      'table.matrix tbody tr:nth-child(even) td { background: #f8f9fa; }',
+      '.funder-section-title { margin: 14px 0 6px; font-size: 12px; font-weight: 700; }',
+      '.funder-section-title:first-of-type { margin-top: 0; }',
+      '.funder-section-count { font-weight: 600; color: #555; font-size: 10px; }',
+      '.funder-section-block { margin-bottom: 12px; }',
+      '.follow-on-col, .hub-enrollment-completions-follow-on { white-space: pre-wrap; }',
+      '.text-muted { color: #666; }',
+      '.empty-msg { text-align: center; color: #666; padding: 16px 0; }',
+      '.doc-footer { margin-top: 10px; padding-top: 4px; border-top: 1px solid #ddd; color: #666; font-size: 9px; display: flex; justify-content: space-between; gap: 12px; }',
+      '@media print { body { margin: 0; } .no-print { display: none !important; } a { color: inherit; text-decoration: none; } }',
+      '@media screen { body { background: #e9ecef; padding: 16px; } .sheet { background: #fff; padding: 14px 16px; box-shadow: 0 1px 6px rgba(0,0,0,0.12); max-width: 100%; } }',
+      '</style>',
+      '</head>',
+      '<body class="print-density-', density, '" data-print-orientation="', escapeHtml(orientation), '">',
+      previewControlsHtml,
+      '<div class="sheet">',
+      identityHtml,
+      printNoteHtml,
+      summaryHtml,
+      tableHtml,
+      '<footer class="doc-footer">', footerLabel, '</footer>',
+      '</div>',
+      orientationScript,
+      '</body></html>'
     ].join('');
   }
 
   function printEnrollmentCompletionsReport() {
-    let printRoot = document.getElementById('hubEnrollmentCompletionsPrintRoot');
-    if (!printRoot) {
-      printRoot = document.createElement('div');
-      printRoot.id = 'hubEnrollmentCompletionsPrintRoot';
-      printRoot.className = 'd-none';
-      document.body.appendChild(printRoot);
+    if (!hubEnrollmentCompletionsPayload || !Array.isArray(hubEnrollmentCompletionsPayload.rows)) {
+      void showHubMessage({
+        title: HUB_ENROLLMENT_COMPLETION_LABEL,
+        icon: 'info',
+        message: 'Generate the report before printing.'
+      });
+      return;
     }
-    printRoot.innerHTML = [
-      '<h1 class="h4 mb-3">Monthly Enrollment Completions</h1>',
-      renderEnrollmentCompletionsPrintDocument(hubEnrollmentCompletionsPayload || {})
-    ].join('');
-    document.body.classList.remove('hub-print-student-progress', 'hub-print-weekly-reports');
-    document.body.classList.add('hub-print-enrollment-completions');
-    window.print();
-    window.setTimeout(function () {
-      document.body.classList.remove('hub-print-enrollment-completions');
-    }, 500);
+    const printRows = getEnrollmentCompletionsDisplayRows();
+    const defaults = {
+      orgName: resolveHubPrintOrgName(),
+      orientation: 'portrait',
+      density: 'compact',
+      logoUrl: resolveHubPrintBrandLogoUrl()
+    };
+    const openPreview = function (settings, existingWindow) {
+      const html = buildEnrollmentCompletionsPrintHtmlDocument({
+        payload: hubEnrollmentCompletionsPayload,
+        rows: printRows,
+        printSettings: settings,
+        columnPrefs: readEnrollmentCompletionsColumnPrefs()
+      });
+      const previewWindow = window.AppPrintManager && typeof window.AppPrintManager.openHtmlPreview === 'function'
+        ? window.AppPrintManager.openHtmlPreview({
+          title: HUB_ENROLLMENT_COMPLETION_LABEL,
+          html: html,
+          settings: settings,
+          sourcePath: location.pathname,
+          view: 'enrollment-completion',
+          autoPrint: false,
+          existingWindow: existingWindow
+        })
+        : null;
+      if (!previewWindow) {
+        const missingPrintManager = !(window.AppPrintManager && typeof window.AppPrintManager.openHtmlPreview === 'function');
+        void showHubMessage({
+          title: 'Print',
+          icon: 'warning',
+          message: missingPrintManager
+            ? 'Print tools did not load on Report Hub. Refresh the page and try again.'
+            : 'Allow pop-ups for this site to open the print preview (same as Attendance Matrix).'
+        });
+      }
+    };
+    if (window.AppPrintManager && typeof window.AppPrintManager.openSettings === 'function') {
+      window.AppPrintManager.openSettings({
+        mode: 'enrollment-completion',
+        defaults: defaults,
+        onConfirm: openPreview
+      });
+    } else {
+      openPreview(defaults);
+    }
   }
 
   function cacheEnrollmentCompletionsFilterOptions(payload) {
@@ -14317,20 +14992,56 @@
         return { id: String(row.id || '').trim(), name: String(row.name || row.id || 'Department').trim() };
       }).filter(function (row) { return row.id; });
     }
-    const programRows = payload && Array.isArray(payload.programOptions) ? payload.programOptions : [];
-    if (programRows.length) {
-      hubEnrollmentCompletionsProgramOptions = programRows.map(function (row) {
-        return { id: String(row.id || '').trim(), name: String(row.name || row.id || 'Program').trim() };
+    const catalogRows = payload && Array.isArray(payload.programCatalog) ? payload.programCatalog : [];
+    if (catalogRows.length) {
+      hubEnrollmentCompletionsProgramCatalog = catalogRows.map(function (row) {
+        return {
+          id: String(row.id || '').trim(),
+          name: String(row.name || row.id || 'Program').trim(),
+          departmentId: String(row.departmentId || '').trim()
+        };
+      }).filter(function (row) { return row.id; });
+    } else {
+      const programRows = payload && Array.isArray(payload.programOptions) ? payload.programOptions : [];
+      if (programRows.length) {
+        hubEnrollmentCompletionsProgramCatalog = programRows.map(function (row) {
+          return {
+            id: String(row.id || '').trim(),
+            name: String(row.name || row.id || 'Program').trim(),
+            departmentId: String(row.departmentId || '').trim()
+          };
+        }).filter(function (row) { return row.id; });
+      }
+    }
+    const funderRows = payload && Array.isArray(payload.funderOptions) ? payload.funderOptions : [];
+    if (funderRows.length) {
+      hubEnrollmentCompletionsFunderOptions = funderRows.map(function (row) {
+        const display = String(row.label || row.name || row.id || 'Funder').trim();
+        return { id: String(row.id || '').trim(), name: display };
       }).filter(function (row) { return row.id; });
     }
-    renderEnrollmentCompletionsMultiSelect('hubEnrollmentCompletionsDepartmentIds', 'Departments (optional)', hubEnrollmentCompletionsDepartmentOptions, readHubMultiSelectValues('hubEnrollmentCompletionsDepartmentIds'));
-    renderEnrollmentCompletionsMultiSelect('hubEnrollmentCompletionsProgramIds', 'Programs (optional)', hubEnrollmentCompletionsProgramOptions, readHubMultiSelectValues('hubEnrollmentCompletionsProgramIds'));
+    renderEnrollmentCompletionsMultiSelect(
+      'hubEnrollmentCompletionsDepartmentIds',
+      'Departments (optional)',
+      hubEnrollmentCompletionsDepartmentOptions,
+      readHubMultiSelectValues('hubEnrollmentCompletionsDepartmentIds')
+    );
+    renderEnrollmentCompletionsProgramSelect();
+    renderEnrollmentCompletionsFunderSelect();
   }
 
   async function ensureEnrollmentCompletionsFilterOptionsLoaded() {
-    if (hubEnrollmentCompletionsDepartmentOptions.length && hubEnrollmentCompletionsProgramOptions.length) {
-      renderEnrollmentCompletionsMultiSelect('hubEnrollmentCompletionsDepartmentIds', 'Departments (optional)', hubEnrollmentCompletionsDepartmentOptions, readHubMultiSelectValues('hubEnrollmentCompletionsDepartmentIds'));
-      renderEnrollmentCompletionsMultiSelect('hubEnrollmentCompletionsProgramIds', 'Programs (optional)', hubEnrollmentCompletionsProgramOptions, readHubMultiSelectValues('hubEnrollmentCompletionsProgramIds'));
+    if (hubEnrollmentCompletionsDepartmentOptions.length
+      && hubEnrollmentCompletionsProgramCatalog.length
+      && hubEnrollmentCompletionsFunderOptions.length) {
+      renderEnrollmentCompletionsMultiSelect(
+        'hubEnrollmentCompletionsDepartmentIds',
+        'Departments (optional)',
+        hubEnrollmentCompletionsDepartmentOptions,
+        readHubMultiSelectValues('hubEnrollmentCompletionsDepartmentIds')
+      );
+      renderEnrollmentCompletionsProgramSelect();
+      renderEnrollmentCompletionsFunderSelect();
       return;
     }
     try {
@@ -14352,19 +15063,65 @@
   function bindEnrollmentCompletionsControls() {
     const runBtn = document.getElementById('hubEnrollmentCompletionsRun');
     if (runBtn) runBtn.addEventListener('click', function () { void loadEnrollmentCompletionsReport(); });
+    const root = document.getElementById('hubEnrollmentCompletionsWorkspace');
+    if (root) {
+      root.querySelectorAll('[data-hub-enrollment-completions-month]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          const token = String(btn.getAttribute('data-hub-enrollment-completions-month') || '').trim();
+          if (token === 'nextMonth') setHubEnrollmentCompletionsMonthOffset(1);
+          else if (token === 'thisMonth') setHubEnrollmentCompletionsMonthOffset(0);
+          else if (token === 'lastMonth') setHubEnrollmentCompletionsMonthOffset(-1);
+        });
+      });
+    }
+    bindEnrollmentCompletionsFilterCollapse();
+    ['hubEnrollmentCompletionsColNewEnrollment', 'hubEnrollmentCompletionsColClb'].forEach(function (checkboxId) {
+      const checkboxEl = document.getElementById(checkboxId);
+      if (!checkboxEl) return;
+      checkboxEl.addEventListener('change', function () {
+        const columnPrefs = readEnrollmentCompletionsColumnPrefs();
+        normalizeEnrollmentCompletionsSortForColumns(columnPrefs);
+        if (hubEnrollmentCompletionsPayload) refreshEnrollmentCompletionsResultsView();
+      });
+    });
+    const departmentSelect = document.getElementById('hubEnrollmentCompletionsDepartmentIds');
+    if (departmentSelect) {
+      departmentSelect.addEventListener('change', function () {
+        renderEnrollmentCompletionsProgramSelect();
+      });
+    }
     const resetBtn = document.getElementById('hubEnrollmentCompletionsReset');
     if (resetBtn) resetBtn.addEventListener('click', function () {
       const monthEl = document.getElementById('hubEnrollmentCompletionsMonth');
       if (monthEl) monthEl.value = hubEnrollmentCompletionsDefaultMonth();
       renderEnrollmentCompletionsMultiSelect('hubEnrollmentCompletionsDepartmentIds', 'Departments (optional)', hubEnrollmentCompletionsDepartmentOptions, []);
-      renderEnrollmentCompletionsMultiSelect('hubEnrollmentCompletionsProgramIds', 'Programs (optional)', hubEnrollmentCompletionsProgramOptions, []);
+      renderEnrollmentCompletionsProgramSelect();
+      renderEnrollmentCompletionsFunderSelect();
+      const newColEl = document.getElementById('hubEnrollmentCompletionsColNewEnrollment');
+      const clbColEl = document.getElementById('hubEnrollmentCompletionsColClb');
+      if (newColEl) newColEl.checked = false;
+      if (clbColEl) clbColEl.checked = true;
       hubEnrollmentCompletionsPayload = null;
+      hubEnrollmentCompletionsSortState = { key: 'finishDate', dir: 'asc' };
       const target = enrollmentCompletionsResultsEl();
       if (target) target.innerHTML = renderEnrollmentCompletionsWaitingState();
     });
     const resultsRoot = document.getElementById('hubEnrollmentCompletionsWorkspace');
     if (resultsRoot) {
       resultsRoot.addEventListener('click', function (event) {
+        const sortHeader = event.target && event.target.closest ? event.target.closest('[data-hub-enrollment-completions-sort]') : null;
+        if (sortHeader) {
+          event.preventDefault();
+          const key = sortHeader.getAttribute('data-hub-enrollment-completions-sort') || 'finishDate';
+          const current = hubEnrollmentCompletionsSortState || { key: 'finishDate', dir: 'asc' };
+          if (current.key === key) {
+            hubEnrollmentCompletionsSortState = { key: key, dir: current.dir === 'asc' ? 'desc' : 'asc' };
+          } else {
+            hubEnrollmentCompletionsSortState = { key: key, dir: 'asc' };
+          }
+          refreshEnrollmentCompletionsResultsView();
+          return;
+        }
         const printBtn = event.target && event.target.closest ? event.target.closest('#hubEnrollmentCompletionsPrint') : null;
         if (printBtn) {
           event.preventDefault();
@@ -14378,20 +15135,22 @@
     if (hubEnrollmentCompletionsLoading) return;
     const month = hubInputValue('hubEnrollmentCompletionsMonth');
     if (!month) {
-      showHubMessage({ title: 'Monthly Enrollment Completions', icon: 'warning', message: 'Choose a calendar month.' });
+      showHubMessage({ title: HUB_ENROLLMENT_COMPLETION_LABEL, icon: 'warning', message: 'Choose a calendar month.' });
       return;
     }
     const departmentIds = readHubMultiSelectValues('hubEnrollmentCompletionsDepartmentIds');
     const programIds = readHubMultiSelectValues('hubEnrollmentCompletionsProgramIds');
+    const funderIds = readHubMultiSelectValues('hubEnrollmentCompletionsFunderIds');
     const requestQuery = new URLSearchParams();
     requestQuery.set('month', month);
     if (departmentIds.length) requestQuery.set('departmentIds', departmentIds.join(','));
     if (programIds.length) requestQuery.set('programIds', programIds.join(','));
+    if (funderIds.length) requestQuery.set('funderIds', funderIds.join(','));
 
     hubEnrollmentCompletionsLoading = true;
     const resultsEl = enrollmentCompletionsResultsEl();
     if (typeof window.showLoading === 'function') {
-      window.showLoading('Building enrollment completions report...');
+      window.showLoading('Building ' + HUB_ENROLLMENT_COMPLETION_LABEL + ' report...');
     }
     try {
       const response = await fetch('/school/report-hub/api/workspace/enrollment-completions?' + requestQuery.toString(), {
@@ -14405,6 +15164,7 @@
         throw new Error(payload.message || 'Unable to build this report.');
       }
       hubEnrollmentCompletionsPayload = payload;
+      hubEnrollmentCompletionsSortState = { key: 'finishDate', dir: 'asc' };
       cacheEnrollmentCompletionsFilterOptions(payload);
       if (resultsEl) resultsEl.innerHTML = renderEnrollmentCompletionsResults(payload);
     } catch (error) {
@@ -14426,21 +15186,32 @@
   function renderEnrollmentCompletionsWorkspace(payload) {
     const section = payload && payload.section ? payload.section : {
       key: 'enrollment-completions',
-      label: 'Monthly Enrollment Completions',
+      label: HUB_ENROLLMENT_COMPLETION_LABEL,
       icon: 'bi bi-calendar-check',
       sourceUrl: '/school/report-hub'
     };
+    const filtersExpanded = !hubEnrollmentCompletionsPayload || hubEnrollmentCompletionsFiltersExpanded();
+    const collapseShowClass = filtersExpanded ? ' show' : '';
+    const sectionLabel = escapeHtml(section.label || HUB_ENROLLMENT_COMPLETION_LABEL);
     els.workspace.innerHTML = [
       '<section class="hub-workspace" id="hubEnrollmentCompletionsWorkspace">',
       '<div class="hub-workspace-card">',
       '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
       '<div>',
       '<div class="text-uppercase text-muted small fw-bold">Report Hub Section</div>',
-      '<h2 class="h5 mb-0"><i class="' + escapeHtml(section.icon || 'bi bi-calendar-check') + ' me-2"></i>' + escapeHtml(section.label || 'Monthly Enrollment Completions') + '</h2>',
-      '<p class="small text-muted mb-0">Students whose effective enrollment ends in the selected month.</p>',
+      '<h2 class="h5 mb-0"><i class="' + escapeHtml(section.icon || 'bi bi-calendar-check') + ' me-2"></i>' + sectionLabel + '</h2>',
       '</div>',
       '</div>',
       '<div class="p-3 border-bottom bg-white hub-no-print">',
+      '<div class="card border shadow-sm mb-0">',
+      '<div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">',
+      '<div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filters</div>',
+      '<button id="hubEnrollmentCompletionsFilterToggleBtn" type="button" class="btn btn-outline-secondary btn-sm px-2" data-bs-toggle="collapse" data-bs-target="#hubEnrollmentCompletionsFilterCollapse" aria-expanded="' + (filtersExpanded ? 'true' : 'false') + '" aria-controls="hubEnrollmentCompletionsFilterCollapse" aria-label="' + (filtersExpanded ? 'Close filters' : 'Open filters') + '">',
+      '<i id="hubEnrollmentCompletionsFilterToggleIcon" class="bi ' + (filtersExpanded ? 'bi-chevron-up' : 'bi-chevron-down') + '"></i>',
+      '</button>',
+      '</div>',
+      '<div class="collapse' + collapseShowClass + '" id="hubEnrollmentCompletionsFilterCollapse">',
+      '<div class="card-body p-3">',
       '<div class="hub-weekly-reports-filter-grid mb-3">',
       '<div class="hub-weekly-reports-filter-field">',
       '<label class="form-label fw-bold small" for="hubEnrollmentCompletionsDepartmentIds">Departments</label>',
@@ -14450,16 +15221,46 @@
       '<div class="hub-weekly-reports-filter-field">',
       '<label class="form-label fw-bold small" for="hubEnrollmentCompletionsProgramIds">Programs</label>',
       '<select id="hubEnrollmentCompletionsProgramIds" class="form-select form-select-sm" multiple size="5" aria-label="Programs"></select>',
-      '<div class="form-text">Leave empty for all programs.</div>',
+      '<div class="form-text">Select department(s) first. Leave empty for all programs in those departments.</div>',
+      '</div>',
+      '<div class="hub-weekly-reports-filter-field">',
+      '<label class="form-label fw-bold small" for="hubEnrollmentCompletionsFunderIds">Funders</label>',
+      '<select id="hubEnrollmentCompletionsFunderIds" class="form-select form-select-sm" multiple size="5" aria-label="Funders"></select>',
+      '<div class="form-text">Leave empty for all funders (including self fund).</div>',
       '</div>',
       '<div class="hub-weekly-reports-filter-field">',
       '<label class="form-label fw-bold small" for="hubEnrollmentCompletionsMonth">Month</label>',
       '<input type="month" id="hubEnrollmentCompletionsMonth" class="form-control form-control-sm">',
+      '<div class="form-text">Effective enrollment finish must fall in this month.</div>',
       '</div>',
       '</div>',
-      '<div class="d-flex gap-2 justify-content-md-end">',
-      '<button type="button" id="hubEnrollmentCompletionsRun" class="btn btn-primary btn-sm fw-bold"><i class="bi bi-funnel-fill me-1"></i> Run report</button>',
+      '<div class="hub-enrollment-completions-column-toggles mb-3">',
+      '<div class="text-uppercase text-muted small fw-bold mb-2"><i class="bi bi-layout-three-columns me-1"></i>Report columns</div>',
+      '<nav class="d-flex flex-wrap align-items-center gap-3">',
+      '<div class="form-check form-check-inline mb-0">',
+      '<input class="form-check-input" type="checkbox" id="hubEnrollmentCompletionsColNewEnrollment" value="1">',
+      '<label class="form-check-label small" for="hubEnrollmentCompletionsColNewEnrollment">', escapeHtml(HUB_ENROLLMENT_COMPLETIONS_NEW_ENROLLMENT_COLUMN_LABEL), '</label>',
+      '</div>',
+      '<div class="form-check form-check-inline mb-0">',
+      '<input class="form-check-input" type="checkbox" id="hubEnrollmentCompletionsColClb" value="1" checked>',
+      '<label class="form-check-label small" for="hubEnrollmentCompletionsColClb">', escapeHtml(HUB_ENROLLMENT_COMPLETIONS_CLB_COLUMN_LABEL), '</label>',
+      '</div>',
+      '</nav>',
+      '<div class="form-text mt-1">When New enrollment is off, a blank Comment column is added for handwritten notes.</div>',
+      '</div>',
+      '<div class="row g-3 align-items-end">',
+      '<div class="col-md-6 d-flex flex-wrap gap-2 pt-1">',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-enrollment-completions-month="nextMonth">Next month</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-enrollment-completions-month="thisMonth">This month</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-enrollment-completions-month="lastMonth">Last month</button>',
+      '</div>',
+      '<div class="col-md-6 d-flex gap-2 justify-content-md-end">',
+      '<button type="button" id="hubEnrollmentCompletionsRun" class="btn btn-primary btn-sm flex-fill flex-md-grow-0 fw-bold"><i class="bi bi-funnel-fill me-1"></i> Generate</button>',
       '<button type="button" id="hubEnrollmentCompletionsReset" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i> Reset</button>',
+      '</div>',
+      '</div>',
+      '</div>',
+      '</div>',
       '</div>',
       '</div>',
       '<div class="p-3" id="hubEnrollmentCompletionsResults">',
@@ -14688,7 +15489,7 @@
         status: 'success',
         section: {
           key: 'enrollment-completions',
-          label: 'Monthly Enrollment Completions',
+          label: HUB_ENROLLMENT_COMPLETION_LABEL,
           icon: 'bi bi-calendar-check',
           sourceUrl: '/school/report-hub'
         }

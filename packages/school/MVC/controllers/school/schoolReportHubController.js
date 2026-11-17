@@ -12,6 +12,7 @@ exports.showReportHubPage = async (req, res) => {
       title: 'Report Hub',
       bodyClass: 'school-report-hub-page',
       mainClass: 'school-report-hub-main p-0 my-0',
+      includePrintManager: true,
       modules,
       defaultType: defaultModule ? defaultModule.type : '',
       canManageAllTasks: taskService.isAdminViewer(req.user),

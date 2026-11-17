@@ -15,6 +15,12 @@ test('weekly reports print uses dedicated document and teacher pages', () => {
   assert.match(reportHubView, /hub-print-weekly-reports/);
 });
 
+test('weekly reports print document meta includes organization logo letterhead', () => {
+  assert.match(reportHubView, /function renderHubReportPrintIdentityBlock\(/);
+  assert.match(reportHubView, /renderHubReportPrintIdentityBlock\(\)/);
+  assert.match(reportHubView, /resolveHubPrintBrandLogoUrl/);
+});
+
 test('weekly reports print supports student documents', () => {
   assert.match(reportHubView, /function renderWeeklyReportsPrintStudentDocument\(/);
   assert.match(reportHubView, /hub-wr-print-student-page/);

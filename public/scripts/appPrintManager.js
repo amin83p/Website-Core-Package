@@ -218,10 +218,17 @@
     if (!pendingPrint) return;
     const pending = pendingPrint;
     pendingPrint = null;
+
+    let preOpenedWindow = null;
+    try {
+      preOpenedWindow = global.open('', '_blank', 'height=720,width=1100');
+    } catch (_) {
+      preOpenedWindow = null;
+    }
     const nextSettings = readModalSettings(pending.settings);
     saveSettings(nextSettings, pending.mode, pending.sourcePath);
     if (modalInstance) modalInstance.hide();
-    if (pending.onConfirm) pending.onConfirm(nextSettings);
+    if (pending.onConfirm) pending.onConfirm(nextSettings, preOpenedWindow);
     pending.resolve(nextSettings);
   }
 
@@ -364,16 +371,21 @@
     const sourcePath = cleanString(options.sourcePath || global.location?.pathname || '/', 500) || '/';
     const view = cleanString(options.view || 'print', 80) || 'print';
     const autoPrint = options.autoPrint !== false;
-    const printWindow = global.open('', '_blank', 'height=720,width=1100');
+    const existingWindow = options.existingWindow && !options.existingWindow.closed
+      ? options.existingWindow
+      : null;
+    const printWindow = existingWindow || global.open('', '_blank', 'height=720,width=1100');
 
     if (!printWindow) {
       return null;
     }
 
     try { printWindow.opener = null; } catch (_) {}
-    printWindow.document.open();
-    printWindow.document.write(buildPrintPlaceholderHtml(title));
-    printWindow.document.close();
+    if (!existingWindow) {
+      printWindow.document.open();
+      printWindow.document.write(buildPrintPlaceholderHtml(title));
+      printWindow.document.close();
+    }
 
     try {
       const qsParts = ['print=1'];
@@ -386,6 +398,9 @@
     printWindow.document.write(html);
     printWindow.document.close();
     printWindow.focus();
+    global.setTimeout(() => {
+      try { printWindow.focus(); } catch (_) { /* ignore */ }
+    }, 120);
 
     if (autoPrint) {
       global.setTimeout(() => {

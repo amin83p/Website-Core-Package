@@ -1264,28 +1264,35 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
 
   if (key === 'enrollment-completions') {
     const access = await evaluateModuleAccess(req, {
-      label: 'Monthly Enrollment Completions',
+      label: 'Enrollment Completion',
       sectionId: SECTIONS.SCHOOL_CLASSES
     });
     if (!access.allowed) {
-      const error = new Error('You do not have access to Monthly Enrollment Completions.');
+      const error = new Error('You do not have access to Enrollment Completion.');
       error.statusCode = 403;
       throw error;
     }
     const filterOptionsOnly = ['1', 'true', 'yes'].includes(lower(queryInput?.filterOptionsOnly || ''));
     if (filterOptionsOnly) {
-      const { departmentOptions, programOptions } = await enrollmentCompletionsHubService.resolveFilterOptions(req.user);
+      const filterDepartmentIds = weeklyReportsHubService.parseFilterIdList(
+        queryInput?.departmentIds || queryInput?.departmentId || ''
+      );
+      const filterOptions = await enrollmentCompletionsHubService.resolveFilterOptions(req.user, {
+        departmentIds: filterDepartmentIds
+      });
       return {
         section: {
           key: 'enrollment-completions',
-          label: 'Monthly Enrollment Completions',
+          label: 'Enrollment Completion',
           icon: 'bi bi-calendar-check',
           sourceUrl: '/school/report-hub'
         },
         rows: [],
         total: 0,
-        departmentOptions,
-        programOptions,
+        departmentOptions: filterOptions.departmentOptions,
+        programOptions: filterOptions.programOptions,
+        programCatalog: filterOptions.programCatalog,
+        funderOptions: filterOptions.funderOptions,
         refreshedAt: new Date().toISOString()
       };
     }
@@ -1296,19 +1303,23 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
     const programIds = weeklyReportsHubService.parseFilterIdList(
       queryInput?.programIds || queryInput?.programId || ''
     );
+    const funderIds = enrollmentCompletionsHubService.parseFunderFilterIdList(
+      queryInput?.funderIds || queryInput?.funderId || ''
+    );
     const orgToday = resolveOrgTodayFromContext(req);
     const report = await enrollmentCompletionsHubService.buildEnrollmentCompletionsReport({
       reqUser: req.user,
       orgToday,
       month,
       departmentIds,
-      programIds
+      programIds,
+      funderIds
     });
-    const { departmentOptions, programOptions } = await enrollmentCompletionsHubService.resolveFilterOptions(req.user);
+    const filterOptions = await enrollmentCompletionsHubService.resolveFilterOptions(req.user, { departmentIds });
     return {
       section: {
         key: 'enrollment-completions',
-        label: 'Monthly Enrollment Completions',
+        label: 'Enrollment Completion',
         icon: 'bi bi-calendar-check',
         sourceUrl: '/school/report-hub'
       },
@@ -1317,8 +1328,10 @@ async function getWorkspaceSection(sectionKey, queryInput, req) {
       filters: report.filters,
       summary: report.summary,
       monthLabel: report.monthLabel,
-      departmentOptions,
-      programOptions,
+      departmentOptions: filterOptions.departmentOptions,
+      programOptions: filterOptions.programOptions,
+      programCatalog: filterOptions.programCatalog,
+      funderOptions: filterOptions.funderOptions,
       refreshedAt: report.refreshedAt
     };
   }

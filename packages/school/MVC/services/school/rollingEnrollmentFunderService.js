@@ -1,7 +1,7 @@
 'use strict';
 
 const { requireCoreModule } = require('./schoolCoreContracts');
-const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 const SELF_FUNDER_ID = 'self';
 const SELF_FUNDER_TYPE = 'self';
@@ -32,6 +32,11 @@ function resolveEnrollmentFunderLabel(period = {}, funderLabelById = new Map()) 
   if (!isSelfFund(funderId)) {
     const known = funderLabelById.get(funderId) || funderLabelById.get(toPublicId(funderId));
     if (known) return known;
+    if (funderLabelById instanceof Map) {
+      for (const [key, value] of funderLabelById.entries()) {
+        if (idsEqual(key, funderId) && value) return value;
+      }
+    }
   }
 
   if (isSelfFund(funderId) && (!funderType || funderType.toLowerCase() === SELF_FUNDER_TYPE)) {
