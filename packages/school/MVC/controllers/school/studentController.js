@@ -38,6 +38,7 @@ const termRegistrationViewService = require('../../services/school/termRegistrat
 const { buildClassEnrollmentRows } = require('../../services/school/studentAcademicOverviewService');
 const studentReportInstancesService = require('../../services/school/studentReportInstancesService');
 const studentListSearchService = require('../../services/school/studentListSearchService');
+const studentListEnrollmentFunderIndexService = require('../../services/school/studentListEnrollmentFunderIndexService');
 const reportService = require('../../services/school/reportService');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
@@ -579,6 +580,12 @@ exports.listStudents = async (req, res) => {
             reqUser: req.user,
             personIds: (Array.isArray(allStudents) ? allStudents : []).map((student) => student.personId)
         });
+        const enrollmentFunderLabelsByStudentId = searchTerm
+            ? await studentListEnrollmentFunderIndexService.loadEnrollmentFunderLabelsByStudentId(
+                req.user,
+                getActiveOrgIdOrThrow(req.user)
+            )
+            : null;
 
         const enrichedStudents = allStudents.map(student => {
             const person = personById.get(toPublicId(student.personId));
@@ -592,7 +599,11 @@ exports.listStudents = async (req, res) => {
                 name: fullName,
                 email: schoolPersonAccessService.readPersonEmail(person) || 'N/A',
                 phone: person?.contact?.phones?.[0]?.number || 'N/A',
-                primaryClaimNumber: studentListSearchService.resolvePrimaryClaimNumber(student)
+                primaryClaimNumber: studentListSearchService.resolvePrimaryClaimNumber(student),
+                enrollmentFunderSearchLabels: studentListEnrollmentFunderIndexService.readEnrollmentFunderLabelsForStudent(
+                    student,
+                    enrollmentFunderLabelsByStudentId
+                )
             };
         });
 
@@ -666,6 +677,12 @@ exports.listArchivedStudents = async (req, res) => {
             reqUser: req.user,
             personIds: (Array.isArray(allStudents) ? allStudents : []).map((student) => student.personId)
         });
+        const enrollmentFunderLabelsByStudentId = searchTerm
+            ? await studentListEnrollmentFunderIndexService.loadEnrollmentFunderLabelsByStudentId(
+                req.user,
+                getActiveOrgIdOrThrow(req.user)
+            )
+            : null;
 
         const enrichedStudents = allStudents.map(student => {
             const person = personById.get(toPublicId(student.personId));
@@ -674,7 +691,11 @@ exports.listArchivedStudents = async (req, res) => {
                 firstName: person?.name?.first || person?.firstName || 'Unknown',
                 lastName: person?.name?.last || person?.lastName || 'Person',
                 email: schoolPersonAccessService.readPersonEmail(person) || 'N/A',
-                phone: person?.contact?.phones?.[0]?.number || 'N/A'
+                phone: person?.contact?.phones?.[0]?.number || 'N/A',
+                enrollmentFunderSearchLabels: studentListEnrollmentFunderIndexService.readEnrollmentFunderLabelsForStudent(
+                    student,
+                    enrollmentFunderLabelsByStudentId
+                )
             };
         });
 

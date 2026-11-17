@@ -13,6 +13,9 @@ const {
   LEGACY_STUDENT_PICKER_SEARCH_FIELDS,
   isLegacyStudentPickerSearchFields
 } = require('../packages/school/MVC/services/school/studentListSearchService');
+const {
+  indexEnrollmentFunderLabelsByStudentId
+} = require('../packages/school/MVC/services/school/studentListEnrollmentFunderIndexService');
 
 const CONFIG_FIELDS = require('../packages/school/config/studentPickerSearchFields');
 
@@ -136,16 +139,52 @@ test('studentMatchesListSearch matches claim label field', () => {
 
 test('mergeStudentListSearchableFields always includes claim DB search fields', () => {
   const merged = mergeStudentListSearchableFields(['id', 'customStudentId']);
-  assert.deepEqual(STUDENT_LIST_EXTRA_DB_SEARCH_FIELDS, ['claimNumbers.number', 'claimNumbers.label']);
+  assert.equal(STUDENT_LIST_EXTRA_DB_SEARCH_FIELDS.includes('claimNumbers.number'), true);
+  assert.equal(STUDENT_LIST_EXTRA_DB_SEARCH_FIELDS.includes('claimNumbers.label'), true);
+  assert.equal(STUDENT_LIST_EXTRA_DB_SEARCH_FIELDS.includes('enrollmentFunderLabels'), true);
   assert.equal(merged.includes('claimNumbers.number'), true);
   assert.equal(merged.includes('claimNumbers.label'), true);
+  assert.equal(merged.includes('enrollmentFunderLabels'), true);
+});
+
+test('buildStudentListSearchHaystack includes enrollment funder labels', () => {
+  const haystack = buildStudentListSearchHaystack(baseStudent({
+    enrollmentFunderSearchLabels: ['Workers Compensation Board', 'IRCC']
+  }));
+  assert.match(haystack, /workers compensation board/);
+  assert.match(haystack, /ircc/);
+});
+
+test('studentMatchesListSearch matches enrollment funder name from class enrollments', () => {
+  const student = baseStudent({
+    enrollmentFunderSearchLabels: ['Alberta Workers Compensation Board']
+  });
+  assert.equal(studentMatchesListSearch(student, { q: 'compensation' }), true);
+  assert.equal(studentMatchesListSearch(student, {
+    q: 'workers',
+    searchFields: 'enrollmentFunderLabels'
+  }), true);
+  assert.equal(studentMatchesListSearch(student, { q: 'ircc' }), false);
+});
+
+test('indexEnrollmentFunderLabelsByStudentId groups labels and skips void enrollments', () => {
+  const funderLabelById = new Map([['FUN-1', 'WCB Alberta']]);
+  const byStudent = indexEnrollmentFunderLabelsByStudentId([
+    { studentId: 'STU-1', status: 'completed', funderId: 'FUN-1', funderType: 'funder' },
+    { studentId: 'STU-1', status: 'void', funderId: 'FUN-1', funderType: 'funder' },
+    { studentId: 'STU-2', status: 'active', funderId: 'self', funderType: 'self' }
+  ], funderLabelById);
+  assert.deepEqual(Array.from(byStudent.get('STU-1') || []), ['WCB Alberta']);
+  assert.deepEqual(Array.from(byStudent.get('STU-2') || []), ['Self Fund']);
 });
 
 test('listStudents wires student list claim search helper', () => {
   const controller = read('packages/school/MVC/controllers/school/studentController.js');
   assert.match(controller, /studentListSearchService/);
+  assert.match(controller, /studentListEnrollmentFunderIndexService/);
   assert.match(controller, /studentMatchesListSearch/);
   assert.match(controller, /mergeStudentListSearchableFields/);
+  assert.match(controller, /loadEnrollmentFunderLabelsByStudentId/);
 });
 
 test('students repository defaultSearchFields include claim number paths', () => {

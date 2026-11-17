@@ -10,7 +10,8 @@ const {
 
 const STUDENT_LIST_EXTRA_DB_SEARCH_FIELDS = Object.freeze([
   'claimNumbers.number',
-  'claimNumbers.label'
+  'claimNumbers.label',
+  'enrollmentFunderLabels'
 ]);
 
 function normalizeSearchFieldsToken(searchFields) {
@@ -68,6 +69,13 @@ function collectClaimSearchTokens(student) {
   return tokens;
 }
 
+function collectEnrollmentFunderSearchTokens(student) {
+  const raw = Array.isArray(student?.enrollmentFunderSearchLabels)
+    ? student.enrollmentFunderSearchLabels
+    : [];
+  return raw.map((value) => String(value || '').trim()).filter(Boolean);
+}
+
 function buildStudentListSearchHaystack(student) {
   const firstName = String(student?.firstName || '').trim();
   const lastName = String(student?.lastName || '').trim();
@@ -86,7 +94,8 @@ function buildStudentListSearchHaystack(student) {
     student?.phone,
     student?.feeCategory,
     student?.studentAccountId,
-    ...collectClaimSearchTokens(student)
+    ...collectClaimSearchTokens(student),
+    ...collectEnrollmentFunderSearchTokens(student)
   ]
     .map((value) => String(value || '').trim().toLowerCase())
     .filter(Boolean)
@@ -116,6 +125,9 @@ function readStudentSearchFieldValues(student, fieldToken) {
   }
   if (field === 'claimNumbers') {
     return collectClaimSearchTokens(student);
+  }
+  if (field === 'enrollmentFunderLabels') {
+    return collectEnrollmentFunderSearchTokens(student);
   }
   if (Object.prototype.hasOwnProperty.call(student || {}, field)) {
     return [student[field]];
