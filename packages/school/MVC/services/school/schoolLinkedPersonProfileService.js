@@ -242,9 +242,11 @@ async function updateLinkedPersonProfile({ reqUser, personId, linkType, linkId =
   const refreshed = await loadPersonRecord(existing.id, reqUser);
   const profile = toProfileDto(refreshed);
   const displayName = schoolPersonAccessService.formatPersonName(refreshed, profile.id);
+  const normalizedLinkType = normalizeLinkType(linkType);
+  const nameChanged = Boolean(displayName && displayName !== priorDisplayName);
   let nameSync = null;
 
-  if (displayName && displayName !== priorDisplayName) {
+  if (nameChanged && normalizedLinkType !== 'teacher') {
     try {
       const activeOrgId = getActiveOrgIdOrThrow(reqUser);
       nameSync = await personDenormalizedNameSyncService.syncPersonDisplayName({
@@ -267,6 +269,8 @@ async function updateLinkedPersonProfile({ reqUser, personId, linkType, linkId =
     person: profile,
     displayName,
     organizations: profile.organizations,
+    nameChanged,
+    priorDisplayName: nameChanged ? priorDisplayName : displayName,
     nameSync
   };
 }

@@ -374,6 +374,165 @@ test('teacher, staff, and student list pages expose sync saved names button', ()
   assert.match(studentList, /syncDenormalizedLinkType: 'student'/);
 });
 
+test('syncPersonDisplayName updates co-teacher and case collaborator names', async () => {
+  const originals = {
+    fetchData: schoolDataService.fetchData,
+    getClassSessions: schoolDataService.getClassSessions,
+    saveClassSessions: schoolDataService.saveClassSessions,
+    updateData: schoolDataService.updateData,
+    sessionCasesList: schoolRepositories.sessionStudentCases.list,
+    sessionCasesUpdate: schoolRepositories.sessionStudentCases.update,
+    activitiesList: schoolRepositories.activities.list,
+    tasksList: schoolRepositories.tasks.list,
+    leaveList: schoolRepositories.leaveRequests.list
+  };
+  const classId = 'CLS_CO_1';
+  let savedSessions = [];
+
+  schoolDataService.fetchData = async (entityType) => {
+    if (entityType === 'classes') {
+      return [{ id: classId, orgId: 'ORG_1', instructors: [], sessions: [] }];
+    }
+  if (entityType === 'teachers') return [{ id: 'TCH_1', personId: 'PER_1', orgId: 'ORG_1' }];
+    return [];
+  };
+  schoolDataService.getClassSessions = async () => ([{
+    sessionId: 'SES_CO_1',
+    delivery: {
+      deliveredBy: 'OTHER',
+      deliveredByName: 'Other Teacher',
+      coTeachers: [{ personId: 'PER_1', name: 'Old Co Name' }]
+    },
+    merged: { previousTeacherId: 'TCH_1', previousTeacherName: 'Old Co Name' }
+  }]);
+  schoolDataService.saveClassSessions = async (_classId, sessions) => {
+    savedSessions = sessions;
+    return sessions;
+  };
+  schoolDataService.updateData = async () => ({});
+  schoolRepositories.sessionStudentCases.list = async () => [{
+    id: 'CASE_1',
+    orgId: 'ORG_1',
+    teacherPersonId: 'PER_1',
+    teacherName: 'Old Co Name',
+    assignedTo: { personId: 'PER_1', personName: 'Old Co Name' },
+    collaborators: [{ personId: 'PER_1', personName: 'Old Co Name' }]
+  }];
+  schoolRepositories.sessionStudentCases.update = async (_id, payload) => payload;
+  schoolRepositories.activities.list = async () => [];
+  schoolRepositories.tasks.list = async () => [];
+  schoolRepositories.leaveRequests.list = async () => [];
+
+  try {
+    const result = await personDenormalizedNameSyncService.syncPersonDisplayName({
+      personId: 'PER_1',
+      displayName: 'Kyle Mack',
+      activeOrgId: 'ORG_1',
+      reqUser: null
+    });
+    assert.equal(result.updated.coTeachers, 1);
+    assert.equal(savedSessions[0].delivery.coTeachers[0].name, 'Kyle Mack');
+    assert.equal(savedSessions[0].merged.previousTeacherName, 'Kyle Mack');
+    assert.equal(result.updated.caseAssignees, 1);
+    assert.equal(result.updated.caseCollaborators, 1);
+  } finally {
+    Object.assign(schoolDataService, {
+      fetchData: originals.fetchData,
+      getClassSessions: originals.getClassSessions,
+      saveClassSessions: originals.saveClassSessions,
+      updateData: originals.updateData
+    });
+    schoolRepositories.sessionStudentCases.list = originals.sessionCasesList;
+    schoolRepositories.sessionStudentCases.update = originals.sessionCasesUpdate;
+    schoolRepositories.activities.list = originals.activitiesList;
+    schoolRepositories.tasks.list = originals.tasksList;
+    schoolRepositories.leaveRequests.list = originals.leaveList;
+  }
+});
+
+test('includeHistorical updates report instances and timesheet makeup teacher labels', async () => {
+  const originals = {
+    fetchData: schoolDataService.fetchData,
+    getClassSessions: schoolDataService.getClassSessions,
+    updateData: schoolDataService.updateData,
+    sessionCasesList: schoolRepositories.sessionStudentCases.list,
+    activitiesList: schoolRepositories.activities.list,
+    tasksList: schoolRepositories.tasks.list,
+    leaveList: schoolRepositories.leaveRequests.list,
+    reportList: schoolRepositories.reportInstances.list,
+    reportUpdate: schoolRepositories.reportInstances.update,
+    timesheetList: schoolRepositories.timesheets.list,
+    timesheetUpdate: schoolRepositories.timesheets.update
+  };
+  let savedReport = null;
+  let savedTimesheet = null;
+
+  schoolDataService.fetchData = async (entityType) => {
+    if (entityType === 'classes') return [];
+    if (entityType === 'teachers') return [{ id: 'TCH_1', personId: 'PER_1', orgId: 'ORG_1' }];
+    if (entityType === 'students') return [];
+    return [];
+  };
+  schoolDataService.getClassSessions = async () => [];
+  schoolDataService.updateData = async () => ({});
+  schoolRepositories.sessionStudentCases.list = async () => [];
+  schoolRepositories.activities.list = async () => [];
+  schoolRepositories.tasks.list = async () => [];
+  schoolRepositories.leaveRequests.list = async () => [];
+  schoolRepositories.bookCoveringReports = schoolRepositories.bookCoveringReports || { list: async () => [], update: async () => null };
+  schoolRepositories.bookCoveringReports.list = async () => [];
+  schoolRepositories.reportInstances.list = async () => [{
+    id: 'RPT_1',
+    orgId: 'ORG_1',
+    teacherId: 'TCH_1',
+    lockSnapshot: { mergedAnswers: { teacher_name: 'Old Teacher' } }
+  }];
+  schoolRepositories.reportInstances.update = async (_id, payload) => {
+    savedReport = payload;
+    return payload;
+  };
+  schoolRepositories.timesheets.list = async () => [{
+    id: 'TS_1',
+    orgId: 'ORG_1',
+    teacherId: 'TCH_1',
+    priorPeriodReconciliation: {
+      makeupChains: [{
+        nodes: [{ deliveryPersonIds: ['PER_1'], teacherName: 'Old Teacher' }]
+      }]
+    }
+  }];
+  schoolRepositories.timesheets.update = async (_id, payload) => {
+    savedTimesheet = payload;
+    return payload;
+  };
+
+  try {
+    const result = await personDenormalizedNameSyncService.syncPersonDisplayName({
+      personId: 'PER_1',
+      displayName: 'New Teacher',
+      activeOrgId: 'ORG_1',
+      includeHistorical: true,
+      reqUser: { id: 'USER_1', activeOrgId: 'ORG_1' }
+    });
+    assert.equal(result.updated.reportInstances, 1);
+    assert.equal(result.updated.timesheets, 1);
+    assert.equal(savedReport.lockSnapshot.mergedAnswers.teacher_name, 'New Teacher');
+    assert.equal(savedTimesheet.priorPeriodReconciliation.makeupChains[0].nodes[0].teacherName, 'New Teacher');
+  } finally {
+    schoolDataService.fetchData = originals.fetchData;
+    schoolDataService.getClassSessions = originals.getClassSessions;
+    schoolDataService.updateData = originals.updateData;
+    schoolRepositories.sessionStudentCases.list = originals.sessionCasesList;
+    schoolRepositories.activities.list = originals.activitiesList;
+    schoolRepositories.tasks.list = originals.tasksList;
+    schoolRepositories.leaveRequests.list = originals.leaveList;
+    schoolRepositories.reportInstances.list = originals.reportList;
+    schoolRepositories.reportInstances.update = originals.reportUpdate;
+    schoolRepositories.timesheets.list = originals.timesheetList;
+    schoolRepositories.timesheets.update = originals.timesheetUpdate;
+  }
+});
+
 test('schedule hour categories use one canonical school role label per event', () => {
   assert.deepEqual(
     scheduleController.getScheduleEventHourCategoryLabels({

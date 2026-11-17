@@ -468,6 +468,134 @@
     }
   }
 
+  function buildTeacherSyncPreviewLine(counts) {
+    const rows = counts && typeof counts === 'object' ? counts : {};
+    const parts = [];
+    const pushCount = (value, label) => {
+      const n = Number(value || 0);
+      if (n > 0) parts.push(`${n} ${label}`);
+    };
+    pushCount(rows.sessions, 'sessions');
+    pushCount(rows.coTeachers, 'co-teachers');
+    pushCount(rows.instructors, 'class instructors');
+    pushCount(rows.sessionStudentCases, 'session issues');
+    pushCount(rows.reportInstances, 'report instances');
+    pushCount(rows.timesheets, 'timesheets');
+    pushCount(rows.bookCoveringReports, 'book covering reports');
+    pushCount(rows.studentsClbHistory, 'student CLB records');
+    pushCount(rows.tasks, 'tasks');
+    pushCount(rows.schoolAccounts, 'school accounts');
+    return parts.length ? `<div class="small mt-2">Saved copies that still use the old name: <b>${safeHtml(parts.join(', '))}</b>.</div>` : '';
+  }
+
+  async function buildTeacherNamePropagateMessage(personId, priorName, nextName) {
+    let previewHtml = '';
+    try {
+      const params = new URLSearchParams({
+        personId: String(personId || ''),
+        linkType: 'teacher',
+        includeHistorical: 'true'
+      });
+      const res = await fetch(`/school/identity/api/sync-denormalized-names/preview?${params.toString()}`, {
+        headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' }
+      });
+      const payload = await res.json();
+      if (res.ok && payload.status === 'success') {
+        previewHtml = buildTeacherSyncPreviewLine(payload.data?.mismatchCounts);
+      }
+    } catch (_) {
+      previewHtml = '';
+    }
+    return (
+      '<div>The person profile was saved with the new display name.</div>' +
+      `<div class="mt-2"><b>${safeHtml(priorName)}</b> → <b>${safeHtml(nextName)}</b></div>` +
+      '<div class="small text-muted mt-2">Update saved copies across classes, sessions, cases, tasks, timesheets, reports, and related historical records?</div>' +
+      '<div class="small text-muted mt-1">Exported PDF/DOCX files already delivered are not changed; only database records are updated.</div>' +
+      previewHtml
+    );
+  }
+
+  function buildTeacherSyncSummaryHtml(data) {
+    const updated = data && data.updated ? data.updated : {};
+    return [
+      '<div class="mb-2"><b>Done.</b> Saved teacher names were updated across the organization.</div>',
+      '<div class="small">',
+      'Classes touched: <b>', Number(updated.classes || 0), '</b><br>',
+      'Sessions updated: <b>', Number(updated.sessions || 0), '</b><br>',
+      'Co-teachers updated: <b>', Number(updated.coTeachers || 0), '</b><br>',
+      'Instructors updated: <b>', Number(updated.instructors || 0), '</b><br>',
+      'Session issues updated: <b>', Number(updated.sessionStudentCases || 0), '</b><br>',
+      'Report instances updated: <b>', Number(updated.reportInstances || 0), '</b><br>',
+      'Timesheets updated: <b>', Number(updated.timesheets || 0), '</b><br>',
+      'Book covering reports updated: <b>', Number(updated.bookCoveringReports || 0), '</b><br>',
+      'Student CLB labels updated: <b>', Number(updated.studentsClbHistory || 0), '</b><br>',
+      'Tasks updated: <b>', Number(updated.tasks || 0), '</b><br>',
+      'School accounts updated: <b>', Number(updated.schoolAccounts || 0), '</b><br>',
+      'Errors: <b>', Number(updated.errors || 0), '</b>',
+      '</div>'
+    ].join('');
+  }
+
+  async function promptTeacherNamePropagation(data) {
+    if (currentContext?.linkType !== 'teacher' || !data?.nameChanged) return;
+    const personId = currentContext.personId;
+    const priorName = String(data.priorDisplayName || '').trim();
+    const nextName = String(data.displayName || '').trim();
+    if (!personId || !priorName || !nextName || priorName === nextName) return;
+
+    const confirmMessage = await buildTeacherNamePropagateMessage(personId, priorName, nextName);
+    let confirmed = false;
+    if (typeof global.showMessageModal === 'function') {
+      const answer = await global.showMessageModal({
+        title: 'Update saved copies?',
+        icon: 'question',
+        message: confirmMessage,
+        buttons: [
+          { text: 'Not now', class: 'btn-secondary btn-md' },
+          { text: 'Update saved copies', class: 'btn-success btn-md' }
+        ]
+      });
+      confirmed = answer === 'Update saved copies';
+    } else {
+      confirmed = global.confirm('Update saved copies of this teacher name across the school?');
+    }
+    if (!confirmed) return;
+
+    try {
+      const res = await fetch('/school/identity/api/sync-denormalized-names', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: JSON.stringify({
+          personId,
+          linkType: 'teacher',
+          includeHistorical: true
+        })
+      });
+      const payload = await res.json();
+      if (payload.status !== 'success') throw new Error(payload.message || 'Name propagation failed.');
+      const summaryHtml = buildTeacherSyncSummaryHtml(payload.data || {});
+      if (typeof global.showMessageModal === 'function') {
+        await global.showMessageModal({
+          title: payload.partial ? 'Updated with warnings' : 'Saved copies updated',
+          icon: payload.partial ? 'warning' : 'success',
+          message: summaryHtml,
+          buttons: [{ text: 'OK', class: 'btn-success btn-md' }]
+        });
+      }
+    } catch (error) {
+      await showUserMessage({
+        title: 'Propagation Failed',
+        message: error.message || 'Failed to update saved teacher name copies.',
+        icon: 'error',
+        buttonClass: 'btn-danger'
+      });
+    }
+  }
+
   async function saveProfile() {
     if (!currentContext?.personId) return;
     setAlert('');
@@ -498,6 +626,7 @@
         });
       }
       modalInstance?.hide();
+      await promptTeacherNamePropagation(data);
     } catch (error) {
       await showUserMessage({
         title: 'Save Failed',

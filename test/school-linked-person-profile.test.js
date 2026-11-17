@@ -10,6 +10,7 @@ const schoolAdminAccessService = require('../packages/school/MVC/services/school
 const { requireCoreModule } = require('../packages/school/MVC/services/school/schoolCoreContracts');
 const { OPERATIONS } = require('../packages/school/config/accessConstants');
 const coreDataService = requireCoreModule('MVC/services/dataService');
+const personDenormalizedNameSyncService = require('../packages/school/MVC/services/school/personDenormalizedNameSyncService');
 
 const ROOT_DIR = path.resolve(__dirname, '..');
 
@@ -406,6 +407,81 @@ test('updateLinkedPersonProfile saves organization funder without gender or DOB'
   }
 });
 
+test('updateLinkedPersonProfile defers denormalized sync for teacher linkType when name changes', async () => {
+  const service = reloadService();
+  const restoreAdmin = mockAdminAccess(true);
+  const originalGetTeacher = schoolDataService.getDataById;
+  const originalGetPerson = schoolPersonAccessService.getPersonById;
+  const originalGetById = coreDataService.getDataById;
+  const originalUpdate = coreDataService.updateData;
+  const originalSync = personDenormalizedNameSyncService.syncPersonDisplayName;
+  let syncCalled = false;
+
+  const existingPerson = {
+    id: 'PER-TCH-1',
+    active: true,
+    personProfileType: 'individual',
+    name: { first: 'Old', last: 'Teacher' },
+    demographics: { gender: 'male', dateOfBirth: '1980-01-01' },
+    contact: { emails: [{ type: 'primary', email: 'old@example.com', isPrimary: true }], phones: [] },
+    addresses: [],
+    organizations: [{ orgId: 'ORG-1', roles: ['school_teacher'] }],
+    manualTags: [],
+    tags: [],
+    avatarUrl: null,
+    audit: { createUser: 'SYS', createDateTime: '2020-01-01T00:00:00.000Z' }
+  };
+  let storedPerson = JSON.parse(JSON.stringify(existingPerson));
+
+  schoolDataService.getDataById = async (entityType, id) => {
+    if (entityType === 'teachers' && id === 'TCH-1') {
+      return { id: 'TCH-1', orgId: 'ORG-1', personId: 'PER-TCH-1' };
+    }
+    return null;
+  };
+  schoolPersonAccessService.getPersonById = async () => storedPerson;
+  coreDataService.getDataById = async () => storedPerson;
+  coreDataService.updateData = async (_type, _id, updates) => {
+    storedPerson = { ...storedPerson, ...updates };
+    return storedPerson;
+  };
+  personDenormalizedNameSyncService.syncPersonDisplayName = async () => {
+    syncCalled = true;
+    return { updated: {} };
+  };
+
+  try {
+    const result = await service.updateLinkedPersonProfile({
+      reqUser,
+      personId: 'PER-TCH-1',
+      linkType: 'teacher',
+      linkId: 'TCH-1',
+      body: {
+        firstName: 'New',
+        lastName: 'Teacher',
+        gender: 'male',
+        dateOfBirth: '1980-01-01',
+        emails: JSON.stringify([{ type: 'primary', email: 'old@example.com', isPrimary: true }]),
+        phones: '[]',
+        addresses: '[]',
+        active: 'true'
+      }
+    });
+    assert.equal(syncCalled, false);
+    assert.equal(result.nameChanged, true);
+    assert.equal(result.priorDisplayName, 'Old Teacher');
+    assert.equal(result.displayName, 'New Teacher');
+    assert.equal(result.nameSync, null);
+  } finally {
+    schoolDataService.getDataById = originalGetTeacher;
+    schoolPersonAccessService.getPersonById = originalGetPerson;
+    coreDataService.getDataById = originalGetById;
+    coreDataService.updateData = originalUpdate;
+    personDenormalizedNameSyncService.syncPersonDisplayName = originalSync;
+    restoreAdmin();
+  }
+});
+
 test('identity routes and forms expose linked person profile integration', () => {
   const routes = read('packages/school/MVC/routes/schoolIdentityRoutes.js');
   assert.match(routes, /linked-person\/:personId/);
@@ -433,6 +509,9 @@ test('identity routes and forms expose linked person profile integration', () =>
   assert.match(read('public/scripts/schoolPersonProfileModal.js'), /organizationLegalName/);
   assert.match(read('public/scripts/schoolPersonProfileModal.js'), /showUserMessage/);
   assert.match(read('public/scripts/schoolPersonProfileModal.js'), /showMessageModal/);
+  assert.match(read('public/scripts/schoolPersonProfileModal.js'), /promptTeacherNamePropagation/);
+  assert.match(read('public/scripts/schoolPersonProfileModal.js'), /includeHistorical:\s*true/);
+  assert.match(routes, /sync-denormalized-names\/preview/);
   const mainJs = read('public/scripts/main.js');
   assert.match(mainJs, /linked-person/);
   assert.match(mainJs, /linked-person[\s\S]{0,800}csrf-token/);

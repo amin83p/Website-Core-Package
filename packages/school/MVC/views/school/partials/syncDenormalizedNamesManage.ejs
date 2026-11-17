@@ -33,7 +33,7 @@
         '<div class="progress" role="progressbar" aria-label="Sync progress" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100">',
         '<div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>',
         '</div>',
-        '<div class="small text-muted mt-2">Updating School Accounts, class sessions, instructors, cases, activities, current tasks, and current leave records where saved names still reference old person labels.</div>'
+        '<div class="small text-muted mt-2">Updating live operational copies only: School Accounts, class sessions, instructors, co-teachers, cases, activities, current tasks, and current leave records. Historical records (timesheets, locked report snapshots, and similar) are not changed by this bulk action.</div>'
       ].join('');
     }
 
@@ -52,7 +52,10 @@
         'Classes touched: <b>', Number(updated.classes || 0), '</b><br>',
         'Sessions updated: <b>', Number(updated.sessions || 0), '</b><br>',
         'Instructors updated: <b>', Number(updated.instructors || 0), '</b><br>',
+        'Co-teachers updated: <b>', Number(updated.coTeachers || 0), '</b><br>',
         'Session issues updated: <b>', Number(updated.sessionStudentCases || 0), '</b><br>',
+        'Case assignees updated: <b>', Number(updated.caseAssignees || 0), '</b><br>',
+        'Case collaborators updated: <b>', Number(updated.caseCollaborators || 0), '</b><br>',
         'Activities updated: <b>', Number(updated.activities || 0), '</b><br>',
         'School Accounts updated: <b>', Number(updated.schoolAccounts || 0), '</b><br>',
         'Tasks updated: <b>', Number(updated.tasks || 0), '</b><br>',

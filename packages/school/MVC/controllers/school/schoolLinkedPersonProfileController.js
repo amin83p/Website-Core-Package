@@ -50,6 +50,46 @@ async function patchLinkedPersonProfile(req, res) {
   }
 }
 
+function parseIncludeHistorical(req) {
+  const raw = req.body?.includeHistorical ?? req.query?.includeHistorical;
+  return raw === true || String(raw || '').trim().toLowerCase() === 'true';
+}
+
+async function previewDenormalizedNames(req, res) {
+  try {
+    const activeOrgId = getActiveOrgIdOrThrow(req.user);
+    const personId = toPublicId(req.query?.personId || req.params?.personId || '');
+    const linkType = String(req.query?.linkType || '').trim().toLowerCase();
+    if (!personId) {
+      return res.status(400).json({ status: 'error', message: 'personId is required.' });
+    }
+    const canSync = await Promise.all([
+      schoolAdminAccessService.isAdminForRequestAsync(req.user, SECTIONS.SCHOOL_TEACHERS, OPERATIONS.UPDATE),
+      schoolAdminAccessService.isAdminForRequestAsync(req.user, SECTIONS.SCHOOL_STAFF, OPERATIONS.UPDATE),
+      schoolAdminAccessService.isAdminForRequestAsync(req.user, SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE)
+    ]);
+    if (!canSync.some(Boolean)) {
+      return res.status(403).json({ status: 'error', message: 'You do not have permission to preview denormalized person names.' });
+    }
+    const includeHistorical = parseIncludeHistorical(req);
+    const result = await personDenormalizedNameSyncService.previewPersonDenormalizedNameSync({
+      personId,
+      activeOrgId,
+      reqUser: req.user,
+      includeHistorical: linkType === 'teacher' ? (includeHistorical || true) : includeHistorical
+    });
+    return res.json({
+      status: 'success',
+      data: {
+        ...result,
+        linkType: linkType || 'person'
+      }
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
 async function syncDenormalizedNames(req, res) {
   let guardKey = '';
   try {
@@ -86,9 +126,16 @@ async function syncDenormalizedNames(req, res) {
       }
     }
 
+    const includeHistorical = parseIncludeHistorical(req);
     const result = isIntegratedBulk
       ? await personDenormalizedNameSyncService.syncAllSchoolPeopleSavedNamesForOrg({ activeOrgId, reqUser: req.user })
-      : await personDenormalizedNameSyncService.syncDenormalizedNamesForOrg({ activeOrgId, reqUser: req.user, personId, linkType });
+      : await personDenormalizedNameSyncService.syncDenormalizedNamesForOrg({
+        activeOrgId,
+        reqUser: req.user,
+        personId,
+        linkType,
+        includeHistorical
+      });
 
     const payload = {
       status: 'success',
@@ -111,5 +158,6 @@ async function syncDenormalizedNames(req, res) {
 module.exports = {
   getLinkedPersonProfile,
   patchLinkedPersonProfile,
+  previewDenormalizedNames,
   syncDenormalizedNames
 };

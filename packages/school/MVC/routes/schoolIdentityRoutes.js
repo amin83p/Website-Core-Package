@@ -111,6 +111,14 @@ function trackDenormalizedNameSync(req, res, next) {
   })(req, res, next);
 }
 
+router.get('/api/sync-denormalized-names/preview',
+  requireAccessAny([
+    SECTIONS.SCHOOL_TEACHERS,
+    SECTIONS.SCHOOL_STAFF,
+    SECTIONS.SCHOOL_STUDENTS
+  ], OPERATIONS.READ),
+  linkedPersonCtrl.previewDenormalizedNames);
+
 router.post('/api/sync-denormalized-names',
   requireAccessAny([
     SECTIONS.SCHOOL_TEACHERS,
