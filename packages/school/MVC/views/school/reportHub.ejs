@@ -3360,6 +3360,21 @@
       break-after: page;
       page-break-after: always;
     }
+
+    body.hub-print-enrollment-completions > *:not(#hubEnrollmentCompletionsPrintRoot) {
+      display: none !important;
+    }
+
+    body.hub-print-enrollment-completions #hubEnrollmentCompletionsPrintRoot {
+      display: block !important;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      width: 100%;
+      margin: 0;
+      padding: 1rem;
+    }
   }
 </style>
 
@@ -3395,6 +3410,9 @@
       </button>
       <button type="button" class="hub-section-segment" data-hub-workspace-section="student-progress">
         <span><i class="bi bi-graph-up me-1"></i> Student Progress</span>
+      </button>
+      <button type="button" class="hub-section-segment" data-hub-workspace-section="enrollment-completions">
+        <span><i class="bi bi-calendar-check me-1"></i> Monthly Enrollment Completions</span>
       </button>
     </div>
   </div>
@@ -3739,6 +3757,12 @@
       endpoint: '/school/report-hub/api/workspace/student-progress',
       sourceUrl: '/school/report-hub',
       icon: 'bi bi-graph-up'
+    },
+    'enrollment-completions': {
+      label: 'Monthly Enrollment Completions',
+      endpoint: '/school/report-hub/api/workspace/enrollment-completions',
+      sourceUrl: '/school/report-hub',
+      icon: 'bi bi-calendar-check'
     }
   };
 
@@ -14135,6 +14159,323 @@
     syncStudentProgressShareUrl();
   }
 
+  let hubEnrollmentCompletionsDepartmentOptions = [];
+  let hubEnrollmentCompletionsProgramOptions = [];
+  let hubEnrollmentCompletionsLoading = false;
+  let hubEnrollmentCompletionsPayload = null;
+
+  function hubEnrollmentCompletionsDefaultMonth() {
+    const today = hubTodayDate();
+    const y = today.getFullYear();
+    const m = String(today.getMonth() + 1).padStart(2, '0');
+    return y + '-' + m;
+  }
+
+  function readHubMultiSelectValues(selectId) {
+    const selectEl = document.getElementById(selectId);
+    if (!selectEl) return [];
+    return Array.from(selectEl.selectedOptions || []).map(function (option) {
+      return String(option.value || '').trim();
+    }).filter(Boolean);
+  }
+
+  function renderEnrollmentCompletionsMultiSelect(selectId, placeholder, optionRows, selectedIds) {
+    const selectEl = document.getElementById(selectId);
+    if (!selectEl) return;
+    const selectedSet = new Set((Array.isArray(selectedIds) ? selectedIds : []).map(function (id) { return String(id || '').trim(); }));
+    const options = (Array.isArray(optionRows) ? optionRows : []).map(function (row) {
+      const id = String(row.id || '').trim();
+      const selected = selectedSet.has(id) ? ' selected' : '';
+      return '<option value="' + escapeHtml(id) + '"' + selected + '>' + escapeHtml(row.name || id) + '</option>';
+    });
+    selectEl.innerHTML = '<option value="" disabled hidden>' + escapeHtml(placeholder) + '</option>' + options.join('');
+  }
+
+  function enrollmentCompletionsResultsEl() {
+    return document.getElementById('hubEnrollmentCompletionsResults');
+  }
+
+  function renderEnrollmentCompletionsWaitingState() {
+    return [
+      '<div class="hub-empty text-muted">',
+      '<div><i class="bi bi-calendar-check display-6 d-block mb-3"></i>',
+      '<div class="fw-semibold">Monthly Enrollment Completions</div>',
+      '<p class="mb-0 small">Choose departments, programs, and a calendar month, then run the report.</p>',
+      '</div></div>'
+    ].join('');
+  }
+
+  function enrollmentCompletionsStatusBadge(status) {
+    const value = String(status || '').trim().toLowerCase();
+    if (value === 'completed') return 'text-bg-success';
+    if (value === 'withdrawn') return 'text-bg-warning';
+    if (value === 'active') return 'text-bg-primary';
+    return 'text-bg-secondary';
+  }
+
+  function renderEnrollmentCompletionsStudentCell(row) {
+    const name = escapeHtml(row.studentName || row.studentPersonId || 'Student');
+    const recordId = String(row.studentRecordId || '').trim();
+    if (recordId) {
+      return '<a href="/school/students/' + escapeHtml(recordId) + '" class="fw-semibold text-decoration-none">' + name + '</a>';
+    }
+    return '<span class="fw-semibold">' + name + '</span>';
+  }
+
+  function renderEnrollmentCompletionsTable(rows, monthLabel) {
+    const list = Array.isArray(rows) ? rows : [];
+    if (!list.length) {
+      return [
+        '<div class="hub-empty text-muted">',
+        '<p class="mb-0">No enrollments with an effective finish in ' + escapeHtml(monthLabel || 'the selected month') + '.</p>',
+        '</div>'
+      ].join('');
+    }
+    const body = list.map(function (row) {
+      const kindBadge = row.enrollmentKind
+        ? '<span class="badge text-bg-light border ms-1">' + escapeHtml(row.enrollmentKind) + '</span>'
+        : '';
+      const dept = row.departmentName
+        ? '<div class="small text-muted">' + escapeHtml(row.departmentName) + '</div>'
+        : '';
+      return [
+        '<tr>',
+        '<td>', renderEnrollmentCompletionsStudentCell(row), '</td>',
+        '<td><div class="fw-semibold">' + escapeHtml(row.className || '') + '</div>', dept, '</td>',
+        '<td class="small">' + escapeHtml(row.teacherNames || '—') + '</td>',
+        '<td class="text-nowrap small">' + escapeHtml(row.enrollmentLabel || '—'), kindBadge, '</td>',
+        '<td class="small">' + escapeHtml(row.notes || '—') + '</td>',
+        '<td class="text-nowrap small text-center">' + escapeHtml(row.attendanceLabel || '—') + '</td>',
+        '<td class="text-nowrap"><span class="badge ' + enrollmentCompletionsStatusBadge(row.status) + '">' + escapeHtml(row.status || '—') + '</span></td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+    return [
+      '<div class="table-responsive">',
+      '<table class="table table-sm table-hover align-middle mb-0" id="hubEnrollmentCompletionsTable">',
+      '<thead class="table-light"><tr>',
+      '<th>Student</th><th>Class</th><th>Teachers</th><th>Enrollment</th><th>Notes</th><th class="text-center">Attendance</th><th>Status</th>',
+      '</tr></thead>',
+      '<tbody>', body, '</tbody>',
+      '</table></div>'
+    ].join('');
+  }
+
+  function renderEnrollmentCompletionsResults(payload) {
+    const summary = payload && payload.summary ? payload.summary : {};
+    const monthLabel = payload && payload.monthLabel ? payload.monthLabel : '';
+    const totalRows = Number(summary.totalRows || (payload && payload.rows ? payload.rows.length : 0));
+    const toolbar = [
+      '<div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3 hub-no-print">',
+      '<div class="small text-muted">',
+      '<strong>' + escapeHtml(monthLabel) + '</strong>',
+      ' · ' + totalRows + ' row' + (totalRows === 1 ? '' : 's'),
+      summary.totalStudents != null ? (' · ' + summary.totalStudents + ' student' + (summary.totalStudents === 1 ? '' : 's')) : '',
+      '</div>',
+      '<button type="button" class="btn btn-outline-secondary btn-sm" id="hubEnrollmentCompletionsPrint"><i class="bi bi-printer me-1"></i> Print</button>',
+      '</div>'
+    ].join('');
+    return toolbar + renderEnrollmentCompletionsTable(payload && payload.rows, monthLabel);
+  }
+
+  function renderEnrollmentCompletionsPrintDocument(payload) {
+    const monthLabel = payload && payload.monthLabel ? payload.monthLabel : '';
+    const rows = payload && Array.isArray(payload.rows) ? payload.rows : [];
+    const tableHtml = rows.length
+      ? renderEnrollmentCompletionsTable(rows, monthLabel)
+      : '<p>No rows.</p>';
+    return [
+      '<ul class="list-unstyled small text-muted mb-3"><li><strong>Month:</strong> ', escapeHtml(monthLabel), '</li></ul>',
+      tableHtml
+    ].join('');
+  }
+
+  function printEnrollmentCompletionsReport() {
+    let printRoot = document.getElementById('hubEnrollmentCompletionsPrintRoot');
+    if (!printRoot) {
+      printRoot = document.createElement('div');
+      printRoot.id = 'hubEnrollmentCompletionsPrintRoot';
+      printRoot.className = 'd-none';
+      document.body.appendChild(printRoot);
+    }
+    printRoot.innerHTML = [
+      '<h1 class="h4 mb-3">Monthly Enrollment Completions</h1>',
+      renderEnrollmentCompletionsPrintDocument(hubEnrollmentCompletionsPayload || {})
+    ].join('');
+    document.body.classList.remove('hub-print-student-progress', 'hub-print-weekly-reports');
+    document.body.classList.add('hub-print-enrollment-completions');
+    window.print();
+    window.setTimeout(function () {
+      document.body.classList.remove('hub-print-enrollment-completions');
+    }, 500);
+  }
+
+  function cacheEnrollmentCompletionsFilterOptions(payload) {
+    const departmentRows = payload && Array.isArray(payload.departmentOptions) ? payload.departmentOptions : [];
+    if (departmentRows.length) {
+      hubEnrollmentCompletionsDepartmentOptions = departmentRows.map(function (row) {
+        return { id: String(row.id || '').trim(), name: String(row.name || row.id || 'Department').trim() };
+      }).filter(function (row) { return row.id; });
+    }
+    const programRows = payload && Array.isArray(payload.programOptions) ? payload.programOptions : [];
+    if (programRows.length) {
+      hubEnrollmentCompletionsProgramOptions = programRows.map(function (row) {
+        return { id: String(row.id || '').trim(), name: String(row.name || row.id || 'Program').trim() };
+      }).filter(function (row) { return row.id; });
+    }
+    renderEnrollmentCompletionsMultiSelect('hubEnrollmentCompletionsDepartmentIds', 'Departments (optional)', hubEnrollmentCompletionsDepartmentOptions, readHubMultiSelectValues('hubEnrollmentCompletionsDepartmentIds'));
+    renderEnrollmentCompletionsMultiSelect('hubEnrollmentCompletionsProgramIds', 'Programs (optional)', hubEnrollmentCompletionsProgramOptions, readHubMultiSelectValues('hubEnrollmentCompletionsProgramIds'));
+  }
+
+  async function ensureEnrollmentCompletionsFilterOptionsLoaded() {
+    if (hubEnrollmentCompletionsDepartmentOptions.length && hubEnrollmentCompletionsProgramOptions.length) {
+      renderEnrollmentCompletionsMultiSelect('hubEnrollmentCompletionsDepartmentIds', 'Departments (optional)', hubEnrollmentCompletionsDepartmentOptions, readHubMultiSelectValues('hubEnrollmentCompletionsDepartmentIds'));
+      renderEnrollmentCompletionsMultiSelect('hubEnrollmentCompletionsProgramIds', 'Programs (optional)', hubEnrollmentCompletionsProgramOptions, readHubMultiSelectValues('hubEnrollmentCompletionsProgramIds'));
+      return;
+    }
+    try {
+      const requestQuery = new URLSearchParams();
+      requestQuery.set('filterOptionsOnly', '1');
+      const response = await fetch('/school/report-hub/api/workspace/enrollment-completions?' + requestQuery.toString(), {
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin'
+      });
+      const payload = await response.json().catch(function () { return { status: 'error' }; });
+      if (response.ok && payload.status === 'success') {
+        cacheEnrollmentCompletionsFilterOptions(payload);
+      }
+    } catch (error) {
+      // Options remain empty; user can still run with month only.
+    }
+  }
+
+  function bindEnrollmentCompletionsControls() {
+    const runBtn = document.getElementById('hubEnrollmentCompletionsRun');
+    if (runBtn) runBtn.addEventListener('click', function () { void loadEnrollmentCompletionsReport(); });
+    const resetBtn = document.getElementById('hubEnrollmentCompletionsReset');
+    if (resetBtn) resetBtn.addEventListener('click', function () {
+      const monthEl = document.getElementById('hubEnrollmentCompletionsMonth');
+      if (monthEl) monthEl.value = hubEnrollmentCompletionsDefaultMonth();
+      renderEnrollmentCompletionsMultiSelect('hubEnrollmentCompletionsDepartmentIds', 'Departments (optional)', hubEnrollmentCompletionsDepartmentOptions, []);
+      renderEnrollmentCompletionsMultiSelect('hubEnrollmentCompletionsProgramIds', 'Programs (optional)', hubEnrollmentCompletionsProgramOptions, []);
+      hubEnrollmentCompletionsPayload = null;
+      const target = enrollmentCompletionsResultsEl();
+      if (target) target.innerHTML = renderEnrollmentCompletionsWaitingState();
+    });
+    const resultsRoot = document.getElementById('hubEnrollmentCompletionsWorkspace');
+    if (resultsRoot) {
+      resultsRoot.addEventListener('click', function (event) {
+        const printBtn = event.target && event.target.closest ? event.target.closest('#hubEnrollmentCompletionsPrint') : null;
+        if (printBtn) {
+          event.preventDefault();
+          printEnrollmentCompletionsReport();
+        }
+      });
+    }
+  }
+
+  async function loadEnrollmentCompletionsReport() {
+    if (hubEnrollmentCompletionsLoading) return;
+    const month = hubInputValue('hubEnrollmentCompletionsMonth');
+    if (!month) {
+      showHubMessage({ title: 'Monthly Enrollment Completions', icon: 'warning', message: 'Choose a calendar month.' });
+      return;
+    }
+    const departmentIds = readHubMultiSelectValues('hubEnrollmentCompletionsDepartmentIds');
+    const programIds = readHubMultiSelectValues('hubEnrollmentCompletionsProgramIds');
+    const requestQuery = new URLSearchParams();
+    requestQuery.set('month', month);
+    if (departmentIds.length) requestQuery.set('departmentIds', departmentIds.join(','));
+    if (programIds.length) requestQuery.set('programIds', programIds.join(','));
+
+    hubEnrollmentCompletionsLoading = true;
+    const resultsEl = enrollmentCompletionsResultsEl();
+    if (typeof window.showLoading === 'function') {
+      window.showLoading('Building enrollment completions report...');
+    }
+    try {
+      const response = await fetch('/school/report-hub/api/workspace/enrollment-completions?' + requestQuery.toString(), {
+        headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin'
+      });
+      const payload = await response.json().catch(function () {
+        return { status: 'error', message: 'Unable to build this report.' };
+      });
+      if (!response.ok || payload.status !== 'success') {
+        throw new Error(payload.message || 'Unable to build this report.');
+      }
+      hubEnrollmentCompletionsPayload = payload;
+      cacheEnrollmentCompletionsFilterOptions(payload);
+      if (resultsEl) resultsEl.innerHTML = renderEnrollmentCompletionsResults(payload);
+    } catch (error) {
+      if (resultsEl) {
+        resultsEl.innerHTML = [
+          '<div class="hub-empty text-danger"><div class="fw-semibold">',
+          escapeHtml(error.message || 'Unable to build this report.'),
+          '</div></div>'
+        ].join('');
+      }
+    } finally {
+      hubEnrollmentCompletionsLoading = false;
+      if (typeof window.hideLoading === 'function') {
+        window.hideLoading({ force: true });
+      }
+    }
+  }
+
+  function renderEnrollmentCompletionsWorkspace(payload) {
+    const section = payload && payload.section ? payload.section : {
+      key: 'enrollment-completions',
+      label: 'Monthly Enrollment Completions',
+      icon: 'bi bi-calendar-check',
+      sourceUrl: '/school/report-hub'
+    };
+    els.workspace.innerHTML = [
+      '<section class="hub-workspace" id="hubEnrollmentCompletionsWorkspace">',
+      '<div class="hub-workspace-card">',
+      '<div class="hub-workspace-header d-flex justify-content-between align-items-start flex-wrap gap-3">',
+      '<div>',
+      '<div class="text-uppercase text-muted small fw-bold">Report Hub Section</div>',
+      '<h2 class="h5 mb-0"><i class="' + escapeHtml(section.icon || 'bi bi-calendar-check') + ' me-2"></i>' + escapeHtml(section.label || 'Monthly Enrollment Completions') + '</h2>',
+      '<p class="small text-muted mb-0">Students whose effective enrollment ends in the selected month.</p>',
+      '</div>',
+      '</div>',
+      '<div class="p-3 border-bottom bg-white hub-no-print">',
+      '<div class="hub-weekly-reports-filter-grid mb-3">',
+      '<div class="hub-weekly-reports-filter-field">',
+      '<label class="form-label fw-bold small" for="hubEnrollmentCompletionsDepartmentIds">Departments</label>',
+      '<select id="hubEnrollmentCompletionsDepartmentIds" class="form-select form-select-sm" multiple size="5" aria-label="Departments"></select>',
+      '<div class="form-text">Leave empty for all departments.</div>',
+      '</div>',
+      '<div class="hub-weekly-reports-filter-field">',
+      '<label class="form-label fw-bold small" for="hubEnrollmentCompletionsProgramIds">Programs</label>',
+      '<select id="hubEnrollmentCompletionsProgramIds" class="form-select form-select-sm" multiple size="5" aria-label="Programs"></select>',
+      '<div class="form-text">Leave empty for all programs.</div>',
+      '</div>',
+      '<div class="hub-weekly-reports-filter-field">',
+      '<label class="form-label fw-bold small" for="hubEnrollmentCompletionsMonth">Month</label>',
+      '<input type="month" id="hubEnrollmentCompletionsMonth" class="form-control form-control-sm">',
+      '</div>',
+      '</div>',
+      '<div class="d-flex gap-2 justify-content-md-end">',
+      '<button type="button" id="hubEnrollmentCompletionsRun" class="btn btn-primary btn-sm fw-bold"><i class="bi bi-funnel-fill me-1"></i> Run report</button>',
+      '<button type="button" id="hubEnrollmentCompletionsReset" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i> Reset</button>',
+      '</div>',
+      '</div>',
+      '<div class="p-3" id="hubEnrollmentCompletionsResults">',
+      renderEnrollmentCompletionsWaitingState(),
+      '</div>',
+      '</div>',
+      '</section>'
+    ].join('');
+
+    const monthEl = document.getElementById('hubEnrollmentCompletionsMonth');
+    if (monthEl && !monthEl.value) monthEl.value = hubEnrollmentCompletionsDefaultMonth();
+    cacheEnrollmentCompletionsFilterOptions(payload || {});
+    bindEnrollmentCompletionsControls();
+    void ensureEnrollmentCompletionsFilterOptionsLoaded();
+  }
+
   const hubWorkspaceNodeCache = new Map();
 
   function preserveCurrentHubWorkspace(nextKey) {
@@ -14336,6 +14677,19 @@
           key: 'student-progress',
           label: 'Student Progress',
           icon: 'bi bi-graph-up',
+          sourceUrl: '/school/report-hub'
+        }
+      });
+      return;
+    }
+
+    if (key === 'enrollment-completions') {
+      renderEnrollmentCompletionsWorkspace({
+        status: 'success',
+        section: {
+          key: 'enrollment-completions',
+          label: 'Monthly Enrollment Completions',
+          icon: 'bi bi-calendar-check',
           sourceUrl: '/school/report-hub'
         }
       });

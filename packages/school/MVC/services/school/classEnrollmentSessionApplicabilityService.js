@@ -772,5 +772,6 @@ module.exports = {
   getEnrollmentExcludedSessionIds,
   periodHasNonNaAttendanceMarkings,
   resolveStudentPersonId,
+  normalizeStudentToPersonMap,
   APPLICABILITY_REASON
 };

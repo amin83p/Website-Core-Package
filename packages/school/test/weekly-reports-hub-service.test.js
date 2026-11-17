@@ -47,6 +47,15 @@ test('classMatchesProgram and classMatchesTeacher filter classes', () => {
   assert.equal(weeklyReportsHubService.classMatchesTeacher(classRow, 'PERSON/T2'), false);
 });
 
+test('filterClassesForEnrollmentCompletions honors department and program id lists', () => {
+  const rows = weeklyReportsHubService.filterClassesForEnrollmentCompletions([
+    { id: 'CLS/1', orgId: 'ORG/1', status: 'active', deliveryDepartmentId: 'DEPT/1', allowedProgramTerms: [{ programId: 'PROG/1' }] },
+    { id: 'CLS/2', orgId: 'ORG/1', status: 'active', deliveryDepartmentId: 'DEPT/2', allowedProgramTerms: [{ programId: 'PROG/2' }] }
+  ], { activeOrgId: 'ORG/1', departmentIds: ['DEPT/1'], programIds: ['PROG/1'] });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].id, 'CLS/1');
+});
+
 test('buildClassBoardRow includes teacher and scheduled hours', () => {
   const row = weeklyReportsHubService.buildClassBoardRow(
     {

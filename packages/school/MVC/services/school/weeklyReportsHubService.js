@@ -161,6 +161,31 @@ function classMatchesProgram(row = {}, programId = '') {
   return collectClassProgramIds(row).has(normalizedProgramId);
 }
 
+function classMatchesDepartmentList(row = {}, departmentIds = []) {
+  const list = parseFilterIdList(departmentIds);
+  if (!list.length) return true;
+  return list.some((id) => classMatchesDepartment(row, id));
+}
+
+function classMatchesProgramList(row = {}, programIds = []) {
+  const list = parseFilterIdList(programIds);
+  if (!list.length) return true;
+  return list.some((id) => classMatchesProgram(row, id));
+}
+
+function filterClassesForEnrollmentCompletions(rows = [], {
+  activeOrgId = '',
+  departmentIds = [],
+  programIds = []
+} = {}) {
+  return (Array.isArray(rows) ? rows : [])
+    .filter((row) => classBelongsToActiveOrg(row, activeOrgId))
+    .filter(isActiveAttendanceClass)
+    .filter((row) => classMatchesDepartmentList(row, departmentIds))
+    .filter((row) => classMatchesProgramList(row, programIds))
+    .sort((a, b) => String(a?.title || a?.id || '').localeCompare(String(b?.title || b?.id || '')));
+}
+
 function isActiveClassInstructor(instructorRow = {}) {
   const status = String(instructorRow?.status || 'active').trim().toLowerCase();
   return status !== 'inactive';
@@ -1174,7 +1199,10 @@ async function buildWeeklyReportsStudentBoard({
 module.exports = {
   parseFilterIdList,
   classMatchesDepartment,
+  classMatchesDepartmentList,
   classMatchesProgram,
+  classMatchesProgramList,
+  filterClassesForEnrollmentCompletions,
   classMatchesTeacher,
   buildTeacherRecordLookup,
   instructorMatchesTeacherPerson,
