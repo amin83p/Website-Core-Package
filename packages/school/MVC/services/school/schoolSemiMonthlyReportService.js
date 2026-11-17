@@ -128,6 +128,37 @@ function sortInstancesDesc(instances = []) {
   });
 }
 
+function buildTemplateOrderRankMap(reportTemplateIds = []) {
+  const rank = new Map();
+  (Array.isArray(reportTemplateIds) ? reportTemplateIds : []).forEach((id, index) => {
+    const token = String(id || '').trim().toLowerCase();
+    if (token && !rank.has(token)) rank.set(token, index);
+  });
+  return rank;
+}
+
+function templateOrderRank(rankMap, templateId = '') {
+  const token = String(templateId || '').trim().toLowerCase();
+  if (!token) return 99999;
+  if (rankMap instanceof Map && rankMap.has(token)) return rankMap.get(token);
+  return 99999;
+}
+
+function sortInstancesByPolicyTemplateOrder(instances = [], reportTemplateIds = []) {
+  const rankMap = buildTemplateOrderRankMap(reportTemplateIds);
+  return [...instances].sort((a, b) => {
+    const aRank = templateOrderRank(rankMap, a?.templateId);
+    const bRank = templateOrderRank(rankMap, b?.templateId);
+    if (aRank !== bRank) return aRank - bRank;
+    const aDate = normalizeDateOnly(a?.sessionDate);
+    const bDate = normalizeDateOnly(b?.sessionDate);
+    if (aDate !== bDate) return bDate.localeCompare(aDate);
+    const aId = String(a?.id || a?.instanceId || '');
+    const bId = String(b?.id || b?.instanceId || '');
+    return bId.localeCompare(aId);
+  });
+}
+
 async function buildTemplateLabelMap(templateIds = [], reqUser) {
   const map = new Map();
   const uniqueIds = [...new Set((Array.isArray(templateIds) ? templateIds : [])
@@ -273,8 +304,9 @@ async function buildSemiMonthlyReportPayload(req, options = {}) {
         studentRecordId,
         personId: String(studentRow.personId || '').trim()
       });
-      const serialized = sortInstancesDesc(
-        matched.map((row) => serializeInstanceRow(row, templateLabelMap))
+      const serialized = sortInstancesByPolicyTemplateOrder(
+        matched.map((row) => serializeInstanceRow(row, templateLabelMap)),
+        reportTemplateIds
       );
       studentMap.get(studentRow.personId).classes.push({
         classId,
@@ -325,5 +357,6 @@ module.exports = {
   buildTemplateIdSet,
   sessionDateInRange,
   instanceMatchesStudent,
+  sortInstancesByPolicyTemplateOrder,
   buildSemiMonthlyReportPayload
 };

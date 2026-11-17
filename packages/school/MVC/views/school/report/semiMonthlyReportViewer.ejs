@@ -144,16 +144,80 @@
     }
     .smmr-instances-col { min-width: 280px; vertical-align: top; }
     .smmr-export-table-wrap { max-height: min(480px, 55vh); overflow: auto; border: 1px solid #e9ecef; border-radius: 10px; }
+    .smmr-export-table { table-layout: fixed; width: 100%; border-collapse: separate; border-spacing: 0; }
+    .smmr-export-table th,
+    .smmr-export-table td { box-sizing: border-box; overflow: hidden; min-width: 0; }
+    .smmr-export-table {
+        --smmr-export-student-w: calc(10.5rem + 5px);
+        --smmr-export-remain-w: calc(100% - var(--smmr-export-student-w));
+        --smmr-export-side-w: calc(var(--smmr-export-remain-w) * 0.575);
+        --smmr-export-overall-w: calc(var(--smmr-export-remain-w) * 0.425);
+    }
     .smmr-export-table th.smmr-export-student-col,
     .smmr-export-table td.smmr-export-student-col {
         position: sticky;
         left: 0;
         z-index: 2;
-        min-width: 160px;
+        width: var(--smmr-export-student-w);
+        max-width: var(--smmr-export-student-w);
+        min-width: var(--smmr-export-student-w);
+        padding-left: 0.75rem;
+        padding-right: 0.5rem;
         background: #fff;
-        border-right: 1px solid #e9ecef;
+        border-right: 1px solid #dee2e6;
+        box-shadow: 2px 0 0 rgba(15, 23, 42, 0.04);
+        vertical-align: top;
+        font-size: 0.9rem;
+        font-weight: 700;
     }
-    .smmr-export-table thead th.smmr-export-student-col { z-index: 3; background: #f8f9fa; }
+    .smmr-export-table thead th.smmr-export-student-col { z-index: 3; background: #f8f9fa; font-weight: 700; }
+    .smmr-export-table th.smmr-export-instances-col,
+    .smmr-export-table td.smmr-export-instances-col {
+        width: var(--smmr-export-side-w);
+        vertical-align: top;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+    .smmr-export-table th.smmr-export-overall-col,
+    .smmr-export-table td.smmr-export-overall-col {
+        width: var(--smmr-export-overall-w);
+        vertical-align: top;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
+    }
+    .smmr-export-col-student { width: var(--smmr-export-student-w); }
+    .smmr-export-col-instances { width: var(--smmr-export-side-w); }
+    .smmr-export-col-overall { width: var(--smmr-export-overall-w); }
+    .smmr-export-table td.smmr-export-student-col { overflow: visible; }
+    .smmr-export-student-name {
+        display: block;
+        overflow-wrap: anywhere;
+        word-break: break-word;
+        white-space: normal;
+        line-height: 1.35;
+        max-width: 100%;
+        font-size: 0.9rem;
+        font-weight: 700;
+    }
+    .smmr-export-student-name a.smmr-export-student-link {
+        color: #0d47a1;
+        font-weight: 700;
+        text-decoration: none;
+        border-bottom: 1px solid rgba(13, 71, 161, 0.2);
+        transition: color 0.15s ease, border-color 0.15s ease;
+    }
+    .smmr-export-student-name a.smmr-export-student-link:hover,
+    .smmr-export-student-name a.smmr-export-student-link:focus {
+        color: #0a58ca;
+        border-bottom-color: rgba(10, 88, 202, 0.55);
+    }
+    .smmr-export-overall-col .form-select,
+    .smmr-export-overall-col .flex-grow-1 { min-width: 0; max-width: 100%; }
+    .smmr-export-instance-label-class { line-height: 1.25; }
+    .smmr-export-instance-label-template { line-height: 1.25; font-size: 0.8rem; }
+    .smmr-export-instance-selects { display: flex; flex-direction: column; gap: 0.35rem; width: 100%; }
+    .smmr-export-instance-selects .form-select { width: 100%; max-width: 100%; }
+    .smmr-export-instance-actions { width: 100%; }
     .smmr-export-instance-row { border: 1px solid #e9ecef; border-radius: 8px; padding: 0.45rem 0.55rem; margin-bottom: 0.45rem; background: #f8fafc; }
     .smmr-export-instance-row:last-child { margin-bottom: 0; }
     .smmr-export-bulk-panel { border: 1px solid #dce9ff; border-radius: 10px; padding: 0.75rem 0.9rem; background: #f8fbff; }
@@ -378,11 +442,16 @@
         <div class="d-none" id="smmrExportTableWrap">
           <div class="table-responsive smmr-export-table-wrap">
             <table class="table table-sm align-middle smmr-export-table mb-0" id="smmrExportTable">
+              <colgroup>
+                <col class="smmr-export-col-student">
+                <col class="smmr-export-col-instances">
+                <col class="smmr-export-col-overall">
+              </colgroup>
               <thead class="table-light">
                 <tr>
-                  <th class="smmr-export-student-col ps-3">Student</th>
-                  <th><i class="bi bi-file-earmark-text me-1"></i>Report instances</th>
-                  <th id="smmrExportOverallHeader" class="d-none"><i class="bi bi-layers me-1"></i>Overall report</th>
+                  <th class="smmr-export-student-col">Student</th>
+                  <th class="smmr-export-instances-col"><i class="bi bi-file-earmark-text me-1"></i>Report instances</th>
+                  <th id="smmrExportOverallHeader" class="smmr-export-overall-col d-none"><i class="bi bi-layers me-1"></i>Overall report</th>
                 </tr>
               </thead>
               <tbody id="smmrExportTableBody"></tbody>
@@ -422,8 +491,12 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
 </script>
 <script src="/scripts/schoolRollingEnrollmentDeepLink.js"></script>
 <% } %>
+<%- include('school/partials/studentProfileLinkBootstrap') %>
 <script>
 (function () {
+  const SMMR_EXPORT_STUDENT_COL_PX = Math.round(10.5 * 16) + 5;
+  const SMMR_EXPORT_INSTANCES_SHARE = 0.575;
+  const SMMR_EXPORT_OVERALL_SHARE = 0.425;
   const initialStartDate = '<%= typeof initialStartDate !== "undefined" ? initialStartDate : "" %>';
   const initialEndDate = '<%= typeof initialEndDate !== "undefined" ? initialEndDate : "" %>';
   const initialStudents = <%- initialStudentsJson %>;
@@ -491,6 +564,36 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
       .replace(/"/g, '&quot;');
   }
 
+  /** Policy labels use "Title | type vN" or "Title vN" — export modal shows title only. */
+  function smmrShortTemplateDisplayName(raw = '') {
+    let text = String(raw || '').trim();
+    if (!text) return '—';
+    const pipeIdx = text.indexOf(' | ');
+    if (pipeIdx >= 0) {
+      text = text.slice(0, pipeIdx).trim();
+    } else {
+      text = text.replace(/\s+v\d+$/i, '').trim();
+    }
+    return text || '—';
+  }
+
+  function buildSmmrExportStudentNameCell(student = {}) {
+    const name = String(student.name || student.personId || '').trim() || '—';
+    const recordId = String(student.studentRecordId || '').trim();
+    const linkClass = 'smmr-export-student-link';
+    if (typeof schoolRenderStudentNameHtml === 'function') {
+      return schoolRenderStudentNameHtml(name, recordId, { className: linkClass });
+    }
+    if (typeof window.schoolCanOpenStudentProfile === 'function'
+      && typeof window.schoolStudentProfileEditUrl === 'function'
+      && window.schoolCanOpenStudentProfile()
+      && recordId) {
+      const href = window.schoolStudentProfileEditUrl(recordId);
+      return `<a href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer" class="${linkClass}">${escapeHtml(name)}</a>`;
+    }
+    return escapeHtml(name);
+  }
+
   function startOfLocalDay(date) {
     const d = new Date(date);
     d.setHours(0, 0, 0, 0);
@@ -505,8 +608,13 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
   }
 
   function setDateRange(start, end) {
-    document.getElementById('filter_startDate').value = formatLocalDate(start);
-    document.getElementById('filter_endDate').value = formatLocalDate(end);
+    const startEl = document.getElementById('filter_startDate');
+    const endEl = document.getElementById('filter_endDate');
+    if (!startEl || !endEl) return;
+    const startValid = start && !Number.isNaN(new Date(start).getTime());
+    const endValid = end && !Number.isNaN(new Date(end).getTime());
+    startEl.value = startValid ? formatLocalDate(start) : '';
+    endEl.value = endValid ? formatLocalDate(end) : '';
   }
 
   function setActiveRangeChip(range) {
@@ -1091,16 +1199,21 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
     throw new Error('Report load is taking longer than expected. Try again with fewer students or check server logs.');
   }
 
-  async function loadSemiMonthlyReport() {
+  async function loadSemiMonthlyReport(options = {}) {
+    const showValidationMessages = options.showValidationMessages !== false;
     const startDate = String(document.getElementById('filter_startDate').value || '').trim();
     const endDate = String(document.getElementById('filter_endDate').value || '').trim();
     const studentIds = selectedStudents.map((row) => String(row.studentRecordId || row.id || '').trim()).filter(Boolean);
     if (!studentIds.length) {
-      showReportMessage({ icon: 'warning', message: 'Select at least one student.' });
+      if (showValidationMessages) {
+        showReportMessage({ icon: 'warning', message: 'Select at least one student.' });
+      }
       return;
     }
     if (!startDate || !endDate) {
-      showReportMessage({ icon: 'warning', message: 'Start date and end date are required.' });
+      if (showValidationMessages) {
+        showReportMessage({ icon: 'warning', message: 'Start date and end date are required.' });
+      }
       return;
     }
 
@@ -1179,17 +1292,30 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
     };
   }
 
-  function validateSmmrFilters() {
+  function validateSmmrFilters(options = {}) {
+    const silent = options.silent === true;
     const filters = getFilterParams();
     if (!filters.studentIds.length) {
-      showReportMessage({ icon: 'warning', message: 'Select at least one student.' });
+      if (!silent) {
+        showReportMessage({ icon: 'warning', message: 'Select at least one student.' });
+      }
       return null;
     }
     if (!filters.startDate || !filters.endDate) {
-      showReportMessage({ icon: 'warning', message: 'Start date and end date are required.' });
+      if (!silent) {
+        showReportMessage({ icon: 'warning', message: 'Start date and end date are required.' });
+      }
       return null;
     }
     return filters;
+  }
+
+  function smmrHasUrlShareQuery() {
+    const params = new URLSearchParams(window.location.search);
+    const startDate = String(params.get('startDate') || '').trim();
+    const endDate = String(params.get('endDate') || '').trim();
+    const rawIds = String(params.get('studentIds') || params.get('personIds') || '').trim();
+    return Boolean(startDate && endDate && rawIds);
   }
 
   function findSmmrExportStudent(personId) {
@@ -1284,7 +1410,7 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
     }
   }
 
-  function buildSmmrFileOptionSelectHtml({ className, options = [], suggestedKey = '', instanceId = '', ariaLabel = '' }) {
+  function buildSmmrFileOptionSelectHtml({ className, options = [], suggestedKey = '', instanceId = '', ariaLabel = '', fullWidth = false }) {
     const rows = (Array.isArray(options) ? options : []).filter((opt) => opt && String(opt.key || '').trim());
     if (!rows.length) return '';
     const suggested = String(suggestedKey || rows[0]?.key || '').trim();
@@ -1297,7 +1423,8 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
       return `<option value="${escapeHtml(key)}"${selected}>${escapeHtml(text)}</option>`;
     }).join('');
     const disabled = rows.length <= 1 ? ' disabled' : '';
-    return `<select class="form-select form-select-sm ${className} mb-1" style="max-width: 14rem;" data-instance-id="${escapeHtml(instanceId)}"${disabled} aria-label="${escapeHtml(ariaLabel)}">${optionsHtml}</select>`;
+    const widthStyle = fullWidth ? 'width:100%;max-width:100%;' : 'max-width:14rem;';
+    return `<select class="form-select form-select-sm ${className} mb-0" style="${widthStyle}" data-instance-id="${escapeHtml(instanceId)}"${disabled} aria-label="${escapeHtml(ariaLabel)}">${optionsHtml}</select>`;
   }
 
   function readSmmrInstanceExportKeys(instanceRowEl, format = '') {
@@ -1322,17 +1449,19 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
     if (funderHint) {
       parts.push(`<div class="small text-muted mb-1">Detected funder: <strong>${escapeHtml(funderHint)}</strong></div>`);
     }
-    const controls = [];
+    const selects = [];
+    const buttons = [];
     if (row.hasDocx) {
       const docxSelect = buildSmmrFileOptionSelectHtml({
         className: 'js-smmr-instance-docx-select',
         options: row.docxOptions,
         suggestedKey: row.suggestedDocxKey,
         instanceId,
-        ariaLabel: 'Word template for this report'
+        ariaLabel: 'Word template for this report',
+        fullWidth: true
       });
-      if (docxSelect) controls.push(docxSelect);
-      controls.push(`<button type="button" class="btn btn-outline-primary btn-sm py-0 js-smmr-row-export" data-format="docx" data-export-type="instance" data-student-id="${escapeHtml(personId)}" data-instance-id="${escapeHtml(instanceId)}">DOCX</button>`);
+      if (docxSelect) selects.push(docxSelect);
+      buttons.push(`<button type="button" class="btn btn-outline-primary btn-sm py-0 js-smmr-row-export" data-format="docx" data-export-type="instance" data-student-id="${escapeHtml(personId)}" data-instance-id="${escapeHtml(instanceId)}">DOCX</button>`);
     }
     if (row.hasPdf) {
       const pdfSelect = buildSmmrFileOptionSelectHtml({
@@ -1340,16 +1469,23 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
         options: row.pdfOptions,
         suggestedKey: row.suggestedPdfKey,
         instanceId,
-        ariaLabel: 'PDF template for this report'
+        ariaLabel: 'PDF template for this report',
+        fullWidth: true
       });
-      if (pdfSelect) controls.push(pdfSelect);
-      controls.push(`<button type="button" class="btn btn-outline-danger btn-sm py-0 js-smmr-row-export" data-format="pdf" data-export-type="instance" data-student-id="${escapeHtml(personId)}" data-instance-id="${escapeHtml(instanceId)}">PDF</button>`);
+      if (pdfSelect) selects.push(pdfSelect);
+      buttons.push(`<button type="button" class="btn btn-outline-danger btn-sm py-0 js-smmr-row-export" data-format="pdf" data-export-type="instance" data-student-id="${escapeHtml(personId)}" data-instance-id="${escapeHtml(instanceId)}">PDF</button>`);
     }
     if (row.hasPayload !== false) {
-      controls.push(`<button type="button" class="btn btn-outline-secondary btn-sm py-0 js-smmr-row-export" data-format="json" data-export-type="instance" data-student-id="${escapeHtml(personId)}" data-instance-id="${escapeHtml(instanceId)}">JSON</button>`);
+      buttons.push(`<button type="button" class="btn btn-outline-secondary btn-sm py-0 js-smmr-row-export" data-format="json" data-export-type="instance" data-student-id="${escapeHtml(personId)}" data-instance-id="${escapeHtml(instanceId)}">JSON</button>`);
     }
-    if (!controls.length) return '';
-    parts.push(`<div class="d-flex flex-wrap gap-1 align-items-start mt-1">${controls.join('')}</div>`);
+    if (!selects.length && !buttons.length) return '';
+    const selectBlock = selects.length
+      ? `<div class="smmr-export-instance-selects mt-1">${selects.join('')}</div>`
+      : '';
+    const buttonBlock = buttons.length
+      ? `<div class="d-flex flex-wrap gap-1 smmr-export-instance-actions mt-2">${buttons.join('')}</div>`
+      : '';
+    parts.push(`<div class="smmr-export-instance-controls w-100">${selectBlock}${buttonBlock}</div>`);
     return parts.join('');
   }
 
@@ -1399,6 +1535,37 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
     return parts.length ? `<div class="d-flex flex-wrap gap-1 mt-1">${parts.join('')}</div>` : '';
   }
 
+  function applySmmrExportTableColumnWidths() {
+    const table = document.getElementById('smmrExportTable');
+    const wrap = document.querySelector('#smmrExportTableWrap .smmr-export-table-wrap')
+      || document.querySelector('.smmr-export-table-wrap');
+    if (!table || !wrap) return;
+    const total = wrap.clientWidth || table.offsetWidth;
+    if (total < 120) return;
+    const remain = Math.max(0, total - SMMR_EXPORT_STUDENT_COL_PX);
+    const overallW = Math.round(remain * SMMR_EXPORT_OVERALL_SHARE);
+    const sideW = Math.max(0, remain - overallW);
+    const cols = table.querySelectorAll('colgroup col');
+    if (cols[0]) cols[0].style.width = `${SMMR_EXPORT_STUDENT_COL_PX}px`;
+    if (cols[1]) cols[1].style.width = `${sideW}px`;
+    if (cols[2]) cols[2].style.width = `${overallW}px`;
+    table.style.setProperty('--smmr-export-student-w', `${SMMR_EXPORT_STUDENT_COL_PX}px`);
+    table.style.setProperty('--smmr-export-side-w', `${sideW}px`);
+    table.style.setProperty('--smmr-export-overall-w', `${overallW}px`);
+  }
+
+  function ensureSmmrExportColumnWidthHooks() {
+    const modalEl = document.getElementById('smmrExportModal');
+    if (!modalEl || modalEl.dataset.smmrColWidthHook === '1') return;
+    modalEl.dataset.smmrColWidthHook = '1';
+    modalEl.addEventListener('shown.bs.modal', () => {
+      window.requestAnimationFrame(() => applySmmrExportTableColumnWidths());
+    });
+    window.addEventListener('resize', () => {
+      if (modalEl.classList.contains('show')) applySmmrExportTableColumnWidths();
+    });
+  }
+
   function renderSmmrExportPlan(plan = {}) {
     smmrExportPlan = plan;
     const students = Array.isArray(plan.students) ? plan.students : [];
@@ -1430,13 +1597,18 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
       const personId = String(student.personId || '').trim();
       const instanceBlocks = (student.instances || []).map((row) => {
         if (!row.exportable) return '';
-        const label = `${row.className || row.classId} · ${row.templateTitle || row.templateId} · ${row.sessionDate || '—'}`;
+        const classLabel = String(row.className || row.classId || '').trim() || '—';
+        const templateFull = String(row.templateTitle || row.templateId || '').trim();
+        const templateLabel = smmrShortTemplateDisplayName(templateFull);
+        const sessionDate = String(row.sessionDate || '').trim();
+        const titleAttr = sessionDate ? ` title="${escapeHtml(`${classLabel} · ${templateFull || templateLabel} · ${sessionDate}`)}"` : '';
         return `
           <div class="smmr-export-instance-row">
             <div class="d-flex gap-2 align-items-start">
               <input type="checkbox" class="form-check-input mt-1 js-smmr-export-check" data-export-type="instance" data-student-id="${escapeHtml(personId)}" data-instance-id="${escapeHtml(row.instanceId)}" checked>
-              <div class="flex-grow-1 min-w-0">
-                <div class="small fw-semibold">${escapeHtml(label)}</div>
+              <div class="flex-grow-1 min-w-0"${titleAttr}>
+                <div class="small fw-semibold smmr-export-instance-label-class text-truncate">${escapeHtml(classLabel)}</div>
+                <div class="text-muted smmr-export-instance-label-template">${escapeHtml(templateLabel)}</div>
                 ${buildSmmrFormatButtons({ ...row, personId }, 'instance')}
               </div>
             </div>
@@ -1454,7 +1626,7 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
           ? resolveSmmrOverallFormatFlagsForOption(selected, selected.suggestedTemplateVariantKey)
           : null;
         return `
-          <td class="align-top js-smmr-overall-cell" data-student-id="${escapeHtml(personId)}">
+          <td class="align-top smmr-export-overall-col js-smmr-overall-cell" data-student-id="${escapeHtml(personId)}">
             <div class="d-flex gap-2 align-items-start">
               <input type="checkbox" class="form-check-input mt-1 js-smmr-export-check" data-export-type="overall" data-student-id="${escapeHtml(personId)}" data-overall-template-id="${escapeHtml(selected?.templateId || '')}" ${selected?.eligible ? 'checked' : 'disabled'}>
               <div class="flex-grow-1">
@@ -1468,11 +1640,12 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
 
       return `
         <tr data-student-id="${escapeHtml(personId)}">
-          <td class="smmr-export-student-col ps-3 fw-semibold align-top">${escapeHtml(student.name || personId)}</td>
-          <td class="align-top">${instanceBlocks}</td>
+          <td class="smmr-export-student-col align-top"><span class="smmr-export-student-name">${buildSmmrExportStudentNameCell(student)}</span></td>
+          <td class="align-top smmr-export-instances-col">${instanceBlocks}</td>
           ${overallCell}
         </tr>`;
     }).join('');
+    window.requestAnimationFrame(() => applySmmrExportTableColumnWidths());
   }
 
   function gatherSmmrExportTargets(format = '', scope = 'all') {
@@ -1705,7 +1878,7 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
   });
   let smmrExportPrefetchTimer = null;
   document.getElementById('btn_exportSmmr')?.addEventListener('mouseenter', () => {
-    const filters = validateSmmrFilters();
+    const filters = validateSmmrFilters({ silent: true });
     if (!filters) return;
     smmrExportPrefetchTimer = window.setTimeout(() => prefetchSmmrExportPlan(filters), 180);
   });
@@ -1766,11 +1939,24 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
   });
   document.getElementById('btn_expandAllStudents')?.addEventListener('click', () => setAllStudentSectionsExpanded(true));
   document.getElementById('btn_collapseAllStudents')?.addEventListener('click', () => setAllStudentSectionsExpanded(false));
-  document.getElementById('btn_reset')?.addEventListener('click', () => {
-    document.getElementById('filter_startDate').value = '';
-    document.getElementById('filter_endDate').value = '';
-    document.querySelectorAll('.btn-range').forEach((btn) => btn.classList.remove('active'));
-  });
+  function resetSemiMonthlyPageFilters() {
+    selectedStudents = [];
+    renderSelectedStudents();
+    setDateRange(null, null);
+    setActiveRangeChip('');
+    const sectionsEl = document.getElementById('studentReportSections');
+    if (sectionsEl) sectionsEl.innerHTML = '';
+    document.getElementById('resultsContainer')?.classList.add('d-none');
+    clearSmmrExportPlanCache();
+    showConfigWarning('');
+    if (window.history?.replaceState) {
+      window.history.replaceState({}, document.title, window.location.pathname);
+    } else {
+      syncShareUrl();
+    }
+    if (window.EnrollmentClaimToggle) window.EnrollmentClaimToggle.setReady(false);
+  }
+  document.getElementById('btn_reset')?.addEventListener('click', resetSemiMonthlyPageFilters);
   document.querySelectorAll('.btn-range').forEach((btn) => {
     btn.addEventListener('click', () => applyQuickRange(btn.getAttribute('data-range')));
   });
@@ -1779,15 +1965,17 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
 
   if (initialStartDate) document.getElementById('filter_startDate').value = initialStartDate;
   if (initialEndDate) document.getElementById('filter_endDate').value = initialEndDate;
-  if (initialStudents.length) {
-    selectedStudents = initialStudents.map((row) => ({
-      id: String(row.studentRecordId || '').trim(),
-      studentRecordId: String(row.studentRecordId || '').trim(),
-      personId: String(row.personId || '').trim(),
-      name: String(row.name || row.studentRecordId || '').trim()
-    })).filter((row) => row.studentRecordId);
-  } else if (initialStudentIds.length) {
-    selectedStudents = initialStudentIds.map((id) => ({ id, studentRecordId: id, name: `Student ${id}` }));
+  selectedStudents = normalizeSelectedStudentItems(initialStudents);
+  if (!selectedStudents.length && initialStudentIds.length) {
+    selectedStudents = initialStudentIds.map((id) => {
+      const studentRecordId = String(id || '').trim();
+      return {
+        id: studentRecordId,
+        studentRecordId,
+        personId: '',
+        name: `Student ${studentRecordId}`
+      };
+    }).filter((row) => row.studentRecordId);
   }
   renderSelectedStudents();
   syncShareUrl();
@@ -1854,6 +2042,21 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
   }
 
   async function promptLoadReportFromUrlLink() {
+    if (!selectedStudents.length) {
+      if (window.ReportMessaging?.showReportMessage) {
+        await window.ReportMessaging.showReportMessage({
+          title: 'Semi-Monthly Report',
+          icon: 'warning',
+          message: 'The link date range was applied, but no students could be loaded from the link. Select students and click Apply.'
+        });
+      } else {
+        await showReportMessage({
+          icon: 'warning',
+          message: 'The link date range was applied, but no students could be loaded from the link. Select students and click Apply.'
+        });
+      }
+      return;
+    }
     const studentCount = selectedStudents.length;
     let confirmed = false;
     if (window.ReportMessaging?.confirmReportAction) {
@@ -1888,12 +2091,14 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
       return;
     }
     runSmmrReportLoadWhenReady(() => {
-      loadSemiMonthlyReport().catch((error) => showReportMessage({ icon: 'error', message: error.message || 'Load failed.' }));
+      loadSemiMonthlyReport({ showValidationMessages: false }).catch((error) => {
+        showReportMessage({ icon: 'error', message: error.message || 'Load failed.' });
+      });
     });
   }
 
   const smmrOpenedFromUrlQuery = Boolean(
-    (initialStudents.length || initialStudentIds.length) && initialStartDate && initialEndDate
+    smmrHasUrlShareQuery() && selectedStudents.length > 0
   );
 
   if (smmrOpenedFromUrlQuery) {
@@ -1901,6 +2106,8 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
       void promptLoadReportFromUrlLink();
     });
   }
+
+  ensureSmmrExportColumnWidthHooks();
 
   if (window.EnrollmentClaimToggle) {
     window.EnrollmentClaimToggle.init({

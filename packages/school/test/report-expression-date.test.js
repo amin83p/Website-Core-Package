@@ -36,3 +36,27 @@ test('formatDate supports custom patterns', () => {
     '03/15/2026'
   );
 });
+
+test('formatSemiMonthlyDueDate maps first half to the 15th', () => {
+  const expr = 'formatSemiMonthlyDueDate(source("T1", "report_period_due_date"), "dd/mm/yyyy")';
+  const result = reportRuleEngineService.evaluateSafeExpression(expr, {
+    sources: { T1: { report_period_due_date: '2026-03-08' } }
+  });
+  assert.equal(result, '15/03/2026');
+});
+
+test('formatSemiMonthlyDueDate maps second half to month end', () => {
+  const expr = 'formatSemiMonthlyDueDate(source("T1", "report_period_due_date"), "dd/mm/yyyy")';
+  assert.equal(
+    reportRuleEngineService.evaluateSafeExpression(expr, {
+      sources: { T1: { report_period_due_date: '2026-03-20' } }
+    }),
+    '31/03/2026'
+  );
+  assert.equal(
+    reportRuleEngineService.evaluateSafeExpression(expr, {
+      sources: { T1: { report_period_due_date: '2026-02-18' } }
+    }),
+    '28/02/2026'
+  );
+});

@@ -119,6 +119,26 @@ function formatDateWithPattern(parts, pattern = 'dd/mm/yyyy') {
     .replace(/dd/g, day);
 }
 
+function resolveSemiMonthlyAnchorDateParts(value) {
+  const parts = parseDateParts(value);
+  if (!parts) return null;
+  const dayNum = Number(parts.day);
+  const yearNum = Number(parts.year);
+  const monthNum = Number(parts.month);
+  if (!Number.isFinite(dayNum) || dayNum < 1 || !Number.isFinite(yearNum) || !Number.isFinite(monthNum)) {
+    return null;
+  }
+  if (dayNum <= 15) {
+    return { year: parts.year, month: parts.month, day: '15' };
+  }
+  const lastDay = new Date(yearNum, monthNum, 0).getDate();
+  return {
+    year: parts.year,
+    month: parts.month,
+    day: String(lastDay).padStart(2, '0')
+  };
+}
+
 function createHelperSet() {
   return Object.freeze({
     num(value, fallback = 0) {
@@ -242,6 +262,9 @@ function createHelperSet() {
     },
     formatDate(value, pattern = 'dd/mm/yyyy') {
       return formatDateWithPattern(parseDateParts(value), pattern);
+    },
+    formatSemiMonthlyDueDate(value, pattern = 'dd/mm/yyyy') {
+      return formatDateWithPattern(resolveSemiMonthlyAnchorDateParts(value), pattern);
     }
   });
 }

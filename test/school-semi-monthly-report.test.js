@@ -234,6 +234,8 @@ test('semi-monthly viewer wires shared-link prompt and report load progress', ()
   assert.match(view, /showSmmrReportWaiting/);
   assert.match(view, /SMMR_REPORT_ASYNC_MIN_STUDENTS/);
   assert.match(view, /buildSmmrSharedLinkConfirmHtml/);
+  assert.match(view, /selectedStudents\.length > 0 && initialStartDate && initialEndDate/);
+  assert.match(view, /showValidationMessages/);
 });
 
 test('school settings semi-monthly panel includes overall templates and export toggles', () => {

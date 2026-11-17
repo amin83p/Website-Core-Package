@@ -21,6 +21,8 @@ const {
   enrichOverallExportOptionsForStudent
 } = studentAttendanceReportGenerationService;
 const { runWithConcurrency } = require('../../utils/asyncPool');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
 function clean(value = '') {
   return String(value ?? '').trim();
@@ -66,13 +68,16 @@ function normalizeDateOnly(value = '') {
   return schoolSemiMonthlyReportService.normalizeDateOnly(value);
 }
 
+function resolveSlotRequiredTemplateId(slot = {}) {
+  return clean(slot.templateId);
+}
+
 function templateIdAllowedForSlot(slot = {}, policy = {}, templateId = '') {
-  const slotTemplateId = clean(slot.templateId);
+  void policy;
+  const required = resolveSlotRequiredTemplateId(slot);
   const instanceTemplateId = clean(templateId);
-  if (!instanceTemplateId) return false;
-  if (slotTemplateId) return instanceTemplateId === slotTemplateId;
-  const allowed = semiMonthlyReportPolicyService.normalizeIdList(policy.reportTemplateIds);
-  return allowed.some((id) => clean(id).toLowerCase() === instanceTemplateId.toLowerCase());
+  if (!instanceTemplateId || !required) return false;
+  return idsEqual(instanceTemplateId, required);
 }
 
 function pickLatestInstance(instances = [], slot = {}, policy = {}) {
@@ -87,7 +92,7 @@ function pickLatestInstance(instances = [], slot = {}, policy = {}) {
   return rows[0] || null;
 }
 
-function buildInstanceCandidatePool(student = {}) {
+function buildInstanceCandidatePool(student = {}, policy = {}) {
   const pool = [];
   sortClasses(student.classes).forEach((classRow) => {
     (Array.isArray(classRow.instances) ? classRow.instances : []).forEach((instance) => {
@@ -105,7 +110,8 @@ function buildInstanceCandidatePool(student = {}) {
       });
     });
   });
-  return pool;
+  const reportTemplateIds = semiMonthlyReportPolicyService.normalizeIdList(policy?.reportTemplateIds);
+  return schoolSemiMonthlyReportService.sortInstancesByPolicyTemplateOrder(pool, reportTemplateIds);
 }
 
 function resolveInstanceIdOverride(instanceIdsBySlot = {}, slot = {}, index = 0) {
@@ -120,7 +126,7 @@ function resolveInstanceIdOverride(instanceIdsBySlot = {}, slot = {}, index = 0)
 
 function resolveOverallSlotAssignments(student = {}, policy = {}, overallTemplate = null, instanceIdsBySlot = {}) {
   const slots = sortOverallSlots(overallTemplate);
-  const pool = buildInstanceCandidatePool(student);
+  const pool = buildInstanceCandidatePool(student, policy);
   const usedInstanceIds = new Set();
   const slotAssignments = [];
   const missingSlots = [];
@@ -248,7 +254,18 @@ function buildSmmrOverallExportBlock(student, policy, overallTemplate) {
   const templateId = clean(overallTemplate.id || policy.overallReportTemplateId);
   const templateTitle = clean(overallTemplate.title) || templateId;
 
-  const eligible = slots.length > 0 && (necessarySlots.length === 0 || missingSlots.length === 0);
+  const blockWarnings = [...warnings];
+  const misconfiguredNecessary = necessarySlots.some((slot) => !resolveSlotRequiredTemplateId(slot));
+  if (misconfiguredNecessary) {
+    blockWarnings.push('Overall template has necessary slots without a source report template.');
+  }
+  const hasMatchedInstance = slotAssignments.some((row) => clean(row.selectedInstanceId));
+  let eligible = slots.length > 0
+    && !misconfiguredNecessary
+    && (necessarySlots.length === 0 || missingSlots.length === 0);
+  if (eligible && necessarySlots.length === 0) {
+    eligible = hasMatchedInstance;
+  }
   const rawOverallMeta = {
     hasDocx: overallReportService.templateHasAttachedDocx(overallTemplate),
     hasPdf: overallReportService.templateHasAttachedPdf(overallTemplate)
@@ -268,7 +285,7 @@ function buildSmmrOverallExportBlock(student, policy, overallTemplate) {
     hasPayload: effectiveOverall.hasPayload,
     eligible,
     missingSlots,
-    warnings,
+    warnings: blockWarnings,
     matchedClassIds,
     matchedInstanceIds,
     slots: slotSummaries,
@@ -515,7 +532,8 @@ function flattenInstanceRows(student, templateMetaMap, policy) {
       });
     });
   });
-  return rows;
+  const reportTemplateIds = semiMonthlyReportPolicyService.normalizeIdList(policy?.reportTemplateIds);
+  return schoolSemiMonthlyReportService.sortInstancesByPolicyTemplateOrder(rows, reportTemplateIds);
 }
 
 async function enrichInstanceRowsForExport(student, instanceRows = [], options = {}) {
