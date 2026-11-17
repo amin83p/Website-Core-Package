@@ -12,6 +12,7 @@
   ).trim();
   const hubPrintBrand = (typeof appBrand !== 'undefined' && appBrand && typeof appBrand === 'object') ? appBrand : {};
   const hubPrintLogoUrl = String(hubPrintBrand.logoUrl || '/uploads/GLOBAL/logo/Logo1.png').trim();
+  const hubReportSectionCount = 5 + (typeof canOpenAttendanceMatrix !== 'undefined' && canOpenAttendanceMatrix ? 1 : 0);
 %>
 
 <style>
@@ -74,7 +75,7 @@
 
   .school-master-hub .hub-section-panel-inner {
     display: grid;
-    grid-template-columns: repeat(8, minmax(0, 1fr));
+    grid-template-columns: repeat(var(--hub-report-section-count, 6), minmax(0, 1fr));
     direction: rtl;
   }
 
@@ -123,6 +124,19 @@
   .school-master-hub .hub-section-segment > span,
   .school-master-hub .hub-section-main-link > span {
     direction: ltr;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35rem;
+    max-width: 100%;
+    line-height: 1.2;
+    text-wrap: balance;
+  }
+
+  .school-master-hub .hub-section-segment > span .bi,
+  .school-master-hub .hub-section-main-link > span .bi {
+    flex: 0 0 auto;
+    font-size: 1rem;
   }
 
   .school-master-hub .hub-task-count {
@@ -291,7 +305,7 @@
     display: grid;
     grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 0.75rem;
-    align-items: end;
+    align-items: stretch;
   }
 
   @media (max-width: 1199.98px) {
@@ -306,13 +320,46 @@
     }
   }
 
+  .school-master-hub .hub-weekly-reports-filter-grid--4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  @media (max-width: 1199.98px) {
+    .school-master-hub .hub-weekly-reports-filter-grid--4 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .school-master-hub .hub-weekly-reports-filter-field {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    min-width: 0;
+  }
+
   .school-master-hub .hub-weekly-reports-filter-field .form-label {
     margin-bottom: 0.25rem;
+    flex: 0 0 auto;
+  }
+
+  .school-master-hub .hub-weekly-reports-filter-field .form-select,
+  .school-master-hub .hub-weekly-reports-filter-field .form-control,
+  .school-master-hub .hub-weekly-reports-filter-field .input-group {
+    flex: 0 0 auto;
+  }
+
+  .school-master-hub .hub-weekly-reports-filter-field .form-text {
+    flex: 1 1 auto;
+    min-height: 2.75rem;
+    margin-top: 0.35rem;
+    margin-bottom: 0;
+    line-height: 1.35;
   }
 
   .school-master-hub .hub-weekly-reports-filter-field .hub-weekly-reports-filter-chips {
     min-height: 0;
     margin-top: 0.35rem;
+    flex: 0 0 auto;
   }
 
   .school-master-hub .hub-student-progress-student {
@@ -2165,7 +2212,25 @@
   .school-master-hub .hub-enrollment-completions-column-toggles {
     border-top: 1px solid #e9ecef;
     margin-top: 0.25rem;
-    padding-top: 0.75rem;
+    padding-top: 0.5rem;
+  }
+
+  .school-master-hub .hub-enrollment-completions-column-toggles-header {
+    min-height: 2rem;
+  }
+
+  .school-master-hub .hub-enrollment-completions-column-toggles-label {
+    color: #64748b;
+    text-align: start;
+  }
+
+  .school-master-hub .hub-enrollment-completions-column-toggles-label:hover,
+  .school-master-hub .hub-enrollment-completions-column-toggles-label:focus-visible {
+    color: #0f172a;
+  }
+
+  .school-master-hub .hub-enrollment-completions-month-shortcuts {
+    margin-top: 0.25rem;
   }
 
   .school-master-hub .hub-enrollment-completions-comment-cell {
@@ -2682,7 +2747,7 @@
 
   @media (max-width: 991.98px) {
     .school-master-hub .hub-section-panel-inner {
-      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
   }
 
@@ -3465,7 +3530,7 @@
   </div>
 
   <div class="hub-section-panel" aria-label="School Report Hub sections">
-    <div class="hub-section-panel-inner">
+    <div class="hub-section-panel-inner" style="--hub-report-section-count: <%= hubReportSectionCount %>;">
       <% if (typeof canOpenAttendanceMatrix !== 'undefined' && canOpenAttendanceMatrix) { %>
       <button type="button" class="hub-section-segment" data-hub-workspace-section="attendance">
         <span><i class="bi bi-clipboard-check-fill me-1"></i> Attendance</span>
@@ -3478,13 +3543,13 @@
         <span><i class="bi bi-journal-bookmark-fill me-1"></i> Academic Ledger</span>
       </button>
       <button type="button" class="hub-section-segment" data-hub-workspace-section="weekly-reports">
-        <span><i class="bi bi-calendar-week me-1"></i> Weekly Reports</span>
+        <span><i class="bi bi-calendar-week-fill me-1"></i> Weekly</span>
       </button>
       <button type="button" class="hub-section-segment" data-hub-workspace-section="student-progress">
         <span><i class="bi bi-graph-up me-1"></i> Student Progress</span>
       </button>
       <button type="button" class="hub-section-segment" data-hub-workspace-section="enrollment-completions">
-        <span><i class="bi bi-calendar-check me-1"></i> Enrollment Completion</span>
+        <span><i class="bi bi-calendar-check-fill me-1"></i> Enrollment</span>
       </button>
     </div>
   </div>
@@ -10948,9 +11013,6 @@
       icon: 'bi bi-calendar-week',
       sourceUrl: '/school/report-hub'
     };
-    const filtersExpanded = hubWeeklyReportsHasFiltersApplied();
-    const collapseShowClass = filtersExpanded ? ' show' : '';
-
     els.workspace.innerHTML = [
       '<section class="hub-workspace">',
       '<div class="hub-workspace-card">',
@@ -10960,16 +11022,7 @@
       '<h2 class="h5 mb-0"><i class="' + escapeHtml(section.icon || 'bi bi-calendar-week') + ' me-2"></i>' + escapeHtml(section.label || 'Weekly Reports') + '</h2>',
       '</div>',
       '</div>',
-      '<div class="p-3 border-bottom bg-white hub-no-print">',
-      '<div class="card border shadow-sm mb-0">',
-      '<div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">',
-      '<div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filters</div>',
-      '<button id="hubWeeklyReportsFilterToggleBtn" type="button" class="btn btn-outline-secondary btn-sm px-2" data-bs-toggle="collapse" data-bs-target="#hubWeeklyReportsFilterCollapse" aria-expanded="' + (filtersExpanded ? 'true' : 'false') + '" aria-controls="hubWeeklyReportsFilterCollapse" aria-label="' + (filtersExpanded ? 'Close filters' : 'Open filters') + '">',
-      '<i id="hubWeeklyReportsFilterToggleIcon" class="bi ' + (filtersExpanded ? 'bi-chevron-up' : 'bi-chevron-down') + '"></i>',
-      '</button>',
-      '</div>',
-      '<div class="collapse' + collapseShowClass + '" id="hubWeeklyReportsFilterCollapse">',
-      '<div class="card-body p-3">',
+      '<div class="hub-workspace-toolbar hub-no-print">',
       '<div class="hub-weekly-reports-filter-grid mb-3">',
       '<div class="hub-weekly-reports-filter-field"><label class="form-label fw-bold small" for="hubWeeklyReportsDepartmentId">Department</label><select id="hubWeeklyReportsDepartmentId" class="form-select form-select-sm"><option value="">All Departments</option></select></div>',
       '<div class="hub-weekly-reports-filter-field"><label class="form-label fw-bold small" for="hubWeeklyReportsProgramId">Program</label><select id="hubWeeklyReportsProgramId" class="form-select form-select-sm"><option value="">All Programs</option></select></div>',
@@ -10977,10 +11030,23 @@
       '<div class="hub-weekly-reports-filter-field"><label class="form-label fw-bold small">Classes</label><div class="input-group input-group-sm"><input type="hidden" id="hubWeeklyReportsClassId"><input type="text" id="hubWeeklyReportsClassName" class="form-control bg-white" placeholder="All Classes..." readonly><button type="button" class="btn btn-outline-danger" id="hubWeeklyReportsClearClass" title="Clear Classes"><i class="bi bi-x"></i></button><button type="button" class="btn btn-outline-primary" id="hubWeeklyReportsOpenClassPicker" title="Select Classes"><i class="bi bi-book"></i></button></div><div id="hubWeeklyReportsClassChips" class="hub-weekly-reports-filter-chips"></div></div>',
       '<div class="hub-weekly-reports-filter-field"><label class="form-label fw-bold small">Students</label><div class="input-group input-group-sm"><input type="hidden" id="hubWeeklyReportsStudentId"><input type="text" id="hubWeeklyReportsStudentName" class="form-control bg-white" placeholder="All Students..." readonly><button type="button" class="btn btn-outline-danger" id="hubWeeklyReportsClearStudent" title="Clear Students"><i class="bi bi-x"></i></button><button type="button" class="btn btn-outline-primary" id="hubWeeklyReportsOpenStudentPicker" title="Select Students"><i class="bi bi-mortarboard"></i></button></div><div id="hubWeeklyReportsStudentChips" class="hub-weekly-reports-filter-chips"></div></div>',
       '</div>',
-      '<div class="row g-3 align-items-end">',
-      '<div class="col-md-3"><label class="form-label fw-bold small" for="hubWeeklyReportsStartDate">Start Date</label><input type="date" id="hubWeeklyReportsStartDate" class="form-control form-control-sm"><div class="form-text">Snaps to Monday</div></div>',
-      '<div class="col-md-3"><label class="form-label fw-bold small" for="hubWeeklyReportsEndDate">End Date</label><input type="date" id="hubWeeklyReportsEndDate" class="form-control form-control-sm"><div class="form-text">Snaps to Sunday</div></div>',
-      '<div class="col-md-6 d-flex gap-2 justify-content-md-end"><button type="button" id="hubWeeklyReportsFilterApply" class="btn btn-primary btn-sm flex-fill flex-md-grow-0 fw-bold"><i class="bi bi-funnel-fill me-1"></i> Apply</button><button type="button" id="hubWeeklyReportsFilterReset" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i> Reset</button></div>',
+      '<div class="row g-3 align-items-end mb-0">',
+      '<div class="col-md-3">',
+      '<div class="hub-weekly-reports-filter-field">',
+      '<label class="form-label fw-bold small" for="hubWeeklyReportsStartDate">Start Date</label>',
+      '<input type="date" id="hubWeeklyReportsStartDate" class="form-control form-control-sm">',
+      '<div class="form-text">Snaps to Monday</div>',
+      '</div></div>',
+      '<div class="col-md-3">',
+      '<div class="hub-weekly-reports-filter-field">',
+      '<label class="form-label fw-bold small" for="hubWeeklyReportsEndDate">End Date</label>',
+      '<input type="date" id="hubWeeklyReportsEndDate" class="form-control form-control-sm">',
+      '<div class="form-text">Snaps to Sunday</div>',
+      '</div></div>',
+      '<div class="col-md-6 d-flex gap-2 justify-content-md-end align-items-end pb-1">',
+      '<button type="button" id="hubWeeklyReportsFilterApply" class="btn btn-primary btn-sm flex-fill flex-md-grow-0 fw-bold"><i class="bi bi-funnel-fill me-1"></i> Apply</button>',
+      '<button type="button" id="hubWeeklyReportsFilterReset" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i> Reset</button>',
+      '</div>',
       '</div>',
       '<div class="d-flex flex-wrap gap-2 pt-3 mt-3 border-top">',
       '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-weekly-reports-range="thisWeek">This Week</button>',
@@ -10990,9 +11056,6 @@
       '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-weekly-reports-range="lastThreeMonths">Last Three Months</button>',
       '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-weekly-reports-range="wholeYear">Whole Year</button>',
       '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-weekly-reports-range="allTime">All Time</button>',
-      '</div>',
-      '</div>',
-      '</div>',
       '</div>',
       '</div>',
       '<div id="hubWeeklyReportsTabBar" class="hub-weekly-reports-tabs hub-no-print d-none"></div>',
@@ -14436,6 +14499,29 @@
     collapseEl.addEventListener('hidden.bs.collapse', function () { setState(false); });
   }
 
+  function bindEnrollmentCompletionsColumnCollapse() {
+    const collapseEl = document.getElementById('hubEnrollmentCompletionsColumnCollapse');
+    const buttonEl = document.getElementById('hubEnrollmentCompletionsColumnToggleBtn');
+    const labelBtn = document.getElementById('hubEnrollmentCompletionsColumnToggleLabel');
+    const iconEl = document.getElementById('hubEnrollmentCompletionsColumnToggleIcon');
+    if (!collapseEl || !buttonEl || !iconEl) return;
+    const setState = function (expanded) {
+      iconEl.classList.remove('bi-chevron-down', 'bi-chevron-up');
+      iconEl.classList.add(expanded ? 'bi-chevron-up' : 'bi-chevron-down');
+      const ariaExpanded = expanded ? 'true' : 'false';
+      const ariaLabel = expanded ? 'Hide report columns' : 'Show report columns';
+      buttonEl.setAttribute('aria-expanded', ariaExpanded);
+      buttonEl.setAttribute('aria-label', ariaLabel);
+      if (labelBtn) {
+        labelBtn.setAttribute('aria-expanded', ariaExpanded);
+        labelBtn.setAttribute('aria-label', ariaLabel);
+      }
+    };
+    setState(collapseEl.classList.contains('show'));
+    collapseEl.addEventListener('shown.bs.collapse', function () { setState(true); });
+    collapseEl.addEventListener('hidden.bs.collapse', function () { setState(false); });
+  }
+
   function renderEnrollmentCompletionsWaitingState() {
     return [
       '<div class="hub-empty">',
@@ -15075,6 +15161,7 @@
       });
     }
     bindEnrollmentCompletionsFilterCollapse();
+    bindEnrollmentCompletionsColumnCollapse();
     ['hubEnrollmentCompletionsColNewEnrollment', 'hubEnrollmentCompletionsColClb'].forEach(function (checkboxId) {
       const checkboxEl = document.getElementById(checkboxId);
       if (!checkboxEl) return;
@@ -15190,8 +15277,6 @@
       icon: 'bi bi-calendar-check',
       sourceUrl: '/school/report-hub'
     };
-    const filtersExpanded = !hubEnrollmentCompletionsPayload || hubEnrollmentCompletionsFiltersExpanded();
-    const collapseShowClass = filtersExpanded ? ' show' : '';
     const sectionLabel = escapeHtml(section.label || HUB_ENROLLMENT_COMPLETION_LABEL);
     els.workspace.innerHTML = [
       '<section class="hub-workspace" id="hubEnrollmentCompletionsWorkspace">',
@@ -15202,17 +15287,8 @@
       '<h2 class="h5 mb-0"><i class="' + escapeHtml(section.icon || 'bi bi-calendar-check') + ' me-2"></i>' + sectionLabel + '</h2>',
       '</div>',
       '</div>',
-      '<div class="p-3 border-bottom bg-white hub-no-print">',
-      '<div class="card border shadow-sm mb-0">',
-      '<div class="card-header bg-white d-flex align-items-center justify-content-between py-2 px-3">',
-      '<div class="fw-bold text-dark"><i class="bi bi-funnel me-2"></i>Filters</div>',
-      '<button id="hubEnrollmentCompletionsFilterToggleBtn" type="button" class="btn btn-outline-secondary btn-sm px-2" data-bs-toggle="collapse" data-bs-target="#hubEnrollmentCompletionsFilterCollapse" aria-expanded="' + (filtersExpanded ? 'true' : 'false') + '" aria-controls="hubEnrollmentCompletionsFilterCollapse" aria-label="' + (filtersExpanded ? 'Close filters' : 'Open filters') + '">',
-      '<i id="hubEnrollmentCompletionsFilterToggleIcon" class="bi ' + (filtersExpanded ? 'bi-chevron-up' : 'bi-chevron-down') + '"></i>',
-      '</button>',
-      '</div>',
-      '<div class="collapse' + collapseShowClass + '" id="hubEnrollmentCompletionsFilterCollapse">',
-      '<div class="card-body p-3">',
-      '<div class="hub-weekly-reports-filter-grid mb-3">',
+      '<div class="hub-workspace-toolbar hub-no-print">',
+      '<div class="hub-weekly-reports-filter-grid hub-weekly-reports-filter-grid--4 mb-3">',
       '<div class="hub-weekly-reports-filter-field">',
       '<label class="form-label fw-bold small" for="hubEnrollmentCompletionsDepartmentIds">Departments</label>',
       '<select id="hubEnrollmentCompletionsDepartmentIds" class="form-select form-select-sm" multiple size="5" aria-label="Departments"></select>',
@@ -15231,12 +15307,25 @@
       '<div class="hub-weekly-reports-filter-field">',
       '<label class="form-label fw-bold small" for="hubEnrollmentCompletionsMonth">Month</label>',
       '<input type="month" id="hubEnrollmentCompletionsMonth" class="form-control form-control-sm">',
+      '<div class="hub-enrollment-completions-month-shortcuts d-flex flex-wrap gap-1">',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-enrollment-completions-month="nextMonth">Next month</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-enrollment-completions-month="thisMonth">This month</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-enrollment-completions-month="lastMonth">Last month</button>',
+      '</div>',
       '<div class="form-text">Effective enrollment finish must fall in this month.</div>',
       '</div>',
       '</div>',
-      '<div class="hub-enrollment-completions-column-toggles mb-3">',
-      '<div class="text-uppercase text-muted small fw-bold mb-2"><i class="bi bi-layout-three-columns me-1"></i>Report columns</div>',
-      '<nav class="d-flex flex-wrap align-items-center gap-3">',
+      '<div class="hub-enrollment-completions-column-toggles mb-2">',
+      '<div class="hub-enrollment-completions-column-toggles-header d-flex align-items-center justify-content-between gap-2">',
+      '<button type="button" id="hubEnrollmentCompletionsColumnToggleLabel" class="hub-enrollment-completions-column-toggles-label btn btn-link btn-sm text-uppercase small fw-bold mb-0 p-0 border-0 shadow-none" data-bs-toggle="collapse" data-bs-target="#hubEnrollmentCompletionsColumnCollapse" aria-expanded="false" aria-controls="hubEnrollmentCompletionsColumnCollapse" aria-label="Show report columns">',
+      '<i class="bi bi-layout-three-columns me-1"></i>Report columns',
+      '</button>',
+      '<button type="button" id="hubEnrollmentCompletionsColumnToggleBtn" class="btn btn-outline-secondary btn-sm px-2 py-0" data-bs-toggle="collapse" data-bs-target="#hubEnrollmentCompletionsColumnCollapse" aria-expanded="false" aria-controls="hubEnrollmentCompletionsColumnCollapse" aria-label="Show report columns">',
+      '<i id="hubEnrollmentCompletionsColumnToggleIcon" class="bi bi-chevron-down"></i>',
+      '</button>',
+      '</div>',
+      '<div class="collapse" id="hubEnrollmentCompletionsColumnCollapse">',
+      '<nav class="d-flex flex-wrap align-items-center gap-3 pt-2">',
       '<div class="form-check form-check-inline mb-0">',
       '<input class="form-check-input" type="checkbox" id="hubEnrollmentCompletionsColNewEnrollment" value="1">',
       '<label class="form-check-label small" for="hubEnrollmentCompletionsColNewEnrollment">', escapeHtml(HUB_ENROLLMENT_COMPLETIONS_NEW_ENROLLMENT_COLUMN_LABEL), '</label>',
@@ -15246,20 +15335,13 @@
       '<label class="form-check-label small" for="hubEnrollmentCompletionsColClb">', escapeHtml(HUB_ENROLLMENT_COMPLETIONS_CLB_COLUMN_LABEL), '</label>',
       '</div>',
       '</nav>',
-      '<div class="form-text mt-1">When New enrollment is off, a blank Comment column is added for handwritten notes.</div>',
+      '<div class="form-text mt-1 mb-0">When New enrollment is off, a blank Comment column is added for handwritten notes.</div>',
+      '</div>',
       '</div>',
       '<div class="row g-3 align-items-end">',
-      '<div class="col-md-6 d-flex flex-wrap gap-2 pt-1">',
-      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-enrollment-completions-month="nextMonth">Next month</button>',
-      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-enrollment-completions-month="thisMonth">This month</button>',
-      '<button type="button" class="btn btn-sm btn-outline-secondary py-0" data-hub-enrollment-completions-month="lastMonth">Last month</button>',
-      '</div>',
-      '<div class="col-md-6 d-flex gap-2 justify-content-md-end">',
+      '<div class="col-12 d-flex gap-2 justify-content-end">',
       '<button type="button" id="hubEnrollmentCompletionsRun" class="btn btn-primary btn-sm flex-fill flex-md-grow-0 fw-bold"><i class="bi bi-funnel-fill me-1"></i> Generate</button>',
       '<button type="button" id="hubEnrollmentCompletionsReset" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-counterclockwise me-1"></i> Reset</button>',
-      '</div>',
-      '</div>',
-      '</div>',
       '</div>',
       '</div>',
       '</div>',

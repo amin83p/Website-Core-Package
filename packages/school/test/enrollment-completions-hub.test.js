@@ -249,6 +249,16 @@ test('reportHub view includes enrollment-completions section and month input', (
   assert.match(reportHubView, /enrollment-completions/);
 });
 
+test('reportHub section bar uses fixed column grid like master academia hub', () => {
+  assert.match(reportHubView, /--hub-report-section-count/);
+  assert.match(reportHubView, /grid-template-columns:\s*repeat\(var\(--hub-report-section-count/);
+});
+
+test('reportHub enrollment column picker and month shortcuts layout', () => {
+  assert.match(reportHubView, /hubEnrollmentCompletionsColumnToggleLabel/);
+  assert.match(reportHubView, /hub-enrollment-completions-month-shortcuts/);
+});
+
 test('report hub controller loads shared print manager like attendance matrix', () => {
   assert.match(reportHubController, /includePrintManager:\s*true/);
 });

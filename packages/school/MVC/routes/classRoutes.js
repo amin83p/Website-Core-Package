@@ -319,7 +319,7 @@ router.get('/api/enrollment-close-reasons',
 
 router.put('/api/enrollment-close-reasons',
   requireAccess(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),
   rollingCtrl.saveEnrollmentCloseReasons);
 
 router.get('/api/:classId/enrollment-periods',

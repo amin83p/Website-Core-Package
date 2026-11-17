@@ -44,4 +44,10 @@ test('rolling enrollment mutation routes allow expired operation token fallback'
     );
     assert.match(source, routePattern, `${routePath} should use rollingEnrollmentMutationActionState`);
   });
+
+  assert.match(
+    source,
+    /router\.put\('\/api\/enrollment-close-reasons'[\s\S]*?trackActionState\([^\n]+rollingEnrollmentMutationActionState\)/,
+    'PUT /api/enrollment-close-reasons should use rollingEnrollmentMutationActionState'
+  );
 });
