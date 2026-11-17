@@ -46,6 +46,30 @@ test('buildAssignmentEditUrl targets assignment edit with rowId query', () => {
   assert.match(url, /[?&]rowId=ROW-9/);
 });
 
+test('resolvePrimaryInstructorForClass prefers primary role over co-teachers', () => {
+  const primary = reviewService.resolvePrimaryInstructorForClass({
+    instructors: [
+      { personId: 'SUB-1', name: 'Substitute Teacher', role: 'Co-teacher' },
+      { personId: 'PRI-1', name: 'Taylor R.', role: 'Primary', primary: true }
+    ]
+  });
+  assert.equal(primary.teacherId, 'PRI-1');
+  assert.equal(primary.teacherName, 'Taylor R.');
+});
+
+test('filterRelatedInstanceRows keeps instances when session deliverer differs from instances', () => {
+  const assignment = { id: 'ASN-1' };
+  const targetRow = { rowId: 'ROW-1', teacherId: 'COVER-1' };
+  const rows = reviewService.filterRelatedInstanceRows([
+    { assignmentId: 'ASN-1', assignmentRowId: 'ROW-1', teacherId: 'PRI-1', status: 'draft' },
+    { assignmentId: 'ASN-1', assignmentRowId: 'ROW-1', teacherId: 'COVER-1', status: 'submitted' },
+    { assignmentId: 'ASN-1', assignmentRowId: 'ROW-OTHER', teacherId: 'PRI-1', status: 'draft' }
+  ], assignment, targetRow);
+  assert.equal(rows.length, 2);
+  assert.ok(rows.some((row) => row.teacherId === 'PRI-1'));
+  assert.ok(rows.some((row) => row.teacherId === 'COVER-1'));
+});
+
 test('review service links Fill Reports matrix for student-scoped assignments', () => {
   const source = fs.readFileSync(
     path.join(__dirname, '../packages/school/MVC/services/school/schoolSemiMonthlyReportReviewService.js'),

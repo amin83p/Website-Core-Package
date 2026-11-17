@@ -79,11 +79,42 @@ function buildStatusSummary(progress = {}) {
   return parts.length ? parts.join(' · ') : 'No instances';
 }
 
-function resolveTeacherId(assignment = {}, targetRow = {}) {
+function resolveSessionDelivererTeacherId(assignment = {}, targetRow = {}) {
   return toPublicId(targetRow?.teacherId)
     || toPublicId(assignment?.teacherId)
     || toPublicId((Array.isArray(assignment?.teacherIds) ? assignment.teacherIds[0] : ''))
     || '';
+}
+
+function resolvePrimaryInstructorForClass(classRow = {}) {
+  const instructors = (Array.isArray(classRow?.instructors) ? classRow.instructors : [])
+    .filter((row) => {
+      const status = String(row?.status || 'active').trim().toLowerCase();
+      return !status || status === 'active';
+    });
+  const primary = instructors.find((row) => row && (row.primary === true || row.isPrimary === true))
+    || instructors.find((row) => {
+      const role = String(row?.role || '').trim().toLowerCase();
+      return role === 'primary' || role === 'primary instructor';
+    })
+    || instructors[0]
+    || null;
+  const teacherId = toPublicId(
+    primary?.teacherId
+    || primary?.personId
+    || primary?.id
+    || classRow?.teacherId
+    || classRow?.instructorId
+    || classRow?.teacherPersonId
+  ) || '';
+  const teacherName = String(
+    primary?.name
+    || primary?.displayName
+    || classRow?.teacherName
+    || teacherId
+    || '—'
+  ).trim();
+  return { teacherId, teacherName };
 }
 
 function buildAssignmentEditUrl(assignmentId = '', assignmentRowId = '') {
@@ -101,7 +132,7 @@ function resolveFillReportsUrl(assignment, targetRow, relatedRows, assignmentMap
   const studentTargeted = scope === 'each_student' || scope === 'selected_students';
   const assignmentId = toPublicId(assignment?.id);
   const assignmentRowId = String(targetRow?.rowId || '').trim();
-  const teacherId = resolveTeacherId(assignment, targetRow);
+  const teacherId = resolveSessionDelivererTeacherId(assignment, targetRow);
 
   if (studentTargeted && assignmentId) {
     const matrixParams = new URLSearchParams();
@@ -130,11 +161,9 @@ function resolveFillReportsUrl(assignment, targetRow, relatedRows, assignmentMap
 function filterRelatedInstanceRows(instanceRows, assignment, targetRow) {
   const assignmentId = toPublicId(assignment?.id);
   const assignmentRowId = String(targetRow?.rowId || '').trim();
-  const teacherId = resolveTeacherId(assignment, targetRow);
   return (Array.isArray(instanceRows) ? instanceRows : []).filter((row) => {
     if (!idsEqual(row?.assignmentId, assignmentId)) return false;
     if (assignmentRowId && String(row?.assignmentRowId || '').trim() !== assignmentRowId) return false;
-    if (teacherId && !idsEqual(row?.teacherId, teacherId)) return false;
     return true;
   });
 }
@@ -212,9 +241,11 @@ async function buildReviewAssignmentsPayload(req) {
       .filter((row) => String(row?.status || 'active').trim().toLowerCase() === 'active')
       .filter((row) => targetRowOverlapsDateRange(row, startDate, endDate));
 
+    const primaryInstructor = resolvePrimaryInstructorForClass(classRow);
+
     for (const targetRow of targetRows) {
       const assignmentRowId = String(targetRow?.rowId || '').trim();
-      const teacherId = resolveTeacherId(assignment, targetRow);
+      const teacherId = primaryInstructor.teacherId;
       const related = filterRelatedInstanceRows(instanceRows, assignment, targetRow)
         .filter((row) => templateIdMatches(row?.templateId, templateIdSet));
       const progress = tallyInstanceProgress(related);
@@ -226,13 +257,7 @@ async function buildReviewAssignmentsPayload(req) {
         templateTitle = semiMonthlyReportPolicyService.formatTemplateLabel(template, templateId);
         templateLabelCache.set(templateId, templateTitle);
       }
-      const teacherName = String(
-        related.find((row) => String(row?.teacherName || '').trim())?.teacherName
-        || classRow?.instructors?.[0]?.name
-        || classRow?.teacherName
-        || teacherId
-        || '—'
-      ).trim();
+      const teacherName = primaryInstructor.teacherName;
 
       const className = String(classRow?.name || classRow?.title || classId).trim();
 
@@ -313,5 +338,8 @@ module.exports = {
   buildStatusSummary,
   buildAssignmentEditUrl,
   sortReviewRowsForTeacherSection,
+  resolvePrimaryInstructorForClass,
+  filterRelatedInstanceRows,
+  resolveSessionDelivererTeacherId,
   buildReviewAssignmentsPayload
 };
