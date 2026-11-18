@@ -3,6 +3,7 @@ const express = require('express');
 const multer = require('multer');
 const router = express.Router();
 const ctrl = require('../controllers/systemSettingsController');
+const packageEvolutionCtrl = require('../controllers/packageEvolutionController');
 const upload = require('../middleware/upload');
 
 const { requireAuth } = require('../middleware/authMiddleware');
@@ -461,6 +462,23 @@ router.get('/packages/transactions/:transactionId',
           requireAccess(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE),
           trackActionState(SECTIONS.SYSTEM_PACKAGE_MANAGER, OPERATIONS.UPDATE, { keepActive: true }),
           ctrl.getPackageTransactionDetailFromManager);
+
+// 7.4 Package Evolution (System Settings)
+router.get('/package-evolution',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_EVOLUTION, OPERATIONS.UPDATE),
+          trackActionState(SECTIONS.SYSTEM_PACKAGE_EVOLUTION, OPERATIONS.UPDATE, { keepActive: true }),
+          packageEvolutionCtrl.listManage);
+router.post('/package-evolution/api/import',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_EVOLUTION, OPERATIONS.UPDATE),
+          trackActionState(SECTIONS.SYSTEM_PACKAGE_EVOLUTION, OPERATIONS.UPDATE, { keepActive: true }),
+          packageEvolutionCtrl.postImportApi);
+router.post('/package-evolution/api/item',
+          requireAuth,
+          requireAccess(SECTIONS.SYSTEM_PACKAGE_EVOLUTION, OPERATIONS.UPDATE),
+          trackActionState(SECTIONS.SYSTEM_PACKAGE_EVOLUTION, OPERATIONS.UPDATE, { keepActive: true }),
+          packageEvolutionCtrl.postItemApi);
 
 // 7.5 Package Builder (System Settings)
 router.get('/package-builder',

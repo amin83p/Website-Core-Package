@@ -4551,4 +4551,12 @@ a .spinner-border.spinner-border-sm,
   color: #6366f1;
 }
 
+.package-evolution-page .package-evolution-timeline {
+  max-width: 920px;
+}
+
+.package-evolution-page .package-evolution-card {
+  border-left: 3px solid var(--bs-primary);
+}
+
 @import url('pages/error.css');

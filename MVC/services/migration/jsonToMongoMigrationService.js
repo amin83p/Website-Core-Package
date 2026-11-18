@@ -209,6 +209,7 @@ function buildCatalog() {
     { key: 'core.emailProviderProfiles', domain: 'Core', section: 'Email Provider Profiles', source: 'emailProviderProfiles.json', collection: 'emailProviderProfiles' },
     { key: 'core.emailEventDefinitions', domain: 'Core', section: 'Email Event Definitions', source: 'emailEventDefinitions.json', collection: 'emailEventDefinitions' },
     { key: 'core.emailLedger', domain: 'Core', section: 'Email Ledger', source: 'emailLedger.json', collection: 'emailLedger' },
+    { key: 'core.packageEvolutionItems', domain: 'Core', section: 'Package Evolution', source: 'packageEvolutionItems.json', collection: 'packageEvolutionItems' },
     { key: 'core.scheduledTaskDefinitions', domain: 'Core', section: 'Auto Scheduled Tasks', source: 'scheduledTaskDefinitions.json', collection: 'scheduledTaskDefinitions' },
     { key: 'core.scheduledTaskRuns', domain: 'Core', section: 'Auto Scheduled Tasks', source: 'scheduledTaskRuns.json', collection: 'scheduledTaskRuns' },
     { key: 'core.emailOutbox', domain: 'Core', section: 'Email Outbox', source: 'emailOutbox.json', collection: 'emailOutbox' },

@@ -154,6 +154,13 @@ const INDEX_DEFINITIONS = Object.freeze({
     { key: { eventKey: 1, dateTime: -1 }, options: { name: 'idx_email_ledger_event_datetime' } },
     { key: { providerMessageId: 1 }, options: { name: 'idx_email_ledger_provider_message' } }
   ],
+  packageEvolutionItems: [
+    { key: { id: 1 }, options: { name: 'idx_package_evolution_items_id', unique: true } },
+    { key: { upsertKey: 1 }, options: { name: 'idx_package_evolution_items_upsert_key', unique: true } },
+    { key: { packageName: 1, committedAt: -1 }, options: { name: 'idx_package_evolution_items_pkg_committed' } },
+    { key: { commitSha: 1 }, options: { name: 'idx_package_evolution_items_commit_sha' } },
+    { key: { status: 1, committedAt: -1 }, options: { name: 'idx_package_evolution_items_status_committed' } }
+  ],
   scheduledTaskDefinitions: [
     { key: { id: 1 }, options: { name: 'idx_scheduled_task_definitions_id', unique: true } },
     { key: { orgId: 1, taskKey: 1, source: 1, sourceRef: 1 }, options: { name: 'idx_scheduled_task_definitions_org_task_source' } },

@@ -1,0 +1,85 @@
+<div class="container-fluid py-4">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+    <div>
+      <h1 class="h4 fw-bold mb-1">Package evolution records</h1>
+      <p class="text-muted small mb-0">Import agent-enriched JSON or review draft and published items.</p>
+    </div>
+    <a href="/package-evolution" class="btn btn-outline-primary btn-sm"><i class="bi bi-graph-up-arrow me-1"></i>Open timeline</a>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-4">
+    <div class="card-body">
+      <h2 class="h6 fw-bold">Bulk import</h2>
+      <form method="post" action="/systemSettings/package-evolution/api/import" id="pevolImportForm">
+        <div class="mb-2">
+          <label class="form-label" for="pevolImportJson">JSON payload (`items` array)</label>
+          <textarea id="pevolImportJson" name="itemsJson" class="form-control font-monospace small" rows="8" placeholder='{"items":[...]}'></textarea>
+        </div>
+        <div class="form-check mb-3">
+          <input type="checkbox" class="form-check-input" id="pevolPublishOnImport" name="publish" value="true">
+          <label class="form-check-label" for="pevolPublishOnImport">Publish on import</label>
+        </div>
+        <button type="submit" class="btn btn-primary btn-sm">Import</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="table-responsive card border-0 shadow-sm">
+    <table class="table table-sm table-hover mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Package</th>
+          <th>Date</th>
+          <th>Type</th>
+          <th>Title</th>
+          <th>Status</th>
+          <th>Commit</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% (rows || []).forEach((row) => { %>
+        <tr>
+          <td><%= row.packageName %></td>
+          <td class="small"><%= row.committedAt || '' %></td>
+          <td><%= row.changeType %></td>
+          <td><%= row.title %></td>
+          <td><%= row.status %></td>
+          <td class="small"><code><%= row.commitShortHash || '' %></code></td>
+        </tr>
+        <% }); %>
+        <% if (!rows || !rows.length) { %>
+        <tr><td colspan="6" class="text-muted text-center py-4">No records yet. Run <code>npm run evolution:scan</code> and import enriched JSON.</td></tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  document.getElementById('pevolImportForm')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const raw = document.getElementById('pevolImportJson')?.value || '';
+    let items = [];
+    try {
+      const parsed = JSON.parse(raw);
+      items = Array.isArray(parsed?.items) ? parsed.items : (Array.isArray(parsed) ? parsed : []);
+    } catch (_) {
+      alert('Invalid JSON.');
+      return;
+    }
+    const publish = document.getElementById('pevolPublishOnImport')?.checked === true;
+    const res = await fetch('/systemSettings/package-evolution/api/import', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ items, publish })
+    });
+    const payload = await res.json().catch(() => ({}));
+    if (!res.ok || payload.status !== 'success') {
+      alert(payload.message || 'Import failed.');
+      return;
+    }
+    alert(`Imported ${payload.total} item(s).`);
+    globalThis.location.reload();
+  });
+</script>

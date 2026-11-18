@@ -356,6 +356,14 @@
                                 <% } %>
                             </li>
 
+                            <% if (typeof canViewPackageEvolution !== 'undefined' && canViewPackageEvolution) { %>
+                            <li class="header-user-menu-nav" role="none">
+                                <a class="header-user-menu-item" href="/package-evolution" role="menuitem">
+                                    <span class="header-user-menu-item-icon" aria-hidden="true"><i class="bi bi-graph-up-arrow"></i></span>
+                                    <span class="header-user-menu-item-label">Package evolution</span>
+                                </a>
+                            </li>
+                            <% } %>
                             <% if (typeof buildVersionShort !== 'undefined' && buildVersionShort) { %>
                             <li class="header-user-menu-divider" role="separator" aria-hidden="true"></li>
                             <li class="header-user-menu-nav" role="none">

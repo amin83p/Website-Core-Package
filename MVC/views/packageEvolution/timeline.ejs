@@ -1,0 +1,45 @@
+<div class="container-fluid py-4 package-evolution-page">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+      <h1 class="h3 fw-bold mb-1"><i class="bi bi-graph-up-arrow text-primary me-2"></i>Package evolution</h1>
+      <p class="text-muted mb-0 small">Track how each package moves forward across commits, releases, and team work.</p>
+    </div>
+    <% if (typeof packages !== 'undefined' && packages.length) { %>
+    <div class="d-flex flex-wrap gap-2" id="pevolPackageChips" role="group" aria-label="Package filter">
+      <button type="button" class="btn btn-sm btn-primary pevol-chip active" data-package="">All packages</button>
+      <% packages.forEach((pkg) => { %>
+        <button type="button" class="btn btn-sm btn-outline-primary pevol-chip" data-package="<%= pkg %>"><%= pkg %></button>
+      <% }); %>
+    </div>
+    <% } %>
+  </div>
+
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <label class="form-label" for="pevolStartDate">Start date</label>
+      <input type="date" id="pevolStartDate" class="form-control">
+    </div>
+    <div class="col-md-3">
+      <label class="form-label" for="pevolEndDate">End date</label>
+      <input type="date" id="pevolEndDate" class="form-control">
+    </div>
+    <div class="col-md-3 d-flex align-items-end">
+      <button type="button" class="btn btn-primary w-100" id="pevolLoadBtn"><i class="bi bi-arrow-clockwise me-1"></i>Refresh</button>
+    </div>
+  </div>
+
+  <div id="pevolLoading" class="text-center text-muted py-5 d-none">
+    <div class="spinner-border spinner-border-sm text-primary" role="status"></div>
+    <div class="mt-2 small">Loading timeline…</div>
+  </div>
+  <div id="pevolEmpty" class="alert alert-light border text-center d-none">No published evolution items match this filter.</div>
+  <div id="pevolTimeline" class="package-evolution-timeline"></div>
+</div>
+
+<script>
+  window.PackageEvolutionTimelineConfig = {
+    apiUrl: '/package-evolution/api/timeline',
+    packages: <%- JSON.stringify(packages || []) %>
+  };
+</script>
+<script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/packageEvolutionTimeline.js') : '/scripts/packageEvolutionTimeline.js' %>"></script>

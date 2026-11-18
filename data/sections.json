@@ -7583,6 +7583,9 @@
       },
       {
         "id": "731287"
+      },
+      {
+        "id": "731288"
       }
     ],
     "trackState": false
@@ -10598,6 +10601,43 @@
       },
       {
         "id": "OP1006",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      }
+    ],
+    "related": [],
+    "subsections": [],
+    "trackState": true
+  },
+  {
+    "id": "731288",
+    "active": true,
+    "audit": {
+      "createUser": "SYS_ROOT_001",
+      "createDateTime": "2026-11-17T00:00:00.000Z",
+      "lastUpdateUser": "SYS_ROOT_001",
+      "lastUpdateDateTime": "2026-11-17T00:00:00.000Z"
+    },
+    "category": "SYSTEM",
+    "dashboardDisplay": true,
+    "description": "Import and manage package evolution records tied to git commits.",
+    "homeURL": "/systemSettings/package-evolution",
+    "inactiveMessage": "",
+    "mainDashboardDisplay": false,
+    "message": "",
+    "minimumAccessRequirement": 5,
+    "name": "SYSTEM_PACKAGE_EVOLUTION",
+    "navigatorSection": false,
+    "operations": [
+      {
+        "id": "OP1002",
+        "sessionAttempts": 5,
+        "sessionTime": 15,
+        "active": true
+      },
+      {
+        "id": "OP1003",
         "sessionAttempts": 5,
         "sessionTime": 15,
         "active": true

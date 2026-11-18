@@ -560,6 +560,11 @@ app.use(requestPerfTracer.wrapMiddleware('app-locals', async (req, res, next) =>
   res.locals.canUseAdminAuthenticator = Boolean(
     req.user && adminAuthorityService.hasAnyAdminPrivilege(req.user)
   );
+  const packageEvolutionAccessService = require('./MVC/services/packageEvolutionAccessService');
+  res.locals.canViewPackageEvolution = Boolean(req.user && packageEvolutionAccessService.canViewPackageEvolution(req.user));
+  res.locals.packageEvolutionPackages = req.user
+    ? packageEvolutionAccessService.resolveAccessiblePackagesSync(req.user)
+    : [];
   res.locals.canViewActiveUsers = false;
   res.locals.canUsePageDiagnostics = false;
   res.locals.pageDiagnosticsEnabled = false;
@@ -635,6 +640,7 @@ const newsletterRoutes = require('./MVC/routes/newsletterRoutes');
 const subscriptionGroupRoutes = require('./MVC/routes/subscriptionGroupRoutes');
 const userMembershipRoutes = require('./MVC/routes/userMembershipRoutes');
 const systemSettingsRoutes = require('./MVC/routes/systemSettingsRoutes');
+const packageEvolutionRoutes = require('./MVC/routes/packageEvolutionRoutes');
 const addressRoutes = require('./MVC/routes/addressRoutes');
 const helpRoutes = require('./MVC/routes/helpRoutes');
 const docsRoutes = require('./MVC/routes/docsRoutes');
@@ -680,6 +686,7 @@ app.use('/newsletter', newsletterRoutes);
 app.use('/subscriptionGroup', subscriptionGroupRoutes);
 app.use('/memberships', userMembershipRoutes);
 app.use('/systemSettings', systemSettingsRoutes);
+app.use('/package-evolution', packageEvolutionRoutes);
 app.use('/api/address', addressRoutes);
 app.use('/help', helpRoutes);
 app.use('/docs', docsRoutes);
