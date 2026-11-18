@@ -117,6 +117,7 @@
     <input type="hidden" name="placeholderMapJson" id="placeholderMapJson">
     <input type="hidden" name="pdfFieldMapJson" id="pdfFieldMapJsonInput">
     <input type="hidden" name="nextSlotNumber" id="nextSlotNumber" value="<%= Number(template?.nextSlotNumber || 3) %>">
+    <input type="hidden" name="slotKeyDocxAliasesJson" id="slotKeyDocxAliasesJson">
 
     <div class="card border-0 shadow-sm mb-3 template-form-section">
       <div class="card-header p-0">
@@ -228,7 +229,7 @@
       </div>
       <div id="collapseKeyCatalog" class="collapse">
       <div class="card-body p-3 border-top">
-        <p class="small text-muted mb-2">Source keys are inputs; overall keys contain saved or editable output values.</p>
+        <p class="small text-muted mb-2">Source keys are inputs; overall keys contain saved or editable output values. Shortcuts can be edited in the DOCX Shortcut column; slot shortcuts apply only to this overall template.</p>
         <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
           <input class="form-control form-control-sm" id="keySearch" placeholder="Search keys..." style="max-width: 360px;">
           <button type="button" class="btn btn-outline-secondary btn-sm" id="btnKeysCsv">Export CSV</button>
@@ -433,6 +434,9 @@
   })) : [];
   let fields = Array.isArray(initial.schema?.fields) ? initial.schema.fields.map(row => ({...row})) : [];
   let nextSlot = Number(initial.nextSlotNumber || 3);
+  let slotKeyDocxAliases = (initial.slotKeyDocxAliases && typeof initial.slotKeyDocxAliases === 'object')
+    ? JSON.parse(JSON.stringify(initial.slotKeyDocxAliases))
+    : {};
   let dragFieldIndex = -1;
   const byTemplateId = new Map(sourceTemplates.map(row => [String(row.id), row]));
   const slotRows = document.getElementById('sourceSlotRows');
@@ -512,6 +516,94 @@
     return Boolean(alias) && alias.length <= DOCX_ALIAS_MAX_LENGTH && aliasPattern.test(alias);
   }
 
+  function normalizeCatalogTokenKey(rawKey = '') {
+    const token = String(rawKey || '').trim().replace(/^\{\{|\}\}$/g, '');
+    const parts = token.split('.');
+    return String(parts.length > 1 ? parts[parts.length - 1] : token).trim();
+  }
+
+  function buildSlotMapKey(slotKey, catalogKey) {
+    const slot = String(slotKey || '').trim().toUpperCase();
+    const key = normalizeCatalogTokenKey(catalogKey);
+    return key ? `${slot}|${key}` : '';
+  }
+
+  function resolveSlotCatalogAlias(slotKey, catalogKey, sourceAlias = '') {
+    const mapKey = buildSlotMapKey(slotKey, catalogKey);
+    const override = normalizeDocxAlias(slotKeyDocxAliases[mapKey]?.docxAlias);
+    if (override) return override;
+    return normalizeDocxAlias(sourceAlias);
+  }
+
+  function slotOverrideRecord(mapKey, { create = false } = {}) {
+    if (!mapKey) return null;
+    if (!slotKeyDocxAliases[mapKey] && create) {
+      slotKeyDocxAliases[mapKey] = { docxAlias: '', legacyDocxAliases: [] };
+    }
+    return slotKeyDocxAliases[mapKey] || null;
+  }
+
+  function reconcileSlotKeyDocxAliases() {
+    slots.forEach((slot) => {
+      if (!String(slot.templateId || '').trim()) return;
+      const slotKey = String(slot.slotKey || '').toUpperCase();
+      const prefix = `${slotKey}|`;
+      const template = byTemplateId.get(String(slot.templateId));
+      const sourceAliasByKey = new Map();
+      (template?.keyOptions || []).forEach((option) => {
+        if (option.origin === 'docx_alias') return;
+        const catalogKey = String(option.key || '').trim();
+        if (!catalogKey) return;
+        sourceAliasByKey.set(catalogKey, normalizeDocxAlias(option.docxAlias));
+      });
+      const ownerByAlias = new Map();
+      const claim = (alias, mapKey) => {
+        if (!alias) return false;
+        if (ownerByAlias.has(alias) && ownerByAlias.get(alias) !== mapKey) return false;
+        ownerByAlias.set(alias, mapKey);
+        return true;
+      };
+      Object.entries(slotKeyDocxAliases).forEach(([mapKey, record]) => {
+        if (!String(mapKey).toUpperCase().startsWith(prefix)) return;
+        claim(normalizeDocxAlias(record?.docxAlias), mapKey);
+      });
+      const legacyRows = [];
+      Object.entries(slotKeyDocxAliases).forEach(([mapKey, record]) => {
+        if (!String(mapKey).toUpperCase().startsWith(prefix)) return;
+        const catalogKey = String(mapKey).slice(prefix.length);
+        (Array.isArray(record?.legacyDocxAliases) ? record.legacyDocxAliases : []).forEach((row) => {
+          const alias = normalizeDocxAlias(row);
+          if (!alias) return;
+          legacyRows.push({
+            mapKey,
+            alias,
+            prefer: alias === (sourceAliasByKey.get(catalogKey) || '')
+          });
+        });
+      });
+      legacyRows.sort((left, right) => Number(right.prefer) - Number(left.prefer) || left.mapKey.localeCompare(right.mapKey));
+      legacyRows.forEach(({ mapKey, alias }) => {
+        claim(alias, mapKey);
+      });
+      Object.entries(slotKeyDocxAliases).forEach(([mapKey, record]) => {
+        if (!String(mapKey).toUpperCase().startsWith(prefix)) return;
+        const primary = normalizeDocxAlias(record?.docxAlias);
+        const seen = new Set();
+        const nextLegacy = [];
+        (Array.isArray(record?.legacyDocxAliases) ? record.legacyDocxAliases : []).forEach((row) => {
+          const alias = normalizeDocxAlias(row);
+          if (!alias || alias === primary) return;
+          if (ownerByAlias.get(alias) !== mapKey) return;
+          if (seen.has(alias)) return;
+          seen.add(alias);
+          nextLegacy.push(alias);
+        });
+        record.legacyDocxAliases = nextLegacy;
+        if (!primary && !nextLegacy.length) delete slotKeyDocxAliases[mapKey];
+      });
+    });
+  }
+
   function validateDocxAliases() {
     const used = new Map();
     const reserved = new Set();
@@ -535,6 +627,44 @@
         throw new Error(`Field "${label}" has a duplicate DOCX shortcut "${alias}" (also used by "${used.get(alias)}").`);
       }
       used.set(alias, label);
+    });
+    reconcileSlotKeyDocxAliases();
+    validateSlotKeyDocxAliases();
+  }
+
+  function validateSlotKeyDocxAliases() {
+    const usedBySlot = new Map();
+    slots.forEach((slot) => {
+      const slotKey = String(slot.slotKey || '').toUpperCase();
+      const prefix = `${slotKey}|`;
+      const used = usedBySlot.get(slotKey) || new Set();
+      const register = (alias, contextLabel) => {
+        if (used.has(alias)) {
+          throw new Error(`DOCX shortcut "${alias}" is duplicated in slot ${slotKey} (${contextLabel} vs existing use).`);
+        }
+        used.add(alias);
+      };
+      Object.entries(slotKeyDocxAliases).forEach(([mapKey, record]) => {
+        if (!String(mapKey).toUpperCase().startsWith(prefix)) return;
+        const catalogKey = String(mapKey).slice(prefix.length);
+        const label = `${slotKey} · ${catalogKey}`;
+        const resolved = normalizeDocxAlias(record?.docxAlias);
+        if (!resolved) return;
+        if (!isValidDocxAlias(resolved)) {
+          throw new Error(`Slot override "${label}" has an invalid DOCX shortcut "${resolved}".`);
+        }
+        const legacy = Array.isArray(record?.legacyDocxAliases) ? record.legacyDocxAliases : [];
+        register(resolved, label);
+        legacy.forEach((row) => {
+          const alias = normalizeDocxAlias(row);
+          if (!alias || alias === resolved) return;
+          if (!isValidDocxAlias(alias)) {
+            throw new Error(`Slot override "${label}" has an invalid legacy DOCX shortcut "${alias}".`);
+          }
+          register(alias, `${label} (legacy)`);
+        });
+      });
+      usedBySlot.set(slotKey, used);
     });
   }
 
@@ -781,24 +911,38 @@
         const catalogKey = `{{${slot.slotKey}.${optionKey}}}`;
         if (seen.has(catalogKey)) return;
         seen.add(catalogKey);
+        const mapKey = buildSlotMapKey(slot.slotKey, optionKey);
+        const resolvedAlias = resolveSlotCatalogAlias(slot.slotKey, optionKey, option.docxAlias);
         rows.push({
+          rowKind: 'slot',
+          mapKey,
+          slotKey: slot.slotKey,
+          catalogToken: optionKey,
+          sourceAlias: normalizeDocxAlias(option.docxAlias),
+          resolvedAlias,
           group: slotGroup,
           label: option.label || optionKey,
           origin: option.origin || 'available_value',
           key: catalogKey,
-          docxShortcut: slotDocxShortcut(slot.slotKey, option.docxAlias),
+          docxShortcut: slotDocxShortcut(slot.slotKey, resolvedAlias),
           description: option.description || '',
           templateTitle: template?.title || slot.templateId
         });
       });
     });
-    fields.filter(field => !isVisual(field)).forEach(field => {
+    fields.forEach((field, fieldIndex) => {
+      if (isVisual(field)) return;
+      const resolvedAlias = normalizeDocxAlias(field.docxAlias);
       rows.push({
+        rowKind: 'overall',
+        fieldIndex,
+        mapKey: '',
+        resolvedAlias,
         group: 'O',
         label: field.label || field.id,
         origin: 'overall_field',
         key: `{{O.${field.id}}}`,
-        docxShortcut: slotDocxShortcut('O', field.docxAlias),
+        docxShortcut: slotDocxShortcut('O', resolvedAlias),
         description: field.helpText || '',
         templateTitle: initial.title || 'Overall Report'
       });
@@ -806,10 +950,80 @@
     return rows;
   }
 
+  function renderKeyCatalogDocxCell(row) {
+    const alias = normalizeDocxAlias(row.resolvedAlias);
+    const shortcut = row.docxShortcut || slotDocxShortcut(row.rowKind === 'overall' ? 'O' : row.slotKey, alias);
+    const attrs = [
+      `class="form-control form-control-sm font-monospace js-key-catalog-docx-alias"`,
+      `data-row-kind="${escapeHtml(row.rowKind)}"`,
+      `value="${escapeHtml(alias)}"`,
+      `maxlength="${DOCX_ALIAS_MAX_LENGTH}"`,
+      'autocomplete="off"',
+      'spellcheck="false"',
+      `aria-label="DOCX shortcut for ${escapeHtml(row.label)}"`
+    ];
+    if (row.mapKey) attrs.push(`data-map-key="${escapeHtml(row.mapKey)}"`);
+    if (row.rowKind === 'slot') {
+      attrs.push(`data-slot-key="${escapeHtml(row.slotKey)}"`);
+      attrs.push(`data-catalog-token="${escapeHtml(row.catalogToken)}"`);
+      attrs.push(`data-source-alias="${escapeHtml(row.sourceAlias || '')}"`);
+    }
+    if (row.rowKind === 'overall') attrs.push(`data-field-index="${Number(row.fieldIndex)}"`);
+    return `<div class="d-flex align-items-center gap-1"><input type="text" ${attrs.join(' ')}>${shortcut ? `<button type="button" class="btn btn-outline-secondary btn-sm js-copy-key" data-key="${escapeHtml(shortcut)}" title="Copy DOCX shortcut"><i class="bi bi-clipboard"></i></button>` : ''}</div>`;
+  }
+
   function renderKeyCatalog() {
     const query = String(document.getElementById('keySearch')?.value || '').toLowerCase();
-    const filtered = keyCatalog().filter(row => !query || [row.key, row.docxShortcut, row.group, row.label, row.origin, row.description, row.templateTitle].some(value => String(value || '').toLowerCase().includes(query)));
-    document.getElementById('keyRows').innerHTML = filtered.map(row => `<tr><td><span class="badge bg-primary">${escapeHtml(row.group)}</span></td><td><strong>${escapeHtml(row.label)}</strong>${row.description ? `<div class="small text-muted">${escapeHtml(row.description)}</div>` : ''}</td><td class="font-monospace">${escapeHtml(row.key)}</td><td class="font-monospace">${row.docxShortcut ? escapeHtml(row.docxShortcut) : '<span class="text-muted">—</span>'}</td><td><span class="badge bg-light text-dark border">${escapeHtml(row.origin)}</span></td><td class="text-nowrap">${row.docxShortcut ? `<button type="button" class="btn btn-outline-secondary btn-sm js-copy-key me-1" data-key="${escapeHtml(row.docxShortcut)}" title="Copy DOCX shortcut">S</button>` : ''}<button type="button" class="btn btn-outline-secondary btn-sm js-copy-key" data-key="${escapeHtml(row.key)}" title="Copy key">Copy</button></td></tr>`).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">No matching keys.</td></tr>';
+    const filtered = keyCatalog().filter(row => !query || [row.key, row.docxShortcut, row.group, row.label, row.origin, row.description, row.templateTitle, row.resolvedAlias].some(value => String(value || '').toLowerCase().includes(query)));
+    document.getElementById('keyRows').innerHTML = filtered.map(row => `<tr><td><span class="badge bg-primary">${escapeHtml(row.group)}</span></td><td><strong>${escapeHtml(row.label)}</strong>${row.description ? `<div class="small text-muted">${escapeHtml(row.description)}</div>` : ''}</td><td class="font-monospace">${escapeHtml(row.key)}</td><td>${renderKeyCatalogDocxCell(row)}</td><td><span class="badge bg-light text-dark border">${escapeHtml(row.origin)}</span></td><td class="text-nowrap"><button type="button" class="btn btn-outline-secondary btn-sm js-copy-key" data-key="${escapeHtml(row.key)}" title="Copy key">Copy</button></td></tr>`).join('') || '<tr><td colspan="6" class="text-center text-muted py-3">No matching keys.</td></tr>';
+  }
+
+  function applyKeyCatalogDocxAliasChange(input) {
+    const rowKind = String(input.dataset.rowKind || '').trim();
+    const alias = normalizeDocxAlias(input.value);
+    const label = input.getAttribute('aria-label')?.replace(/^DOCX shortcut for /, '') || 'Key catalog row';
+    if (!alias) throw new Error(`"${label}" requires a DOCX shortcut.`);
+    if (!isValidDocxAlias(alias)) {
+      throw new Error(`Invalid DOCX shortcut "${alias}" for "${label}". Use a letter followed by lowercase letters or numbers (up to ${DOCX_ALIAS_MAX_LENGTH} characters).`);
+    }
+    if (rowKind === 'overall') {
+      const index = Number(input.dataset.fieldIndex);
+      const field = fields[index];
+      if (!field || isVisual(field)) return;
+      assertDocxAliasAvailable(alias, field.label || field.id || 'Field', index);
+      const priorAlias = normalizeDocxAlias(field.docxAlias);
+      if (priorAlias && priorAlias !== alias) {
+        const legacy = new Set(Array.isArray(field.legacyDocxAliases) ? field.legacyDocxAliases : []);
+        legacy.add(priorAlias);
+        field.legacyDocxAliases = [...legacy];
+      }
+      field.docxAlias = alias;
+      const fieldInput = fieldRows.querySelector(`.js-field-docx-alias[data-index="${index}"]`);
+      if (fieldInput) fieldInput.value = alias;
+      renderKeyCatalog();
+      return;
+    }
+    if (rowKind === 'slot') {
+      const mapKey = String(input.dataset.mapKey || '').trim();
+      const sourceAlias = normalizeDocxAlias(input.dataset.sourceAlias || '');
+      const priorResolved = resolveSlotCatalogAlias(input.dataset.slotKey, input.dataset.catalogToken, sourceAlias);
+      const record = slotOverrideRecord(mapKey, { create: true });
+      if (priorResolved && priorResolved !== alias) {
+        const legacy = new Set(Array.isArray(record.legacyDocxAliases) ? record.legacyDocxAliases : []);
+        legacy.add(priorResolved);
+        record.legacyDocxAliases = [...legacy];
+      }
+      if (alias === sourceAlias && !(record.legacyDocxAliases || []).length) {
+        delete slotKeyDocxAliases[mapKey];
+      } else {
+        record.docxAlias = alias;
+        record.legacyDocxAliases = (Array.isArray(record.legacyDocxAliases) ? record.legacyDocxAliases : [])
+          .map((row) => normalizeDocxAlias(row))
+          .filter((row) => row && row !== alias);
+      }
+      input.value = alias;
+      renderKeyCatalog();
+    }
   }
 
   function modalOptions() {
@@ -1268,6 +1482,20 @@
     bootstrap.Modal.getOrCreateInstance(document.getElementById('previewModal')).show();
   });
   document.getElementById('keySearch').addEventListener('input', renderKeyCatalog);
+  const keyRows = document.getElementById('keyRows');
+  keyRows.addEventListener('mousedown', (event) => {
+    if (event.target.closest('.js-key-catalog-docx-alias')) event.stopPropagation();
+  });
+  keyRows.addEventListener('change', (event) => {
+    const input = event.target.closest('.js-key-catalog-docx-alias');
+    if (!input) return;
+    try {
+      applyKeyCatalogDocxAliasChange(input);
+    } catch (error) {
+      renderKeyCatalog();
+      showReportModal({ title: 'Invalid DOCX Shortcut', message: error.message, icon: 'error' });
+    }
+  });
   document.addEventListener('mousedown', event => {
     if (event.target.closest('.js-copy-key')) event.stopPropagation();
   });
@@ -1512,10 +1740,23 @@
 
   function syncOverallFormDraftFields() {
     ensureAliases();
+    reconcileSlotKeyDocxAliases();
     document.getElementById('sourceSlotsJson').value = JSON.stringify(slots.map((slot, index) => ({ ...slot, order: index + 1 })));
     document.getElementById('schemaJson').value = JSON.stringify({ version: Number(initial.schema?.version || 1), fields });
     document.getElementById('placeholderMapJson').value = JSON.stringify(Object.fromEntries(fields.filter(field => !isVisual(field)).map(field => [field.id, `{{O.${field.id}}}`])));
     document.getElementById('nextSlotNumber').value = nextSlot;
+    const slotAliasPayload = {};
+    Object.entries(slotKeyDocxAliases).forEach(([mapKey, record]) => {
+      const docxAlias = normalizeDocxAlias(record?.docxAlias);
+      if (!docxAlias) return;
+      slotAliasPayload[mapKey] = {
+        docxAlias,
+        legacyDocxAliases: Array.isArray(record?.legacyDocxAliases)
+          ? [...new Set(record.legacyDocxAliases.map((row) => normalizeDocxAlias(row)).filter(Boolean))]
+          : []
+      };
+    });
+    document.getElementById('slotKeyDocxAliasesJson').value = JSON.stringify(slotAliasPayload);
     const pdfFieldMapEditor = document.getElementById('pdfFieldMapEditor');
     const pdfFieldMapJsonInput = document.getElementById('pdfFieldMapJsonInput');
     const pdfMapText = String(pdfFieldMapEditor?.value || '').trim();

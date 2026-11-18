@@ -176,6 +176,7 @@ function buildOverallTemplateComplianceDraft(req, existing = null) {
     nextSlotNumber: req.body.nextSlotNumber,
     schema: parseJson(req.body.schemaJson, { version: 1, fields: [] }),
     placeholderMap: parseJson(req.body.placeholderMapJson, {}),
+    slotKeyDocxAliases: parseJson(req.body.slotKeyDocxAliasesJson, {}),
     docxTemplate,
     docxTemplatesByFunder,
     pdfTemplate,
@@ -285,6 +286,7 @@ async function copyTemplate(req, res) {
       pdfTemplate: clonePlainValue(source.pdfTemplate, null),
       pdfTemplatesByFunder: clonePlainValue(source.pdfTemplatesByFunder, []),
       pdfFieldMap: clonePlainValue(source.pdfFieldMap, {}),
+      slotKeyDocxAliases: clonePlainValue(source.slotKeyDocxAliases, {}),
       audit: {
         createUser: req.user?.id || '',
         createDateTime: now,

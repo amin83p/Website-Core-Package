@@ -412,9 +412,69 @@ test('overall template form allows editable DOCX shortcuts with save-time unique
   assert.match(source, /id="fieldAlias"[^>]*maxlength="32"/);
   assert.doesNotMatch(source, /id="fieldAlias"[^>]*readonly/);
   assert.match(source, /js-field-docx-alias/);
+  assert.match(source, /js-key-catalog-docx-alias/);
+  assert.match(source, /slotKeyDocxAliasesJson/);
   assert.match(source, /function validateDocxAliases/);
-  assert.match(source, /'substr'/);
+  assert.match(source, /function validateSlotKeyDocxAliases/);
   assert.match(source, /DOCX Shortcut Validation/);
+});
+
+test('overall template model sanitizes slotKeyDocxAliases and rejects duplicate shortcuts per slot', () => {
+  const base = singleSourceOverallTemplate();
+  const sanitized = overallTemplateModel.sanitizeTemplate({
+    ...base,
+    slotKeyDocxAliases: {
+      'T1|score': { docxAlias: 'sc01', legacyDocxAliases: ['oldsc'] },
+      'T1|comments': { docxAlias: 'cm01', legacyDocxAliases: [] }
+    }
+  });
+  assert.equal(sanitized.slotKeyDocxAliases['T1|score'].docxAlias, 'sc01');
+  assert.throws(() => overallTemplateModel.sanitizeTemplate({
+    ...base,
+    slotKeyDocxAliases: {
+      'T1|score': { docxAlias: 'dup1', legacyDocxAliases: [] },
+      'T1|comments': { docxAlias: 'dup1', legacyDocxAliases: [] }
+    }
+  }), /Duplicate DOCX shortcut/);
+  const dropped = overallTemplateModel.sanitizeTemplate({
+    ...base,
+    slotKeyDocxAliases: {
+      'T1|score': { docxAlias: '1bad', legacyDocxAliases: [] }
+    }
+  });
+  assert.equal(Object.keys(dropped.slotKeyDocxAliases || {}).length, 0);
+});
+
+test('buildOverallTemplateKeyAllowlist honors slotKeyDocxAliases overrides', () => {
+  const template = singleSourceOverallTemplate({
+    slotKeyDocxAliases: {
+      'T1|score': { docxAlias: 'sc1', legacyDocxAliases: ['oldsc'] }
+    }
+  });
+  const sourceMap = new Map([
+    ['T1', sourceTemplate('SRC-1')]
+  ]);
+  const allowlist = overallReportService.buildOverallTemplateKeyAllowlist(template, sourceMap);
+  const allowed = allowlist instanceof Set ? allowlist : new Set(allowlist);
+  assert.ok(allowed.has('t1.sc1'));
+  assert.ok(allowed.has('t1.oldsc'));
+  assert.ok(allowed.has('t1.score'));
+});
+
+test('buildDocxPayloadDetailed emits slot DOCX alias overrides from template snapshot', () => {
+  const payload = overallReportService.buildDocxPayloadDetailed({
+    answers: {},
+    sourceValues: { T1: { score: 91 } },
+    templateSnapshot: {
+      slotKeyDocxAliases: {
+        'T1|score': { docxAlias: 'sc1', legacyDocxAliases: ['oldsc'] }
+      },
+      schema: { fields: [] }
+    }
+  });
+  assert.equal(payload.placeholders['T1.score'], 91);
+  assert.equal(payload.placeholders['T1.sc1'], 91);
+  assert.equal(payload.placeholders['T1.oldsc'], 91);
 });
 
 test('overall fields retain relevant layout, guidance, styling, typed defaults, and modes', () => {
@@ -1002,6 +1062,7 @@ test('overall template, creation, and instance views render searchable pickers a
       funderPickerOptions: [{ id: 'FUNDER-1', label: 'Funder One' }],
       valueModes: ['manual', 'derived_editable', 'derived_locked'],
       statuses: ['draft', 'active', 'inactive', 'archived'],
+      expressionHelperNames: ['source', 'sourceSlotPopulated'],
       user: reqUser
     },
     renderOptions

@@ -53,6 +53,38 @@ function listDocxPlaceholderAliases(field = {}) {
   return [...aliases];
 }
 
+function buildSlotKeyDocxAliasMapKey(slotKey, catalogKey) {
+  const slot = String(slotKey || '').trim().toUpperCase();
+  const key = normalizeTokenKey(catalogKey);
+  return key ? `${slot}|${key}` : '';
+}
+
+function getSlotKeyDocxAliasRecord(overallTemplate = {}, slotKey, catalogKey) {
+  const mapKey = buildSlotKeyDocxAliasMapKey(slotKey, catalogKey);
+  if (!mapKey) return null;
+  const record = overallTemplate?.slotKeyDocxAliases?.[mapKey];
+  return record && typeof record === 'object' ? record : null;
+}
+
+function resolveSlotDocxAlias(slotKey, catalogKey, sourceOption = {}, overallTemplate = {}) {
+  const record = getSlotKeyDocxAliasRecord(overallTemplate, slotKey, catalogKey);
+  const override = reportRuleEngineService.normalizeDocxAlias(record?.docxAlias);
+  if (override && reportRuleEngineService.DOCX_ALIAS_PATTERN.test(override)) return override;
+  return reportRuleEngineService.normalizeDocxAlias(sourceOption?.docxAlias);
+}
+
+function listSlotDocxPlaceholderAliases(overallTemplate = {}, slotKey, catalogKey, sourceOption = {}) {
+  const aliases = new Set();
+  const primary = resolveSlotDocxAlias(slotKey, catalogKey, sourceOption, overallTemplate);
+  if (reportRuleEngineService.DOCX_ALIAS_PATTERN.test(primary)) aliases.add(primary);
+  const record = getSlotKeyDocxAliasRecord(overallTemplate, slotKey, catalogKey);
+  (Array.isArray(record?.legacyDocxAliases) ? record.legacyDocxAliases : []).forEach((row) => {
+    const alias = reportRuleEngineService.normalizeDocxAlias(row);
+    if (reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias)) aliases.add(alias);
+  });
+  return [...aliases];
+}
+
 function formatSourceSlotTokenHint(token, placeholders = {}) {
   const match = String(token || '').match(/^(T\d+)\.(.+)$/i);
   if (!match) return '';
@@ -509,10 +541,9 @@ function buildOverallTemplateKeyAllowlist(template = {}, sourceTemplateMap = new
       const optionKey = String(option?.key || '').trim();
       if (!optionKey) return;
       addToken(`${slotKey}.${optionKey}`);
-      const alias = reportRuleEngineService.normalizeDocxAlias(option.docxAlias);
-      if (alias && reportRuleEngineService.DOCX_ALIAS_PATTERN.test(alias)) {
+      listSlotDocxPlaceholderAliases(template, slotKey, optionKey, option).forEach((alias) => {
         addToken(`${slotKey}.${alias}`);
-      }
+      });
     });
   });
 
@@ -1288,13 +1319,16 @@ async function transitionStatus({ instance, action, reqUser }) {
 function buildDocxPayloadDetailed(instance) {
   const placeholders = {};
   const conversionDiagnostics = [];
+  const template = instance.templateSnapshot || {};
   Object.entries(instance.sourceValues || {}).forEach(([slotKey, values]) => {
     Object.entries(values || {}).forEach(([key, value]) => {
       placeholders[`${slotKey}.${key}`] = value;
+      listSlotDocxPlaceholderAliases(template, slotKey, key).forEach((alias) => {
+        placeholders[`${slotKey}.${alias}`] = value;
+      });
     });
   });
   expandLegacySourceSlotDocxPlaceholders(placeholders);
-  const template = instance.templateSnapshot || {};
   getDataFields(template).forEach((field) => {
     const conversion = reportRuleEngineService.convertFieldValueForExport({
       field,
@@ -2445,5 +2479,8 @@ module.exports = {
   exportOverallReportPdf,
   resolveSelectedPdfKey,
   formatMissingDocxTokenError,
-  listDocxPlaceholderAliases
+  listDocxPlaceholderAliases,
+  buildSlotKeyDocxAliasMapKey,
+  resolveSlotDocxAlias,
+  listSlotDocxPlaceholderAliases
 };

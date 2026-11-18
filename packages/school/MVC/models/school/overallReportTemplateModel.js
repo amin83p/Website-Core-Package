@@ -142,6 +142,45 @@ function sanitizeLegacyDocxAliases(rawList) {
   return out;
 }
 
+function normalizeSlotCatalogKey(value = '') {
+  const token = String(value || '').trim().replace(/^\{\{|\}\}$/g, '');
+  const parts = token.split('.');
+  const leaf = parts.length > 1 ? parts[parts.length - 1] : token;
+  return clean(leaf, 180);
+}
+
+function sanitizeSlotKeyDocxAliases(raw, sourceSlots = []) {
+  if (!isObject(raw)) return {};
+  const validSlots = new Set(
+    (Array.isArray(sourceSlots) ? sourceSlots : []).map((slot) => String(slot?.slotKey || '').trim().toUpperCase())
+  );
+  const usedBySlot = new Map();
+  const out = {};
+  Object.entries(raw).forEach(([mapKey, record]) => {
+    const match = String(mapKey || '').match(/^(T[1-9]\d*)\|(.+)$/i);
+    if (!match) return;
+    const slotKey = String(match[1]).toUpperCase();
+    const catalogKey = normalizeSlotCatalogKey(match[2]);
+    if (!SLOT_KEY_PATTERN.test(slotKey) || !catalogKey || !validSlots.has(slotKey)) return;
+    if (!isObject(record)) return;
+    const docxAlias = reportRuleEngineService.normalizeDocxAlias(record.docxAlias);
+    if (!docxAlias || !reportRuleEngineService.DOCX_ALIAS_PATTERN.test(docxAlias)) return;
+    const legacyDocxAliases = sanitizeLegacyDocxAliases(record.legacyDocxAliases);
+    const used = usedBySlot.get(slotKey) || new Set();
+    const register = (alias) => {
+      if (used.has(alias)) {
+        throw new Error(`Duplicate DOCX shortcut "${alias}" in source slot ${slotKey}.`);
+      }
+      used.add(alias);
+    };
+    register(docxAlias);
+    legacyDocxAliases.forEach((alias) => register(alias));
+    usedBySlot.set(slotKey, used);
+    out[`${slotKey}|${catalogKey}`] = { docxAlias, legacyDocxAliases };
+  });
+  return out;
+}
+
 function sanitizeSchema(rawSchema, sourceSlots, inputPlaceholderMap = {}) {
   const raw = isObject(rawSchema) ? rawSchema : {};
   const rawFields = Array.isArray(raw.fields) ? raw.fields : [];
@@ -257,6 +296,7 @@ function sanitizeTemplate(input, { existing = null, isUpdate = false } = {}) {
     input.pdfFieldMap,
     normalizedSchema.schema
   );
+  const slotKeyDocxAliases = sanitizeSlotKeyDocxAliases(input.slotKeyDocxAliases, sourceSlots);
   const now = new Date().toISOString();
   const out = {
     orgId,
@@ -273,6 +313,7 @@ function sanitizeTemplate(input, { existing = null, isUpdate = false } = {}) {
     pdfTemplate,
     pdfTemplatesByFunder,
     pdfFieldMap,
+    slotKeyDocxAliases,
     audit: {
       createUser: clean(input?.audit?.createUser || existing?.audit?.createUser, 80),
       createDateTime: clean(input?.audit?.createDateTime || existing?.audit?.createDateTime, 60) || now,
