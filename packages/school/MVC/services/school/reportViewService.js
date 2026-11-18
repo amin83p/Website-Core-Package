@@ -2228,6 +2228,21 @@ function buildInstanceAnswers(template, body = {}, existingMerged = {}) {
     }
 
     const key = `field__${field.id}`;
+    if (!Object.prototype.hasOwnProperty.call(body, key)) {
+      const prev = existing[field.id];
+      if (field.type === 'checkbox') {
+        answers[field.id] = prev === true || String(prev).toLowerCase() === 'true';
+      } else if (field.type === 'number') {
+        if (prev === undefined || prev === null || prev === '') answers[field.id] = '';
+        else {
+          const n = Number(prev);
+          answers[field.id] = Number.isFinite(n) ? n : '';
+        }
+      } else {
+        answers[field.id] = prev === undefined || prev === null ? '' : String(prev).trim();
+      }
+      return;
+    }
     const rawValue = body[key];
     let value;
 

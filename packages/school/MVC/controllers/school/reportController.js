@@ -2351,7 +2351,9 @@ async function saveReportMatrixRows(req, res) {
     const actionLabel = matrixAction === 'submit' ? 'submitted' : (matrixAction === 'lock' ? 'locked' : 'saved');
     const payloadOut = {
       status: summary.failed > 0 || summary.skipped > 0 ? 'partial' : 'success',
-      message: String(summary.succeeded) + ' report(s) ' + actionLabel + '; ' + String(summary.skipped) + ' row(s) skipped; ' + String(summary.failed) + ' row(s) failed.',
+      message: String(summary.succeeded) + ' report(s) ' + actionLabel + '.\n'
+        + String(summary.skipped) + ' row(s) skipped.\n'
+        + String(summary.failed) + ' row(s) failed.',
       summary,
       results: result.results,
       matrix: result.matrix

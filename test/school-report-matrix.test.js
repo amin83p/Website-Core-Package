@@ -486,6 +486,24 @@ test('saving a pending matrix row stores its Report Instance prefill snapshot', 
   assert.deepEqual(created.prefillSnapshot, { student_full_name: 'Alice', student_email: 'alice@example.com' });
 });
 
+test('buildInstanceAnswers preserves omitted matrix fields from existing merged answers', () => {
+  const template = {
+    schema: {
+      fields: [
+        { id: 'comment', type: 'text' },
+        { id: 'note', type: 'textarea' }
+      ]
+    }
+  };
+  const { answers } = reportViewService.buildInstanceAnswers(
+    template,
+    { field__comment: 'updated' },
+    { comment: 'old', note: 'stored note' }
+  );
+  assert.equal(answers.comment, 'updated');
+  assert.equal(answers.note, 'stored note');
+});
+
 test('bulk matrix save processes editable rows, skips locked rows, and summarizes failures', async () => {
   const assignment = {
     id: 'ASN-1', assignmentRowId: 'ROW-1', orgId: '900000', classId: 'CLS-1', sessionId: 'SES-1',
@@ -613,7 +631,11 @@ test('report matrix routes and UI expose bulk actions, grouping, and accessible 
   assert.doesNotMatch(matrixView, /matrix-help-icon/);
   assert.match(matrixView, /reportMatrixSharedSections/);
   assert.match(matrixView, /js-matrix-bulk-action/);
-  assert.match(matrixView, /Save All Drafts/);
+  assert.match(matrixView, /hasSubmittableRows/);
+  assert.match(matrixView, /Save All/);
+  assert.doesNotMatch(matrixView, /Save All Drafts/);
+  assert.match(matrixView, /syncBulkSubmitButton/);
+  assert.match(read('packages/school/MVC/views/school/report/partials/reportMessageHelpers.ejs'), /formatPlainReportMessageHtml/);
   assert.match(matrixView, /Lock All Reports/);
   assert.match(matrixView, /function showReportMatrixMessage/);
   assert.match(matrixView, /window\.ReportMessaging/);
@@ -690,8 +712,10 @@ test('report matrix EJS renders supported controls and locked row state', async 
   assert.doesNotMatch(html, /font-monospace/);
   assert.match(html, /textarea class="form-control js-matrix-shared-field"/);
   assert.match(html, /option value="good" selected/);
-  assert.match(html, /Save All Drafts/);
+  assert.match(html, /Save All/);
+  assert.doesNotMatch(html, /Save All Drafts/);
   assert.match(html, /Submit All Reports/);
+  assert.match(html, /data-action="submit"[^>]*hidden/);
   assert.match(html, /Lock All Reports/);
   assert.match(html, /accordion-collapse collapse show/);
   assert.match(html, /class="col-12"/);
@@ -710,6 +734,63 @@ test('report matrix EJS renders supported controls and locked row state', async 
   assert.match(html, /data-tip="Enter the session score/);
   const matrixThead = html.match(/<thead class="table-light">[\s\S]*?<\/thead>/)?.[0] || '';
   assert.doesNotMatch(matrixThead, /data-matrix-field-id="prefill_only"[\s\S]*js-matrix-column-apply-all/);
+});
+
+test('report matrix shows bulk submit only when a row is not yet submitted', async () => {
+  const matrix = {
+    assignmentId: 'ASN-2',
+    assignmentRowId: 'ROW-2',
+    templateTitle: 'Progress',
+    classId: 'CLS-1',
+    className: 'Class A',
+    sessionId: 'SES-1',
+    sessionDate: '2026-07-14',
+    reportStartDate: '2026-07-14',
+    reportDueDate: '2026-07-14',
+    teacherId: 'TEACHER-1',
+    teacherName: 'Teacher One',
+    progress: { total: 2, submitted: 1, drafts: 1, pending: 0 },
+    commonFields: [],
+    sharedFields: [],
+    tableFields: [{ id: 'score', label: 'Score', type: 'number', readOnly: false, options: [] }],
+    rows: [
+      {
+        studentId: 'STU-1',
+        studentName: 'Alice',
+        status: 'submitted',
+        locked: false,
+        editHref: '/school/reports/instances/edit-v2/INS-1',
+        answers: { score: 90 }
+      },
+      {
+        studentId: 'STU-2',
+        studentName: 'Bob',
+        status: 'draft',
+        locked: false,
+        editHref: '/school/reports/instances/edit-v2/INS-2',
+        answers: { score: 80 }
+      }
+    ]
+  };
+  const htmlSubmittedOnly = await ejs.renderFile(
+    path.join(ROOT_DIR, 'packages/school/MVC/views/school/report/instanceMatrix.ejs'),
+    {
+      matrix: {
+        ...matrix,
+        rows: [matrix.rows[0]],
+        progress: { total: 1, submitted: 1, drafts: 0, pending: 0 }
+      },
+      actionStateId: 'ACTION-1'
+    }
+  );
+  assert.match(htmlSubmittedOnly, /data-action="submit"[^>]*hidden/);
+
+  const htmlDraft = await ejs.renderFile(
+    path.join(ROOT_DIR, 'packages/school/MVC/views/school/report/instanceMatrix.ejs'),
+    { matrix, actionStateId: 'ACTION-1' }
+  );
+  assert.match(htmlDraft, /data-action="submit"/);
+  assert.doesNotMatch(htmlDraft, /data-action="submit"[^>]*hidden/);
 });
 
 test('matrix reset from live skips locked rows and resets editable draft instances', async () => {

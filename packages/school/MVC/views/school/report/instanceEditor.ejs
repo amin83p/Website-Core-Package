@@ -54,10 +54,15 @@
   const instStatus = String(instance?.status || '').toLowerCase() || 'draft';
   const statusBadgeLabel = instStatus === 'submitted'
     ? 'Submitted (awaiting review)'
-    : (instance.status || '-');
+    : (instStatus === 'locked'
+      ? 'Locked'
+      : (instStatus === 'draft' ? 'Draft' : (instance.status || 'Draft')));
   const statusBadgeClass = instStatus === 'locked'
-    ? 'bg-dark'
-    : (instStatus === 'submitted' ? 'bg-success' : 'bg-secondary');
+    ? 'bg-dark text-white'
+    : (instStatus === 'submitted' ? 'bg-success' : 'bg-warning text-dark');
+  const actionBarStatusLabel = instStatus === 'locked'
+    ? 'Locked'
+    : (instStatus === 'submitted' ? 'Submitted' : 'Draft');
   const rptStart = String(assignment?.reportStartDate || '').trim();
   const rptDue = String(assignment?.reportDueDate || '').trim();
   const tsReflect = assignment?.timesheetReflection === true;
@@ -691,23 +696,25 @@
     <div class="card border-0 shadow-sm">
       <div class="card-body py-2">
         <div class="d-flex flex-wrap align-items-center gap-2 w-100">
-          <% const saveDraftDisabled = isSubmitted || isLocked || isReadOnly; %>
+          <% const saveDisabled = isLocked || isReadOnly; %>
           <% const submitDisabled = isLocked || isReadOnly; %>
           <% const lockDisabled = isLocked || isReadOnly; %>
           <button
             class="btn btn-primary btn-sm"
             type="submit"
             value="save"
-            <%= saveDraftDisabled ? 'disabled' : '' %>
-            title="<%= isSubmitted ? 'Submitted reports cannot be saved as draft. Reopen for teacher first, or use Submit / Lock.' : (isLocked ? 'Locked reports cannot be saved.' : 'Save as draft') %>"
-          ><i class="bi bi-save me-1"></i>Save Draft</button>
+            <%= saveDisabled ? 'disabled' : '' %>
+            title="<%= isLocked ? 'Locked reports cannot be saved.' : (isReadOnly ? 'This report is read-only.' : (isSubmitted ? 'Save changes while keeping submitted status.' : 'Save report answers')) %>"
+          ><i class="bi bi-save me-1"></i>Save</button>
+          <% if (!isSubmitted) { %>
           <button
             class="btn btn-success btn-sm"
             type="submit"
             value="submit"
             <%= submitDisabled ? 'disabled' : '' %>
-            title="<%= isLocked ? 'Locked reports cannot be submitted.' : (isReadOnly ? 'This report is read-only until an administrator reopens it.' : 'Submit report') %>"
+            title="<%= isLocked ? 'Locked reports cannot be submitted.' : (isReadOnly ? 'This report is read-only until an administrator reopens it.' : 'Save answers and submit report') %>"
           ><i class="bi bi-send-check me-1"></i>Submit Report</button>
+          <% } %>
           <% if (!isLocked) { %>
             <button
               class="btn btn-outline-dark btn-sm"
@@ -717,12 +724,14 @@
               title="<%= lockDisabled ? 'You cannot lock this report in its current state.' : 'Lock report' %>"
             ><i class="bi bi-lock me-1"></i>Lock Report</button>
           <% } %>
+          <span
+            class="badge <%= statusBadgeClass %> p-2"
+            id="reportInstanceActionStatusBadge"
+            title="Current report status"
+          ><%= actionBarStatusLabel %></span>
 
           <div class="d-flex flex-wrap align-items-center gap-2 ms-3 ms-md-4 ps-3 border-start">
             <div class="d-flex flex-wrap align-items-center gap-2">
-              <span class="badge <%= isSubmitted ? 'bg-success' : 'bg-secondary-subtle text-secondary border' %> p-2">
-                <%= isSubmitted ? 'Submitted (awaiting review)' : 'Submitted' %>
-              </span>
               <% if (canReopenReportInstanceSafe) { %>
                 <% if (isSubmitted) { %>
                   <button
@@ -745,10 +754,11 @@
               <% } %>
             </div>
 
+            <% if (canUnlockReportInstanceSafe || (isLocked && !canUnlockReportInstanceSafe)) { %>
             <div class="mx-2 mx-md-4 text-muted user-select-none" aria-hidden="true">&middot;</div>
+            <% } %>
 
             <div class="d-flex flex-wrap align-items-center gap-2">
-              <span class="badge <%= isLocked ? 'bg-dark' : 'bg-secondary-subtle text-secondary border' %> p-2">Locked</span>
               <% if (canUnlockReportInstanceSafe) { %>
                 <% if (isLocked) { %>
                   <button
@@ -2155,7 +2165,9 @@
           setReportInstanceSubmitting(true, submitter);
           reportInstanceSubmitLoadingToken = showLoadingToken({
             title: submitAction === 'submit' ? 'Submitting Report' : 'Saving Report',
-            note: 'Please wait while this report instance is saved.',
+            note: submitAction === 'submit'
+              ? 'Saving answers and updating status to submitted.'
+              : 'Please wait while this report instance is saved.',
             operation: 'Report Instance'
           });
         }, true);

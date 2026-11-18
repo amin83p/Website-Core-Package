@@ -124,8 +124,11 @@ test('report workflow wires reopen endpoint and editor gates', () => {
   assert.match(editor, /js-reopen-report-instance/);
   assert.match(editor, /js-unlock-report-instance/);
   assert.match(editor, /reportAssignmentDelete\.js/);
-  assert.match(editor, /saveDraftDisabled/);
+  assert.match(editor, /saveDisabled/);
   assert.match(editor, /submitDisabled/);
+  assert.match(editor, /if \(!isSubmitted\)/);
+  assert.match(editor, /Save changes while keeping submitted status/);
+  assert.doesNotMatch(editor, /Save Draft</);
   assert.match(editor, /Unlock Report/);
   assert.match(editor, /Shared fields are read-only/);
   assert.match(editor, /fieldIsDisabled/);

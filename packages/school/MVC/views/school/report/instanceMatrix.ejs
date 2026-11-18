@@ -9,6 +9,9 @@
     ? matrix.sharedGroups
     : (fallbackSharedFields.length ? [{ id: 'shared-default', label: 'Shared fields', fields: fallbackSharedFields }] : []);
   const hasEditableRows = rows.some((row) => !row.locked);
+  const hasSubmittableRows = rows.some((row) => (
+    !row.locked && String(row.status || '').toLowerCase() !== 'submitted'
+  ));
   const canUnlockReportInstanceSafe = Boolean(typeof canUnlockReportInstance !== 'undefined' && canUnlockReportInstance);
   const canReopenReportInstanceSafe = Boolean(typeof canReopenReportInstanceToDraft !== 'undefined' && canReopenReportInstanceToDraft);
   const startedRows = rows.filter((row) => row.instanceId && !row.isPending);
@@ -20,6 +23,20 @@
   })();
   const showBulkReopen = canReopenReportInstanceSafe && uniformStatus === 'submitted' && startedRows.length > 0;
   const showBulkUnlock = canUnlockReportInstanceSafe && uniformStatus === 'locked' && startedRows.length > 0;
+  const matrixActionBarStatus = uniformStatus === 'submitted'
+    ? { label: 'Submitted', className: 'bg-success' }
+    : uniformStatus === 'locked'
+      ? { label: 'Locked', className: 'bg-dark text-white' }
+      : uniformStatus === 'draft'
+        ? { label: 'Draft', className: 'bg-warning text-dark' }
+        : null;
+  const matrixMixedStatusSummary = (() => {
+    const parts = [];
+    if (Number(progress.drafts) > 0) parts.push(String(progress.drafts) + ' draft');
+    if (Number(progress.submitted) > 0) parts.push(String(progress.submitted) + ' submitted');
+    if (Number(progress.pending) > 0) parts.push(String(progress.pending) + ' not started');
+    return parts.length ? 'Mixed: ' + parts.join(', ') : 'Mixed statuses';
+  })();
   const sharedFieldsEditableSafe = matrix?.sharedFieldsEditable !== false;
   const sharedFieldsLockReasonSafe = String(matrix?.sharedFieldsLockReason || '').trim();
   const hasSharedFieldsBlock = sharedFields.length > 0;
@@ -680,9 +697,14 @@
   <div class="card border-0 shadow-sm mt-4" id="reportMatrixActions">
     <div class="card-body py-2">
       <div class="d-flex flex-wrap align-items-center gap-2 w-100">
-        <button type="button" class="btn btn-primary btn-sm js-matrix-bulk-action" data-action="save" <%= hasEditableRows ? '' : 'disabled' %>><i class="bi bi-save me-1"></i>Save All Drafts</button>
-        <button type="button" class="btn btn-success btn-sm js-matrix-bulk-action" data-action="submit" <%= hasEditableRows ? '' : 'disabled' %>><i class="bi bi-send-check me-1"></i>Submit All Reports</button>
+        <button type="button" class="btn btn-primary btn-sm js-matrix-bulk-action" data-action="save" <%= hasEditableRows ? '' : 'disabled' %>><i class="bi bi-save me-1"></i>Save All</button>
+        <button type="button" class="btn btn-success btn-sm js-matrix-bulk-action" data-action="submit" <%= hasSubmittableRows ? '' : 'hidden' %> <%= (hasSubmittableRows && hasEditableRows) ? '' : 'disabled' %>><i class="bi bi-send-check me-1"></i>Submit All Reports</button>
         <button type="button" class="btn btn-outline-dark btn-sm js-matrix-bulk-action" data-action="lock" <%= hasEditableRows ? '' : 'disabled' %>><i class="bi bi-lock me-1"></i>Lock All Reports</button>
+        <% if (matrixActionBarStatus) { %>
+          <span class="badge <%= matrixActionBarStatus.className %> p-2" id="reportMatrixBulkStatusBadge" title="Every started report in this grid shares this status"><%= matrixActionBarStatus.label %></span>
+        <% } else { %>
+          <span class="badge bg-secondary-subtle text-secondary border p-2" id="reportMatrixBulkStatusBadge" title="Reports in this grid have mixed statuses"><%= matrixMixedStatusSummary %></span>
+        <% } %>
         <% if (showBulkReopen || showBulkUnlock) { %>
           <span id="matrixLifecycleDivider" class="mx-1 text-muted d-none d-md-inline">|</span>
         <% } %>
@@ -1491,7 +1513,60 @@
       }
     }
 
+    function matrixHasSubmittableRows(rows = matrixState.rows) {
+      return (Array.isArray(rows) ? rows : []).some((row) => (
+        !row.locked && String(row.status || '').toLowerCase() !== 'submitted'
+      ));
+    }
+
+    function syncBulkSubmitButton() {
+      const hasEditable = (matrixState.rows || []).some((row) => !row.locked);
+      const hasSubmittable = matrixHasSubmittableRows();
+      document.querySelectorAll('.js-matrix-bulk-action[data-action="submit"]').forEach((button) => {
+        button.hidden = !hasSubmittable;
+        button.disabled = !hasSubmittable || !hasEditable;
+      });
+    }
+
+    function syncMatrixBulkStatusBadge() {
+      const badge = document.getElementById('reportMatrixBulkStatusBadge');
+      if (!badge) return;
+      const started = (matrixState.rows || []).filter((row) => row.instanceId && !row.isPending);
+      const first = started.length ? String(started[0].status || '').toLowerCase() : '';
+      const uniform = first && started.every((row) => String(row.status || '').toLowerCase() === first) ? first : '';
+      const progress = matrixState.progress && typeof matrixState.progress === 'object'
+        ? matrixState.progress
+        : { drafts: 0, submitted: 0, pending: 0 };
+      if (uniform === 'submitted') {
+        badge.className = 'badge bg-success p-2';
+        badge.textContent = 'Submitted';
+        badge.title = 'Every started report in this grid shares this status';
+        return;
+      }
+      if (uniform === 'locked') {
+        badge.className = 'badge bg-dark text-white p-2';
+        badge.textContent = 'Locked';
+        badge.title = 'Every started report in this grid shares this status';
+        return;
+      }
+      if (uniform === 'draft') {
+        badge.className = 'badge bg-warning text-dark p-2';
+        badge.textContent = 'Draft';
+        badge.title = 'Every started report in this grid shares this status';
+        return;
+      }
+      const parts = [];
+      if (Number(progress.drafts) > 0) parts.push(String(progress.drafts) + ' draft');
+      if (Number(progress.submitted) > 0) parts.push(String(progress.submitted) + ' submitted');
+      if (Number(progress.pending) > 0) parts.push(String(progress.pending) + ' not started');
+      badge.className = 'badge bg-secondary-subtle text-secondary border p-2';
+      badge.textContent = parts.length ? 'Mixed: ' + parts.join(', ') : 'Mixed statuses';
+      badge.title = 'Reports in this grid have mixed statuses';
+    }
+
     function syncBulkLifecycleActions() {
+      syncBulkSubmitButton();
+      syncMatrixBulkStatusBadge();
       const started = (matrixState.rows || []).filter((row) => row.instanceId && !row.isPending);
       const first = started.length ? String(started[0].status || '').toLowerCase() : '';
       const uniform = first && started.every((row) => String(row.status || '').toLowerCase() === first) ? first : '';
@@ -1538,6 +1613,7 @@
     function applyMatrixState(nextMatrix, savedStudentId, options = {}) {
       const preserveStudentIds = options.preserveStudentIds instanceof Set ? options.preserveStudentIds : new Set();
       const preserveShared = options.preserveShared === true;
+      const preserveEditableRowInputs = options.preserveEditableRowInputs === true;
       if (!nextMatrix || typeof nextMatrix !== 'object') return;
       matrixState = nextMatrix;
       if (!preserveShared) {
@@ -1557,9 +1633,16 @@
           if (!field) return;
           const rowId = String(rowState.studentId);
           if (!preserveStudentIds.has(rowId) && (savedStudentId === undefined || savedStudentId === null || rowId === String(savedStudentId) || field.readOnly || field.calculated)) {
+            if (preserveEditableRowInputs && !field.readOnly && !field.calculated) return;
             writeControl(control, rowState.answers?.[field.id]);
           }
         });
+        if (preserveEditableRowInputs && !preserveStudentIds.has(String(rowState.studentId))) {
+          const domRow = document.querySelector(`tr[data-student-id="${CSS.escape(String(rowState.studentId))}"]`);
+          if (domRow) {
+            rowState.answers = { ...(rowState.answers || {}), ...collectMatrixEditableAnswers(domRow) };
+          }
+        }
         const status = row.querySelector('.js-matrix-status');
         applyReportMatrixStatusIcon(status, rowState.status);
         const openLink = row.querySelector('.js-matrix-open');
@@ -1616,7 +1699,7 @@
             submitAction,
             rows: editableRows.map((row) => ({
               studentId: String(row.dataset.studentId || ''),
-              answers: collectControls(row, '.js-matrix-row-field')
+              answers: collectMatrixEditableAnswers(row)
             })),
             sharedAnswers: collectControls(document, '.js-matrix-shared-field'),
             actionStateId: String(document.getElementById('reportMatrixActionStateId')?.value || '')
@@ -1629,7 +1712,12 @@
         const unsuccessfulIds = new Set((result.results || [])
           .filter((item) => item.status !== 'success')
           .map((item) => String(item.studentId || '')));
-        applyMatrixState(result.matrix, null, { preserveStudentIds: unsuccessfulIds, preserveShared: unsuccessfulIds.size > 0 });
+        const preserveEditableRowInputs = submitAction === 'save' && unsuccessfulIds.size === 0;
+        applyMatrixState(result.matrix, null, {
+          preserveStudentIds: unsuccessfulIds,
+          preserveShared: unsuccessfulIds.size > 0,
+          preserveEditableRowInputs
+        });
         dirtyStudents.clear();
         document.querySelectorAll('tr[data-student-id]').forEach((row) => row.classList.remove('matrix-row-dirty'));
         unsuccessfulIds.forEach((studentId) => {
@@ -1641,8 +1729,8 @@
           .filter((item) => item.status === 'error' && item.message)
           .slice(0, 3)
           .map((item) => String(item.studentId || '') + ': ' + item.message)
-          .join(' | ');
-        const message = [result.message || 'Report matrix processed.', detail].filter(Boolean).join(' ');
+          .join('\n');
+        const message = [result.message || 'Report matrix processed.', detail].filter(Boolean).join('\n');
         feedback = {
           title: submitAction === 'submit' ? 'Reports Submitted' : (submitAction === 'lock' ? 'Reports Locked' : 'Reports Saved'),
           icon: result.status === 'partial' ? 'warning' : 'success',
@@ -1658,7 +1746,16 @@
         };
       } finally {
         const hasEditable = (matrixState.rows || []).some((row) => !row.locked);
-        actionButtons.forEach((item) => { item.disabled = !hasEditable; });
+        const hasSubmittable = matrixHasSubmittableRows();
+        actionButtons.forEach((item) => {
+          const action = String(item.dataset.action || '').toLowerCase();
+          if (action === 'submit') {
+            item.hidden = !hasSubmittable;
+            item.disabled = !hasSubmittable || !hasEditable;
+          } else {
+            item.disabled = !hasEditable;
+          }
+        });
         if (typeof window.hideLoading === 'function') window.hideLoading(loadingToken || { force: true });
       }
       await showReportMatrixMessage(feedback);

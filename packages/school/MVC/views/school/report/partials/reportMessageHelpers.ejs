@@ -1,3 +1,11 @@
+<style>
+  .report-message-body {
+    white-space: pre-wrap;
+    line-height: 1.45;
+    max-height: min(24rem, 50vh);
+    overflow-y: auto;
+  }
+</style>
 <script>
 (() => {
   if (window.ReportMessaging?.ready) return;
@@ -14,6 +22,16 @@
 
   function plainReportMessage(value) {
     return String(value ?? '').replace(/<br\s*\/?>/gi, '\n').replace(/<[^>]+>/g, '').trim();
+  }
+
+  function formatPlainReportMessageHtml(value) {
+    let plain = plainReportMessage(value);
+    plain = plain
+      .replace(/\s*\|\s*/g, '\n')
+      .replace(/;\s+(?=\d+\s+(?:report|row)\(s\)\s)/gi, '\n')
+      .replace(/;\s+(?=[A-Za-z0-9_-]+:\s)/g, '\n');
+    const escaped = escapeReportMessage(plain);
+    return `<div class="report-message-body text-start text-break mb-0">${escaped}</div>`;
   }
 
   function formatPdfAcroFieldType(rawType = '') {
@@ -429,7 +447,11 @@
         }
       }
     }
-    const displayMessage = resolvedHtml ? String(resolvedMessage ?? '') : escapeReportMessage(plainReportMessage(resolvedMessage));
+    if (!resolvedHtml) {
+      resolvedMessage = formatPlainReportMessageHtml(resolvedMessage);
+      resolvedHtml = true;
+    }
+    const displayMessage = String(resolvedMessage ?? '');
     return window.showMessageModal({
       title,
       icon,
@@ -452,7 +474,7 @@
       console.error('Report message modal is unavailable on this page.');
       return false;
     }
-    const displayMessage = html ? String(message ?? '') : escapeReportMessage(plainReportMessage(message));
+    const displayMessage = html ? String(message ?? '') : formatPlainReportMessageHtml(message);
     const result = await window.showMessageModal({
       title,
       icon,
@@ -469,6 +491,7 @@
     ready: true,
     escapeReportMessage,
     plainReportMessage,
+    formatPlainReportMessageHtml,
     buildPdfFieldsInspectModalHtml,
     buildTemplateFileComplianceModalHtml,
     buildSnapshotComplianceSaveFailureModalHtml,

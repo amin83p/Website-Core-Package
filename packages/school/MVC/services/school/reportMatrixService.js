@@ -265,7 +265,8 @@ async function buildStudentMatrixRow({
   studentId,
   instance,
   reqUser,
-  treatSubmittedAsLocked = false
+  treatSubmittedAsLocked = false,
+  freshMerge = false
 } = {}) {
   let effectiveInstance = instance;
   const editorMergeOptions = reportService.templateUsesSnapshotScope(template)
@@ -309,12 +310,13 @@ async function buildStudentMatrixRow({
       }
     }
   }
-  const skipRecalculation = Boolean(
+  const useRenderCache = !freshMerge && Boolean(
     instance
       && reportService.shouldFreezeReportInstanceOnOpen(template, effectiveInstance)
       && reportService.isInstanceRenderCacheValid(template, effectiveInstance)
   );
-  const mergedAnswers = skipRecalculation
+  const skipRecalculation = useRenderCache;
+  const mergedAnswers = useRenderCache
     ? { ...effectiveInstance.renderCache.mergedAnswers }
     : reportService.mergeTemplateData(template, effectiveInstance, assignment, editorMergeOptions);
   const prefill = effectiveInstance.prefillSnapshot || {};
@@ -484,7 +486,8 @@ async function buildMatrixContext({
   assignmentRowId = '',
   teacherId = '',
   reqUser,
-  windowParams = null
+  windowParams = null,
+  freshMerge = false
 } = {}) {
   const resolved = await resolveMatrixBase({ assignmentId, assignmentRowId, teacherId, reqUser });
   const { assignment, assignmentRow, template, classData, teacherId: resolvedTeacherId, targetStudentIds } = resolved;
@@ -539,7 +542,8 @@ async function buildMatrixContext({
       studentId
     }),
     reqUser,
-    treatSubmittedAsLocked
+    treatSubmittedAsLocked,
+    freshMerge
   })));
   applyRosterNicknamesToReportMatrixRows(allRows, classData?.attendanceRosterNicknames, studentIdToPersonId);
   if (attendanceRosterPersonOrder.length) {
@@ -626,9 +630,8 @@ function matrixPayloadToFormBody(template, rowAnswers = {}, sharedAnswers = {}, 
   (Array.isArray(template?.schema?.fields) ? template.schema.fields : []).forEach((field) => {
     if (!field?.id || isVisualField(field)) return;
     const source = field.sharedAcrossStudents === true ? sharedAnswers : rowAnswers;
-    body[`field__${field.id}`] = source && Object.prototype.hasOwnProperty.call(source, field.id)
-      ? source[field.id]
-      : undefined;
+    if (!source || !Object.prototype.hasOwnProperty.call(source, field.id)) return;
+    body[`field__${field.id}`] = source[field.id];
   });
   return body;
 }
@@ -729,7 +732,8 @@ async function saveMatrixRow({
         assignmentRowId: assignment.assignmentRowId || assignmentRow?.rowId || '',
         teacherId: resolvedTeacherId,
         reqUser,
-        windowParams: { applyWindow: false }
+        windowParams: { applyWindow: false },
+        freshMerge: true
       })
     : null;
 
@@ -823,7 +827,8 @@ async function saveMatrixRows({
     assignmentRowId: assignment.assignmentRowId || assignmentRow?.rowId || '',
     teacherId: resolvedTeacherId,
     reqUser,
-    windowParams: { applyWindow: false }
+    windowParams: { applyWindow: false },
+    freshMerge: true
   });
   const summary = {
     total: requestedRows.length,
