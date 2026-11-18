@@ -2,8 +2,7 @@
   const bulkField = field && typeof field === 'object' ? field : {};
   const bulkType = String(bulkField.type || 'text').trim().toLowerCase();
   const bulkEligible = bulkField.readOnly !== true
-    && bulkField.calculated !== true
-    && bulkType !== 'textarea';
+    && bulkField.calculated !== true;
   const bulkFieldId = String(bulkField.id || '').trim();
 %>
 <% if (bulkEligible && bulkFieldId) { %>

@@ -669,6 +669,12 @@ test('report matrix routes and UI expose bulk actions, grouping, and accessible 
   assert.match(matrixView, /function openMatrixColumnBulkPopover/);
   assert.match(matrixView, /reportSelectField\.js/);
   assert.match(matrixView, /matrix-column-apply-all-btn/);
+  assert.match(matrixView, /id="reportMatrixNoteModal"/);
+  assert.match(matrixView, /js-matrix-note-open/);
+  assert.match(matrixView, /js-matrix-note-value/);
+  assert.match(matrixView, /syncReportMatrixNoteButton/);
+  assert.match(matrixView, /openReportMatrixNoteModal/);
+  assert.match(matrixView, /matrix-note-cell/);
 });
 
 test('report matrix EJS renders supported controls and locked row state', async () => {
@@ -732,6 +738,10 @@ test('report matrix EJS renders supported controls and locked row state', async 
   assert.match(html, /id="matrixColumnBulkPopover"/);
   assert.match(html, /matrix-header-tip-trigger/);
   assert.match(html, /data-tip="Enter the session score/);
+  assert.match(html, /id="reportMatrixNoteModal"/);
+  assert.match(html, /js-matrix-note-open[^>]*disabled/);
+  assert.match(html, /js-matrix-note-value[^>]*data-field-id="note"[^>]*value="Complete"/);
+  assert.match(html, /Edit note/);
   const matrixThead = html.match(/<thead class="table-light">[\s\S]*?<\/thead>/)?.[0] || '';
   assert.doesNotMatch(matrixThead, /data-matrix-field-id="prefill_only"[\s\S]*js-matrix-column-apply-all/);
 });

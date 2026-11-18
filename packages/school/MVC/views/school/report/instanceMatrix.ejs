@@ -2,6 +2,10 @@
   const sharedFields = Array.isArray(matrix?.sharedFields) ? matrix.sharedFields : [];
   const commonFields = Array.isArray(matrix?.commonFields) ? matrix.commonFields : [];
   const tableFields = Array.isArray(matrix?.tableFields) ? matrix.tableFields : [];
+  function matrixIsNoteFieldType(type) {
+    const token = String(type || '').trim().toLowerCase();
+    return token === 'text' || token === 'textarea';
+  }
   const rows = Array.isArray(matrix?.rows) ? matrix.rows : [];
   const progress = matrix?.progress || { total: rows.length, submitted: 0, drafts: 0, pending: rows.length };
   const fallbackSharedFields = sharedFields;
@@ -354,6 +358,34 @@
   }
   .report-matrix-page .matrix-table th.matrix-student-col { z-index: 6; background: #f1f5f9; }
   .report-matrix-page .matrix-table textarea { min-width: 180px; width: 100%; resize: vertical; }
+  .report-matrix-page .matrix-table td.matrix-note-cell,
+  .report-matrix-page .matrix-table th.matrix-note-col {
+    min-width: 8.5rem;
+    max-width: 10.5rem;
+    width: 9rem;
+    vertical-align: middle;
+  }
+  .report-matrix-page .matrix-note-cell .js-matrix-note-open {
+    width: 100%;
+    max-width: 9.5rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    padding-left: 0.45rem;
+    padding-right: 0.45rem;
+  }
+  .report-matrix-page .matrix-note-cell .js-matrix-note-btn-label {
+    font-size: 0.78rem;
+  }
+  #reportMatrixTableModal .matrix-note-cell .js-matrix-note-open {
+    max-width: 100%;
+    font-size: 0.8125rem;
+    padding-left: 0.35rem;
+    padding-right: 0.35rem;
+  }
+  #reportMatrixTableModal .matrix-note-cell .js-matrix-note-open .bi {
+    margin-right: 0.2rem !important;
+  }
   .report-matrix-page .matrix-table input[type="text"],
   .report-matrix-page .matrix-table input[type="number"],
   .report-matrix-page .matrix-table input[type="date"],
@@ -614,11 +646,12 @@
           <tr>
             <th class="matrix-student-col ps-3">Student</th>
             <% tableFields.forEach((field) => { %>
+              <% const headerNoteCol = matrixIsNoteFieldType(field.type) ? 'matrix-note-col' : ''; %>
               <% const headerTipParts = [];
                  if (field.helpText) headerTipParts.push(String(field.helpText));
                  if (field.placeholder) headerTipParts.push('Expected: ' + String(field.placeholder));
                  const headerTip = headerTipParts.join('\n'); %>
-              <th data-matrix-field-id="<%= field.id %>">
+              <th data-matrix-field-id="<%= field.id %>"<%= headerNoteCol ? ` class="${headerNoteCol}"` : '' %>>
                 <div class="matrix-field-header">
                   <div class="matrix-field-header-main">
                     <div class="matrix-field-header-top">
@@ -661,9 +694,26 @@
               <% tableFields.forEach((field) => { %>
                 <% const value = row.answers?.[field.id] === undefined || row.answers?.[field.id] === null ? '' : row.answers[field.id]; %>
                 <% const disabled = row.locked || field.readOnly; %>
-                <td data-matrix-cell="<%= field.id %>">
-                  <% if (field.type === 'textarea') { %>
-                    <textarea class="form-control form-control-sm js-matrix-row-field" rows="3" data-field-id="<%= field.id %>" placeholder="<%= field.placeholder || '' %>" <%= disabled ? 'readonly' : '' %>><%= value %></textarea>
+                <% const isNoteCell = matrixIsNoteFieldType(field.type); %>
+                <td data-matrix-cell="<%= field.id %>"<%= isNoteCell ? ' class="matrix-note-cell"' : '' %>>
+                  <% if (isNoteCell) { %>
+                    <% const noteStr = value === '' ? '' : String(value); %>
+                    <% const hasNote = noteStr.trim().length > 0; %>
+                    <% const btnLabel = hasNote ? 'Edit note' : 'Add note'; %>
+                    <% const preview = hasNote && noteStr.length > 48 ? noteStr.slice(0, 48) + '…' : (hasNote ? noteStr : ''); %>
+                    <% const fieldTypeToken = String(field.type || 'text').toLowerCase(); %>
+                    <input type="hidden" class="js-matrix-row-field js-matrix-note-value" data-field-id="<%= field.id %>" value="<%= noteStr %>">
+                    <button type="button" class="btn btn-outline-secondary btn-sm js-matrix-note-open"<%= disabled ? ' disabled' : '' %>
+                      data-field-id="<%= field.id %>"
+                      data-field-label="<%= field.label %>"
+                      data-field-type="<%= fieldTypeToken %>"
+                      data-student-id="<%= row.studentId %>"
+                      data-student-name="<%= row.studentName %>"
+                      data-help-text="<%= field.helpText || '' %>"
+                      <% if (preview) { %>title="<%= btnLabel %>: <%= preview %>"<% } %>
+                      aria-label="<%= btnLabel %> for <%= field.label %> — <%= row.studentName %>">
+                      <i class="bi bi-journal-text me-1" aria-hidden="true"></i><span class="js-matrix-note-btn-label"><%= btnLabel %></span>
+                    </button>
                   <% } else if (field.type === 'select') { %>
                     <%- include('partials/reportSelectField', {
                       field,
@@ -804,6 +854,25 @@
       <button type="button" class="btn btn-primary" id="btnApplyMatrixPrefill" disabled><i class="bi bi-check2-circle me-1"></i>Apply selected updates</button>
     </div>
   </div></div>
+</div>
+
+<div class="modal fade" id="reportMatrixNoteModal" tabindex="-1" aria-labelledby="reportMatrixNoteModalTitle" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header">
+        <h5 class="modal-title" id="reportMatrixNoteModalTitle">Note</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted mb-2 d-none" id="reportMatrixNoteHelp"></p>
+        <div id="reportMatrixNoteEditor"></div>
+      </div>
+      <div class="modal-footer bg-white border-top">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" id="btnReportMatrixNoteCancel">Cancel</button>
+        <button type="button" class="btn btn-primary" id="btnReportMatrixNoteSave"><i class="bi bi-check2 me-1"></i>Save</button>
+      </div>
+    </div>
+  </div>
 </div>
 
 <%- include('partials/reportPrefillPreviewUi') %>
@@ -993,14 +1062,189 @@
       };
     }
 
+    function matrixIsNoteField(field) {
+      const type = String(field?.type || '').trim().toLowerCase();
+      return type === 'text' || type === 'textarea';
+    }
+
+    function reportMatrixNotePreview(value, max = 48) {
+      const text = String(value ?? '').trim();
+      if (!text) return '';
+      return text.length > max ? `${text.slice(0, max)}…` : text;
+    }
+
+    function isReportMatrixTableInExpandedView() {
+      return Boolean(document.querySelector('#reportMatrixTableModalHost .matrix-table-wrap'));
+    }
+
+    function reportMatrixNoteActionLabel(hasNote) {
+      return hasNote ? 'Edit note' : 'Add note';
+    }
+
+    function reportMatrixNoteVisibleLabel(hasNote, compact) {
+      if (compact) return 'Note';
+      return reportMatrixNoteActionLabel(hasNote);
+    }
+
+    function syncReportMatrixNoteButton(btn, value, options = {}) {
+      if (!btn) return;
+      const hasNote = String(value ?? '').trim().length > 0;
+      const fieldLabel = btn.getAttribute('data-field-label') || 'note';
+      const studentName = btn.getAttribute('data-student-name') || 'student';
+      const compact = options.compact === undefined ? isReportMatrixTableInExpandedView() : Boolean(options.compact);
+      const actionLabel = reportMatrixNoteActionLabel(hasNote);
+      const labelText = reportMatrixNoteVisibleLabel(hasNote, compact);
+      const labelSpan = btn.querySelector('.js-matrix-note-btn-label');
+      if (labelSpan) labelSpan.textContent = labelText;
+      const preview = reportMatrixNotePreview(value);
+      btn.title = preview ? `${actionLabel}: ${preview}` : actionLabel;
+      btn.setAttribute('aria-label', `${actionLabel} for ${fieldLabel} — ${studentName}`);
+    }
+
+    function syncAllReportMatrixNoteButtons(options = {}) {
+      const table = document.getElementById('reportMatrixTable');
+      if (!table) return;
+      table.querySelectorAll('.js-matrix-note-open').forEach((btn) => {
+        const row = btn.closest('tr[data-student-id]');
+        const fieldId = String(btn.getAttribute('data-field-id') || '').trim();
+        if (!row || !fieldId) return;
+        const hidden = row.querySelector(`.js-matrix-note-value[data-field-id="${CSS.escape(fieldId)}"]`);
+        syncReportMatrixNoteButton(btn, hidden ? readControl(hidden) : '', options);
+      });
+    }
+
+    function syncReportMatrixNoteButtonsInRow(row) {
+      if (!row) return;
+      row.querySelectorAll('.js-matrix-note-open').forEach((btn) => {
+        const fieldId = String(btn.getAttribute('data-field-id') || '').trim();
+        if (!fieldId) return;
+        const hidden = row.querySelector(`.js-matrix-note-value[data-field-id="${CSS.escape(fieldId)}"]`);
+        if (hidden) syncReportMatrixNoteButton(btn, readControl(hidden));
+      });
+    }
+
+    function buildReportMatrixNoteCellHtml(field, row) {
+      const value = row.answers?.[field.id];
+      const disabled = row.locked || field.readOnly;
+      const valueStr = value === undefined || value === null ? '' : String(value);
+      const esc = reportMatrixEscapeHtml;
+      const fieldId = esc(field.id);
+      const hasNote = valueStr.trim().length > 0;
+      const btnLabel = hasNote ? 'Edit note' : 'Add note';
+      const preview = reportMatrixNotePreview(valueStr);
+      const title = preview ? `${btnLabel}: ${esc(preview)}` : btnLabel;
+      const dis = disabled ? ' disabled' : '';
+      const fieldType = esc(String(field.type || 'text').toLowerCase());
+      const fieldLabel = esc(field.label || field.id || 'Note');
+      const studentName = esc(row.studentName || '');
+      const studentId = esc(row.studentId || '');
+      return `<input type="hidden" class="js-matrix-row-field js-matrix-note-value" data-field-id="${fieldId}" value="${esc(valueStr)}">
+<button type="button" class="btn btn-outline-secondary btn-sm js-matrix-note-open"${dis}
+  data-field-id="${fieldId}"
+  data-field-label="${fieldLabel}"
+  data-field-type="${fieldType}"
+  data-student-id="${studentId}"
+  data-student-name="${studentName}"
+  data-help-text="${esc(field.helpText || '')}"
+  title="${title}"
+  aria-label="${btnLabel} for ${fieldLabel} — ${studentName}">
+  <i class="bi bi-journal-text me-1" aria-hidden="true"></i><span class="js-matrix-note-btn-label">${btnLabel}</span>
+</button>`;
+    }
+
+    let reportMatrixNoteContext = null;
+    let reportMatrixNoteModal = null;
+
+    function ensureReportMatrixNoteModal() {
+      if (reportMatrixNoteModal) return reportMatrixNoteModal;
+      const el = document.getElementById('reportMatrixNoteModal');
+      if (!el || typeof bootstrap === 'undefined' || !bootstrap.Modal) return null;
+      reportMatrixNoteModal = bootstrap.Modal.getOrCreateInstance(el);
+      el.addEventListener('hidden.bs.modal', () => {
+        reportMatrixNoteContext = null;
+        const editor = document.getElementById('reportMatrixNoteEditor');
+        if (editor) editor.innerHTML = '';
+      });
+      return reportMatrixNoteModal;
+    }
+
+    function openReportMatrixNoteModal(btn) {
+      if (!btn || btn.disabled) return;
+      const row = btn.closest('tr[data-student-id]');
+      const fieldId = String(btn.dataset.fieldId || '').trim();
+      if (!row || !fieldId) return;
+      const hidden = row.querySelector(`.js-matrix-note-value[data-field-id="${CSS.escape(fieldId)}"]`);
+      if (!hidden) return;
+      const modal = ensureReportMatrixNoteModal();
+      if (!modal) return;
+      const fieldLabel = String(btn.dataset.fieldLabel || 'Note');
+      const studentName = String(btn.dataset.studentName || '');
+      const fieldType = String(btn.dataset.fieldType || 'text').toLowerCase();
+      const helpText = String(btn.dataset.helpText || '').trim();
+      const titleEl = document.getElementById('reportMatrixNoteModalTitle');
+      const helpEl = document.getElementById('reportMatrixNoteHelp');
+      const editor = document.getElementById('reportMatrixNoteEditor');
+      if (!titleEl || !editor) return;
+      titleEl.textContent = `${fieldLabel} — ${studentName}`;
+      if (helpEl) {
+        if (helpText) {
+          helpEl.textContent = helpText;
+          helpEl.classList.remove('d-none');
+        } else {
+          helpEl.textContent = '';
+          helpEl.classList.add('d-none');
+        }
+      }
+      const currentValue = readControl(hidden);
+      const esc = reportMatrixEscapeHtml;
+      const inputId = 'reportMatrixNoteInput';
+      if (fieldType === 'textarea') {
+        editor.innerHTML = `<label class="form-label" for="${inputId}">${esc(fieldLabel)}</label><textarea id="${inputId}" class="form-control js-report-matrix-note-control" rows="5">${esc(String(currentValue ?? ''))}</textarea>`;
+      } else {
+        editor.innerHTML = `<label class="form-label" for="${inputId}">${esc(fieldLabel)}</label><input type="text" id="${inputId}" class="form-control js-report-matrix-note-control" value="${esc(String(currentValue ?? ''))}">`;
+      }
+      reportMatrixNoteContext = { btn, hidden, row, fieldId, originalValue: String(currentValue ?? '') };
+      modal.show();
+      const focusEl = document.getElementById(inputId);
+      if (focusEl && typeof focusEl.focus === 'function') {
+        window.setTimeout(() => focusEl.focus(), 150);
+      }
+    }
+
+    function saveReportMatrixNoteModal() {
+      if (!reportMatrixNoteContext) return;
+      const { btn, hidden, row } = reportMatrixNoteContext;
+      const control = document.querySelector('.js-report-matrix-note-control');
+      const value = control ? readControl(control) : '';
+      writeControl(hidden, value);
+      syncReportMatrixNoteButton(btn, value);
+      const studentId = String(row.dataset.studentId || '');
+      const fieldId = reportMatrixNoteContext.fieldId;
+      const rowState = (matrixState.rows || []).find((item) => String(item.studentId || '') === studentId);
+      if (rowState) {
+        rowState.answers = { ...(rowState.answers || {}), [fieldId]: value };
+        rowState.calculationAnswers = {
+          ...(rowState.calculationAnswers && typeof rowState.calculationAnswers === 'object'
+            ? rowState.calculationAnswers
+            : rowState.answers || {}),
+          [fieldId]: value
+        };
+      }
+      recalculateRow(row);
+      dirtyStudents.add(studentId);
+      row.classList.add('matrix-row-dirty');
+      persistMatrixStateJson();
+      ensureReportMatrixNoteModal()?.hide();
+    }
+
     function buildReportMatrixFieldHtml(field, row) {
       const value = row.answers?.[field.id];
       const disabled = row.locked || field.readOnly;
       const valueStr = value === undefined || value === null ? '' : String(value);
       const readonlyAttr = disabled ? 'readonly' : '';
       const disabledAttr = disabled ? 'disabled' : '';
-      if (field.type === 'textarea') {
-        return `<textarea class="form-control form-control-sm js-matrix-row-field" rows="3" data-field-id="${reportMatrixEscapeHtml(field.id)}" placeholder="${reportMatrixEscapeHtml(field.placeholder || '')}" ${readonlyAttr}>${reportMatrixEscapeHtml(valueStr)}</textarea>`;
+      if (matrixIsNoteField(field)) {
+        return buildReportMatrixNoteCellHtml(field, row);
       }
       if (field.type === 'select') {
         const binaryHtml = window.ReportSelectField?.buildReportSelectFieldHtml?.({
@@ -1042,9 +1286,10 @@
       const openBtn = openHref
         ? `<a href="${reportMatrixEscapeHtml(openHref)}" class="matrix-row-icon-btn js-matrix-open" target="_blank" rel="noopener noreferrer" title="Open individual report" aria-label="Open individual report"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>`
         : '';
-      const cells = tableFields.map((field) => (
-        `<td data-matrix-cell="${reportMatrixEscapeHtml(field.id)}">${buildReportMatrixFieldHtml(field, row)}</td>`
-      )).join('');
+      const cells = tableFields.map((field) => {
+        const noteClass = matrixIsNoteField(field) ? ' class="matrix-note-cell"' : '';
+        return `<td data-matrix-cell="${reportMatrixEscapeHtml(field.id)}"${noteClass}>${buildReportMatrixFieldHtml(field, row)}</td>`;
+      }).join('');
       return `<tr data-student-id="${reportMatrixEscapeHtml(row.studentId)}" data-instance-id="${reportMatrixEscapeHtml(row.instanceId || '')}" data-report-status="${reportMatrixEscapeHtml(row.status || '')}" class="${row.locked ? 'table-secondary' : ''}">
         <td class="matrix-student-col ps-3">
           <div class="matrix-student-head">
@@ -1086,7 +1331,11 @@
         });
         const tbody = document.querySelector('#reportMatrixTable tbody');
         if (tbody && mergedRows.length) {
-          mergedRows.forEach((row) => tbody.insertAdjacentHTML('beforeend', buildReportMatrixRowHtml(row)));
+          mergedRows.forEach((row) => {
+            tbody.insertAdjacentHTML('beforeend', buildReportMatrixRowHtml(row));
+            const tr = tbody.lastElementChild;
+            if (tr) attachMatrixRowFieldListeners(tr);
+          });
         }
         matrixState.rows = [...(matrixState.rows || []), ...mergedRows];
         matrixState.window = payload.window || matrixState.window;
@@ -1116,7 +1365,7 @@
     }, true);
 
     const MATRIX_MODAL_SIZE_CLASSES = ['modal-lg', 'modal-xl', 'modal-fullscreen', 'modal-dialog-centered'];
-    const REPORT_MATRIX_MODAL_IDS = ['reportMatrixTableModal', 'matrixPdfExportModal', 'reportMatrixPrefillModal'];
+    const REPORT_MATRIX_MODAL_IDS = ['reportMatrixTableModal', 'matrixPdfExportModal', 'reportMatrixPrefillModal', 'reportMatrixNoteModal'];
 
     function portalReportMatrixModalsToBody() {
       REPORT_MATRIX_MODAL_IDS.forEach((id) => {
@@ -1155,8 +1404,12 @@
         updateReportMatrixTableModalSize();
         moveReportMatrixTableToModal();
       });
+      reportMatrixTableModalEl.addEventListener('shown.bs.modal', () => {
+        syncAllReportMatrixNoteButtons({ compact: true });
+      });
       reportMatrixTableModalEl.addEventListener('hidden.bs.modal', () => {
         restoreReportMatrixTableInline();
+        syncAllReportMatrixNoteButtons({ compact: false });
       });
     }
 
@@ -1181,8 +1434,7 @@
 
     function fieldBulkEligible(field) {
       if (!field || field.readOnly === true || field.calculated === true) return false;
-      const type = String(field.type || 'text').trim().toLowerCase();
-      return type !== 'textarea';
+      return true;
     }
 
     function coerceBulkValue(field, raw) {
@@ -1275,6 +1527,9 @@
       if (type === 'date') {
         return `<label class="form-label" for="matrix_bulk_date_${esc(fieldId)}">Date</label><input type="date" id="matrix_bulk_date_${esc(fieldId)}" class="form-control form-control-sm js-matrix-column-bulk-value" data-field-id="${esc(fieldId)}">`;
       }
+      if (type === 'textarea') {
+        return `<label class="form-label" for="matrix_bulk_textarea_${esc(fieldId)}">Value</label><textarea id="matrix_bulk_textarea_${esc(fieldId)}" class="form-control form-control-sm js-matrix-column-bulk-value" data-field-id="${esc(fieldId)}" rows="4" placeholder="Enter note for all students"></textarea>`;
+      }
       return `<label class="form-label" for="matrix_bulk_text_${esc(fieldId)}">Value</label><input type="text" id="matrix_bulk_text_${esc(fieldId)}" class="form-control form-control-sm js-matrix-column-bulk-value" data-field-id="${esc(fieldId)}" placeholder="Enter value for all students">`;
     }
 
@@ -1360,6 +1615,8 @@
         const control = rowEl.querySelector(`.js-matrix-row-field[data-field-id="${CSS.escape(cleanFieldId)}"]`);
         if (!control || control.disabled || control.readOnly) return;
         writeControl(control, value);
+        const noteBtn = rowEl.querySelector(`.js-matrix-note-open[data-field-id="${CSS.escape(cleanFieldId)}"]`);
+        if (noteBtn) syncReportMatrixNoteButton(noteBtn, value);
         rowEl.classList.add('matrix-row-dirty');
         recalculateRow(rowEl);
       });
@@ -1652,6 +1909,7 @@
         }
         row.classList.toggle('table-secondary', Boolean(rowState.locked));
         syncRowLifecycleActions(row, rowState);
+        syncReportMatrixNoteButtonsInRow(row);
       });
       Object.entries(nextMatrix.progress || {}).forEach(([key, value]) => {
         const target = document.querySelector(`[data-progress-key="${CSS.escape(key)}"]`);
@@ -1891,21 +2149,39 @@
       closeMatrixColumnBulkPopover();
     });
 
-    document.querySelectorAll('.js-matrix-row-field').forEach((control) => {
-      control.addEventListener('change', () => {
-        const row = control.closest('tr[data-student-id]');
-        if (!row) return;
-        recalculateRow(row);
-        dirtyStudents.add(String(row.dataset.studentId || ''));
-        row.classList.add('matrix-row-dirty');
+    function onMatrixRowFieldEdited(control) {
+      const row = control.closest('tr[data-student-id]');
+      if (!row) return;
+      recalculateRow(row);
+      dirtyStudents.add(String(row.dataset.studentId || ''));
+      row.classList.add('matrix-row-dirty');
+    }
+
+    function attachMatrixRowFieldListeners(root) {
+      const scope = root || document;
+      const controls = root?.matches?.('.js-matrix-row-field')
+        ? [root]
+        : Array.from(scope.querySelectorAll?.('.js-matrix-row-field') || []);
+      controls.forEach((control) => {
+        if (control.dataset.matrixListenerBound === '1') return;
+        control.dataset.matrixListenerBound = '1';
+        control.addEventListener('change', () => onMatrixRowFieldEdited(control));
+        control.addEventListener('input', () => onMatrixRowFieldEdited(control));
       });
-      control.addEventListener('input', () => {
-        const row = control.closest('tr[data-student-id]');
-        if (!row) return;
-        recalculateRow(row);
-        dirtyStudents.add(String(row.dataset.studentId || ''));
-        row.classList.add('matrix-row-dirty');
-      });
+    }
+
+    attachMatrixRowFieldListeners(document.getElementById('reportMatrixTable'));
+
+    document.getElementById('reportMatrixTable')?.addEventListener('click', (event) => {
+      const noteBtn = event.target.closest('.js-matrix-note-open');
+      if (!noteBtn || noteBtn.disabled) return;
+      event.preventDefault();
+      event.stopPropagation();
+      openReportMatrixNoteModal(noteBtn);
+    });
+    document.getElementById('btnReportMatrixNoteSave')?.addEventListener('click', () => saveReportMatrixNoteModal());
+    document.getElementById('btnReportMatrixNoteCancel')?.addEventListener('click', () => {
+      reportMatrixNoteContext = null;
     });
     document.querySelectorAll('.js-matrix-shared-field').forEach((control) => {
       control.addEventListener('change', () => { sharedDirty = true; recalculateAllRows(); });
