@@ -1,0 +1,83 @@
+<%
+  const services = Array.isArray(serviceOptions) ? serviceOptions : [];
+%>
+
+<%- include('partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel,
+  user,
+  tableName,
+  actionStateId,
+  btn_export: true,
+  print: true,
+  headerManageBtns: typeof headerManageBtns !== 'undefined' ? headerManageBtns : [],
+  manageBtns: typeof manageBtns !== 'undefined' ? manageBtns : []
+}) %>
+
+<%- include('partials/tablePages-search', {
+  placeholder: 'Search limits by user, period, or service scope...',
+  fields: ['id', 'userId', 'periodType', 'appliesTo', 'notes']
+}) %>
+
+<div class="alert alert-light border d-flex gap-3 align-items-start mb-3">
+  <i class="bi bi-shield-check text-primary fs-5"></i>
+  <div>
+    <div class="fw-semibold">Per-user token and request caps</div>
+    <div class="small text-muted">Limits apply to the active organization and enforce during school AI runtime calls.</div>
+  </div>
+</div>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable ps-4" data-column="userDisplayName">User</th>
+        <th class="draggable" data-column="periodType">Period</th>
+        <th class="draggable" data-column="appliesTo">Applies to</th>
+        <th class="draggable" data-column="maxTotalTokens">Max tokens</th>
+        <th class="draggable" data-column="maxRequestCount">Max requests</th>
+        <th class="draggable" data-column="isActive">Status</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || !data.length) { %>
+        <tr><td colspan="7" class="text-center py-5 text-muted">No usage limits configured.</td></tr>
+      <% } %>
+      <% (data || []).forEach((item) => { %>
+        <% const appliesLabel = String(item.appliesTo || 'all_services') === 'all_services'
+          ? 'All services'
+          : (services.find((s) => String(s.serviceKey) === String(item.appliesTo))?.label || item.appliesTo); %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-semibold text-dark"><%= item.userDisplayName || item.userId %></div>
+            <% if (item.userDisplayName && item.userDisplayName !== item.userId) { %>
+              <div class="x-small text-muted font-monospace"><%= item.userId %></div>
+            <% } %>
+          </td>
+          <td><%= item.periodType || '-' %></td>
+          <td><%= appliesLabel %></td>
+          <td><%= item.maxTotalTokens != null ? item.maxTotalTokens : '-' %></td>
+          <td><%= item.maxRequestCount != null ? item.maxRequestCount : '-' %></td>
+          <td>
+            <span class="badge <%= item.isActive === false ? 'bg-secondary' : 'bg-success' %>">
+              <%= item.isActive === false ? 'Inactive' : 'Active' %>
+            </span>
+          </td>
+          <td class="table-actions text-end pe-4">
+            <a href="/<%= newUrl %>/edit/<%= item.id %>" class="btn btn-sm btn-filled btn-edit">Edit</a>
+            <button type="button" class="btn btn-sm btn-filled btn-delete delete-btn" data-id="<%= item.id %>">Delete</button>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('partials/pagination', {
+  pagination,
+  filters,
+  baseUrlPath: newUrl
+}) %>
+<%- include('partials/tablePages-end') %>

@@ -119,7 +119,11 @@ const SCHOOL_ENTITY_REGISTRY = Object.freeze({
   notificationRuns: { repository: schoolRepositories.notificationRuns },
   taskRoutingRules: { repository: schoolRepositories.taskRoutingRules },
   sessionStudentCases: { repository: schoolRepositories.sessionStudentCases },
-  attendanceChangeLogs: { repository: schoolRepositories.attendanceChangeLogs }
+  attendanceChangeLogs: { repository: schoolRepositories.attendanceChangeLogs },
+  schoolAiProviders: { repository: schoolRepositories.schoolAiProviders },
+  schoolAiServiceAssignments: { repository: schoolRepositories.schoolAiServiceAssignments },
+  schoolAiTokenUsage: { repository: schoolRepositories.schoolAiTokenUsage },
+  schoolAiUserUsageLimits: { repository: schoolRepositories.schoolAiUserUsageLimits }
 });
 
 const SCHOOL_INDEX_DOCS = Object.freeze({

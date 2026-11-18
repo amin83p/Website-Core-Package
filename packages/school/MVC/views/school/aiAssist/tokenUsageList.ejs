@@ -1,0 +1,119 @@
+<%
+  const queryFilters = (typeof filters !== 'undefined' && filters && typeof filters === 'object') ? filters : {};
+  const selectedService = (typeof selectedServiceKey !== 'undefined' && selectedServiceKey) ? String(selectedServiceKey) : '';
+  const services = Array.isArray(serviceOptions) ? serviceOptions : [];
+%>
+
+<%- include('partials/tablePages-start', {
+  title,
+  newUrl,
+  user,
+  tableName,
+  actionStateId,
+  btn_export: true,
+  print: true,
+  headerManageBtns: typeof headerManageBtns !== 'undefined' ? headerManageBtns : [],
+  manageBtns: typeof manageBtns !== 'undefined' ? manageBtns : []
+}) %>
+
+<div class="row g-2 align-items-end mb-3">
+  <div class="col-md-auto">
+    <form method="get" action="/school/ai-assist/token-usage" id="tokenUsageServiceFilter" class="d-flex flex-wrap align-items-end gap-2">
+      <% Object.entries(queryFilters).forEach(([key, value]) => { %>
+        <% if (key === 'serviceKey__eq' || key === 'page') return; %>
+        <% if (value === undefined || value === null || String(value).trim() === '') return; %>
+        <input type="hidden" name="<%= key %>" value="<%= value %>">
+      <% }) %>
+      <div>
+        <label for="tokenUsageServiceSelect" class="form-label fw-bold small mb-1">Service</label>
+        <select id="tokenUsageServiceSelect" name="serviceKey__eq" class="form-select size-md" style="min-width: 240px;">
+          <option value="" <%= !selectedService ? 'selected' : '' %>>All services</option>
+          <% services.forEach((svc) => { %>
+            <option value="<%= svc.serviceKey %>" <%= selectedService === String(svc.serviceKey) ? 'selected' : '' %>>
+              <%= svc.label %>
+            </option>
+          <% }) %>
+        </select>
+      </div>
+      <input type="hidden" name="page" value="1">
+      <button type="submit" class="btn btn-filled btn-secondary btn-md mb-0">
+        <i class="bi bi-funnel me-1"></i> Apply
+      </button>
+    </form>
+  </div>
+</div>
+
+<%- include('partials/tablePages-search', {
+  placeholder: 'Search usage by user, service, model...',
+  fields: ['userId', 'serviceKey', 'providerId', 'modelId', 'status', 'traceId']
+}) %>
+
+<div class="alert alert-light border d-flex gap-3 align-items-start mb-3">
+  <i class="bi bi-cpu-fill text-primary fs-5"></i>
+  <div>
+    <div class="fw-semibold">Audit log of school AI token consumption</div>
+    <div class="small text-muted">Filter by service above or use client search and DB Search on the toolbar. Manage per-user caps on
+      <a href="/school/ai-assist/token-usage/limits">Usage Limits</a>.</div>
+  </div>
+</div>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="draggable ps-4" data-column="createdAt">When</th>
+        <th class="draggable" data-column="userId">User</th>
+        <th class="draggable" data-column="serviceKey">Service</th>
+        <th class="draggable" data-column="modelId">Model</th>
+        <th class="draggable" data-column="totalTokenCount">Tokens</th>
+        <th class="draggable" data-column="status">Status</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!data || !data.length) { %>
+        <tr><td colspan="7" class="text-center py-5 text-muted">No AI calls logged yet.</td></tr>
+      <% } %>
+      <% (data || []).forEach((item) => { %>
+        <% const svcLabel = services.find((s) => String(s.serviceKey) === String(item.serviceKey || ''))?.label || item.serviceKey; %>
+        <tr>
+          <td class="ps-4"><%= item.createdAt || '-' %></td>
+          <td class="font-monospace"><%= item.userId || '-' %></td>
+          <td>
+            <div class="fw-semibold"><%= svcLabel || '-' %></div>
+            <% if (item.serviceKey && svcLabel !== item.serviceKey) { %>
+              <div class="x-small text-muted"><code><%= item.serviceKey %></code></div>
+            <% } %>
+          </td>
+          <td><%= item.modelId || '-' %></td>
+          <td><%= item.totalTokenCount != null ? item.totalTokenCount : '-' %></td>
+          <td>
+            <span class="badge <%= String(item.status || '').toLowerCase() === 'failed' ? 'bg-danger' : 'bg-success' %>">
+              <%= item.status || '-' %>
+            </span>
+          </td>
+          <td class="table-actions text-end pe-4">
+            <a class="btn btn-sm btn-filled btn-edit" href="/school/ai-assist/token-usage/<%= item.id %>">Detail</a>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('partials/pagination', {
+  pagination,
+  filters,
+  baseUrlPath: newUrl
+}) %>
+<%- include('partials/tablePages-end') %>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const serviceFilter = document.getElementById('tokenUsageServiceFilter');
+  const serviceSelect = document.getElementById('tokenUsageServiceSelect');
+  serviceSelect?.addEventListener('change', function () {
+    serviceFilter?.requestSubmit();
+  });
+});
+</script>

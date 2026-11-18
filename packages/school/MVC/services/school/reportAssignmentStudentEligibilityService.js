@@ -7,6 +7,7 @@ const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 const NO_ATTENDANCE_STATUS_NOTE = 'No attendance status during this report period.';
+const OFF_ROSTER_PERSISTED_NOTE = 'No longer on class roster for this report period (saved on assignment). Deselect to remove.';
 
 function isSelectableStudentRow(student = {}) {
   if (student && student.selectable === false) return false;
@@ -290,6 +291,55 @@ async function resolveEligibleStudentsForAssignment({
   return results.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
 }
 
+function collectPersistedTargetStudentIds(targetRows = []) {
+  const ids = new Set();
+  (Array.isArray(targetRows) ? targetRows : []).forEach((row) => {
+    (Array.isArray(row?.targetStudentIds) ? row.targetStudentIds : []).forEach((id) => {
+      const token = toPublicId(id);
+      if (token) ids.add(token);
+    });
+  });
+  return [...ids];
+}
+
+async function appendOffRosterPersistedStudents({
+  students = [],
+  targetRows = [],
+  reqUser,
+  personMap = new Map()
+} = {}) {
+  const list = Array.isArray(students) ? [...students] : [];
+  const presentIds = new Set(
+    list.map((row) => toPublicId(row?.personId || row?.id)).filter(Boolean)
+  );
+  const missingIds = collectPersistedTargetStudentIds(targetRows).filter((id) => !presentIds.has(id));
+  if (!missingIds.length) return list;
+
+  const allStudents = await schoolDataService.fetchAllData('students', {}, reqUser);
+  const personToStudent = new Map();
+  (Array.isArray(allStudents) ? allStudents : []).forEach((student) => {
+    const personId = toPublicId(student?.personId);
+    if (personId) personToStudent.set(personId, student);
+  });
+
+  missingIds.forEach((personId) => {
+    const studentRecord = personToStudent.get(personId) || null;
+    list.push({
+      personId,
+      id: personId,
+      name: personMap.get(personId)
+        || String(studentRecord?.name || '').trim()
+        || personId,
+      eligibleSessionCount: 0,
+      selectable: false,
+      offRosterPersisted: true,
+      ineligibleNote: OFF_ROSTER_PERSISTED_NOTE
+    });
+  });
+
+  return list.sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+}
+
 async function resolveSelectablePersonIdsForTargetRow({
   classData,
   sessions = [],
@@ -316,12 +366,15 @@ async function resolveSelectablePersonIdsForTargetRow({
 
 module.exports = {
   NO_ATTENDANCE_STATUS_NOTE,
+  OFF_ROSTER_PERSISTED_NOTE,
   normalizeDateOnly,
   resolveAssignmentDurationFromTargetRows,
   resolveScopedSessions,
   isSelectableStudentRow,
   filterSelectableStudents,
   selectablePersonIds,
+  collectPersistedTargetStudentIds,
   resolveEligibleStudentsForAssignment,
+  appendOffRosterPersistedStudents,
   resolveSelectablePersonIdsForTargetRow
 };

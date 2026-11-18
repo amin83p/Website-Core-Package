@@ -1,0 +1,361 @@
+<%
+  const record = provider || {};
+  const isEdit = Boolean(record.id);
+  const models = Array.isArray(record.models) ? record.models : [];
+  const bannedIds = Array.isArray(record.bannedUserIds) ? record.bannedUserIds : [];
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <h1 class="page-heading size-md m-0">
+        <i class="bi bi-key-fill me-2"></i><%= isEdit ? 'Edit School AI Provider' : 'Create School AI Provider' %>
+      </h1>
+      <% if (isEdit) { %>
+        <span class="badge bg-primary border font-monospace">ID: <%= record.id %></span>
+      <% } else { %>
+        <span class="badge bg-success border">New provider key</span>
+      <% } %>
+    </div>
+    <a href="/school/ai-assist/providers" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i> Back to List
+    </a>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="schoolAiProviderForm" method="POST" action="<%= isEdit ? '/school/ai-assist/providers/edit/' + record.id : '/school/ai-assist/providers/new' %>">
+      <input type="hidden" name="actionStateId" value="<%= asid %>">
+      <input type="hidden" name="modelsJson" id="modelsJson" value="">
+
+      <ul class="nav nav-tabs mb-4" id="schoolAiProviderTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+          <button class="nav-link active" type="button" data-bs-toggle="tab" data-bs-target="#tab-ai-config" role="tab" aria-controls="tab-ai-config" aria-selected="true">
+            <i class="bi bi-gear me-1"></i> Configuration
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" type="button" data-bs-toggle="tab" data-bs-target="#tab-ai-models" role="tab" aria-controls="tab-ai-models" aria-selected="false">
+            <i class="bi bi-cpu me-1"></i> Models
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link" type="button" data-bs-toggle="tab" data-bs-target="#tab-ai-access" role="tab" aria-controls="tab-ai-access" aria-selected="false">
+            <i class="bi bi-shield-lock me-1"></i> Access control
+          </button>
+        </li>
+      </ul>
+
+      <div class="tab-content">
+        <div class="tab-pane fade show active" id="tab-ai-config" role="tabpanel">
+          <p class="small text-muted mb-3">Org-wide vendor credentials. Keys are encrypted at rest; only a short hint is shown after save.</p>
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-4">
+              <h6 class="fw-bold text-primary mb-3"><i class="bi bi-key me-2"></i>Provider key</h6>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label fw-bold" for="providerName">Display name <span class="text-danger">*</span></label>
+                  <input id="providerName" type="text" class="form-control size-md" name="name" required value="<%= record.name || '' %>" placeholder="e.g. Production OpenAI key">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label fw-bold" for="providerVendor">Vendor <span class="text-danger">*</span></label>
+                  <select id="providerVendor" class="form-select size-md" name="providerId" required>
+                    <% (providerOptions || []).forEach((row) => { %>
+                      <option value="<%= row.id %>" <%= String(record.providerId || '') === String(row.id) ? 'selected' : '' %>><%= row.label %></option>
+                    <% }) %>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <label class="form-label fw-bold" for="providerApiKey">API key <%= isEdit ? '' : '<span class="text-danger">*</span>' %></label>
+                  <input id="providerApiKey" type="password" class="form-control size-md" name="apiKey" autocomplete="new-password" placeholder="<%= isEdit ? 'Leave blank to keep the current key' : 'Paste vendor API key' %>" <%= isEdit ? '' : 'required' %>>
+                  <% if (isEdit && record.apiKeyMasked) { %>
+                    <div class="form-text">Current key hint: <strong><%= record.apiKeyMasked %></strong></div>
+                  <% } %>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-4">
+              <h6 class="fw-bold text-primary mb-3"><i class="bi bi-sliders me-2"></i>Advanced (optional)</h6>
+              <div class="row g-3">
+                <div class="col-md-4">
+                  <label class="form-label fw-bold" for="providerProject">Project</label>
+                  <input id="providerProject" type="text" class="form-control size-md" name="project" value="<%= record.project || '' %>" placeholder="GCP project id">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label fw-bold" for="providerLocation">Location</label>
+                  <input id="providerLocation" type="text" class="form-control size-md" name="location" value="<%= record.location || '' %>" placeholder="us-central1">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label fw-bold" for="providerBaseUrl">Base URL</label>
+                  <input id="providerBaseUrl" type="text" class="form-control size-md" name="baseUrl" value="<%= record.baseUrl || '' %>" placeholder="Custom endpoint (optional)">
+                </div>
+                <div class="col-12">
+                  <label class="form-label fw-bold" for="providerNotes">Notes</label>
+                  <textarea id="providerNotes" class="form-control size-md" name="notes" rows="3" placeholder="Internal notes for administrators"><%= record.notes || '' %></textarea>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-4">
+              <h6 class="fw-bold text-primary mb-3"><i class="bi bi-toggle-on me-2"></i>Status</h6>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <div class="border rounded p-3 bg-light-subtle h-100">
+                    <div class="d-flex justify-content-between align-items-start gap-3">
+                      <div>
+                        <label class="fw-semibold mb-1" for="providerActive">Active</label>
+                        <div class="small text-muted">Inactive keys cannot be selected for new AI calls.</div>
+                      </div>
+                      <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="providerActive" name="isActive" value="true" <%= record.isActive !== false ? 'checked' : '' %>>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <div class="border rounded p-3 bg-light-subtle h-100">
+                    <div class="d-flex justify-content-between align-items-start gap-3">
+                      <div>
+                        <label class="fw-semibold mb-1" for="providerDefault">Organization default</label>
+                        <div class="small text-muted">Used when a service has no assignment yet.</div>
+                      </div>
+                      <div class="form-check form-switch">
+                        <input class="form-check-input" type="checkbox" role="switch" id="providerDefault" name="isDefault" value="true" <%= record.isDefault ? 'checked' : '' %>>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-ai-models" role="tabpanel">
+          <p class="small text-muted mb-3">Define one or more model entries for this key. Service assignments pick a single model from this list.</p>
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+              <h6 class="fw-bold m-0 text-primary"><i class="bi bi-list-stars me-2"></i>Model catalog</h6>
+              <button type="button" class="btn btn-outline-primary btn-sm" id="addModelRow">
+                <i class="bi bi-plus-lg me-1"></i> Add model
+              </button>
+            </div>
+            <div class="card-body p-4" id="modelsEditor"></div>
+            <div id="modelsEmptyState" class="text-center text-muted small py-4 d-none">No models yet. Add at least one model id.</div>
+          </div>
+        </div>
+
+        <div class="tab-pane fade" id="tab-ai-access" role="tabpanel">
+          <p class="small text-muted mb-3">Banned users cannot use this provider key or any school AI service routed through it.</p>
+          <div class="card border-0 shadow-sm mb-3">
+            <div class="card-body p-4">
+              <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                <h6 class="fw-bold text-primary m-0"><i class="bi bi-person-x me-2"></i>Banned users</h6>
+                <button type="button" class="btn btn-outline-primary btn-sm" id="btnOpenBannedUserPicker">
+                  <i class="bi bi-people me-1"></i> Select users
+                </button>
+              </div>
+              <ul class="list-group list-group-flush border rounded" id="bannedUserList">
+                <% bannedIds.forEach((uid) => { %>
+                  <li class="list-group-item d-flex align-items-center justify-content-between gap-2 school-ai-ban-row" data-user-id="<%= uid %>">
+                    <div>
+                      <div class="fw-semibold font-monospace"><%= uid %></div>
+                      <div class="x-small text-muted">Banned from this provider key</div>
+                    </div>
+                    <button type="button" class="btn btn-outline-danger btn-sm py-0 px-2 school-ai-ban-remove" title="Remove" aria-label="Remove banned user">
+                      <i class="bi bi-x-lg"></i>
+                    </button>
+                    <input type="hidden" name="bannedUserIds[]" value="<%= uid %>">
+                  </li>
+                <% }) %>
+              </ul>
+              <p id="bannedUserEmpty" class="small text-muted mb-0 mt-3 <%= bannedIds.length ? 'd-none' : '' %>">No banned users. Use <strong>Select users</strong> to block specific accounts.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md">
+          <i class="bi bi-save me-1"></i><%= isEdit ? 'Save Changes' : 'Create Provider' %>
+        </button>
+        <a href="/school/ai-assist/providers" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('partials/modal') %>
+<%- include('partials/modal_GenericPicker', { user }) %>
+
+<script type="application/json" id="initialModels"><%- JSON.stringify(models).replace(/</g, '\\u003c') %></script>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const form = document.getElementById('schoolAiProviderForm');
+  const editor = document.getElementById('modelsEditor');
+  const hiddenModels = document.getElementById('modelsJson');
+  const modelsEmpty = document.getElementById('modelsEmptyState');
+  const isActiveInput = document.getElementById('providerActive');
+  const isDefaultInput = document.getElementById('providerDefault');
+  const bannedList = document.getElementById('bannedUserList');
+  const bannedEmpty = document.getElementById('bannedUserEmpty');
+  const btnBannedPicker = document.getElementById('btnOpenBannedUserPicker');
+
+  const initial = JSON.parse(document.getElementById('initialModels').textContent || '[]');
+  let rows = Array.isArray(initial) ? initial.slice() : [];
+
+  function escapeHtml(value) {
+    return String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function syncDefaultAvailability() {
+    if (!isDefaultInput || !isActiveInput) return;
+    if (!isActiveInput.checked) {
+      isDefaultInput.checked = false;
+      isDefaultInput.disabled = true;
+    } else {
+      isDefaultInput.disabled = false;
+    }
+  }
+
+  isActiveInput?.addEventListener('change', syncDefaultAvailability);
+  syncDefaultAvailability();
+
+  function syncModelsHidden() {
+    if (!editor || !hiddenModels) return;
+    const out = [];
+    editor.querySelectorAll('.model-id').forEach((input) => {
+      const index = Number(input.getAttribute('data-index'));
+      const modelId = String(input.value || '').trim();
+      if (!modelId) return;
+      const labelInput = editor.querySelector('.model-label[data-index="' + index + '"]');
+      const activeInput = editor.querySelector('.model-active[data-index="' + index + '"]');
+      const prior = rows[index] || {};
+      out.push({
+        id: prior.id || ('mdl_' + (out.length + 1)),
+        modelId,
+        label: labelInput ? String(labelInput.value || '').trim() || modelId : modelId,
+        isActive: activeInput ? activeInput.checked : true,
+        notes: prior.notes || ''
+      });
+    });
+    hiddenModels.value = JSON.stringify(out);
+    if (modelsEmpty) modelsEmpty.classList.toggle('d-none', out.length > 0);
+  }
+
+  function renderModels() {
+    if (!editor) return;
+    editor.innerHTML = '';
+    rows.forEach((row, index) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'border rounded p-3 mb-3 bg-light-subtle';
+      wrap.innerHTML = ''
+        + '<div class="row g-2 align-items-end">'
+        + '  <div class="col-md-5"><label class="form-label fw-bold small">Model ID <span class="text-danger">*</span></label>'
+        + '    <input class="form-control size-md model-id" data-index="' + index + '" value="' + escapeHtml(row.modelId || '') + '" placeholder="gpt-4.1-mini">'
+        + '  </div>'
+        + '  <div class="col-md-5"><label class="form-label fw-bold small">Label</label>'
+        + '    <input class="form-control size-md model-label" data-index="' + index + '" value="' + escapeHtml(row.label || '') + '" placeholder="Friendly label">'
+        + '  </div>'
+        + '  <div class="col-md-2 text-md-end">'
+        + '    <div class="form-check form-switch d-inline-block me-2">'
+        + '      <input class="form-check-input model-active" type="checkbox" role="switch" data-index="' + index + '" ' + (row.isActive !== false ? 'checked' : '') + '>'
+        + '      <label class="form-check-label small">Active</label>'
+        + '    </div>'
+        + '    <button type="button" class="btn btn-link btn-sm text-danger remove-model" data-index="' + index + '">Remove</button>'
+        + '  </div>'
+        + '</div>';
+      editor.appendChild(wrap);
+    });
+    syncModelsHidden();
+  }
+
+  editor?.addEventListener('input', syncModelsHidden);
+  editor?.addEventListener('change', syncModelsHidden);
+  editor?.addEventListener('click', (event) => {
+    const btn = event.target.closest('.remove-model');
+    if (!btn) return;
+    const index = Number(btn.getAttribute('data-index'));
+    rows.splice(index, 1);
+    renderModels();
+  });
+
+  document.getElementById('addModelRow')?.addEventListener('click', () => {
+    rows.push({ modelId: '', label: '', isActive: true });
+    renderModels();
+  });
+
+  renderModels();
+
+  function syncBannedEmptyState() {
+    if (!bannedList || !bannedEmpty) return;
+    const hasRows = bannedList.querySelectorAll('.school-ai-ban-row').length > 0;
+    bannedEmpty.classList.toggle('d-none', hasRows);
+  }
+
+  function hasBannedUser(userId) {
+    if (!bannedList || !userId) return false;
+    return Boolean(bannedList.querySelector('.school-ai-ban-row[data-user-id="' + CSS.escape(userId) + '"]'));
+  }
+
+  function addBannedUser(item) {
+    if (!bannedList) return;
+    const userId = String(item?.userId || item?.id || '').trim();
+    if (!userId || hasBannedUser(userId)) return;
+    const displayName = String(item?.displayName || item?.name || item?.username || item?.email || userId).trim();
+    const li = document.createElement('li');
+    li.className = 'list-group-item d-flex align-items-center justify-content-between gap-2 school-ai-ban-row';
+    li.dataset.userId = userId;
+    li.innerHTML = ''
+      + '<div><div class="fw-semibold">' + escapeHtml(displayName) + '</div>'
+      + '<div class="x-small text-muted font-monospace">' + escapeHtml(userId) + '</div></div>'
+      + '<button type="button" class="btn btn-outline-danger btn-sm py-0 px-2 school-ai-ban-remove" title="Remove" aria-label="Remove banned user"><i class="bi bi-x-lg"></i></button>'
+      + '<input type="hidden" name="bannedUserIds[]" value="' + escapeHtml(userId) + '">';
+    bannedList.appendChild(li);
+    syncBannedEmptyState();
+  }
+
+  bannedList?.addEventListener('click', (event) => {
+    const btn = event.target.closest('.school-ai-ban-remove');
+    if (!btn) return;
+    btn.closest('.school-ai-ban-row')?.remove();
+    syncBannedEmptyState();
+  });
+
+  btnBannedPicker?.addEventListener('click', () => {
+    if (!window.GenericPicker || !window.GenericPickerPresets) {
+      if (typeof showMessageModal === 'function') {
+        showMessageModal({ title: 'User picker', icon: 'warning', message: 'The user picker is not available on this page.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
+      } else {
+        alert('User picker is not available on this page.');
+      }
+      return;
+    }
+    window.GenericPicker.open(window.GenericPickerPresets.user({
+      title: 'Ban users from this provider key',
+      icon: 'bi-person-x',
+      apiEndpoint: '/school/identity/api/taggable-users',
+      placeholder: 'Search users...',
+      multiselect: true,
+      onSelect: (items) => {
+        const selected = Array.isArray(items) ? items : [items];
+        selected.forEach((item) => addBannedUser(item));
+      }
+    }));
+  });
+
+  syncBannedEmptyState();
+
+  form?.addEventListener('submit', () => {
+    syncModelsHidden();
+  });
+});
+</script>

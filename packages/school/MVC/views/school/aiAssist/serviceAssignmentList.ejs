@@ -1,0 +1,171 @@
+<%
+  const pageMatrix = (typeof matrix !== 'undefined' && matrix) ? matrix : {};
+  const services = pageMatrix.assignments || [];
+  const providers = pageMatrix.providers || [];
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const headerBtns = (typeof headerManageBtns !== 'undefined' && Array.isArray(headerManageBtns)) ? headerManageBtns : [];
+  const toolbarBtns = (typeof manageBtns !== 'undefined' && Array.isArray(manageBtns)) ? manageBtns : [];
+
+  const providersForClient = providers.map((prov) => ({
+    id: prov.id,
+    name: prov.name,
+    providerId: prov.providerId,
+    models: (Array.isArray(prov.models) ? prov.models : []).map((m) => ({
+      id: m.id,
+      modelId: m.modelId,
+      label: m.label || m.modelId
+    }))
+  }));
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <h1 class="page-heading size-md m-0">
+        <i class="bi bi-sliders me-2"></i><%= title || 'School AI Service Assignments' %>
+      </h1>
+      <span class="badge bg-light text-dark border"><%= services.length %> service<%= services.length === 1 ? '' : 's' %></span>
+    </div>
+    <% if (headerBtns.length) { %>
+      <div class="d-flex align-items-center flex-wrap gap-2">
+        <% headerBtns.forEach((btn) => { %><%- String(btn || '').replace(/\bmb-2\b/g, '') %><% }) %>
+      </div>
+    <% } %>
+  </div>
+
+  <% if (toolbarBtns.length) { %>
+    <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end mb-4">
+      <% toolbarBtns.forEach((btn) => { %><%- btn %><% }) %>
+    </div>
+  <% } %>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <div class="alert alert-light border d-flex gap-3 align-items-start mb-4">
+      <i class="bi bi-info-circle-fill text-primary fs-5"></i>
+      <div>
+        <div class="fw-semibold">Route each registered school AI service to one provider key and model.</div>
+        <div class="small text-muted">Assignments apply to the active organization. Unconfigured services stay on planned routing until you save a provider and model pair.</div>
+      </div>
+    </div>
+
+    <% if (!providers.length) { %>
+      <div class="alert alert-warning border d-flex gap-3 align-items-start">
+        <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+        <div>
+          <div class="fw-semibold">No active provider keys</div>
+          <div class="small text-muted">Add at least one active provider key before assigning services.</div>
+          <a href="/school/ai-assist/providers/new" class="btn btn-sm btn-filled btn-primary mt-2">
+            <i class="bi bi-key-fill me-1"></i> Add Provider Key
+          </a>
+        </div>
+      </div>
+    <% } %>
+
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-body p-4">
+        <h6 class="fw-bold text-primary mb-3"><i class="bi bi-diagram-3 me-2"></i>Service routing</h6>
+
+        <% if (!services.length) { %>
+          <p class="text-muted mb-0">No registered AI services are available for this organization.</p>
+        <% } %>
+
+        <% services.forEach((row, index) => { %>
+          <% const assignment = row.assignment || {}; %>
+          <% const selectedProvider = providers.find((p) => String(p.id) === String(assignment.providerRecordId || '')); %>
+          <% const models = selectedProvider && Array.isArray(selectedProvider.models) ? selectedProvider.models : []; %>
+          <% const statusText = String(row.status || 'planned').toLowerCase(); %>
+          <% const statusBadge = statusText === 'active'
+            ? 'bg-success'
+            : (statusText === 'planned' ? 'bg-secondary' : 'bg-light text-dark border'); %>
+          <div class="border rounded-3 p-3 mb-3<%= index === services.length - 1 ? ' mb-0' : '' %>" data-service-block="<%= row.serviceKey %>">
+            <div class="d-flex align-items-start justify-content-between flex-wrap gap-2 mb-3">
+              <div>
+                <div class="fw-bold text-dark"><%= row.label %></div>
+                <code class="small text-muted"><%= row.serviceKey %></code>
+              </div>
+              <span class="badge <%= statusBadge %>"><%= row.status || 'planned' %></span>
+            </div>
+
+            <form
+              method="POST"
+              action="/school/ai-assist/service-assignments/<%= encodeURIComponent(row.serviceKey) %>"
+              class="row g-3 align-items-end school-ai-assignment-form"
+              data-service-key="<%= row.serviceKey %>">
+              <input type="hidden" name="actionStateId" value="<%= asid %>">
+              <div class="col-md-5">
+                <label class="form-label fw-bold" for="provider-<%= index %>">Provider key <span class="text-danger">*</span></label>
+                <select id="provider-<%= index %>" class="form-select size-md js-assignment-provider" name="providerRecordId" required <%= providers.length ? '' : 'disabled' %>>
+                  <option value="">Select provider</option>
+                  <% providers.forEach((prov) => { %>
+                    <option value="<%= prov.id %>" <%= String(assignment.providerRecordId || '') === String(prov.id) ? 'selected' : '' %>>
+                      <%= prov.name %> (<%= prov.providerId %>)
+                    </option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="col-md-5">
+                <label class="form-label fw-bold" for="model-<%= index %>">Model <span class="text-danger">*</span></label>
+                <select id="model-<%= index %>" class="form-select size-md js-assignment-model" name="modelEntryId" required <%= providers.length ? '' : 'disabled' %>>
+                  <option value="">Select model</option>
+                  <% models.forEach((m) => { %>
+                    <option value="<%= m.id %>" <%= String(assignment.modelEntryId || '') === String(m.id) ? 'selected' : '' %>>
+                      <%= m.label || m.modelId %>
+                    </option>
+                  <% }) %>
+                </select>
+              </div>
+              <div class="col-md-2">
+                <button type="submit" class="btn btn-filled btn-success w-100" <%= providers.length ? '' : 'disabled' %>>
+                  <i class="bi bi-check2-circle me-1"></i> Save
+                </button>
+              </div>
+            </form>
+          </div>
+        <% }) %>
+      </div>
+    </div>
+
+    <div class="d-flex justify-content-end">
+      <a href="/school/ai-assist/providers" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i> Back to Provider Keys
+      </a>
+    </div>
+  </div>
+</div>
+
+<script type="application/json" id="schoolAiAssignmentProvidersJson"><%- JSON.stringify(providersForClient).replace(/</g, '\\u003c') %></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  let providers = [];
+  try {
+    providers = JSON.parse(document.getElementById('schoolAiAssignmentProvidersJson')?.textContent || '[]');
+  } catch (_) {
+    providers = [];
+  }
+  const byId = new Map(providers.map((row) => [String(row.id), row]));
+
+  function refillModels(selectEl, providerId, selectedModelId) {
+    if (!selectEl) return;
+    const prov = byId.get(String(providerId || ''));
+    const models = prov && Array.isArray(prov.models) ? prov.models : [];
+    selectEl.innerHTML = '<option value="">Select model</option>';
+    models.forEach((model) => {
+      const opt = document.createElement('option');
+      opt.value = model.id;
+      opt.textContent = model.label || model.modelId;
+      if (selectedModelId && String(selectedModelId) === String(model.id)) {
+        opt.selected = true;
+      }
+      selectEl.appendChild(opt);
+    });
+  }
+
+  document.querySelectorAll('.school-ai-assignment-form').forEach((form) => {
+    const providerSelect = form.querySelector('.js-assignment-provider');
+    const modelSelect = form.querySelector('.js-assignment-model');
+    providerSelect?.addEventListener('change', function () {
+      refillModels(modelSelect, providerSelect.value, '');
+    });
+  });
+});
+</script>

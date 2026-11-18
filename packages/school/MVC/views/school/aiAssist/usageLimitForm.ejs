@@ -1,0 +1,184 @@
+<%
+  const record = limit || {};
+  const isEdit = Boolean(record.id);
+  const services = Array.isArray(serviceOptions) ? serviceOptions : [];
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const appliesTo = String(record.appliesTo || 'all_services');
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <h1 class="page-heading size-md m-0">
+        <i class="bi bi-shield-check me-2"></i><%= isEdit ? 'Edit Usage Limit' : 'Create Usage Limit' %>
+      </h1>
+      <% if (isEdit) { %>
+        <span class="badge bg-primary border font-monospace">ID: <%= record.id %></span>
+      <% } else { %>
+        <span class="badge bg-success border">New limit</span>
+      <% } %>
+    </div>
+    <a href="/school/ai-assist/token-usage/limits" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i> Back to List
+    </a>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1200px;">
+    <form id="usageLimitForm" method="POST" action="<%= isEdit ? '/school/ai-assist/token-usage/limits/edit/' + record.id : '/school/ai-assist/token-usage/limits/new' %>">
+      <input type="hidden" name="actionStateId" value="<%= asid %>">
+      <input type="hidden" name="userId" id="limitUserId" value="<%= record.userId || '' %>">
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+          <h6 class="fw-bold text-primary mb-3"><i class="bi bi-person-badge me-2"></i>User & scope</h6>
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-bold">User <span class="text-danger">*</span></label>
+              <div class="d-flex flex-wrap gap-2">
+                <input type="text" class="form-control size-md flex-grow-1" id="limitUserDisplay" readonly
+                  placeholder="No user selected"
+                  value="<%= record.userId ? (record.userDisplayName || record.userId) : '' %>">
+                <button type="button" class="btn btn-outline-primary" id="btnOpenLimitUserPicker">
+                  <i class="bi bi-people me-1"></i> Select user
+                </button>
+              </div>
+              <div class="form-text">Use the picker to choose the account this cap applies to.</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-bold" for="limitPeriodType">Period <span class="text-danger">*</span></label>
+              <select id="limitPeriodType" class="form-select size-md" name="periodType" required>
+                <% (periodTypes || []).forEach((p) => { %>
+                  <option value="<%= p %>" <%= String(record.periodType || 'monthly') === String(p) ? 'selected' : '' %>><%= p %></option>
+                <% }) %>
+              </select>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label fw-bold" for="limitAppliesTo">Applies to <span class="text-danger">*</span></label>
+              <select id="limitAppliesTo" class="form-select size-md" name="appliesTo" required>
+                <option value="all_services" <%= appliesTo === 'all_services' ? 'selected' : '' %>>All services</option>
+                <% services.forEach((svc) => { %>
+                  <option value="<%= svc.serviceKey %>" <%= appliesTo === String(svc.serviceKey) ? 'selected' : '' %>><%= svc.label %></option>
+                <% }) %>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+          <h6 class="fw-bold text-primary mb-3"><i class="bi bi-speedometer2 me-2"></i>Caps</h6>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-bold" for="limitMaxTokens">Max tokens</label>
+              <input id="limitMaxTokens" class="form-control size-md" name="maxTotalTokens" type="number" min="0"
+                value="<%= record.maxTotalTokens != null ? record.maxTotalTokens : 0 %>" placeholder="0 = unlimited">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label fw-bold" for="limitMaxRequests">Max requests</label>
+              <input id="limitMaxRequests" class="form-control size-md" name="maxRequestCount" type="number" min="0"
+                value="<%= record.maxRequestCount != null ? record.maxRequestCount : 0 %>" placeholder="0 = unlimited">
+            </div>
+            <div class="col-md-4 d-flex align-items-end">
+              <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" role="switch" id="limitActive" name="isActive" value="true"
+                  <%= record.isActive === false ? '' : 'checked' %>>
+                <label class="form-check-label fw-semibold" for="limitActive">Active</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-bold" for="limitNotes">Notes</label>
+              <textarea id="limitNotes" class="form-control size-md" name="notes" rows="2" maxlength="4000"
+                placeholder="Optional note for admins"><%= record.notes || '' %></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top">
+        <button type="submit" class="btn btn-filled btn-primary btn-md">
+          <i class="bi bi-save me-1"></i><%= isEdit ? 'Save Changes' : 'Create Limit' %>
+        </button>
+        <a href="/school/ai-assist/token-usage/limits" class="btn btn-filled btn-secondary btn-md">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('partials/modal') %>
+<%- include('partials/modal_GenericPicker', { user }) %>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const form = document.getElementById('usageLimitForm');
+  const limitUserId = document.getElementById('limitUserId');
+  const limitUserDisplay = document.getElementById('limitUserDisplay');
+  const btnOpenLimitUserPicker = document.getElementById('btnOpenLimitUserPicker');
+
+  function setLimitUser(item) {
+    const row = item && typeof item === 'object' ? item : null;
+    const id = String(row?.id || row?.userId || '').trim();
+    if (!id) return;
+    limitUserId.value = id;
+    const label = [row?.fullName, row?.displayName, row?.email, row?.username]
+      .map((v) => String(v || '').trim())
+      .find(Boolean) || id;
+    limitUserDisplay.value = label + ' (' + id + ')';
+  }
+
+  if (limitUserId?.value && limitUserDisplay && !limitUserDisplay.value.trim()) {
+    limitUserDisplay.value = limitUserId.value;
+  }
+
+  btnOpenLimitUserPicker?.addEventListener('click', function () {
+    if (!window.GenericPicker) {
+      if (typeof showMessageModal === 'function') {
+        showMessageModal({
+          title: 'User picker',
+          icon: 'warning',
+          message: 'The user picker is not available on this page.',
+          buttons: [{ text: 'OK', class: 'btn-primary' }]
+        });
+      } else {
+        alert('The user picker is not available on this page.');
+      }
+      return;
+    }
+    const factory = window.GenericPickerPresets && typeof window.GenericPickerPresets.user === 'function'
+      ? window.GenericPickerPresets.user
+      : null;
+    const config = factory
+      ? factory({
+          title: 'Select user for usage limit',
+          icon: 'bi-person-badge',
+          apiEndpoint: '/school/identity/api/taggable-users',
+          placeholder: 'Search users...',
+          multiselect: false,
+          onSelect: (item) => setLimitUser(item)
+        })
+      : {
+          title: 'Select user for usage limit',
+          apiEndpoint: '/school/identity/api/taggable-users',
+          multiselect: false,
+          onSelect: (item) => setLimitUser(item)
+        };
+    window.GenericPicker.open(config);
+  });
+
+  form?.addEventListener('submit', function (event) {
+    if (!String(limitUserId?.value || '').trim()) {
+      event.preventDefault();
+      if (typeof showMessageModal === 'function') {
+        showMessageModal({
+          title: 'User required',
+          icon: 'warning',
+          message: 'Choose a user with Select user before saving.',
+          buttons: [{ text: 'OK', class: 'btn-primary' }]
+        });
+      } else {
+        alert('Choose a user before saving.');
+      }
+    }
+  });
+});
+</script>

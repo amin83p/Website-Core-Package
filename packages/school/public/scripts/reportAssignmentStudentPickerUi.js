@@ -36,7 +36,8 @@
     const name = String(student?.name || id).trim();
     const count = Number(student?.eligibleSessionCount || 0);
     const selectable = isSelectableStudent(student);
-    const isChecked = selectable && checked;
+    const offRosterPersisted = student?.offRosterPersisted === true;
+    const isChecked = checked && (selectable || offRosterPersisted);
     const note = ineligibleNoteForStudent(student);
     const noteHtml = note
       ? `<div class="small text-muted">${escapeHtml(note)}</div>`
@@ -45,7 +46,7 @@
     const extraAttrs = String(checkboxExtraAttrs || '').trim();
     const extraAttrText = extraAttrs ? ` ${extraAttrs}` : '';
     return `<tr${rowClass}>
-      <td><input type="checkbox" class="form-check-input ${escapeHtml(checkboxClass)}" data-student-id="${escapeHtml(id)}"${extraAttrText}${isChecked ? ' checked' : ''}${selectable ? '' : ' disabled'}></td>
+      <td><input type="checkbox" class="form-check-input ${escapeHtml(checkboxClass)}" data-student-id="${escapeHtml(id)}"${extraAttrText}${isChecked ? ' checked' : ''}${selectable || offRosterPersisted ? '' : ' disabled'}></td>
       <td><div>${escapeHtml(name)}</div>${noteHtml}</td>
       <td class="text-end">${count}</td>
     </tr>`;
@@ -73,6 +74,12 @@
       nextIds = [];
     } else {
       nextIds = eligible.filter((id) => previousSelection.has(id));
+      rows.forEach((row) => {
+        if (row?.offRosterPersisted !== true) return;
+        const id = String(row?.id || row?.personId || '').trim();
+        if (!id || !previousSelection.has(id)) return;
+        if (!nextIds.includes(id)) nextIds.push(id);
+      });
     }
     return {
       selectedIds: nextIds,

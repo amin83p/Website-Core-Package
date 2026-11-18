@@ -4361,6 +4361,114 @@
     }
   },
   {
+    "id": "446200",
+    "name": "SCHOOL_AI_ASSIST",
+    "category": "SCHOOL",
+    "description": "Navigator for School AI provider keys, service routing, token usage, and per-user quotas.",
+    "homeURL": "/dashboard/section-nav/SCHOOL_AI_ASSIST",
+    "message": "",
+    "inactiveMessage": "",
+    "active": true,
+    "dashboardDisplay": true,
+    "trackState": false,
+    "minimumAccessRequirement": 1,
+    "navigatorSection": true,
+    "mainDashboardDisplay": false,
+    "subsections": [
+      { "id": "446210" },
+      { "id": "446211" },
+      { "id": "446212" },
+      { "id": "446213" }
+    ],
+    "related": [],
+    "operations": [],
+    "packageId": "school",
+    "packageName": "SCHOOL"
+  },
+  {
+    "id": "446210",
+    "name": "SCHOOL_AI_PROVIDER_KEYS",
+    "category": "SCHOOL",
+    "description": "Org-wide AI vendor API keys with models and banned users.",
+    "homeURL": "/school/ai-assist/providers",
+    "active": true,
+    "dashboardDisplay": true,
+    "trackState": true,
+    "minimumAccessRequirement": 1,
+    "navigatorSection": false,
+    "subsections": [],
+    "operations": [
+      { "id": "OP1001", "sessionAttempts": 10, "sessionTime": 30, "active": true },
+      { "id": "OP1002", "sessionAttempts": 10, "sessionTime": 30, "active": true },
+      { "id": "OP1003", "sessionAttempts": 10, "sessionTime": 30, "active": true },
+      { "id": "OP1004", "sessionAttempts": 10, "sessionTime": 30, "active": true },
+      { "id": "OP1005", "sessionAttempts": 10, "sessionTime": 30, "active": true }
+    ],
+    "packageId": "school",
+    "packageName": "SCHOOL"
+  },
+  {
+    "id": "446211",
+    "name": "SCHOOL_AI_SERVICE_ASSIGNMENTS",
+    "category": "SCHOOL",
+    "description": "Map registered school AI services to provider keys and models.",
+    "homeURL": "/school/ai-assist/service-assignments",
+    "active": true,
+    "dashboardDisplay": true,
+    "trackState": true,
+    "minimumAccessRequirement": 1,
+    "navigatorSection": false,
+    "subsections": [],
+    "operations": [
+      { "id": "OP1001", "sessionAttempts": 10, "sessionTime": 30, "active": true },
+      { "id": "OP1003", "sessionAttempts": 10, "sessionTime": 30, "active": true }
+    ],
+    "packageId": "school",
+    "packageName": "SCHOOL"
+  },
+  {
+    "id": "446212",
+    "name": "SCHOOL_AI_TOKEN_USAGE",
+    "category": "SCHOOL",
+    "description": "Audit log of school AI token consumption (Consumed Tokens).",
+    "homeURL": "/school/ai-assist/token-usage",
+    "active": true,
+    "dashboardDisplay": true,
+    "trackState": true,
+    "minimumAccessRequirement": 1,
+    "navigatorSection": false,
+    "subsections": [],
+    "operations": [
+      { "id": "OP1001", "sessionAttempts": 10, "sessionTime": 30, "active": true },
+      { "id": "OP1003", "sessionAttempts": 10, "sessionTime": 30, "active": true },
+      { "id": "OP1004", "sessionAttempts": 10, "sessionTime": 30, "active": true },
+      { "id": "OP1005", "sessionAttempts": 10, "sessionTime": 30, "active": true }
+    ],
+    "packageId": "school",
+    "packageName": "SCHOOL"
+  },
+  {
+    "id": "446213",
+    "name": "SCHOOL_AI_USAGE_LIMITS",
+    "category": "SCHOOL",
+    "description": "Per-user token and request caps for school AI services.",
+    "homeURL": "/school/ai-assist/token-usage/limits",
+    "active": true,
+    "dashboardDisplay": true,
+    "trackState": true,
+    "minimumAccessRequirement": 1,
+    "navigatorSection": false,
+    "subsections": [],
+    "operations": [
+      { "id": "OP1001", "sessionAttempts": 10, "sessionTime": 30, "active": true },
+      { "id": "OP1003", "sessionAttempts": 10, "sessionTime": 30, "active": true },
+      { "id": "OP1004", "sessionAttempts": 10, "sessionTime": 30, "active": true },
+      { "id": "OP1005", "sessionAttempts": 10, "sessionTime": 30, "active": true }
+    ],
+    "packageId": "school",
+    "packageName": "SCHOOL"
+  },
+  {
     "id": "446201",
     "name": "IELTS_SCORING_PIPELINE_CLASSIC",
     "category": "IELTS",

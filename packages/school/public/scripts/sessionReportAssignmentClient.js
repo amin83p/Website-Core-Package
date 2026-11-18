@@ -509,6 +509,7 @@
         name: String(student?.name || '').trim(),
         eligibleSessionCount: Number(student?.eligibleSessionCount || 0),
         selectable: student?.selectable !== false && Number(student?.eligibleSessionCount || 0) > 0,
+        offRosterPersisted: student?.offRosterPersisted === true,
         ineligibleNote: String(student?.ineligibleNote || '').trim()
       })).filter((student) => Boolean(student.id));
       const pickerUi = getStudentPickerUi();

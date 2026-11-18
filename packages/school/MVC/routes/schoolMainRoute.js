@@ -90,6 +90,7 @@ router.use('/exams', require('./examRoutes'));
 router.use('/leave-requests', require('./leaveRequestRoutes'));
 router.use('/tasks', require('./taskRoutes'));
 router.use('/notification-center', require('./notificationCenterRoutes'));
+router.use('/ai-assist', require('./schoolAiAssistRoutes'));
 router.use('/withdrawal', require('./withdrawalRoutes'));
 router.use('/', require('./deletionGuardRoutes'));
 router.use('/', require('./schoolRoutes'));

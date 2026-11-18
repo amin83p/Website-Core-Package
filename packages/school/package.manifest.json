@@ -1470,6 +1470,125 @@
       "adoptExisting": true
     },
     {
+      "id": "446200",
+      "name": "SCHOOL_AI_ASSIST",
+      "category": "SCHOOL",
+      "description": "Navigator for School AI provider keys, service routing, token usage, and per-user quotas.",
+      "active": true,
+      "trackState": false,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": true,
+      "homeURL": "/dashboard/section-nav/SCHOOL_AI_ASSIST",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [],
+      "subsections": [
+        { "id": "446210" },
+        { "id": "446211" },
+        { "id": "446212" },
+        { "id": "446213" }
+      ],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "446210",
+      "name": "SCHOOL_AI_PROVIDER_KEYS",
+      "category": "SCHOOL",
+      "description": "Org-wide AI vendor API keys with models and banned users.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/ai-assist/providers",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        { "id": "OP1001", "sessionAttempts": 10, "sessionTime": 30, "active": true },
+        { "id": "OP1002", "sessionAttempts": 10, "sessionTime": 30, "active": true },
+        { "id": "OP1003", "sessionAttempts": 10, "sessionTime": 30, "active": true },
+        { "id": "OP1004", "sessionAttempts": 10, "sessionTime": 30, "active": true },
+        { "id": "OP1005", "sessionAttempts": 10, "sessionTime": 30, "active": true }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "446211",
+      "name": "SCHOOL_AI_SERVICE_ASSIGNMENTS",
+      "category": "SCHOOL",
+      "description": "Map registered school AI services to provider keys and models.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/ai-assist/service-assignments",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        { "id": "OP1001", "sessionAttempts": 10, "sessionTime": 30, "active": true },
+        { "id": "OP1003", "sessionAttempts": 10, "sessionTime": 30, "active": true }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "446212",
+      "name": "SCHOOL_AI_TOKEN_USAGE",
+      "category": "SCHOOL",
+      "description": "Audit log of school AI token consumption (Consumed Tokens).",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/ai-assist/token-usage",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        { "id": "OP1001", "sessionAttempts": 10, "sessionTime": 30, "active": true },
+        { "id": "OP1003", "sessionAttempts": 10, "sessionTime": 30, "active": true },
+        { "id": "OP1004", "sessionAttempts": 10, "sessionTime": 30, "active": true },
+        { "id": "OP1005", "sessionAttempts": 10, "sessionTime": 30, "active": true }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "446213",
+      "name": "SCHOOL_AI_USAGE_LIMITS",
+      "category": "SCHOOL",
+      "description": "Per-user token and request caps for school AI services.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/ai-assist/token-usage/limits",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        { "id": "OP1001", "sessionAttempts": 10, "sessionTime": 30, "active": true },
+        { "id": "OP1003", "sessionAttempts": 10, "sessionTime": 30, "active": true },
+        { "id": "OP1004", "sessionAttempts": 10, "sessionTime": 30, "active": true },
+        { "id": "OP1005", "sessionAttempts": 10, "sessionTime": 30, "active": true }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
       "id": "555012",
       "name": "SCHOOL_ACTIVITIES",
       "category": "SCHOOL",
@@ -5040,6 +5159,66 @@
       "tags": [
         "SCHOOL_LIBRARY_BOOK_COVERING",
         "446117"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SCHOOL_AI_ASSIST_001",
+      "name": "SCHOOL_AI_ASSIST",
+      "type": "class",
+      "value": "bi bi-robot",
+      "tags": [
+        "SCHOOL_AI_ASSIST",
+        "446200"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SCHOOL_AI_PROVIDER_KEYS_001",
+      "name": "SCHOOL_AI_PROVIDER_KEYS",
+      "type": "class",
+      "value": "bi bi-key-fill",
+      "tags": [
+        "SCHOOL_AI_PROVIDER_KEYS",
+        "446210"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SCHOOL_AI_SERVICE_ASSIGNMENTS_001",
+      "name": "SCHOOL_AI_SERVICE_ASSIGNMENTS",
+      "type": "class",
+      "value": "bi bi-sliders",
+      "tags": [
+        "SCHOOL_AI_SERVICE_ASSIGNMENTS",
+        "446211"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SCHOOL_AI_TOKEN_USAGE_001",
+      "name": "SCHOOL_AI_TOKEN_USAGE",
+      "type": "class",
+      "value": "bi bi-cpu-fill",
+      "tags": [
+        "SCHOOL_AI_TOKEN_USAGE",
+        "446212"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SCHOOL_AI_USAGE_LIMITS_001",
+      "name": "SCHOOL_AI_USAGE_LIMITS",
+      "type": "class",
+      "value": "bi bi-shield-check",
+      "tags": [
+        "SCHOOL_AI_USAGE_LIMITS",
+        "446213"
       ],
       "orgId": "SYSTEM",
       "adoptExisting": true
@@ -10710,6 +10889,26 @@
       "entityType": "activities",
       "label": "School Activities",
       "collectionName": "schoolActivities"
+    },
+    {
+      "entityType": "schoolAiProviders",
+      "label": "School AI Providers",
+      "collectionName": "schoolAiProviders"
+    },
+    {
+      "entityType": "schoolAiServiceAssignments",
+      "label": "School AI Service Assignments",
+      "collectionName": "schoolAiServiceAssignments"
+    },
+    {
+      "entityType": "schoolAiTokenUsage",
+      "label": "School AI Token Usage",
+      "collectionName": "schoolAiTokenUsage"
+    },
+    {
+      "entityType": "schoolAiUserUsageLimits",
+      "label": "School AI User Usage Limits",
+      "collectionName": "schoolAiUserUsageLimits"
     }
   ],
   "seeders": [

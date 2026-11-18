@@ -1110,7 +1110,7 @@ async function getAssignmentEligibleStudents(req, res) {
     const endDate = reportViewService.parseDateOnlyValue(req.body?.endDate) || duration.endDate;
     const personMap = await reportViewService.buildPersonNameMap(req.user);
 
-    const students = await reportAssignmentStudentEligibilityService.resolveEligibleStudentsForAssignment({
+    const eligibleStudents = await reportAssignmentStudentEligibilityService.resolveEligibleStudentsForAssignment({
       classData,
       sessions,
       reqUser: req.user,
@@ -1118,6 +1118,12 @@ async function getAssignmentEligibleStudents(req, res) {
       endDate,
       targetSessionIds,
       targetRows,
+      personMap
+    });
+    const students = await reportAssignmentStudentEligibilityService.appendOffRosterPersistedStudents({
+      students: eligibleStudents,
+      targetRows,
+      reqUser: req.user,
       personMap
     });
 

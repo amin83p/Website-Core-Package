@@ -712,9 +712,26 @@
           "hasBorder": false,
           "backgroundColor": "",
           "prefillKey": "",
-          "helpText": "Please write up to 5 sentences about the future plan for this skill. You may use sentences starting with \"I will... We will....\"",
+          "helpText": "Max 490 characters (letters, spaces, punctuation). Future tense, singular (e.g. I will…); up to ~5 sentences. Do not use \"client\"—use the student's name, \"the student\", or pronouns (Student Name). No \"Over the next two weeks\" (period is already two weeks). No book titles, units, or page numbers. Print: Word template (e.g. Arial 10); font is not set here.",
           "options": [],
-          "validationRules": [],
+          "validationRules": [
+            {
+              "id": "fg_listen_max_490",
+              "enabled": true,
+              "severity": "error",
+              "when": "if_has_value",
+              "expression": "len(str(value)) <= 490",
+              "message": "Future Goal: Listening must be 490 characters or fewer (including spaces and punctuation)."
+            },
+            {
+              "id": "fg_listen_no_digits_warn",
+              "enabled": true,
+              "severity": "warning",
+              "when": "if_has_value",
+              "expression": "digits(str(value)) == \"\"",
+              "message": "Avoid unit or page numbers. Do not include book titles, unit numbers, or page references."
+            }
+          ],
           "conversionRule": {
             "enabled": false,
             "expression": "",

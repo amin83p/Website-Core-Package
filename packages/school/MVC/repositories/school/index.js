@@ -73,6 +73,10 @@ const notificationRuleModel = require('../../models/school/notificationRuleModel
 const notificationRunModel = require('../../models/school/notificationRunModel');
 const sessionStudentCaseModel = require('../../models/school/sessionStudentCaseModel');
 const attendanceChangeLogModel = require('../../models/school/attendanceChangeLogModel');
+const schoolAiProviderModel = require('../../models/school/schoolAiProviderModel');
+const schoolAiServiceAssignmentModel = require('../../models/school/schoolAiServiceAssignmentModel');
+const schoolAiTokenUsageModel = require('../../models/school/schoolAiTokenUsageModel');
+const schoolAiUserUsageLimitModel = require('../../models/school/schoolAiUserUsageLimitModel');
 const { normalizeSkillCode } = require('../../../config/skillDefinitions');
 const { SCOPE_MODES } = require('../../services/school/schoolDataScopeBuilder');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
@@ -1464,6 +1468,54 @@ const schoolRepositories = {
     remove: skillModel.deleteSkill,
     generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueSkillId),
     defaultSearchFields: ['id', 'orgId', 'code', 'label', 'kind'],
+    allowSystemFallback: false
+  }),
+  schoolAiProviders: createSchoolRepository({
+    entityName: 'schoolAiProviders',
+    collectionName: 'schoolAiProviders',
+    getAll: schoolAiProviderModel.getAllProviders,
+    getById: schoolAiProviderModel.getProviderById,
+    create: schoolAiProviderModel.addProvider,
+    update: schoolAiProviderModel.updateProvider,
+    remove: schoolAiProviderModel.deleteProvider,
+    transformList: (rows) => normalizeRows(rows).map((row) => schoolAiProviderModel.sanitizeProviderForRead(row)),
+    transformItem: (row) => schoolAiProviderModel.sanitizeProviderForRead(row),
+    defaultSearchFields: ['id', 'orgId', 'name', 'providerId', 'notes'],
+    allowSystemFallback: false
+  }),
+  schoolAiServiceAssignments: createSchoolRepository({
+    entityName: 'schoolAiServiceAssignments',
+    collectionName: 'schoolAiServiceAssignments',
+    getAll: schoolAiServiceAssignmentModel.getAllAssignments,
+    getById: schoolAiServiceAssignmentModel.getAssignmentById,
+    create: schoolAiServiceAssignmentModel.upsertAssignment,
+    update: async (id, data) => schoolAiServiceAssignmentModel.upsertAssignment({ ...data, id }),
+    remove: schoolAiServiceAssignmentModel.deleteAssignment,
+    defaultSearchFields: ['id', 'orgId', 'serviceKey', 'providerRecordId', 'notes'],
+    allowSystemFallback: false
+  }),
+  schoolAiTokenUsage: createSchoolRepository({
+    entityName: 'schoolAiTokenUsage',
+    collectionName: 'schoolAiTokenUsage',
+    getAll: schoolAiTokenUsageModel.getAllUsage,
+    getById: schoolAiTokenUsageModel.getUsageById,
+    create: schoolAiTokenUsageModel.appendUsage,
+    update: async () => { throw new Error('AI token usage rows are append-only.'); },
+    remove: async () => { throw new Error('AI token usage rows cannot be deleted.'); },
+    mongoRemoveUnsupported: true,
+    mongoRemoveMessage: 'AI token usage rows cannot be deleted.',
+    defaultSearchFields: ['id', 'orgId', 'userId', 'serviceKey', 'providerId', 'modelId', 'traceId'],
+    allowSystemFallback: false
+  }),
+  schoolAiUserUsageLimits: createSchoolRepository({
+    entityName: 'schoolAiUserUsageLimits',
+    collectionName: 'schoolAiUserUsageLimits',
+    getAll: schoolAiUserUsageLimitModel.getAllLimits,
+    getById: schoolAiUserUsageLimitModel.getLimitById,
+    create: schoolAiUserUsageLimitModel.upsertLimit,
+    update: async (id, data) => schoolAiUserUsageLimitModel.upsertLimit({ ...data, id }),
+    remove: schoolAiUserUsageLimitModel.deleteLimit,
+    defaultSearchFields: ['id', 'orgId', 'userId', 'periodType', 'appliesTo', 'notes'],
     allowSystemFallback: false
   }),
   books: createSchoolRepository({

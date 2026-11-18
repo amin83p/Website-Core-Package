@@ -48,5 +48,26 @@ module.exports = Object.freeze({
     { key: { orgId: 1, status: 1, 'audit.lastUpdateDateTime': -1 }, options: { name: 'idx_school_overall_report_instances_org_status_updated' } },
     { key: { orgId: 1, overallTemplateId: 1 }, options: { name: 'idx_school_overall_report_instances_org_template' } },
     { key: { orgId: 1, 'sourceSelections.instanceId': 1 }, options: { name: 'idx_school_overall_report_instances_org_source_instance' } }
+  ],
+  schoolAiProviders: [
+    { key: { id: 1 }, options: { name: 'idx_school_ai_providers_id', unique: true } },
+    { key: { orgId: 1, isActive: 1, 'audit.lastUpdateDateTime': -1 }, options: { name: 'idx_school_ai_providers_org_active_updated' } },
+    { key: { orgId: 1, isDefault: 1 }, options: { name: 'idx_school_ai_providers_org_default' } }
+  ],
+  schoolAiServiceAssignments: [
+    { key: { id: 1 }, options: { name: 'idx_school_ai_service_assignments_id', unique: true } },
+    { key: { orgId: 1, serviceKey: 1 }, options: { name: 'idx_school_ai_service_assignments_org_service', unique: true } }
+  ],
+  schoolAiTokenUsage: [
+    { key: { id: 1 }, options: { name: 'idx_school_ai_token_usage_id', unique: true } },
+    { key: { orgId: 1, userId: 1, createdAt: -1 }, options: { name: 'idx_school_ai_token_usage_org_user_created' } },
+    { key: { orgId: 1, serviceKey: 1, createdAt: -1 }, options: { name: 'idx_school_ai_token_usage_org_service_created' } }
+  ],
+  schoolAiUserUsageLimits: [
+    { key: { id: 1 }, options: { name: 'idx_school_ai_user_usage_limits_id', unique: true } },
+    {
+      key: { orgId: 1, userId: 1, periodType: 1, appliesTo: 1 },
+      options: { name: 'idx_school_ai_user_usage_limits_org_user_period', unique: true }
+    }
   ]
 });

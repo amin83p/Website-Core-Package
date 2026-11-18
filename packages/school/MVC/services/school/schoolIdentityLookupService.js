@@ -327,11 +327,42 @@ async function listTaggableUsers({ reqUser, q = '', query = {} } = {}) {
   return listSchoolUsers({ reqUser, q, query, requireSchoolPerson: true });
 }
 
+async function mapUserDisplayNames(reqUser, userIds = []) {
+  const wanted = [...new Set((Array.isArray(userIds) ? userIds : []).map(normalizeId).filter(Boolean))];
+  const out = new Map();
+  if (!wanted.length) return out;
+
+  const activeOrgId = getActiveOrgId(reqUser);
+  const [users, persons] = await Promise.all([
+    fetchCoreRows('users', {}),
+    fetchCoreRows('persons', {}, PERSON_QUERY_OPTIONS)
+  ]);
+  const personById = new Map((Array.isArray(persons) ? persons : [])
+    .map((person) => [normalizeId(person.id || person.personId), person])
+    .filter(([id]) => Boolean(id)));
+
+  for (const user of Array.isArray(users) ? users : []) {
+    const userId = normalizeId(user.id || user.userId || user._id);
+    if (!userId || !wanted.some((id) => idsEqual(id, userId))) continue;
+    if (activeOrgId && !userBelongsToOrg(user, activeOrgId)) continue;
+    const personId = normalizeId(user.personId || user.identity?.personId || user.profile?.personId);
+    const person = personId ? personById.get(personId) : null;
+    const label = userDisplayName(user, person);
+    out.set(userId, label || userId);
+  }
+
+  wanted.forEach((id) => {
+    if (!out.has(id)) out.set(id, id);
+  });
+  return out;
+}
+
 module.exports = {
   listSchoolPersonRecords,
   listSchoolPersons,
   listSchoolUsers,
   listTaggableUsers,
+  mapUserDisplayNames,
   personMatchesQuery,
   rowMatchesQuery,
   formatPersonName
