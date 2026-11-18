@@ -481,6 +481,7 @@
 <%- include('partials/reportMessageHelpers') %>
 
 <script src="/scripts/reportByFunderModal.js"></script>
+<script src="/scripts/reportAssignmentDelete.js"></script>
 <script src="/scripts/reviewReportsModal.js"></script>
 <% if (typeof canShowEnrollmentClaims !== 'undefined' && canShowEnrollmentClaims === true) { %>
 <script src="/scripts/enrollmentClaimToggle.js"></script>
@@ -1994,6 +1995,7 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
   if (typeof window.ReviewReportsModal !== 'undefined' && typeof window.ReviewReportsModal.init === 'function') {
     window.ReviewReportsModal.init({
       apiUrl: '/school/reports/semi-monthly/api/review-assignments',
+      actionStateId: smmrActionStateId,
       escapeHtml,
       showReportMessage,
       getDefaultDateRange() {

@@ -196,6 +196,10 @@ test('semi-monthly export routes are registered', () => {
   assert.match(routes, /semiMonthlyCtrl\.exportSelections/);
   assert.match(routes, /\/semi-monthly\/api\/review-assignments/);
   assert.match(routes, /semiMonthlyCtrl\.getReviewAssignments/);
+  assert.match(routes, /\/semi-monthly\/api\/review-assignments\/lock/);
+  assert.match(routes, /\/semi-monthly\/api\/review-assignments\/unlock/);
+  assert.match(routes, /semiMonthlyCtrl\.lockReviewAssignmentRow/);
+  assert.match(routes, /semiMonthlyCtrl\.unlockReviewAssignmentRow/);
 });
 
 test('semi-monthly report viewer includes Review Reports modal and API', () => {
@@ -217,9 +221,19 @@ test('semi-monthly report viewer includes Review Reports modal and API', () => {
   assert.match(view, /apiUrl: '\/school\/reports\/semi-monthly\/api\/review-assignments'/);
   assert.match(reviewPartial, /id="reviewReportsModal"/);
   assert.match(reviewPartial, /btn_reviewReportsLoad/);
-  assert.match(reviewJs, /Fill Reports/);
   assert.match(reviewJs, /review-assignments/);
   assert.match(reviewJs, /fillReportsUrl/);
+  assert.match(reviewJs, /sessionManageUrl/);
+  assert.match(reviewJs, /review-reports-icon-btn/);
+  assert.match(reviewJs, /Open report assignment/);
+  assert.match(reviewJs, /Open linked class session/);
+  assert.match(reviewJs, /js-review-lock-submitted/);
+  assert.match(reviewJs, /js-review-unlock-locked/);
+  assert.match(reviewJs, /refreshSingleReviewRow/);
+  assert.match(reviewJs, /data-review-assignment-id/);
+  assert.match(reviewJs, /withReviewOperationWaiting/);
+  assert.match(reviewJs, /title: 'Review Reports'/);
+  assert.match(view, /reportAssignmentDelete\.js/);
 });
 
 test('semi-monthly viewer wires shared-link prompt and report load progress', () => {

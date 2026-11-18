@@ -28,6 +28,25 @@ test('sortReviewRowsForTeacherSection orders by class then due date', () => {
   assert.equal(sorted[1].reportDueDate, '2026-03-15');
 });
 
+test('buildRowLifecycleMeta collects lock and unlock targets', () => {
+  const meta = reviewService.buildRowLifecycleMeta([
+    { status: 'submitted', id: 'INS-1', studentId: 'STU-1' },
+    { status: 'submitted', id: 'INS-2' },
+    { status: 'locked', id: 'INS-3', studentId: 'STU-3' },
+    { status: 'draft', id: 'INS-4', studentId: 'STU-4' }
+  ], true);
+  assert.equal(meta.canLockSubmitted, true);
+  assert.deepEqual(meta.lockStudentIds, ['STU-1']);
+  assert.deepEqual(meta.lockInstanceIds, ['INS-2']);
+  assert.equal(meta.canUnlockLocked, true);
+  assert.deepEqual(meta.unlockInstanceIds, ['INS-3']);
+  const noUnlock = reviewService.buildRowLifecycleMeta([
+    { status: 'locked', id: 'INS-9', studentId: 'STU-9' }
+  ], false);
+  assert.equal(noUnlock.canUnlockLocked, false);
+  assert.deepEqual(noUnlock.unlockInstanceIds, []);
+});
+
 test('tallyInstanceProgress counts pending, draft, submitted, and locked', () => {
   const progress = reviewService.tallyInstanceProgress([
     { isPendingAssignment: true },
@@ -44,6 +63,22 @@ test('buildAssignmentEditUrl targets assignment edit with rowId query', () => {
   const url = reviewService.buildAssignmentEditUrl('ASN-1', 'ROW-9');
   assert.match(url, /\/school\/reports\/assignments\/edit\/ASN-1/);
   assert.match(url, /[?&]rowId=ROW-9/);
+});
+
+test('buildSessionManageUrl and resolveSessionManageUrl link session-targeted assignments', () => {
+  const manageUrl = reviewService.buildSessionManageUrl('CLS-1', 'SES-42');
+  assert.equal(manageUrl, '/school/classes/CLS-1/sessions/SES-42');
+  const resolved = reviewService.resolveSessionManageUrl(
+    { classId: 'CLS-1', targetType: 'session', sessionId: 'SES-42' },
+    { rowId: 'ROW-1', sessionId: 'SES-42', targetType: 'session' },
+    'CLS-1'
+  );
+  assert.equal(resolved, manageUrl);
+  assert.equal(reviewService.resolveSessionManageUrl(
+    { classId: 'CLS-1', targetType: 'date', dueDate: '2026-03-01' },
+    { rowId: 'ROW-1', sessionDate: '2026-03-01' },
+    'CLS-1'
+  ), '');
 });
 
 test('resolvePrimaryInstructorForClass prefers primary role over co-teachers', () => {

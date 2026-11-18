@@ -261,6 +261,40 @@ async function getReviewAssignments(req, res) {
   }
 }
 
+async function lockReviewAssignmentRow(req, res) {
+  try {
+    const payload = await schoolSemiMonthlyReportReviewService.lockReviewAssignmentRow({
+      req,
+      body: req.body && typeof req.body === 'object' ? req.body : {}
+    });
+    const summary = payload.summary || {};
+    const status = summary.failed > 0 && !summary.succeeded ? 'error' : (summary.failed > 0 ? 'partial' : 'success');
+    return res.json({ status, ...payload });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 400).json({
+      status: 'error',
+      message: error.message || 'Could not lock reports.'
+    });
+  }
+}
+
+async function unlockReviewAssignmentRow(req, res) {
+  try {
+    const payload = await schoolSemiMonthlyReportReviewService.unlockReviewAssignmentRow({
+      req,
+      body: req.body && typeof req.body === 'object' ? req.body : {}
+    });
+    const summary = payload.summary || {};
+    const status = summary.failed > 0 && !summary.succeeded ? 'error' : (summary.failed > 0 ? 'partial' : 'success');
+    return res.json({ status, ...payload });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 403).json({
+      status: 'error',
+      message: error.message || 'Could not unlock reports.'
+    });
+  }
+}
+
 module.exports = {
   showSemiMonthlyReportPage,
   getSemiMonthlyReportData,
@@ -269,5 +303,7 @@ module.exports = {
   getFunderStudentSelection,
   getExportPlan,
   exportSelections,
-  getReviewAssignments
+  getReviewAssignments,
+  lockReviewAssignmentRow,
+  unlockReviewAssignmentRow
 };

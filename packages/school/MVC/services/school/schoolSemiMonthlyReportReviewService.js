@@ -5,6 +5,9 @@ const schoolSemiMonthlyReportService = require('./schoolSemiMonthlyReportService
 const semiMonthlyReportPolicyModel = require('../../models/school/semiMonthlyReportPolicyModel');
 const semiMonthlyReportPolicyService = require('./semiMonthlyReportPolicyService');
 const reportViewService = require('./reportViewService');
+const reportMatrixService = require('./reportMatrixService');
+const reportIntegrityService = require('./reportIntegrityService');
+const reportService = require('./reportService');
 const sessionReportInstanceService = require('./sessionReportInstanceService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const reportAssignmentSessionUtils = requireCoreModule('MVC/utils/reportAssignmentSessionUtils');
@@ -79,6 +82,32 @@ function buildStatusSummary(progress = {}) {
   return parts.length ? parts.join(' · ') : 'No instances';
 }
 
+function buildRowLifecycleMeta(relatedRows = [], canUnlock = false) {
+  const lockStudentIds = [];
+  const lockInstanceIds = [];
+  const unlockInstanceIds = [];
+  (Array.isArray(relatedRows) ? relatedRows : []).forEach((row) => {
+    if (row?.isPendingAssignment) return;
+    const status = String(row?.status || '').trim().toLowerCase();
+    const instanceId = toPublicId(row?.id || row?.instanceId);
+    const studentId = String(row?.studentId || row?.studentPersonId || '').trim();
+    if (status === 'submitted' && instanceId) {
+      if (studentId) lockStudentIds.push(studentId);
+      else lockInstanceIds.push(instanceId);
+    }
+    if (status === 'locked' && instanceId && canUnlock) {
+      unlockInstanceIds.push(instanceId);
+    }
+  });
+  return {
+    canLockSubmitted: lockStudentIds.length > 0 || lockInstanceIds.length > 0,
+    canUnlockLocked: unlockInstanceIds.length > 0,
+    lockStudentIds,
+    lockInstanceIds,
+    unlockInstanceIds
+  };
+}
+
 function resolveSessionDelivererTeacherId(assignment = {}, targetRow = {}) {
   return toPublicId(targetRow?.teacherId)
     || toPublicId(assignment?.teacherId)
@@ -125,6 +154,21 @@ function buildAssignmentEditUrl(assignmentId = '', assignmentRowId = '') {
   if (rowId) params.set('rowId', rowId);
   const query = params.toString();
   return `/school/reports/assignments/edit/${encodeURIComponent(id)}${query ? `?${query}` : ''}`;
+}
+
+function buildSessionManageUrl(classId = '', sessionId = '') {
+  const cid = toPublicId(classId);
+  const sid = toPublicId(sessionId);
+  if (!cid || !sid) return '';
+  return `/school/classes/${encodeURIComponent(cid)}/sessions/${encodeURIComponent(sid)}`;
+}
+
+function resolveSessionManageUrl(assignment = {}, targetRow = {}, classId = '') {
+  const applied = reportAssignmentSessionUtils.applyTargetRow(assignment, targetRow);
+  const targetType = reportAssignmentSessionUtils.inferAssignmentTargetType(applied);
+  const sessionId = toPublicId(applied?.sessionId);
+  if (targetType !== 'session' || !sessionId) return '';
+  return buildSessionManageUrl(classId, sessionId);
 }
 
 function resolveFillReportsUrl(assignment, targetRow, relatedRows, assignmentMap) {
@@ -194,6 +238,7 @@ async function buildReviewAssignmentsPayload(req) {
   }
 
   const templateIdSet = schoolSemiMonthlyReportService.buildTemplateIdSet(reportTemplateIds);
+  const canUnlockReportInstance = await reportViewService.canUnlockReportInstance(req.user);
   const routeAccessContext = schoolDataService.buildRouteAccessContext(req);
   const assignmentQuery = activeOrgId ? { orgId__eq: activeOrgId } : {};
   const [allAssignments, allClasses, instanceRows] = await Promise.all([
@@ -279,8 +324,11 @@ async function buildReviewAssignmentsPayload(req) {
         statusSummary: buildStatusSummary(progress),
         fillReportsUrl: resolveFillReportsUrl(assignment, targetRow, related, assignmentMap),
         assignmentEditUrl: buildAssignmentEditUrl(assignment?.id, assignmentRowId),
+        sessionId: toPublicId(reportAssignmentSessionUtils.applyTargetRow(assignment, targetRow)?.sessionId),
+        sessionManageUrl: resolveSessionManageUrl(assignment, targetRow, classId),
         reviewComplete: progress.total > 0 && progress.pending === 0 && progress.draft === 0
-          && progress.submitted + progress.locked === progress.total
+          && progress.submitted + progress.locked === progress.total,
+        ...buildRowLifecycleMeta(related, canUnlockReportInstance)
       };
 
       const groupKey = teacherGroupKey(teacherId, teacherName);
@@ -315,7 +363,143 @@ async function buildReviewAssignmentsPayload(req) {
     startDate,
     endDate,
     teachers,
-    reportTemplateIds
+    reportTemplateIds,
+    canUnlockReportInstance
+  };
+}
+
+function parseIdListParam(value = '') {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || '').trim()).filter(Boolean);
+  }
+  return String(value || '')
+    .split(/[,|]/)
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+}
+
+async function lockSingleReportInstance(instanceId = '', reqUser) {
+  const instance = await reportIntegrityService.getAccessibleInstanceOrThrow(instanceId, reqUser);
+  const status = String(instance.status || '').trim().toLowerCase();
+  if (status === 'locked') {
+    return { instanceId: toPublicId(instance.id), status: 'skipped', message: 'Report instance is already locked.' };
+  }
+  if (status !== 'submitted') {
+    throw new Error('Only submitted reports can be locked from Review Reports.');
+  }
+  const [template, assignment] = await Promise.all([
+    schoolDataService.getDataById('reportTemplates', instance.templateId, reqUser),
+    schoolDataService.getDataById('reportAssignments', instance.assignmentId, reqUser)
+  ]);
+  if (!template) throw new Error('Template not found for this report instance.');
+  const effectiveAssignment = reportViewService.applyAssignmentRow(
+    assignment,
+    reportViewService.findAssignmentRow(assignment, instance.assignmentRowId || '')
+  );
+  const lockSnapshot = await reportService.buildLockSnapshot({
+    template,
+    instance,
+    assignment: effectiveAssignment,
+    reqUser
+  });
+  const now = new Date().toISOString();
+  await schoolDataService.updateData('reportInstances', instance.id, {
+    status: 'locked',
+    lockSnapshot,
+    audit: {
+      lastUpdateUser: reqUser?.id || '',
+      lastUpdateDateTime: now,
+      lockedAt: instance.audit?.lockedAt || now
+    }
+  }, reqUser);
+  return { instanceId: toPublicId(instance.id), status: 'success', reportStatus: 'locked' };
+}
+
+async function lockReviewAssignmentRow({ req, body = {} } = {}) {
+  const assignmentId = toPublicId(body.assignmentId);
+  const assignmentRowId = String(body.assignmentRowId || '').trim();
+  const teacherId = String(body.teacherId || '').trim();
+  const lockStudentIds = parseIdListParam(body.lockStudentIds);
+  const lockInstanceIds = parseIdListParam(body.lockInstanceIds);
+  if (!assignmentId) throw new Error('Assignment is required.');
+  if (!lockStudentIds.length && !lockInstanceIds.length) {
+    throw new Error('No submitted reports to lock.');
+  }
+
+  const results = [];
+  let matrixSummary = null;
+  if (lockStudentIds.length) {
+    const matrixResult = await reportMatrixService.lockMatrixRows({
+      assignmentId,
+      assignmentRowId,
+      teacherId,
+      rows: lockStudentIds.map((studentId) => ({ studentId })),
+      reqUser: req.user
+    });
+    matrixSummary = matrixResult.summary || null;
+    (matrixResult.results || []).forEach((row) => results.push(row));
+  }
+  for (const instanceId of lockInstanceIds) {
+    try {
+      results.push(await lockSingleReportInstance(instanceId, req.user));
+    } catch (error) {
+      results.push({ instanceId, status: 'error', message: error.message });
+    }
+  }
+
+  const summary = {
+    total: results.length,
+    succeeded: results.filter((row) => row.status === 'success').length,
+    failed: results.filter((row) => row.status === 'error').length,
+    skipped: results.filter((row) => row.status === 'skipped').length,
+    matrix: matrixSummary
+  };
+  return {
+    message: `${summary.succeeded} report(s) locked. ${summary.skipped} skipped. ${summary.failed} failed.`,
+    summary,
+    results
+  };
+}
+
+async function unlockReviewAssignmentRow({ req, body = {} } = {}) {
+  const canUnlock = await reportViewService.canUnlockReportInstance(req.user);
+  if (!canUnlock) {
+    throw new Error('Only a super user can unlock a locked report.');
+  }
+  const unlockInstanceIds = parseIdListParam(body.unlockInstanceIds);
+  if (!unlockInstanceIds.length) throw new Error('No locked reports to unlock.');
+
+  const results = [];
+  for (const instanceId of unlockInstanceIds) {
+    try {
+      const instance = await reportIntegrityService.assertInstanceUnlockable(instanceId, req.user);
+      const nextStatus = reportIntegrityService.resolveInstanceUnlockTargetStatus(instance);
+      const now = new Date().toISOString();
+      await schoolDataService.updateData('reportInstances', instance.id, {
+        status: nextStatus,
+        lockSnapshot: null,
+        audit: {
+          lastUpdateUser: req.user?.id || '',
+          lastUpdateDateTime: now,
+          unlockedAt: now,
+          unlockedBy: toPublicId(req.user?.id || '')
+        }
+      }, req.user);
+      results.push({ instanceId: toPublicId(instance.id), status: 'success', nextStatus });
+    } catch (error) {
+      results.push({ instanceId, status: 'error', message: error.message });
+    }
+  }
+
+  const summary = {
+    total: results.length,
+    succeeded: results.filter((row) => row.status === 'success').length,
+    failed: results.filter((row) => row.status === 'error').length
+  };
+  return {
+    message: `${summary.succeeded} report(s) unlocked. ${summary.failed} failed.`,
+    summary,
+    results
   };
 }
 
@@ -336,10 +520,16 @@ module.exports = {
   targetRowOverlapsDateRange,
   tallyInstanceProgress,
   buildStatusSummary,
+  buildRowLifecycleMeta,
   buildAssignmentEditUrl,
+  buildSessionManageUrl,
+  resolveSessionManageUrl,
   sortReviewRowsForTeacherSection,
   resolvePrimaryInstructorForClass,
   filterRelatedInstanceRows,
   resolveSessionDelivererTeacherId,
-  buildReviewAssignmentsPayload
+  buildReviewAssignmentsPayload,
+  parseIdListParam,
+  lockReviewAssignmentRow,
+  unlockReviewAssignmentRow
 };

@@ -228,6 +228,16 @@ router.get('/semi-monthly/api/review-assignments',
   trackActionState(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ, { keepActive: true }),
   semiMonthlyCtrl.getReviewAssignments);
 
+router.post('/semi-monthly/api/review-assignments/lock',
+  requireAccess(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ),
+  trackActionState(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ, { keepActive: true }),
+  semiMonthlyCtrl.lockReviewAssignmentRow);
+
+router.post('/semi-monthly/api/review-assignments/unlock',
+  requireAccess(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ),
+  trackActionState(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ, { keepActive: true }),
+  semiMonthlyCtrl.unlockReviewAssignmentRow);
+
 router.get('/semi-monthly/api/report-plan',
   requireAccess(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ),
   trackActionState(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ, { keepActive: true }),
