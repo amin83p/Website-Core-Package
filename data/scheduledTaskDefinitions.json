@@ -31,5 +31,101 @@
     "createdByDisplayName": "System",
     "createdAt": "2026-10-24T00:47:26.047Z",
     "updatedAt": "2026-10-24T00:47:26.047Z"
+  },
+  {
+    "id": "STDEF2026111600537",
+    "orgId": "",
+    "packageName": "CORE",
+    "taskKey": "core.emailOutbox.dispatch",
+    "label": "Dispatch queued emails",
+    "description": "Sends email outbox entries whose send time has arrived.",
+    "scheduleType": "interval",
+    "runAtTime": "00:00",
+    "timezone": "UTC",
+    "enabled": true,
+    "paused": false,
+    "source": "core.system",
+    "sourceRef": "emailOutbox.dispatch",
+    "input": {
+      "intervalMinutes": 5
+    },
+    "nextRunAt": "2026-11-16T18:35:31.302Z",
+    "lastRunAt": "",
+    "createdByUserId": "SYSTEM",
+    "createdByDisplayName": "System",
+    "createdAt": "2026-11-16T18:30:31.304Z",
+    "updatedAt": "2026-11-16T18:30:31.304Z"
+  },
+  {
+    "id": "STDEF2026111626231",
+    "orgId": "",
+    "packageName": "CORE",
+    "taskKey": "core.emailOutbox.dispatch",
+    "label": "Dispatch queued emails",
+    "description": "Sends email outbox entries whose send time has arrived.",
+    "scheduleType": "interval",
+    "runAtTime": "00:00",
+    "timezone": "UTC",
+    "enabled": true,
+    "paused": false,
+    "source": "core.system",
+    "sourceRef": "emailOutbox.dispatch",
+    "input": {
+      "intervalMinutes": 5
+    },
+    "nextRunAt": "2026-11-16T18:35:31.303Z",
+    "lastRunAt": "",
+    "createdByUserId": "SYSTEM",
+    "createdByDisplayName": "System",
+    "createdAt": "2026-11-16T18:30:31.311Z",
+    "updatedAt": "2026-11-16T18:30:31.311Z"
+  },
+  {
+    "id": "STDEF2026111680698",
+    "orgId": "",
+    "packageName": "CORE",
+    "taskKey": "core.smsOutbox.dispatch",
+    "label": "Dispatch queued SMS messages",
+    "description": "Sends SMS outbox entries whose send time has arrived.",
+    "scheduleType": "interval",
+    "runAtTime": "00:00",
+    "timezone": "UTC",
+    "enabled": true,
+    "paused": false,
+    "source": "core.system",
+    "sourceRef": "smsOutbox.dispatch",
+    "input": {
+      "intervalMinutes": 5
+    },
+    "nextRunAt": "2026-11-16T18:35:31.316Z",
+    "lastRunAt": "",
+    "createdByUserId": "SYSTEM",
+    "createdByDisplayName": "System",
+    "createdAt": "2026-11-16T18:30:31.318Z",
+    "updatedAt": "2026-11-16T18:30:31.318Z"
+  },
+  {
+    "id": "STDEF2026111641363",
+    "orgId": "",
+    "packageName": "CORE",
+    "taskKey": "core.smsOutbox.dispatch",
+    "label": "Dispatch queued SMS messages",
+    "description": "Sends SMS outbox entries whose send time has arrived.",
+    "scheduleType": "interval",
+    "runAtTime": "00:00",
+    "timezone": "UTC",
+    "enabled": true,
+    "paused": false,
+    "source": "core.system",
+    "sourceRef": "smsOutbox.dispatch",
+    "input": {
+      "intervalMinutes": 5
+    },
+    "nextRunAt": "2026-11-16T18:35:31.317Z",
+    "lastRunAt": "",
+    "createdByUserId": "SYSTEM",
+    "createdByDisplayName": "System",
+    "createdAt": "2026-11-16T18:30:31.322Z",
+    "updatedAt": "2026-11-16T18:30:31.322Z"
   }
 ]
