@@ -19,6 +19,7 @@ const {
 const gradebookSkillCatalogService = require('./gradebookSkillCatalogService');
 const gradebookWeightService = require('./gradebookWeightService');
 const reportFunderDocxService = require('./reportFunderDocxService');
+const studentClaimNumberService = require('./studentClaimNumberService');
 const sessionGradebookMakeupService = require('./sessionGradebookMakeupService');
 const reportExportBatchCacheService = require('./reportExportBatchCacheService');
 const studentPunctualityMetricsService = require('./studentPunctualityMetricsService');
@@ -2374,16 +2375,45 @@ async function buildPrefillSnapshot({
     const pid = toPublicId(row?.personId);
     if (sid && pid) studentToPersonMap.set(sid, pid);
   });
-  const enrollmentClaimNumber = (wants(PREFILL_COMPUTE_BUNDLE.ENROLLMENT_CLAIM) || wants(PREFILL_COMPUTE_BUNDLE.STUDENT_RECORD))
-    ? reportFunderDocxService.resolveEnrollmentClaimNumberForReportPeriod({
+  let enrollmentClaimNumber = '';
+  const shouldResolveEnrollmentClaim = wants(PREFILL_COMPUTE_BUNDLE.ENROLLMENT_CLAIM)
+    || wants(PREFILL_COMPUTE_BUNDLE.STUDENT_RECORD);
+  if (shouldResolveEnrollmentClaim) {
+    let claimStudentRecord = studentRecord;
+    const chosenEnrollmentPeriod = reportFunderDocxService.pickEnrollmentPeriodForReportWindow({
       periodRows: enrollmentPeriodRows,
       studentId: studentRecord?.id,
       personId: studentPersonId,
       studentToPersonMap,
       windowStart: reportPeriod.startDate,
       windowEnd: reportPeriod.dueDate
-    })
-    : '';
+    });
+    if (
+      chosenEnrollmentPeriod?.claimNumberId
+        && claimStudentRecord
+        && !studentClaimNumberService.resolveClaimFromStudent(
+          claimStudentRecord,
+          chosenEnrollmentPeriod.claimNumberId
+        )
+    ) {
+      const reloadedStudent = await schoolDataService.getDataById(
+        'students',
+        toPublicId(claimStudentRecord.id),
+        reqUser
+      );
+      if (reloadedStudent) claimStudentRecord = reloadedStudent;
+    }
+    enrollmentClaimNumber = reportFunderDocxService.resolveEnrollmentClaimNumberForReportPeriod({
+      periodRows: enrollmentPeriodRows,
+      studentId: claimStudentRecord?.id,
+      personId: studentPersonId,
+      studentToPersonMap,
+      windowStart: reportPeriod.startDate,
+      windowEnd: reportPeriod.dueDate,
+      studentRecord: claimStudentRecord,
+      students
+    });
+  }
   const reportOrgId = toPublicId(classData?.orgId || assignment?.orgId || studentRecord?.orgId);
   let statusMap = {};
   let orgPolicyLayer = {};

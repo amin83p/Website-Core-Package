@@ -457,3 +457,37 @@ test('resetInstanceFromLivePrefill refreshes private fields only on student-targ
     });
   });
 });
+
+test('prefill preview surfaces docx-only snapshot keys without form fields', async (t) => {
+  const template = {
+    id: 'TPL_CLAIM',
+    version: 1,
+    snapshotKeys: ['enrollment_claim_number'],
+    schema: { fields: [] }
+  };
+  const instance = {
+    id: 'RINS_CLAIM',
+    studentId: 'PER-1',
+    teacherId: 'T1',
+    status: 'draft',
+    answers: {},
+    prefillSnapshot: { enrollment_claim_number: '' }
+  };
+  const origBuild = reportService.buildPrefillSnapshot;
+  reportService.buildPrefillSnapshot = async () => ({
+    enrollment_claim_number: 'WCB-12345',
+    student_id_at_funder: 'WCB-12345'
+  });
+  t.after(() => {
+    reportService.buildPrefillSnapshot = origBuild;
+  });
+  const preview = await reportPrefillRefreshPreviewService.buildPrefillRefreshPreview({
+    instance,
+    template,
+    assignment: { id: 'ASG_C', classId: 'CLS-1', reportStartDate: '2026-10-16', reportDueDate: '2026-10-29' },
+    reqUser: { id: 'u1' }
+  });
+  const row = preview.changes.find((c) => c.prefillKey === 'enrollment_claim_number');
+  assert.ok(row, 'expected enrollment_claim_number in preview');
+  assert.equal(row.fields[0].newValue, 'WCB-12345');
+});

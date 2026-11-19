@@ -58,6 +58,28 @@ test('resolveDocxTemplateForFunder falls back to default template', () => {
   );
 });
 
+test('resolveEnrollmentClaimNumberForReportPeriod resolves claimNumberId from student profile', () => {
+  const periods = [{
+    studentId: 'stu1',
+    startDate: '2026-10-01',
+    endDate: '2026-12-31',
+    claimNumberId: 'CLM-WCB',
+    claimNumber: ''
+  }];
+  const studentRecord = {
+    id: 'stu1',
+    claimNumbers: [{ id: 'CLM-WCB', number: 'WCB-998877', label: 'WCB' }]
+  };
+  const resolved = reportFunderDocxService.resolveEnrollmentClaimNumberForReportPeriod({
+    periodRows: periods,
+    studentId: 'stu1',
+    windowStart: '2026-10-15',
+    windowEnd: '2026-10-29',
+    studentRecord
+  });
+  assert.equal(resolved, 'WCB-998877');
+});
+
 test('resolveStudentFunderForReportPeriod picks latest overlapping enrollment funder', () => {
   const periods = [
     {

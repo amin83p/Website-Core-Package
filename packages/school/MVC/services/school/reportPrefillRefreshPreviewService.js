@@ -256,6 +256,43 @@ async function buildPrefillRefreshPreview({ instance, template, assignment, reqU
     });
   });
 
+  const templateFillKeys = reportService.resolveTemplateFillKeys(template);
+  const templateFillKeySet = new Set(
+    [...templateFillKeys].map((key) => String(key || '').trim().toLowerCase()).filter(Boolean)
+  );
+  changedPrefillKeys.forEach((prefillKey) => {
+    const normalized = reportService.normalizePrefillKey(prefillKey);
+    if (!normalized) return;
+    if (!templateFillKeySet.has(normalized.toLowerCase())) return;
+    if (changesByKey.has(normalized)) return;
+    const oldResolved = getPrefillValue(oldPrefill, normalized);
+    const newResolved = getPrefillValue(refreshedPrefill, normalized);
+    if (!newResolved.found) return;
+    if (stableValueToken(oldResolved.found ? oldResolved.value : undefined) === stableValueToken(newResolved.value)) {
+      return;
+    }
+    changesByKey.set(normalized, {
+      prefillKey: normalized,
+      expressionDriven: false,
+      oldRawValue: oldResolved.found ? oldResolved.value : undefined,
+      newRawValue: newResolved.value,
+      fields: [{
+        fieldId: '',
+        label: reportService.resolveSnapshotKeyLabel(template, normalized)
+          || reportService.getPrefillCatalogLabel(normalized)
+          || normalized,
+        type: 'prefill',
+        prefillOnly: true,
+        oldValue: oldResolved.found ? oldResolved.value : '',
+        newValue: newResolved.value,
+        currentValue: oldResolved.found ? oldResolved.value : '',
+        oldRawValue: oldResolved.found ? oldResolved.value : undefined,
+        newRawValue: newResolved.value,
+        skippedDueToOverride: false
+      }]
+    });
+  });
+
   function fieldDisplayWouldChange(fieldId) {
     const persisted = persistedDisplayAnswers[fieldId];
     const grid = gridDisplay ? gridDisplay[fieldId] : undefined;
@@ -273,7 +310,9 @@ async function buildPrefillRefreshPreview({ instance, template, assignment, reqU
 
   const changes = Array.from(changesByKey.values())
     .map((change) => {
-      const fields = (change.fields || []).filter((field) => fieldDisplayWouldChange(field.fieldId));
+      const fields = (change.fields || []).filter((field) => (
+        field.prefillOnly === true || fieldDisplayWouldChange(field.fieldId)
+      ));
       let prefillKeyLabel = '';
       if (change.expressionDriven) {
         prefillKeyLabel = String(fields[0]?.label || '').trim() || 'Calculated field';

@@ -5,6 +5,7 @@ const schoolDataService = require('./schoolDataService');
 const rollingEnrollmentFunderService = require('./rollingEnrollmentFunderService');
 const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
+const studentClaimNumberService = require('./studentClaimNumberService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -158,7 +159,19 @@ function resolveStudentFunderForReportPeriod({
 
 function resolveEnrollmentClaimNumberForReportPeriod(params = {}) {
   const chosen = pickEnrollmentPeriodForReportWindow(params);
-  return String(chosen?.claimNumber || '').trim();
+  if (!chosen) return '';
+  const direct = String(chosen.claimNumber || '').trim();
+  const claimNumberId = String(chosen.claimNumberId || '').trim();
+  if (direct || !claimNumberId) return direct;
+  let student = params.studentRecord || null;
+  if (!student) {
+    const sid = clean(chosen.studentId);
+    student = (Array.isArray(params.students) ? params.students : [])
+      .find((row) => idsEqual(row?.id, sid)) || null;
+  }
+  if (!student) return '';
+  const enriched = studentClaimNumberService.enrichPeriodClaimFields(chosen, student);
+  return String(enriched.claimNumber || '').trim();
 }
 
 async function loadActiveFunderOptions(reqUser, orgId) {
