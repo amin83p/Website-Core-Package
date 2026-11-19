@@ -50,6 +50,7 @@
   const canEditStudentClbJson = jsonForScript(Boolean(typeof canEditStudentClb !== 'undefined' && canEditStudentClb));
   const canViewStudentAcademicOverviewJson = jsonForScript(Boolean(typeof canViewStudentAcademicOverview !== 'undefined' && canViewStudentAcademicOverview));
   const canOpenStudentAttendanceReportJson = jsonForScript(Boolean(typeof canOpenStudentAttendanceReport !== 'undefined' && canOpenStudentAttendanceReport));
+  const canOpenAttendanceMatrixJson = jsonForScript(Boolean(typeof canOpenAttendanceMatrix !== 'undefined' && canOpenAttendanceMatrix));
   const isRollingJson = jsonForScript(Boolean(isRolling));
   const rollingFilters = (typeof filters !== 'undefined' && filters && typeof filters === 'object') ? filters : {};
   const hasRollingFiltersAppliedFlag = typeof hasRollingFiltersApplied !== 'undefined' && hasRollingFiltersApplied === true;
@@ -2397,6 +2398,9 @@
   <button type="button" class="rolling-student-context-menu-item" data-action="attendance-report" id="rollingStudentContextMenuAttendanceReport">
     <i class="bi bi-person-lines-fill"></i><span>Student Attendance Report</span>
   </button>
+  <button type="button" class="rolling-student-context-menu-item" data-action="attendance-matrix" id="rollingStudentContextMenuAttendanceMatrix">
+    <i class="bi bi-table"></i><span>Attendance Matrix</span>
+  </button>
 </div>
 
 <%- include('../partials/studentClaimNumbersModal') %>
@@ -3174,6 +3178,7 @@
   const canEditStudentClb = <%- canEditStudentClbJson %>;
   const canViewStudentAcademicOverview = <%- canViewStudentAcademicOverviewJson %>;
   const canOpenStudentAttendanceReport = <%- canOpenStudentAttendanceReportJson %>;
+  const canOpenAttendanceMatrix = <%- canOpenAttendanceMatrixJson %>;
   const defaultTeacher = <%- defaultTeacherJson %>;
   const studentMap = new Map((Array.isArray(studentOptions) ? studentOptions : []).map((row) => [String(row.id || ''), row]));
   let periodRows = <%- initialRowsJson %>;
@@ -6786,6 +6791,15 @@
       attendanceReportBtn.disabled = !openable;
       attendanceReportBtn.classList.toggle('disabled', !openable);
     }
+    const attendanceMatrixBtn = qs('rollingStudentContextMenuAttendanceMatrix');
+    if (attendanceMatrixBtn) {
+      const openable = canOpenAttendanceMatrix === true;
+      attendanceMatrixBtn.disabled = !openable;
+      attendanceMatrixBtn.classList.toggle('disabled', !openable);
+      attendanceMatrixBtn.title = openable
+        ? 'Open the attendance matrix for this month or the last month of the student’s oldest enrollment.'
+        : 'You do not have permission to open the attendance matrix.';
+    }
   }
 
   function hideRollingStudentContextMenu() {
@@ -7499,6 +7513,89 @@
     const url = new URL('/school/attendances/report', window.location.origin);
     url.searchParams.set('studentIds', sid);
     return url.toString();
+  }
+
+  function normalizeEnrollmentDateYmd(value) {
+    const raw = String(value || '').trim();
+    return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : '';
+  }
+
+  function calendarMonthBoundsFromAnchorYmd(anchorYmd) {
+    const anchor = normalizeEnrollmentDateYmd(anchorYmd);
+    if (!anchor) return { startDate: '', endDate: '' };
+    const year = Number(anchor.slice(0, 4));
+    const monthIndex = Number(anchor.slice(5, 7)) - 1;
+    if (!Number.isFinite(year) || !Number.isFinite(monthIndex) || monthIndex < 0 || monthIndex > 11) {
+      return { startDate: '', endDate: '' };
+    }
+    const startDate = `${anchor.slice(0, 7)}-01`;
+    const endDate = new Date(year, monthIndex + 1, 0).toISOString().slice(0, 10);
+    return { startDate, endDate };
+  }
+
+  function resolveEnrollmentPeriodRowsForStudent(studentId) {
+    const sid = String(studentId || '').trim();
+    if (!sid) return [];
+    return (Array.isArray(periodRows) ? periodRows : [])
+      .filter((row) => String(row?.studentId || '').trim() === sid);
+  }
+
+  function resolveOldestEnrollmentPeriodForStudent(studentId) {
+    const rows = resolveEnrollmentPeriodRowsForStudent(studentId)
+      .slice()
+      .sort((a, b) => String(a?.startDate || '').localeCompare(String(b?.startDate || '')));
+    return rows[0] || null;
+  }
+
+  function resolveRollingStudentAttendanceMatrixMonth(context = {}) {
+    const today = orgTodayFallback();
+    const thisMonth = calendarMonthBoundsFromAnchorYmd(today);
+    const oldest = resolveOldestEnrollmentPeriodForStudent(context?.studentId);
+    if (!oldest) {
+      return { range: 'thisMonth', startDate: thisMonth.startDate, endDate: thisMonth.endDate };
+    }
+    const periodEnd = normalizeEnrollmentDateYmd(oldest.endDate);
+    const periodStart = normalizeEnrollmentDateYmd(oldest.startDate);
+    const anchor = periodEnd || periodStart || today;
+    const enrollmentLastMonth = calendarMonthBoundsFromAnchorYmd(anchor);
+    if (!periodEnd || periodEnd >= thisMonth.startDate) {
+      return { range: 'thisMonth', startDate: thisMonth.startDate, endDate: thisMonth.endDate };
+    }
+    return { range: '', startDate: enrollmentLastMonth.startDate, endDate: enrollmentLastMonth.endDate };
+  }
+
+  function buildRollingStudentAttendanceMatrixUrl(context = {}) {
+    const matrixClassId = String(classId || '').trim();
+    if (!matrixClassId) return '';
+    const personId = String(context?.personId || '').trim();
+    const studentId = String(context?.studentId || '').trim();
+    const studentKey = personId || studentId;
+    if (!studentKey) return '';
+    const month = resolveRollingStudentAttendanceMatrixMonth(context);
+    const params = new URLSearchParams();
+    params.set('classId', matrixClassId);
+    params.set('studentId', studentKey);
+    if (month.range === 'thisMonth') {
+      params.set('range', 'thisMonth');
+    } else {
+      if (month.startDate) params.set('startDate', month.startDate);
+      if (month.endDate) params.set('endDate', month.endDate);
+    }
+    return `/school/attendances?${params.toString()}`;
+  }
+
+  async function openRollingStudentAttendanceMatrixTab(context = {}) {
+    hideRollingStudentContextMenu();
+    if (canOpenAttendanceMatrix !== true) {
+      await showMsg('Permission', 'warning', 'You do not have permission to open the attendance matrix.');
+      return;
+    }
+    const matrixUrl = buildRollingStudentAttendanceMatrixUrl(context);
+    if (!matrixUrl) {
+      await showMsg('Attendance Matrix', 'warning', 'Unable to build the attendance matrix link for this student.');
+      return;
+    }
+    window.open(matrixUrl, '_blank', 'noopener,noreferrer');
   }
 
   async function openRollingStudentAttendanceReportTab(context = {}) {
@@ -14607,6 +14704,10 @@
   qs('rollingStudentContextMenuAttendanceReport')?.addEventListener('click', () => {
     if (!rollingStudentContextState) return;
     openRollingStudentAttendanceReportTab(rollingStudentContextState);
+  });
+  qs('rollingStudentContextMenuAttendanceMatrix')?.addEventListener('click', () => {
+    if (!rollingStudentContextState) return;
+    openRollingStudentAttendanceMatrixTab(rollingStudentContextState);
   });
   qs('rollingStudentAcademicTimelineBody')?.addEventListener('click', (event) => {
     const trigger = event.target.closest('.rolling-academic-timeline-registration-trigger');

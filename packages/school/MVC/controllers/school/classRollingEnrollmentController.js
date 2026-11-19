@@ -1572,6 +1572,7 @@ async function showRollingEnrollmentPage(req, res) {
       canEditStudentClb: await canAccessSchoolOperation(req.user, SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE),
       canViewStudentAcademicOverview: await canAccessSchoolOperation(req.user, SECTIONS.SCHOOL_ACADEMIC_LEDGER, OPERATIONS.READ_ALL),
       canOpenStudentAttendanceReport: (await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip)).canOpenReport,
+      canOpenAttendanceMatrix: (await attendanceAccessService.buildAttendanceAccess(req.user, req.ip)).canOpenMatrix,
       enrollmentCloseReasons,
       canManageEnrollmentCloseReasons
     });

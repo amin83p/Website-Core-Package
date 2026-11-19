@@ -616,14 +616,14 @@
                         <div class="p-3 border-top">
                             <div class="col-12" id="wrap_cellExcuseNotes">
                                 <div class="row g-2 align-items-start" id="wrap_cellExcuseNotesEditor">
-                                    <div class="col-md-8">
+                                    <div class="col-12">
                                         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
                                             <span class="small fw-bold text-secondary">Excuse / reference notes</span>
                                             <button type="button" class="btn btn-outline-secondary btn-sm" id="btnPickCellExcuseReason" title="Pick a frequent excuse reason"><i class="bi bi-ui-checks-grid me-1"></i>Pick reason</button>
                                         </div>
                                         <textarea class="form-control form-control-sm" id="inp_cellExcuseRef" rows="3" placeholder="Add details..."></textarea>
                                     </div>
-                                    <div class="col-md-4">
+                                    <div class="col-12">
                                         <input type="file" class="form-control form-control-sm" id="inp_cellExcuseFile">
                                         <div class="small text-muted mt-1">Attach supporting file if needed.</div>
                                     </div>
@@ -733,6 +733,7 @@ let detailsModalAllowClose = false;
 let detailsModalSnapshot = null;
 let attendanceMatrixBusyToken = null;
 let matrixCellModalBaselineStatus = '';
+let matrixCellModalUserAttendanceChoice = '';
 let attendanceMatrixBusyDepth = 0;
 let attendanceScopedRollupTimer = null;
 const attendanceScopedRollupQueue = new Set();
@@ -1578,6 +1579,8 @@ function readCellAttendanceTimingSavePayload() {
 function resolveCellModalSaveAttendance() {
     const checked = document.querySelector('input[name="modal_cell_attendance"]:checked')?.value;
     if (checked) return String(checked).trim().toLowerCase();
+    const userChoice = String(matrixCellModalUserAttendanceChoice || '').trim().toLowerCase();
+    if (userChoice) return userChoice;
     return String(matrixCellModalBaselineStatus || '').trim().toLowerCase();
 }
 
@@ -1618,6 +1621,7 @@ async function confirmMatrixResetAttendance() {
 
 function applyClearedAttendanceToCellModal() {
     matrixCellModalBaselineStatus = '';
+    matrixCellModalUserAttendanceChoice = '';
     document.querySelectorAll('input[name="modal_cell_attendance"]').forEach((el) => {
         el.checked = false;
     });
@@ -1973,6 +1977,9 @@ function isCellModalAttendanceSectionDirty() {
 
 function isCellModalRosterNoteOrExcuseOnlySave() {
     if (!detailsModalSnapshot) return false;
+    const resolvedAttendance = resolveCellModalSaveAttendance();
+    const baselineAttendance = String(matrixCellModalBaselineStatus || '').trim().toLowerCase();
+    if (resolvedAttendance && resolvedAttendance !== baselineAttendance) return false;
     const current = captureAttendanceDetailsModalSnapshot();
     const noteDirty = current.rosterNote !== detailsModalSnapshot.rosterNote;
     const excuseDirty = current.excuse !== detailsModalSnapshot.excuse
@@ -1980,8 +1987,9 @@ function isCellModalRosterNoteOrExcuseOnlySave() {
     if (!noteDirty && !excuseDirty) return false;
     const baselineUnmarked = String(matrixCellModalBaselineStatus || '').trim() === '';
     const noStatusSelected = !document.querySelector('input[name="modal_cell_attendance"]:checked');
-    if (baselineUnmarked && noStatusSelected) return true;
-    if (isCellModalAttendanceSectionDirty()) return false;
+    const attendanceDirty = isCellModalAttendanceSectionDirty();
+    if (baselineUnmarked && noStatusSelected && !attendanceDirty) return true;
+    if (attendanceDirty) return false;
     return noteDirty || excuseDirty;
 }
 
@@ -3986,7 +3994,10 @@ document.addEventListener('DOMContentLoaded', () => {
         syncAbsenceExcuseControl();
     });
     document.querySelectorAll('input[name="modal_cell_attendance"]').forEach((el) => {
-        el.addEventListener('change', () => syncTimingExcuseControls());
+        el.addEventListener('change', () => {
+            matrixCellModalUserAttendanceChoice = String(el.value || '').trim().toLowerCase();
+            syncTimingExcuseControls();
+        });
     });
 
     const btnResetCellAttendance = document.getElementById('btn_reset_cell_attendance');
@@ -4027,6 +4038,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const sessionId = document.getElementById('modal_sessionId').value;
             const personId = document.getElementById('modal_personId').value;
             const attendance = resolveCellModalSaveAttendance();
+            let rosterNoteOrExcuseOnly = isCellModalRosterNoteOrExcuseOnlySave();
+            if (attendance) rosterNoteOrExcuseOnly = false;
+            const timingPayload = readCellAttendanceTimingSavePayload();
             if (attendance === 'late' && hasCellAttendanceTimingValidationError()) {
                 if (typeof showMessageModal === 'function') {
                     showMessageModal({ title: 'Attendance timing', icon: 'warning', message: document.getElementById('cell_modalAttendanceTimingError')?.textContent || 'Fix timing fields before saving.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
@@ -4050,8 +4064,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
             try {
                 if (!(await ensureAttendanceRequestBudgetAvailable())) return;
-                const timingPayload = readCellAttendanceTimingSavePayload();
-                const rosterNoteOrExcuseOnly = isCellModalRosterNoteOrExcuseOnlySave();
                 const payload = {
                     classId,
                     sessionId,
@@ -4411,6 +4423,7 @@ window.openInteractiveModal = function(studentPersonId, sessionId) {
     let effStatus = known.includes(record.status) ? record.status : '';
     if (record.status === 'excused') effStatus = 'absent';
     matrixCellModalBaselineStatus = effStatus;
+    matrixCellModalUserAttendanceChoice = effStatus;
     syncModalAttendanceOptions(allowed, effStatus);
     document.querySelectorAll('input[name="modal_cell_attendance"]').forEach((el) => {
         el.checked = el.value === effStatus;

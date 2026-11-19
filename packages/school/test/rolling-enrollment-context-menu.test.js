@@ -40,6 +40,19 @@ test('rolling enrollment page syncs search inputs after loadRows', () => {
   assert.match(src, /getElementById\('searchInput'\)/);
 });
 
+test('rolling enrollment student context menu includes attendance matrix deep link', () => {
+  const src = read('packages/school/MVC/views/school/class/rollingEnrollment.ejs');
+  assert.match(src, /rollingStudentContextMenuAttendanceMatrix/);
+  assert.match(src, /buildRollingStudentAttendanceMatrixUrl/);
+  assert.match(src, /resolveRollingStudentAttendanceMatrixMonth/);
+  assert.match(src, /canOpenAttendanceMatrix/);
+});
+
+test('rolling enrollment controller passes canOpenAttendanceMatrix to the view', () => {
+  const src = read('packages/school/MVC/controllers/school/classRollingEnrollmentController.js');
+  assert.match(src, /canOpenAttendanceMatrix:\s*\(await attendanceAccessService\.buildAttendanceAccess\(req\.user, req\.ip\)\)\.canOpenMatrix/);
+});
+
 test('matrix and report views load rolling deep-link script when canOpenRollingEnrollment', () => {
   const files = [
     'packages/school/MVC/views/school/attendance/attendanceViewer.ejs',

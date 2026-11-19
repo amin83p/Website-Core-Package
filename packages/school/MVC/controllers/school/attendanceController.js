@@ -1633,7 +1633,7 @@ async function updateAttendanceRosterCell(req, res) {
         const priorUnmarked = attendanceMatrixMetricsService.isUnmarkedAttendanceStatus(previousAttendance);
         const explicitUnmark = attendanceProvided
             && attendanceMatrixMetricsService.isUnmarkedAttendanceStatus(req.body.attendance);
-        if (priorUnmarked || explicitUnmark) {
+        if (explicitUnmark || (priorUnmarked && !attendanceProvided)) {
             const timingTotals = attendanceMatrixMetricsService.normalizeAttendanceTimingFields(rosterRecord);
             if ((timingTotals.lateMinutes || 0) === 0 && (timingTotals.earlyLeaveMinutes || 0) === 0
                 && attendanceMatrixMetricsService.isAbsentLikeStatus(rosterRecord.attendance)) {
