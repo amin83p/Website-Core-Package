@@ -62,6 +62,21 @@ function stableValueToken(value) {
   }
 }
 
+function coerceDateFieldValue(rawValue) {
+  const text = String(rawValue ?? '').trim();
+  if (!text) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+  const slashDmy = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slashDmy) {
+    const day = String(slashDmy[1]).padStart(2, '0');
+    const month = String(slashDmy[2]).padStart(2, '0');
+    return `${slashDmy[3]}-${month}-${day}`;
+  }
+  const isoPrefix = text.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (isoPrefix) return isoPrefix[1];
+  return normalizeDateOnly(text);
+}
+
 function coercePrefillValueForField(field, rawPrefill) {
   const type = String(field?.type || '').trim().toLowerCase();
   if (type === 'checkbox') {
@@ -70,6 +85,9 @@ function coercePrefillValueForField(field, rawPrefill) {
   if (type === 'number') {
     const n = Number(rawPrefill);
     return Number.isFinite(n) ? n : '';
+  }
+  if (type === 'date') {
+    return coerceDateFieldValue(rawPrefill);
   }
   if (Array.isArray(rawPrefill)) {
     if (rawPrefill.length && rawPrefill.every((item) => item && typeof item === 'object' && Object.prototype.hasOwnProperty.call(item, 'number'))) {
@@ -1008,6 +1026,7 @@ module.exports = {
   evaluateExpressionFieldValue,
   coercePrefillValueForField,
   coerceExpressionValueForField,
+  coerceDateFieldValue,
   stableValueToken,
   resolveGenerationContext,
   buildEphemeralAssignmentContext,

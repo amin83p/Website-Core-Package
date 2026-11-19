@@ -130,6 +130,20 @@ test('resolveInstanceMergedAnswersForDisplay uses renderCache when template vers
   assert.equal(merged.doubled, 999);
 });
 
+test('prepareReportAnswersForUI coerces frozen dd/mm date cache to ISO for date inputs', () => {
+  const template = {
+    schema: { fields: [{ id: 'report_date', type: 'date', label: 'Report Date' }] }
+  };
+  const prepared = reportRuleEngineService.prepareReportAnswersForUI({
+    template,
+    mergedAnswers: { report_date: '31/10/2026' },
+    prefill: {},
+    skipRecalculation: true
+  });
+  assert.equal(prepared.displayAnswers.report_date, '2026-10-31');
+  assert.equal(prepared.calculationAnswers.report_date, '2026-10-31');
+});
+
 test('prepareReportAnswersForUI skipRecalculation avoids changing merged answers', () => {
   const merged = { name: 10, doubled: 'should_stay' };
   const prepared = reportRuleEngineService.prepareReportAnswersForUI({

@@ -164,6 +164,24 @@
     margin-top: 0.15rem;
     word-break: break-all;
   }
+  .prefill-preview-student-section {
+    margin-bottom: 1.25rem;
+  }
+  .prefill-preview-student-section:last-child {
+    margin-bottom: 0;
+  }
+  .prefill-preview-student-section__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-bottom: 0.5rem;
+  }
+  .prefill-preview-student-section__name {
+    font-weight: 600;
+    color: #1e293b;
+    margin: 0;
+  }
 </style>
 <script>
   (function () {
@@ -257,41 +275,87 @@
       `;
     }
 
-    function renderMatrixStudentBlock(student, escapeFn) {
+    const MATRIX_PREFILL_TABLE_HEAD = `
+      <thead>
+        <tr>
+          <th style="width: 48px;">Use</th>
+          <th style="min-width: 180px;">Data source</th>
+          <th>Current on report</th>
+          <th>Stored prefill</th>
+          <th>Live value</th>
+        </tr>
+      </thead>
+    `;
+
+    function renderMatrixStudentTableBody(student, escapeFn) {
       const esc = typeof escapeFn === 'function' ? escapeFn : escapeHtml;
       const disabled = student.locked || student.pending || !student.changes?.length;
-      const status = student.pending ? 'Not started' : (student.locked ? 'Locked' : (student.status || 'Draft'));
-      const statusClass = student.locked ? 'bg-secondary' : (student.pending ? 'bg-warning text-dark' : 'bg-light text-secondary border');
-      const changes = (student.changes || []).map((change) => {
+      const changes = Array.isArray(student.changes) ? student.changes : [];
+      if (!changes.length) {
+        return '<tr><td colspan="5" class="text-center text-muted py-4">No applicable updates.</td></tr>';
+      }
+      return changes.map((change) => {
         const title = resolveChangeTitle(change);
-        const keyMeta = change.prefillKey && !String(change.prefillKey).startsWith('__field__')
-          ? `<div class="prefill-preview-change__meta">${esc(change.prefillKey)}</div>`
+        const keyLine = change.prefillKey && title !== change.prefillKey && !String(change.prefillKey).startsWith('__field__')
+          ? `<div class="prefill-preview-table-sub">${esc(change.prefillKey)}</div>`
           : '';
-        const fieldsHtml = (change.fields || []).map((field) => renderFieldValueTransition(field, 'matrix')).join('');
+        const fields = Array.isArray(change.fields) ? change.fields : [];
+        const skipped = fields.some((field) => field.skippedDueToOverride);
         return `
-          <div class="prefill-preview-change">
-            <label class="prefill-preview-change__select mb-0 w-100">
-              <input type="checkbox" class="form-check-input js-matrix-prefill-key mt-1" data-student-id="${esc(student.studentId)}" data-prefill-key="${esc(change.prefillKey)}" ${disabled ? 'disabled' : ''}>
-              <span class="flex-grow-1">
-                <div class="prefill-preview-change__title">${esc(title)}</div>
-                ${keyMeta}
-                ${fieldsHtml}
-              </span>
-            </label>
-          </div>
+          <tr>
+            <td class="text-center">
+              <input type="checkbox" class="form-check-input js-matrix-prefill-key" data-student-id="${esc(student.studentId)}" data-prefill-key="${esc(change.prefillKey)}" ${disabled ? 'disabled' : ''} ${!disabled && !skipped ? 'checked' : ''}>
+            </td>
+            <td>
+              <div class="prefill-preview-table-title">${esc(title)}</div>
+              ${keyLine}
+            </td>
+            <td>${renderInstanceFieldColumn(fields, 'currentValue', formatPreviewValue)}</td>
+            <td>${renderInstanceFieldColumn(fields, 'oldValue', formatStoredValue)}</td>
+            <td>${renderInstanceFieldColumn(fields, 'newValue', formatNewValue)}</td>
+          </tr>
         `;
       }).join('');
-      return `
-        <div class="prefill-preview-student-card">
-          <div class="prefill-preview-student-card__head">
-            <p class="prefill-preview-student-card__name mb-0">${esc(student.studentName || student.studentId)}</p>
+    }
+
+    function renderMatrixStudentSection(student, escapeFn, options = {}) {
+      const esc = typeof escapeFn === 'function' ? escapeFn : escapeHtml;
+      const status = student.pending ? 'Not started' : (student.locked ? 'Locked' : (student.status || 'Draft'));
+      const statusClass = student.locked ? 'bg-secondary' : (student.pending ? 'bg-warning text-dark' : 'bg-light text-secondary border');
+      const showHead = options.showStudentHead !== false;
+      const headHtml = showHead
+        ? `<div class="prefill-preview-student-section__head">
+            <p class="prefill-preview-student-section__name">${esc(student.studentName || student.studentId)}</p>
             <span class="badge ${statusClass}">${esc(status)}</span>
-          </div>
-          <div class="prefill-preview-student-card__body">
-            ${changes || '<p class="text-muted small mb-0 px-3 py-2">No applicable updates.</p>'}
+          </div>`
+        : '';
+      return `
+        <div class="prefill-preview-student-section">
+          ${headHtml}
+          <div class="table-responsive prefill-preview-table-wrap">
+            <table class="table table-sm align-middle">
+              ${MATRIX_PREFILL_TABLE_HEAD}
+              <tbody>${renderMatrixStudentTableBody(student, esc)}</tbody>
+            </table>
           </div>
         </div>
       `;
+    }
+
+    function renderMatrixPrefillTables(students, escapeFn, options = {}) {
+      const list = Array.isArray(students) ? students : [];
+      if (!list.length) {
+        return '<p class="text-muted mb-0">No student rows were found.</p>';
+      }
+      const hideStudentHead = options.hideStudentHead === true;
+      const showHeadDefault = list.length > 1 && !hideStudentHead;
+      return list.map((student) => renderMatrixStudentSection(student, escapeFn, {
+        showStudentHead: showHeadDefault
+      })).join('');
+    }
+
+    function renderMatrixStudentBlock(student, escapeFn) {
+      return renderMatrixStudentSection(student, escapeFn, { showStudentHead: true });
     }
 
     function renderInstanceFieldColumn(fields, valueKey, formatter) {
@@ -339,6 +403,8 @@
       resolveChangeTitle,
       formatPreviewValue,
       renderMatrixStudentBlock,
+      renderMatrixStudentSection,
+      renderMatrixPrefillTables,
       renderInstanceTableRows
     };
   })();

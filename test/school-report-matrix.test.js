@@ -147,6 +147,38 @@ test('matrix keeps overall attendance day rows student-specific even when values
   );
 });
 
+test('matrix semi-monthly calculated report_date ignores stale sharedAnswers', () => {
+  const template = {
+    schema: {
+      fields: [{
+        id: 'report_date',
+        type: 'date',
+        label: 'Report Date',
+        readOnly: true,
+        sharedAcrossStudents: true,
+        valueMode: 'calculated',
+        calculationRule: {
+          enabled: true,
+          expression: 'formatSemiMonthlyDueDate(prefill.report_period_due_date, "dd/mm/yyyy")',
+          onError: 'keep_last'
+        }
+      }]
+    }
+  };
+  const rows = [{
+    answers: { report_date: '2026-10-29' },
+    calculationAnswers: { report_date: '2026-10-29' },
+    calculationPrefill: { report_period_due_date: '2026-10-29' }
+  }];
+  const groups = reportMatrixService.classifyMatrixFields(template, rows, {
+    reportScope: 'each_student',
+    sharedAnswers: { report_date: '2026-10-29' }
+  }, { reportDueDate: '2026-10-29' });
+  const reportDateField = groups.commonFields.find((field) => field.id === 'report_date');
+  assert.ok(reportDateField, 'expected shared calculated report_date in common fields');
+  assert.equal(reportDateField.value, '2026-10-31');
+});
+
 test('matrix marks an unsaved shared value as conflicting instead of choosing a student value', () => {
   const template = {
     schema: { fields: [{ id: 'shared_goal', type: 'text', label: 'Goal', sharedAcrossStudents: true }] }
@@ -157,6 +189,76 @@ test('matrix marks an unsaved shared value as conflicting instead of choosing a 
   ], { reportScope: 'selected_students', sharedAnswers: {} });
   assert.equal(groups.sharedFields[0].value, '');
   assert.equal(groups.sharedFields[0].hasConflictingInitialValues, true);
+});
+
+test('matrix keeps common and trailing common fields in template order around shared editables', () => {
+  const template = {
+    schema: {
+      fields: [
+        { id: 'class_name', type: 'text', readOnly: true, prefillKey: 'class_name' },
+        {
+          id: 'report_date',
+          type: 'date',
+          label: 'Report Date',
+          readOnly: true,
+          sharedAcrossStudents: true,
+          valueMode: 'calculated'
+        },
+        { id: 'teacher_name', type: 'text', readOnly: true, prefillKey: 'teacher_name' },
+        { id: '__section_additional', type: 'section', label: '2 - Additional Information Provided by Equilibrium school' },
+        { id: 'shared_goal', type: 'textarea', sharedAcrossStudents: true },
+        { id: '__sub_additional_notes', type: 'subheader', label: 'Additional Notes' },
+        {
+          id: 'futuregoal_additionalnotes',
+          type: 'textarea',
+          label: 'Additional Notes',
+          readOnly: true,
+          sharedAcrossStudents: true
+        },
+        { id: 'comment', type: 'text' }
+      ]
+    }
+  };
+  const rows = [
+    { answers: { class_name: 'A', report_date: '2026-03-01', teacher_name: 'T', shared_goal: 'G', futuregoal_additionalnotes: 'Note', comment: '1' } },
+    { answers: { class_name: 'A', report_date: '2026-03-01', teacher_name: 'T', shared_goal: 'G', futuregoal_additionalnotes: 'Note', comment: '2' } }
+  ];
+  const groups = reportMatrixService.classifyMatrixFields(template, rows, { sharedAnswers: {} });
+  assert.deepEqual(groups.commonFields.map((field) => field.id), ['class_name', 'report_date', 'teacher_name']);
+  assert.deepEqual(groups.sharedFields.map((field) => field.id), ['shared_goal']);
+  assert.deepEqual(groups.commonFieldsTrailing.map((field) => field.id), ['futuregoal_additionalnotes']);
+  assert.deepEqual(groups.tableFields.map((field) => field.id), ['comment']);
+  assert.equal(groups.sharedGroups.length, 1);
+  assert.match(groups.sharedGroups[0].label, /Additional Information Provided by Equilibrium school/);
+  assert.deepEqual(groups.sharedGroups[0].fields.map((field) => field.id), ['shared_goal', 'futuregoal_additionalnotes']);
+  assert.equal(groups.sharedGroups[0].fields[1].renderInSharedSection, true);
+});
+
+test('matrix promotes shared calculated report context fields to common instead of student columns', () => {
+  const template = {
+    schema: {
+      fields: [
+        { id: 'student_full_name', type: 'text', readOnly: true, prefillKey: 'student_full_name' },
+        {
+          id: 'report_date',
+          type: 'date',
+          label: 'Report Date',
+          readOnly: true,
+          sharedAcrossStudents: true,
+          valueMode: 'calculated',
+          calculationRule: { enabled: true, expression: 'prefill.report_date', onError: 'keep_last' }
+        },
+        { id: 'comment', type: 'text' }
+      ]
+    }
+  };
+  const rows = [
+    { answers: { student_full_name: 'Alice', report_date: '2026-03-01', comment: 'A' } },
+    { answers: { student_full_name: 'Bob', report_date: '2026-03-01', comment: 'B' } }
+  ];
+  const groups = reportMatrixService.classifyMatrixFields(template, rows, { sharedAnswers: {} });
+  assert.deepEqual(groups.commonFields.map((field) => field.id), ['report_date']);
+  assert.deepEqual(groups.tableFields.map((field) => field.id), ['comment']);
 });
 
 test('matrix classifies report context prefill fields as common using rendered answers', () => {
@@ -438,9 +540,9 @@ test('matrix groups shared fields by configured sections and preserves full-widt
   const groups = reportMatrixService.classifyMatrixFields(template, [
     { answers: { shared_a: 'A', shared_b: 'B', student_value: 'X' } }
   ], { reportScope: 'each_student', sharedAnswers: {} });
-  assert.deepEqual(groups.sharedGroups.map((group) => group.label), ['Overview', 'Overview / Notes']);
+  assert.deepEqual(groups.sharedGroups.map((group) => group.label), ['Overview']);
   assert.equal(groups.sharedGroups[0].fields[0].fullPageWidth, true);
-  assert.equal(groups.sharedGroups[1].fields[0].id, 'shared_b');
+  assert.deepEqual(groups.sharedGroups[0].fields.map((field) => field.id), ['shared_a', 'shared_b']);
 });
 
 test('saving a pending matrix row stores its Report Instance prefill snapshot', async () => {
@@ -619,6 +721,8 @@ test('report matrix routes and UI expose bulk actions, grouping, and accessible 
   assert.match(routes, /requireReportMatrixEditorAccess/);
   assert.match(matrixView, /matrix-student-col/);
   assert.match(matrixView, /matrix-student-tools/);
+  assert.match(matrixView, /id="reportMatrixTableModalHost"[^>]*report-matrix-table-scope/);
+  assert.match(matrixView, /report-matrix-table-scope \.matrix-row-icon-btn/);
   assert.match(matrixView, /matrix-status-icon/);
   assert.match(matrixView, /matrix-row-icon-btn js-matrix-open/);
   assert.doesNotMatch(matrixView, /matrix-actions-col/);
@@ -656,6 +760,8 @@ test('report matrix routes and UI expose bulk actions, grouping, and accessible 
   assert.match(matrixView, /id="reportMatrixTableModal"/);
   assert.match(matrixView, /portalReportMatrixModalsToBody/);
   assert.match(matrixView, /id="reportMatrixTableInlineHost"/);
+  assert.match(matrixView, /syncReportMatrixInlineTableHeight/);
+  assert.doesNotMatch(matrixView, /matrix-table-wrap--inline[\s\S]{0,120}min-height:\s*32rem/);
   assert.match(matrixView, /Open expanded view/);
   assert.match(matrixView, /matrix-context-card/);
   assert.match(matrixView, /matrix-context-label/);
@@ -698,7 +804,7 @@ test('report matrix EJS renders supported controls and locked row state', async 
       { id: 'attended', label: 'Attended', type: 'select', readOnly: false, options: [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }] },
       { id: 'level', label: 'Level', type: 'select', readOnly: false, options: [{ value: 'good', label: 'Good' }] },
       { id: 'done', label: 'Done', type: 'checkbox', readOnly: false, options: [] },
-      { id: 'note', label: 'Note', type: 'text', readOnly: false, options: [] },
+      { id: 'note', label: 'Notes', type: 'text', readOnly: false, options: [] },
       { id: 'prefill_only', label: 'Prefill', type: 'text', readOnly: true, options: [] }
     ],
     rows: [{
@@ -741,7 +847,8 @@ test('report matrix EJS renders supported controls and locked row state', async 
   assert.match(html, /id="reportMatrixNoteModal"/);
   assert.match(html, /js-matrix-note-open[^>]*disabled/);
   assert.match(html, /js-matrix-note-value[^>]*data-field-id="note"[^>]*value="Complete"/);
-  assert.match(html, /Edit note/);
+  assert.match(html, /<span class="js-matrix-note-btn-label">Notes<\/span>/);
+  assert.doesNotMatch(html, /<span class="js-matrix-note-btn-label">(?:Add note|Edit note|Note)<\/span>/);
   const matrixThead = html.match(/<thead class="table-light">[\s\S]*?<\/thead>/)?.[0] || '';
   assert.doesNotMatch(matrixThead, /data-matrix-field-id="prefill_only"[\s\S]*js-matrix-column-apply-all/);
 });

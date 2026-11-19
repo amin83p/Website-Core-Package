@@ -45,6 +45,29 @@ test('formatSemiMonthlyDueDate maps first half to the 15th', () => {
   assert.equal(result, '15/03/2026');
 });
 
+test('formatSemiMonthlyDueDate via prefill.report_period_due_date coerces to date field storage', () => {
+  const template = {
+    schema: {
+      fields: [{
+        id: 'report_date',
+        type: 'date',
+        valueMode: 'calculated',
+        calculationRule: {
+          enabled: true,
+          expression: 'formatSemiMonthlyDueDate(prefill.report_period_due_date, "dd/mm/yyyy")',
+          onError: 'keep_last'
+        }
+      }]
+    }
+  };
+  const { answers } = reportRuleEngineService.recomputeCalculatedAnswers({
+    template,
+    mergedAnswers: {},
+    prefill: { report_period_due_date: '2026-10-29' }
+  });
+  assert.equal(answers.report_date, '2026-10-31');
+});
+
 test('formatSemiMonthlyDueDate maps second half to month end', () => {
   const expr = 'formatSemiMonthlyDueDate(source("T1", "report_period_due_date"), "dd/mm/yyyy")';
   assert.equal(

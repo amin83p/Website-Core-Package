@@ -41,6 +41,85 @@
     return out;
   }
 
+  function parseDateParts(value) {
+    const text = String(value ?? '').trim();
+    if (!text) return null;
+    const isoDate = text.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s].*)?$/);
+    if (isoDate) {
+      return { year: isoDate[1], month: isoDate[2], day: isoDate[3] };
+    }
+    const slashDmy = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (slashDmy) {
+      return {
+        year: slashDmy[3],
+        month: String(slashDmy[2]).padStart(2, '0'),
+        day: String(slashDmy[1]).padStart(2, '0')
+      };
+    }
+    const parsed = new Date(text);
+    if (Number.isNaN(parsed.getTime())) return null;
+    return {
+      year: String(parsed.getFullYear()),
+      month: String(parsed.getMonth() + 1).padStart(2, '0'),
+      day: String(parsed.getDate()).padStart(2, '0')
+    };
+  }
+
+  function formatDateWithPattern(parts, pattern = 'dd/mm/yyyy') {
+    if (!parts) return '';
+    const token = String(pattern || 'dd/mm/yyyy').trim().toLowerCase();
+    const year = String(parts.year || '');
+    const month = String(parts.month || '').padStart(2, '0');
+    const day = String(parts.day || '').padStart(2, '0');
+    if (!year || !month || !day) return '';
+    return token
+      .replace(/yyyy/g, year)
+      .replace(/yy/g, year.slice(-2))
+      .replace(/mm/g, month)
+      .replace(/dd/g, day);
+  }
+
+  function resolveSemiMonthlyAnchorDateParts(value) {
+    const parts = parseDateParts(value);
+    if (!parts) return null;
+    const dayNum = Number(parts.day);
+    const yearNum = Number(parts.year);
+    const monthNum = Number(parts.month);
+    if (!Number.isFinite(dayNum) || dayNum < 1 || !Number.isFinite(yearNum) || !Number.isFinite(monthNum)) {
+      return null;
+    }
+    if (dayNum <= 15) {
+      return { year: parts.year, month: parts.month, day: '15' };
+    }
+    const lastDay = new Date(yearNum, monthNum, 0).getDate();
+    return {
+      year: parts.year,
+      month: parts.month,
+      day: String(lastDay).padStart(2, '0')
+    };
+  }
+
+  function coerceDateFieldValue(rawValue) {
+    const text = String(rawValue ?? '').trim();
+    if (!text) return '';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+    const parts = parseDateParts(text);
+    if (!parts) return text;
+    return `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
+  }
+
+  function coerceDateFieldAnswers(fields, answers = {}) {
+    const out = answers && typeof answers === 'object' ? { ...answers } : {};
+    (Array.isArray(fields) ? fields : []).forEach((field) => {
+      const fieldId = String(field?.id || '').trim();
+      if (!fieldId || String(field?.type || '').trim().toLowerCase() !== 'date') return;
+      if (!Object.prototype.hasOwnProperty.call(out, fieldId)) return;
+      const coerced = coerceDateFieldValue(out[fieldId]);
+      if (coerced) out[fieldId] = coerced;
+    });
+    return out;
+  }
+
   function helpers() {
     return {
       num(value, fallback = 0) {
@@ -91,6 +170,12 @@
         }
         if (branches.length % 2 === 1) return branches[branches.length - 1];
         return '';
+      },
+      formatDate(value, pattern = 'dd/mm/yyyy') {
+        return formatDateWithPattern(parseDateParts(value), pattern);
+      },
+      formatSemiMonthlyDueDate(value, pattern = 'dd/mm/yyyy') {
+        return formatDateWithPattern(resolveSemiMonthlyAnchorDateParts(value), pattern);
       }
     };
   }
@@ -376,7 +461,12 @@
       if (!rule.enabled || !rule.expression) return;
       const previousValue = nextAnswers[fieldId];
       try {
-        nextAnswers[fieldId] = evaluateExpression(rule.expression, { value: previousValue, answers: nextAnswers, prefill: safePrefill });
+        let nextValue = evaluateExpression(rule.expression, { value: previousValue, answers: nextAnswers, prefill: safePrefill });
+        if (String(field?.type || '').trim().toLowerCase() === 'date') {
+          const coerced = coerceDateFieldValue(nextValue);
+          nextValue = coerced || '';
+        }
+        nextAnswers[fieldId] = nextValue;
       } catch (error) {
         nextAnswers[fieldId] = rule.onError === 'empty' ? '' : previousValue;
         diagnostics.push({ fieldId, error: error.message, onError: rule.onError });
@@ -463,9 +553,11 @@
       answers: calculationAnswers,
       prefill
     });
+    const coercedCalculation = coerceDateFieldAnswers(fields, calculationAnswers);
+    const coercedDisplay = coerceDateFieldAnswers(fields, displayResult.answers);
     return {
-      calculationAnswers,
-      displayAnswers: displayResult.answers,
+      calculationAnswers: coercedCalculation,
+      displayAnswers: coercedDisplay,
       diagnostics: recalculated.diagnostics || [],
       orderedIds: recalculated.orderedIds || []
     };

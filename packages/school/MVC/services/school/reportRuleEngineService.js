@@ -1067,11 +1067,28 @@ function recomputeCalculatedAnswers({ template, mergedAnswers = {}, prefill = {}
     const previousValue = base[fieldId];
 
     try {
-      const nextValue = evaluateSafeExpression(calcRule.expression, {
+      const rawValue = evaluateSafeExpression(calcRule.expression, {
         value: previousValue,
         answers: base,
         prefill: prefillSafe
       });
+      let nextValue = rawValue;
+      const fieldType = String(field?.type || '').trim().toLowerCase();
+      if (fieldType === 'date') {
+        const parts = parseDateParts(rawValue);
+        nextValue = parts
+          ? `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`
+          : '';
+      } else if (fieldType === 'number') {
+        const n = Number(rawValue);
+        nextValue = Number.isFinite(n) ? n : '';
+      } else if (rawValue === undefined || rawValue === null) {
+        nextValue = '';
+      } else if (typeof rawValue !== 'string') {
+        nextValue = rawValue;
+      } else {
+        nextValue = rawValue.trim();
+      }
       base[fieldId] = nextValue;
     } catch (error) {
       if (calcRule.onError === 'empty') {
@@ -1139,6 +1156,21 @@ function templateForSnapshotComputation(template) {
   }
 }
 
+function coerceDateFieldAnswersForUI(template, answers = {}) {
+  const out = answers && typeof answers === 'object' ? { ...answers } : {};
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  fields.forEach((field) => {
+    const fieldId = String(field?.id || '').trim();
+    if (!fieldId || String(field?.type || '').trim().toLowerCase() !== 'date') return;
+    if (!Object.prototype.hasOwnProperty.call(out, fieldId)) return;
+    const parts = parseDateParts(out[fieldId]);
+    if (parts) {
+      out[fieldId] = `${parts.year}-${String(parts.month).padStart(2, '0')}-${String(parts.day).padStart(2, '0')}`;
+    }
+  });
+  return out;
+}
+
 function prepareReportAnswersForUI({
   template,
   mergedAnswers = {},
@@ -1159,11 +1191,13 @@ function prepareReportAnswersForUI({
     diagnostics = recalculated.diagnostics || [];
     orderedIds = recalculated.orderedIds || [];
   }
-  const displayAnswers = applyReadOnlyDisplayConversions({
+  calculationAnswers = coerceDateFieldAnswersForUI(template, calculationAnswers);
+  let displayAnswers = applyReadOnlyDisplayConversions({
     template,
     mergedAnswers: calculationAnswers,
     prefill
   });
+  displayAnswers = coerceDateFieldAnswersForUI(template, displayAnswers);
   return {
     calculationAnswers,
     displayAnswers,

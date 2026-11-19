@@ -893,17 +893,25 @@ window.__schoolRollingEnrollmentAccess = { canOpen: true };
     if (!instances.length) {
       return '<span class="text-muted small">No matching report instances in this period.</span>';
     }
-    return `<div class="smmr-instance-list">${instances.map((row) => `
+    return `<div class="smmr-instance-list">${instances.map((row) => {
+      const v2Url = String(row.editV2Url || '').trim();
+      const reviewBtn = v2Url
+        ? `<a href="${escapeHtml(v2Url)}" class="btn btn-outline-primary btn-sm py-0 px-2" target="_blank" rel="noopener noreferrer" title="Open in Report Instance (V2)"><i class="bi bi-layout-text-window-reverse me-1" aria-hidden="true"></i>Review</a>`
+        : '';
+      return `
       <div class="smmr-instance-item">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2">
           <div class="min-w-0">
-            <a href="${escapeHtml(row.editUrl || '#')}" class="fw-semibold small text-decoration-none" target="_blank" rel="noopener noreferrer">${escapeHtml(row.templateLabel || row.id)}</a>
+            <span class="fw-semibold small">${escapeHtml(row.templateLabel || row.id)}</span>
             <div class="text-muted" style="font-size:0.72rem;">${escapeHtml(row.sessionDate || '')}${row.assignmentId ? ` · ${escapeHtml(row.assignmentId)}` : ''}</div>
           </div>
-          <span class="badge ${statusBadgeClass(row.status)} text-uppercase">${escapeHtml(row.status || 'draft')}</span>
+          <div class="d-flex flex-wrap align-items-center gap-2 flex-shrink-0">
+            ${reviewBtn}
+            <span class="badge ${statusBadgeClass(row.status)} text-uppercase">${escapeHtml(row.status || 'draft')}</span>
+          </div>
         </div>
-      </div>
-    `).join('')}</div>`;
+      </div>`;
+    }).join('')}</div>`;
   }
 
   function buildStudentSection(student, startDate, endDate) {

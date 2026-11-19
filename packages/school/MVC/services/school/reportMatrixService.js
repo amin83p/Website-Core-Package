@@ -73,7 +73,38 @@ function isPerStudentSessionRatingField(field = {}) {
 }
 
 function fieldPrefillTokens(field = {}) {
-  return [clean(field.prefillKey).toLowerCase(), clean(field.id).toLowerCase()].filter(Boolean);
+  const tokens = new Set(
+    [clean(field.prefillKey).toLowerCase(), clean(field.id).toLowerCase()].filter(Boolean)
+  );
+  const expression = String(field?.calculationRule?.expression || '');
+  const refPattern = /\bprefill\.([A-Za-z_][A-Za-z0-9_]*)/g;
+  let match = refPattern.exec(expression);
+  while (match) {
+    tokens.add(String(match[1] || '').toLowerCase());
+    match = refPattern.exec(expression);
+  }
+  return [...tokens];
+}
+
+function resolveCommonCalculatedFieldValue(field, rows = [], template) {
+  const fieldId = clean(field.id);
+  if (!fieldId || !Array.isArray(rows) || !rows.length || !template) return null;
+  const row = rows.find((item) => item?.calculationPrefill || item?.calculationAnswers || item?.answers) || rows[0];
+  const merged = row?.calculationAnswers && typeof row.calculationAnswers === 'object'
+    ? { ...row.calculationAnswers }
+    : (row?.answers && typeof row.answers === 'object' ? { ...row.answers } : {});
+  const prefill = row?.calculationPrefill && typeof row.calculationPrefill === 'object'
+    ? row.calculationPrefill
+    : {};
+  const prepared = reportRuleEngineService.prepareReportAnswersForUI({
+    template,
+    mergedAnswers: merged,
+    prefill,
+    skipRecalculation: false
+  });
+  const value = prepared.displayAnswers?.[fieldId];
+  if (value === undefined || value === null || value === '') return null;
+  return value;
 }
 
 function isCommonContextPrefillField(field = {}) {
@@ -86,8 +117,23 @@ function isCommonContextPrefillField(field = {}) {
   return fieldPrefillTokens(field).some((token) => COMMON_CONTEXT_PREFILL_KEYS.has(token));
 }
 
-function resolveCommonFieldValue(field, rows = [], sharedAnswers = {}, contextHints = {}) {
+function fieldHasCalculationExpression(field = {}) {
+  const rule = field?.calculationRule || {};
+  if (rule.enabled === false) return false;
+  return Boolean(String(rule.expression || '').trim());
+}
+
+function resolveCommonFieldValue(field, rows = [], sharedAnswers = {}, contextHints = {}, template = null) {
   const fieldId = clean(field.id);
+  if (template && isCalculatedField(field) && fieldHasCalculationExpression(field)) {
+    let computed = null;
+    try {
+      computed = resolveCommonCalculatedFieldValue(field, rows, template);
+    } catch (_) {
+      computed = null;
+    }
+    if (computed !== null) return computed;
+  }
   if (Object.prototype.hasOwnProperty.call(sharedAnswers, fieldId)) {
     return sharedAnswers[fieldId];
   }
@@ -138,7 +184,17 @@ function buildFieldHelpText(field = {}) {
   return [...new Set(parts)].join(' ');
 }
 
+function coerceMatrixFieldValue(field, value) {
+  if (clean(field?.type).toLowerCase() !== 'date') return value;
+  const coerced = reportGenerationEngineService.coerceDateFieldValue(value);
+  return coerced || value;
+}
+
 function toFieldDto(field = {}, extra = {}) {
+  const patchedExtra = { ...extra };
+  if (Object.prototype.hasOwnProperty.call(patchedExtra, 'value')) {
+    patchedExtra.value = coerceMatrixFieldValue(field, patchedExtra.value);
+  }
   return {
     id: clean(field.id),
     label: clean(field.label || field.id || 'Field'),
@@ -177,7 +233,7 @@ function toFieldDto(field = {}, extra = {}) {
             || String(field.conversionRule.applyOnReadOnlyDisplay || '').toLowerCase() === 'true'
         }
       : { enabled: false, expression: '', onError: 'use_raw', applyOnReadOnlyDisplay: false },
-    ...extra
+    ...patchedExtra
   };
 }
 
@@ -228,6 +284,25 @@ function buildFieldSectionMap(template) {
       return;
     }
     if (field?.id && !isVisualField(field)) sectionMap.set(clean(field.id), current);
+  });
+  return sectionMap;
+}
+
+/** Fill Reports shared accordion: one group per template section (subheaders stay in the same section). */
+function buildMatrixSharedSectionMap(template) {
+  const sectionMap = new Map();
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  let current = { id: 'shared-default', label: 'Shared fields' };
+  fields.forEach((field, index) => {
+    const type = clean(field?.type).toLowerCase();
+    if (type === 'section') {
+      current = {
+        id: clean(field.id) || `section-${index + 1}`,
+        label: clean(field.label) || 'Shared fields'
+      };
+      return;
+    }
+    if (field?.id && !isVisualField(field)) sectionMap.set(clean(field.id), { ...current });
   });
   return sectionMap;
 }
@@ -355,7 +430,7 @@ async function buildStudentMatrixRow({
 function classifyMatrixFields(template, rows, assignment, contextHints = {}) {
   const fields = (Array.isArray(template?.schema?.fields) ? template.schema.fields : [])
     .filter((field) => field?.id && !isVisualField(field));
-  const sectionMap = buildFieldSectionMap(template);
+  const sectionMap = buildMatrixSharedSectionMap(template);
   const dtoExtras = (field) => {
     const section = sectionMap.get(clean(field.id)) || { id: 'shared-default', label: 'Shared fields' };
     return { sectionId: section.id, sectionLabel: section.label };
@@ -371,8 +446,24 @@ function classifyMatrixFields(template, rows, assignment, contextHints = {}) {
     && isReadOnlyField(field)
     && !isCalculatedField(field)
   ));
-  const consumed = new Set([...studentNameFields, ...sharedFields, ...sharedReadOnlyFields].map((field) => clean(field.id)));
-  const commonReadOnlyFields = [...sharedReadOnlyFields];
+  const sharedCommonCalculatedFields = fields.filter((field) => (
+    field.sharedAcrossStudents === true
+    && isCalculatedField(field)
+    && fieldPrefillTokens(field).some((token) => COMMON_CONTEXT_PREFILL_KEYS.has(token))
+  ));
+  const fieldIndexById = new Map(fields.map((field, index) => [clean(field.id), index]));
+  const commonFieldIdSet = new Set();
+  const markCommonField = (field) => {
+    commonFieldIdSet.add(clean(field.id));
+  };
+  sharedReadOnlyFields.forEach(markCommonField);
+  sharedCommonCalculatedFields.forEach(markCommonField);
+  const consumed = new Set([
+    ...studentNameFields,
+    ...sharedFields,
+    ...sharedReadOnlyFields,
+    ...sharedCommonCalculatedFields
+  ].map((field) => clean(field.id)));
 
   fields.forEach((field) => {
     if (
@@ -383,14 +474,31 @@ function classifyMatrixFields(template, rows, assignment, contextHints = {}) {
       || isPerStudentSessionRatingField(field)
     ) return;
     if (isCommonContextPrefillField(field)) {
-      commonReadOnlyFields.push(field);
+      markCommonField(field);
       consumed.add(clean(field.id));
       return;
     }
     const values = rows.map((row) => row.answers?.[field.id]);
     if (valuesAreIdentical(values)) {
-      commonReadOnlyFields.push(field);
+      markCommonField(field);
       consumed.add(clean(field.id));
+    }
+  });
+
+  const commonReadOnlyFields = fields.filter((field) => commonFieldIdSet.has(clean(field.id)));
+  let lastSharedEditableIndex = -1;
+  sharedFields.forEach((field) => {
+    const index = fieldIndexById.get(clean(field.id));
+    if (typeof index === 'number' && index > lastSharedEditableIndex) lastSharedEditableIndex = index;
+  });
+  const commonFieldsLeading = [];
+  const commonFieldsTrailing = [];
+  commonReadOnlyFields.forEach((field) => {
+    const index = fieldIndexById.get(clean(field.id));
+    if (lastSharedEditableIndex >= 0 && typeof index === 'number' && index > lastSharedEditableIndex) {
+      commonFieldsTrailing.push(field);
+    } else {
+      commonFieldsLeading.push(field);
     }
   });
 
@@ -409,15 +517,20 @@ function classifyMatrixFields(template, rows, assignment, contextHints = {}) {
     });
   });
 
-  const commonFieldDtos = commonReadOnlyFields.map((field) => toFieldDto(field, {
+  const toCommonFieldDto = (field) => toFieldDto(field, {
     ...dtoExtras(field),
-    value: resolveCommonFieldValue(field, rows, sharedAnswers, contextHints)
-  }));
+    value: resolveCommonFieldValue(field, rows, sharedAnswers, contextHints, template)
+  });
+  const commonFieldDtos = commonFieldsLeading.map(toCommonFieldDto);
+  const commonFieldsTrailingDtos = commonFieldsTrailing.map(toCommonFieldDto);
   const tableFields = fields
     .filter((field) => !consumed.has(clean(field.id)))
     .map((field) => toFieldDto(field, dtoExtras(field)));
 
-  const fieldDtosById = new Map(sharedFieldDtos.map((field) => [field.id, field]));
+  const fieldDtosById = new Map([
+    ...sharedFieldDtos,
+    ...commonFieldsTrailingDtos.map((field) => ({ ...field, renderInSharedSection: true }))
+  ].map((field) => [field.id, field]));
   const sharedGroups = [];
   const groupsById = new Map();
   fields.forEach((field) => {
@@ -436,6 +549,7 @@ function classifyMatrixFields(template, rows, assignment, contextHints = {}) {
   return {
     sharedFields: sharedFieldDtos,
     commonFields: commonFieldDtos,
+    commonFieldsTrailing: commonFieldsTrailingDtos,
     sharedGroups,
     tableFields,
     studentNameFieldIds: studentNameFields.map((field) => clean(field.id))
@@ -948,10 +1062,22 @@ async function resolveMatrixData({ assignmentId, assignmentRowId = '', teacherId
   return { ...resolved, assignmentRowId: effectiveRowId, resolvedTeacherId, instances, template, assignment, targetStudentIds };
 }
 
-async function buildMatrixPrefillPreview({ assignmentId, assignmentRowId = '', teacherId = '', reqUser } = {}) {
+async function buildMatrixPrefillPreview({ assignmentId, assignmentRowId = '', teacherId = '', studentId = '', reqUser } = {}) {
   const source = await resolveMatrixData({ assignmentId, assignmentRowId, teacherId, reqUser });
+  const filterStudentId = clean(studentId);
+  let targetStudentIds = Array.isArray(source.targetStudentIds) ? [...source.targetStudentIds] : [];
+  if (filterStudentId) {
+    const allowed = targetStudentIds.some((id) => idsEqual(id, filterStudentId));
+    if (!allowed) {
+      const error = new Error('Student is not on this report matrix.');
+      error.statusCode = 400;
+      throw error;
+    }
+    targetStudentIds = [filterStudentId];
+  }
   const students = [];
-  for (const studentId of source.targetStudentIds) {
+  for (const loopStudentId of targetStudentIds) {
+    const studentId = loopStudentId;
     const instance = findMatchingInstance(source.instances, { assignmentId: source.assignment.id, assignmentRowId: source.assignmentRowId, teacherId: source.resolvedTeacherId, studentId });
     const row = await buildStudentMatrixRow({ assignment: source.assignment, template: source.template, teacherId: source.resolvedTeacherId, studentId, instance, reqUser });
     if (!instance) {
@@ -1179,6 +1305,7 @@ async function buildMatrixExportPayload({ assignmentId, assignmentRowId = '', te
       source.assignmentRowId || source.assignment?.assignmentRowId || ''
     ),
     commonFields: matrix.commonFields,
+    commonFieldsTrailing: matrix.commonFieldsTrailing,
     sharedFields: matrix.sharedFields,
     rows
   };
@@ -1193,6 +1320,7 @@ module.exports = {
   valuesAreIdentical,
   buildFieldHelpText,
   buildFieldSectionMap,
+  buildMatrixSharedSectionMap,
   buildCalculationPrefill,
   findMatchingInstance,
   classifyMatrixFields,

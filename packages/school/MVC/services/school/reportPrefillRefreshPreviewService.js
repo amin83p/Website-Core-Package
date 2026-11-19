@@ -1,6 +1,7 @@
 const reportService = require('./reportService');
 const reportRuleEngineService = require('./reportRuleEngineService');
 const reportGenerationEngineService = require('./reportGenerationEngineService');
+const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
 const { getPrefillValue, isAutoRefreshPrefillKey } = require('./reportPrefillKeyUtils');
 
 function isVisualOnlyField(field = {}) {
@@ -10,6 +11,38 @@ function isVisualOnlyField(field = {}) {
 
 function stableValueToken(value) {
   return reportGenerationEngineService.stableValueToken(value);
+}
+
+function stableValueTokenForField(field, value) {
+  const type = String(field?.type || '').trim().toLowerCase();
+  if (type === 'date') {
+    const coerced = reportGenerationEngineService.coerceDateFieldValue(value);
+    if (coerced) return stableValueToken(coerced);
+  }
+  return stableValueToken(value);
+}
+
+function resolveStoredFieldValue(field, instance, assignment) {
+  const fieldId = String(field?.id || '').trim();
+  if (!fieldId) return undefined;
+  if (field.sharedAcrossStudents === true && assignment) {
+    const shared = reportAssignmentModel.resolveSharedAnswersForRow(
+      assignment,
+      instance?.assignmentRowId || assignment?.assignmentRowId || assignment?.rowId || ''
+    );
+    if (Object.prototype.hasOwnProperty.call(shared, fieldId)) {
+      return shared[fieldId];
+    }
+  }
+  return instance?.answers?.[fieldId];
+}
+
+function resolveRawCachedFieldValue(instance, template, fieldId) {
+  const tid = String(template?.id || '').trim();
+  const rc = instance?.renderCache;
+  if (!rc?.mergedAnswers || typeof rc.mergedAnswers !== 'object') return undefined;
+  if (tid && String(rc.templateId || '').trim() !== tid) return undefined;
+  return rc.mergedAnswers[fieldId];
 }
 
 function coercePrefillValueForField(field, rawPrefill) {
@@ -149,8 +182,15 @@ async function buildPrefillRefreshPreview({ instance, template, assignment, reqU
     const persistedVal = persistedDisplayAnswers[fieldId];
     const gridVal = gridDisplay ? gridDisplay[fieldId] : undefined;
     const refreshedVal = refreshedAnswers[fieldId];
-    const baselineVersusTarget = stableValueToken(persistedVal) !== stableValueToken(refreshedVal);
-    const gridVersusTarget = gridDisplay && stableValueToken(gridVal) !== stableValueToken(refreshedVal);
+    const baselineVersusTarget = stableValueTokenForField(field, persistedVal) !== stableValueTokenForField(field, refreshedVal);
+    const gridVersusTarget = gridDisplay
+      && stableValueTokenForField(field, gridVal) !== stableValueTokenForField(field, refreshedVal);
+    const storedAnswerVal = resolveStoredFieldValue(field, instance, assignment);
+    const rawCachedVal = resolveRawCachedFieldValue(instance, template, fieldId);
+    const storedVersusTarget = (valueMode === 'calculated' || valueMode === 'derived_editable')
+      && stableValueTokenForField(field, refreshedVal) !== stableValueTokenForField(field, storedAnswerVal);
+    const cacheVersusTarget = (valueMode === 'calculated' || valueMode === 'derived_editable')
+      && stableValueTokenForField(field, refreshedVal) !== stableValueTokenForField(field, rawCachedVal);
 
     const prefillKey = reportService.normalizePrefillKey(field?.prefillKey || '');
     const oldResolved = prefillKey ? getPrefillValue(oldPrefill, prefillKey) : { found: false };
@@ -158,7 +198,7 @@ async function buildPrefillRefreshPreview({ instance, template, assignment, reqU
     const prefillRawChanged = prefillKey && newResolved.found
       && stableValueToken(oldResolved.found ? oldResolved.value : undefined) !== stableValueToken(newResolved.value);
 
-    if (!baselineVersusTarget && !gridVersusTarget) {
+    if (!baselineVersusTarget && !gridVersusTarget && !storedVersusTarget && !cacheVersusTarget) {
       return;
     }
 
@@ -220,8 +260,15 @@ async function buildPrefillRefreshPreview({ instance, template, assignment, reqU
     const persisted = persistedDisplayAnswers[fieldId];
     const grid = gridDisplay ? gridDisplay[fieldId] : undefined;
     const refreshed = refreshedAnswers[fieldId];
-    return stableValueToken(persisted) !== stableValueToken(refreshed)
-      || (gridDisplay && stableValueToken(grid) !== stableValueToken(refreshed));
+    const stored = instance?.answers?.[fieldId];
+    const field = fields.find((item) => String(item?.id) === fieldId);
+    const storedResolved = field ? resolveStoredFieldValue(field, instance, assignment) : stored;
+    const rawCached = field ? resolveRawCachedFieldValue(instance, template, fieldId) : undefined;
+    const tokenFor = (value) => (field ? stableValueTokenForField(field, value) : stableValueToken(value));
+    return tokenFor(persisted) !== tokenFor(refreshed)
+      || (gridDisplay && tokenFor(grid) !== tokenFor(refreshed))
+      || tokenFor(storedResolved) !== tokenFor(refreshed)
+      || tokenFor(rawCached) !== tokenFor(refreshed);
   }
 
   const changes = Array.from(changesByKey.values())

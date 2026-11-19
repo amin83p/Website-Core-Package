@@ -267,3 +267,21 @@ test('school settings catalog includes semi-monthly report group', () => {
   const groups = listSchoolSettingsGroups();
   assert.ok(groups.some((row) => row.key === 'school-semi-monthly-report'));
 });
+
+test('serializeInstanceRow exposes edit-v2 URL for semi-monthly instance rows', () => {
+  const row = schoolSemiMonthlyReportService.serializeInstanceRow({ id: '362935', templateId: 'TPL-1' }, new Map([['TPL-1', 'Progress']]));
+  assert.equal(row.editV2Url, '/school/reports/instances/edit-v2/362935');
+  assert.match(row.editUrl, /\/school\/reports\/instances\/edit\/362935/);
+});
+
+test('semi-monthly instance list renders Review button for Report Instance V2', () => {
+  const view = fs.readFileSync(
+    path.join(__dirname, '../packages/school/MVC/views/school/report/semiMonthlyReportViewer.ejs'),
+    'utf8'
+  );
+  const fnBlock = view.slice(view.indexOf('function buildInstanceListHtml'), view.indexOf('function buildStudentSection'));
+  assert.match(fnBlock, /editV2Url/);
+  assert.match(fnBlock, />Review</);
+  assert.match(fnBlock, /Report Instance \(V2\)/);
+  assert.match(fnBlock, /bi-layout-text-window-reverse/);
+});

@@ -2931,6 +2931,7 @@ async function previewReportMatrixPrefill(req, res) {
       assignmentId: req.params.assignmentId,
       assignmentRowId: req.query.assignmentRowId || req.query.rowId || '',
       teacherId: req.query.teacherId || '',
+      studentId: req.query.studentId || '',
       reqUser: req.user
     });
     return res.json(preview);

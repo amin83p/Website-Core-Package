@@ -219,6 +219,19 @@ test('getLatestClbLevelEntry returns newest dated entry', () => {
   assert.equal(latest.result.listening, '7');
 });
 
+test('getLatestClbLevelEntry ignores entries recorded after asOfDate', () => {
+  const history = {
+    clbLevelHistory: [
+      { id: 'on-due', recordedAt: '2026-07-31', goal: { listening: '6' } },
+      { id: 'after-due', recordedAt: '2026-08-15', goal: { listening: '9' } },
+      { id: 'older', recordedAt: '2026-01-01', goal: { listening: '4' } }
+    ]
+  };
+  const latest = reportService.getLatestClbLevelEntry(history, { asOfDate: '2026-07-31' });
+  assert.equal(latest.id, 'on-due');
+  assert.equal(latest.goal.listening, '6');
+});
+
 test('buildPrefillSnapshot exposes latest CLB goal, current, result, and date keys', async () => {
   const assignment = {
     id: 'ASN-CLB',
@@ -280,6 +293,13 @@ test('buildPrefillSnapshot exposes latest CLB goal, current, result, and date ke
             recordedAt: '2025-09-01',
             goal: { listening: '4' },
             current: { listening: '3+' }
+          },
+          {
+            id: 'future',
+            recordedAt: '2026-09-01',
+            goal: { listening: '10', speaking: '10', reading: '10', writing: '10' },
+            current: { listening: '9+', speaking: '9+', reading: '9+', writing: '9+' },
+            result: { listening: '9', speaking: '9', reading: '9', writing: '9' }
           }
         ]
       }];
@@ -331,6 +351,7 @@ test('buildPrefillSnapshot exposes latest CLB goal, current, result, and date ke
       reqUser: { id: 'USER-1', activeOrgId: '900000' }
     });
     assert.equal(collections.student_clb_entries.length, 3);
+    assert.ok(!collections.student_clb_entries.some((row) => row.clb_entry_id === 'future'));
     assert.equal(collections.student_clb_entries[0].student_full_name, 'Sam Student');
     assert.equal(collections.student_clb_entries[0].clb_entry_id, 'new');
     assert.equal(collections.student_clb_entries[0].clb_entry_no, 1);

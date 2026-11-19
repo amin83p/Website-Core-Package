@@ -62,7 +62,10 @@
     .field-designer-table { width: 100%; table-layout: fixed; }
     .field-main-cell .field-label { display: block; font-weight: 600; }
     .field-main-cell .field-id { display: block; font-size: 0.8rem; color: #6c757d; word-break: break-all; }
-    .field-summary-cell { white-space: normal; overflow-wrap: anywhere; word-break: break-word; line-height: 1.2; }
+    #fieldDesignerScrollPanel.template-scroll-panel--expanded {
+      max-height: min(72vh, calc(100dvh - 12rem));
+    }
+    .field-designer-table.field-designer-rows-expanded tbody tr { vertical-align: top; }
     .field-row-visual { background: #fcfcff; }
     .field-main-cell .field-kind { display: inline-block; font-size: 0.75rem; margin-right: 0.35rem; }
     .template-form-section {
@@ -162,6 +165,34 @@
       font-size: 0.8125rem;
       color: #64748b;
       margin-bottom: 0.75rem;
+    }
+    #templatePreviewModal .template-preview-modal-dialog {
+      max-width: min(1140px, 96vw);
+    }
+    #templatePreviewModal .template-form-preview-page .report-section-chevron {
+      transition: transform 0.2s ease;
+      display: inline-block;
+    }
+    #templatePreviewModal .template-form-preview-page .report-section-toggle.collapsed .report-section-chevron {
+      transform: rotate(-90deg);
+    }
+    #templatePreviewModal .template-form-preview-page .report-section-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--bs-emphasis-color);
+    }
+    #templatePreviewModal .template-form-preview-page .help-tooltip-icon {
+      color: var(--bs-secondary-color);
+      padding: 0;
+      margin-left: 0.35rem;
+      vertical-align: baseline;
+      line-height: 1;
+      border: 0;
+      background: transparent;
+    }
+    #templatePreviewModal .template-form-preview-page .help-tooltip-icon:hover,
+    #templatePreviewModal .template-form-preview-page .help-tooltip-icon:focus-visible {
+      color: var(--bs-primary);
     }
   </style>
   <div class="row g-2 align-items-start mb-4">
@@ -902,34 +933,34 @@
     </div>
     <div class="card border-0 shadow-sm mb-3 template-form-section">
       <div class="card-header p-0">
-        <button class="btn w-100 text-start d-flex align-items-center justify-content-between gap-2 px-3 py-3 template-section-toggle collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFieldDesigner" aria-expanded="false" aria-controls="collapseFieldDesigner">
+        <button class="btn w-100 text-start d-flex align-items-center justify-content-between gap-2 px-3 py-3 template-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#collapseFieldDesigner" aria-expanded="true" aria-controls="collapseFieldDesigner">
           <span class="d-flex align-items-center gap-2 flex-wrap">
             <span>
               <h5 class="m-0 fw-bold">Field Designer</h5>
-              <span class="small text-muted d-block mt-1">Compact rows; use the menu to edit. Drag to reorder.</span>
+              <span class="small text-muted d-block mt-1">Use Expanded list for a taller table when reordering. Drag to reorder; use the menu to edit field settings.</span>
             </span>
           </span>
           <i class="bi bi-chevron-down template-section-chevron" aria-hidden="true"></i>
         </button>
       </div>
-      <div id="collapseFieldDesigner" class="collapse">
+      <div id="collapseFieldDesigner" class="collapse show">
       <div class="card-body p-0 border-top">
         <div class="d-flex flex-wrap justify-content-end gap-2 p-3 pb-0">
+          <button type="button" class="btn btn-sm btn-outline-secondary" id="btnFieldDesignerExpandedList" aria-pressed="true" title="Taller field list for reordering"><i class="bi bi-arrows-collapse"></i> Compact list</button>
           <button type="button" class="btn btn-sm btn-outline-secondary" id="btnPreviewTemplate"><i class="bi bi-eye"></i> Preview Form</button>
           <button type="button" class="btn btn-sm btn-outline-dark" id="btnAddSection"><i class="bi bi-layout-text-window-reverse"></i> Add Section</button>
           <button type="button" class="btn btn-sm btn-outline-dark" id="btnAddSubheader"><i class="bi bi-text-indent-left"></i> Add Subheader</button>
           <button type="button" class="btn btn-sm btn-outline-dark" id="btnAddRowBreak"><i class="bi bi-layout-three-columns me-1"></i> New Row</button>
           <button type="button" class="btn btn-sm btn-outline-primary" id="btnAddField"><i class="bi bi-plus-circle"></i> Add Field</button>
         </div>
-        <div class="table-responsive template-scroll-panel border-top">
-          <table class="table table-sm align-middle mb-0 field-designer-table">
+        <div id="fieldDesignerScrollPanel" class="table-responsive template-scroll-panel template-scroll-panel--expanded border-top">
+          <table class="table table-sm align-middle mb-0 field-designer-table field-designer-rows-expanded">
             <thead class="table-light">
               <tr>
                 <th style="width: 70px;" class="text-center">Order</th>
-                <th style="width: 34%;">Field</th>
+                <th style="width: 48%;">Field</th>
                 <th style="width: 90px;">Type</th>
                 <th style="width: 170px;">Flags</th>
-                <th>Details</th>
                 <th style="width: 60px;" class="text-center">Menu</th>
               </tr>
             </thead>
@@ -1143,7 +1174,7 @@
   </div>
 
   <div class="modal fade" id="templatePreviewModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable template-preview-modal-dialog modal-fullscreen-lg-down">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title fw-bold" id="templatePreviewTitle">Report Form Preview</h5>
@@ -1310,6 +1341,10 @@
     const initialFields = <%- JSON.stringify(initialFields).replace(/</g, '\\u003c') %>;
     const initialMap = <%- JSON.stringify(initialMap).replace(/</g, '\\u003c') %>;
     const tbody = document.getElementById('fieldRowsBody');
+    const FIELD_DESIGNER_EXPANDED_LIST_KEY = 'reportTemplateFieldDesignerExpandedList';
+    const fieldDesignerScrollPanel = document.getElementById('fieldDesignerScrollPanel');
+    const fieldDesignerTable = fieldDesignerScrollPanel?.querySelector('.field-designer-table');
+    const btnFieldDesignerExpandedList = document.getElementById('btnFieldDesignerExpandedList');
     const addBtn = document.getElementById('btnAddField');
     const addSectionBtn = document.getElementById('btnAddSection');
     const addSubheaderBtn = document.getElementById('btnAddSubheader');
@@ -2074,6 +2109,38 @@ num(value) <= 95</code></pre>
       return ok;
     }
 
+    function isFieldDesignerListExpanded() {
+      return fieldDesignerScrollPanel?.classList.contains('template-scroll-panel--expanded') === true;
+    }
+
+    function readFieldDesignerExpandedListPreference() {
+      try {
+        const stored = sessionStorage.getItem(FIELD_DESIGNER_EXPANDED_LIST_KEY);
+        if (stored === '0') return false;
+        if (stored === '1') return true;
+      } catch (_) { /* ignore */ }
+      return true;
+    }
+
+    function applyFieldDesignerExpandedListUi(expanded) {
+      if (!fieldDesignerScrollPanel || !fieldDesignerTable) return;
+      fieldDesignerScrollPanel.classList.toggle('template-scroll-panel--expanded', expanded);
+      fieldDesignerTable.classList.toggle('field-designer-rows-expanded', expanded);
+      if (btnFieldDesignerExpandedList) {
+        btnFieldDesignerExpandedList.setAttribute('aria-pressed', expanded ? 'true' : 'false');
+        btnFieldDesignerExpandedList.classList.toggle('active', expanded);
+        btnFieldDesignerExpandedList.innerHTML = expanded
+          ? '<i class="bi bi-arrows-collapse"></i> Compact list'
+          : '<i class="bi bi-arrows-expand"></i> Expanded list';
+        btnFieldDesignerExpandedList.title = expanded
+          ? 'Switch to a shorter compact table'
+          : 'Taller field list for reordering';
+      }
+      try {
+        sessionStorage.setItem(FIELD_DESIGNER_EXPANDED_LIST_KEY, expanded ? '1' : '0');
+      } catch (_) { /* ignore */ }
+    }
+
     function buildFlagsHtml(field) {
       const flags = [];
       if (isVisualOnlyType(field.type)) flags.push('<span class="badge bg-dark-subtle text-dark border">Visual only</span>');
@@ -2091,40 +2158,13 @@ num(value) <= 95</code></pre>
 
     function renderFieldRows() {
       if (!Array.isArray(fieldsState) || !fieldsState.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No fields yet. Click "Add Field" to start.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No fields yet. Click "Add Field" to start.</td></tr>';
         refreshPrefillKeyOptionsDatalist();
         return;
       }
 
       tbody.innerHTML = fieldsState.map((field, idx) => {
         const visualOnly = isVisualOnlyType(field.type);
-        const layoutSummary = field.fullPageWidth ? 'Layout: Full page width' : 'Layout: Row-based width';
-        const prefillSummary = field.prefillKey ? `Prefill: ${field.prefillKey}` : '';
-        const placeholderSummary = field.placeholderToken ? `Token: ${field.placeholderToken}` : '';
-        const docxAliasSummary = field.docxAlias ? `DOCX shortcut: {{${field.docxAlias}}}` : '';
-        const optionsSummary = field.type === 'select' && field.options.length
-          ? `Options: ${toOptionsCsv(field.options)}`
-          : '';
-        const validationSummary = Array.isArray(field.validationRules) && field.validationRules.length
-          ? `Validation rules: ${field.validationRules.length}`
-          : '';
-        const conversionSummary = field?.conversionRule?.enabled && String(field?.conversionRule?.expression || '').trim()
-          ? `Conversion: ${String(field.conversionRule.expression).trim()}${field?.conversionRule?.applyOnReadOnlyDisplay ? ' (show on report)' : ''}`
-          : '';
-        const calcSummary = String(field.valueMode || VALUE_MODES.MANUAL) === VALUE_MODES.CALCULATED
-          ? `Calculated: ${String(field?.calculationRule?.expression || '').trim()} | deps: ${(Array.isArray(field?.calculationDependencies) ? field.calculationDependencies : []).join(', ')}`
-          : (String(field.valueMode || VALUE_MODES.MANUAL) === VALUE_MODES.DERIVED_EDITABLE
-            ? `Derived: ${String(field?.calculationRule?.expression || '').trim()}`
-            : '');
-        const borderSummary = field.hasBorder ? 'Border: enabled' : '';
-        const backgroundSummary = field.backgroundColor ? `Back color: ${field.backgroundColor}` : '';
-        const exportCaseSummary = normalizeExportTextCase(field.exportTextCase) !== EXPORT_TEXT_CASES.AS_ENTERED
-          ? `DOCX value case: ${normalizeExportTextCase(field.exportTextCase)}`
-          : '';
-        const detailsParts = visualOnly
-          ? ['Display-only grouping row', String(field.helpText || '').trim()].filter(Boolean)
-          : [layoutSummary, prefillSummary, placeholderSummary, docxAliasSummary, exportCaseSummary, optionsSummary, validationSummary, conversionSummary, calcSummary, borderSummary, backgroundSummary, String(field.helpText || '').trim()].filter(Boolean);
-        const detailsText = detailsParts.join(' | ') || '-';
         const visualClass = visualOnly ? ' field-row-visual' : '';
         let visualKind = '';
         if (visualOnly) {
@@ -2149,7 +2189,6 @@ num(value) <= 95</code></pre>
             </td>
             <td><span class="badge bg-secondary-subtle text-secondary border">${escapeHtml(field.type || 'text')}</span></td>
             <td>${buildFlagsHtml(field)}</td>
-            <td class="field-summary-cell" title="${escapeHtml(detailsText)}">${escapeHtml(detailsText)}</td>
             <td class="text-center">
               <div class="dropdown">
                 <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown" aria-expanded="false" title="Field actions">
@@ -2989,17 +3028,68 @@ num(value) <= 95</code></pre>
       }
     }
 
+    function buildPreviewHelpTooltip(helpText, label = 'Help') {
+      const text = String(helpText || '').trim();
+      if (!text) return '';
+      return `<button type="button" class="help-tooltip-icon" data-bs-toggle="tooltip" data-bs-placement="top" title="${escapeHtml(text)}" aria-label="${escapeHtml(label)}"><i class="bi bi-info-circle"></i></button>`;
+    }
+
+    function isPreviewRowBreakField(field) {
+      return String(field?.type || '').trim().toLowerCase() === 'row_break';
+    }
+
+    function buildPreviewSectionGroups(fields) {
+      const orderedFieldsList = Array.isArray(fields) ? fields : [];
+      const sectionGroups = [];
+      let currentSectionGroup = { header: null, rows: [] };
+      let currentRow = [];
+
+      const flushFieldRow = () => {
+        if (!currentRow.length) return;
+        currentSectionGroup.rows.push(currentRow);
+        currentRow = [];
+      };
+      const flushSectionGroup = () => {
+        flushFieldRow();
+        if (!currentSectionGroup.header && currentSectionGroup.rows.length === 0) return;
+        sectionGroups.push(currentSectionGroup);
+        currentSectionGroup = { header: null, rows: [] };
+      };
+
+      orderedFieldsList.forEach((field) => {
+        const fieldType = String(field?.type || '').trim().toLowerCase();
+        const isSection = fieldType === 'section';
+        const isSubheader = fieldType === 'subheader';
+        const fullWidthField = field?.fullPageWidth === true || String(field?.fullPageWidth || '').toLowerCase() === 'true';
+        if (isPreviewRowBreakField(field)) {
+          flushFieldRow();
+          return;
+        }
+        if (isSection) {
+          flushSectionGroup();
+          currentSectionGroup.header = field;
+          return;
+        }
+        if (isSubheader || fullWidthField) {
+          flushFieldRow();
+          currentSectionGroup.rows.push([field]);
+          return;
+        }
+        currentRow.push(field);
+      });
+      flushSectionGroup();
+      return sectionGroups;
+    }
+
     function buildPreviewControlHtml(field) {
       const type = String(field.type || 'text').toLowerCase();
-      const prefillHint = field.prefillKey ? `[Prefill: ${field.prefillKey}]` : '';
-      const valueHint = prefillHint || (type === 'checkbox' ? '' : 'Sample value');
+      const sampleHint = type === 'checkbox' ? '' : 'Sample value';
       const options = Array.isArray(field.options) ? field.options : [];
       const calculatedMode = String(field.valueMode || VALUE_MODES.MANUAL) === VALUE_MODES.CALCULATED;
-      const derivedMode = String(field.valueMode || VALUE_MODES.MANUAL) === VALUE_MODES.DERIVED_EDITABLE;
 
       if (field.readOnly || calculatedMode) {
         if (type === 'textarea') {
-          return `<textarea class="form-control bg-light" rows="3" readonly>${escapeHtml(valueHint)}</textarea>`;
+          return `<textarea class="form-control bg-light" rows="4" readonly>${escapeHtml(sampleHint)}</textarea>`;
         }
         if (type === 'number') {
           return `<input type="number" class="form-control bg-light" value="0" readonly>`;
@@ -3027,11 +3117,11 @@ num(value) <= 95</code></pre>
           const selectOpts = options.map((opt) => `<option value="${escapeHtml(opt.value || '')}">${escapeHtml(opt.label || opt.value || '')}</option>`).join('');
           return `<select class="form-select bg-light" disabled><option value="">Select...</option>${selectOpts}</select>`;
         }
-        return `<input type="text" class="form-control bg-light" value="${escapeHtml(valueHint)}" readonly>`;
+        return `<input type="text" class="form-control bg-light" value="${escapeHtml(sampleHint)}" readonly>`;
       }
 
       if (type === 'textarea') {
-        return `<textarea class="form-control" rows="3" placeholder="Enter ${escapeHtml(field.label || 'value')}"></textarea>`;
+        return `<textarea class="form-control" rows="4" placeholder="Enter ${escapeHtml(field.label || 'value')}"></textarea>`;
       }
       if (type === 'number') {
         return `<input type="number" class="form-control" placeholder="Enter ${escapeHtml(field.label || 'value')}">`;
@@ -3062,100 +3152,126 @@ num(value) <= 95</code></pre>
       return `<input type="text" class="form-control" placeholder="Enter ${escapeHtml(field.label || 'value')}">`;
     }
 
-    function buildPreviewFieldHtml(field) {
-      const visualOnly = isVisualOnlyType(field.type);
-      if (visualOnly) {
-        if (field.type === 'row_break') return '';
-        const headerTag = field.type === 'section' ? 'h5' : 'h6';
-        const className = field.type === 'section' ? 'fw-bold mt-2 mb-1' : 'fw-semibold mt-1 mb-1 text-muted';
-        const helpHtml = field.helpText ? `<div class="small text-muted mb-2">${escapeHtml(field.helpText)}</div>` : '';
-        return `
-          <div class="col-12">
-            <${headerTag} class="${className}">${escapeHtml(field.label || 'Untitled')}</${headerTag}>
-            ${helpHtml}
-          </div>
-        `;
-      }
-      const badges = [
-        field.required ? '<span class="badge bg-danger-subtle text-danger border ms-1">Required</span>' : '',
-        field.readOnly ? '<span class="badge bg-light text-secondary border ms-1">View only</span>' : '',
-        field.sharedAcrossStudents ? '<span class="badge bg-info-subtle text-info-emphasis border ms-1">Shared</span>' : '',
-        field.fullPageWidth ? '<span class="badge bg-primary-subtle text-primary-emphasis border ms-1">Full width</span>' : '',
-        String(field.valueMode || VALUE_MODES.MANUAL) === VALUE_MODES.CALCULATED ? '<span class="badge bg-warning-subtle text-warning-emphasis border ms-1">Auto-calculated</span>' : '',
-        String(field.valueMode || VALUE_MODES.MANUAL) === VALUE_MODES.DERIVED_EDITABLE ? '<span class="badge bg-info-subtle text-info-emphasis border ms-1">Starts from catalog keys</span>' : '',
-        field.hasBorder ? '<span class="badge bg-secondary-subtle text-secondary-emphasis border ms-1">Border</span>' : '',
-        field.backgroundColor ? `<span class="badge border ms-1" style="background-color:${escapeHtml(field.backgroundColor)};">Back color</span>` : '',
-        normalizeExportTextCase(field.exportTextCase) !== EXPORT_TEXT_CASES.AS_ENTERED ? `<span class="badge bg-dark-subtle text-dark border ms-1">DOCX: ${escapeHtml(normalizeExportTextCase(field.exportTextCase))}</span>` : ''
-      ].filter(Boolean).join('');
-      const helpHtml = field.helpText ? `<div class="small text-muted mt-1">${escapeHtml(field.helpText)}</div>` : '';
-      const prefillHtml = field.prefillKey
-        ? `<div class="small text-muted mt-1">Prefill key: <span class="font-monospace">${escapeHtml(field.prefillKey)}</span></div>`
-        : '';
-      const fieldCardClass = field.hasBorder ? 'border rounded p-2' : '';
-      const fieldCardStyle = field.backgroundColor ? ` style="background-color:${escapeHtml(field.backgroundColor)};"` : '';
-
+    function buildPreviewSubheaderHtml(field) {
+      const fieldType = String(field?.type || '').trim().toLowerCase();
+      if (fieldType !== 'subheader') return '';
       return `
-        <div class="${field.fullPageWidth ? 'col-12' : 'col'}">
-          <div class="${fieldCardClass}"${fieldCardStyle}>
+        <div class="col-12">
+          <hr class="my-3 text-muted">
+          <h6 class="fw-semibold mt-1 mb-1 text-muted">
+            ${escapeHtml(field.label || 'Subheader')}
+            ${buildPreviewHelpTooltip(field.helpText, 'Subheader help')}
+          </h6>
+        </div>
+      `;
+    }
+
+    function buildPreviewDataFieldHtml(field, options = {}) {
+      const showSharedBadge = options.showSharedBadge !== false;
+      const calculatedMode = String(field.valueMode || VALUE_MODES.MANUAL) === VALUE_MODES.CALCULATED;
+      const derivedMode = String(field.valueMode || VALUE_MODES.MANUAL) === VALUE_MODES.DERIVED_EDITABLE;
+      const readOnlyField = field.readOnly === true || calculatedMode;
+      const fullWidthField = field.fullPageWidth === true || String(field.fullPageWidth || '').toLowerCase() === 'true';
+      const fieldColClass = fullWidthField ? 'col-12' : 'col';
+      const hasFieldBorder = field.hasBorder === true || String(field.hasBorder || '').toLowerCase() === 'true';
+      const fieldBackgroundColor = String(field.backgroundColor || '').trim();
+      const hasFieldBackground = /^#[0-9A-Fa-f]{6}$/.test(fieldBackgroundColor);
+      const fieldShellClass = `${hasFieldBorder ? 'border rounded p-2' : ''}${hasFieldBackground ? ' p-2' : ''}`.trim();
+      const fieldShellStyleValue = hasFieldBackground ? `background-color:${fieldBackgroundColor};` : '';
+      const labelBadges = [
+        field.required ? '<span class="text-danger">*</span>' : '',
+        showSharedBadge && field.sharedAcrossStudents ? '<span class="badge bg-info-subtle text-info-emphasis border ms-1">Shared</span>' : '',
+        readOnlyField ? '<span class="badge bg-light text-secondary border ms-1">View only</span>' : '',
+        calculatedMode ? '<span class="badge bg-warning-subtle text-warning-emphasis border ms-1">Auto-calculated</span>' : '',
+        derivedMode ? '<span class="badge bg-info-subtle text-info-emphasis border ms-1">Starts from catalog keys</span>' : ''
+      ].filter(Boolean).join('');
+      return `
+        <div class="${fieldColClass}">
+          <div class="${fieldShellClass}"${fieldShellStyleValue ? ` style="${fieldShellStyleValue}"` : ''}>
             <label class="form-label fw-bold">
               ${escapeHtml(field.label || field.id || 'Field')}
-              ${badges}
+              ${buildPreviewHelpTooltip(field.helpText, 'Field help')}
+              ${labelBadges}
             </label>
             ${buildPreviewControlHtml(field)}
-            ${prefillHtml}
-            ${helpHtml}
           </div>
         </div>
       `;
     }
 
-    function buildPreviewRowsHtml(fields) {
-      const rows = [];
-      let current = [];
-      const list = Array.isArray(fields) ? fields : [];
-
-      const flushCurrent = () => {
-        if (!current.length) return;
-        rows.push({ items: [...current] });
-        current = [];
-      };
-
-      list.forEach((field) => {
-        const type = String(field?.type || '').trim().toLowerCase();
-        const isRowBreak = type === 'row_break';
-        const isSectionLike = type === 'section' || type === 'subheader';
-        const isFullWidth = field?.fullPageWidth === true || String(field?.fullPageWidth || '').toLowerCase() === 'true';
-
-        if (isRowBreak) {
-          flushCurrent();
-          return;
-        }
-        if (isSectionLike || isFullWidth) {
-          flushCurrent();
-          rows.push({ items: [field] });
-          return;
-        }
-        current.push(field);
-      });
-
-      flushCurrent();
-      return rows.map((row) => {
-        const cols = row.items.map((field) => buildPreviewFieldHtml(field)).join('');
-        return `<div class="row g-3 mb-4">${cols}</div>`;
+    function buildPreviewFieldRowHtml(rowFields, options = {}) {
+      const list = Array.isArray(rowFields) ? rowFields : [];
+      if (!list.length) return '';
+      const cols = list.map((field) => {
+        const fieldType = String(field?.type || '').trim().toLowerCase();
+        if (fieldType === 'subheader') return buildPreviewSubheaderHtml(field);
+        if (isVisualOnlyType(field.type)) return '';
+        return buildPreviewDataFieldHtml(field, options);
       }).join('');
+      if (!cols.trim()) return '';
+      return `<div class="row g-3 mb-4">${cols}</div>`;
     }
 
-    function buildPreviewSectionHtml(title, subtitle, fields) {
-      const list = Array.isArray(fields) ? fields : [];
-      if (!list.length) return '';
-      const rows = buildPreviewRowsHtml(list);
+    function buildPreviewSectionCardHtml(group, groupIndex, options = {}) {
+      const rows = Array.isArray(group?.rows) ? group.rows : [];
+      const rowsHtml = rows.map((rowFields) => buildPreviewFieldRowHtml(rowFields, options)).join('');
+      if (!group?.header) {
+        return rowsHtml ? `<div class="mb-3">${rowsHtml}</div>` : '';
+      }
+      const collapseId = `templatePreviewSection_${groupIndex}`;
+      const header = group.header;
       return `
-        <div class="mb-4">
-          <h6 class="fw-bold mb-1">${escapeHtml(title)}</h6>
-          ${subtitle ? `<div class="small text-muted mb-3">${escapeHtml(subtitle)}</div>` : ''}
-          ${rows}
+        <div class="border rounded mb-4 bg-light-subtle">
+          <button
+            type="button"
+            class="report-section-toggle card-header bg-transparent border-0 w-100 d-flex justify-content-between align-items-center py-3 text-start rounded-top"
+            data-bs-toggle="collapse"
+            data-bs-target="#${collapseId}"
+            aria-expanded="true"
+            aria-controls="${collapseId}">
+            <span>
+              <span class="report-section-title">
+                ${escapeHtml(header.label || 'Section')}
+                ${buildPreviewHelpTooltip(header.helpText, 'Section help')}
+              </span>
+            </span>
+            <i class="bi bi-chevron-down text-muted report-section-chevron" aria-hidden="true"></i>
+          </button>
+          <div id="${collapseId}" class="collapse show">
+            <div class="card-body border-top p-3">
+              ${rowsHtml || '<p class="text-muted small mb-0">No fields in this section.</p>'}
+            </div>
+          </div>
         </div>
       `;
+    }
+
+    function buildInstanceLikePreviewHtml(fields, options = {}) {
+      const sectionGroups = buildPreviewSectionGroups(fields);
+      if (!sectionGroups.length) {
+        return '<div class="text-muted">No fields defined in template schema.</div>';
+      }
+      return sectionGroups.map((group, index) => buildPreviewSectionCardHtml(group, index, options)).join('');
+    }
+
+    function initTemplatePreviewModalUi() {
+      if (!previewBody) return;
+      previewBody.querySelectorAll('.report-section-toggle[data-bs-toggle="collapse"]').forEach((toggle) => {
+        toggle.addEventListener('click', () => {
+          window.setTimeout(() => {
+            const target = String(toggle.getAttribute('data-bs-target') || '').replace('#', '');
+            const panel = target ? document.getElementById(target) : null;
+            const expanded = panel && panel.classList.contains('show');
+            toggle.classList.toggle('collapsed', !expanded);
+            toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+          }, 0);
+        });
+      });
+      if (typeof bootstrap !== 'undefined' && bootstrap?.Tooltip) {
+        previewBody.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
+          bootstrap.Tooltip.getOrCreateInstance(el);
+        });
+      }
     }
 
     function openPreviewModal() {
@@ -3169,16 +3285,35 @@ num(value) <= 95</code></pre>
       const sharedCount = fields.filter((field) => field.sharedAcrossStudents === true).length;
       const formTitle = String(form.querySelector('input[name="title"]')?.value || '').trim();
       previewTitle.textContent = formTitle ? `${formTitle} - Form Preview` : 'Report Form Preview';
+      const sharedNote = sharedCount
+        ? '<div class="small text-muted mt-1">Shared fields are marked and follow the template order.</div>'
+        : '';
       previewBody.innerHTML = `
-        <div class="alert alert-light border small mb-3">
-          Preview of how users will see and fill this report template. Fields are shown in the exact order of the Field Designer list.
+        <div class="sections-page report-instance-page template-form-preview-page">
+          <div class="alert alert-light border small mb-3">
+            Preview matches the Report Instance (V2) layout. Sample values stand in for live data.
+          </div>
+          <div class="card border-0 shadow-sm mb-0">
+            <div class="card-header bg-white">
+              <h5 class="m-0 fw-bold">Report fields</h5>
+              ${sharedNote}
+            </div>
+            <div class="card-body p-3">
+              ${buildInstanceLikePreviewHtml(fields, { showSharedBadge: sharedCount > 0 })}
+            </div>
+          </div>
         </div>
-        ${sharedCount ? `<div class="small text-muted mb-2"><span class="badge bg-info-subtle text-info-emphasis border me-1">Shared</span>${sharedCount} field(s) are marked shared and are still shown below in their original order.</div>` : ''}
-        ${buildPreviewSectionHtml('Report Fields', '', fields)}
       `;
 
       if (window.bootstrap && window.bootstrap.Modal && previewModalEl) {
-        window.bootstrap.Modal.getOrCreateInstance(previewModalEl).show();
+        const modal = window.bootstrap.Modal.getOrCreateInstance(previewModalEl);
+        previewModalEl.addEventListener('shown.bs.modal', function onShown() {
+          initTemplatePreviewModalUi();
+          previewModalEl.removeEventListener('shown.bs.modal', onShown);
+        });
+        modal.show();
+      } else {
+        initTemplatePreviewModalUi();
       }
     }
 
@@ -4017,6 +4152,11 @@ num(value) <= 95</code></pre>
     });
 
     initializeState();
+    applyFieldDesignerExpandedListUi(readFieldDesignerExpandedListPreference());
+    btnFieldDesignerExpandedList?.addEventListener('click', () => {
+      applyFieldDesignerExpandedListUi(!isFieldDesignerListExpanded());
+      renderFieldRows();
+    });
     renderFieldRows();
     refreshPrefillKeyOptionsDatalist();
     applyPrefillFilter();

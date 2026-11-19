@@ -115,7 +115,8 @@ function serializeInstanceRow(instance = {}, templateLabelMap = new Map()) {
     templateId,
     templateLabel,
     assignmentId: String(instance?.assignmentId || '').trim(),
-    editUrl: id ? `/school/reports/instances/edit/${encodeURIComponent(toPublicId(id))}` : ''
+    editUrl: id ? `/school/reports/instances/edit/${encodeURIComponent(toPublicId(id))}` : '',
+    editV2Url: id ? `/school/reports/instances/edit-v2/${encodeURIComponent(toPublicId(id))}` : ''
   };
 }
 
@@ -358,5 +359,6 @@ module.exports = {
   sessionDateInRange,
   instanceMatchesStudent,
   sortInstancesByPolicyTemplateOrder,
+  serializeInstanceRow,
   buildSemiMonthlyReportPayload
 };

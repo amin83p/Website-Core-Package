@@ -231,19 +231,19 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'student_session_rating_span_respects_teachers_percent', label: 'Student Session Rating Span Respects The Teachers %', description: 'Average respects-the-teachers rating across attended sessions within report period.' }),
     Object.freeze({ key: 'student_session_rating_span_respects_students_percent', label: 'Student Session Rating Span Treats Other Students With Respect %', description: 'Average treats-other-students-with-respect rating across attended sessions within report period.' }),
     ...buildOverallAttendanceDayCatalogEntries(),
-    Object.freeze({ key: 'CLB_goal_listening', label: 'CLB Goal Listening', description: 'Latest CLB goal for listening from student profile history.' }),
-    Object.freeze({ key: 'CLB_goal_speaking', label: 'CLB Goal Speaking', description: 'Latest CLB goal for speaking from student profile history.' }),
-    Object.freeze({ key: 'CLB_goal_reading', label: 'CLB Goal Reading', description: 'Latest CLB goal for reading from student profile history.' }),
-    Object.freeze({ key: 'CLB_goal_writing', label: 'CLB Goal Writing', description: 'Latest CLB goal for writing from student profile history.' }),
-    Object.freeze({ key: 'CLB_current_listening', label: 'CLB Current Listening', description: 'Latest current CLB level for listening from student profile history.' }),
-    Object.freeze({ key: 'CLB_current_speaking', label: 'CLB Current Speaking', description: 'Latest current CLB level for speaking from student profile history.' }),
-    Object.freeze({ key: 'CLB_current_reading', label: 'CLB Current Reading', description: 'Latest current CLB level for reading from student profile history.' }),
-    Object.freeze({ key: 'CLB_current_writing', label: 'CLB Current Writing', description: 'Latest current CLB level for writing from student profile history.' }),
-    Object.freeze({ key: 'CLB_latest_recorded_at', label: 'CLB Latest Recorded Date', description: 'Recorded date of the latest CLB history entry.' }),
-    Object.freeze({ key: 'CLB_result_listening', label: 'CLB Result Listening', description: 'Latest CLB result for listening from student profile history.' }),
-    Object.freeze({ key: 'CLB_result_speaking', label: 'CLB Result Speaking', description: 'Latest CLB result for speaking from student profile history.' }),
-    Object.freeze({ key: 'CLB_result_reading', label: 'CLB Result Reading', description: 'Latest CLB result for reading from student profile history.' }),
-    Object.freeze({ key: 'CLB_result_writing', label: 'CLB Result Writing', description: 'Latest CLB result for writing from student profile history.' })
+    Object.freeze({ key: 'CLB_goal_listening', label: 'CLB Goal Listening', description: 'CLB goal for listening from the latest student profile history entry on or before the report due date.' }),
+    Object.freeze({ key: 'CLB_goal_speaking', label: 'CLB Goal Speaking', description: 'CLB goal for speaking from the latest student profile history entry on or before the report due date.' }),
+    Object.freeze({ key: 'CLB_goal_reading', label: 'CLB Goal Reading', description: 'CLB goal for reading from the latest student profile history entry on or before the report due date.' }),
+    Object.freeze({ key: 'CLB_goal_writing', label: 'CLB Goal Writing', description: 'CLB goal for writing from the latest student profile history entry on or before the report due date.' }),
+    Object.freeze({ key: 'CLB_current_listening', label: 'CLB Current Listening', description: 'Current CLB level for listening from the latest student profile history entry on or before the report due date.' }),
+    Object.freeze({ key: 'CLB_current_speaking', label: 'CLB Current Speaking', description: 'Current CLB level for speaking from the latest student profile history entry on or before the report due date.' }),
+    Object.freeze({ key: 'CLB_current_reading', label: 'CLB Current Reading', description: 'Current CLB level for reading from the latest student profile history entry on or before the report due date.' }),
+    Object.freeze({ key: 'CLB_current_writing', label: 'CLB Current Writing', description: 'Current CLB level for writing from the latest student profile history entry on or before the report due date.' }),
+    Object.freeze({ key: 'CLB_latest_recorded_at', label: 'CLB Latest Recorded Date', description: 'Recorded date of the latest CLB history entry on or before the report due date.' }),
+    Object.freeze({ key: 'CLB_result_listening', label: 'CLB Result Listening', description: 'CLB result for listening from the latest student profile history entry on or before the report due date.' }),
+    Object.freeze({ key: 'CLB_result_speaking', label: 'CLB Result Speaking', description: 'CLB result for speaking from the latest student profile history entry on or before the report due date.' }),
+    Object.freeze({ key: 'CLB_result_reading', label: 'CLB Result Reading', description: 'CLB result for reading from the latest student profile history entry on or before the report due date.' }),
+    Object.freeze({ key: 'CLB_result_writing', label: 'CLB Result Writing', description: 'CLB result for writing from the latest student profile history entry on or before the report due date.' })
   ]),
   gradebookPeriodStudent: Object.freeze([
     Object.freeze({ key: 'student_gradebook_period_activity_count', label: 'Student Gradebook Period Activities', description: 'Include-in-grade activities in period where student not absent and has a score.' }),
@@ -2073,7 +2073,7 @@ async function buildReportDocxCollections({ instance, assignment, reqUser, dataC
   const studentClbEntries = [];
   studentContexts.forEach((context, studentIndex) => {
     const studentRow = studentRows[studentIndex] || {};
-    getSortedClbLevelHistory(context.studentRecord).forEach((entry, entryIndex) => {
+    getSortedClbLevelHistory(context.studentRecord, { asOfDate: reportPeriod.dueDate }).forEach((entry, entryIndex) => {
       studentClbEntries.push({
         row_no: studentClbEntries.length + 1,
         student_no: studentIndex + 1,
@@ -2115,17 +2115,35 @@ async function buildReportDocxCollections({ instance, assignment, reqUser, dataC
   };
 }
 
-function getSortedClbLevelHistory(studentRecord = {}) {
+function resolveClbAsOfDate(options = {}) {
+  const raw = String(options?.asOfDate || options?.asOfDueDate || '').trim();
+  if (!raw) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  return toDateOnly(raw);
+}
+
+function clbEntryOnOrBeforeDate(entry, asOfDate = '') {
+  const asOfTs = parseDateOnlyToUtcDay(asOfDate);
+  if (!Number.isFinite(asOfTs)) return true;
+  const entryTs = parseDateOnlyToUtcDay(String(entry?.recordedAt || '').trim());
+  return Number.isFinite(entryTs) && entryTs <= asOfTs;
+}
+
+function getSortedClbLevelHistory(studentRecord = {}, options = {}) {
   const history = Array.isArray(studentRecord?.clbLevelHistory) ? studentRecord.clbLevelHistory : [];
-  return [...history].sort((a, b) => {
+  const asOfDate = resolveClbAsOfDate(options);
+  const filtered = asOfDate
+    ? history.filter((entry) => clbEntryOnOrBeforeDate(entry, asOfDate))
+    : history;
+  return [...filtered].sort((a, b) => {
     const dateCmp = String(b?.recordedAt || '').localeCompare(String(a?.recordedAt || ''));
     if (dateCmp !== 0) return dateCmp;
     return String(b?.id || '').localeCompare(String(a?.id || ''));
   });
 }
 
-function getLatestClbLevelEntry(studentRecord = {}) {
-  const sorted = getSortedClbLevelHistory(studentRecord);
+function getLatestClbLevelEntry(studentRecord = {}, options = {}) {
+  const sorted = getSortedClbLevelHistory(studentRecord, options);
   return sorted[0] || null;
 }
 
@@ -2551,7 +2569,7 @@ async function buildPrefillSnapshot({
   const studentAddress = getAddressFromPerson(studentPerson);
   const studentNameParts = getPersonNameParts(studentPerson);
   const latestClbLevelEntry = wants(PREFILL_COMPUTE_BUNDLE.CLB)
-    ? getLatestClbLevelEntry(studentRecord)
+    ? getLatestClbLevelEntry(studentRecord, { asOfDate: reportPeriod.dueDate })
     : null;
 
   const snapshot = {

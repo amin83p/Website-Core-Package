@@ -143,6 +143,17 @@ test('report workflow wires reopen endpoint and editor gates', () => {
   assert.match(matrix, /MATRIX_HAS_SHARED_FIELDS/);
   assert.match(matrix, /shared fields will stay read-only/);
   assert.match(matrix, /sharedFieldsEditableSafe/);
+  assert.match(matrix, /js-matrix-prefill-preview/);
+  assert.match(matrix, /prefillBtn = event\.target\.closest\('\.js-matrix-prefill-preview'\)/);
+  assert.doesNotMatch(matrix, /report-matrix-page['"]\)\?\.addEventListener\('click'[\s\S]*js-matrix-prefill-preview/);
+  assert.match(matrix, /renderMatrixPrefillTables/);
+  assert.match(matrix, /studentId/);
+
+  const matrixService = readRoot('packages/school/MVC/services/school/reportMatrixService.js');
+  assert.match(matrixService, /buildMatrixPrefillPreview\(\{[\s\S]*studentId/);
+
+  const reportCtrl = readRoot('packages/school/MVC/controllers/school/reportController.js');
+  assert.match(reportCtrl, /studentId: req\.query\.studentId/);
 
   const saveService = readRoot('packages/school/MVC/services/school/reportInstanceSaveService.js');
   assert.match(saveService, /sharedAnswersSkipped/);

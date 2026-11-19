@@ -48,6 +48,15 @@
     .replace(/"/g, '&quot;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
+  function fieldChipAbbrev(label) {
+    const text = String(label || '').trim();
+    if (!text) return '';
+    const words = text.split(/[\s\-–/]+/).filter((part) => part.length);
+    if (words.length >= 2) {
+      return (String(words[0][0] || '') + String(words[1][0] || '')).toUpperCase();
+    }
+    return text.slice(0, Math.min(2, text.length)).toUpperCase();
+  }
   const lifecycleMode = String(classData?.registrationMode || 'term_based').trim().toLowerCase() === 'rolling' ? 'rolling' : 'term_based';
   const parsedCycleNo = Number.parseInt(String(classData?.cycleNo || '').trim(), 10);
   const lifecycleCycleNo = Number.isFinite(parsedCycleNo) && parsedCycleNo > 0 ? parsedCycleNo : 1;
@@ -135,6 +144,13 @@
   .report-instance-page .help-tooltip-icon:hover,
   .report-instance-page .help-tooltip-icon:focus-visible { color: var(--bs-primary); }
   .report-instance-page .instance-detail-grid-v2 .card { border-radius: 0.75rem; }
+  .report-instance-page .field-flag-chip {
+    font-size: 0.65rem;
+    padding: 0.15rem 0.38rem;
+    cursor: help;
+    letter-spacing: 0.03em;
+    vertical-align: middle;
+  }
 </style>
 <div class="sections-page report-instance-page">
   <input type="hidden" id="reportInstanceActionStateId" value="<%= actionStateId || '' %>">
@@ -251,8 +267,7 @@
               <div class="card border h-100">
                 <div class="card-body">
                   <div class="small text-muted text-uppercase">Teacher</div>
-                  <div class="fw-semibold mt-1"><%= dtl.teacherName || instance.teacherId || '—' %></div>
-                  <div class="x-small text-muted font-monospace"><%= instance.teacherId || '—' %></div>
+                  <div class="fw-semibold mt-1"><%= dtl.teacherName || '—' %></div>
                 </div>
               </div>
             </div>
@@ -260,8 +275,7 @@
               <div class="card border h-100">
                 <div class="card-body">
                   <div class="small text-muted text-uppercase">Class</div>
-                  <div class="fw-semibold mt-1"><%= dtl.className || instance.classId || '—' %></div>
-                  <div class="x-small text-muted font-monospace"><%= instance.classId || '—' %></div>
+                  <div class="fw-semibold mt-1"><%= dtl.className || '—' %></div>
                 </div>
               </div>
             </div>
@@ -269,8 +283,7 @@
               <div class="card border h-100">
                 <div class="card-body">
                   <div class="small text-muted text-uppercase">Session Date</div>
-                  <div class="fw-semibold mt-1"><%= instance.sessionDate || '-' %></div>
-                  <div class="x-small text-muted font-monospace"><%= instance.sessionId || '—' %></div>
+                  <div class="fw-semibold mt-1"><%= instance.sessionDate || '—' %></div>
                 </div>
               </div>
             </div>
@@ -278,10 +291,7 @@
               <div class="card border h-100">
                 <div class="card-body">
                   <div class="small text-muted text-uppercase">Student</div>
-                  <div class="fw-semibold mt-1"><%- include('school/partials/studentNameLink', { name: dtl.studentName || (instance.studentId ? `Record ${instance.studentId}` : '-'), studentRecordId: dtl.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div>
-                  <div class="x-small text-muted font-monospace">
-                    <% if (dtl.studentLocalId) { %>Local <%= dtl.studentLocalId %> | <% } %>Record ID <%= instance.studentId || '-' %>
-                  </div>
+                  <div class="fw-semibold mt-1"><%- include('school/partials/studentNameLink', { name: dtl.studentName || '—', studentRecordId: dtl.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div>
                 </div>
               </div>
             </div>
@@ -289,8 +299,7 @@
               <div class="card border h-100">
                 <div class="card-body">
                   <div class="small text-muted text-uppercase">Assignment</div>
-                  <div class="fw-semibold mt-1"><%= dtl.assignmentSummary || 'Assignment linked' %></div>
-                  <div class="x-small text-muted font-monospace">ID <%= instance.assignmentId || '—' %></div>
+                  <div class="fw-semibold mt-1"><%= dtl.assignmentSummary || '—' %></div>
                 </div>
               </div>
             </div>
@@ -489,10 +498,18 @@
                                   </button>
                                 <% } %>
                                 <% if (field.required) { %><span class="text-danger">*</span><% } %>
-                                <% if (hasSharedFields && field.sharedAcrossStudents === true) { %><span class="badge bg-info-subtle text-info-emphasis border ms-1">Shared</span><% } %>
-                                <% if (readOnlyField) { %><span class="badge bg-light text-secondary border ms-1">View only</span><% } %>
-                                <% if (calculatedField) { %><span class="badge bg-warning-subtle text-warning-emphasis border ms-1">Auto-calculated</span><% } %>
-                                <% if (derivedEditableField) { %><span class="badge bg-info-subtle text-info-emphasis border ms-1">Starts from catalog keys</span><% } %>
+                                <% if (hasSharedFields && field.sharedAcrossStudents === true) { %>
+                                  <% if (isV2) { %><span class="badge bg-info-subtle text-info-emphasis border ms-1 field-flag-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= attrEscapeForTitle('Shared') %>" aria-label="Shared"><%= fieldChipAbbrev('Shared') %></span><% } else { %><span class="badge bg-info-subtle text-info-emphasis border ms-1">Shared</span><% } %>
+                                <% } %>
+                                <% if (readOnlyField) { %>
+                                  <% if (isV2) { %><span class="badge bg-light text-secondary border ms-1 field-flag-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= attrEscapeForTitle('View only') %>" aria-label="View only"><%= fieldChipAbbrev('View only') %></span><% } else { %><span class="badge bg-light text-secondary border ms-1">View only</span><% } %>
+                                <% } %>
+                                <% if (calculatedField) { %>
+                                  <% if (isV2) { %><span class="badge bg-warning-subtle text-warning-emphasis border ms-1 field-flag-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= attrEscapeForTitle('Auto-calculated') %>" aria-label="Auto-calculated"><%= fieldChipAbbrev('Auto-calculated') %></span><% } else { %><span class="badge bg-warning-subtle text-warning-emphasis border ms-1">Auto-calculated</span><% } %>
+                                <% } %>
+                                <% if (derivedEditableField) { %>
+                                  <% if (isV2) { %><span class="badge bg-info-subtle text-info-emphasis border ms-1 field-flag-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= attrEscapeForTitle('Starts from catalog keys') %>" aria-label="Starts from catalog keys"><%= fieldChipAbbrev('Starts from catalog keys') %></span><% } else { %><span class="badge bg-info-subtle text-info-emphasis border ms-1">Starts from catalog keys</span><% } %>
+                                <% } %>
                               </label>
 
                               <% if (readOnlyField) { %>
@@ -619,10 +636,18 @@
                               </button>
                             <% } %>
                             <% if (field.required) { %><span class="text-danger">*</span><% } %>
-                            <% if (hasSharedFields && field.sharedAcrossStudents === true) { %><span class="badge bg-info-subtle text-info-emphasis border ms-1">Shared</span><% } %>
-                            <% if (readOnlyField) { %><span class="badge bg-light text-secondary border ms-1">View only</span><% } %>
-                            <% if (calculatedField) { %><span class="badge bg-warning-subtle text-warning-emphasis border ms-1">Auto-calculated</span><% } %>
-                            <% if (derivedEditableField) { %><span class="badge bg-info-subtle text-info-emphasis border ms-1">Starts from catalog keys</span><% } %>
+                            <% if (hasSharedFields && field.sharedAcrossStudents === true) { %>
+                              <% if (isV2) { %><span class="badge bg-info-subtle text-info-emphasis border ms-1 field-flag-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= attrEscapeForTitle('Shared') %>" aria-label="Shared"><%= fieldChipAbbrev('Shared') %></span><% } else { %><span class="badge bg-info-subtle text-info-emphasis border ms-1">Shared</span><% } %>
+                            <% } %>
+                            <% if (readOnlyField) { %>
+                              <% if (isV2) { %><span class="badge bg-light text-secondary border ms-1 field-flag-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= attrEscapeForTitle('View only') %>" aria-label="View only"><%= fieldChipAbbrev('View only') %></span><% } else { %><span class="badge bg-light text-secondary border ms-1">View only</span><% } %>
+                            <% } %>
+                            <% if (calculatedField) { %>
+                              <% if (isV2) { %><span class="badge bg-warning-subtle text-warning-emphasis border ms-1 field-flag-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= attrEscapeForTitle('Auto-calculated') %>" aria-label="Auto-calculated"><%= fieldChipAbbrev('Auto-calculated') %></span><% } else { %><span class="badge bg-warning-subtle text-warning-emphasis border ms-1">Auto-calculated</span><% } %>
+                            <% } %>
+                            <% if (derivedEditableField) { %>
+                              <% if (isV2) { %><span class="badge bg-info-subtle text-info-emphasis border ms-1 field-flag-chip" data-bs-toggle="tooltip" data-bs-placement="top" title="<%= attrEscapeForTitle('Starts from catalog keys') %>" aria-label="Starts from catalog keys"><%= fieldChipAbbrev('Starts from catalog keys') %></span><% } else { %><span class="badge bg-info-subtle text-info-emphasis border ms-1">Starts from catalog keys</span><% } %>
+                            <% } %>
                           </label>
                           <% if (readOnlyField) { %>
                             <% if (field.type === 'textarea') { %>

@@ -196,6 +196,121 @@ function withPatched(target, replacements, callback) {
     });
 }
 
+test('prefill preview shows semi-monthly calculated report date with ISO storage', async (t) => {
+  const template = {
+    id: 'TPL_PRE_DATE',
+    version: 1,
+    schema: {
+      fields: [
+        {
+          id: 'report_date',
+          label: 'Report Date',
+          type: 'date',
+          valueMode: 'calculated',
+          calculationRule: {
+            enabled: true,
+            expression: 'formatSemiMonthlyDueDate(prefill.report_period_due_date, "dd/mm/yyyy")',
+            onError: 'keep_last'
+          }
+        }
+      ]
+    }
+  };
+  const assignment = {
+    id: 'ASG_PRE_DATE',
+    reportScope: 'each_student',
+    classId: 'CLS1',
+    reportDueDate: '2026-10-29'
+  };
+  const instance = {
+    id: 'RINS_PRE_DATE',
+    studentId: 'STU1',
+    teacherId: 'T1',
+    status: 'draft',
+    answers: { report_date: '2026-10-29' },
+    prefillSnapshot: { report_period_due_date: '2026-10-29' },
+    audit: { firstSavedAt: '2025-01-01T00:00:00.000Z' },
+    renderCache: {
+      templateId: 'TPL_PRE_DATE',
+      templateVersion: 1,
+      mergedAnswers: { report_date: '2026-10-29' }
+    }
+  };
+
+  const origBuild = reportService.buildPrefillSnapshot;
+  reportService.buildPrefillSnapshot = async () => ({ report_period_due_date: '2026-10-29' });
+
+  t.after(() => {
+    reportService.buildPrefillSnapshot = origBuild;
+  });
+
+  const preview = await reportPrefillRefreshPreviewService.buildPrefillRefreshPreview({
+    instance,
+    template,
+    assignment,
+    reqUser: { id: 'u1' }
+  });
+
+  const row = preview.changes.find((item) => item.prefillKey === '__field__report_date');
+  assert.ok(row, 'expected calculated report date drift when frozen cache holds assignment due');
+  assert.equal(row.fields[0].newValue, '2026-10-31');
+  assert.equal(row.fields[0].currentValue, '2026-10-29');
+});
+
+test('prefill preview detects shared calculated report_date drift on assignment sharedAnswers', async (t) => {
+  const template = {
+    id: 'TPL_SHARED_DATE',
+    version: 1,
+    schema: {
+      fields: [{
+        id: 'report_date',
+        type: 'date',
+        sharedAcrossStudents: true,
+        valueMode: 'calculated',
+        calculationRule: {
+          enabled: true,
+          expression: 'formatSemiMonthlyDueDate(prefill.report_period_due_date, "dd/mm/yyyy")',
+          onError: 'keep_last'
+        }
+      }]
+    }
+  };
+  const assignment = {
+    id: 'ASG_SHARED_DATE',
+    reportScope: 'each_student',
+    classId: 'CLS1',
+    reportDueDate: '2026-10-29',
+    sharedAnswers: { report_date: '2026-10-29' }
+  };
+  const instance = {
+    id: 'RINS_SHARED_DATE',
+    studentId: 'STU1',
+    teacherId: 'T1',
+    status: 'draft',
+    answers: {},
+    prefillSnapshot: { report_period_due_date: '2026-10-29' },
+    audit: { firstSavedAt: '2025-01-01T00:00:00.000Z' }
+  };
+
+  const origBuild = reportService.buildPrefillSnapshot;
+  reportService.buildPrefillSnapshot = async () => ({ report_period_due_date: '2026-10-29' });
+
+  t.after(() => {
+    reportService.buildPrefillSnapshot = origBuild;
+  });
+
+  const preview = await reportPrefillRefreshPreviewService.buildPrefillRefreshPreview({
+    instance,
+    template,
+    assignment,
+    reqUser: { id: 'u1' }
+  });
+
+  const row = preview.changes.find((item) => item.prefillKey === '__field__report_date');
+  assert.ok(row, 'expected shared calculated drift vs assignment sharedAnswers');
+  assert.equal(row.fields[0].newValue, '2026-10-31');
+});
+
 test('resetInstanceFromLivePrefill rejects locked instances', async () => {
   await withPatched(reportIntegrityService, {
     getEditableInstanceOrThrow: async () => {

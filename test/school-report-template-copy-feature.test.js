@@ -33,6 +33,29 @@ test('report template copy form posts to create flow and carries source id safel
   assert.match(source, /isEdit \? \('\/school\/reports\/templates\/edit\/'.*\) : '\/school\/reports\/templates\/new'/);
 });
 
+test('report template field designer supports expanded list mode for reordering', () => {
+  const source = read('packages/school/MVC/views/school/report/templateForm.ejs');
+  assert.match(source, /id="btnFieldDesignerExpandedList"/);
+  assert.match(source, /id="fieldDesignerScrollPanel"/);
+  assert.match(source, /template-scroll-panel--expanded/);
+  assert.match(source, /field-designer-rows-expanded/);
+  assert.match(source, /id="collapseFieldDesigner" class="collapse show"/);
+  assert.match(source, /function isFieldDesignerListExpanded/);
+  assert.doesNotMatch(source, /<th[^>]*>\s*Details\s*<\/th>/);
+});
+
+test('report template preview modal mirrors Report Instance V2 layout', () => {
+  const source = read('packages/school/MVC/views/school/report/templateForm.ejs');
+  assert.match(source, /template-preview-modal-dialog/);
+  assert.match(source, /modal-xl modal-dialog-scrollable template-preview-modal-dialog/);
+  assert.match(source, /function buildPreviewSectionGroups/);
+  assert.match(source, /function buildInstanceLikePreviewHtml/);
+  assert.match(source, /template-form-preview-page/);
+  assert.match(source, /report-instance-page/);
+  assert.match(source, /function initTemplatePreviewModalUi/);
+  assert.doesNotMatch(source, /Prefill key:/);
+});
+
 test('report template copy controller creates a draft copy without mutating source', () => {
   const source = read('packages/school/MVC/controllers/school/reportController.js');
   assert.match(source, /async function showTemplateCopyForm/);

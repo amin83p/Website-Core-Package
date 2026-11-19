@@ -132,10 +132,10 @@
     border-top: 1px dashed #e2e8f0;
   }
   .report-matrix-page .matrix-table-wrap--inline {
-    flex: 1 1 auto;
-    min-height: 32rem;
-    height: clamp(34rem, 78vh, calc(100dvh - 6rem));
-    max-height: clamp(34rem, 78vh, calc(100dvh - 6rem));
+    flex: 0 0 auto;
+    min-height: 10rem;
+    height: auto;
+    max-height: clamp(20rem, 78vh, calc(100dvh - 6rem));
     overflow: auto;
   }
   #reportMatrixTableModal .matrix-table-wrap {
@@ -347,7 +347,9 @@
     background: #fafbfc;
   }
   .report-matrix-page .matrix-table th.matrix-student-col,
-  .report-matrix-page .matrix-table td.matrix-student-col {
+  .report-matrix-page .matrix-table td.matrix-student-col,
+  .report-matrix-table-scope .matrix-table th.matrix-student-col,
+  .report-matrix-table-scope .matrix-table td.matrix-student-col {
     position: sticky;
     left: 0;
     min-width: 230px;
@@ -356,7 +358,8 @@
     background: var(--bs-body-bg);
     box-shadow: 3px 0 5px rgba(0, 0, 0, 0.06);
   }
-  .report-matrix-page .matrix-table th.matrix-student-col { z-index: 6; background: #f1f5f9; }
+  .report-matrix-page .matrix-table th.matrix-student-col,
+  .report-matrix-table-scope .matrix-table th.matrix-student-col { z-index: 6; background: #f1f5f9; }
   .report-matrix-page .matrix-table textarea { min-width: 180px; width: 100%; resize: vertical; }
   .report-matrix-page .matrix-table td.matrix-note-cell,
   .report-matrix-page .matrix-table th.matrix-note-col {
@@ -408,7 +411,8 @@
     flex: 0 1 auto;
     white-space: nowrap;
   }
-  .report-matrix-page .matrix-row-dirty .matrix-student-name::after { content: " • Unsaved"; color: var(--bs-warning-text-emphasis); font-size: .75rem; }
+  .report-matrix-page .matrix-row-dirty .matrix-student-name::after,
+  .report-matrix-table-scope .matrix-row-dirty .matrix-student-name::after { content: " • Unsaved"; color: var(--bs-warning-text-emphasis); font-size: .75rem; }
   .report-matrix-page .matrix-context-card {
     border: 1px solid #dbe3ef;
     border-radius: 12px;
@@ -457,36 +461,45 @@
     color: #94a3b8;
     font-weight: 500;
   }
-  .report-matrix-page .matrix-student-head {
+  .report-matrix-page .matrix-student-head,
+  .report-matrix-table-scope .matrix-student-head {
     display: flex;
     align-items: flex-start;
     justify-content: space-between;
     gap: 0.5rem;
   }
-  .report-matrix-page .matrix-student-name {
+  .report-matrix-page .matrix-student-name,
+  .report-matrix-table-scope .matrix-student-name {
     flex: 1 1 auto;
     min-width: 0;
     line-height: 1.35;
   }
-  .report-matrix-page .matrix-student-tools {
+  .report-matrix-page .matrix-student-tools,
+  .report-matrix-table-scope .matrix-student-tools {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
     flex-shrink: 0;
     margin-top: 0.05rem;
   }
-  .report-matrix-page .matrix-status-icon {
+  .report-matrix-page .matrix-status-icon,
+  .report-matrix-table-scope .matrix-status-icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     font-size: 1.05rem;
     line-height: 1;
   }
-  .report-matrix-page .matrix-status-icon--submitted { color: var(--bs-success); }
-  .report-matrix-page .matrix-status-icon--locked { color: #334155; }
-  .report-matrix-page .matrix-status-icon--draft { color: #b45309; }
-  .report-matrix-page .matrix-status-icon--pending { color: #64748b; }
-  .report-matrix-page .matrix-row-icon-btn {
+  .report-matrix-page .matrix-status-icon--submitted,
+  .report-matrix-table-scope .matrix-status-icon--submitted { color: var(--bs-success); }
+  .report-matrix-page .matrix-status-icon--locked,
+  .report-matrix-table-scope .matrix-status-icon--locked { color: #334155; }
+  .report-matrix-page .matrix-status-icon--draft,
+  .report-matrix-table-scope .matrix-status-icon--draft { color: #b45309; }
+  .report-matrix-page .matrix-status-icon--pending,
+  .report-matrix-table-scope .matrix-status-icon--pending { color: #64748b; }
+  .report-matrix-page .matrix-row-icon-btn,
+  .report-matrix-table-scope .matrix-row-icon-btn {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -502,18 +515,23 @@
     line-height: 1;
   }
   .report-matrix-page .matrix-row-icon-btn:hover,
-  .report-matrix-page .matrix-row-icon-btn:focus-visible {
+  .report-matrix-page .matrix-row-icon-btn:focus-visible,
+  .report-matrix-table-scope .matrix-row-icon-btn:hover,
+  .report-matrix-table-scope .matrix-row-icon-btn:focus-visible {
     color: var(--bs-primary);
     border-color: #93c5fd;
     background: #f8fbff;
   }
-  .report-matrix-page .matrix-row-icon-btn--warning {
+  .report-matrix-page .matrix-row-icon-btn--warning,
+  .report-matrix-table-scope .matrix-row-icon-btn--warning {
     color: #b45309;
     border-color: #fcd34d;
     background: #fffbeb;
   }
   .report-matrix-page .matrix-row-icon-btn--warning:hover,
-  .report-matrix-page .matrix-row-icon-btn--warning:focus-visible {
+  .report-matrix-page .matrix-row-icon-btn--warning:focus-visible,
+  .report-matrix-table-scope .matrix-row-icon-btn--warning:hover,
+  .report-matrix-table-scope .matrix-row-icon-btn--warning:focus-visible {
     color: #92400e;
     border-color: #f59e0b;
     background: #fef3c7;
@@ -607,9 +625,12 @@
           <% sharedGroups.forEach((group, groupIndex) => { const collapseId = 'reportMatrixSharedGroup' + groupIndex; %>
             <div class="accordion-item"><h2 class="accordion-header" id="<%= collapseId %>Heading"><button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#<%= collapseId %>" aria-expanded="true"><%= group.label %> <span class="badge bg-info-subtle text-info-emphasis border ms-2"><%= group.fields.length %> field(s)</span></button></h2>
               <div id="<%= collapseId %>" class="accordion-collapse collapse show"><div class="accordion-body"><div class="row g-3">
-                <% (group.fields || []).forEach((field) => { const value = field.value === undefined || field.value === null ? '' : field.value; const col = field.fullPageWidth ? 'col-12' : 'col-12 col-md-6 col-xl-4'; const sharedDisabled = !sharedFieldsEditableSafe; %>
-                  <div class="<%= col %>"><label class="form-label fw-bold"><%= field.label %> <span class="badge bg-info-subtle text-info-emphasis border ms-1">Shared</span></label>
-                    <% if (field.type === 'textarea') { %><textarea class="form-control js-matrix-shared-field" rows="3" data-field-id="<%= field.id %>" <%= sharedDisabled ? 'readonly' : '' %>><%= value %></textarea>
+                <% (group.fields || []).forEach((field) => { const value = field.value === undefined || field.value === null ? '' : field.value; const col = field.fullPageWidth ? 'col-12' : 'col-12 col-md-6 col-xl-4'; const sharedDisabled = !sharedFieldsEditableSafe; const sharedSectionReadOnly = field.renderInSharedSection === true || field.readOnly === true; %>
+                  <div class="<%= col %>"><label class="form-label fw-bold"><%= field.label %> <% if (sharedSectionReadOnly) { %><span class="badge bg-light text-secondary border ms-1">View only</span><% } else { %><span class="badge bg-info-subtle text-info-emphasis border ms-1">Shared</span><% } %></label>
+                    <% if (sharedSectionReadOnly) { %>
+                      <% if (field.type === 'textarea') { %><textarea class="form-control" rows="3" data-field-id="<%= field.id %>" readonly><%= value %></textarea>
+                      <% } else { %><input type="<%= field.type === 'date' ? 'date' : 'text' %>" class="form-control" data-field-id="<%= field.id %>" value="<%= value %>" readonly><% } %>
+                    <% } else if (field.type === 'textarea') { %><textarea class="form-control js-matrix-shared-field" rows="3" data-field-id="<%= field.id %>" <%= sharedDisabled ? 'readonly' : '' %>><%= value %></textarea>
                     <% } else if (field.type === 'select') { %>
                       <%- include('partials/reportSelectField', {
                         field,
@@ -631,7 +652,6 @@
       </div>
     </div>
   <% } %>
-
   <div class="card border-0 shadow-sm" id="reportMatrixStudentReports">
     <div class="card-header bg-white py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
       <h5 class="m-0 fw-bold"><i class="bi bi-table me-2 text-primary"></i>Student reports</h5>
@@ -688,6 +708,9 @@
                     <% if (row.instanceId && String(row.status || '').toLowerCase() === 'locked' && canUnlockReportInstanceSafe) { %>
                       <button type="button" class="matrix-row-icon-btn matrix-row-icon-btn--warning js-matrix-unlock-instance" data-instance-id="<%= row.instanceId %>" data-student-name="<%= row.studentName %>" title="Unlock returns the report to submitted" aria-label="Unlock returns the report to submitted"><i class="bi bi-unlock" aria-hidden="true"></i></button>
                     <% } %>
+                    <% if (isMatrixAdminViewerSafe && row.instanceId && String(row.status || '').toLowerCase() !== 'locked') { %>
+                      <button type="button" class="matrix-row-icon-btn js-matrix-prefill-preview" data-student-id="<%= row.studentId %>" data-student-name="<%= row.studentName %>" title="Preview prefill for this student" aria-label="Preview prefill for <%= row.studentName %>"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></button>
+                    <% } %>
                   </div>
                 </div>
               </td>
@@ -699,19 +722,21 @@
                   <% if (isNoteCell) { %>
                     <% const noteStr = value === '' ? '' : String(value); %>
                     <% const hasNote = noteStr.trim().length > 0; %>
-                    <% const btnLabel = hasNote ? 'Edit note' : 'Add note'; %>
+                    <% const fieldDisplayLabel = String(field.label || field.id || 'Note').trim() || 'Note'; %>
+                    <% const actionLabel = hasNote ? 'Edit note' : 'Add note'; %>
+                    <% const btnLabel = fieldDisplayLabel; %>
                     <% const preview = hasNote && noteStr.length > 48 ? noteStr.slice(0, 48) + '…' : (hasNote ? noteStr : ''); %>
                     <% const fieldTypeToken = String(field.type || 'text').toLowerCase(); %>
                     <input type="hidden" class="js-matrix-row-field js-matrix-note-value" data-field-id="<%= field.id %>" value="<%= noteStr %>">
                     <button type="button" class="btn btn-outline-secondary btn-sm js-matrix-note-open"<%= disabled ? ' disabled' : '' %>
                       data-field-id="<%= field.id %>"
-                      data-field-label="<%= field.label %>"
+                      data-field-label="<%= fieldDisplayLabel %>"
                       data-field-type="<%= fieldTypeToken %>"
                       data-student-id="<%= row.studentId %>"
                       data-student-name="<%= row.studentName %>"
                       data-help-text="<%= field.helpText || '' %>"
-                      <% if (preview) { %>title="<%= btnLabel %>: <%= preview %>"<% } %>
-                      aria-label="<%= btnLabel %> for <%= field.label %> — <%= row.studentName %>">
+                      title="<%= preview ? (actionLabel + ': ' + preview) : (actionLabel + ' ' + fieldDisplayLabel) %>"
+                      aria-label="<%= actionLabel %> for <%= fieldDisplayLabel %> — <%= row.studentName %>">
                       <i class="bi bi-journal-text me-1" aria-hidden="true"></i><span class="js-matrix-note-btn-label"><%= btnLabel %></span>
                     </button>
                   <% } else if (field.type === 'select') { %>
@@ -783,7 +808,7 @@
         <h5 class="modal-title" id="reportMatrixTableModalLabel"><i class="bi bi-table me-2 text-primary"></i>Student reports</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body p-0" id="reportMatrixTableModalHost"></div>
+      <div class="modal-body p-0 report-matrix-table-scope" id="reportMatrixTableModalHost"></div>
     </div>
   </div>
 </div>
@@ -840,7 +865,7 @@
   <div class="modal-dialog modal-xl modal-dialog-scrollable"><div class="modal-content border-0 shadow">
     <div class="modal-header">
       <div>
-        <h5 class="modal-title mb-1"><i class="bi bi-arrow-repeat me-2"></i>Preview Prefill Updates</h5>
+        <h5 class="modal-title mb-1" id="reportMatrixPrefillModalTitle"><i class="bi bi-arrow-repeat me-2"></i>Preview Prefill Updates</h5>
         <p class="small mb-0 opacity-75">Review live data changes before updating student reports.</p>
       </div>
       <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -896,6 +921,7 @@
     window.CAN_REOPEN_REPORT_INSTANCE = <%- JSON.stringify(typeof canReopenReportInstanceToDraft !== 'undefined' && !!canReopenReportInstanceToDraft) %>;
     window.MATRIX_HAS_SHARED_FIELDS = <%- JSON.stringify(hasSharedFieldsBlock) %>;
     window.CAN_UNLOCK_REPORT_INSTANCE = <%- JSON.stringify(typeof canUnlockReportInstance !== 'undefined' && !!canUnlockReportInstance) %>;
+    window.IS_MATRIX_ADMIN_VIEWER = <%- JSON.stringify(isMatrixAdminViewerSafe) %>;
 
     function initializeTooltips() {
       if (typeof bootstrap === 'undefined' || !bootstrap?.Tooltip) return;
@@ -1073,27 +1099,22 @@
       return text.length > max ? `${text.slice(0, max)}…` : text;
     }
 
-    function isReportMatrixTableInExpandedView() {
-      return Boolean(document.querySelector('#reportMatrixTableModalHost .matrix-table-wrap'));
-    }
-
     function reportMatrixNoteActionLabel(hasNote) {
       return hasNote ? 'Edit note' : 'Add note';
     }
 
-    function reportMatrixNoteVisibleLabel(hasNote, compact) {
-      if (compact) return 'Note';
-      return reportMatrixNoteActionLabel(hasNote);
+    function reportMatrixNoteVisibleLabel(fieldLabel) {
+      const label = String(fieldLabel || '').trim();
+      return label || 'Note';
     }
 
     function syncReportMatrixNoteButton(btn, value, options = {}) {
       if (!btn) return;
       const hasNote = String(value ?? '').trim().length > 0;
-      const fieldLabel = btn.getAttribute('data-field-label') || 'note';
+      const fieldLabel = btn.getAttribute('data-field-label') || 'Note';
       const studentName = btn.getAttribute('data-student-name') || 'student';
-      const compact = options.compact === undefined ? isReportMatrixTableInExpandedView() : Boolean(options.compact);
       const actionLabel = reportMatrixNoteActionLabel(hasNote);
-      const labelText = reportMatrixNoteVisibleLabel(hasNote, compact);
+      const labelText = reportMatrixNoteVisibleLabel(fieldLabel);
       const labelSpan = btn.querySelector('.js-matrix-note-btn-label');
       if (labelSpan) labelSpan.textContent = labelText;
       const preview = reportMatrixNotePreview(value);
@@ -1130,12 +1151,14 @@
       const esc = reportMatrixEscapeHtml;
       const fieldId = esc(field.id);
       const hasNote = valueStr.trim().length > 0;
-      const btnLabel = hasNote ? 'Edit note' : 'Add note';
+      const fieldLabelRaw = String(field.label || field.id || 'Note').trim() || 'Note';
+      const actionLabel = hasNote ? 'Edit note' : 'Add note';
+      const btnLabel = fieldLabelRaw;
       const preview = reportMatrixNotePreview(valueStr);
-      const title = preview ? `${btnLabel}: ${esc(preview)}` : btnLabel;
+      const title = preview ? `${actionLabel}: ${esc(preview)}` : `${actionLabel} ${esc(fieldLabelRaw)}`;
       const dis = disabled ? ' disabled' : '';
       const fieldType = esc(String(field.type || 'text').toLowerCase());
-      const fieldLabel = esc(field.label || field.id || 'Note');
+      const fieldLabel = esc(fieldLabelRaw);
       const studentName = esc(row.studentName || '');
       const studentId = esc(row.studentId || '');
       return `<input type="hidden" class="js-matrix-row-field js-matrix-note-value" data-field-id="${fieldId}" value="${esc(valueStr)}">
@@ -1147,7 +1170,7 @@
   data-student-name="${studentName}"
   data-help-text="${esc(field.helpText || '')}"
   title="${title}"
-  aria-label="${btnLabel} for ${fieldLabel} — ${studentName}">
+  aria-label="${actionLabel} for ${fieldLabel} — ${studentName}">
   <i class="bi bi-journal-text me-1" aria-hidden="true"></i><span class="js-matrix-note-btn-label">${btnLabel}</span>
 </button>`;
     }
@@ -1282,6 +1305,10 @@
       const unlockBtn = row.instanceId && String(row.status || '').toLowerCase() === 'locked' && window.CAN_UNLOCK_REPORT_INSTANCE
         ? `<button type="button" class="matrix-row-icon-btn matrix-row-icon-btn--warning js-matrix-unlock-instance" data-instance-id="${reportMatrixEscapeHtml(row.instanceId)}" data-student-name="${reportMatrixEscapeHtml(row.studentName)}" title="Unlock returns the report to submitted" aria-label="Unlock returns the report to submitted"><i class="bi bi-unlock" aria-hidden="true"></i></button>`
         : '';
+      const statusToken = String(row.status || '').toLowerCase();
+      const prefillBtn = window.IS_MATRIX_ADMIN_VIEWER && row.instanceId && statusToken !== 'locked'
+        ? `<button type="button" class="matrix-row-icon-btn js-matrix-prefill-preview" data-student-id="${reportMatrixEscapeHtml(row.studentId)}" data-student-name="${reportMatrixEscapeHtml(row.studentName)}" title="Preview prefill for this student" aria-label="Preview prefill for ${reportMatrixEscapeHtml(row.studentName)}"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></button>`
+        : '';
       const openHref = row.editHref || '';
       const openBtn = openHref
         ? `<a href="${reportMatrixEscapeHtml(openHref)}" class="matrix-row-icon-btn js-matrix-open" target="_blank" rel="noopener noreferrer" title="Open individual report" aria-label="Open individual report"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>`
@@ -1299,6 +1326,7 @@
               ${openBtn}
               ${reopenBtn}
               ${unlockBtn}
+              ${prefillBtn}
             </div>
           </div>
         </td>
@@ -1352,7 +1380,41 @@
         });
       } finally {
         reportMatrixWindowState.loading = false;
+        syncReportMatrixInlineTableHeight();
       }
+    }
+
+    function reportMatrixInlineHeightCapPx() {
+      const viewportCap = Math.max(320, Math.min(window.innerHeight * 0.78, window.innerHeight - 96));
+      const cssMax = 54 * 16;
+      return Math.min(viewportCap, cssMax);
+    }
+
+    function syncReportMatrixInlineTableHeight() {
+      const wrap = document.querySelector('#reportMatrixTableInlineHost .matrix-table-wrap');
+      const table = document.getElementById('reportMatrixTable');
+      if (!wrap || !table || wrap.closest('#reportMatrixTableModalHost')) return;
+      const rows = table.querySelectorAll('tbody tr[data-student-id]');
+      const header = table.querySelector('thead');
+      const headerHeight = header ? header.getBoundingClientRect().height : 0;
+      let bodyHeight = 0;
+      rows.forEach((row) => { bodyHeight += row.getBoundingClientRect().height; });
+      const chrome = 8;
+      const desired = Math.ceil(headerHeight + bodyHeight + chrome);
+      const minHeight = Math.max(160, Math.ceil(headerHeight + 56));
+      const maxHeight = reportMatrixInlineHeightCapPx();
+      const height = Math.max(minHeight, Math.min(desired, maxHeight));
+      wrap.style.height = `${height}px`;
+      wrap.style.maxHeight = `${maxHeight}px`;
+    }
+
+    let reportMatrixInlineHeightRaf = 0;
+    function scheduleReportMatrixInlineTableHeight() {
+      window.cancelAnimationFrame(reportMatrixInlineHeightRaf);
+      reportMatrixInlineHeightRaf = window.requestAnimationFrame(() => {
+        reportMatrixInlineHeightRaf = 0;
+        syncReportMatrixInlineTableHeight();
+      });
     }
 
     document.addEventListener('scroll', (event) => {
@@ -1410,8 +1472,12 @@
       reportMatrixTableModalEl.addEventListener('hidden.bs.modal', () => {
         restoreReportMatrixTableInline();
         syncAllReportMatrixNoteButtons({ compact: false });
+        scheduleReportMatrixInlineTableHeight();
       });
     }
+
+    window.addEventListener('resize', () => scheduleReportMatrixInlineTableHeight());
+    scheduleReportMatrixInlineTableHeight();
 
     document.addEventListener('click', function (event) {
       const exportLink = event.target.closest('.js-export-report-instance');
@@ -1691,6 +1757,7 @@
       return fieldsForSnapshotComputation([
         ...(matrixState.sharedFields || []),
         ...(matrixState.commonFields || []),
+        ...(matrixState.commonFieldsTrailing || []),
         ...(matrixState.tableFields || [])
       ]);
     }
@@ -1698,6 +1765,7 @@
     function collectMatrixEditableAnswers(row) {
       return {
         ...collectControls(document, '#reportMatrixCommonFields [data-field-id]'),
+        ...collectControls(document, '#reportMatrixSharedFields [data-field-id]:not(.js-matrix-row-field)'),
         ...collectControls(document, '.js-matrix-shared-field'),
         ...collectControls(row, '.js-matrix-row-field')
       };
@@ -1733,6 +1801,31 @@
 
     function recalculateAllRows() {
       document.querySelectorAll('tr[data-student-id]').forEach(recalculateRow);
+    }
+
+    function recalculateCommonCalculatedFields() {
+      const api = window.SchoolReportCalculatedFields;
+      if (!api?.prepareReportAnswersForUI) return;
+      const fields = [
+        ...(matrixState.commonFields || []),
+        ...(matrixState.commonFieldsTrailing || [])
+      ].filter((field) => field.calculated && field.calculationRule?.enabled && field.calculationRule?.expression);
+      if (!fields.length) return;
+      const rowState = (matrixState.rows || []).find((row) => row.calculationPrefill) || (matrixState.rows || [])[0];
+      if (!rowState) return;
+      const merged = rowState.calculationAnswers && typeof rowState.calculationAnswers === 'object'
+        ? { ...rowState.calculationAnswers }
+        : { ...(rowState.answers || {}) };
+      const prepared = api.prepareReportAnswersForUI({
+        fields,
+        answers: merged,
+        prefill: rowState.calculationPrefill || {}
+      });
+      fields.forEach((field) => {
+        const control = document.querySelector(`[data-field-id="${CSS.escape(field.id)}"]:not(.js-matrix-row-field)`);
+        if (!control) return;
+        writeControl(control, prepared.displayAnswers?.[field.id]);
+      });
     }
 
     function syncRowLifecycleActions(row, rowState) {
@@ -1878,7 +1971,7 @@
           writeControl(document.querySelector(`.js-matrix-shared-field[data-field-id="${CSS.escape(field.id)}"]`), field.value);
         });
       }
-      (nextMatrix.commonFields || []).forEach((field) => {
+      [...(nextMatrix.commonFields || []), ...(nextMatrix.commonFieldsTrailing || [])].forEach((field) => {
         writeControl(document.querySelector(`[data-field-id="${CSS.escape(field.id)}"]:not(.js-matrix-row-field)`), field.value);
       });
       const fieldMap = new Map((nextMatrix.tableFields || []).map((field) => [String(field.id), field]));
@@ -1916,6 +2009,8 @@
         if (target) target.textContent = String(value);
       });
       syncBulkLifecycleActions();
+      recalculateCommonCalculatedFields();
+      scheduleReportMatrixInlineTableHeight();
     }
 
     async function runBulkAction(button) {
@@ -2025,31 +2120,57 @@
     const applyPrefillButton = document.getElementById('btnApplyMatrixPrefill');
     function escapeHtml(value) { return String(value ?? '').replace(/[&<>"']/g, (char) => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[char])); }
     function updatePrefillApplyState() { if (applyPrefillButton) applyPrefillButton.disabled = !prefillRowsEl?.querySelector('.js-matrix-prefill-key:checked'); }
-    function renderPrefillPreview(result) {
+    const prefillModalTitleEl = document.getElementById('reportMatrixPrefillModalTitle');
+
+    function renderPrefillPreview(result, context = {}) {
       const students = Array.isArray(result?.students) ? result.students : [];
       const changed = Number(result.summary?.changed) || 0;
+      const singleStudent = students.length === 1;
+      const studentLabel = singleStudent ? (students[0]?.studentName || students[0]?.studentId || 'student') : '';
+      if (prefillModalTitleEl) {
+        prefillModalTitleEl.innerHTML = singleStudent && context.studentId
+          ? '<i class="bi bi-arrow-repeat me-2"></i>Preview Prefill — ' + escapeHtml(studentLabel)
+          : '<i class="bi bi-arrow-repeat me-2"></i>Preview Prefill Updates';
+      }
       if (prefillSummaryEl) {
-        prefillSummaryEl.innerHTML = students.length
-          ? `<strong>${changed}</strong> of <strong>${students.length}</strong> student${students.length === 1 ? '' : 's'} have updates. Select the items you want to apply to each report.`
-          : 'No student rows were found for this matrix.';
+        if (!students.length) {
+          prefillSummaryEl.textContent = 'No student rows were found for this matrix.';
+        } else if (singleStudent && context.studentId) {
+          const rowChanges = (students[0]?.changes || []).length;
+          prefillSummaryEl.innerHTML = rowChanges
+            ? `<strong>${rowChanges}</strong> update${rowChanges === 1 ? '' : 's'} for <strong>${escapeHtml(studentLabel)}</strong>. Select items to apply.`
+            : `No prefill changes for <strong>${escapeHtml(studentLabel)}</strong>.`;
+        } else {
+          prefillSummaryEl.innerHTML = `<strong>${changed}</strong> of <strong>${students.length}</strong> student${students.length === 1 ? '' : 's'} have updates. Select the items you want to apply to each report.`;
+        }
       }
       if (!prefillRowsEl) return;
       const ui = window.ReportPrefillPreviewUi;
-      prefillRowsEl.innerHTML = students.map((student) => (
-        ui?.renderMatrixStudentBlock ? ui.renderMatrixStudentBlock(student, escapeHtml) : ''
-      )).join('');
+      prefillRowsEl.innerHTML = ui?.renderMatrixPrefillTables
+        ? ui.renderMatrixPrefillTables(students, escapeHtml, {
+          hideStudentHead: Boolean(context.studentId && students.length === 1)
+        })
+        : '';
       prefillRowsEl.querySelectorAll('.js-matrix-prefill-key').forEach((item) => item.addEventListener('change', updatePrefillApplyState));
       updatePrefillApplyState();
     }
-    async function loadPrefillPreview() {
+    async function loadPrefillPreview(context = {}) {
+      const studentId = String(context.studentId || '').trim();
       if (prefillSummaryEl) prefillSummaryEl.textContent = 'Loading prefill updates...';
       if (prefillRowsEl) prefillRowsEl.innerHTML = '';
-      if (typeof bootstrap !== 'undefined' && prefillModal) bootstrap.Modal.getOrCreateInstance(prefillModal).show();
+      if (typeof bootstrap !== 'undefined' && prefillModal) {
+        bootstrap.Modal.getOrCreateInstance(prefillModal).show();
+      }
       try {
-        const response = await fetch('/school/reports/instances/matrix/' + encodeURIComponent(matrixState.assignmentId) + '/prefill-preview?assignmentRowId=' + encodeURIComponent(matrixState.assignmentRowId || '') + '&teacherId=' + encodeURIComponent(matrixState.teacherId || ''), { headers: { Accept: 'application/json', 'x-ajax-request': 'true' } });
+        const qs = new URLSearchParams({
+          assignmentRowId: matrixState.assignmentRowId || '',
+          teacherId: matrixState.teacherId || ''
+        });
+        if (studentId) qs.set('studentId', studentId);
+        const response = await fetch('/school/reports/instances/matrix/' + encodeURIComponent(matrixState.assignmentId) + '/prefill-preview?' + qs.toString(), { headers: { Accept: 'application/json', 'x-ajax-request': 'true' } });
         const result = await response.json().catch(() => ({}));
         if (!response.ok || result.status !== 'success') throw new Error(result.message || 'Unable to preview prefill updates.');
-        renderPrefillPreview(result);
+        renderPrefillPreview(result, { studentId });
       } catch (error) { if (prefillSummaryEl) prefillSummaryEl.textContent = error.message; }
     }
     async function applyPrefillUpdates() {
@@ -2074,7 +2195,7 @@
         applyPrefillButton.disabled = false;
       }
     }
-    document.getElementById('btnMatrixPrefillPreview')?.addEventListener('click', loadPrefillPreview);
+    document.getElementById('btnMatrixPrefillPreview')?.addEventListener('click', () => loadPrefillPreview());
     applyPrefillButton?.addEventListener('click', applyPrefillUpdates);
 
     async function resetMatrixFromLiveData() {
@@ -2173,6 +2294,16 @@
     attachMatrixRowFieldListeners(document.getElementById('reportMatrixTable'));
 
     document.getElementById('reportMatrixTable')?.addEventListener('click', (event) => {
+      const prefillBtn = event.target.closest('.js-matrix-prefill-preview');
+      if (prefillBtn) {
+        const sid = String(prefillBtn.getAttribute('data-student-id') || '').trim();
+        if (sid) {
+          event.preventDefault();
+          event.stopPropagation();
+          loadPrefillPreview({ studentId: sid });
+        }
+        return;
+      }
       const noteBtn = event.target.closest('.js-matrix-note-open');
       if (!noteBtn || noteBtn.disabled) return;
       event.preventDefault();
@@ -2561,6 +2692,7 @@
       event.returnValue = '';
     });
     recalculateAllRows();
+    recalculateCommonCalculatedFields();
     initializeTooltips();
     bindMatrixColumnHeaderTips();
   })();
