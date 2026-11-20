@@ -28,6 +28,33 @@ const simpleTemplate = {
   }
 };
 
+test('isInstanceRenderCacheValid accepts prefillRefreshedAt without firstSavedAt', () => {
+  assert.equal(reportService.isInstanceRenderCacheValid(simpleTemplate, {
+    audit: { prefillRefreshedAt: '2025-01-02T00:00:00.000Z' },
+    renderCache: {
+      templateId: 'TPL-RRC-1',
+      templateVersion: 3,
+      capturedAt: '2025-01-02T00:00:00.000Z',
+      mergedAnswers: { name: 'from-prefill' }
+    }
+  }), true);
+});
+
+test('isInstanceRenderCacheValid rejects stale renderCache when lastDraftSavedAt is newer', () => {
+  assert.equal(reportService.isInstanceRenderCacheValid(simpleTemplate, {
+    audit: {
+      firstSavedAt: '2025-01-01T00:00:00.000Z',
+      lastDraftSavedAt: '2025-01-03T12:00:00.000Z'
+    },
+    renderCache: {
+      templateId: 'TPL-RRC-1',
+      templateVersion: 3,
+      capturedAt: '2025-01-02T00:00:00.000Z',
+      mergedAnswers: { name: 'stale' }
+    }
+  }), false);
+});
+
 test('isInstanceRenderCacheValid requires firstSavedAt, matching template id, mergedAnswers (ignores version mismatch)', () => {
   assert.equal(reportService.isInstanceRenderCacheValid(simpleTemplate, { audit: {} }), false);
   assert.equal(reportService.isInstanceRenderCacheValid(simpleTemplate, {

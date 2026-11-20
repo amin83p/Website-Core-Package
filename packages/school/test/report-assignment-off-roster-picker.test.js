@@ -2,8 +2,36 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const classEnrollmentReadService = require('../MVC/services/school/classEnrollmentReadService');
+const classEnrollmentSessionApplicabilityService = require('../MVC/services/school/classEnrollmentSessionApplicabilityService');
 const reportAssignmentStudentEligibilityService = require('../MVC/services/school/reportAssignmentStudentEligibilityService');
 const pickerUi = require('../public/scripts/reportAssignmentStudentPickerUi.js');
+
+test('assignment picker statuses include closed enrollments overlapping report window', () => {
+  const statuses = new Set(classEnrollmentReadService.getAssignmentPickerRosterStatusesForClass({ registrationMode: 'term' }));
+  const completedPeriod = {
+    status: 'completed',
+    startDate: '2026-09-01',
+    endDate: '2026-11-16',
+    completionDate: '2026-11-16'
+  };
+  const withdrawnPeriod = {
+    status: 'withdrawn',
+    startDate: '2026-09-01',
+    endDate: '2026-11-16',
+    completionDate: '2026-11-16'
+  };
+  assert.ok(statuses.has('completed'));
+  assert.ok(statuses.has('withdrawn'));
+  assert.equal(
+    classEnrollmentReadService.periodOverlapsWindow(completedPeriod, '2026-10-01', '2026-10-15', statuses),
+    true
+  );
+  assert.equal(
+    classEnrollmentReadService.periodOverlapsWindow(withdrawnPeriod, '2026-10-01', '2026-10-15', statuses),
+    true
+  );
+});
 
 test('appendOffRosterPersistedStudents adds saved ids missing from eligible roster', async () => {
   const schoolDataService = require('../MVC/services/school/schoolDataService');

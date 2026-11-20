@@ -7,6 +7,14 @@ const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSes
 const OPEN_PERIOD_STATUSES = new Set(['active', 'planned']);
 const REPORT_ROSTER_OPEN_STATUSES = Object.freeze(['active', 'planned', 'to_be_confirmed']);
 const HISTORICAL_ROLLING_ROSTER_STATUSES = Object.freeze(['active', 'planned', 'completed']);
+/** Closed enrollments that still count when their effective dates overlap a report assignment window. */
+const REPORT_ASSIGNMENT_PICKER_HISTORICAL_STATUSES = Object.freeze([
+  'active',
+  'planned',
+  'to_be_confirmed',
+  'completed',
+  'withdrawn'
+]);
 
 function normalizeStatus(value) {
   return String(value || '').trim().toLowerCase();
@@ -106,9 +114,18 @@ function getReportRosterStatusesForClass(classItem = {}) {
     : REPORT_ROSTER_OPEN_STATUSES;
 }
 
+/** Report assignment picker: include closed periods that overlap the row's report window. */
+function getAssignmentPickerRosterStatusesForClass(classItem = {}) {
+  return isRollingClassItem(classItem)
+    ? Object.freeze(['active', 'planned', 'completed', 'withdrawn'])
+    : REPORT_ASSIGNMENT_PICKER_HISTORICAL_STATUSES;
+}
+
 const classEnrollmentReadService = {
   HISTORICAL_ROLLING_ROSTER_STATUSES,
+  REPORT_ASSIGNMENT_PICKER_HISTORICAL_STATUSES,
   getReportRosterStatusesForClass,
+  getAssignmentPickerRosterStatusesForClass,
   isRollingClassItem,
 
   async listActiveStudentIdsForClass({

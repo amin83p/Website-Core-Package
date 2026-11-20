@@ -121,12 +121,25 @@ function buildStudentPunctualityFromSessions(sessions, studentId, statusMap = nu
   const matrixPolicy = attendanceMatrixMetricsService.resolvePolicy(classData, orgPolicyLayer);
   const enabledAttendanceStatuses = attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses(classData);
 
+  const notApplicableSessionIds = options?.notApplicableSessionIds instanceof Set
+    ? options.notApplicableSessionIds
+    : new Set();
+  const expectedSessionIds = options?.expectedSessionIds instanceof Set
+    ? options.expectedSessionIds
+    : null;
+  const buildSessionMetricKey = options?.buildSessionMetricKey && typeof options.buildSessionMetricKey === 'function'
+    ? options.buildSessionMetricKey
+    : (session) => String(session?.sessionId || session?.id || '').trim();
+
   (Array.isArray(sessions) ? sessions : []).forEach((session) => {
     if (sessionStatusPolicyService.shouldExcludeFromAttendanceByMap(effectiveStatusMap, {
       status: session?.status,
       notes: session?.notes
     })) return;
     if (sessionForcesNotApplicableAttendance(session, effectiveStatusMap)) return;
+    const sessionKey = buildSessionMetricKey(session);
+    if (sessionKey && notApplicableSessionIds.has(sessionKey)) return;
+    if (expectedSessionIds && sessionKey && !expectedSessionIds.has(sessionKey)) return;
     const roster = Array.isArray(session?.roster) ? session.roster : [];
     const row = roster.find((item) => idsEqual(item?.personId, target));
     if (!row) return;

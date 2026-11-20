@@ -489,7 +489,7 @@
     <div class="alert alert-warning border-warning-subtle mb-4" role="alert">
       <div class="fw-semibold mb-1"><i class="bi bi-lock-fill me-1"></i>Shared fields are read-only</div>
       <div class="small mb-0"><%= sharedFieldsLockReasonSafe %></div>
-      <div class="small mt-1 mb-0">You can still edit student-specific (private) fields on this report.</div>
+      <div class="small mt-1 mb-0">You can still edit student-specific (private) fields on this report. Saving will not update shared field values until all sibling reports on this row are draft.</div>
     </div>
   <% } %>
 
@@ -627,6 +627,7 @@
 
   <form method="POST" action="/school/reports/instances/edit/<%= instance.id %>">
     <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+    <% if (isV2) { %><input type="hidden" name="editorVariant" value="v2"><% } %>
     <input type="hidden" name="submitAction" id="reportInstanceSubmitAction" value="">
 
     <% if ((validation.errors || []).length || (validation.warnings || []).length) { %>
@@ -786,7 +787,7 @@
                               <% } else if (field.type === 'textarea') { %>
                                 <textarea class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" rows="4" <%= fieldIsDisabled(field) ? 'disabled' : '' %>><%= value %></textarea>
                               <% } else if (field.type === 'number') { %>
-                                <input type="number" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= fieldIsDisabled(field) ? 'disabled' : '' %>>
+                                <input type="number" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" step="any" <%= fieldIsDisabled(field) ? 'disabled' : '' %>>
                               <% } else if (field.type === 'date') { %>
                                 <input type="date" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= fieldIsDisabled(field) ? 'disabled' : '' %>>
                               <% } else if (field.type === 'checkbox') { %>
@@ -923,7 +924,7 @@
                           <% } else if (field.type === 'textarea') { %>
                             <textarea class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" rows="4" <%= fieldIsDisabled(field) ? 'disabled' : '' %>><%= value %></textarea>
                           <% } else if (field.type === 'number') { %>
-                            <input type="number" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= fieldIsDisabled(field) ? 'disabled' : '' %>>
+                            <input type="number" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" step="any" <%= fieldIsDisabled(field) ? 'disabled' : '' %>>
                           <% } else if (field.type === 'date') { %>
                             <input type="date" class="form-control js-report-field" data-field-id="<%= field.id %>" name="<%= fieldName %>" value="<%= value %>" <%= fieldIsDisabled(field) ? 'disabled' : '' %>>
                           <% } else if (field.type === 'checkbox') { %>
@@ -1454,17 +1455,84 @@
     }
 
     async function showExpiredActionStateMessage() {
-      const message = 'This report form session is no longer active. Reload the report instance, review your changes, and save again.';
+      const message = 'This report form session is no longer active. Your changes were not sent to the server. Reload the page to get a fresh session token, then save again.';
       const result = await window.ReportMessaging.showReportMessage({
         title: 'Form Session Expired',
         icon: 'warning',
         message,
         buttons: [
-          { text: 'Stay', class: 'btn-secondary' },
-          { text: 'Reload', class: 'btn-primary' }
+          { text: 'Stay on page', class: 'btn-secondary' },
+          { text: 'Reload page', class: 'btn-primary' }
         ]
       });
-      if (result === 'Reload') window.location.reload();
+      if (result === 'Reload page') window.location.reload();
+    }
+
+    function serializeFieldValueForPost(field, value) {
+      const type = String(field?.type || '').trim().toLowerCase();
+      if (type === 'checkbox') return value === true ? 'true' : 'false';
+      if (value === undefined || value === null) return '';
+      return String(value);
+    }
+
+    function syncFormFieldPayloadBeforeSubmit() {
+      if (!formEl) return;
+      const fields = parseJsonScript(fieldConfigEl, []);
+      const mergedBefore = parseJsonScript(mergedDataEl, {});
+      const answers = collectAnswers(fields, mergedBefore, { preferLiveDom: false });
+      let host = document.getElementById('reportInstanceSavePayload');
+      if (!host) {
+        host = document.createElement('div');
+        host.id = 'reportInstanceSavePayload';
+        host.hidden = true;
+        host.setAttribute('aria-hidden', 'true');
+        formEl.appendChild(host);
+      }
+      host.innerHTML = '';
+      fields.forEach((field) => {
+        if (isVisualOnlyField(field) || !field?.id) return;
+        if (isHiddenFromDisplayField(field)) return;
+        if (field.readOnly === true || isCalculatedField(field)) return;
+        const name = `field__${field.id}`;
+        formEl.querySelectorAll(`[name="${CSS.escape(name)}"]`).forEach((el) => {
+          if (el.closest('#reportInstanceSavePayload')) return;
+          el.removeAttribute('name');
+          el.dataset.reportSaveNameStripped = '1';
+        });
+        const hidden = document.createElement('input');
+        hidden.type = 'hidden';
+        hidden.name = name;
+        hidden.value = serializeFieldValueForPost(field, answers[field.id]);
+        host.appendChild(hidden);
+      });
+    }
+
+    async function handlePostSaveQueryFlags() {
+      const params = new URLSearchParams(window.location.search);
+      const saved = params.get('saved') === '1';
+      const submitted = params.get('submitted') === '1';
+      const sharedSkipped = params.get('sharedSkipped') === '1';
+      if (!saved && !submitted && !sharedSkipped) return;
+      if (saved || submitted) {
+        const title = submitted ? 'Report Submitted' : 'Report Saved';
+        const message = submitted
+          ? 'Your report was submitted. Displayed values match what is stored on the server.'
+          : 'Your draft was saved. Displayed values match what is stored on the server.';
+        await showReportInstanceMessage({ title, icon: 'success', message });
+      }
+      if (sharedSkipped) {
+        await showReportInstanceMessage({
+          title: 'Shared Fields Not Updated',
+          icon: 'warning',
+          message: 'Student-specific answers were saved, but shared fields could not be updated because other reports on this row are not all in draft. Resolve sibling report statuses, then edit shared fields again.'
+        });
+      }
+      params.delete('saved');
+      params.delete('submitted');
+      params.delete('sharedSkipped');
+      const rest = params.toString();
+      const nextUrl = `${window.location.pathname}${rest ? `?${rest}` : ''}${window.location.hash || ''}`;
+      try { window.history.replaceState({}, '', nextUrl); } catch (_) { /* ignore */ }
     }
 
     function getPrefillRefreshModal() {
@@ -2333,10 +2401,7 @@
 
     function collectAnswers(fields, mergedBefore, options = {}) {
       const preferLiveDom = options.preferLiveDom === true;
-      const prefillSafe = options.prefill && typeof options.prefill === 'object' ? options.prefill : {};
-      const base = preferLiveDom
-        ? { ...prefillSafe }
-        : (mergedBefore && typeof mergedBefore === 'object' ? { ...mergedBefore } : {});
+      const base = mergedBefore && typeof mergedBefore === 'object' ? { ...mergedBefore } : {};
       (Array.isArray(fields) ? fields : []).forEach((field) => {
         if (isVisualOnlyField(field) || !field?.id) return;
         if (isHiddenFromDisplayField(field)) {
@@ -2345,7 +2410,12 @@
           }
           return;
         }
-        if (isCalculatedField(field)) return;
+        if (isCalculatedField(field)) {
+          if (mergedBefore && Object.prototype.hasOwnProperty.call(mergedBefore, field.id)) {
+            base[field.id] = mergedBefore[field.id];
+          }
+          return;
+        }
         if (field.readOnly === true) {
           if (preferLiveDom && mergedBefore && Object.prototype.hasOwnProperty.call(mergedBefore, field.id)) {
             base[field.id] = mergedBefore[field.id];
@@ -2513,6 +2583,7 @@
     }
 
     focusValidationSummaryIfRequested();
+    handlePostSaveQueryFlags();
 
     if (formEl) {
       try {
@@ -2577,6 +2648,7 @@
             });
             return;
           }
+          syncFormFieldPayloadBeforeSubmit();
           setReportInstanceSubmitting(true, submitter);
           reportInstanceSubmitLoadingToken = showLoadingToken({
             title: submitAction === 'submit' ? 'Submitting Report' : 'Saving Report',

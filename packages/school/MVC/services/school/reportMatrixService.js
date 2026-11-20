@@ -1109,15 +1109,30 @@ async function applyMatrixPrefill({ assignmentId, assignmentRowId = '', teacherI
     const instance = findMatchingInstance(source.instances, { assignmentId: source.assignment.id, assignmentRowId: source.assignmentRowId, teacherId: source.resolvedTeacherId, studentId });
     const previewStudent = preview.students.find((student) => idsEqual(student.studentId, studentId));
     if (!instance || previewStudent?.locked) { results.push({ studentId, status: 'skipped', message: !instance ? 'Pending student has no stored snapshot.' : 'Locked report instance was skipped.' }); continue; }
-    const keys = new Set((Array.isArray(update?.prefillKeys) ? update.prefillKeys : []).map((key) => reportService.normalizePrefillKey(key)).filter(Boolean));
-    const changes = (previewStudent?.changes || []).filter((change) => keys.has(change.prefillKey));
+    const { expandKeysForApply } = require('./reportPrefillMirrorKeys');
+    const requestedKeys = (Array.isArray(update?.prefillKeys) ? update.prefillKeys : [])
+      .map((key) => reportService.normalizePrefillKey(key))
+      .filter(Boolean);
+    const keys = new Set(expandKeysForApply(source.assignment?.reportScope, requestedKeys));
+    const changes = (previewStudent?.changes || []).filter((change) => {
+      const primary = reportService.normalizePrefillKey(change?.prefillKey || '');
+      if (keys.has(primary)) return true;
+      return (Array.isArray(change?.mirrorKeys) ? change.mirrorKeys : [])
+        .map((key) => reportService.normalizePrefillKey(key))
+        .some((key) => keys.has(key));
+    });
     if (!changes.length) { results.push({ studentId, status: 'skipped', message: 'No selected prefill changes remain.' }); continue; }
     const nextPrefill = { ...(instance.prefillSnapshot || {}) };
     const nextAnswers = { ...(instance.answers || {}) };
     const nextDerivedOverrides = { ...(instance.derivedOverrides || {}) };
     changes.forEach((change) => {
       if (!change?.expressionDriven) {
-        nextPrefill[change.prefillKey] = change.newRawValue;
+        const raw = change.newRawValue;
+        nextPrefill[change.prefillKey] = raw;
+        (Array.isArray(change.mirrorKeys) ? change.mirrorKeys : []).forEach((mirrorKey) => {
+          const normalized = reportService.normalizePrefillKey(mirrorKey);
+          if (normalized) nextPrefill[normalized] = raw;
+        });
       }
       (change.fields || []).forEach((field) => {
         if (!field?.fieldId) return;

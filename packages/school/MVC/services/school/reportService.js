@@ -49,7 +49,8 @@ const STUDENT_PHONE_PREFILL_KEY_PATTERNS = Object.freeze([
  * - `common`: Available for all report types (class-scope and each-student-scope)
  * - `classOnly`: Behave differently depending on assignment.reportScope:
  *     * class-scope reports: Aggregate counts (e.g., class_attendance_present = total present count)
- *     * each-student-scope reports: Student-specific metrics (e.g., class_attendance_present = Attendance Matrix % for that student)
+ *     * each-student-scope reports: Student-specific metrics (e.g., class_attendance_present = Attendance Matrix % for that student).
+ *       Prefer binding form fields to student_attendance_span_percent; class_attendance_present is a legacy/export mirror on each-student reports.
  * - `studentOnly`: Only available for each-student-scope reports; populated for target student
  * - `gradebookPeriodClass` / `gradebookPeriodStudent`: Period-based grade aggregates
  * - `gradebookPeriodSkillsClass` / `gradebookPeriodSkillsStudent`: Per-skill grade aggregates in report period
@@ -443,6 +444,46 @@ function enrollmentPeriodCoversSession(period = {}, session = {}) {
   return Boolean(sessionDate && start && start <= sessionDate && end >= sessionDate);
 }
 
+function enrollmentPeriodCoversSessionForPrefill(period = {}, session = {}, classData = {}) {
+  const status = String(period?.status || '').trim().toLowerCase();
+  const allowed = new Set(
+    (classEnrollmentReadService.getAssignmentPickerRosterStatusesForClass(classData) || [])
+      .map((value) => String(value || '').trim().toLowerCase())
+      .filter(Boolean)
+  );
+  if (!allowed.has(status)) return false;
+  return classEnrollmentSessionApplicabilityService.periodCoversSession(
+    period,
+    session,
+    { honorCompletion: true }
+  );
+}
+
+function applyMarkedAttendanceExpectedSessions({
+  sessionRows = [],
+  targetPersonId,
+  expectedSessionIds = new Set(),
+  notApplicableSessionIds = new Set()
+} = {}) {
+  const target = toPublicId(targetPersonId);
+  if (!target) return;
+  (Array.isArray(sessionRows) ? sessionRows : []).forEach((session) => {
+    const key = buildSessionMetricKey(session);
+    if (!key) return;
+    const roster = Array.isArray(session?.roster) ? session.roster : [];
+    const row = roster.find((item) => idsEqual(item?.personId, target));
+    if (!row) return;
+    const status = attendanceMatrixMetricsService.normalizeStatus(
+      row?.attendance,
+      attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT
+    );
+    if (attendanceMatrixMetricsService.isUnmarkedAttendanceStatus(status)) return;
+    if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) return;
+    expectedSessionIds.add(key);
+    notApplicableSessionIds.delete(key);
+  });
+}
+
 async function buildStudentAttendanceApplicabilityContext({ classData, sessions, studentRecord, studentPersonId, reqUser, orgId }) {
   const targetPersonId = toPublicId(studentPersonId);
   const sessionRows = Array.isArray(sessions) ? sessions : [];
@@ -466,7 +507,7 @@ async function buildStudentAttendanceApplicabilityContext({ classData, sessions,
       activeOrgId: orgId || classData?.orgId || reqUser?.activeOrgId || '',
       orgId: orgId || classData?.orgId || reqUser?.activeOrgId || '',
       reqUser,
-      allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES,
+      allowedStatuses: classEnrollmentSessionApplicabilityService.ROLLING_ATTENDANCE_WINDOW_STATUSES,
       forceNotApplicableSessionKeys: forceNotApplicableSessionIds
     });
     sessionRows.forEach((session) => {
@@ -481,8 +522,30 @@ async function buildStudentAttendanceApplicabilityContext({ classData, sessions,
       if (state?.expected) expectedSessionIds.add(key);
       else notApplicableSessionIds.add(key);
     });
+    applyMarkedAttendanceExpectedSessions({
+      sessionRows,
+      targetPersonId,
+      expectedSessionIds,
+      notApplicableSessionIds
+    });
     return { notApplicableSessionIds, expectedSessionIds };
   }
+
+  const periods = await schoolDataService.getClassEnrollmentPeriodsByClassId(classData?.id || '', reqUser);
+  const studentRecordId = toPublicId(studentRecord?.id);
+  const studentPeriods = (Array.isArray(periods) ? periods : []).filter((row) => idsEqual(row?.studentId, studentRecordId));
+  expectedSessionIds.clear();
+  sessionRows.forEach((session) => {
+    const key = buildSessionMetricKey(session);
+    if (!key) return;
+    if (forceNotApplicableSessionIds.has(key)) {
+      notApplicableSessionIds.add(key);
+      return;
+    }
+    const covered = studentPeriods.some((period) => enrollmentPeriodCoversSessionForPrefill(period, session, classData));
+    if (covered) expectedSessionIds.add(key);
+    else notApplicableSessionIds.add(key);
+  });
 
   const leaveConflicts = await leaveRequestService.findApprovedLeaveConflicts({
     orgId,
@@ -497,7 +560,17 @@ async function buildStudentAttendanceApplicabilityContext({ classData, sessions,
   });
   leaveConflicts.forEach((row) => {
     const key = String(row?.sessionIndex || '').trim();
-    if (key) notApplicableSessionIds.add(key);
+    if (key) {
+      notApplicableSessionIds.add(key);
+      expectedSessionIds.delete(key);
+    }
+  });
+
+  applyMarkedAttendanceExpectedSessions({
+    sessionRows,
+    targetPersonId,
+    expectedSessionIds,
+    notApplicableSessionIds
   });
 
   return { notApplicableSessionIds, expectedSessionIds };
@@ -2544,7 +2617,10 @@ async function buildPrefillSnapshot({
   const studentPunctualitySpan = wants(PREFILL_COMPUTE_BUNDLE.STUDENT_PUNCTUALITY_SPAN)
     ? buildStudentPunctualitySummary(periodSessions, studentId, statusMap, {
       classData,
-      orgPolicyLayer
+      orgPolicyLayer,
+      notApplicableSessionIds: attendanceApplicabilityContext.notApplicableSessionIds,
+      expectedSessionIds: attendanceApplicabilityContext.expectedSessionIds,
+      buildSessionMetricKey
     })
     : {
       attendedSessions: 0,
@@ -4097,18 +4173,39 @@ function resolveExportLockSnapshot(instance) {
   return instance.lockSnapshot;
 }
 
+function parseReportAuditTimestamp(value) {
+  const token = String(value || '').trim();
+  if (!token) return NaN;
+  const parsed = Date.parse(token);
+  return Number.isFinite(parsed) ? parsed : NaN;
+}
+
 /**
- * After the first successful save (audit.firstSavedAt), draft/submitted opens may use
- * persisted renderCache.mergedAnswers instead of recomputing mergeTemplateData.
+ * True when answers/prefill were persisted after the frozen renderCache was captured.
+ */
+function renderCacheIsStaleAgainstAudit(instance) {
+  const capturedAt = parseReportAuditTimestamp(instance?.renderCache?.capturedAt);
+  if (!Number.isFinite(capturedAt)) return false;
+  const lastDraft = parseReportAuditTimestamp(instance?.audit?.lastDraftSavedAt);
+  return Number.isFinite(lastDraft) && lastDraft > capturedAt;
+}
+
+/**
+ * After the first successful save (audit.firstSavedAt) or prefill replace (prefillRefreshedAt),
+ * draft/submitted opens may use persisted renderCache.mergedAnswers instead of recomputing mergeTemplateData.
  */
 function isInstanceRenderCacheValid(template, instance) {
-  if (!instance?.audit?.firstSavedAt) return false;
+  const hasFreezeBaseline = Boolean(
+    instance?.audit?.firstSavedAt || instance?.audit?.prefillRefreshedAt
+  );
+  if (!hasFreezeBaseline) return false;
   const rc = instance.renderCache;
   if (!rc || typeof rc !== 'object' || !rc.mergedAnswers || typeof rc.mergedAnswers !== 'object') {
     return false;
   }
   const tid = String(template?.id || '').trim();
   if (!tid || String(rc.templateId || '').trim() !== tid) return false;
+  if (renderCacheIsStaleAgainstAudit(instance)) return false;
   // Intentionally ignore template.version vs renderCache.templateVersion so formula edits
   // do not force a full recalculation on GET; save / Preview Prefill refresh rebuilds cache.
   return true;

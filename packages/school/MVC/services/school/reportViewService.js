@@ -2231,7 +2231,7 @@ function buildInstanceAnswers(template, body = {}, existingMerged = {}) {
     if (!Object.prototype.hasOwnProperty.call(body, key)) {
       const prev = existing[field.id];
       if (field.type === 'checkbox') {
-        answers[field.id] = prev === true || String(prev).toLowerCase() === 'true';
+        answers[field.id] = false;
       } else if (field.type === 'number') {
         if (prev === undefined || prev === null || prev === '') answers[field.id] = '';
         else {

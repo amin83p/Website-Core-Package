@@ -3,6 +3,7 @@ const classEnrollmentReadService = require('./classEnrollmentReadService');
 const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
 const sessionStatusPolicyService = require('./sessionStatusPolicyService');
 const leaveRequestService = require('./leaveRequestService');
+const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -90,12 +91,39 @@ function periodCoversSessionDate(period = {}, sessionDate = '', classData = {}) 
   const end = classEnrollmentSessionApplicabilityService.periodEffectiveEndDate(period);
   if (!start) return false;
   const status = String(period?.status || '').trim().toLowerCase();
-  const allowed = classEnrollmentReadService.getReportRosterStatusesForClass(classData);
+  const allowed = classEnrollmentReadService.getAssignmentPickerRosterStatusesForClass(classData);
   const statusSet = new Set(
     (Array.isArray(allowed) ? allowed : []).map((value) => String(value || '').trim().toLowerCase()).filter(Boolean)
   );
   if (!statusSet.has(status)) return false;
-  return start <= date && end >= date;
+  return classEnrollmentSessionApplicabilityService.periodCoversSession(
+    period,
+    { date },
+    { honorCompletion: true }
+  );
+}
+
+function countMarkedAttendanceSessionsForPerson({
+  scopedSessions = [],
+  personId,
+  forceNotApplicableSessionKeys = new Set()
+} = {}) {
+  const target = toPublicId(personId);
+  if (!target) return 0;
+  return (Array.isArray(scopedSessions) ? scopedSessions : []).reduce((count, session) => {
+    const sessionKey = buildSessionMetricKey(session);
+    if (!sessionKey || forceNotApplicableSessionKeys.has(sessionKey)) return count;
+    const roster = Array.isArray(session?.roster) ? session.roster : [];
+    const row = roster.find((item) => idsEqual(item?.personId, target));
+    if (!row) return count;
+    const status = attendanceMatrixMetricsService.normalizeStatus(
+      row?.attendance,
+      attendanceMatrixMetricsService.ATTENDANCE_STATUS.ABSENT
+    );
+    if (attendanceMatrixMetricsService.isUnmarkedAttendanceStatus(status)) return count;
+    if (status === attendanceMatrixMetricsService.ATTENDANCE_STATUS.NOT_APPLICABLE) return count;
+    return count + 1;
+  }, 0);
 }
 
 async function resolveEligiblePersonIdsForDuration({
@@ -116,7 +144,7 @@ async function resolveEligiblePersonIdsForDuration({
     sessionDates: resolveScopedSessions({ sessions, startDate, endDate }).map((row) => String(row?.date || '').trim()).filter(Boolean),
     startDate,
     endDate,
-    canonicalStatuses: classEnrollmentReadService.getReportRosterStatusesForClass(classData)
+    canonicalStatuses: classEnrollmentReadService.getAssignmentPickerRosterStatusesForClass(classData)
   });
   const activeStudentIds = snapshot?.studentIds instanceof Set ? [...snapshot.studentIds] : [];
   if (!activeStudentIds.length) return [];
@@ -150,16 +178,25 @@ async function countEligibleSessionsForPerson({
   const registrationMode = String(classData?.registrationMode || '').trim().toLowerCase();
   if (registrationMode === 'rolling') {
     const stateByKey = applicability?.stateByKey;
-    if (!(stateByKey instanceof Map)) return 0;
-    return scopedSessions.reduce((count, session) => {
-      const state = classEnrollmentSessionApplicabilityService.getApplicabilityState(
-        stateByKey,
-        targetPersonId,
-        session,
-        session?.sessionId || session?.id
-      );
-      return count + (state?.expected ? 1 : 0);
-    }, 0);
+    let enrollmentExpectedCount = 0;
+    if (stateByKey instanceof Map) {
+      enrollmentExpectedCount = scopedSessions.reduce((count, session) => {
+        const state = classEnrollmentSessionApplicabilityService.getApplicabilityState(
+          stateByKey,
+          targetPersonId,
+          session,
+          session?.sessionId || session?.id
+        );
+        return count + (state?.expected ? 1 : 0);
+      }, 0);
+    }
+    const markedCount = countMarkedAttendanceSessionsForPerson({
+      scopedSessions,
+      personId: targetPersonId,
+      forceNotApplicableSessionKeys
+    });
+    const rollingResult = Math.max(enrollmentExpectedCount, markedCount);
+    return rollingResult;
   }
 
   const studentId = toPublicId(studentRecord?.id);
@@ -183,7 +220,7 @@ async function countEligibleSessionsForPerson({
       .filter(Boolean)
   );
 
-  return scopedSessions.reduce((count, session) => {
+  const enrollmentExpectedCount = scopedSessions.reduce((count, session) => {
     const sessionKey = buildSessionMetricKey(session);
     if (!sessionKey || leaveSessionKeys.has(sessionKey)) return count;
     if (forceNotApplicableSessionKeys.has(sessionKey) || forceNotApplicableSessionKeys.has(normalizeDateOnly(session?.date))) {
@@ -193,6 +230,13 @@ async function countEligibleSessionsForPerson({
     const covered = studentPeriods.some((period) => periodCoversSessionDate(period, sessionDate, classData));
     return count + (covered ? 1 : 0);
   }, 0);
+  const markedCount = countMarkedAttendanceSessionsForPerson({
+    scopedSessions,
+    personId: targetPersonId,
+    forceNotApplicableSessionKeys
+  });
+  const termResult = Math.max(enrollmentExpectedCount, markedCount);
+  return termResult;
 }
 
 async function resolveEligibleStudentsForAssignment({
@@ -257,7 +301,7 @@ async function resolveEligibleStudentsForAssignment({
       activeOrgId: orgId,
       orgId,
       reqUser,
-      allowedStatuses: classEnrollmentSessionApplicabilityService.OPEN_OR_HISTORICAL_STATUSES,
+      allowedStatuses: classEnrollmentSessionApplicabilityService.ROLLING_ATTENDANCE_WINDOW_STATUSES,
       forceNotApplicableSessionKeys
     });
   }

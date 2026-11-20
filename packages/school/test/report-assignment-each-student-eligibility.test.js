@@ -568,6 +568,85 @@ test('validateAssignmentCrossEntityContext lists students not enrolled for targe
   }
 });
 
+test('validateAssignmentCrossEntityContext uses picker roster statuses so withdrawn overlap can save', async () => {
+  const originals = {
+    getDataById: schoolDataService.getDataById,
+    getClassSessions: schoolDataService.getClassSessions,
+    fetchAllData: schoolDataService.fetchAllData,
+    getTemplateById: schoolRepositories.reportTemplates.getById,
+    listActiveStudentIdsForClass: classEnrollmentReadService.listActiveStudentIdsForClass,
+    resolveSelectablePersonIdsForTargetRow: reportAssignmentStudentEligibilityService.resolveSelectablePersonIdsForTargetRow
+  };
+  const receivedCanonicalStatuses = [];
+  try {
+    schoolDataService.getDataById = async (entityType, id) => {
+      if (entityType === 'classes' && id === 'CLS-1') return classData;
+      return null;
+    };
+    schoolDataService.getClassSessions = async () => ([{
+      sessionId: 'SES-0',
+      date: '2026-10-01',
+      startTime: '09:00',
+      endTime: '10:00',
+      roster: []
+    }, {
+      sessionId: 'SES-1',
+      date: '2026-10-15',
+      startTime: '09:00',
+      endTime: '10:00',
+      roster: []
+    }]);
+    schoolDataService.fetchAllData = async (entityType) => {
+      if (entityType === 'students') {
+        return [
+          { id: 'REG-1', personId: 'STU-1', displayName: 'Ada Active' },
+          { id: 'REG-2', personId: 'STU-2', displayName: 'Guy Withdrawn' }
+        ];
+      }
+      return [];
+    };
+    schoolRepositories.reportTemplates.getById = async () => template;
+    classEnrollmentReadService.listActiveStudentIdsForClass = async (opts = {}) => {
+      receivedCanonicalStatuses.push(opts.canonicalStatuses);
+      return { source: 'canonical', studentIds: new Set(['REG-1', 'REG-2']), usedFallback: false };
+    };
+    reportAssignmentStudentEligibilityService.resolveSelectablePersonIdsForTargetRow = async () => ['STU-1', 'STU-2'];
+
+    await reportIntegrityService.validateAssignmentCrossEntityContext({
+      classId: 'CLS-1',
+      templateId: 'TPL-1',
+      reqUser,
+      reportScope: 'selected_students',
+      hasSessionTargets: true,
+      selectedSessionIds: ['SES-1'],
+      teacherIds: ['TCH-1'],
+      requestedReportStartDate: '2026-10-01',
+      requestedReportDueDate: '2026-10-15',
+      selectedTargetStudentIds: [],
+      targetRows: [buildSessionTargetRow({
+        sessionId: 'SES-1',
+        sessionDate: '2026-10-15',
+        reportStartDate: '2026-10-01',
+        reportDueDate: '2026-10-15',
+        targetStudentIds: ['STU-1', 'STU-2']
+      })]
+    });
+
+    assert.ok(receivedCanonicalStatuses.length >= 1);
+    assert.ok(
+      receivedCanonicalStatuses[0].includes('withdrawn'),
+      'expected assignment save to use picker roster statuses including withdrawn'
+    );
+  } finally {
+    schoolDataService.getDataById = originals.getDataById;
+    schoolDataService.getClassSessions = originals.getClassSessions;
+    schoolDataService.fetchAllData = originals.fetchAllData;
+    schoolRepositories.reportTemplates.getById = originals.getTemplateById;
+    classEnrollmentReadService.listActiveStudentIdsForClass = originals.listActiveStudentIdsForClass;
+    reportAssignmentStudentEligibilityService.resolveSelectablePersonIdsForTargetRow = originals.resolveSelectablePersonIdsForTargetRow;
+  }
+});
+
 test('validateAssignmentCrossEntityContext skips enrollment on unchanged rows when validateOnlyRowIds is set', async (t) => {
   stubAttendanceEligibleStudentMetrics(t);
   const originals = {

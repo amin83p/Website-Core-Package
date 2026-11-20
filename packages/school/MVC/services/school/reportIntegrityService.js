@@ -76,12 +76,16 @@ async function resolveClassStudentIds({
   startDate = '',
   endDate = '',
   referenceDate = '',
-  strictCanonical = false
+  strictCanonical = false,
+  canonicalStatuses = null
 } = {}) {
   const classId = String(classData?.id || '').trim();
   if (!classId) return [];
   const enrollmentStartDate = normalizeDateOnly(startDate) || normalizeDateOnly(referenceDate) || normalizeDateOnly(endDate);
   const enrollmentEndDate = normalizeDateOnly(endDate) || normalizeDateOnly(referenceDate) || normalizeDateOnly(startDate);
+  const statusList = Array.isArray(canonicalStatuses) && canonicalStatuses.length
+    ? canonicalStatuses
+    : classEnrollmentReadService.getReportRosterStatusesForClass(classData);
   const snapshot = await classEnrollmentReadService.listActiveStudentIdsForClass({
     classId,
     classItem: classData,
@@ -90,7 +94,7 @@ async function resolveClassStudentIds({
     sessionDates: (Array.isArray(sessions) ? sessions : []).map((row) => String(row?.date || '').trim()).filter(Boolean),
     startDate: enrollmentStartDate,
     endDate: enrollmentEndDate,
-    canonicalStatuses: classEnrollmentReadService.getReportRosterStatusesForClass(classData)
+    canonicalStatuses: statusList
   });
   const activeStudentIds = snapshot?.studentIds instanceof Set ? [...snapshot.studentIds] : [];
   if (!activeStudentIds.length) return [];
@@ -871,6 +875,7 @@ const reportIntegrityService = {
         const rowLabel = buildTargetRowDisplayLabel(targetRow, rowIndex, rowStart, rowEnd);
         const rowPeriodLabel = rowStart && rowEnd ? `${rowStart} to ${rowEnd}` : `row ${rowIndex + 1}`;
         // eslint-disable-next-line no-await-in-loop
+        const pickerStatuses = classEnrollmentReadService.getAssignmentPickerRosterStatusesForClass(classData);
         const eligible = await resolveClassStudentIds({
           classData,
           sessions,
@@ -878,7 +883,8 @@ const reportIntegrityService = {
           startDate: rowStart,
           endDate: rowEnd,
           referenceDate: rowEnd,
-          strictCanonical: true
+          strictCanonical: true,
+          canonicalStatuses: pickerStatuses
         });
         const eligibleSet = new Set(eligible);
         // eslint-disable-next-line no-await-in-loop

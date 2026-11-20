@@ -122,6 +122,202 @@ test('prefill preview diffs frozen renderCache display vs live refreshed merge',
   assert.equal(sub.newValue, '90% (live)');
 });
 
+test('prefill preview suggests prefill-linked manual fields when answers were overridden (derivedOverrides)', async (t) => {
+  const template = {
+    id: 'TPL_OVR',
+    version: 1,
+    schema: {
+      fields: [
+        {
+          id: 'listening',
+          label: 'Listening',
+          type: 'number',
+          prefillKey: 'student_gradebook_skill_listening_avg_percent',
+          valueMode: 'manual'
+        },
+        {
+          id: 'speaking',
+          label: 'Speaking',
+          type: 'number',
+          prefillKey: 'student_gradebook_skill_speaking_avg_percent',
+          valueMode: 'manual'
+        },
+        {
+          id: 'attendance',
+          label: 'Attendance',
+          type: 'number',
+          prefillKey: 'student_attendance_span_percent',
+          valueMode: 'manual'
+        }
+      ]
+    }
+  };
+  const assignment = { id: 'ASG_OVR', reportScope: 'each_student', classId: 'CLS1' };
+  const instance = {
+    id: 'RINS_OVR',
+    studentId: 'STU1',
+    teacherId: 'T1',
+    status: 'draft',
+    answers: { listening: 10, speaking: 15, attendance: 25 },
+    derivedOverrides: { listening: true, speaking: true, attendance: true },
+    audit: { firstSavedAt: '2026-01-01T00:00:00.000Z' },
+    renderCache: {
+      templateId: 'TPL_OVR',
+      templateVersion: 1,
+      capturedAt: '2026-01-02T00:00:00.000Z',
+      mergedAnswers: { listening: 10, speaking: 15, attendance: 25 }
+    },
+    prefillSnapshot: {
+      student_gradebook_skill_listening_avg_percent: 0,
+      student_gradebook_skill_speaking_avg_percent: 85.7,
+      student_attendance_span_percent: 60.07
+    }
+  };
+
+  const origBuild = reportService.buildPrefillSnapshot;
+  reportService.buildPrefillSnapshot = async () => ({
+    student_gradebook_skill_listening_avg_percent: 0,
+    student_gradebook_skill_speaking_avg_percent: 85.7,
+    student_attendance_span_percent: 60.07
+  });
+
+  t.after(() => {
+    reportService.buildPrefillSnapshot = origBuild;
+  });
+
+  const preview = await reportPrefillRefreshPreviewService.buildPrefillRefreshPreview({
+    instance,
+    template,
+    assignment,
+    reqUser: { id: 'u1' }
+  });
+
+  const listen = preview.changes.find((c) => c.prefillKey === 'student_gradebook_skill_listening_avg_percent');
+  const speak = preview.changes.find((c) => c.prefillKey === 'student_gradebook_skill_speaking_avg_percent');
+  const attend = preview.changes.find((c) => c.prefillKey === 'student_attendance_span_percent');
+  assert.ok(listen, 'listening override should appear when prefill differs from saved answer');
+  assert.ok(speak, 'speaking override should appear when prefill differs from saved answer');
+  assert.ok(attend, 'attendance override should appear when prefill differs from saved answer');
+  assert.equal(listen.fields[0].currentValue, 10);
+  assert.equal(listen.fields[0].newValue, 0);
+  assert.equal(speak.fields[0].currentValue, 15);
+  assert.equal(speak.fields[0].newValue, 85.7);
+  assert.equal(attend.fields[0].currentValue, 25);
+  assert.equal(attend.fields[0].newValue, 60.07);
+});
+
+test('prefill preview collapses each-student attendance mirror keys into one row', async (t) => {
+  const template = {
+    id: 'TPL_ATT_MIRROR',
+    version: 1,
+    snapshotKeys: ['student_attendance_span_percent', 'class_attendance_present'],
+    placeholderMap: { Attendance: '{{class_attendance_present}}' },
+    schema: {
+      fields: [
+        {
+          id: 'Attendance',
+          label: 'Attendance',
+          type: 'number',
+          prefillKey: 'student_attendance_span_percent',
+          valueMode: 'manual'
+        }
+      ]
+    }
+  };
+  const assignment = { id: 'ASG_MIRROR', reportScope: 'each_student', classId: 'CLS1' };
+  const instance = {
+    id: 'RINS_MIRROR',
+    studentId: 'STU1',
+    teacherId: 'T1',
+    status: 'draft',
+    answers: { Attendance: 25 },
+    derivedOverrides: { Attendance: true },
+    audit: { firstSavedAt: '2026-01-01T00:00:00.000Z' },
+    renderCache: {
+      templateId: 'TPL_ATT_MIRROR',
+      templateVersion: 1,
+      capturedAt: '2026-01-02T00:00:00.000Z',
+      mergedAnswers: { Attendance: 25 }
+    },
+    prefillSnapshot: {
+      student_attendance_span_percent: 60.07,
+      class_attendance_present: 60.07
+    }
+  };
+
+  const origBuild = reportService.buildPrefillSnapshot;
+  reportService.buildPrefillSnapshot = async () => ({
+    student_attendance_span_percent: 60.07,
+    class_attendance_present: 60.07
+  });
+
+  t.after(() => {
+    reportService.buildPrefillSnapshot = origBuild;
+  });
+
+  const preview = await reportPrefillRefreshPreviewService.buildPrefillRefreshPreview({
+    instance,
+    template,
+    assignment,
+    reqUser: { id: 'u1' }
+  });
+
+  const attendanceRows = preview.changes.filter((c) => (
+    c.prefillKey === 'student_attendance_span_percent'
+    || c.prefillKey === 'class_attendance_present'
+  ));
+  assert.equal(attendanceRows.length, 1);
+  assert.equal(attendanceRows[0].prefillKey, 'student_attendance_span_percent');
+  assert.ok((attendanceRows[0].mirrorKeys || []).includes('class_attendance_present'));
+});
+
+test('prefill preview shows punctuality when live prefill differs from manual override', async (t) => {
+  const template = {
+    id: 'TPL_PUNC',
+    version: 1,
+    schema: {
+      fields: [
+        {
+          id: 'Punctuality',
+          label: 'Punctuality For Class',
+          type: 'number',
+          prefillKey: 'student_punctuality_span_percent',
+          valueMode: 'manual'
+        }
+      ]
+    }
+  };
+  const assignment = { id: 'ASG_PUNC', reportScope: 'each_student', classId: 'CLS1' };
+  const instance = {
+    id: 'RINS_PUNC',
+    studentId: 'STU1',
+    teacherId: 'T1',
+    status: 'draft',
+    answers: { Punctuality: 20 },
+    derivedOverrides: { Punctuality: true },
+    prefillSnapshot: { student_punctuality_span_percent: 20 }
+  };
+
+  const origBuild = reportService.buildPrefillSnapshot;
+  reportService.buildPrefillSnapshot = async () => ({ student_punctuality_span_percent: 0 });
+
+  t.after(() => {
+    reportService.buildPrefillSnapshot = origBuild;
+  });
+
+  const preview = await reportPrefillRefreshPreviewService.buildPrefillRefreshPreview({
+    instance,
+    template,
+    assignment,
+    reqUser: { id: 'u1' }
+  });
+
+  const row = preview.changes.find((c) => c.prefillKey === 'student_punctuality_span_percent');
+  assert.ok(row, 'punctuality should appear when live prefill differs from saved answer');
+  assert.equal(row.fields[0].currentValue, 20);
+  assert.equal(row.fields[0].newValue, 0);
+});
+
 test('prefill preview recalculates calculated fields for refreshed side when matrix uses frozen cache', async (t) => {
   const template = {
     id: 'TPL_PRE_3',

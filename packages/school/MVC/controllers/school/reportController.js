@@ -20,6 +20,7 @@ const semiMonthlyReportAssignmentWizardService = require('../../services/school/
 const reportRuleEngineService = require('../../services/school/reportRuleEngineService');
 const reportInstanceSaveService = require('../../services/school/reportInstanceSaveService');
 const reportPrefillRefreshPreviewService = require('../../services/school/reportPrefillRefreshPreviewService');
+const { expandKeysForApply } = require('../../services/school/reportPrefillMirrorKeys');
 const reportInstanceLivePrefillResetService = require('../../services/school/reportInstanceLivePrefillResetService');
 const reportMatrixService = require('../../services/school/reportMatrixService');
 const classAttendanceRosterOrderService = require('../../services/school/classAttendanceRosterOrderService');
@@ -1144,7 +1145,6 @@ async function getAssignmentEligibleStudents(req, res) {
       reqUser: req.user,
       personMap
     });
-
     return res.json({ status: 'success', students });
   } catch (error) {
     return res.status(400).json({ status: 'error', message: error.message });
@@ -2003,7 +2003,8 @@ async function buildInstanceEditorRenderContext(req) {
     : {};
   let mergedBeforeCalculation;
   let skipRecalculation = false;
-  if (freezeOnOpen && reportService.isInstanceRenderCacheValid(template, latestInstance)) {
+  const renderCacheValid = reportService.isInstanceRenderCacheValid(template, latestInstance);
+  if (freezeOnOpen && renderCacheValid) {
     mergedBeforeCalculation = { ...latestInstance.renderCache.mergedAnswers };
     skipRecalculation = true;
   } else {
@@ -2237,11 +2238,21 @@ async function saveInstance(req, res) {
       validation: {
         errorCount: validationSummary.errors.length,
         warningCount: validationSummary.warnings.length
-      }
+      },
+      sharedAnswersSkipped: saveResult.sharedAnswersSkipped === true,
+      sharedAnswersSkipReason: saveResult.sharedAnswersSkipReason || ''
     };
     idempotencyGuardService.completeGuard(guardKey, payloadOut);
     if (isAjax(req)) return res.json(payloadOut);
-    res.redirect(`/school/reports/instances/edit/${instance.id}`);
+    const editorSegment = String(req.body?.editorVariant || '').trim().toLowerCase() === 'v2'
+      ? 'edit-v2'
+      : 'edit';
+    const redirectQs = new URLSearchParams();
+    if (savedAsSubmitted) redirectQs.set('submitted', '1');
+    else redirectQs.set('saved', '1');
+    if (saveResult.sharedAnswersSkipped) redirectQs.set('sharedSkipped', '1');
+    const query = redirectQs.toString();
+    res.redirect(`/school/reports/instances/${editorSegment}/${instance.id}${query ? `?${query}` : ''}`);
   } catch (error) {
     if (guardKey) idempotencyGuardService.failGuard(guardKey);
     if (isAjax(req)) return res.status(400).json({ status: 'error', message: error.message });
@@ -2490,14 +2501,13 @@ async function applyInstancePrefillRefresh(req, res) {
     const rawSelected = Array.isArray(req.body?.selectedKeys)
       ? req.body.selectedKeys
       : String(req.body?.selectedKeys || '').split(',');
-    const selectedKeys = new Set(
-      rawSelected
-        .map((key) => reportService.normalizePrefillKey(key))
-        .filter(Boolean)
-    );
-    if (!selectedKeys.size) {
+    const normalizedSelected = rawSelected
+      .map((key) => reportService.normalizePrefillKey(key))
+      .filter(Boolean);
+    if (!normalizedSelected.length) {
       throw new Error('Select at least one prefill key to replace.');
     }
+    const expandedSelected = new Set(expandKeysForApply(effectiveAssignment?.reportScope, normalizedSelected));
 
     const preview = await reportPrefillRefreshPreviewService.buildPrefillRefreshPreview({
       instance,
@@ -2505,7 +2515,13 @@ async function applyInstancePrefillRefresh(req, res) {
       assignment: effectiveAssignment,
       reqUser: req.user
     });
-    const selectedChanges = preview.changes.filter((change) => selectedKeys.has(change.prefillKey));
+    const selectedChanges = preview.changes.filter((change) => {
+      const primary = reportService.normalizePrefillKey(change?.prefillKey || '');
+      if (expandedSelected.has(primary)) return true;
+      return (Array.isArray(change?.mirrorKeys) ? change.mirrorKeys : [])
+        .map((key) => reportService.normalizePrefillKey(key))
+        .some((key) => expandedSelected.has(key));
+    });
     if (!selectedChanges.length) {
       throw new Error('The selected prefill keys no longer have changes to apply.');
     }
@@ -2521,7 +2537,12 @@ async function applyInstancePrefillRefresh(req, res) {
     };
     selectedChanges.forEach((change) => {
       if (!change?.expressionDriven) {
-        nextPrefill[change.prefillKey] = change.newRawValue;
+        const raw = change.newRawValue;
+        nextPrefill[change.prefillKey] = raw;
+        (Array.isArray(change.mirrorKeys) ? change.mirrorKeys : []).forEach((mirrorKey) => {
+          const normalized = reportService.normalizePrefillKey(mirrorKey);
+          if (normalized) nextPrefill[normalized] = raw;
+        });
       }
       (change.fields || []).forEach((fieldChange) => {
         if (!fieldChange?.fieldId) return;
