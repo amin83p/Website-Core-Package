@@ -78,6 +78,10 @@
   const allocNum = Number(assignment?.allocatedHours);
   const allocDisplay = tsReflect && Number.isFinite(allocNum) && allocNum > 0 ? Number(allocNum.toFixed(2)) : '';
   const dtl = typeof instanceDetails !== 'undefined' && instanceDetails && typeof instanceDetails === 'object' ? instanceDetails : {};
+  const studentRecordIdMenu = String(dtl.studentRecordId || '').trim();
+  const showStudentContextMenu = Boolean(studentRecordIdMenu);
+  const reportPeriodStartMenu = String(typeof reportPeriodStart !== 'undefined' ? reportPeriodStart : rptStart).trim();
+  const reportPeriodEndMenu = String(typeof reportPeriodEnd !== 'undefined' ? reportPeriodEnd : rptDue).trim();
   const reviewNav = (typeof reportReviewNavigator !== 'undefined' && reportReviewNavigator && typeof reportReviewNavigator === 'object')
     ? reportReviewNavigator
     : { rows: [], currentIndex: -1, olderCount: 0, olderHref: '', newerHref: '' };
@@ -86,6 +90,10 @@
   const isVisualOnlyField = (field) => {
     const t = String(field?.type || '').trim().toLowerCase();
     return t === 'section' || t === 'subheader' || t === 'row_break';
+  };
+  const isHiddenFromDisplayField = (field) => {
+    if (!field || isVisualOnlyField(field)) return false;
+    return field.hiddenFromDisplay === true || String(field.hiddenFromDisplay || '').trim().toLowerCase() === 'true';
   };
   const isRowBreakField = (field) => String(field?.type || '').trim().toLowerCase() === 'row_break';
   const sectionGroups = [];
@@ -103,6 +111,7 @@
     currentSectionGroup = { header: null, rows: [] };
   };
   orderedFieldsList.forEach((field) => {
+    if (isHiddenFromDisplayField(field)) return;
     const fieldType = String(field?.type || '').trim().toLowerCase();
     const isSection = fieldType === 'section';
     const isSubheader = fieldType === 'subheader';
@@ -143,13 +152,191 @@
   }
   .report-instance-page .help-tooltip-icon:hover,
   .report-instance-page .help-tooltip-icon:focus-visible { color: var(--bs-primary); }
-  .report-instance-page .instance-detail-grid-v2 .card { border-radius: 0.75rem; }
+  .report-instance-page .instance-details-v2 {
+    display: grid;
+    grid-template-columns: 1fr;
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.75rem;
+    overflow: hidden;
+    background: var(--bs-tertiary-bg, #f8f9fa);
+  }
+  @media (min-width: 768px) {
+    .report-instance-page .instance-details-v2 {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+  }
+  .report-instance-page .instance-details-v2-item {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.65rem;
+    padding: 0.9rem 1rem;
+    background: var(--bs-body-bg);
+    border-bottom: 1px solid var(--bs-border-color-translucent, rgba(0, 0, 0, 0.08));
+    min-height: 100%;
+  }
+  @media (min-width: 768px) {
+    .report-instance-page .instance-details-v2-item {
+      border-right: 1px solid var(--bs-border-color-translucent, rgba(0, 0, 0, 0.08));
+    }
+    .report-instance-page .instance-details-v2-item:nth-child(3n) {
+      border-right: 0;
+    }
+    .report-instance-page .instance-details-v2-item:nth-last-child(-n+3) {
+      border-bottom: 0;
+    }
+  }
+  .report-instance-page .instance-details-v2-item:last-child {
+    border-bottom: 0;
+  }
+  .report-instance-page .instance-details-v2-icon {
+    flex: 0 0 auto;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.5rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bs-primary-bg-subtle, #cfe2ff);
+    color: var(--bs-primary);
+    font-size: 1rem;
+    line-height: 1;
+  }
+  .report-instance-page .instance-details-v2-label {
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--bs-secondary-color);
+    margin-bottom: 0.2rem;
+  }
+  .report-instance-page .instance-details-v2-value {
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--bs-emphasis-color);
+    line-height: 1.35;
+    word-break: break-word;
+  }
+  .report-instance-page .instance-details-v2-value--assignment {
+    font-weight: 500;
+    font-size: 0.875rem;
+  }
+  .report-instance-page .instance-details-v2-body {
+    padding: 0.75rem !important;
+    background: transparent;
+  }
   .report-instance-page .field-flag-chip {
     font-size: 0.65rem;
     padding: 0.15rem 0.38rem;
     cursor: help;
     letter-spacing: 0.03em;
     vertical-align: middle;
+  }
+  .report-instance-page .report-instance-title-info {
+    color: var(--bs-secondary-color);
+    line-height: 1;
+    text-decoration: none;
+  }
+  .report-instance-page .report-instance-title-info:hover,
+  .report-instance-page .report-instance-title-info:focus-visible {
+    color: var(--bs-primary);
+  }
+  .report-instance-page .report-instance-context-dl dt {
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--bs-secondary-color);
+    margin-bottom: 0.15rem;
+  }
+  .report-instance-page .report-instance-context-dl dd {
+    font-size: 0.9375rem;
+    margin-bottom: 0.75rem;
+  }
+  .report-instance-page .report-instance-context-dl dd:last-child {
+    margin-bottom: 0;
+  }
+  .report-instance-page .report-toolbar-icon-btn {
+    width: 2.125rem;
+    height: 2.125rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+  .report-instance-page .report-toolbar-icon-btn .bi {
+    font-size: 1.05rem;
+  }
+  .report-instance-page .js-report-instance-student-context-target {
+    cursor: context-menu;
+    border-radius: 0.25rem;
+    display: inline-block;
+    max-width: 100%;
+  }
+  .report-instance-page .js-report-instance-student-context-target:hover {
+    background: rgba(13, 110, 253, 0.06);
+  }
+  #reportInstanceStudentContextMenu {
+    position: fixed;
+    z-index: 1200;
+    min-width: 240px;
+    max-width: min(100vw - 1rem, 300px);
+    background: #fff;
+    border: 1px solid #d0d7de;
+    border-radius: 0.55rem;
+    box-shadow: 0 0.55rem 1.25rem rgba(23, 50, 77, 0.18);
+    padding: 0.35rem 0;
+    overflow: hidden;
+  }
+  #reportInstanceStudentContextMenu .report-instance-student-context-menu-header {
+    padding: 0.45rem 0.75rem 0.15rem;
+    font-size: 0.8125rem;
+    font-weight: 700;
+    color: #17324d;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #reportInstanceStudentContextMenu .report-instance-student-context-menu-subtitle {
+    padding: 0 0.75rem 0.35rem;
+    font-size: 0.6875rem;
+    color: #5c6b7a;
+    border-bottom: 1px solid #e8edf3;
+    margin-bottom: 0.25rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #reportInstanceStudentContextMenu .report-instance-student-context-menu-divider {
+    height: 1px;
+    margin: 0.3rem 0.5rem;
+    background: #e8edf3;
+  }
+  #reportInstanceStudentContextMenu .report-instance-student-context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    padding: 0.45rem 0.75rem;
+    font-size: 0.875rem;
+    color: #17324d;
+    border-radius: 0;
+  }
+  #reportInstanceStudentContextMenu .report-instance-student-context-menu-item:hover:not(:disabled),
+  #reportInstanceStudentContextMenu .report-instance-student-context-menu-item:focus-visible:not(:disabled) {
+    background: rgba(23, 50, 77, 0.06);
+    color: #17324d;
+  }
+  #reportInstanceStudentContextMenu .report-instance-student-context-menu-item:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+  #reportInstanceStudentContextMenu .report-instance-student-context-menu-item i {
+    width: 1.1rem;
+    text-align: center;
+    flex-shrink: 0;
+    color: #5c6b7a;
   }
 </style>
 <div class="sections-page report-instance-page">
@@ -163,7 +350,22 @@
 
   <div class="row g-2 align-items-start mb-4">
     <div class="col">
-      <h1 class="page-heading size-md m-0 text-start" style="padding-left:0;"><%= isV2 ? 'Report Instance (V2)' : 'Report Instance' %></h1>
+      <% if (isV2) { %>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <h1 class="page-heading size-md m-0 text-start" style="padding-left:0;">Report Instance (V2)</h1>
+        <button
+          type="button"
+          class="btn btn-link p-0 border-0 report-instance-title-info"
+          data-bs-toggle="modal"
+          data-bs-target="#reportInstanceContextModal"
+          aria-label="View instance context and assignment details"
+          title="Instance context">
+          <i class="bi bi-info-circle" style="font-size: 1.15rem;" aria-hidden="true"></i>
+        </button>
+      </div>
+      <h6 class="fw-semibold text-primary mt-2 mb-0"><%= template?.title || 'Report' %></h6>
+      <% } else { %>
+      <h1 class="page-heading size-md m-0 text-start" style="padding-left:0;">Report Instance</h1>
       <h6 class="fw-semibold text-primary mt-2 mb-0"><%= template?.title || 'Report' %></h6>
       <div class="text-muted small mt-1">Instance ID: <strong class="font-monospace"><%= instance.id %></strong></div>
       <div class="text-muted small mt-1">
@@ -194,9 +396,12 @@
           <span class="badge bg-light text-dark border">Term-Based</span>
         <% } %>
       </div>
+      <% } %>
     </div>
     <div class="col-auto d-flex flex-column align-items-end gap-1">
+      <% if (!isV2) { %>
       <span class="badge bg-primary border font-monospace">ID: <%= instance.id %></span>
+      <% } %>
       <a href="<%= reportDashHref %>" class="school-navigator-dashboard school-navigator-reports-dashboard btn btn-filled btn-secondary btn-sm"><i class="bi bi-file-earmark-richtext me-1"></i>School Reports</a>
     </div>
   </div>
@@ -210,22 +415,70 @@
             <a href="/school/classes/edit-wizard/<%= encodeURIComponent(instance.classId) %>" class="btn btn-outline-info btn-sm"><i class="bi bi-diagram-3 me-1"></i>Class Lifecycle</a>
           <% } %>
         <% } else { %>
-          <button type="button" class="btn btn-outline-secondary btn-sm" id="btnReviewPreviousReports" data-bs-toggle="modal" data-bs-target="#reportReviewNavigatorModal">
-            <i class="bi bi-clock-history me-1"></i>Review Previous Reports
-            <span class="badge bg-secondary ms-1"><%= reviewOlderCount %></span>
+          <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm report-toolbar-icon-btn position-relative"
+            id="btnReviewPreviousReports"
+            data-bs-toggle="modal"
+            data-bs-target="#reportReviewNavigatorModal"
+            title="Review previous reports"
+            aria-label="Review previous reports">
+            <i class="bi bi-clock-history" aria-hidden="true"></i>
+            <% if (reviewOlderCount > 0) { %>
+            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-secondary" style="font-size:0.6rem;"><%= reviewOlderCount %></span>
+            <% } %>
           </button>
         <% } %>
         <% if (template?.docxTemplate?.path || (Array.isArray(template?.docxTemplatesByFunder) && template.docxTemplatesByFunder.some((row) => row?.docxTemplate?.path))) { %>
+          <% if (isV2) { %>
+          <button
+            type="button"
+            class="btn btn-outline-primary btn-sm report-toolbar-icon-btn"
+            id="btnInstanceExportDocx"
+            data-bs-toggle="tooltip"
+            data-bs-placement="bottom"
+            title="Export DOCX"
+            aria-label="Export DOCX">
+            <i class="bi bi-file-earmark-word" aria-hidden="true"></i>
+          </button>
+          <% } else { %>
           <button type="button" class="btn btn-outline-primary btn-sm" id="btnInstanceExportDocx"><i class="bi bi-file-earmark-word me-1"></i>Export DOCX</button>
+          <% } %>
         <% } %>
         <% if (template?.pdfTemplate?.path || (Array.isArray(template?.pdfTemplatesByFunder) && template.pdfTemplatesByFunder.some((row) => row?.pdfTemplate?.path))) { %>
+          <% if (isV2) { %>
+          <button
+            type="button"
+            class="btn btn-outline-danger btn-sm report-toolbar-icon-btn"
+            id="btnInstanceExportPdf"
+            data-bs-toggle="tooltip"
+            data-bs-placement="bottom"
+            title="Export PDF"
+            aria-label="Export PDF">
+            <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>
+          </button>
+          <% } else { %>
           <button type="button" class="btn btn-outline-danger btn-sm" id="btnInstanceExportPdf"><i class="bi bi-file-earmark-pdf me-1"></i>Export PDF</button>
+          <% } %>
         <% } %>
         <% if (!isV2) { %>
           <a href="/school/reports/instances/export/<%= instance.id %>?download=1" class="btn btn-outline-dark btn-sm"><i class="bi bi-download me-1"></i>Export Payload</a>
         <% } %>
         <% if (!isReadOnly) { %>
+          <% if (isV2) { %>
+          <button
+            type="button"
+            class="btn btn-outline-primary btn-sm report-toolbar-icon-btn"
+            id="btnReviewPrefillUpdates"
+            data-bs-toggle="tooltip"
+            data-bs-placement="bottom"
+            title="Preview prefill updates"
+            aria-label="Preview prefill updates">
+            <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+          </button>
+          <% } else { %>
           <button type="button" class="btn btn-outline-primary btn-sm" id="btnReviewPrefillUpdates"><i class="bi bi-arrow-repeat me-1"></i>Preview Prefill Updates</button>
+          <% } %>
         <% } %>
         <button type="button" class="btn btn-warning btn-md btn-filled ms-auto" id="btnCloseReportInstance"><i class="bi bi-x-lg me-1"></i>Close</button>
       </div>
@@ -252,55 +505,49 @@
       <i class="bi bi-chevron-down text-muted" id="reportInstanceDetailsChevron" aria-hidden="true"></i>
     </button>
     <div id="reportInstanceDetailsCollapse" class="collapse show">
-      <div class="card-body p-3 border-top">
+      <div class="card-body p-3 border-top<%= isV2 ? ' instance-details-v2-body' : '' %>">
         <% if (isV2) { %>
-          <div class="row g-3 instance-detail-grid-v2">
-            <div class="col-lg-4 col-md-6">
-              <div class="card border h-100">
-                <div class="card-body">
-                  <div class="small text-muted text-uppercase">Status</div>
-                  <div class="mt-1"><span class="badge <%= statusBadgeClass %>"><%= statusBadgeLabel %></span></div>
-                </div>
+          <div class="instance-details-v2" role="list">
+            <div class="instance-details-v2-item" role="listitem">
+              <span class="instance-details-v2-icon" aria-hidden="true"><i class="bi bi-flag"></i></span>
+              <div class="flex-grow-1 min-w-0">
+                <div class="instance-details-v2-label">Status</div>
+                <div class="instance-details-v2-value"><span class="badge <%= statusBadgeClass %>"><%= statusBadgeLabel %></span></div>
               </div>
             </div>
-            <div class="col-lg-4 col-md-6">
-              <div class="card border h-100">
-                <div class="card-body">
-                  <div class="small text-muted text-uppercase">Teacher</div>
-                  <div class="fw-semibold mt-1"><%= dtl.teacherName || '—' %></div>
-                </div>
+            <div class="instance-details-v2-item" role="listitem">
+              <span class="instance-details-v2-icon" aria-hidden="true"><i class="bi bi-person-badge"></i></span>
+              <div class="flex-grow-1 min-w-0">
+                <div class="instance-details-v2-label">Student</div>
+                <div class="instance-details-v2-value"><% if (showStudentContextMenu) { %><span class="js-report-instance-student-context-target"><% } %><%- include('school/partials/studentNameLink', { name: dtl.studentName || '—', studentRecordId: dtl.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none fw-semibold' }) %><% if (showStudentContextMenu) { %></span><% } %></div>
               </div>
             </div>
-            <div class="col-lg-4 col-md-6">
-              <div class="card border h-100">
-                <div class="card-body">
-                  <div class="small text-muted text-uppercase">Class</div>
-                  <div class="fw-semibold mt-1"><%= dtl.className || '—' %></div>
-                </div>
+            <div class="instance-details-v2-item" role="listitem">
+              <span class="instance-details-v2-icon" aria-hidden="true"><i class="bi bi-person-workspace"></i></span>
+              <div class="flex-grow-1 min-w-0">
+                <div class="instance-details-v2-label">Teacher</div>
+                <div class="instance-details-v2-value"><%= dtl.teacherName || '—' %></div>
               </div>
             </div>
-            <div class="col-lg-4 col-md-6">
-              <div class="card border h-100">
-                <div class="card-body">
-                  <div class="small text-muted text-uppercase">Session Date</div>
-                  <div class="fw-semibold mt-1"><%= instance.sessionDate || '—' %></div>
-                </div>
+            <div class="instance-details-v2-item" role="listitem">
+              <span class="instance-details-v2-icon" aria-hidden="true"><i class="bi bi-mortarboard"></i></span>
+              <div class="flex-grow-1 min-w-0">
+                <div class="instance-details-v2-label">Class</div>
+                <div class="instance-details-v2-value"><%= dtl.className || '—' %></div>
               </div>
             </div>
-            <div class="col-lg-4 col-md-6">
-              <div class="card border h-100">
-                <div class="card-body">
-                  <div class="small text-muted text-uppercase">Student</div>
-                  <div class="fw-semibold mt-1"><%- include('school/partials/studentNameLink', { name: dtl.studentName || '—', studentRecordId: dtl.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div>
-                </div>
+            <div class="instance-details-v2-item" role="listitem">
+              <span class="instance-details-v2-icon" aria-hidden="true"><i class="bi bi-calendar-event"></i></span>
+              <div class="flex-grow-1 min-w-0">
+                <div class="instance-details-v2-label">Session date</div>
+                <div class="instance-details-v2-value font-monospace"><%= instance.sessionDate || '—' %></div>
               </div>
             </div>
-            <div class="col-lg-4 col-md-6">
-              <div class="card border h-100">
-                <div class="card-body">
-                  <div class="small text-muted text-uppercase">Assignment</div>
-                  <div class="fw-semibold mt-1"><%= dtl.assignmentSummary || '—' %></div>
-                </div>
+            <div class="instance-details-v2-item" role="listitem">
+              <span class="instance-details-v2-icon" aria-hidden="true"><i class="bi bi-journal-text"></i></span>
+              <div class="flex-grow-1 min-w-0">
+                <div class="instance-details-v2-label">Assignment</div>
+                <div class="instance-details-v2-value instance-details-v2-value--assignment"><%= dtl.assignmentSummary || '—' %></div>
               </div>
             </div>
           </div>
@@ -362,7 +609,7 @@
             <div class="col-md-3">
               <div class="small text-muted">Student</div>
               <% if (dtl.studentName) { %>
-                <div class="fw-bold"><%- include('school/partials/studentNameLink', { name: dtl.studentName, studentRecordId: dtl.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %></div>
+                <div class="fw-bold"><% if (showStudentContextMenu) { %><span class="js-report-instance-student-context-target"><% } %><%- include('school/partials/studentNameLink', { name: dtl.studentName, studentRecordId: dtl.studentRecordId, canOpenStudentProfile: typeof canOpenStudentProfile !== 'undefined' ? canOpenStudentProfile : false, linkClass: 'text-decoration-none' }) %><% if (showStudentContextMenu) { %></span><% } %></div>
                 <div class="font-monospace x-small text-muted">
                   <% if (dtl.studentLocalId) { %>Local <%= dtl.studentLocalId %> | <% } %>Record ID <%= instance.studentId || '-' %>
                 </div>
@@ -819,6 +1066,78 @@
 </div>
 
 <% if (isV2) { %>
+<div class="modal fade" id="reportInstanceContextModal" tabindex="-1" aria-labelledby="reportInstanceContextModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header bg-light border-bottom">
+        <div>
+          <h5 class="modal-title mb-0" id="reportInstanceContextModalLabel"><i class="bi bi-info-circle me-2 text-primary"></i>Instance context</h5>
+          <div class="small text-muted mt-1"><%= template?.title || 'Report' %></div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="row g-4">
+          <div class="col-md-6">
+            <h6 class="text-uppercase text-secondary fw-semibold small mb-3" style="letter-spacing: 0.04em;">Report instance</h6>
+            <dl class="report-instance-context-dl mb-0">
+              <dt>Instance ID</dt>
+              <dd><span class="font-monospace fw-semibold"><%= instance.id %></span></dd>
+              <dt>Class</dt>
+              <dd><%= classData?.title || instance.classId || '-' %></dd>
+              <dt>Session date</dt>
+              <dd><%= instance.sessionDate || '-' %></dd>
+            </dl>
+          </div>
+          <div class="col-md-6">
+            <h6 class="text-uppercase text-secondary fw-semibold small mb-3" style="letter-spacing: 0.04em;">Report period</h6>
+            <dl class="report-instance-context-dl mb-0">
+              <dt>Report start date</dt>
+              <dd><%= rptStart || '-' %></dd>
+              <dt>Report due date</dt>
+              <dd><%= rptDue || '-' %></dd>
+            </dl>
+          </div>
+          <% if (tsReflect) { %>
+          <div class="col-12">
+            <h6 class="text-uppercase text-secondary fw-semibold small mb-3" style="letter-spacing: 0.04em;">Timesheet reflection</h6>
+            <div class="card border bg-info-subtle border-info-subtle">
+              <div class="card-body py-3">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                  <span class="badge bg-info text-white"><i class="bi bi-clock-history me-1"></i>Enabled</span>
+                  <span class="text-muted">Allocated hours:</span>
+                  <strong class="text-body"><%= allocDisplay !== '' ? allocDisplay : '-' %></strong>
+                </div>
+              </div>
+            </div>
+          </div>
+          <% } %>
+          <div class="col-12">
+            <h6 class="text-uppercase text-secondary fw-semibold small mb-3" style="letter-spacing: 0.04em;">Class lifecycle</h6>
+            <% if (lifecycleMode === 'rolling') { %>
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+              <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">Rolling enrollment</span>
+              <span class="badge bg-light text-dark border">Cycle #<%= lifecycleCycleNo %></span>
+              <% if (classData?.isClosedForNewEnrollment) { %>
+              <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Closed enrollment</span>
+              <% } %>
+            </div>
+            <dl class="report-instance-context-dl mb-0">
+              <dt>Cycle window</dt>
+              <dd><%= classData?.cycleStartDate || '?' %> <span class="text-muted">→</span> <%= classData?.cycleEndDate || 'Open' %></dd>
+            </dl>
+            <% } else { %>
+            <span class="badge bg-light text-dark border">Term-based class</span>
+            <% } %>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer border-top">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="modal fade" id="reportReviewNavigatorModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-lg modal-dialog-scrollable">
     <div class="modal-content">
@@ -976,6 +1295,60 @@
   </div>
 </div>
 
+<% if (showStudentContextMenu) { %>
+<div id="reportInstanceStudentContextMenu" class="d-none" role="menu" aria-hidden="true">
+  <div class="report-instance-student-context-menu-header" data-role="header">Student</div>
+  <div class="report-instance-student-context-menu-subtitle text-muted" data-role="subtitle"></div>
+  <button type="button" class="report-instance-student-context-menu-item" data-action="attendance-matrix">
+    <i class="bi bi-table" aria-hidden="true"></i><span>Attendance Matrix</span>
+  </button>
+  <button type="button" class="report-instance-student-context-menu-item" data-action="attendance-report">
+    <i class="bi bi-person-lines-fill" aria-hidden="true"></i><span>Student Attendance Report</span>
+  </button>
+  <button type="button" class="report-instance-student-context-menu-item" data-action="grades-matrix">
+    <i class="bi bi-grid-3x3-gap" aria-hidden="true"></i><span>Grades Matrix</span>
+  </button>
+  <button type="button" class="report-instance-student-context-menu-item" data-action="conduct-matrix">
+    <i class="bi bi-clipboard-check" aria-hidden="true"></i><span>Class Conduct Matrix</span>
+  </button>
+  <button type="button" class="report-instance-student-context-menu-item" data-action="class-conduct-report">
+    <i class="bi bi-clipboard2-data" aria-hidden="true"></i><span>Class Conduct Report</span>
+  </button>
+  <div class="report-instance-student-context-menu-divider d-none" data-role="rolling-divider" aria-hidden="true"></div>
+  <button type="button" class="report-instance-student-context-menu-item d-none" data-action="rolling-enrollment">
+    <i class="bi bi-arrow-repeat" aria-hidden="true"></i><span>Rolling enrollment</span>
+  </button>
+  <div class="report-instance-student-context-menu-divider d-none" data-role="profile-divider" aria-hidden="true"></div>
+  <button type="button" class="report-instance-student-context-menu-item d-none" data-action="student-profile">
+    <i class="bi bi-person-vcard" aria-hidden="true"></i><span>Student profile</span>
+  </button>
+</div>
+<script>
+  window.__reportInstanceStudentTools = <%- JSON.stringify({
+    classId: String(instance?.classId || '').trim(),
+    studentRecordId: studentRecordIdMenu,
+    studentPersonId: String(dtl.studentPersonId || '').trim(),
+    studentName: String(dtl.studentName || '').trim(),
+    reportPeriodStart: reportPeriodStartMenu,
+    reportPeriodEnd: reportPeriodEndMenu,
+    registrationMode: lifecycleMode,
+    canOpenAttendanceMatrix: Boolean(typeof canOpenAttendanceMatrix !== 'undefined' && canOpenAttendanceMatrix),
+    canOpenStudentAttendanceReport: Boolean(typeof canOpenStudentAttendanceReport !== 'undefined' && canOpenStudentAttendanceReport),
+    canOpenGradesMatrix: Boolean(typeof canOpenGradesMatrix !== 'undefined' && canOpenGradesMatrix),
+    canOpenConductMatrix: Boolean(typeof canOpenConductMatrix !== 'undefined' && canOpenConductMatrix),
+    canOpenClassConductReport: Boolean(typeof canOpenClassConductReport !== 'undefined' && canOpenClassConductReport),
+    canOpenRollingEnrollment: Boolean(typeof canOpenRollingEnrollment !== 'undefined' && canOpenRollingEnrollment),
+    canOpenStudentProfile: Boolean(typeof canOpenStudentProfile !== 'undefined' && canOpenStudentProfile)
+  }).replace(/</g, '\\u003c').replace(/&/g, '\\u0026') %>;
+</script>
+<% if (typeof canOpenRollingEnrollment !== 'undefined' && canOpenRollingEnrollment) { %>
+<script>
+  window.__schoolRollingEnrollmentAccess = { canOpen: true };
+</script>
+<script src="/scripts/schoolRollingEnrollmentDeepLink.js"></script>
+<% } %>
+<script src="/scripts/reportInstanceStudentContextMenu.js"></script>
+<% } %>
 <%- include('partials/reportPrefillPreviewUi') %>
 <%- include('partials/calculatedFieldsRuntime') %>
 <%- include('partials/reportMessageHelpers') %>
@@ -1012,6 +1385,11 @@
       document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach((el) => {
         if (!bootstrap.Tooltip.getInstance(el)) {
           new bootstrap.Tooltip(el);
+        }
+      });
+      document.querySelectorAll('.report-toolbar-icon-btn[title]:not([data-bs-toggle="tooltip"])').forEach((el) => {
+        if (!bootstrap.Tooltip.getInstance(el)) {
+          new bootstrap.Tooltip(el, { placement: 'bottom' });
         }
       });
     }
@@ -1405,6 +1783,11 @@
     function isVisualOnlyField(field) {
       const t = String(field?.type || '').trim().toLowerCase();
       return t === 'section' || t === 'subheader' || t === 'row_break';
+    }
+
+    function isHiddenFromDisplayField(field) {
+      if (!field || isVisualOnlyField(field)) return false;
+      return field.hiddenFromDisplay === true || String(field.hiddenFromDisplay || '').trim().toLowerCase() === 'true';
     }
 
     function normalizeValueMode(rawMode) {
@@ -1956,6 +2339,12 @@
         : (mergedBefore && typeof mergedBefore === 'object' ? { ...mergedBefore } : {});
       (Array.isArray(fields) ? fields : []).forEach((field) => {
         if (isVisualOnlyField(field) || !field?.id) return;
+        if (isHiddenFromDisplayField(field)) {
+          if (mergedBefore && Object.prototype.hasOwnProperty.call(mergedBefore, field.id)) {
+            base[field.id] = mergedBefore[field.id];
+          }
+          return;
+        }
         if (isCalculatedField(field)) return;
         if (field.readOnly === true) {
           if (preferLiveDom && mergedBefore && Object.prototype.hasOwnProperty.call(mergedBefore, field.id)) {
@@ -1973,6 +2362,7 @@
       const allIssues = [];
       (Array.isArray(fields) ? fields : []).forEach((field) => {
         if (isVisualOnlyField(field) || !field?.id) return;
+        if (isHiddenFromDisplayField(field)) return;
         if (field.readOnly === true || isCalculatedField(field)) return;
         const fieldId = String(field.id || '').trim();
         const label = String(field.label || fieldId || 'Field').trim();

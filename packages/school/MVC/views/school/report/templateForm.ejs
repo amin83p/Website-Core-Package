@@ -67,6 +67,20 @@
     }
     .field-designer-table.field-designer-rows-expanded tbody tr { vertical-align: top; }
     .field-row-visual { background: #fcfcff; }
+    .field-label-edit {
+      font-weight: 600;
+      color: var(--bs-body-color);
+      text-decoration: none;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      text-align: left;
+    }
+    .field-label-edit:hover,
+    .field-label-edit:focus-visible {
+      color: var(--bs-primary);
+      text-decoration: underline;
+    }
     .field-main-cell .field-kind { display: inline-block; font-size: 0.75rem; margin-right: 0.35rem; }
     .template-form-section {
       border: 1px solid rgba(15, 23, 42, 0.08) !important;
@@ -1164,6 +1178,13 @@
               </div>
             </div>
           </div>
+          <div class="border-top pt-3 mt-1" id="fieldEditorHiddenWrap">
+            <div class="form-check mb-0">
+              <input class="form-check-input" type="checkbox" id="fieldEditorHidden">
+              <label class="form-check-label fw-semibold" for="fieldEditorHidden">Hide on report instance</label>
+            </div>
+            <div class="form-text">Skips this field on the instance form and preview. Prefill, calculations, and exports are unchanged.</div>
+          </div>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -1395,6 +1416,8 @@
     const fieldEditorSharedInput = document.getElementById('fieldEditorShared');
     const fieldEditorFullWidthInput = document.getElementById('fieldEditorFullWidth');
     const fieldEditorBorderInput = document.getElementById('fieldEditorBorder');
+    const fieldEditorHiddenInput = document.getElementById('fieldEditorHidden');
+    const fieldEditorHiddenWrap = document.getElementById('fieldEditorHiddenWrap');
     const fieldEditorBackgroundColorInput = document.getElementById('fieldEditorBackgroundColor');
     const clearFieldEditorBackgroundColorBtn = document.getElementById('btnFieldEditorClearBackgroundColor');
     const saveFieldEditorBtn = document.getElementById('btnSaveFieldEditor');
@@ -1596,8 +1619,14 @@
         docxAlias: generateUniqueDocxAlias(),
         options: [],
         validationRules: [],
-        conversionRule: { enabled: false, expression: '', onError: 'use_raw', applyOnReadOnlyDisplay: false }
+        conversionRule: { enabled: false, expression: '', onError: 'use_raw', applyOnReadOnlyDisplay: false },
+        hiddenFromDisplay: false
       };
+    }
+
+    function isFieldHiddenFromDisplay(field) {
+      if (!field || isVisualOnlyType(field?.type)) return false;
+      return field.hiddenFromDisplay === true || String(field.hiddenFromDisplay || '').trim().toLowerCase() === 'true';
     }
 
     function finalizeClientConversionRule(rawRule, fieldContext = {}) {
@@ -2031,6 +2060,7 @@ num(value) <= 95</code></pre>
         label: String(raw.label || '').trim(),
         type,
         required: visualOnly ? false : (raw.required === true || String(raw.required) === 'true'),
+        hiddenFromDisplay: visualOnly ? false : isFieldHiddenFromDisplay(raw),
         sharedAcrossStudents: raw.sharedAcrossStudents === true || String(raw.sharedAcrossStudents) === 'true',
         readOnly,
         fullPageWidth: visualOnly ? true : (raw.fullPageWidth === true || String(raw.fullPageWidth) === 'true'),
@@ -2147,6 +2177,7 @@ num(value) <= 95</code></pre>
       if (field.required) flags.push('<span class="badge bg-danger-subtle text-danger border">Required</span>');
       if (field.readOnly) flags.push('<span class="badge bg-light text-secondary border">View only</span>');
       if (field.sharedAcrossStudents) flags.push('<span class="badge bg-info-subtle text-info-emphasis border">Shared</span>');
+      if (isFieldHiddenFromDisplay(field)) flags.push('<span class="badge bg-secondary-subtle text-secondary border">Hidden</span>');
       if (field.fullPageWidth) flags.push('<span class="badge bg-primary-subtle text-primary-emphasis border">Full width</span>');
       if (String(field.valueMode || VALUE_MODES.MANUAL) === VALUE_MODES.CALCULATED) flags.push('<span class="badge bg-warning-subtle text-warning-emphasis border">Calculated</span>');
       if (String(field.valueMode || VALUE_MODES.MANUAL) === VALUE_MODES.DERIVED_EDITABLE) flags.push('<span class="badge bg-info-subtle text-info-emphasis border">Derived</span>');
@@ -2184,7 +2215,9 @@ num(value) <= 95</code></pre>
             </td>
             <td class="field-main-cell">
               ${visualKind}
-              <span class="field-label">${escapeHtml(field.label || '-')}</span>
+              <button type="button" class="field-label field-label-edit js-field-open-editor d-block" data-index="${idx}" title="Edit field">
+                ${escapeHtml(field.label || '-')}
+              </button>
               <span class="font-monospace field-id">${escapeHtml(field.id || '')}</span>
             </td>
             <td><span class="badge bg-secondary-subtle text-secondary border">${escapeHtml(field.type || 'text')}</span></td>
@@ -2235,6 +2268,7 @@ num(value) <= 95</code></pre>
           label,
           type: normalizedType,
           required: visualOnly ? false : source?.required === true,
+          hiddenFromDisplay: visualOnly ? false : source?.hiddenFromDisplay === true,
           readOnly,
           sharedAcrossStudents: source?.sharedAcrossStudents === true,
           fullPageWidth: visualOnly ? true : source?.fullPageWidth === true,
@@ -2755,6 +2789,11 @@ num(value) <= 95</code></pre>
       if (fieldEditorReadonlyInput) fieldEditorReadonlyInput.disabled = visualOnly || calculatedMode || valueMode === VALUE_MODES.DERIVED_EDITABLE;
       if (fieldEditorFullWidthInput) fieldEditorFullWidthInput.disabled = visualOnly;
       if (fieldEditorBorderInput) fieldEditorBorderInput.disabled = visualOnly;
+      if (fieldEditorHiddenWrap) fieldEditorHiddenWrap.classList.toggle('d-none', visualOnly);
+      if (fieldEditorHiddenInput) {
+        fieldEditorHiddenInput.disabled = visualOnly;
+        if (visualOnly) fieldEditorHiddenInput.checked = false;
+      }
       if (fieldEditorBackgroundColorInput) fieldEditorBackgroundColorInput.disabled = visualOnly;
       if (fieldEditorValidationRulesInput) fieldEditorValidationRulesInput.disabled = visualOnly;
       if (fieldEditorConversionEnabledInput) fieldEditorConversionEnabledInput.disabled = visualOnly;
@@ -2851,6 +2890,7 @@ num(value) <= 95</code></pre>
       fieldEditorSharedInput.checked = field.sharedAcrossStudents === true;
       fieldEditorFullWidthInput.checked = field.fullPageWidth === true;
       fieldEditorBorderInput.checked = field.hasBorder === true;
+      if (fieldEditorHiddenInput) fieldEditorHiddenInput.checked = isFieldHiddenFromDisplay(field);
       const normalizedBg = normalizeHexColor(field.backgroundColor);
       fieldEditorBackgroundColorInput.value = normalizedBg || '#ffffff';
       fieldEditorBackgroundColorInput.setAttribute('data-cleared', normalizedBg ? '0' : '1');
@@ -2896,6 +2936,7 @@ num(value) <= 95</code></pre>
       const backgroundColor = backgroundCleared ? '' : normalizeHexColor(backgroundColorInput);
       const options = type === 'select' ? parseOptionsCsv(fieldEditorOptionsInput.value) : [];
       const visualOnly = isVisualOnlyType(type);
+      const hiddenFromDisplay = !visualOnly && fieldEditorHiddenInput?.checked === true;
       const docxAlias = visualOnly ? '' : (normalizeDocxAlias(fieldEditorDocxAliasInput.value) || generateUniqueDocxAlias());
       const valueMode = visualOnly ? VALUE_MODES.MANUAL : normalizeClientValueMode(fieldEditorValueModeInput?.value || VALUE_MODES.MANUAL);
       const usesExpression = valueMode === VALUE_MODES.CALCULATED || valueMode === VALUE_MODES.DERIVED_EDITABLE;
@@ -2980,6 +3021,7 @@ num(value) <= 95</code></pre>
         placeholderToken: visualOnly ? '' : placeholderToken,
         helpText,
         required: visualOnly ? false : required,
+        hiddenFromDisplay,
         readOnly: effectiveReadOnly,
         sharedAcrossStudents,
         fullPageWidth: visualOnly ? true : fullPageWidth,
@@ -3057,6 +3099,7 @@ num(value) <= 95</code></pre>
       };
 
       orderedFieldsList.forEach((field) => {
+        if (isFieldHiddenFromDisplay(field)) return;
         const fieldType = String(field?.type || '').trim().toLowerCase();
         const isSection = fieldType === 'section';
         const isSubheader = fieldType === 'subheader';
@@ -3393,6 +3436,14 @@ num(value) <= 95</code></pre>
     });
 
     tbody.addEventListener('click', async (e) => {
+      const openEditorBtn = e.target.closest('.js-field-open-editor');
+      if (openEditorBtn) {
+        const openIndex = Number(openEditorBtn.getAttribute('data-index'));
+        if (Number.isInteger(openIndex) && openIndex >= 0 && openIndex < fieldsState.length) {
+          openFieldEditor(openIndex);
+        }
+        return;
+      }
       const actionBtn = e.target.closest('.js-field-action');
       if (!actionBtn) return;
       const action = String(actionBtn.getAttribute('data-action') || '').trim().toLowerCase();

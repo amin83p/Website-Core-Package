@@ -5,7 +5,7 @@
  * Per-session length: from session startTime/endTime, else durationHours, else policy scheduledMinutes.
  *
  * Attendance percentage (configurable via org rollupFormula in school settings):
- * - absenceExcused on absent / acf → full session weight
+ * - absenceExcused on absent / acf → no extra rollup credit (same as unexcused absent); excuse affects display/timing rules, not span %
  * - N/A / not_applicable → excluded from the denominator
  * - unmarked → excluded by default, or counted as absent when configured
  * - present / late / absent / acf → credit = weight × presenceRatio
@@ -791,10 +791,6 @@ function computeSessionCredit(record, sessionWeight, policy) {
     }
     return { credit: 0, disqualified: false, exempt: false, reason: 'no_record' };
   }
-  if (isAbsentLikeStatus(st) && isAbsenceExcused(record)) {
-    return { credit: sessionWeight, disqualified: false, reason: 'absence_excused_full' };
-  }
-
   const penalty = rollupPenaltyMinutes(record, policy);
   if (penalty.countAsAbsentForExcuse) {
     return { credit: 0, disqualified: false, reason: 'excuse_counts_absent' };
@@ -930,11 +926,10 @@ function computeStudentMatrixSummary(records, classData = {}, orgPolicyLayer = {
       policy
     );
     const excuseCountsAbsent = sessionCredit.reason === 'excuse_counts_absent';
-    const absenceExcusedFull = sessionCredit.reason === 'absence_excused_full';
     if ((st === ATTENDANCE_STATUS.PRESENT || st === ATTENDANCE_STATUS.LATE) && !excuseCountsAbsent) {
       totalPresentSessions += 1;
     }
-    if ((countsAsAbsentForRollupSummary(st, rollupFormula) && !absenceExcusedFull) || excuseCountsAbsent) {
+    if (countsAsAbsentForRollupSummary(st, rollupFormula) || excuseCountsAbsent) {
       totalAbsentSessions += 1;
     }
 

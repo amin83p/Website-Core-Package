@@ -40,6 +40,45 @@ const baseTemplatePayload = {
   snapshotKeys: ['student_full_name', 'student_name', 'attendance_pct', 'student_attendance_percent']
 };
 
+test('reportTemplateModel preserves hiddenFromDisplay on schema fields', () => {
+  const sanitized = reportTemplateModel.sanitizeTemplate({
+    ...baseTemplatePayload,
+    schema: {
+      version: 1,
+      fields: [
+        {
+          id: 'hidden_note',
+          label: 'Internal Note',
+          type: 'text',
+          hiddenFromDisplay: true,
+          valueMode: 'manual'
+        },
+        {
+          id: 'visible_note',
+          label: 'Visible Note',
+          type: 'text',
+          hiddenFromDisplay: false,
+          valueMode: 'manual'
+        }
+      ]
+    },
+    placeholderMap: {},
+    snapshotKeys: []
+  });
+  const byId = new Map(sanitized.schema.fields.map((field) => [field.id, field]));
+  assert.equal(byId.get('hidden_note')?.hiddenFromDisplay, true);
+  assert.equal(byId.get('visible_note')?.hiddenFromDisplay, false);
+});
+
+test('evaluateFieldValidations skips hiddenFromDisplay fields', () => {
+  const reportRuleEngineService = require('../MVC/services/school/reportRuleEngineService');
+  const issues = reportRuleEngineService.evaluateFieldValidations({
+    field: { id: 'x', label: 'X', type: 'text', required: true, hiddenFromDisplay: true },
+    value: ''
+  });
+  assert.equal(issues.length, 0);
+});
+
 test('reportTemplateModel sanitizes snapshotKeys with dedupe and cap', () => {
   const sanitized = reportTemplateModel.sanitizeTemplate({
     ...baseTemplatePayload,

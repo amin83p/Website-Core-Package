@@ -190,6 +190,9 @@ function sanitizeField(rawField, index) {
     label,
     type,
     required: rawField.required === true || String(rawField.required) === 'true',
+    hiddenFromDisplay: !visualOnly && (
+      rawField.hiddenFromDisplay === true || String(rawField.hiddenFromDisplay) === 'true'
+    ),
     sharedAcrossStudents: rawField.sharedAcrossStudents === true || String(rawField.sharedAcrossStudents) === 'true',
     readOnly,
     fullPageWidth:

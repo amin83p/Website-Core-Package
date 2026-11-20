@@ -34,7 +34,7 @@ test('shared editor template has V2-only streamlined toolbar and essential detai
   assert.match(viewSource, /<% if \(!isV2\) { %>[\s\S]*Class Lifecycle/);
   assert.match(viewSource, /<% if \(!isV2\) { %>[\s\S]*Export Payload/);
 
-  const detailsStart = viewSource.indexOf('<% if (isV2) { %>');
+  const detailsStart = viewSource.indexOf('<div class="instance-details-v2" role="list">');
   const detailsEnd = viewSource.indexOf('<% } else { %>', detailsStart);
   assert.notEqual(detailsStart, -1);
   assert.notEqual(detailsEnd, -1);
@@ -42,7 +42,7 @@ test('shared editor template has V2-only streamlined toolbar and essential detai
   assert.ok(v2DetailsBlock.includes('Status'));
   assert.ok(v2DetailsBlock.includes('Teacher'));
   assert.ok(v2DetailsBlock.includes('Class'));
-  assert.ok(v2DetailsBlock.includes('Session Date'));
+  assert.ok(v2DetailsBlock.includes('Session date'));
   assert.ok(v2DetailsBlock.includes('Student'));
   assert.ok(v2DetailsBlock.includes('Assignment'));
   assert.equal(v2DetailsBlock.includes('Template'), false);
@@ -63,7 +63,11 @@ test('shared editor template uses tooltip help markers for V2 instead of inline 
 test('shared editor template has V2 previous report navigator button, modal, and guarded links', () => {
   const viewSource = read('packages/school/MVC/views/school/report/instanceEditor.ejs');
 
-  assert.match(viewSource, /<% \} else \{ %>[\s\S]*id="btnReviewPreviousReports"[\s\S]*Review Previous Reports/);
+  assert.match(viewSource, /id="reportInstanceContextModal"/);
+  assert.match(viewSource, /data-bs-target="#reportInstanceContextModal"/);
+  assert.match(viewSource, /<% \} else \{ %>[\s\S]*id="btnReviewPreviousReports"[\s\S]*title="Review previous reports"/);
+  assert.match(viewSource, /id="btnReviewPrefillUpdates"[\s\S]*title="Preview prefill updates"/);
+  assert.match(viewSource, /report-toolbar-icon-btn/);
   assert.match(viewSource, /id="reportReviewNavigatorModal"/);
   assert.match(viewSource, /href="<%= row\.href %>"/);
   assert.match(viewSource, /class="btn btn-outline-primary btn-sm js-report-review-nav-link"[\s\S]*Open V2/);
@@ -103,4 +107,39 @@ test('instance editor export modals use lazy bootstrap initialization', () => {
   assert.match(viewSource, /function getInstancePdfExportModal\(\)/);
   assert.match(viewSource, /getInstancePdfExportModal\(\)\?\.show\(\)/);
   assert.doesNotMatch(viewSource, /const instancePdfModal = instancePdfModalEl && window\.bootstrap\?\.Modal/);
+});
+
+test('report instance editor passes student tool access flags from buildInstanceEditorRenderContext', () => {
+  const controllerSource = read('packages/school/MVC/controllers/school/reportController.js');
+  assert.match(controllerSource, /studentPersonId,/);
+  assert.match(controllerSource, /canOpenAttendanceMatrix: Boolean\(attendanceAccess\?\.canOpenMatrix\)/);
+  assert.match(controllerSource, /canOpenStudentAttendanceReport: Boolean\(attendanceReportAccess\?\.canOpenReport\)/);
+  assert.match(controllerSource, /canOpenGradesMatrix,/);
+  assert.match(controllerSource, /canOpenConductMatrix,/);
+  assert.match(controllerSource, /canOpenClassConductReport,/);
+  assert.match(controllerSource, /reportPeriodStart,/);
+  assert.match(controllerSource, /reportPeriodEnd,/);
+});
+
+test('report instance editor student context menu is wired in the shared template', () => {
+  const viewSource = read('packages/school/MVC/views/school/report/instanceEditor.ejs');
+  assert.match(viewSource, /js-report-instance-student-context-target/);
+  assert.match(viewSource, /id="reportInstanceStudentContextMenu"/);
+  assert.match(viewSource, /__reportInstanceStudentTools/);
+  assert.match(viewSource, /reportInstanceStudentContextMenu\.js/);
+  assert.match(viewSource, /data-action="attendance-matrix"/);
+  assert.match(viewSource, /data-action="class-conduct-report"/);
+});
+
+test('reportInstanceStudentContextMenu builds period-scoped deep links', () => {
+  const scriptSource = read('packages/school/public/scripts/reportInstanceStudentContextMenu.js');
+  assert.match(scriptSource, /buildAttendanceMatrixUrl/);
+  assert.match(scriptSource, /buildStudentAttendanceReportUrl/);
+  assert.match(scriptSource, /buildGradesMatrixUrl/);
+  assert.match(scriptSource, /buildConductMatrixUrl/);
+  assert.match(scriptSource, /buildClassConductReportUrl/);
+  assert.match(scriptSource, /params\.set\('startDate'/);
+  assert.match(scriptSource, /params\.set\('endDate'/);
+  assert.match(scriptSource, /\/school\/grades-matrix/);
+  assert.match(scriptSource, /\/school\/conduct-matrix/);
 });

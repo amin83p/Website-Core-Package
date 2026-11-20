@@ -34,6 +34,8 @@ const reportTargetDepartmentPolicy = require('../../services/school/reportTarget
 const sessionConductService = require('../../services/school/sessionConductService');
 const sessionConductReportLockService = require('../../services/school/sessionConductReportLockService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
+const attendanceAccessService = require('../../services/school/attendanceAccessService');
+const schoolRollingEnrollmentAccessService = require('../../services/school/schoolRollingEnrollmentAccessService');
 const schoolDeletionGuardService = require('../../services/school/schoolDeletionGuardService');
 const classReferenceSyncService = require('../../services/school/classReferenceSyncService');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
@@ -142,9 +144,25 @@ function buildReportInstanceDetailsForView(inst, {
     assignmentSummary,
     studentName,
     studentRecordId: toPublicId(studentRegistry?.id),
+    studentPersonId,
     studentLocalId: studentExtra,
     targetLabel
   };
+}
+
+async function evaluateSchoolSectionReadAllowed(user, sectionId, ipAddress) {
+  if (!user || !sectionId) return false;
+  try {
+    const evaluation = await accessService.evaluateAccess({
+      user,
+      sectionId,
+      operationId: OPERATIONS.READ,
+      ipAddress
+    });
+    return Boolean(evaluation?.allowed);
+  } catch (_) {
+    return false;
+  }
 }
 
 function getActiveOrgIdOrThrow(reqUser) {
@@ -2094,6 +2112,24 @@ async function buildInstanceEditorRenderContext(req) {
     && freezeOnOpen
     && reportService.isTemplateVersionAheadOfRenderCache(template, latestInstance);
 
+  const reportPeriodStart = String(effectiveAssignment?.reportStartDate || assignment?.reportStartDate || '').trim();
+  const reportPeriodEnd = String(effectiveAssignment?.reportDueDate || assignment?.reportDueDate || '').trim();
+  const [
+    attendanceAccess,
+    attendanceReportAccess,
+    canOpenGradesMatrix,
+    canOpenConductMatrix,
+    canOpenClassConductReport,
+    canOpenRollingEnrollment
+  ] = await Promise.all([
+    attendanceAccessService.buildAttendanceAccess(req.user, req.ip).catch(() => ({ canOpenMatrix: false })),
+    attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip).catch(() => ({ canOpenReport: false })),
+    evaluateSchoolSectionReadAllowed(req.user, SECTIONS.SCHOOL_GRADEBOOK, req.ip),
+    evaluateSchoolSectionReadAllowed(req.user, SECTIONS.SCHOOL_CLASS_CONDUCT_MATRIX, req.ip),
+    evaluateSchoolSectionReadAllowed(req.user, SECTIONS.SCHOOL_CLASS_CONDUCT_REPORT, req.ip),
+    schoolRollingEnrollmentAccessService.canAccessRollingEnrollment(req.user).catch(() => false)
+  ]);
+
   return {
     title: `Report Editor: ${template.title}`,
     instance: latestInstance,
@@ -2122,7 +2158,15 @@ async function buildInstanceEditorRenderContext(req) {
     user: req.user,
     actionStateId: req.actionStateId,
     useFrozenRenderCache: freezeOnOpen,
-    renderCacheStaleVersusTemplate
+    renderCacheStaleVersusTemplate,
+    reportPeriodStart,
+    reportPeriodEnd,
+    canOpenAttendanceMatrix: Boolean(attendanceAccess?.canOpenMatrix),
+    canOpenStudentAttendanceReport: Boolean(attendanceReportAccess?.canOpenReport),
+    canOpenGradesMatrix,
+    canOpenConductMatrix,
+    canOpenClassConductReport,
+    canOpenRollingEnrollment: Boolean(canOpenRollingEnrollment)
   };
 }
 

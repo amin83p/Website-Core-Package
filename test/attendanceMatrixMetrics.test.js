@@ -111,15 +111,15 @@ test('absent and N/A yield zero credit', () => {
   assert.equal(computeSessionCredit({ status: 'N/A' }, w, policy180).credit, 0);
 });
 
-test('absence excused on absent or acf yields full session weight', () => {
+test('absence excused on absent or acf yields zero rollup credit', () => {
   const w = 10;
   assert.equal(
     computeSessionCredit({ status: 'absent', absenceExcused: true }, w, policy180).credit,
-    w
+    0
   );
   assert.equal(
     computeSessionCredit({ status: 'acf', absenceExcused: true }, w, policy180).credit,
-    w
+    0
   );
   assert.equal(
     computeSessionCredit({ status: 'excused' }, w, policy180).credit,
@@ -403,7 +403,7 @@ test('computeRosterAttendancePercent averages eligible roster rows', () => {
   assert.ok(Math.abs(percent - expected) < 0.01);
 });
 
-test('rollup excludes absence-excused sessions from absent P/A count', () => {
+test('rollup counts absence-excused sessions as absent for P/A and lowers percent', () => {
   const records = [
     { status: 'present' },
     { status: 'absent', absenceExcused: true },
@@ -412,8 +412,8 @@ test('rollup excludes absence-excused sessions from absent P/A count', () => {
   const s = computeStudentMatrixSummary(records, {});
   assert.equal(s.totalEligibleSessions, 3);
   assert.equal(s.totalPresentSessions, 1);
-  assert.equal(s.totalAbsentSessions, 0);
-  assert.equal(s.performancePercent, 100);
+  assert.equal(s.totalAbsentSessions, 2);
+  assert.equal(s.performancePercent, Math.round((100 / 3) * 100) / 100);
 });
 
 test('rollup counts ACF in totalAbsentSessions', () => {

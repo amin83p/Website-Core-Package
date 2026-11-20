@@ -863,12 +863,16 @@ async function buildClassAttendanceSpanSummary(sessions, statusMap = null, optio
       out.total += 1;
       incrementAttendanceStatusCount(out, status, row);
       const timing = attendanceMatrixMetricsService.normalizeAttendanceTimingFields(row);
+      const absentFields = attendanceMatrixMetricsService.normalizeAbsenceExcusedFields(
+        attendanceMatrixMetricsService.normalizeLegacyAbsenceExcusedRecord(row || {})
+      );
       matrixRecords.push({
         status,
         lateMinutes: timing.lateMinutes,
         earlyLeaveMinutes: timing.earlyLeaveMinutes,
         lateExcused: timing.lateExcused,
         earlyLeaveExcused: timing.earlyLeaveExcused,
+        absenceExcused: absentFields.absenceExcused,
         scheduledMinutes
       });
     });

@@ -1206,7 +1206,13 @@ function prepareReportAnswersForUI({
   };
 }
 
+function isFieldHiddenFromDisplay(field) {
+  if (!field || isVisualOnlyField(field)) return false;
+  return field.hiddenFromDisplay === true || String(field.hiddenFromDisplay || '').trim().toLowerCase() === 'true';
+}
+
 function evaluateFieldValidations({ field, value, answers = {}, prefill = {} }) {
+  if (isFieldHiddenFromDisplay(field)) return [];
   const fieldId = String(field?.id || '').trim();
   const label = String(field?.label || fieldId || 'Field').trim();
   const rulesRaw = Array.isArray(field?.validationRules) ? field.validationRules : [];

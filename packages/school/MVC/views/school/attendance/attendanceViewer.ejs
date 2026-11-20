@@ -801,7 +801,7 @@ function buildAttendanceLegendText(enabledStatuses) {
     const parts = [];
     if (enabled.has('present')) parts.push('P Present');
     if (enabled.has('late')) parts.push('L Late');
-    parts.push('E Excused absence (Absent/ACF + flag)');
+    parts.push('E Excused absence (Absent/ACF + flag; rollup % unchanged)');
     if (enabled.has('absent')) parts.push('A Absent');
     if (enabled.has('acf')) parts.push('ACF Absent Camera Off');
     if (enabled.has('not_applicable')) parts.push('— N/A');
