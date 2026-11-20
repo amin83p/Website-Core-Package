@@ -370,8 +370,13 @@ async function buildStudentMatrixRow({
       prefillSnapshot
     };
   } else {
+    const lockSnapshotForUi = reportService.resolveExportLockSnapshot(instance);
+    const instLocked = Boolean(
+      lockSnapshotForUi?.mergedAnswers && typeof lockSnapshotForUi.mergedAnswers === 'object'
+    );
     const freezeOnOpen = reportService.shouldFreezeReportInstanceOnOpen(template, instance);
-    if (!freezeOnOpen) {
+    const partialLiveRefresh = freezeOnOpen && reportService.instanceHasLiveOnOpenKeys(template);
+    if (!instLocked && (!freezeOnOpen || partialLiveRefresh)) {
       const freshPrefill = await reportService.buildPrefillSnapshot({
         assignment,
         teacherId,
@@ -385,15 +390,39 @@ async function buildStudentMatrixRow({
       }
     }
   }
-  const useRenderCache = !freshMerge && Boolean(
+  const lockSnapshotForMerge = instance ? reportService.resolveExportLockSnapshot(instance) : null;
+  const instLockedForMerge = Boolean(
+    lockSnapshotForMerge?.mergedAnswers && typeof lockSnapshotForMerge.mergedAnswers === 'object'
+  );
+  const useRenderCache = !freshMerge && !instLockedForMerge && Boolean(
     instance
       && reportService.shouldFreezeReportInstanceOnOpen(template, effectiveInstance)
       && reportService.isInstanceRenderCacheValid(template, effectiveInstance)
   );
-  const skipRecalculation = useRenderCache;
-  const mergedAnswers = useRenderCache
-    ? { ...effectiveInstance.renderCache.mergedAnswers }
-    : reportService.mergeTemplateData(template, effectiveInstance, assignment, editorMergeOptions);
+  let skipRecalculation = useRenderCache;
+  let mergedAnswers;
+  if (instLockedForMerge) {
+    const uiState = reportService.resolveInstanceMergedStateForUI({
+      template,
+      instance: effectiveInstance,
+      assignment,
+      options: { scopeOptions: editorMergeOptions }
+    });
+    mergedAnswers = uiState.mergedAnswers;
+    skipRecalculation = true;
+  } else if (useRenderCache) {
+    const blended = reportService.mergeMergedAnswersWithRenderCache({
+      template,
+      instance: effectiveInstance,
+      assignment,
+      cachedMerged: effectiveInstance.renderCache.mergedAnswers,
+      options: { scopeOptions: editorMergeOptions }
+    });
+    mergedAnswers = blended.mergedAnswers;
+    skipRecalculation = blended.skipRecalculation;
+  } else {
+    mergedAnswers = reportService.mergeTemplateData(template, effectiveInstance, assignment, editorMergeOptions);
+  }
   const prefill = effectiveInstance.prefillSnapshot || {};
   const prepared = reportRuleEngineService.prepareReportAnswersForUI({
     template,

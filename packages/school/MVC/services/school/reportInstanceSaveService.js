@@ -5,7 +5,7 @@ const reportRuleEngineService = require('./reportRuleEngineService');
 const reportGenerationEngineService = require('./reportGenerationEngineService');
 const reportAssignmentModel = require('../../models/school/reportAssignmentModel');
 const sessionConductReportLockService = require('./sessionConductReportLockService');
-const { getPrefillValue, isAutoRefreshPrefillKey } = require('./reportPrefillKeyUtils');
+const { getPrefillValue } = require('./reportPrefillKeyUtils');
 
 function isVisualOnlyField(field = {}) {
   const type = String(field?.type || '').trim().toLowerCase();
@@ -52,8 +52,8 @@ async function persistInstanceAnswers({
     : {};
   fields.forEach((field) => {
     if (!field?.id || isVisualOnlyField(field)) return;
-    const autoRefreshKey = isAutoRefreshPrefillKey(field?.prefillKey);
-    if (autoRefreshKey) {
+    const refreshOnOpenKey = reportService.fieldPrefillRefreshOnOpen(template, field);
+    if (refreshOnOpenKey) {
       const resolved = getPrefillValue(prefillSnapshot, field.prefillKey);
       if (resolved.found) {
         const prefillValue = reportGenerationEngineService.coercePrefillValueForField(field, resolved.value);

@@ -1163,6 +1163,25 @@ function buildTemplateSavePayload({
     payload.snapshotKeyDocxAliases = {};
   }
 
+  let snapshotKeyRefreshOnOpen = body.snapshotKeyRefreshOnOpen;
+  if (typeof snapshotKeyRefreshOnOpen === 'string' && snapshotKeyRefreshOnOpen.trim()) {
+    try {
+      snapshotKeyRefreshOnOpen = JSON.parse(snapshotKeyRefreshOnOpen);
+    } catch {
+      snapshotKeyRefreshOnOpen = {};
+    }
+  }
+  if (snapshotKeyRefreshOnOpen && typeof snapshotKeyRefreshOnOpen === 'object' && !Array.isArray(snapshotKeyRefreshOnOpen)) {
+    payload.snapshotKeyRefreshOnOpen = snapshotKeyRefreshOnOpen;
+  } else if (
+    existingTemplate?.snapshotKeyRefreshOnOpen
+    && typeof existingTemplate.snapshotKeyRefreshOnOpen === 'object'
+  ) {
+    payload.snapshotKeyRefreshOnOpen = existingTemplate.snapshotKeyRefreshOnOpen;
+  } else {
+    payload.snapshotKeyRefreshOnOpen = {};
+  }
+
   return payload;
 }
 

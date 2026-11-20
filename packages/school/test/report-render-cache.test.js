@@ -245,3 +245,73 @@ test('buildReportInstanceExportPayload uses renderCache mergedAnswers when valid
   assert.equal(payload.mergedAnswers.name, 'export-cached');
   assert.equal(payload.mergedAnswers.doubled, 404);
 });
+
+test('resolveInstanceMergedStateForUI prefers lockSnapshot when locked', () => {
+  const instance = {
+    status: 'locked',
+    answers: { name: 'would-recalc' },
+    prefillSnapshot: {},
+    lockSnapshot: {
+      mergedAnswers: { name: 'frozen-at-lock', doubled: 42 }
+    },
+    renderCache: {
+      templateId: 'TPL-RRC-1',
+      templateVersion: 3,
+      capturedAt: '2025-01-02T00:00:00.000Z',
+      mergedAnswers: { name: 'from-cache', doubled: 1 }
+    },
+    audit: { firstSavedAt: '2025-01-01T00:00:00.000Z' }
+  };
+  const state = reportService.resolveInstanceMergedStateForUI({
+    template: simpleTemplate,
+    instance,
+    assignment: null
+  });
+  assert.equal(state.displaySource, 'lock');
+  assert.equal(state.skipRecalculation, true);
+  assert.equal(state.usedPartialCache, false);
+  assert.equal(state.mergedAnswers.name, 'frozen-at-lock');
+  assert.equal(state.mergedAnswers.doubled, 42);
+  assert.deepEqual(
+    reportService.resolveInstanceMergedAnswersForDisplay({ template: simpleTemplate, instance }),
+    state.mergedAnswers
+  );
+});
+
+test('resolveInstanceMergedStateForUI uses cache blend when renderCache is valid', () => {
+  const instance = {
+    status: 'submitted',
+    templateVersion: 3,
+    answers: { name: 'live-answers' },
+    audit: { firstSavedAt: '2025-01-01T00:00:00.000Z' },
+    renderCache: {
+      templateId: 'TPL-RRC-1',
+      templateVersion: 3,
+      capturedAt: '2025-01-02T00:00:00.000Z',
+      mergedAnswers: { name: 'cached-name', doubled: 8 }
+    },
+    prefillSnapshot: {}
+  };
+  const state = reportService.resolveInstanceMergedStateForUI({
+    template: simpleTemplate,
+    instance,
+    assignment: null
+  });
+  assert.equal(state.displaySource, 'cache');
+  assert.equal(state.mergedAnswers.name, 'cached-name');
+});
+
+test('resolveInstanceMergedStateForUI uses live merge for draft without cache', () => {
+  const instance = {
+    status: 'draft',
+    answers: { name: 'ada' },
+    prefillSnapshot: {}
+  };
+  const state = reportService.resolveInstanceMergedStateForUI({
+    template: simpleTemplate,
+    instance
+  });
+  assert.equal(state.displaySource, 'live');
+  assert.equal(state.skipRecalculation, false);
+  assert.equal(state.mergedAnswers.name, 'ada');
+});

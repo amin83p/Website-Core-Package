@@ -12,7 +12,7 @@ const sarExportTimingService = require('./sarExportTimingService');
 const reportFunderDocxService = require('./reportFunderDocxService');
 const reportFunderPdfService = require('./reportFunderPdfService');
 const classEnrollmentReadService = require('./classEnrollmentReadService');
-const { getPrefillValue, isAutoRefreshPrefillKey } = require('./reportPrefillKeyUtils');
+const { getPrefillValue } = require('./reportPrefillKeyUtils');
 
 const EPHEMERAL_ASSIGNMENT_ID = 'engine:ephemeral';
 
@@ -135,11 +135,13 @@ function hydrateAnswersFromPrefill(template, instance, options = {}) {
     ? { ...instance.answers }
     : {};
   const overwritePrefillFields = options?.overwritePrefillFields === true;
+  const onlyFieldIds = options?.onlyFieldIds instanceof Set ? options.onlyFieldIds : null;
   let changed = false;
 
   fields.forEach((field) => {
     const type = String(field?.type || '').trim().toLowerCase();
     if (!field?.id || type === 'section' || type === 'subheader' || type === 'row_break') return;
+    if (onlyFieldIds && !onlyFieldIds.has(String(field.id))) return;
 
     const valueMode = reportRuleEngineService.normalizeValueMode(field?.valueMode);
     if (valueMode === 'calculated' || valueMode === 'derived_editable') {
@@ -166,7 +168,7 @@ function hydrateAnswersFromPrefill(template, instance, options = {}) {
     const looksRating = /session_rating|classEffort|classParticipation|respectsTeachers|respectsStudents|conduct/i.test(
       String(field?.prefillKey || '')
     );
-    const autoRefreshPrefill = isAutoRefreshPrefillKey(field?.prefillKey);
+    const autoRefreshPrefill = reportService.fieldPrefillRefreshOnOpen(template, field);
     const currentIsNa = ['n/a', 'na'].includes(String(currentValue ?? '').trim().toLowerCase());
     const canOverwriteNaRating = looksRating && currentIsNa;
     const rawPrefill = resolvedPrefill.value;

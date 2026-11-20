@@ -1375,6 +1375,8 @@
     const reportReviewNavLinks = Array.from(document.querySelectorAll('.js-report-review-nav-link'));
     const instanceId = <%- JSON.stringify(String(instance?.id || '')) %>;
     const useFrozenRenderCache = <%- JSON.stringify(Boolean(typeof useFrozenRenderCache !== 'undefined' && useFrozenRenderCache)) %>;
+    const liveOnOpenFieldIds = <%- JSON.stringify(Array.isArray(liveOnOpenFieldIds) ? liveOnOpenFieldIds : []).replace(/</g, '\\u003c') %>;
+    const liveOnOpenFieldIdSet = new Set((Array.isArray(liveOnOpenFieldIds) ? liveOnOpenFieldIds : []).map((id) => String(id || '').trim()).filter(Boolean));
     const summaryFocusStorageKey = 'report_instance_validation_focus';
     let prefillRefreshModal = null;
     let prefillRefreshChanges = [];
@@ -2399,6 +2401,14 @@
       return nextAnswers;
     }
 
+    function fieldUsesFrozenRenderCache(field, preferLiveDom) {
+      if (!preferLiveDom) return false;
+      if (!liveOnOpenFieldIdSet.size) return true;
+      const fieldId = String(field?.id || '').trim();
+      if (!fieldId) return true;
+      return !liveOnOpenFieldIdSet.has(fieldId);
+    }
+
     function collectAnswers(fields, mergedBefore, options = {}) {
       const preferLiveDom = options.preferLiveDom === true;
       const base = mergedBefore && typeof mergedBefore === 'object' ? { ...mergedBefore } : {};
@@ -2411,15 +2421,19 @@
           return;
         }
         if (isCalculatedField(field)) {
-          if (mergedBefore && Object.prototype.hasOwnProperty.call(mergedBefore, field.id)) {
+          if (fieldUsesFrozenRenderCache(field, preferLiveDom) && mergedBefore && Object.prototype.hasOwnProperty.call(mergedBefore, field.id)) {
             base[field.id] = mergedBefore[field.id];
           }
           return;
         }
         if (field.readOnly === true) {
-          if (preferLiveDom && mergedBefore && Object.prototype.hasOwnProperty.call(mergedBefore, field.id)) {
+          if (fieldUsesFrozenRenderCache(field, preferLiveDom) && mergedBefore && Object.prototype.hasOwnProperty.call(mergedBefore, field.id)) {
             base[field.id] = mergedBefore[field.id];
           }
+          return;
+        }
+        if (fieldUsesFrozenRenderCache(field, preferLiveDom) && mergedBefore && Object.prototype.hasOwnProperty.call(mergedBefore, field.id)) {
+          base[field.id] = mergedBefore[field.id];
           return;
         }
         base[field.id] = readFieldValue(field);
@@ -2505,8 +2519,9 @@
 
     function refreshCalculatedFieldDisplays(fields, mergedBefore, prefill) {
       const computationFields = fieldsForSnapshotComputation(fields);
+      const preferLiveDom = useFrozenRenderCache || liveOnOpenFieldIdSet.size > 0;
       const userAnswers = collectAnswers(fields, mergedBefore, {
-        preferLiveDom: useFrozenRenderCache,
+        preferLiveDom,
         prefill
       });
       const prepared = window.SchoolReportCalculatedFields?.prepareReportAnswersForUI
@@ -2525,8 +2540,9 @@
       const computationFields = fieldsForSnapshotComputation(fields);
       const mergedBefore = parseJsonScript(mergedDataEl, {});
       const prefill = parseJsonScript(prefillDataEl, {});
+      const preferLiveDomForValidation = useFrozenRenderCache || liveOnOpenFieldIdSet.size > 0;
       const userAnswers = collectAnswers(fields, mergedBefore, {
-        preferLiveDom: useFrozenRenderCache,
+        preferLiveDom: preferLiveDomForValidation,
         prefill
       });
       const prepared = window.SchoolReportCalculatedFields?.prepareReportAnswersForUI

@@ -13,7 +13,6 @@ const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatri
 const {
   getPrefillValue,
   normalizePrefillKey,
-  isAutoRefreshPrefillKey,
   stableValueToken
 } = require('./reportPrefillKeyUtils');
 const gradebookSkillCatalogService = require('./gradebookSkillCatalogService');
@@ -3570,7 +3569,7 @@ function mergeTemplateData(template, instance, assignment = null, options = {}) 
     } else {
       const answerValue = answers[field.id];
       const hasAnswer = answerValue !== undefined && answerValue !== null && String(answerValue) !== '';
-      if (hasAnswer && isAutoRefreshPrefillKey(field.prefillKey) && derivedOverrides[field.id] !== true) {
+      if (hasAnswer && fieldPrefillRefreshOnOpen(template, field) && derivedOverrides[field.id] !== true) {
         const resolvedAuto = getPrefillValue(prefill, field.prefillKey);
         if (resolvedAuto.found) {
           merged[field.id] = resolvedAuto.value;
@@ -4180,6 +4179,155 @@ function parseReportAuditTimestamp(value) {
   return Number.isFinite(parsed) ? parsed : NaN;
 }
 
+function resolveSnapshotKeyRefreshOnOpen(template, rawKey = '') {
+  const key = normalizeSnapshotKey(rawKey);
+  if (!key) return false;
+  const map = template?.snapshotKeyRefreshOnOpen && typeof template.snapshotKeyRefreshOnOpen === 'object'
+    ? template.snapshotKeyRefreshOnOpen
+    : {};
+  if (map[key] === true) return true;
+  const lower = key.toLowerCase();
+  return Object.entries(map).some(([rowKey, flag]) => (
+    flag === true && normalizeSnapshotKey(rowKey).toLowerCase() === lower
+  ));
+}
+
+function pruneTemplateSnapshotKeyRefreshOnOpen(template = {}) {
+  const allowed = new Set(
+    resolveTemplateLockKeys(template)
+      .map((row) => normalizeSnapshotKey(row).toLowerCase())
+      .filter(Boolean)
+  );
+  const source = template?.snapshotKeyRefreshOnOpen && typeof template.snapshotKeyRefreshOnOpen === 'object'
+    ? template.snapshotKeyRefreshOnOpen
+    : {};
+  const out = {};
+  Object.entries(source).forEach(([rawKey, flag]) => {
+    if (flag !== true) return;
+    const key = normalizeSnapshotKey(rawKey);
+    if (!key || !allowed.has(key.toLowerCase())) return;
+    out[key] = true;
+  });
+  template.snapshotKeyRefreshOnOpen = out;
+  return template;
+}
+
+function resolveLiveOnOpenSnapshotKeys(template) {
+  return resolveTemplateLockKeys(template).filter((row) => resolveSnapshotKeyRefreshOnOpen(template, row));
+}
+
+function instanceHasLiveOnOpenKeys(template) {
+  return resolveLiveOnOpenSnapshotKeys(template).length > 0;
+}
+
+function fieldPrefillRefreshOnOpen(template, field) {
+  if (!field) return false;
+  const placeholderMap = template?.placeholderMap && typeof template.placeholderMap === 'object'
+    ? template.placeholderMap
+    : {};
+  const canonical = resolveCanonicalSnapshotKeyForField(field, placeholderMap);
+  if (canonical?.key && resolveSnapshotKeyRefreshOnOpen(template, canonical.key)) return true;
+  if (field?.prefillKey && resolveSnapshotKeyRefreshOnOpen(template, field.prefillKey)) return true;
+  const fieldId = String(field?.id || '').trim();
+  if (fieldId && resolveSnapshotKeyRefreshOnOpen(template, fieldId)) return true;
+  return false;
+}
+
+function fieldIsLiveOnOpen(template, field) {
+  return fieldPrefillRefreshOnOpen(template, field);
+}
+
+function resolveLiveOnOpenFieldIds(template) {
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  const liveIds = new Set();
+  fields.forEach((field) => {
+    if (!field?.id || isVisualOnlyField(field)) return;
+    if (fieldIsLiveOnOpen(template, field)) {
+      liveIds.add(String(field.id));
+    }
+  });
+  let changed = true;
+  while (changed) {
+    changed = false;
+    fields.forEach((field) => {
+      if (!field?.id || !reportRuleEngineService.isCalculatedField(field)) return;
+      const fieldId = String(field.id);
+      if (liveIds.has(fieldId)) return;
+      const deps = Array.isArray(field.calculationDependencies) ? field.calculationDependencies : [];
+      const dependsOnLive = deps.some((dep) => liveIds.has(String(dep || '').trim()));
+      if (dependsOnLive) {
+        liveIds.add(fieldId);
+        changed = true;
+      }
+    });
+  }
+  return [...liveIds];
+}
+
+function mergeMergedAnswersWithRenderCache({
+  template,
+  instance,
+  assignment = null,
+  cachedMerged = null,
+  options = {}
+} = {}) {
+  const scopeOptions = options.scopeOptions !== undefined
+    ? options.scopeOptions
+    : (templateUsesSnapshotScope(template) ? { respectSnapshotKeys: true } : {});
+  const liveMerged = mergeTemplateData(template, instance, assignment, scopeOptions);
+  if (!cachedMerged || typeof cachedMerged !== 'object') {
+    return { mergedAnswers: liveMerged, skipRecalculation: false, usedPartialCache: false };
+  }
+
+  const liveFieldIds = new Set(resolveLiveOnOpenFieldIds(template));
+  const liveKeys = resolveLiveOnOpenSnapshotKeys(template);
+  const liveKeyLower = new Set(liveKeys.map((row) => normalizeSnapshotKey(row).toLowerCase()).filter(Boolean));
+  const hasLive = liveFieldIds.size > 0 || liveKeyLower.size > 0;
+  if (!hasLive) {
+    return { mergedAnswers: { ...cachedMerged }, skipRecalculation: true, usedPartialCache: false };
+  }
+
+  const ctx = resolveSnapshotScopeContext(template);
+  const useScope = scopeOptions.respectSnapshotKeys === true && ctx.active;
+  const out = { ...cachedMerged };
+
+  liveKeys.forEach((rawKey) => {
+    const normalized = normalizeSnapshotKey(rawKey);
+    if (!normalized) return;
+    if (Object.prototype.hasOwnProperty.call(liveMerged, normalized)) {
+      out[normalized] = liveMerged[normalized];
+    }
+    if (Object.prototype.hasOwnProperty.call(liveMerged, rawKey)) {
+      out[rawKey] = liveMerged[rawKey];
+    }
+  });
+
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  fields.forEach((field) => {
+    const fieldId = String(field?.id || '').trim();
+    if (!fieldId) return;
+    if (!liveFieldIds.has(fieldId) && !fieldIsLiveOnOpen(template, field)) return;
+    if (Object.prototype.hasOwnProperty.call(liveMerged, fieldId)) {
+      out[fieldId] = liveMerged[fieldId];
+    }
+  });
+
+  const prefill = instance?.prefillSnapshot && typeof instance.prefillSnapshot === 'object'
+    ? instance.prefillSnapshot
+    : {};
+  const templateForCalc = useScope ? expandTemplateForSnapshotCalculation(template, ctx) : template;
+  const recalculated = reportRuleEngineService.recomputeCalculatedAnswers({
+    template: templateForCalc,
+    mergedAnswers: out,
+    prefill
+  });
+  const mergedAnswers = useScope
+    ? stripOutOfScopeMergedAnswers(template, recalculated.answers, ctx)
+    : recalculated.answers;
+
+  return { mergedAnswers, skipRecalculation: false, usedPartialCache: true };
+}
+
 /**
  * True when answers/prefill were persisted after the frozen renderCache was captured.
  */
@@ -4247,7 +4395,7 @@ function mergeTemplateDataLivePersisted(template, instance, assignment = null, o
   return mergeTemplateData(template, instance, assignment, scopeOptions);
 }
 
-function resolveInstanceMergedAnswersForDisplay({
+function resolveInstanceMergedStateForUI({
   template,
   instance,
   assignment = null,
@@ -4263,19 +4411,45 @@ function resolveInstanceMergedAnswersForDisplay({
     : resolveExportLockSnapshot(instance);
 
   if (resolvedLock?.mergedAnswers && typeof resolvedLock.mergedAnswers === 'object') {
-    return ctx.active
+    const mergedAnswers = ctx.active
       ? stripOutOfScopeMergedAnswers(template, resolvedLock.mergedAnswers, ctx)
       : { ...resolvedLock.mergedAnswers };
+    return {
+      mergedAnswers,
+      skipRecalculation: true,
+      displaySource: 'lock',
+      usedPartialCache: false
+    };
   }
 
   if (isInstanceRenderCacheValid(template, instance)) {
     const rc = instance.renderCache;
-    return ctx.active
-      ? stripOutOfScopeMergedAnswers(template, rc.mergedAnswers, ctx)
-      : { ...rc.mergedAnswers };
+    const blended = mergeMergedAnswersWithRenderCache({
+      template,
+      instance,
+      assignment,
+      cachedMerged: rc.mergedAnswers,
+      options: { scopeOptions }
+    });
+    return {
+      mergedAnswers: blended.mergedAnswers,
+      skipRecalculation: blended.skipRecalculation,
+      displaySource: 'cache',
+      usedPartialCache: blended.usedPartialCache
+    };
   }
 
-  return mergeTemplateData(template, instance, assignment, scopeOptions);
+  const mergedAnswers = mergeTemplateData(template, instance, assignment, scopeOptions);
+  return {
+    mergedAnswers,
+    skipRecalculation: false,
+    displaySource: 'live',
+    usedPartialCache: false
+  };
+}
+
+function resolveInstanceMergedAnswersForDisplay(params = {}) {
+  return resolveInstanceMergedStateForUI(params).mergedAnswers;
 }
 
 function filterAnswersToSnapshotScope(template, answers = {}) {
@@ -4320,6 +4494,7 @@ async function buildReportInstanceExportPayload({
     !lockSnapshot
       && reqUser
       && isInstanceRenderCacheValid(template, instance)
+      && !instanceHasLiveOnOpenKeys(template)
   );
   if (!lockSnapshot && reqUser && !skipPrefillRefresh) {
     const freshPrefill = await buildPrefillSnapshot({
@@ -4414,23 +4589,47 @@ async function buildReportInstanceExportPayload({
 }
 
 async function buildLockSnapshot({ template, instance, assignment = null, reqUser }) {
-  void reqUser;
   const overallReportService = require('./overallReportService');
   const lockKeys = resolveTemplateLockKeys(template);
   if (!lockKeys.length) {
     throw new Error('Configure lock snapshot keys on the report template before locking.');
   }
   const scopeOptions = templateUsesSnapshotScope(template) ? { respectSnapshotKeys: true } : {};
-  const mergedAnswers = mergeTemplateData(template, instance, assignment, scopeOptions);
-  const placeholderBundle = buildDocxPlaceholderPayloadDetailed(template, instance, assignment, scopeOptions);
+  let workingInstance = instance;
+  if (reqUser && instanceHasLiveOnOpenKeys(template)) {
+    const freshPrefill = await buildPrefillSnapshot({
+      assignment,
+      teacherId: instance?.teacherId,
+      studentId: instance?.studentId,
+      reqUser,
+      requiredKeys: resolveTemplateFillKeys(template)
+    });
+    workingInstance = {
+      ...instance,
+      prefillSnapshot: freshPrefill
+    };
+  }
+  const mergedState = resolveInstanceMergedStateForUI({
+    template,
+    instance: workingInstance,
+    assignment,
+    options: { scopeOptions }
+  });
+  const mergedAnswers = mergedState.mergedAnswers;
+  const placeholderBundle = buildDocxPlaceholderPayloadDetailed(
+    template,
+    workingInstance,
+    assignment,
+    scopeOptions
+  );
   const placeholders = placeholderBundle?.placeholders && typeof placeholderBundle.placeholders === 'object'
     ? placeholderBundle.placeholders
     : {};
   const sourceValuesFull = overallReportService.buildSourceValuesFromPlaceholders(template, placeholders);
   const lockKeySet = new Set(lockKeys.map((key) => normalizeSnapshotKey(key)).filter(Boolean));
   const sourceValues = pickKeySubset(sourceValuesFull, lockKeySet);
-  const prefill = instance?.prefillSnapshot && typeof instance.prefillSnapshot === 'object'
-    ? instance.prefillSnapshot
+  const prefill = workingInstance?.prefillSnapshot && typeof workingInstance.prefillSnapshot === 'object'
+    ? workingInstance.prefillSnapshot
     : {};
   const keys = {};
   lockKeys.forEach((rawKey) => {
@@ -4508,6 +4707,15 @@ module.exports = {
   isInstanceRenderCacheValid,
   isTemplateVersionAheadOfRenderCache,
   shouldFreezeReportInstanceOnOpen,
+  resolveSnapshotKeyRefreshOnOpen,
+  pruneTemplateSnapshotKeyRefreshOnOpen,
+  resolveLiveOnOpenSnapshotKeys,
+  resolveLiveOnOpenFieldIds,
+  instanceHasLiveOnOpenKeys,
+  fieldPrefillRefreshOnOpen,
+  fieldIsLiveOnOpen,
+  mergeMergedAnswersWithRenderCache,
+  resolveInstanceMergedStateForUI,
   resolveInstanceMergedAnswersForDisplay,
   mergeTemplateDataLivePersisted,
   buildTemplateSnapshotKeySuggestions,

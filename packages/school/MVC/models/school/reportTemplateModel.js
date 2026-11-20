@@ -490,6 +490,37 @@ function sanitizeSnapshotKeyDocxAliases(rawAliases, snapshotKeys = [], existingA
   return out;
 }
 
+function sanitizeSnapshotKeyRefreshOnOpen(rawMap, snapshotKeys = []) {
+  const allowed = new Set(
+    (Array.isArray(snapshotKeys) ? snapshotKeys : [])
+      .map((row) => normalizePrefillKey(row).toLowerCase())
+      .filter(Boolean)
+  );
+  let source = rawMap;
+  if (typeof source === 'string' && source.trim()) {
+    try {
+      source = JSON.parse(source);
+    } catch {
+      source = {};
+    }
+  }
+  if (!isPlainObject(source)) source = {};
+  const out = {};
+  let count = 0;
+  Object.entries(source).forEach(([rawKey, rawFlag]) => {
+    if (count >= 200) return;
+    const key = normalizePrefillKey(rawKey);
+    if (!key) return;
+    if (allowed.size && !allowed.has(key.toLowerCase())) return;
+    const refreshOnOpen = rawFlag === true
+      || String(rawFlag || '').trim().toLowerCase() === 'true';
+    if (!refreshOnOpen) return;
+    out[key] = true;
+    count += 1;
+  });
+  return out;
+}
+
 function sanitizeRequiredGradebookSkills(rawList) {
   const rows = Array.isArray(rawList) ? rawList : [];
   const out = [];
@@ -538,6 +569,10 @@ function sanitizeTemplate(input, { isUpdate = false, existing = null } = {}) {
       input.snapshotKeyDocxAliases !== undefined ? input.snapshotKeyDocxAliases : existing?.snapshotKeyDocxAliases,
       snapshotKeys,
       existing?.snapshotKeyDocxAliases
+    ),
+    snapshotKeyRefreshOnOpen: sanitizeSnapshotKeyRefreshOnOpen(
+      input.snapshotKeyRefreshOnOpen !== undefined ? input.snapshotKeyRefreshOnOpen : existing?.snapshotKeyRefreshOnOpen,
+      snapshotKeys
     ),
     allowedReportScopes: reportScopePolicy.normalizeAllowedReportScopes(input.allowedReportScopes),
     targetDepartmentIds: reportTargetDepartmentPolicy.normalizeTargetDepartmentIds(

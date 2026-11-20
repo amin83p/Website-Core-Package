@@ -478,6 +478,7 @@ function buildCopiedTemplateDraft(sourceTemplate = {}, templates = [], activeOrg
     snapshotKeys: clonePlainValue(sourceTemplate?.snapshotKeys, []),
     snapshotKeyLabels: clonePlainValue(sourceTemplate?.snapshotKeyLabels, {}),
     snapshotKeyDocxAliases: clonePlainValue(sourceTemplate?.snapshotKeyDocxAliases, {}),
+    snapshotKeyRefreshOnOpen: clonePlainValue(sourceTemplate?.snapshotKeyRefreshOnOpen, {}),
     allowedReportScopes: reportScopePolicy.resolveAllowedReportScopes(sourceTemplate),
     reportPeriodBase: reportPeriodBasePolicy.resolveReportPeriodFields(sourceTemplate).reportPeriodBase,
     reportPeriodOffset: reportPeriodBasePolicy.resolveReportPeriodFields(sourceTemplate).reportPeriodOffset,
@@ -657,6 +658,7 @@ async function saveTemplate(req, res) {
     if (snapshotReconcile.addedKeys.length) {
       payload.snapshotKeys = snapshotReconcile.snapshotKeys;
     }
+    reportService.pruneTemplateSnapshotKeyRefreshOnOpen(payload);
 
     const invalidSnapshotKeys = reportService.validateTemplateSnapshotKeys(payload);
     if (invalidSnapshotKeys.length) {
@@ -1960,9 +1962,16 @@ async function buildInstanceEditorRenderContext(req) {
   let latestInstance = await schoolDataService.getDataById('reportInstances', req.params.id, req.user);
   const canEditAnswers = await reportViewService.canEditReportInstanceAnswers(latestInstance, req.user);
   const isAdminEditor = await reportViewService.isReportInstanceAdminEditor(req.user);
+  const lockSnapshotForUi = reportService.resolveExportLockSnapshot(latestInstance);
+  const instLocked = Boolean(
+    lockSnapshotForUi?.mergedAnswers && typeof lockSnapshotForUi.mergedAnswers === 'object'
+  );
   const freezeOnOpen = reportService.shouldFreezeReportInstanceOnOpen(template, latestInstance);
+  const renderCacheValid = reportService.isInstanceRenderCacheValid(template, latestInstance);
+  const hasLiveOnOpenKeys = reportService.instanceHasLiveOnOpenKeys(template);
+  const shouldRefreshPrefillOnOpen = !instLocked && canEditAnswers && (!freezeOnOpen || (renderCacheValid && hasLiveOnOpenKeys));
 
-  if (canEditAnswers && !freezeOnOpen) {
+  if (shouldRefreshPrefillOnOpen) {
     // Refresh prefill so Step 1 conduct saved after instance create still flows into rating fields.
     const freshPrefill = await reportService.buildPrefillSnapshot({
       assignment: effectiveAssignment || assignment,
@@ -1983,7 +1992,14 @@ async function buildInstanceEditorRenderContext(req) {
       ...latestInstance,
       prefillSnapshot: freshPrefill
     };
-    const hydrated = hydrateInitialAnswersFromPrefill(template, latestInstance);
+    const liveOnOpenFieldIds = hasLiveOnOpenKeys && freezeOnOpen
+      ? reportService.resolveLiveOnOpenFieldIds(template)
+      : null;
+    const hydrated = hydrateInitialAnswersFromPrefill(template, latestInstance, {
+      ...(Array.isArray(liveOnOpenFieldIds) && liveOnOpenFieldIds.length
+        ? { onlyFieldIds: new Set(liveOnOpenFieldIds) }
+        : {})
+    });
     if (hydrated.changed || templatePrefillChanged) {
       latestInstance = await schoolDataService.updateData('reportInstances', latestInstance.id, {
         ...(hydrated.changed ? { answers: hydrated.answers } : {}),
@@ -2003,10 +2019,28 @@ async function buildInstanceEditorRenderContext(req) {
     : {};
   let mergedBeforeCalculation;
   let skipRecalculation = false;
-  const renderCacheValid = reportService.isInstanceRenderCacheValid(template, latestInstance);
-  if (freezeOnOpen && renderCacheValid) {
-    mergedBeforeCalculation = { ...latestInstance.renderCache.mergedAnswers };
+  let usedPartialRenderCache = false;
+  if (instLocked) {
+    const uiState = reportService.resolveInstanceMergedStateForUI({
+      template,
+      instance: latestInstance,
+      assignment: effectiveAssignment,
+      options: { scopeOptions: editorMergeOptions }
+    });
+    mergedBeforeCalculation = uiState.mergedAnswers;
     skipRecalculation = true;
+    usedPartialRenderCache = false;
+  } else if (freezeOnOpen && renderCacheValid) {
+    const blended = reportService.mergeMergedAnswersWithRenderCache({
+      template,
+      instance: latestInstance,
+      assignment: effectiveAssignment,
+      cachedMerged: latestInstance.renderCache.mergedAnswers,
+      options: { scopeOptions: editorMergeOptions }
+    });
+    mergedBeforeCalculation = blended.mergedAnswers;
+    skipRecalculation = blended.skipRecalculation;
+    usedPartialRenderCache = blended.usedPartialCache;
   } else {
     mergedBeforeCalculation = reportService.mergeTemplateData(
       template,
@@ -2015,6 +2049,9 @@ async function buildInstanceEditorRenderContext(req) {
       editorMergeOptions
     );
   }
+  const liveOnOpenFieldIdsForClient = instLocked
+    ? []
+    : reportService.resolveLiveOnOpenFieldIds(template);
   const preparedForRender = reportRuleEngineService.prepareReportAnswersForUI({
     template,
     mergedAnswers: mergedBeforeCalculation,
@@ -2158,7 +2195,8 @@ async function buildInstanceEditorRenderContext(req) {
     includeModal: true,
     user: req.user,
     actionStateId: req.actionStateId,
-    useFrozenRenderCache: freezeOnOpen,
+    useFrozenRenderCache: instLocked || (freezeOnOpen && !usedPartialRenderCache),
+    liveOnOpenFieldIds: liveOnOpenFieldIdsForClient,
     renderCacheStaleVersusTemplate,
     reportPeriodStart,
     reportPeriodEnd,
