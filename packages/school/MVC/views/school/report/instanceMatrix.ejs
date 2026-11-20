@@ -380,6 +380,11 @@
   .report-matrix-page .matrix-note-cell .js-matrix-note-btn-label {
     font-size: 0.78rem;
   }
+  .report-matrix-page .matrix-table td.matrix-note-cell.matrix-note-cell--has-content,
+  .report-matrix-table-scope .matrix-table td.matrix-note-cell.matrix-note-cell--has-content,
+  #reportMatrixTableModal .matrix-table td.matrix-note-cell.matrix-note-cell--has-content {
+    background-color: #fffbeb;
+  }
   #reportMatrixTableModal .matrix-note-cell .js-matrix-note-open {
     max-width: 100%;
     font-size: 0.8125rem;
@@ -718,17 +723,17 @@
                 <% const value = row.answers?.[field.id] === undefined || row.answers?.[field.id] === null ? '' : row.answers[field.id]; %>
                 <% const disabled = row.locked || field.readOnly; %>
                 <% const isNoteCell = matrixIsNoteFieldType(field.type); %>
-                <td data-matrix-cell="<%= field.id %>"<%= isNoteCell ? ' class="matrix-note-cell"' : '' %>>
+                <% const noteStr = isNoteCell ? (value === '' ? '' : String(value)) : ''; %>
+                <% const hasNote = isNoteCell && noteStr.trim().length > 0; %>
+                <td data-matrix-cell="<%= field.id %>"<%= isNoteCell ? ` class="matrix-note-cell${hasNote ? ' matrix-note-cell--has-content' : ''}"` : '' %>>
                   <% if (isNoteCell) { %>
-                    <% const noteStr = value === '' ? '' : String(value); %>
-                    <% const hasNote = noteStr.trim().length > 0; %>
                     <% const fieldDisplayLabel = String(field.label || field.id || 'Note').trim() || 'Note'; %>
                     <% const actionLabel = hasNote ? 'Edit note' : 'Add note'; %>
                     <% const btnLabel = fieldDisplayLabel; %>
                     <% const preview = hasNote && noteStr.length > 48 ? noteStr.slice(0, 48) + '…' : (hasNote ? noteStr : ''); %>
                     <% const fieldTypeToken = String(field.type || 'text').toLowerCase(); %>
                     <input type="hidden" class="js-matrix-row-field js-matrix-note-value" data-field-id="<%= field.id %>" value="<%= noteStr %>">
-                    <button type="button" class="btn btn-outline-secondary btn-sm js-matrix-note-open"<%= disabled ? ' disabled' : '' %>
+                    <button type="button" class="btn btn-sm js-matrix-note-open <%= hasNote ? 'btn-warning matrix-note-has-content' : 'btn-outline-secondary' %>"<%= disabled ? ' disabled' : '' %>
                       data-field-id="<%= field.id %>"
                       data-field-label="<%= fieldDisplayLabel %>"
                       data-field-type="<%= fieldTypeToken %>"
@@ -1108,6 +1113,16 @@
       return label || 'Note';
     }
 
+    function reportMatrixApplyNoteButtonVisual(btn, hasNote) {
+      if (!btn) return;
+      const on = Boolean(hasNote);
+      btn.classList.toggle('matrix-note-has-content', on);
+      btn.classList.remove('btn-outline-secondary', 'btn-outline-warning', 'btn-warning');
+      btn.classList.add(on ? 'btn-warning' : 'btn-outline-secondary');
+      const cell = btn.closest('td.matrix-note-cell');
+      if (cell) cell.classList.toggle('matrix-note-cell--has-content', on);
+    }
+
     function syncReportMatrixNoteButton(btn, value, options = {}) {
       if (!btn) return;
       const hasNote = String(value ?? '').trim().length > 0;
@@ -1120,6 +1135,7 @@
       const preview = reportMatrixNotePreview(value);
       btn.title = preview ? `${actionLabel}: ${preview}` : actionLabel;
       btn.setAttribute('aria-label', `${actionLabel} for ${fieldLabel} — ${studentName}`);
+      reportMatrixApplyNoteButtonVisual(btn, hasNote);
     }
 
     function syncAllReportMatrixNoteButtons(options = {}) {
@@ -1161,8 +1177,9 @@
       const fieldLabel = esc(fieldLabelRaw);
       const studentName = esc(row.studentName || '');
       const studentId = esc(row.studentId || '');
+      const noteBtnVariant = hasNote ? 'btn-warning matrix-note-has-content' : 'btn-outline-secondary';
       return `<input type="hidden" class="js-matrix-row-field js-matrix-note-value" data-field-id="${fieldId}" value="${esc(valueStr)}">
-<button type="button" class="btn btn-outline-secondary btn-sm js-matrix-note-open"${dis}
+<button type="button" class="btn btn-sm js-matrix-note-open ${noteBtnVariant}"${dis}
   data-field-id="${fieldId}"
   data-field-label="${fieldLabel}"
   data-field-type="${fieldType}"
@@ -1478,6 +1495,7 @@
 
     window.addEventListener('resize', () => scheduleReportMatrixInlineTableHeight());
     scheduleReportMatrixInlineTableHeight();
+    syncAllReportMatrixNoteButtons({});
 
     document.addEventListener('click', function (event) {
       const exportLink = event.target.closest('.js-export-report-instance');
