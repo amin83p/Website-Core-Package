@@ -30,15 +30,21 @@
   <script>
     (function () {
       try {
+        const schoolSmEmbed = <%= (typeof schoolSmEmbed !== 'undefined' && schoolSmEmbed) ? 'true' : 'false' %>;
         const storedHeaderCompact = localStorage.getItem('app_header_compact');
         if (storedHeaderCompact !== '0') {
           document.documentElement.classList.add('header-pref-compact');
         }
-        const pageWidth = String(localStorage.getItem('app_page_width') || '').trim().toLowerCase();
-        if (pageWidth === 'wide') {
-          document.documentElement.classList.add('app-page-width-wide');
-        } else if (pageWidth === 'full') {
+        if (schoolSmEmbed) {
+          document.documentElement.classList.add('school-sm-embed-iframe');
           document.documentElement.classList.add('app-page-width-full');
+        } else {
+          const pageWidth = String(localStorage.getItem('app_page_width') || '').trim().toLowerCase();
+          if (pageWidth === 'wide') {
+            document.documentElement.classList.add('app-page-width-wide');
+          } else if (pageWidth === 'full') {
+            document.documentElement.classList.add('app-page-width-full');
+          }
         }
       } catch (_) {}
     })();

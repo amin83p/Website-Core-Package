@@ -1,0 +1,128 @@
+<style>
+  #rollingStudentClaimNumbersModal.rolling-student-manage-modal .modal-header,
+  #rollingStudentClbModal .modal-header {
+    border-bottom: 1px solid #e8edf3;
+    background: #f8fafc;
+  }
+  #rollingStudentClaimNumbersModal .rolling-student-manage-summary {
+    border: 1px solid #e8edf3;
+    border-radius: 0.5rem;
+    background: #f8fafc;
+    padding: 0.75rem 0.85rem;
+    margin-bottom: 1rem;
+  }
+  #rollingStudentClaimNumbersModal .claim-number-row-editor,
+  #rollingStudentClbModal .rolling-clb-editor-shell {
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+    background: #f8fafc;
+  }
+  #rollingStudentClaimNumbersModal .rolling-claim-actions {
+    display: inline-flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 0.25rem;
+    white-space: nowrap;
+  }
+  #rollingStudentClaimNumbersModal th.rolling-claim-actions-col,
+  #rollingStudentClaimNumbersModal td.rolling-claim-actions-col {
+    width: 1%;
+    white-space: nowrap;
+  }
+  .clb-level-value-warning { border-color: var(--bs-warning) !important; }
+  #rollingStudentClbModal .rolling-clb-heads-up {
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    border-radius: 0.5rem;
+    background: #f8fafc;
+    padding: 0.75rem;
+    margin-bottom: 0.75rem;
+  }
+  #rollingStudentClbModal .rolling-clb-heads-up__header {
+    display: flex;
+    gap: 0.5rem;
+    align-items: flex-start;
+    margin-bottom: 0.5rem;
+  }
+  #rollingStudentClbModal .rolling-clb-heads-up__dates {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1rem;
+    font-size: 0.8rem;
+    margin-bottom: 0.5rem;
+  }
+  #rollingStudentClbModal #rollingClb_historyWrap .rolling-clb-history-spacer td {
+    padding: 0.35rem 0;
+    border: 0;
+    background: transparent;
+  }
+  #rollingStudentClbModal #rollingClb_historyWrap tr.rolling-clb-history-entry-block > td {
+    border-top-width: 2px;
+  }
+  #rollingStudentClbModal #rollingClb_historyWrap .rolling-clb-history-row:hover > td {
+    background: rgba(2, 132, 199, 0.06);
+    cursor: pointer;
+  }
+</style>
+
+<div class="modal fade" id="hubStudentsDateRangeModal" tabindex="-1" aria-labelledby="hubStudentsDateRangeModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold" id="hubStudentsDateRangeModalLabel">Choose date range</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-3" id="hubStudentsDateRangeModalHint">Pick the reporting window for the selected student.</p>
+        <div class="hub-students-date-range-shortcuts mb-3" role="group" aria-label="Date shortcuts" id="hubStudentsDateRangeShortcuts">
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-hub-students-range-token="m0-full">This Month</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-hub-students-range-token="m-1-full">Last Month</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-hub-students-range-token="last-2-months">Last Two Months</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-hub-students-range-token="last-3-months">Last Three Months</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-hub-students-range-token="last-6-months">Last Six Months</button>
+          <button type="button" class="btn btn-sm btn-outline-secondary" data-hub-students-range-token="year">This Year</button>
+        </div>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label" for="hubStudentsDateRangeStart">From</label>
+            <input type="date" class="form-control" id="hubStudentsDateRangeStart" autocomplete="off">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label" for="hubStudentsDateRangeEnd">To</label>
+            <input type="date" class="form-control" id="hubStudentsDateRangeEnd" autocomplete="off">
+          </div>
+        </div>
+        <div class="small text-danger mt-2 d-none" id="hubStudentsDateRangeError" role="alert"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="hubStudentsDateRangeConfirm">Open</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade hub-students-embed-modal" id="hubStudentsEmbedModal" tabindex="-1" aria-labelledby="hubStudentsEmbedModalLabel" aria-hidden="true" data-bs-backdrop="static">
+  <div class="modal-dialog modal-dialog-scrollable hub-students-embed-dialog">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header py-2">
+        <h5 class="modal-title fw-bold text-truncate pe-3" id="hubStudentsEmbedModalLabel">Loading…</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body hub-students-embed-body p-0">
+        <div class="hub-students-embed-loading" id="hubStudentsEmbedLoading" role="status" aria-live="polite">
+          <span class="spinner-border text-primary" aria-hidden="true"></span>
+          <span class="small text-muted fw-semibold">Loading page…</span>
+        </div>
+        <iframe class="hub-students-embed-frame" id="hubStudentsEmbedFrame" title="School tool workspace" loading="lazy"></iframe>
+      </div>
+    </div>
+  </div>
+</div>
+
+<%- include('studentClaimNumbersModal') %>
+<%- include('studentClbModal') %>
+<%- include('personProfileEditModal') %>
+<%- include('enrollmentPeriodCloseModal') %>
+<%- include('enrollmentCloseReasonPickerModal') %>

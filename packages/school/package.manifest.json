@@ -1,7 +1,7 @@
 {
   "id": "school",
   "name": "School",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "mountPath": "/school",
   "enabledByDefault": false,
   "routes": [
@@ -129,6 +129,9 @@
         },
         {
           "id": "445583"
+        },
+        {
+          "id": "445587"
         },
         {
           "id": "446106"
@@ -4606,6 +4609,56 @@
       "subsections": [],
       "related": [],
       "adoptExisting": true
+    },
+    {
+      "id": "445587",
+      "name": "SCHOOL_STUDENT_MANAGEMENT",
+      "category": "SCHOOL",
+      "description": "Search students, review profiles, and monitor student population from one workspace.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/student-management",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
     }
   ],
   "symbols": [
@@ -5474,6 +5527,18 @@
       "tags": [
         "SCHOOL_REPORT_HUB",
         "445583"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SYSTEM_139",
+      "name": "SCHOOL_STUDENT_MANAGEMENT",
+      "type": "class",
+      "value": "bi bi-person-vcard-fill",
+      "tags": [
+        "SCHOOL_STUDENT_MANAGEMENT",
+        "445587"
       ],
       "orgId": "SYSTEM",
       "adoptExisting": true
@@ -10640,6 +10705,17 @@
       "href": "/school/report-hub",
       "icon": "bi bi-grid-1x2-fill",
       "description": "Open the Report Hub for reviewing reports from one workspace.",
+      "visibility": "authenticated",
+      "target": "_self",
+      "category": "School",
+      "active": true
+    },
+    {
+      "id": "school-dashboard-student-management",
+      "label": "School Student Management",
+      "href": "/school/student-management",
+      "icon": "bi bi-person-vcard-fill",
+      "description": "Search students, review profiles, and monitor population counts.",
       "visibility": "authenticated",
       "target": "_self",
       "category": "School",

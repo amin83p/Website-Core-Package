@@ -12,6 +12,7 @@ const reportDocxRenderService = require('../../services/school/reportDocxRenderS
 const reportPdfRenderService = require('../../services/school/reportPdfRenderService');
 const reportIntegrityService = require('../../services/school/reportIntegrityService');
 const reportViewService = require('../../services/school/reportViewService');
+const schoolStudentMgmtEmbedService = require('../../services/school/schoolStudentMgmtEmbedService');
 const gradebookSkillCatalogService = require('../../services/school/gradebookSkillCatalogService');
 const skillCatalogService = require('../../services/school/skillCatalogService');
 const reportAssignmentBulkRowService = require('../../services/school/reportAssignmentBulkRowService');
@@ -1825,7 +1826,7 @@ async function listPersonReports(req, res) {
     const { data, pagination } = paginate(instances, req.query);
     if (isAjax(req)) return res.json({ status: 'success', results: data, pagination });
 
-    res.render('school/report/personReportList', {
+    const personReportsRenderLocals = {
       title: 'Assigned Reports by Person',
       tableName: 'Report_Assigned_ByPerson',
       data,
@@ -1843,6 +1844,10 @@ async function listPersonReports(req, res) {
       print: true,
       user: req.user,
       actionStateId: req.actionStateId
+    };
+    res.render('school/report/personReportList', {
+      ...personReportsRenderLocals,
+      ...schoolStudentMgmtEmbedService.embedRenderLocals(req, personReportsRenderLocals)
     });
   } catch (error) {
     if (isAjax(req)) return res.status(500).json({ status: 'error', message: error.message });

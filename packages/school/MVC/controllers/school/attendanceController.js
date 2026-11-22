@@ -19,6 +19,7 @@ const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatri
 const attendanceMarkAppearancePolicyModel = require('../../models/school/attendanceMarkAppearancePolicyModel');
 const attendanceMarkAppearanceService = require('../../services/school/attendanceMarkAppearanceService');
 const schoolStudentProfileLinkService = require('../../services/school/schoolStudentProfileLinkService');
+const schoolStudentMgmtEmbedService = require('../../services/school/schoolStudentMgmtEmbedService');
 const schoolFileService = require('../../services/school/schoolFileService');
 const accessService = requireCoreModule('MVC/services/security/index');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
@@ -1747,7 +1748,7 @@ async function showStudentAttendanceReportPage(req, res) {
         }
         const canOpenRollingEnrollment = await schoolRollingEnrollmentAccessService.canAccessRollingEnrollment(req.user);
 
-        res.render('school/attendance/studentAttendanceReportViewer', {
+        const sarRenderLocals = {
             title: 'Student Attendance Report',
             includeModal: true,
             user: req.user,
@@ -1776,6 +1777,10 @@ async function showStudentAttendanceReportPage(req, res) {
             overallReportTemplateLabels,
             funderPickerOptions,
             canOpenRollingEnrollment
+        };
+        res.render('school/attendance/studentAttendanceReportViewer', {
+            ...sarRenderLocals,
+            ...schoolStudentMgmtEmbedService.embedRenderLocals(req, sarRenderLocals)
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });

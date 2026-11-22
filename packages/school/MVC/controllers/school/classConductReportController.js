@@ -7,6 +7,7 @@ const { resolveSelectedStudents } = require('../../services/school/studentAttend
 const enrollmentClaimDisplayService = require('../../services/school/enrollmentClaimDisplayService');
 const schoolRollingEnrollmentAccessService = require('../../services/school/schoolRollingEnrollmentAccessService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
+const schoolStudentMgmtEmbedService = require('../../services/school/schoolStudentMgmtEmbedService');
 
 function parseStudentIds(raw = '') {
   return String(raw || '')
@@ -42,7 +43,7 @@ async function showClassConductReportPage(req, res) {
     );
     const canOpenRollingEnrollment = await schoolRollingEnrollmentAccessService.canAccessRollingEnrollment(req.user);
 
-    res.render('school/report/classConductReport', {
+    const ccrRenderLocals = {
       title: 'Class Conduct Report',
       includeModal: true,
       includePrintManager: true,
@@ -56,6 +57,10 @@ async function showClassConductReportPage(req, res) {
       canShowEnrollmentClaims,
       conductRatingScaleResolved,
       canOpenRollingEnrollment
+    };
+    res.render('school/report/classConductReport', {
+      ...ccrRenderLocals,
+      ...schoolStudentMgmtEmbedService.embedRenderLocals(req, ccrRenderLocals)
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });

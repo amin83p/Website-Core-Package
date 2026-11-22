@@ -124,6 +124,17 @@ function resolveClassTeacherName(classData = {}) {
   return String(primary?.name || primary?.displayName || '').trim();
 }
 
+function resolveClassSessionTime(classData = {}) {
+  const current = classData?.schedule?.current;
+  if (!current || typeof current !== 'object') {
+    return { sessionStartTime: '', sessionEndTime: '', sessionTimeLabel: '' };
+  }
+  const sessionStartTime = String(current.startTime || '').trim();
+  const sessionEndTime = String(current.endTime || '').trim();
+  const sessionTimeLabel = [sessionStartTime, sessionEndTime].filter(Boolean).join(' – ');
+  return { sessionStartTime, sessionEndTime, sessionTimeLabel };
+}
+
 function buildEnrollmentDetailApiUrl(studentId, enrollmentId) {
   const normalizedStudentId = toPublicId(studentId);
   const normalizedEnrollmentId = toPublicId(enrollmentId);
@@ -187,6 +198,7 @@ async function buildClassEnrollmentRows({
         classId,
         classTitle: String(classRow?.title || classId || '').trim(),
         teacherName: resolveClassTeacherName(classRow),
+        ...resolveClassSessionTime(classRow),
         subjectLabel: resolveClassSubjectLabel(classRow, subjectMap),
         programId,
         programLabel: buildProgramLabel(program, programId),

@@ -1,0 +1,34 @@
+<%- include('partials/studentManagementStyles') %>
+
+<div class="container-fluid school-student-management-root pt-3 pb-4" data-student-management-root>
+  <div class="school-student-management-banner mb-3">
+    <div class="school-student-management-banner-row d-flex justify-content-between align-items-center flex-wrap gap-3">
+      <div class="school-student-management-banner-copy">
+        <h1 class="h3 mb-1">School Student Management</h1>
+        <p class="text-muted small mb-0">Search students and review profile details.</p>
+      </div>
+      <div id="hubStudentsBannerStats" class="hub-students-banner-stats">
+        <div class="text-muted small d-flex align-items-center justify-content-end" id="hubStudentsBannerStatsBody">
+          <span class="spinner-border spinner-border-sm text-primary me-2" role="status" aria-hidden="true"></span>
+          Loading student counts…
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="schoolStudentManagementWorkspace" class="school-student-management-workspace"></div>
+</div>
+
+<%- include('partials/studentManagementModals') %>
+
+<script>
+  window.__HUB_STUDENTS_CAN_EDIT_CLB__ = <%= canEditStudentClb ? 'true' : 'false' %>;
+</script>
+<script src="/scripts/clbLevelValueParser.js"></script>
+<script src="/scripts/schoolMessageUi.js"></script>
+<script src="/scripts/studentClaimNumbersManager.js"></script>
+<script src="/scripts/rollingStudentClbManager.js"></script>
+<script src="/scripts/enrollmentCloseReasonPickerClient.js"></script>
+<script src="/scripts/schoolStudentManagementEnrollmentClose.js"></script>
+<script src="/scripts/schoolDateRangeShortcuts.js"></script>
+<script src="/scripts/schoolStudentManagement.js"></script>

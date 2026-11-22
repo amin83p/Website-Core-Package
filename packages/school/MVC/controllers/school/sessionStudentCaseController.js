@@ -17,6 +17,7 @@ const paginate = requireCoreModule('MVC/utils/paginationHelper');
 const { isAjax, buildDataServiceQuery } = requireCoreModule('MVC/utils/generalTools');
 const settingService = requireCoreModule('MVC/services/settingService');
 const { getActiveOrgIdOrThrow } = requireCoreModule('MVC/utils/orgContextUtils');
+const schoolStudentMgmtEmbedService = require('../../services/school/schoolStudentMgmtEmbedService');
 
 function normalizeSearchKeyword(value = '') {
   return String(value || '').trim();
@@ -110,7 +111,7 @@ exports.listSessionStudentCases = async (req, res) => {
       return res.json({ status: 'success', results: rows, pagination });
     }
 
-    return res.render('school/sessionStudentCase/sessionStudentCaseList', {
+    const casesRenderLocals = {
       title: 'Student Cases',
       tableName: 'School_SessionStudentCases',
       data: rows,
@@ -138,6 +139,10 @@ exports.listSessionStudentCases = async (req, res) => {
       canDeleteCases: caseCapabilities.canDelete,
       canOverrideLockedCaseDelete: caseCapabilities.canOverrideLockedCaseDelete,
       canConfigureRouting
+    };
+    return res.render('school/sessionStudentCase/sessionStudentCaseList', {
+      ...casesRenderLocals,
+      ...schoolStudentMgmtEmbedService.embedRenderLocals(req, casesRenderLocals)
     });
   } catch (error) {
     if (isAjax(req)) return res.status(500).json({ status: 'error', message: error.message });

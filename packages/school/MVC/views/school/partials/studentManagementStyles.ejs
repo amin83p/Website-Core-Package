@@ -1,0 +1,1342 @@
+<style>
+  body.school-student-management-page main.school-student-management-main {
+    width: 80vw;
+    max-width: 80vw;
+    margin-left: auto;
+    margin-right: auto;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  .school-student-management-root .school-student-management-banner {
+    border: 1px solid rgba(15, 23, 42, 0.09);
+    border-radius: 0.85rem;
+    background: linear-gradient(135deg, rgba(2, 132, 199, 0.07), rgba(34, 197, 94, 0.05));
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+    padding: 1rem 1.15rem 1.05rem;
+  }
+
+  .school-student-management-root .school-student-management-banner-row {
+    width: 100%;
+  }
+
+  .school-student-management-root .hub-students-banner-stats {
+    flex: 0 0 auto;
+    margin-left: auto;
+  }
+
+  .school-student-management-root .hub-students-banner-stats .hub-students-stat-tile {
+    min-height: 0;
+    padding: 0.35rem 0.85rem 0.45rem;
+    text-align: right;
+    border: 1px solid rgba(15, 23, 42, 0.1);
+    border-radius: 0.65rem;
+    background: rgba(255, 255, 255, 0.72);
+  }
+
+  .school-student-management-root .hub-students-banner-stats .hub-students-stat-tile-label {
+    font-size: 0.7rem;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: rgba(15, 23, 42, 0.55);
+  }
+
+  .school-student-management-root .hub-students-banner-stats .hub-students-stat-tile-value {
+    font-size: 1.65rem;
+    font-weight: 600;
+    line-height: 1.15;
+  }
+
+  .school-student-management-root .school-student-management-workspace {
+    position: relative;
+    min-height: min(72vh, 680px);
+  }
+
+  .school-student-management-root .hub-students-empty-hero-page {
+    position: absolute;
+    inset: 0;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .school-student-management-root .hub-workspace-card {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 0.85rem;
+    background: #ffffff;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
+    overflow: hidden;
+  }
+
+  .school-student-management-root .hub-workspace-header {
+    padding: 1rem 1.15rem;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    background: linear-gradient(135deg, rgba(2, 132, 199, 0.08), rgba(34, 197, 94, 0.07));
+  }
+
+  .school-student-management-root .hub-students-workspace-toolbar {
+    padding: 1rem 1.15rem 0.65rem;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1rem;
+    align-items: start;
+  }
+
+  @media (max-width: 991.98px) {
+    .school-student-management-root .hub-students-workspace-toolbar {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .school-student-management-root .hub-students-toolbar-left {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+  }
+
+  .school-student-management-root .hub-students-quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    gap: 0.4rem;
+    min-width: 0;
+  }
+
+  @media (max-width: 991.98px) {
+    .school-student-management-root .hub-students-quick-actions {
+      justify-content: flex-start;
+    }
+  }
+
+  .school-student-management-root .hub-students-date-range-shortcuts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  #hubStudentsEmbedModal.hub-students-embed-modal {
+    z-index: 1065;
+  }
+
+  #hubStudentsEmbedModal .hub-students-embed-dialog {
+    width: 90vw;
+    max-width: 90vw;
+    height: 90vh;
+    max-height: 90vh;
+    margin: 5vh auto;
+  }
+
+  #hubStudentsEmbedModal .hub-students-embed-dialog .modal-content {
+    height: 100%;
+    max-height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #hubStudentsEmbedModal .hub-students-embed-body {
+    position: relative;
+    padding: 0;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #hubStudentsEmbedModal .hub-students-embed-frame {
+    flex: 1 1 auto;
+    width: 100%;
+    min-height: 0;
+    height: 100%;
+    border: 0;
+    background: #fff;
+  }
+
+  #hubStudentsEmbedModal .hub-students-embed-loading {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.65rem;
+    background: rgba(248, 250, 252, 0.92);
+    z-index: 2;
+  }
+
+  #hubStudentsEmbedModal .hub-students-embed-loading.is-hidden {
+    display: none;
+  }
+
+  #hubStudentsDateRangeModal {
+    z-index: 1060;
+  }
+
+  .school-student-management-root .hub-students-workspace-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 1rem;
+    padding: 0 1.15rem 1.25rem;
+    align-items: start;
+  }
+
+  .school-student-management-root .hub-students-side-pair-column {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .school-student-management-root .hub-students-side-pair,
+  .school-student-management-root .hub-students-claims-clb-pair {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    min-width: 0;
+  }
+
+  .school-student-management-root .hub-students-claims-clb-pair > [data-hub-students-card="clb"] {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .school-student-management-root .hub-students-claims-clb-pair > [data-hub-students-card="clb"] .hub-students-card-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .school-student-management-root .hub-students-main-panel {
+    min-width: 0;
+    min-height: min(72vh, 680px);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .school-student-management-root .hub-students-empty-hero-logo-wrap {
+    position: relative;
+    width: clamp(22rem, 44vw, 36rem);
+    height: clamp(15.5rem, 30vw, 25rem);
+    aspect-ratio: 400 / 280;
+    border-radius: 1.35rem;
+    isolation: isolate;
+    box-shadow:
+      0 0 0 2px rgba(15, 23, 42, 0.06),
+      0 28px 64px rgba(2, 132, 199, 0.16),
+      0 12px 32px rgba(15, 23, 42, 0.08);
+  }
+
+  .school-student-management-root .hub-students-empty-hero-border-lights {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    overflow: hidden;
+    border-radius: inherit;
+  }
+
+  .school-student-management-root .hub-students-empty-hero-border-light {
+    position: absolute;
+    width: 1.15rem;
+    height: 1.15rem;
+    border-radius: 50%;
+    opacity: 1;
+    transition: opacity 0.45s ease;
+    background: radial-gradient(
+      circle at 38% 38%,
+      rgba(255, 255, 255, 1) 0%,
+      var(--hub-light-core, rgba(56, 189, 248, 0.95)) 48%,
+      transparent 74%
+    );
+    box-shadow:
+      0 0 12px 4px var(--hub-light-glow, rgba(56, 189, 248, 0.5)),
+      0 0 22px 7px var(--hub-light-glow, rgba(56, 189, 248, 0.35));
+    opacity: 0.82;
+  }
+
+  .school-student-management-root .hub-students-empty-hero-logo-core {
+    position: absolute;
+    inset: 4px;
+    z-index: 2;
+    border-radius: 1.1rem;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(145deg, #ffffff 0%, #f1f5f9 100%);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.95);
+    overflow: hidden;
+    isolation: isolate;
+  }
+
+  .school-student-management-root .hub-students-empty-hero-logo {
+    position: relative;
+    z-index: 1;
+    width: auto;
+    height: auto;
+    max-width: 92%;
+    max-height: 82%;
+    object-fit: contain;
+    filter: drop-shadow(0 12px 26px rgba(15, 23, 42, 0.18));
+  }
+
+  .school-student-management-root .hub-students-empty-hero-fallback {
+    position: relative;
+    z-index: 1;
+    font-size: clamp(6.5rem, 14vw, 8.5rem);
+    color: #0284c7;
+    filter: drop-shadow(0 10px 22px rgba(2, 132, 199, 0.28));
+  }
+
+  .school-student-management-root .hub-students-empty-hero-loading {
+    position: absolute;
+    inset: 0;
+    z-index: 6;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.85rem;
+    border-radius: inherit;
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(3px);
+  }
+
+  .school-student-management-root .hub-students-empty-hero-loading-spinner {
+    width: 2.35rem;
+    height: 2.35rem;
+    border-width: 0.22rem;
+  }
+
+  .school-student-management-root .hub-students-empty-hero-loading-text {
+    font-size: 1.22rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #0f172a;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.85);
+  }
+
+  .school-student-management-root .hub-students-empty-hero-logo-wrap.is-loading .hub-students-empty-hero-logo-core {
+    opacity: 0.42;
+  }
+
+  .school-student-management-root .hub-students-empty-hero-logo-wrap.is-loading .hub-students-empty-hero-border-lights {
+    opacity: 0.22;
+  }
+
+  .school-student-management-root .hub-students-enrollment-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .school-student-management-root .hub-students-enrollment-item {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(4.5rem, 32%) auto;
+    align-items: center;
+    gap: 0.5rem 0.65rem;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 0.65rem;
+    padding: 0.55rem 0.6rem;
+  }
+
+  .school-student-management-root .hub-students-enrollment--active {
+    background: rgba(56, 189, 248, 0.1);
+    border-color: rgba(14, 165, 233, 0.18);
+  }
+
+  .school-student-management-root .hub-students-enrollment--completed {
+    background: rgba(148, 163, 184, 0.16);
+    border-color: rgba(100, 116, 139, 0.16);
+  }
+
+  .school-student-management-root .hub-students-enrollment--closed {
+    background: rgba(203, 213, 225, 0.22);
+    border-color: rgba(148, 163, 184, 0.2);
+  }
+
+  .school-student-management-root .hub-students-enrollment--other {
+    background: rgba(251, 191, 36, 0.1);
+    border-color: rgba(251, 191, 36, 0.2);
+  }
+
+  .school-student-management-root .hub-students-enrollment-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    line-height: 1.25;
+    color: #0f172a;
+  }
+
+  .school-student-management-root .hub-students-enrollment-sub {
+    font-size: 0.72rem;
+    color: rgba(15, 23, 42, 0.58);
+    margin-top: 0.1rem;
+  }
+
+  .school-student-management-root .hub-students-enrollment-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.65rem;
+    margin-top: 0.35rem;
+    font-size: 0.82rem;
+    color: rgba(15, 23, 42, 0.62);
+  }
+
+  .school-student-management-root .hub-students-enrollment-teacher-col {
+    min-width: 0;
+    text-align: center;
+    padding: 0 0.15rem;
+  }
+
+  .school-student-management-root .hub-students-enrollment-teacher-name {
+    font-size: 1.15rem;
+    font-weight: 800;
+    line-height: 1.2;
+    color: #0f172a;
+    word-break: break-word;
+  }
+
+  .school-student-management-root .hub-students-enrollment-session-time {
+    margin-top: 0.2rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: rgba(15, 23, 42, 0.55);
+    line-height: 1.2;
+  }
+
+  .school-student-management-root .hub-students-enrollment-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    flex-shrink: 0;
+    align-items: stretch;
+    justify-self: end;
+  }
+
+  @media (max-width: 575.98px) {
+    .school-student-management-root .hub-students-enrollment-item {
+      grid-template-columns: minmax(0, 1fr);
+      align-items: start;
+    }
+
+    .school-student-management-root .hub-students-enrollment-teacher-col {
+      text-align: left;
+    }
+
+    .school-student-management-root .hub-students-enrollment-actions {
+      flex-direction: row;
+      flex-wrap: wrap;
+      justify-self: start;
+    }
+  }
+
+  .school-student-management-root .hub-students-program-reg-status,
+  .school-student-management-root .hub-students-enrollment-status {
+    font-weight: 700;
+    text-transform: capitalize;
+  }
+
+  .school-student-management-root .hub-students-search-column,
+  .school-student-management-root .hub-students-side-pair-column {
+    min-width: 0;
+  }
+
+  .school-student-management-root .hub-students-side-card {
+    border: 1px solid rgba(15, 23, 42, 0.09);
+    border-radius: 0.85rem;
+    background: #ffffff;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.04);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .school-student-management-root .hub-students-program-regs-card,
+  .school-student-management-root .hub-students-enrollments-card {
+    flex: 0 0 auto;
+  }
+
+  .school-student-management-root .hub-students-side-card-header {
+    padding: 0.65rem 0.85rem;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    background: linear-gradient(135deg, rgba(2, 132, 199, 0.06), rgba(34, 197, 94, 0.04));
+    font-weight: 700;
+    font-size: 0.92rem;
+  }
+
+  .school-student-management-root .hub-students-side-card-body {
+    padding: 0.65rem 0.75rem 0.75rem;
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .school-student-management-root .hub-students-program-reg-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 0.45rem;
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+  }
+
+  .school-student-management-root .hub-students-program-reg-item {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.5rem;
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: 0.65rem;
+    padding: 0.55rem 0.6rem;
+  }
+
+  .school-student-management-root .hub-students-program-reg--active {
+    background: rgba(34, 197, 94, 0.11);
+    border-color: rgba(34, 197, 94, 0.18);
+  }
+
+  .school-student-management-root .hub-students-program-reg--completed {
+    background: rgba(148, 163, 184, 0.16);
+    border-color: rgba(100, 116, 139, 0.16);
+  }
+
+  .school-student-management-root .hub-students-program-reg--void {
+    background: rgba(248, 113, 113, 0.1);
+    border-color: rgba(248, 113, 113, 0.18);
+  }
+
+  .school-student-management-root .hub-students-program-reg--inactive {
+    background: rgba(203, 213, 225, 0.22);
+    border-color: rgba(148, 163, 184, 0.2);
+  }
+
+  .school-student-management-root .hub-students-program-reg--other {
+    background: rgba(251, 191, 36, 0.11);
+    border-color: rgba(251, 191, 36, 0.2);
+  }
+
+  .school-student-management-root .hub-students-side-card-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+    flex-shrink: 0;
+    align-items: stretch;
+  }
+
+  .school-student-management-root .hub-students-side-action {
+    font-size: 0.72rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .school-student-management-root .hub-students-program-reg-date-line,
+  .school-student-management-root .hub-students-enrollment-date-line {
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+    line-height: 1.25;
+    margin-top: 0.2rem;
+  }
+
+  .school-student-management-root .hub-students-program-reg-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    line-height: 1.25;
+    color: #0f172a;
+  }
+
+  .school-student-management-root .hub-students-program-reg-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 0.65rem;
+    margin-top: 0.35rem;
+    font-size: 0.82rem;
+    color: rgba(15, 23, 42, 0.62);
+  }
+
+  .school-student-management-root .hub-students-program-reg-status {
+    text-transform: capitalize;
+    font-weight: 600;
+  }
+
+  .school-student-management-root .hub-students-program-reg-link {
+    flex-shrink: 0;
+    align-self: center;
+    text-decoration: none;
+    font-weight: 600;
+  }
+
+  .school-student-management-root .hub-students-stats-card {
+    flex: 0 0 auto;
+    align-self: stretch;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+  }
+
+  .school-student-management-root .hub-students-stats-card .hub-students-card-body {
+    padding: 0.9rem 1rem 1rem;
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .school-student-management-root [data-hub-students-card="personal"] {
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+  }
+
+  .school-student-management-root [data-hub-students-card="personal"] .hub-students-card-body,
+  .school-student-management-root [data-hub-students-card="personal"] .hub-students-card-empty {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .school-student-management-root .hub-students-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.55rem;
+    align-content: start;
+  }
+
+  .school-student-management-root .hub-students-stat-tile {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: stretch;
+    gap: 0.35rem;
+    min-height: 6.1rem;
+    padding: 0.7rem 0.65rem 0.75rem;
+    border: 1px solid rgba(15, 23, 42, 0.11);
+    border-radius: 0.65rem;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+    box-shadow: 0 2px 5px rgba(15, 23, 42, 0.06);
+  }
+
+  .school-student-management-root .hub-students-stat-tile-label {
+    font-size: 0.66rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.045em;
+    color: #000000;
+    opacity: 0.52;
+    line-height: 1.2;
+    width: 100%;
+    flex: 0 0 auto;
+  }
+
+  .school-student-management-root .hub-students-stat-tile-value {
+    font-size: 1.95rem;
+    font-weight: 800;
+    line-height: 1;
+    color: #000000;
+    font-variant-numeric: tabular-nums;
+    width: 100%;
+    flex: 1 1 auto;
+    display: flex;
+    align-items: flex-end;
+    padding-bottom: 0.05rem;
+  }
+
+  .school-student-management-root .hub-students-stat-tile-value.is-loading {
+    font-size: 0.95rem;
+    font-weight: 600;
+    opacity: 0.55;
+  }
+
+  .school-student-management-root .hub-students-stats-footnote {
+    margin-top: 0.55rem;
+    margin-bottom: 0;
+    line-height: 1.35;
+  }
+
+  .school-student-management-root .hub-students-stats-reserved {
+    margin-top: 0.65rem;
+    flex: 1 1 auto;
+    min-height: 2.75rem;
+    border: 1px dashed rgba(15, 23, 42, 0.12);
+    border-radius: 0.6rem;
+    background: rgba(248, 250, 252, 0.65);
+  }
+
+  @media (max-width: 991.98px) {
+    .school-student-management-root .hub-students-stats-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .school-student-management-root .hub-students-stat-tile {
+      min-height: 5.5rem;
+    }
+  }
+
+  @media (max-width: 479.98px) {
+    .school-student-management-root .hub-students-stats-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .school-student-management-root .hub-students-recent {
+    margin-top: 0.15rem;
+  }
+
+  .school-student-management-root .hub-students-recent-label {
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #000000;
+    opacity: 0.5;
+    margin-bottom: 0.35rem;
+  }
+
+  .school-student-management-root .hub-students-recent-list {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .school-student-management-root .hub-students-recent-list > li {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    max-width: 100%;
+  }
+
+  .school-student-management-root .hub-students-recent-chip {
+    appearance: none;
+    display: inline-flex;
+    align-items: center;
+    max-width: 100%;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    border-radius: 999px;
+    background: #ffffff;
+    padding: 0.35rem 0.8rem;
+    color: #000000;
+    font-size: 0.84rem;
+    font-weight: 700;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: background 120ms ease, border-color 120ms ease;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+  }
+
+  .school-student-management-root .hub-students-recent-chip:hover,
+  .school-student-management-root .hub-students-recent-chip:focus-visible {
+    background: rgba(2, 132, 199, 0.1);
+    border-color: rgba(2, 132, 199, 0.35);
+  }
+
+  @media (max-width: 991.98px) {
+    .school-student-management-root .hub-students-workspace-body {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .school-student-management-root .hub-students-search-wrap {
+    position: relative;
+  }
+
+  .school-student-management-root .hub-students-suggest-list {
+    position: absolute;
+    z-index: 20;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    max-height: 280px;
+    overflow: auto;
+    margin: 0;
+    padding: 0.35rem 0;
+    list-style: none;
+    border: 1px solid rgba(15, 23, 42, 0.12);
+    border-radius: 0.65rem;
+    background: #ffffff;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+  }
+
+  .school-student-management-root .hub-students-suggest-list:empty {
+    display: none;
+  }
+
+  .school-student-management-root .hub-students-suggest-item {
+    display: block;
+    width: 100%;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    padding: 0.55rem 0.85rem;
+    color: #0f172a;
+    cursor: pointer;
+  }
+
+  .school-student-management-root .hub-students-suggest-item:hover,
+  .school-student-management-root .hub-students-suggest-item.is-active {
+    background: rgba(2, 132, 199, 0.1);
+  }
+
+  .school-student-management-root .hub-students-card-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    min-width: 0;
+    align-items: stretch;
+  }
+
+  .school-student-management-root [data-hub-students-card="claims"],
+  .school-student-management-root [data-hub-students-card="clb"] {
+    flex: 0 0 auto;
+  }
+
+  .school-student-management-root .hub-students-card {
+    border: 1px solid rgba(15, 23, 42, 0.09);
+    border-radius: 0.85rem;
+    background: #ffffff;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.05);
+    overflow: hidden;
+  }
+
+  .school-student-management-root .hub-students-card-header {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    background: linear-gradient(135deg, rgba(2, 132, 199, 0.07), rgba(34, 197, 94, 0.05));
+    font-weight: 700;
+  }
+
+  .school-student-management-root .hub-students-card-header--split {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
+  }
+
+  .school-student-management-root .hub-students-card-actions .btn {
+    font-weight: 600;
+  }
+
+  .school-student-management-root .hub-students-card-body {
+    padding: 1.25rem 1.35rem 1.35rem;
+    color: #000000;
+  }
+
+  .school-student-management-root .hub-students-hero {
+    margin-bottom: 1.1rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  .school-student-management-root .hub-students-hero-main {
+    min-width: 0;
+  }
+
+  .school-student-management-root .hub-students-hero-name-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem 1.25rem;
+    min-width: 0;
+  }
+
+  .school-student-management-root .hub-students-hero-name-row .hub-students-hero-name {
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
+  }
+
+  @media (max-width: 767.98px) {
+    .school-student-management-root .hub-students-hero-name-row {
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 0.35rem;
+    }
+  }
+
+  .school-student-management-root .hub-students-hero-claims-top {
+    display: flex;
+    flex-direction: column;
+    gap: 0.35rem;
+    align-items: stretch;
+    text-align: right;
+  }
+
+  @media (max-width: 767.98px) {
+    .school-student-management-root .hub-students-hero-claims-top {
+      text-align: left;
+      padding-top: 0.35rem;
+      border-top: 1px solid rgba(0, 0, 0, 0.06);
+    }
+  }
+
+  .school-student-management-root .hub-students-hero-claim-line {
+    flex: 0 1 auto;
+    font-size: 2.05rem;
+    font-weight: 800;
+    line-height: 1.15;
+    color: #000000;
+    text-align: right;
+    word-break: break-word;
+  }
+
+  @media (max-width: 767.98px) {
+    .school-student-management-root .hub-students-hero-claim-line {
+      text-align: left;
+    }
+  }
+
+  .school-student-management-root .hub-students-ancillary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+    margin-top: 0.85rem;
+    align-items: start;
+    width: 100%;
+  }
+
+  .school-student-management-root .hub-students-ancillary-grid > .hub-students-panel {
+    min-width: 0;
+    margin: 0;
+    min-height: 0;
+  }
+
+  .school-student-management-root .hub-students-panel-toggle {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 0.45rem;
+    min-height: 2.35rem;
+    border: 0;
+    cursor: pointer;
+  }
+
+  .school-student-management-root .hub-students-panel-chevron {
+    font-size: 0.85rem;
+    line-height: 1;
+    transition: transform 120ms ease;
+    flex: 0 0 auto;
+  }
+
+  .school-student-management-root .hub-students-collapsible-panel.is-open .hub-students-panel-chevron {
+    transform: rotate(90deg);
+  }
+
+  .school-student-management-root .hub-students-collapsible-panel.is-open .hub-students-panel-title {
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  .school-student-management-root .hub-students-panel-body.is-collapsed {
+    display: none;
+  }
+
+  @media (max-width: 767.98px) {
+    .school-student-management-root .hub-students-ancillary-grid {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
+  .school-student-management-root .hub-students-panel {
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 0.75rem;
+    background: #f8fafc;
+    overflow: hidden;
+    min-height: 0;
+  }
+
+  .school-student-management-root .hub-students-panel-title {
+    padding: 0.55rem 0.85rem;
+    font-size: 0.82rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #000000;
+    background: rgba(2, 132, 199, 0.08);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  .school-student-management-root .hub-students-panel-body {
+    padding: 0.75rem 0.85rem;
+    color: #000000;
+  }
+
+  .school-student-management-root .hub-students-claim-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+
+  .school-student-management-root .hub-students-claim-list-item {
+    padding: 0.5rem 0.6rem;
+    border-radius: 0.55rem;
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+  }
+
+  .school-student-management-root .hub-students-claim-list-label {
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #000000;
+    opacity: 0.55;
+  }
+
+  .school-student-management-root .hub-students-claim-list-number {
+    font-size: 1.02rem;
+    font-weight: 800;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    margin-top: 0.15rem;
+    word-break: break-word;
+  }
+
+  .school-student-management-root .hub-students-claim-list-notes {
+    font-size: 0.82rem;
+    font-weight: 500;
+    margin-top: 0.25rem;
+    opacity: 0.8;
+  }
+
+  .school-student-management-root .hub-students-clb-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.65rem;
+    max-height: 22rem;
+    overflow-y: auto;
+    padding-right: 0.15rem;
+  }
+
+  .school-student-management-root .hub-students-hero-name-link {
+    color: #000000;
+    text-decoration: none;
+  }
+
+  .school-student-management-root .hub-students-hero-name-link:hover {
+    color: #0284c7;
+    text-decoration: underline;
+  }
+
+  .school-student-management-root .hub-students-hero-id-under {
+    margin: 0.35rem 0 0;
+    font-size: 1.15rem;
+    font-weight: 700;
+    color: #000000;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    line-height: 1.25;
+  }
+
+  .school-student-management-root .hub-students-hero-id-meta {
+    margin: 0.15rem 0 0;
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #000000;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    opacity: 0.85;
+  }
+
+  .school-student-management-root .hub-students-hero-name {
+    font-size: 2.05rem;
+    font-weight: 800;
+    line-height: 1.15;
+    color: #000000;
+    margin: 0;
+  }
+
+  .school-student-management-root .hub-students-hero-name a {
+    color: #000000;
+    text-decoration: none;
+  }
+
+  .school-student-management-root .hub-students-hero-name a:hover {
+    text-decoration: underline;
+  }
+
+  .school-student-management-root .hub-students-claims-strip {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-items: stretch;
+  }
+
+  .school-student-management-root [data-hub-students-card="claims"] .hub-students-card-body {
+    padding-top: 0.55rem;
+    padding-bottom: 0.55rem;
+  }
+
+  .school-student-management-root .hub-students-claim-chip {
+    flex: 1 1 auto;
+    min-width: 6.5rem;
+    max-width: 14rem;
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    border-radius: 0.7rem;
+    padding: 0.55rem 0.7rem;
+    background: linear-gradient(135deg, rgba(2, 132, 199, 0.06), rgba(255, 255, 255, 0.9));
+    color: #000000;
+  }
+
+  .school-student-management-root .hub-students-claim-chip-label {
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    opacity: 0.55;
+    margin-bottom: 0.2rem;
+  }
+
+  .school-student-management-root .hub-students-claim-chip-number {
+    font-size: 1rem;
+    font-weight: 700;
+    word-break: break-word;
+  }
+
+  .school-student-management-root .hub-students-claim-chip-notes {
+    font-size: 0.78rem;
+    font-weight: 500;
+    margin-top: 0.25rem;
+    opacity: 0.75;
+  }
+
+  .school-student-management-root .hub-students-claim-chip-primary {
+    display: inline-block;
+    margin-top: 0.3rem;
+    font-size: 0.65rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #0284c7;
+  }
+
+  .school-student-management-root .hub-students-details {
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    margin-top: 1rem;
+    padding-top: 0.35rem;
+    color: #000000;
+  }
+
+  .school-student-management-root .hub-students-details + .hub-students-details {
+    margin-top: 0.25rem;
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .school-student-management-root .hub-students-details > summary {
+    cursor: pointer;
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #000000;
+    list-style: none;
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.45rem 0;
+  }
+
+  .school-student-management-root .hub-students-details > summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .school-student-management-root .hub-students-details > summary::before {
+    content: '▸';
+    font-size: 0.85rem;
+    transition: transform 120ms ease;
+  }
+
+  .school-student-management-root .hub-students-details[open] > summary::before {
+    transform: rotate(90deg);
+  }
+
+  .school-student-management-root .hub-students-details-body {
+    padding: 0.35rem 0 0.65rem;
+    font-size: 0.92rem;
+    color: #000000;
+  }
+
+  .school-student-management-root .hub-students-clb-strip {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    gap: 0.75rem;
+    overflow-x: auto;
+    padding-bottom: 0.35rem;
+    scrollbar-width: thin;
+  }
+
+  .school-student-management-root .hub-students-clb-entry {
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 0.65rem;
+    padding: 0.65rem 0.7rem;
+    background: #ffffff;
+    color: #000000;
+  }
+
+  .school-student-management-root .hub-students-clb-entry-head {
+    font-size: 0.84rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    color: #000000;
+    line-height: 1.35;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  }
+
+  .school-student-management-root .hub-students-clb-grid {
+    display: grid;
+    grid-template-columns: 4.25rem repeat(4, minmax(2rem, 1fr));
+    gap: 0.35rem 0.4rem;
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: #000000;
+    align-items: center;
+  }
+
+  .school-student-management-root .hub-students-clb-grid .hub-students-clb-skill-h {
+    text-align: center;
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    opacity: 0.55;
+  }
+
+  .school-student-management-root .hub-students-clb-grid .hub-students-clb-row-label {
+    font-size: 0.7rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    opacity: 0.55;
+    white-space: nowrap;
+  }
+
+  .school-student-management-root .hub-students-clb-grid .hub-students-clb-skill-v {
+    text-align: center;
+    font-size: 1rem;
+    font-weight: 800;
+    padding: 0.2rem 0;
+    background: rgba(0, 0, 0, 0.03);
+    border-radius: 0.35rem;
+  }
+
+  .school-student-management-root .hub-students-fields {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.85rem 1.35rem;
+    align-items: start;
+  }
+
+  @media (max-width: 767.98px) {
+    .school-student-management-root .hub-students-fields {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  .school-student-management-root .hub-students-field {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+  }
+
+  .school-student-management-root .hub-students-field--span-2 {
+    grid-column: span 2;
+  }
+
+  .school-student-management-root .hub-students-field--full {
+    grid-column: 1 / -1;
+  }
+
+  .school-student-management-root .hub-students-field-label--row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .school-student-management-root .hub-students-field-label-text {
+    flex: 0 0 auto;
+  }
+
+  .school-student-management-root .hub-students-field-manage {
+    font-size: 0.72rem;
+    font-weight: 600;
+    line-height: 1.2;
+    padding: 0.15rem 0.45rem;
+    flex: 0 0 auto;
+    margin-left: 0;
+  }
+
+  .school-student-management-root .hub-students-field-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #000000;
+    opacity: 0.5;
+  }
+
+  .school-student-management-root .hub-students-field-value {
+    font-size: 1.08rem;
+    font-weight: 600;
+    color: #000000;
+    line-height: 1.4;
+    word-break: break-word;
+  }
+
+  .school-student-management-root .hub-students-value-list {
+    margin: 0;
+    padding-left: 1.15rem;
+    color: #000000;
+    font-size: 1.05rem;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  .school-student-management-root .hub-students-value-list li + li {
+    margin-top: 0.15rem;
+  }
+
+  .school-student-management-root .hub-students-inline-values {
+    font-size: 1.05rem;
+    font-weight: 600;
+    color: #000000;
+    line-height: 1.45;
+    word-break: break-word;
+  }
+
+  .school-student-management-root .hub-students-card-empty {
+    padding: 2rem 1rem;
+    text-align: center;
+    color: #94a3b8;
+  }
+</style>

@@ -3,6 +3,7 @@
 <%- include('partials/tablePages-start', {
   title,
   user,
+  sectionsPageClass: (typeof sectionsPageClass !== 'undefined' && sectionsPageClass) ? sectionsPageClass : '',
   tableName,
   btn_export: true,
   print: true,

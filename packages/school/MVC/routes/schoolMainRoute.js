@@ -40,6 +40,7 @@ router.use(async (req, res, next) => {
 
 router.use('/master-hub', require('./schoolMasterAcademiaHubRoutes'));
 router.use('/report-hub', require('./schoolReportHubRoutes'));
+router.use('/student-management', require('./schoolStudentManagementRoutes'));
 router.use('/settings', require('./schoolSettingsRoutes'));
 router.use('/entity-picker', require('./schoolEntityPickerRoutes'));
 router.use('/identity', require('./schoolIdentityRoutes'));

@@ -1,0 +1,21 @@
+/* Uses global app-page-width-full (side control "Full width"); only minor embed tweaks below. */
+html.school-sm-embed-iframe.app-page-width-full {
+  --app-side-controls-gutter: 0px;
+}
+
+html.school-sm-embed-iframe.app-page-width-full main.container {
+  max-width: 100%;
+  width: 100%;
+  padding-left: var(--spacing-md, 1rem);
+  padding-right: var(--spacing-md, 1rem);
+}
+
+html.school-sm-embed-iframe .table-scroll-wrapper,
+html.school-sm-embed-iframe .hub-attendance-matrix-wrap,
+html.school-sm-embed-iframe .schedule-shell {
+  max-width: 100%;
+}
+
+html.school-sm-embed-iframe .report-by-funder-modal-dialog {
+  max-width: min(100%, 96vw);
+}
