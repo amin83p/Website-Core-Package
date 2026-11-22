@@ -24,6 +24,7 @@ const adminCheckersService = require('../services/adminChekersService');
 const authImpersonationService = require('../services/authImpersonationService');
 const adminAuthorityService = require('../services/adminAuthorityService');
 const { normalizePhoneE164, validateSmsPhoneE164, maskPhone } = require('../utils/phoneUtils');
+const packageNavigationService = require('../services/packageNavigationService');
 
 const DEFAULT_DASHBOARD_URL = '/dashboard';
 const USER_DASHBOARD_FALLBACK_URL = DEFAULT_DASHBOARD_URL;
@@ -493,6 +494,10 @@ async function resolvePendingMicrosoftSessionLimit(req) {
 }
 
 function resolveUserDashboardRedirectUrl(user) {
+  const packageHome = packageNavigationService.getPrimaryDashboardHref(user, { fallback: '' });
+  if (packageHome && packageHome !== DEFAULT_DASHBOARD_URL) {
+    return packageHome;
+  }
   return USER_DASHBOARD_FALLBACK_URL;
 }
 

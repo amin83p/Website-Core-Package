@@ -15,6 +15,10 @@
   const layoutPageDiagnosticsEnabled = (typeof pageDiagnosticsEnabled === 'undefined' || pageDiagnosticsEnabled);
   const layoutNewsUnreadSideControl = (typeof user !== 'undefined' && user)
     && (typeof newsUnreadSideControlEnabled !== 'undefined' && newsUnreadSideControlEnabled);
+  const layoutLoginGreeting = (typeof loginGreetingAudio !== 'undefined' && loginGreetingAudio && typeof loginGreetingAudio === 'object')
+    ? loginGreetingAudio
+    : {};
+  const layoutLoginGreetingEnabled = layoutLoginGreeting.enabled === true;
 %>
 <html lang="en"<% if (layoutHtmlClass) { %> class="<%= layoutHtmlClass %>"<% } %>>
 <head>
@@ -51,6 +55,17 @@
   </script>
   <script>
     window.__APP_UI_SETTINGS__ = <%- JSON.stringify((typeof appUiSettings !== 'undefined' && appUiSettings) ? appUiSettings : { genericPickerSearchDebounceMs: 400, chatBackgroundPollIntervalSeconds: 60, chatBackgroundPollIntervalMs: 60000, chatRealtimeWhenModalClosed: false }) %>;
+  </script>
+  <script>
+    window.__LOGIN_GREETING_AUDIO__ = <%- JSON.stringify({
+      enabled: layoutLoginGreetingEnabled,
+      active: layoutLoginGreeting.active === true,
+      audioUrl: layoutLoginGreetingEnabled ? String(layoutLoginGreeting.audioUrl || '') : '',
+      audioMaxSeconds: layoutLoginGreetingEnabled ? Number(layoutLoginGreeting.audioMaxSeconds || 12) : 0,
+      inactivityHours: layoutLoginGreetingEnabled ? Number(layoutLoginGreeting.inactivityHours || 3) : 0,
+      inactivityMs: layoutLoginGreetingEnabled ? Number(layoutLoginGreeting.inactivityMs || 0) : 0,
+      primaryDashboardHref: typeof primaryDashboardHref !== 'undefined' ? String(primaryDashboardHref || '/dashboard') : '/dashboard'
+    }) %>;
   </script>
 
   <link rel="icon" type="<%= layoutBrowserTabIconType %>" href="<%= layoutBrowserTabIconUrl %>">
@@ -239,6 +254,9 @@
     <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/orgDateTime.js') : '/scripts/orgDateTime.js' %>"></script>
   <% } %>
   <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/main.js') : '/scripts/main.js' %>"></script>
+  <% if (layoutLoginGreetingEnabled) { %>
+    <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/loginGreetingAudio.js') : '/scripts/loginGreetingAudio.js' %>"></script>
+  <% } %>
 
   <% if (layoutNewsUnreadSideControl) { %>
     <script>

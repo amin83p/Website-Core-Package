@@ -117,6 +117,13 @@ const DEFAULT_NEWS_UNREAD_NOTIFY = Object.freeze({
   categories: []
 });
 
+const DEFAULT_LOGIN_GREETING_AUDIO = Object.freeze({
+  enabled: false,
+  audioUrl: '',
+  audioMaxSeconds: 12,
+  inactivityHours: 3
+});
+
 // Updated Defaults mapping to constants.js structure
 const DEFAULTS = {
   newsletter: {
@@ -147,6 +154,7 @@ const DEFAULTS = {
     chatRealtimeWhenModalClosed: false,
     chatPolicy: { ...DEFAULT_CHAT_POLICY },
     newsUnreadNotify: { ...DEFAULT_NEWS_UNREAD_NOTIFY },
+    loginGreetingAudio: { ...DEFAULT_LOGIN_GREETING_AUDIO },
     requestCacheTtlSeconds: 900,
     requestCacheMaxEntries: 500,
     buildVersionOverride: '',
@@ -223,7 +231,7 @@ function mergeAppSettings(base = {}, incoming = {}) {
     ? incomingPublicMenu.items
     : (Array.isArray(basePublicMenu.items) ? basePublicMenu.items : DEFAULT_PUBLIC_MENU_ITEMS);
 
-  return {
+  const merged = {
     ...baseApp,
     ...incomingApp,
     brand: {
@@ -274,8 +282,25 @@ function mergeAppSettings(base = {}, incoming = {}) {
         ...(baseApp.newsUnreadNotify || DEFAULT_NEWS_UNREAD_NOTIFY),
         ...(incomingApp.newsUnreadNotify || {})
       });
+    })(),
+    loginGreetingAudio: (() => {
+      const loginGreetingAudioService = require('../services/loginGreetingAudioService');
+      const baseSource = loginGreetingAudioService.rawLoginGreetingSource({
+        loginGreetingAudio: baseApp.loginGreetingAudio,
+        festiveSeason: baseApp.festiveSeason
+      });
+      const incomingSource = loginGreetingAudioService.rawLoginGreetingSource({
+        loginGreetingAudio: incomingApp.loginGreetingAudio,
+        festiveSeason: incomingApp.festiveSeason
+      });
+      return loginGreetingAudioService.normalizeFromStored({
+        ...baseSource,
+        ...incomingSource
+      });
     })()
   };
+  delete merged.festiveSeason;
+  return merged;
 }
 
 async function getSettings() {

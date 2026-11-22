@@ -445,9 +445,23 @@ function getDashboardEntries(user = null) {
 }
 
 function getPrimaryDashboardHref(user = null, options = {}) {
-  const fallback = cleanMenuHref(options.fallback || '');
-  const entry = getDashboardEntries(user).find((row) => cleanMenuHref(row?.href));
-  return cleanMenuHref(entry?.href || '') || fallback;
+  const fallback = cleanMenuHref(options.fallback || '') || '/dashboard';
+  const entries = getDashboardEntries(user);
+  if (!entries.length) return fallback;
+
+  const flaggedPrimary = entries.find((row) => row && row.primary === true && cleanMenuHref(row.href));
+  if (flaggedPrimary) return cleanMenuHref(flaggedPrimary.href);
+
+  const packageMain = entries.find((row) => {
+    const href = cleanMenuHref(row?.href);
+    if (!href) return false;
+    const id = String(row.id || '').toLowerCase();
+    const packageId = String(row.sourcePackageId || '').toLowerCase();
+    return Boolean(packageId && id === `${packageId}-dashboard`);
+  });
+  if (packageMain) return cleanMenuHref(packageMain.href);
+
+  return fallback;
 }
 
 function filterMenuItemsAgainstDisabledPackages(items = []) {

@@ -266,7 +266,7 @@
                         </button>
                     </div>
 
-                    <a id="headerDashboardTrigger" class="nav-pill-btn px-2" href="/dashboard" title="Dashboard (Alt+Shift+D)" aria-keyshortcuts="Alt+Shift+D">
+                    <a id="headerDashboardTrigger" class="nav-pill-btn px-2" href="<%= typeof primaryDashboardHref !== 'undefined' && primaryDashboardHref ? primaryDashboardHref : '/dashboard' %>" title="Dashboard (Alt+Shift+D)" aria-keyshortcuts="Alt+Shift+D">
                          <i class="bi bi-grid-3x3-gap-fill fs-4 text-secondary top-action-icon"></i>
                     </a>
 
@@ -539,6 +539,19 @@
             >
                 <i class="bi bi-gear-fill" aria-hidden="true"></i>
             </button>
+
+            <% if (typeof user !== 'undefined' && user !== null && typeof loginGreetingAudio !== 'undefined' && loginGreetingAudio && loginGreetingAudio.enabled) { %>
+                <button
+                    type="button"
+                    id="loginGreetingMuteToggle"
+                    class="header-settings-toggle header-side-control-btn"
+                    aria-label="Mute login greeting sound"
+                    aria-pressed="false"
+                    title="Mute login greeting sound"
+                >
+                    <i class="bi bi-volume-up-fill" aria-hidden="true"></i>
+                </button>
+            <% } %>
 
             <% if (typeof canViewActiveUsers !== 'undefined' && canViewActiveUsers) { %>
                 <button

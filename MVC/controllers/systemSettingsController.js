@@ -24,6 +24,7 @@ const integrationVariableModel = require('../models/integrationVariableModel');
 const integrationVariableService = require('../services/integrationVariableService');
 const chatPolicyService = require('../services/chatPolicyService');
 const newsUnreadNotifyPolicyService = require('../services/newsUnreadNotifyPolicyService');
+const loginGreetingAudioService = require('../services/loginGreetingAudioService');
 const publicPageContentSettingsDataService = require('../services/publicPageContentSettingsDataService');
 const coreFilesService = require('../services/coreFilesService');
 const coreUploadRefService = require('../services/coreUploadRefService');
@@ -268,6 +269,9 @@ exports.showAppSettings = async (req, res) => {
       integrationVariableRows: integrationVariableModel.listRowsForForm(settings?.app?.integrationVariables),
       chatPolicyDisplay: chatPolicyService.enrichPolicyForDisplay(settings?.app?.chatPolicy),
       newsUnreadNotifyDisplay: newsUnreadNotifyPolicyService.enrichPolicyForDisplay(settings?.app?.newsUnreadNotify),
+      loginGreetingAudioDisplay: loginGreetingAudioService.enrichForDisplay(
+        loginGreetingAudioService.rawLoginGreetingSource(settings?.app)
+      ),
       newsCategories
     });
   } catch (error) {
@@ -665,6 +669,9 @@ exports.updateAppSettings = async (req, res) => {
         chatPolicy: chatPolicyService.validatePolicyInput(chatPolicyService.normalizePolicyFromForm(req.body)),
         newsUnreadNotify: newsUnreadNotifyPolicyService.validatePolicyInput(
           newsUnreadNotifyPolicyService.normalizePolicyFromForm(req.body)
+        ),
+        loginGreetingAudio: loginGreetingAudioService.validatePolicyInput(
+          loginGreetingAudioService.normalizeFromForm(req.body)
         ),
         requestCacheTtlSeconds: parseInt(req.body.requestCacheTtlSeconds, 10),
         requestCacheMaxEntries: parseInt(req.body.requestCacheMaxEntries, 10),

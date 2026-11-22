@@ -292,6 +292,13 @@ document.addEventListener('DOMContentLoaded', () => {
       const result = await response.json();
 
       if (response.ok) {
+        if (window.LoginGreetingAudio && typeof window.LoginGreetingAudio.queuePendingLogin === 'function') {
+          window.LoginGreetingAudio.queuePendingLogin();
+        } else if (typeof window.queueLoginGreetingPending === 'function') {
+          window.queueLoginGreetingPending();
+        } else {
+          try { sessionStorage.setItem('loginGreetingPending', 'login'); } catch (_) {}
+        }
         window.location.href = result.redirectUrl || '/dashboard';
       } else {
         if (result.status === 'captcha_required') {

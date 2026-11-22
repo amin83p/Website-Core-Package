@@ -315,6 +315,16 @@ function sortMainDashboardSectionsForDisplay(rows = []) {
 ============================================================ */
 async function showDashboard(req, res) {
   try {
+    const isAdminHomeUser = adminCheckersService.isAdmin(req.user)
+      || adminCheckersService.isOrgAdmin(req.user)
+      || Boolean(String(req.user?.systemAccessProfileId || '').trim());
+    if (!isAdminHomeUser) {
+      const packageHome = packageNavigationService.getPrimaryDashboardHref(req.user, { fallback: '' });
+      if (packageHome && packageHome !== '/dashboard') {
+        return res.redirect(302, packageHome);
+      }
+    }
+
     // 1. Fetch Data
     const [allSections, contextSymbols, sectionCategories, firstRunBootstrap] = await Promise.all([
         sectionsOperationsCatalogCacheService.getSectionsForUser(req.user),

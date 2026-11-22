@@ -46,6 +46,8 @@ const sessionEnforcement = require('./MVC/middleware/sessionEnforcement');
 const requestRatePhaseOne = require('./MVC/middleware/requestRateMonitor');
 const settingService = require('./MVC/services/settingService'); // Import Setting Service
 const newsUnreadNotifyPolicyService = require('./MVC/services/newsUnreadNotifyPolicyService');
+const loginGreetingAudioService = require('./MVC/services/loginGreetingAudioService');
+const packageNavigationService = require('./MVC/services/packageNavigationService');
 const appBrandingService = require('./MVC/services/appBrandingService');
 const appPublicUrlService = require('./MVC/services/appPublicUrlService');
 const smsProviderService = require('./MVC/services/sms/smsProviderService');
@@ -57,7 +59,6 @@ const dataBackendRecoveryMiddleware = require('./MVC/middleware/dataBackendRecov
 const packageLoaderService = require('./MVC/services/packageLoaderService');
 const packageRegistryService = require('./MVC/services/packageRegistryService');
 const packageRegistryInstallerService = require('./MVC/services/packageRegistryInstallerService');
-const packageNavigationService = require('./MVC/services/packageNavigationService');
 const { getPackageStorageRootAbsolute } = require('./MVC/utils/packageStoragePathUtils');
 const sessionAuthDiagnosticLogService = require('./MVC/services/diagnostics/sessionAuthDiagnosticLogService');
 const startupLogger = require('./MVC/utils/startupLogger');
@@ -539,6 +540,12 @@ app.use(requestPerfTracer.wrapMiddleware('app-locals', async (req, res, next) =>
   res.locals.publicMenu = appBrandingService.getPublicMenu(req.user || null);
   res.locals.publicMenuEndpointOptions = appBrandingService.getPublicMenuEndpointOptions();
   res.locals.appUiSettings = resolveAppUiSettings();
+  res.locals.primaryDashboardHref = req.user
+    ? packageNavigationService.getPrimaryDashboardHref(req.user, { fallback: '/dashboard' })
+    : '/dashboard';
+  res.locals.loginGreetingAudio = loginGreetingAudioService.resolveForClient(settingService.get()?.app, {
+    primaryDashboardHref: res.locals.primaryDashboardHref
+  });
   res.locals.buildVersionShort = cleanBuildVersionToken(req.app?.locals?.buildVersionShort);
   res.locals.buildVersionCommitAt = String(req.app?.locals?.buildVersionCommitAt || '').trim();
   res.locals.buildVersionStartedAt = String(req.app?.locals?.buildVersionStartedAt || APP_STARTED_AT).trim();

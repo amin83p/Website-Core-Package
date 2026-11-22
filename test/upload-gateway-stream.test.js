@@ -3,7 +3,9 @@ const assert = require('node:assert/strict');
 
 const {
   buildPublicGatewayUploadUrlFromRequest,
-  shouldRedirectRemoteUploadRead
+  shouldRedirectRemoteUploadRead,
+  isBrowserStreamableMediaPath,
+  mimeTypeForUploadRelativePath
 } = require('../MVC/services/uploadGatewayStreamService');
 
 const ORIGINAL_GATEWAY_BASE = process.env.RAILWAY_GATEWAY_BASE_URL;
@@ -25,6 +27,12 @@ test('buildPublicGatewayUploadUrlFromRequest maps /uploads paths to gateway host
     url,
     'https://equportal.app/uploads/ORG_900000/school/books/BK1/cover/cover%20photo.jpg'
   );
+});
+
+test('isBrowserStreamableMediaPath detects mp3 for same-origin streaming', () => {
+  assert.equal(isBrowserStreamableMediaPath('ORG_900000/misc/ChristmasMusic.mp3'), true);
+  assert.equal(isBrowserStreamableMediaPath('GLOBAL/logo/Logo1.png'), false);
+  assert.equal(mimeTypeForUploadRelativePath('ORG_900000/misc/ChristmasMusic.mp3'), 'audio/mpeg');
 });
 
 test('shouldRedirectRemoteUploadRead defaults to redirect unless proxy mode is set', () => {

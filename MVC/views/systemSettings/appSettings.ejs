@@ -222,6 +222,42 @@
           </div>
         </div>
       </div>
+
+      <% const loginGreetingForm = (typeof loginGreetingAudioDisplay !== 'undefined' && loginGreetingAudioDisplay)
+        ? loginGreetingAudioDisplay
+        : (appSettings.loginGreetingAudio || appSettings.festiveSeason || {}); %>
+      <div class="card mb-4 shadow-sm border-0">
+        <div class="card-header bg-white border-0 pb-0">
+          <h5 class="fw-bold mb-1"><i class="bi bi-music-note-beamed text-primary me-2"></i>Login greeting audio</h5>
+          <p class="text-muted small mb-0">Short MP3 after sign-in and when a signed-in user returns after idle time. Seasonal look: change the logo URL in branding above.</p>
+        </div>
+        <div class="card-body p-4">
+          <div class="form-check form-switch mb-4">
+            <input type="hidden" name="loginGreetingEnabled_present" value="1">
+            <input class="form-check-input" type="checkbox" role="switch" id="loginGreetingEnabled" name="loginGreetingEnabled" value="true" <%= loginGreetingForm.enabled ? 'checked' : '' %>>
+            <label class="form-check-label fw-bold" for="loginGreetingEnabled">Enable login greeting audio</label>
+          </div>
+          <div class="row g-3 mb-0">
+            <div class="col-md-6">
+              <label class="form-label fw-bold" for="loginGreetingAudioMaxSeconds">Max audio length (seconds)</label>
+              <input type="number" class="form-control" id="loginGreetingAudioMaxSeconds" name="loginGreetingAudioMaxSeconds" min="3" max="60" step="1" value="<%= loginGreetingForm.audioMaxSeconds != null ? loginGreetingForm.audioMaxSeconds : 12 %>">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold" for="loginGreetingInactivityHours">Idle hours before replay</label>
+              <input type="number" class="form-control" id="loginGreetingInactivityHours" name="loginGreetingInactivityHours" min="1" max="24" step="1" value="<%= loginGreetingForm.inactivityHours != null ? loginGreetingForm.inactivityHours : 3 %>">
+              <div class="form-text">Plays again when a signed-in user opens a page after this many hours without activity.</div>
+            </div>
+            <div class="col-12">
+              <label class="form-label fw-bold" for="loginGreetingAudioUrl">Greeting audio (MP3 URL)</label>
+              <input type="text" class="form-control font-monospace" id="loginGreetingAudioUrl" name="loginGreetingAudioUrl" value="<%= loginGreetingForm.audioUrl || '' %>" placeholder="/uploads/GLOBAL/audio/greeting.mp3">
+              <div class="form-text">Same-site path to an <code>.mp3</code> file you have rights to use.</div>
+            </div>
+          </div>
+          <div class="alert alert-warning border-0 small mb-0 mt-4 py-2">
+            <i class="bi bi-shield-check me-1"></i> Users can mute this sound from the header. Respects <code>prefers-reduced-motion</code> (no auto-play).
+          </div>
+        </div>
+      </div>
         </div>
 
         <div class="tab-pane fade" id="app-contact-pane" role="tabpanel" aria-labelledby="app-contact-tab" tabindex="0">

@@ -33,6 +33,21 @@ function cleanRelativePath(value = '') {
   return String(value || '').trim().replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '');
 }
 
+function isBrowserStreamableMediaPath(relativePath = '') {
+  return /\.(mp3|wav|ogg|m4a|aac|webm)(\?|$)/i.test(cleanRelativePath(relativePath));
+}
+
+function mimeTypeForUploadRelativePath(relativePath = '') {
+  const lower = cleanRelativePath(relativePath).toLowerCase();
+  if (lower.endsWith('.mp3')) return 'audio/mpeg';
+  if (lower.endsWith('.wav')) return 'audio/wav';
+  if (lower.endsWith('.ogg')) return 'audio/ogg';
+  if (lower.endsWith('.m4a')) return 'audio/mp4';
+  if (lower.endsWith('.aac')) return 'audio/aac';
+  if (lower.endsWith('.webm')) return 'audio/webm';
+  return '';
+}
+
 function parseUploadsRelativePath(relativePath = '') {
   const parts = cleanRelativePath(relativePath).split('/').filter(Boolean);
   if (!parts.length) return null;
@@ -61,7 +76,8 @@ async function streamUploadFromGateway(req, res) {
     return;
   }
 
-  if (shouldRedirectRemoteUploadRead()) {
+  const forceSameOriginStream = isBrowserStreamableMediaPath(relative);
+  if (shouldRedirectRemoteUploadRead() && !forceSameOriginStream) {
     const remoteUrl = buildPublicGatewayUploadUrlFromRequest(req);
     if (remoteUrl) {
       res.setHeader('Cache-Control', 'public, max-age=300');
@@ -78,7 +94,8 @@ async function streamUploadFromGateway(req, res) {
     }
     const downloaded = await downloadRemoteUploadFile(parsed.scopeKey, decodedRelativePath);
     const buffer = Buffer.from(await downloaded.blob.arrayBuffer());
-    res.setHeader('Content-Type', downloaded.mimeType || 'application/octet-stream');
+    const mediaMime = mimeTypeForUploadRelativePath(relative);
+    res.setHeader('Content-Type', mediaMime || downloaded.mimeType || 'application/octet-stream');
     res.setHeader('Cache-Control', 'public, max-age=3600');
     return res.status(200).send(buffer);
   } catch (error) {
@@ -96,5 +113,7 @@ module.exports = {
   parseUploadsRelativePath,
   streamUploadFromGateway,
   buildPublicGatewayUploadUrlFromRequest,
-  shouldRedirectRemoteUploadRead
+  shouldRedirectRemoteUploadRead,
+  isBrowserStreamableMediaPath,
+  mimeTypeForUploadRelativePath
 };

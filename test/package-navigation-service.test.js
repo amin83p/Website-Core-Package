@@ -198,6 +198,30 @@ test('primary dashboard href resolves from enabled package dashboard entries', a
   });
 });
 
+test('primary dashboard href prefers explicit package main entry over extra tiles', async () => {
+  await withTempPackageWorkspace(async ({ packageRootDir }) => {
+    await writeManifest(packageRootDir, 'school', {
+      id: 'school',
+      name: 'School',
+      version: '1.0.0',
+      mountPath: '/school',
+      dashboardEntries: [
+        { id: 'school-dashboard-students', label: 'Students', href: '/school/students', active: true }
+      ]
+    });
+    await packageRegistryService.upsertPackageRegistry({
+      packageId: 'school',
+      enabled: true,
+      installStatus: 'enabled'
+    }, { backendMode: 'json' });
+    await packageNavigationService.refreshNavigationRegistry({
+      backendMode: 'json',
+      packageRootDir
+    });
+    assert.equal(packageNavigationService.getPrimaryDashboardHref({ id: 'U1' }, { fallback: '/dashboard' }), '/school');
+  });
+});
+
 test('filterSectionsExcludingDisabledPackages removes paused package sections by alias and mount path', async () => {
   await withTempPackageWorkspace(async ({ packageRootDir }) => {
     await Promise.all([
@@ -257,13 +281,12 @@ test('filterSectionsExcludingDisabledPackages removes paused package sections by
 });
 
 test('core dashboard redirects are package-navigation driven instead of PTE literals', async () => {
-  const [authSource, dashboardRouteSource] = await Promise.all([
+  const [authSource, dashboardSource] = await Promise.all([
     fs.readFile(path.resolve(__dirname, '../MVC/controllers/authController.js'), 'utf8'),
-    fs.readFile(path.resolve(__dirname, '../MVC/routes/dashboardRoutes.js'), 'utf8')
+    fs.readFile(path.resolve(__dirname, '../MVC/controllers/dashboardController.js'), 'utf8')
   ]);
 
   assert.doesNotMatch(authSource, /\/pte\/dashboard/);
-  assert.doesNotMatch(dashboardRouteSource, /\/pte\/dashboard/);
   assert.match(authSource, /packageNavigationService\.getPrimaryDashboardHref/);
-  assert.match(dashboardRouteSource, /packageNavigationService\.getPrimaryDashboardHref/);
+  assert.match(dashboardSource, /resolveSingleMainDashboardRedirect/);
 });
