@@ -7,6 +7,13 @@ const SCHOOL_AI_SERVICES = Object.freeze([
     description: 'AI-assisted review and feedback for school report instances.',
     status: 'planned',
     category: 'reports'
+  }),
+  Object.freeze({
+    serviceKey: 'school.bimpr_goals_checker',
+    label: 'Bi-MPR Goals Checker',
+    description: 'Revises up to four Bi-MPR future-goal statements against MPR length, tense, and wording rules.',
+    status: 'implemented',
+    category: 'reports'
   })
 ]);
 

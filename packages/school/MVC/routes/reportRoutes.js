@@ -275,6 +275,37 @@ router.post('/templates/snapshot-compliance',
   trackActionState(REPORT_TEMPLATE_SECTION, OPERATIONS.READ),
   ctrl.checkTemplateSnapshotCompliance);
 
+async function requireReportTemplateDesignerAccess(req, res, next) {
+  try {
+  for (const operationId of [OPERATIONS.UPDATE, OPERATIONS.CREATE, OPERATIONS.READ]) {
+      // eslint-disable-next-line no-await-in-loop
+      const evaluation = await accessService.evaluateAccess({
+        user: req.user,
+        sectionId: REPORT_TEMPLATE_SECTION,
+        operationId,
+        ipAddress: req.ip
+      });
+      if (evaluation?.allowed) return next();
+    }
+    if (await adminAuthorityService.isAdminForRequestAsync(
+      req.user,
+      REPORT_TEMPLATE_SECTION,
+      OPERATIONS.READ_ALL,
+      { ipAddress: req.ip }
+    )) {
+      return next();
+    }
+    return res.status(403).json({ status: 'error', message: 'Template designer access required.' });
+  } catch (error) {
+    return next(error);
+  }
+}
+
+router.get('/templates/ai-service-definitions/:serviceKey',
+  requireReportTemplateDesignerAccess,
+  trackActionState(REPORT_TEMPLATE_SECTION, OPERATIONS.READ),
+  ctrl.getTemplateAiServiceDefinition);
+
 router.get('/templates/:id/pdf-fields',
   requireAccess(REPORT_TEMPLATE_SECTION, OPERATIONS.READ),
   trackActionState(REPORT_TEMPLATE_SECTION, OPERATIONS.READ),
@@ -793,6 +824,16 @@ router.get('/assignments/:id/delete-preview',
   ctrl.getAssignmentDeletePreview);
 
 // Instances
+router.post('/ai-assist/prepare',
+  requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, { requireToken: false }),
+  ctrl.reportAiAssistPrepare);
+
+router.post('/ai-assist/run',
+  requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, { requireToken: false }),
+  ctrl.reportAiAssistRun);
+
 router.get('/instances',
   requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.READ_ALL),
   trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.READ_ALL),

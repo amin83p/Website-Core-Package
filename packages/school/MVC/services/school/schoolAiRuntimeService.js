@@ -37,7 +37,11 @@ async function resolveForService({ serviceKey, requestingUser }, accessContext =
   let selectionSource = 'assignment';
 
   if (assignment) {
-    const raw = await schoolAiProviderDataService.getRawProviderById(assignment.providerRecordId);
+    const raw = await schoolAiProviderDataService.getRawProviderById(
+      assignment.providerRecordId,
+      requestingUser,
+      accessContext
+    );
     provider = raw;
     model = schoolAiProviderDataService.findModelEntry(raw, assignment.modelEntryId);
   }
@@ -50,7 +54,11 @@ async function resolveForService({ serviceKey, requestingUser }, accessContext =
     if (!defaultRow) {
       throw new Error('No active AI provider is configured. Add a provider key in School AI Assist.');
     }
-    provider = await schoolAiProviderDataService.getRawProviderById(defaultRow.id);
+    provider = await schoolAiProviderDataService.getRawProviderById(
+      defaultRow.id,
+      requestingUser,
+      accessContext
+    );
     const activeModel = (Array.isArray(provider?.models) ? provider.models : []).find((m) => m.isActive !== false);
     model = activeModel || (provider.models || [])[0];
     selectionSource = assignment ? 'default_fallback' : 'org_default';

@@ -1,0 +1,207 @@
+<%
+  const runner = (typeof aiServiceRunner !== 'undefined' && aiServiceRunner) ? aiServiceRunner : null;
+  if (!runner || !runner.serviceKey) return;
+  const def = runner.definition || {};
+  const inputs = Array.isArray(def.inputs) ? def.inputs : [];
+  const defaults = (runner.inputDefaults && typeof runner.inputDefaults === 'object') ? runner.inputDefaults : {};
+  const submitLabel = String(runner.submitLabel || 'Run').trim() || 'Run';
+  const formId = String(runner.formId || ('aiServiceRunner_' + runner.serviceKey.replace(/\W/g, '_'))).trim();
+  const canRun = runner.configured !== false && runner.active !== false;
+  const runUrl = runner.runUrl || ('/school/ai-assist/services/' + encodeURIComponent(runner.serviceKey) + '/run');
+  const collapsed = runner.startCollapsed === true;
+  const panelVariant = String(runner.panelVariant || '').toLowerCase();
+  const isDefinitionTest = panelVariant === 'definition-test';
+  const rootClasses = 'school-ai-service-runner card mb-4' + (isDefinitionTest
+    ? ' border border-primary border-opacity-25 shadow-sm school-ai-runner-definition-test'
+    : ' border-0 shadow-sm');
+%>
+
+<div class="<%= rootClasses %>" data-service-key="<%= runner.serviceKey %>">
+  <button
+    type="button"
+    class="<%= isDefinitionTest ? 'bg-primary-subtle' : 'bg-white' %> border-0 w-100 d-flex justify-content-between align-items-center py-3 px-4 text-start rounded-top<%= collapsed ? ' collapsed' : '' %>"
+    data-bs-toggle="collapse"
+    data-bs-target="#<%= formId %>_collapse"
+    aria-expanded="<%= collapsed ? 'false' : 'true' %>">
+    <span class="fw-bold text-body d-flex align-items-center flex-wrap gap-2">
+      <i class="bi bi-<%= isDefinitionTest ? 'beaker' : 'robot' %> me-1 text-primary"></i>
+      <%= runner.label || 'AI Assist' %>
+      <% if (isDefinitionTest) { %>
+        <span class="badge bg-primary text-uppercase" style="font-size:0.65rem;">Sandbox</span>
+      <% } %>
+    </span>
+    <i class="bi bi-chevron-down text-muted" aria-hidden="true"></i>
+  </button>
+  <div id="<%= formId %>_collapse" class="collapse<%= collapsed ? '' : ' show' %>">
+    <div class="card-body border-top<%= isDefinitionTest ? ' bg-white' : '' %>">
+      <% if (!canRun) { %>
+        <div class="alert alert-warning border mb-0 small">
+          This service is not configured or is inactive. Configure it under School AI Assist → Service Definitions.
+        </div>
+      <% } else { %>
+        <% if (runner.description) { %>
+          <div class="alert alert-light border small mb-4 d-flex gap-2 align-items-start<%= isDefinitionTest ? ' bg-primary-subtle border-primary border-opacity-10' : '' %>">
+            <i class="bi bi-info-circle text-primary mt-1"></i>
+            <div class="text-body-secondary mb-0"><%= runner.description %></div>
+          </div>
+        <% } %>
+        <form id="<%= formId %>" class="js-school-ai-service-runner-form" data-run-url="<%= runUrl %>">
+          <div id="<%= formId %>_inputs" class="row g-3 mb-4">
+            <% inputs.forEach((field) => { %>
+              <% const fid = field.id; %>
+              <% const val = defaults[fid] !== undefined ? defaults[fid] : (field.defaultValue || ''); %>
+              <% const type = String(field.type || 'text').toLowerCase(); %>
+              <div class="col-12<%= type === 'boolean' ? ' col-md-4' : (isDefinitionTest ? ' col-lg-6' : '') %>">
+                <label class="form-label fw-semibold" for="<%= formId %>_<%= fid %>">
+                  <%= field.label || fid %><% if (field.required) { %><span class="text-danger"> *</span><% } %>
+                </label>
+                <% if (type === 'textarea' || type === 'json') { %>
+                  <textarea class="form-control size-md font-monospace" id="<%= formId %>_<%= fid %>" name="<%= fid %>" rows="<%= type === 'json' ? 4 : 6 %>"<%= field.required ? ' required' : '' %>><%= val %></textarea>
+                <% } else if (type === 'boolean') { %>
+                  <select class="form-select size-md" id="<%= formId %>_<%= fid %>" name="<%= fid %>">
+                    <option value="false"<%= String(val).toLowerCase() !== 'true' ? ' selected' : '' %>>No</option>
+                    <option value="true"<%= String(val).toLowerCase() === 'true' ? ' selected' : '' %>>Yes</option>
+                  </select>
+                <% } else if (type === 'select' && Array.isArray(field.options) && field.options.length) { %>
+                  <select class="form-select size-md" id="<%= formId %>_<%= fid %>" name="<%= fid %>"<%= field.required ? ' required' : '' %>>
+                    <% field.options.forEach((opt) => { %>
+                      <option value="<%= opt.value %>"<%= String(val) === String(opt.value) ? ' selected' : '' %>><%= opt.label || opt.value %></option>
+                    <% }) %>
+                  </select>
+                <% } else if (type === 'number') { %>
+                  <input type="number" class="form-control size-md" id="<%= formId %>_<%= fid %>" name="<%= fid %>" value="<%= val %>"<%= field.required ? ' required' : '' %>>
+                <% } else { %>
+                  <input type="text" class="form-control size-md" id="<%= formId %>_<%= fid %>" name="<%= fid %>" value="<%= val %>"<%= field.required ? ' required' : '' %>>
+                <% } %>
+                <% if (field.helpText) { %>
+                  <div class="form-text"><%= field.helpText %></div>
+                <% } %>
+              </div>
+            <% }) %>
+            <% if (!inputs.length) { %>
+              <p class="small text-muted mb-0">No inputs defined for this service.</p>
+            <% } %>
+          </div>
+          <div class="d-flex flex-wrap gap-2 align-items-center mb-3 pb-3 border-bottom">
+            <button type="button" class="btn btn-filled btn-primary btn-sm js-school-ai-service-run-btn" data-no-wait="true">
+              <i class="bi bi-play-fill me-1"></i><%= submitLabel %>
+            </button>
+            <span class="small text-muted js-school-ai-service-status" aria-live="polite"></span>
+          </div>
+          <div class="js-school-ai-service-output d-none">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="fw-semibold small text-uppercase text-muted">Output</span>
+              <span class="badge bg-success-subtle text-success border border-success-subtle js-school-ai-service-output-badge d-none">OK</span>
+            </div>
+            <div class="js-school-ai-service-output-body p-3 rounded border bg-light font-monospace small mb-0" style="white-space: pre-wrap; max-height: 420px; overflow: auto;"></div>
+            <details class="mt-3 small">
+              <summary class="text-muted">Raw response</summary>
+              <pre class="js-school-ai-service-raw small mb-0 mt-2 p-3 rounded border bg-white" style="white-space: pre-wrap; max-height: 280px; overflow: auto;"></pre>
+            </details>
+          </div>
+        </form>
+      <% } %>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const form = document.getElementById(<%- JSON.stringify(formId) %>);
+    if (!form || form.dataset.runnerBound === '1') return;
+    form.dataset.runnerBound = '1';
+    const statusEl = form.querySelector('.js-school-ai-service-status');
+    const outputWrap = form.querySelector('.js-school-ai-service-output');
+    const outputBody = form.querySelector('.js-school-ai-service-output-body');
+    const outputBadge = form.querySelector('.js-school-ai-service-output-badge');
+    const rawEl = form.querySelector('.js-school-ai-service-raw');
+    const runUrl = form.getAttribute('data-run-url') || '';
+    const btn = form.querySelector('.js-school-ai-service-run-btn');
+    let hasCompletedRun = false;
+
+    function showAssistMessage({ title, icon, message }) {
+      if (typeof showMessageModal === 'function') {
+        return showMessageModal({
+          title: title || 'School AI Assist',
+          icon: icon || 'info',
+          message: message || '',
+          buttons: [{ text: 'OK', class: icon === 'error' ? 'btn-secondary' : 'btn-primary' }]
+        });
+      }
+      window.alert(message || title || 'School AI Assist');
+      return Promise.resolve();
+    }
+
+    function releaseRunButton() {
+      if (!btn) return;
+      if (window.appWaiting && typeof window.appWaiting.clear === 'function') {
+        window.appWaiting.clear(btn);
+      }
+      btn.disabled = false;
+      btn.classList.remove('disabled');
+      btn.removeAttribute('aria-disabled');
+      if (hasCompletedRun) {
+        btn.innerHTML = '<i class="bi bi-arrow-repeat me-1"></i>Run again';
+      }
+    }
+
+    async function executeRun() {
+      if (!runUrl || !btn || btn.disabled) return;
+      const inputs = {};
+      form.querySelectorAll('[name]').forEach((el) => {
+        if (!el.name || el.tagName === 'BUTTON') return;
+        inputs[el.name] = el.value;
+      });
+      if (statusEl) statusEl.textContent = 'Running…';
+      if (outputWrap) outputWrap.classList.add('d-none');
+      if (outputBadge) outputBadge.classList.add('d-none');
+      btn.disabled = true;
+      try {
+        const response = await fetch(runUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+          body: JSON.stringify({ inputs })
+        });
+        const payload = await response.json().catch(() => ({}));
+        if (!response.ok || payload.status !== 'success') {
+          throw new Error(payload.message || 'Run failed.');
+        }
+        const result = payload.result || {};
+        hasCompletedRun = true;
+        if (statusEl) {
+          statusEl.textContent = result.traceId ? ('Trace: ' + result.traceId) : 'Done';
+        }
+        if (result.ok === false && result.error) {
+          await showAssistMessage({ title: 'Test run failed', icon: 'error', message: result.error });
+          if (outputWrap) outputWrap.classList.add('d-none');
+          return;
+        }
+        if (outputWrap) outputWrap.classList.remove('d-none');
+        if (outputBadge) outputBadge.classList.remove('d-none');
+        if (outputBody) {
+          if (result.data && typeof result.data === 'object') {
+            outputBody.textContent = JSON.stringify(result.data, null, 2);
+          } else {
+            outputBody.textContent = result.displayText || result.rawText || '';
+          }
+        }
+        if (rawEl) rawEl.textContent = result.rawText || '';
+      } catch (err) {
+        if (statusEl) statusEl.textContent = '';
+        if (outputWrap) outputWrap.classList.add('d-none');
+        await showAssistMessage({ title: 'Test run failed', icon: 'error', message: err.message || 'Run failed.' });
+      } finally {
+        releaseRunButton();
+      }
+    }
+
+    btn?.addEventListener('click', (event) => {
+      event.preventDefault();
+      executeRun();
+    });
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      executeRun();
+    });
+  })();
+</script>

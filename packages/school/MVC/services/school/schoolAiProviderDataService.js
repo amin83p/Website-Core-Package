@@ -1,10 +1,13 @@
 'use strict';
 
 const schoolDataService = require('./schoolDataService');
+const schoolRepositories = require('../../repositories/school');
 const schoolAiProviderModel = require('../../models/school/schoolAiProviderModel');
 const { requireCoreModule } = require('./schoolCoreContracts');
+const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const { applyGenericFilter } = requireCoreModule('MVC/utils/queryEngine');
 const { decrypt } = require('./schoolAiModelUtils');
+const schoolAiProviderInvokeService = require('./schoolAiProviderInvokeService');
 const {
   getActiveOrgIdOrThrow,
   idsEqual,
@@ -12,7 +15,8 @@ const {
   assertOrgRow,
   resolveRequesterUserId,
   normalizeProviderFormBody,
-  PROVIDER_VENDOR_OPTIONS
+  PROVIDER_VENDOR_OPTIONS,
+  cleanString
 } = require('./schoolAiAssistCommon');
 
 const ENTITY = 'schoolAiProviders';
@@ -63,16 +67,37 @@ const schoolAiProviderDataService = {
     return schoolAiProviderModel.sanitizeProviderForRead(row);
   },
 
-  async getRawProviderById(id) {
-    return schoolAiProviderModel.getProviderById(id);
+  async getRawProviderById(id, requestingUser, accessContext = {}) {
+    const normalizedId = toPublicId(id);
+    if (!normalizedId) return null;
+    if (requestingUser) {
+      const orgId = getActiveOrgIdOrThrow(requestingUser);
+      const row = await schoolRepositories.schoolAiProviders.getById(normalizedId, {
+        skipTransform: true,
+        accessContext,
+        scope: {
+          orgId,
+          scopeId: accessContext?.scopeId || ''
+        }
+      });
+      if (row) {
+        assertOrgRow(row, orgId);
+        return row;
+      }
+    }
+    return schoolAiProviderModel.getProviderById(normalizedId);
   },
 
-  async decryptApiKeyForProvider(id, requestingUser) {
+  async decryptApiKeyForProvider(id, requestingUser, accessContext = {}) {
     const orgId = getActiveOrgIdOrThrow(requestingUser);
-    const raw = await schoolAiProviderModel.getProviderById(id);
+    const raw = await schoolAiProviderDataService.getRawProviderById(id, requestingUser, accessContext);
     if (!raw) throw new Error('AI provider not found.');
     assertOrgRow(raw, orgId);
-    if (!raw.apiKeyEncrypted) throw new Error('AI provider has no stored API key.');
+    const legacyPlain = cleanString(raw.apiKey, { max: 8000, allowEmpty: true }) || '';
+    if (!raw.apiKeyEncrypted) {
+      if (legacyPlain) return legacyPlain;
+      throw new Error('AI provider has no stored API key.');
+    }
     try {
       return decrypt(raw.apiKeyEncrypted);
     } catch (error) {
@@ -121,6 +146,47 @@ const schoolAiProviderDataService = {
   },
 
   findModelEntry,
+
+  async listVendorModels(requestingUser, params = {}, accessContext = {}) {
+    const orgId = getActiveOrgIdOrThrow(requestingUser);
+    const providerRecordId = toPublicId(params.providerRecordId || params.id);
+    let vendorId = cleanString(params.providerId, { max: 80, allowEmpty: true }).toLowerCase();
+    const credentials = {
+      project: cleanString(params.project, { max: 220, allowEmpty: true }) || '',
+      location: cleanString(params.location, { max: 220, allowEmpty: true }) || '',
+      baseUrl: cleanString(params.baseUrl, { max: 500, allowEmpty: true }) || ''
+    };
+    const overrideKey = cleanString(params.apiKey, { max: 8000, allowEmpty: true }) || '';
+    if (providerRecordId) {
+      const raw = await schoolAiProviderDataService.getRawProviderById(providerRecordId, requestingUser, accessContext);
+      if (!raw) throw new Error('AI provider not found.');
+      assertOrgRow(raw, orgId);
+      vendorId = cleanString(raw.providerId, { max: 80, allowEmpty: true }).toLowerCase() || vendorId;
+      credentials.project = credentials.project || cleanString(raw.project, { max: 220, allowEmpty: true }) || '';
+      credentials.location = credentials.location || cleanString(raw.location, { max: 220, allowEmpty: true }) || '';
+      credentials.baseUrl = credentials.baseUrl || cleanString(raw.baseUrl, { max: 500, allowEmpty: true }) || '';
+      credentials.apiKey = overrideKey || await schoolAiProviderDataService.decryptApiKeyForProvider(
+        providerRecordId,
+        requestingUser,
+        accessContext
+      );
+    } else {
+      if (!vendorId) throw new Error('Provider vendor is required to list models.');
+      if (!overrideKey) throw new Error('API key is required to list models (save the provider or paste a key on the form).');
+      credentials.apiKey = overrideKey;
+    }
+    if (!credentials.apiKey) throw new Error('API key is required to list models.');
+    const rows = await schoolAiProviderInvokeService.listAvailableModels(vendorId, credentials);
+    const models = (Array.isArray(rows) ? rows : [])
+      .filter((row) => row?.supportsGenerateContent !== false)
+      .map((row) => ({
+        modelId: String(row.id || '').trim(),
+        label: String(row.name || row.id || '').trim(),
+        provider: row.provider || vendorId
+      }))
+      .filter((row) => row.modelId);
+    return { providerId: vendorId, models };
+  },
 
   assertUserNotBanned(providerRecord, userId) {
     const bans = Array.isArray(providerRecord?.bannedUserIds) ? providerRecord.bannedUserIds : [];

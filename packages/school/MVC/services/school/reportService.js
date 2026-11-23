@@ -3566,6 +3566,14 @@ function mergeTemplateData(template, instance, assignment = null, options = {}) 
         merged[field.id] = sharedRaw[field.id];
         return;
       }
+      const sharedFromInstance = answers[field.id];
+      const hasSharedFromInstance = sharedFromInstance !== undefined
+        && sharedFromInstance !== null
+        && String(sharedFromInstance) !== '';
+      if (hasSharedFromInstance) {
+        merged[field.id] = sharedFromInstance;
+        return;
+      }
     } else {
       const answerValue = answers[field.id];
       const hasAnswer = answerValue !== undefined && answerValue !== null && String(answerValue) !== '';
@@ -4264,6 +4272,20 @@ function resolveLiveOnOpenFieldIds(template) {
   return [...liveIds];
 }
 
+function overlaySharedAcrossStudentsFromLiveMerge(out, liveMerged, template, assignment) {
+  if (!isStudentTargetedScope(assignment?.reportScope)) return false;
+  let changed = false;
+  const fields = Array.isArray(template?.schema?.fields) ? template.schema.fields : [];
+  fields.forEach((field) => {
+    if (field?.sharedAcrossStudents !== true || !field?.id) return;
+    if (!Object.prototype.hasOwnProperty.call(liveMerged, field.id)) return;
+    const next = liveMerged[field.id];
+    if (out[field.id] !== next) changed = true;
+    out[field.id] = next;
+  });
+  return changed;
+}
+
 function mergeMergedAnswersWithRenderCache({
   template,
   instance,
@@ -4283,12 +4305,38 @@ function mergeMergedAnswersWithRenderCache({
   const liveKeys = resolveLiveOnOpenSnapshotKeys(template);
   const liveKeyLower = new Set(liveKeys.map((row) => normalizeSnapshotKey(row).toLowerCase()).filter(Boolean));
   const hasLive = liveFieldIds.size > 0 || liveKeyLower.size > 0;
-  if (!hasLive) {
-    return { mergedAnswers: { ...cachedMerged }, skipRecalculation: true, usedPartialCache: false };
-  }
-
   const ctx = resolveSnapshotScopeContext(template);
   const useScope = scopeOptions.respectSnapshotKeys === true && ctx.active;
+
+  function finalizeBlendedMerge(out, skipRecalculation, usedPartialCache) {
+    const sharedOverlayed = overlaySharedAcrossStudentsFromLiveMerge(out, liveMerged, template, assignment);
+    if (!sharedOverlayed && skipRecalculation) {
+      return { mergedAnswers: out, skipRecalculation: true, usedPartialCache };
+    }
+    const prefill = instance?.prefillSnapshot && typeof instance.prefillSnapshot === 'object'
+      ? instance.prefillSnapshot
+      : {};
+    const templateForCalc = useScope ? expandTemplateForSnapshotCalculation(template, ctx) : template;
+    const recalculated = reportRuleEngineService.recomputeCalculatedAnswers({
+      template: templateForCalc,
+      mergedAnswers: out,
+      prefill
+    });
+    const mergedAnswers = useScope
+      ? stripOutOfScopeMergedAnswers(template, recalculated.answers, ctx)
+      : recalculated.answers;
+    return {
+      mergedAnswers,
+      skipRecalculation: sharedOverlayed ? false : skipRecalculation,
+      usedPartialCache: sharedOverlayed ? true : usedPartialCache
+    };
+  }
+
+  if (!hasLive) {
+    const out = { ...cachedMerged };
+    return finalizeBlendedMerge(out, true, false);
+  }
+
   const out = { ...cachedMerged };
 
   liveKeys.forEach((rawKey) => {
@@ -4312,20 +4360,7 @@ function mergeMergedAnswersWithRenderCache({
     }
   });
 
-  const prefill = instance?.prefillSnapshot && typeof instance.prefillSnapshot === 'object'
-    ? instance.prefillSnapshot
-    : {};
-  const templateForCalc = useScope ? expandTemplateForSnapshotCalculation(template, ctx) : template;
-  const recalculated = reportRuleEngineService.recomputeCalculatedAnswers({
-    template: templateForCalc,
-    mergedAnswers: out,
-    prefill
-  });
-  const mergedAnswers = useScope
-    ? stripOutOfScopeMergedAnswers(template, recalculated.answers, ctx)
-    : recalculated.answers;
-
-  return { mergedAnswers, skipRecalculation: false, usedPartialCache: true };
+  return finalizeBlendedMerge(out, false, true);
 }
 
 /**

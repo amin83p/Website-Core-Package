@@ -24,6 +24,7 @@
   </div>
 
   <div class="form-container wide" style="max-width: 1400px;">
+    <datalist id="vendorModelIdList"></datalist>
     <form id="schoolAiProviderForm" method="POST" action="<%= isEdit ? '/school/ai-assist/providers/edit/' + record.id : '/school/ai-assist/providers/new' %>">
       <input type="hidden" name="actionStateId" value="<%= asid %>">
       <input type="hidden" name="modelsJson" id="modelsJson" value="">
@@ -136,14 +137,20 @@
         </div>
 
         <div class="tab-pane fade" id="tab-ai-models" role="tabpanel">
-          <p class="small text-muted mb-3">Define one or more model entries for this key. Service assignments pick a single model from this list.</p>
+          <p class="small text-muted mb-3">Define models for this key using <strong>Fetch from vendor</strong> so saved ids match the API (e.g. <code>gemini-2.5-flash</code>, not display names with spaces). Service assignments pick one model from this list.</p>
           <div class="card border-0 shadow-sm mb-3">
-            <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+            <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
               <h6 class="fw-bold m-0 text-primary"><i class="bi bi-list-stars me-2"></i>Model catalog</h6>
-              <button type="button" class="btn btn-outline-primary btn-sm" id="addModelRow">
-                <i class="bi bi-plus-lg me-1"></i> Add model
-              </button>
+              <div class="d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="btnFetchVendorModels">
+                  <i class="bi bi-cloud-download me-1"></i> Fetch from vendor
+                </button>
+                <button type="button" class="btn btn-outline-primary btn-sm" id="addModelRow">
+                  <i class="bi bi-plus-lg me-1"></i> Add model
+                </button>
+              </div>
             </div>
+            <p id="vendorModelsStatus" class="small text-muted px-4 pt-2 mb-0 d-none"></p>
             <div class="card-body p-4" id="modelsEditor"></div>
             <div id="modelsEmptyState" class="text-center text-muted small py-4 d-none">No models yet. Add at least one model id.</div>
           </div>
@@ -206,7 +213,12 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnBannedPicker = document.getElementById('btnOpenBannedUserPicker');
 
   const initial = JSON.parse(document.getElementById('initialModels').textContent || '[]');
+  const providerRecordId = <%- JSON.stringify(String(record.id || '')) %>;
+  const vendorModelsUrl = providerRecordId
+    ? ('/school/ai-assist/providers/' + encodeURIComponent(providerRecordId) + '/vendor-models')
+    : '/school/ai-assist/providers/draft/vendor-models';
   let rows = Array.isArray(initial) ? initial.slice() : [];
+  let vendorCatalog = [];
 
   function escapeHtml(value) {
     return String(value ?? '')
@@ -251,6 +263,22 @@ document.addEventListener('DOMContentLoaded', () => {
     if (modelsEmpty) modelsEmpty.classList.toggle('d-none', out.length > 0);
   }
 
+  function buildModelIdField(index, modelId) {
+    const current = escapeHtml(modelId || '');
+    if (!vendorCatalog.length) {
+      return '<input class="form-control size-md model-id" data-index="' + index + '" value="' + current + '" placeholder="gemini-2.5-flash" list="vendorModelIdList">'
+        + '<div class="form-text">Use Fetch from vendor or type the API model id (not the display name).</div>';
+    }
+    const options = vendorCatalog.map((opt) => {
+      const selected = String(opt.modelId) === String(modelId) ? ' selected' : '';
+      return '<option value="' + escapeHtml(opt.modelId) + '"' + selected + '>' + escapeHtml((opt.label || opt.modelId) + ' — ' + opt.modelId) + '</option>';
+    }).join('');
+    return '<select class="form-select size-md model-id" data-index="' + index + '" required>'
+      + '<option value="" disabled' + (current ? '' : ' selected') + '>Choose a model…</option>'
+      + options
+      + '</select>';
+  }
+
   function renderModels() {
     if (!editor) return;
     editor.innerHTML = '';
@@ -259,8 +287,8 @@ document.addEventListener('DOMContentLoaded', () => {
       wrap.className = 'border rounded p-3 mb-3 bg-light-subtle';
       wrap.innerHTML = ''
         + '<div class="row g-2 align-items-end">'
-        + '  <div class="col-md-5"><label class="form-label fw-bold small">Model ID <span class="text-danger">*</span></label>'
-        + '    <input class="form-control size-md model-id" data-index="' + index + '" value="' + escapeHtml(row.modelId || '') + '" placeholder="gpt-4.1-mini">'
+        + '  <div class="col-md-5"><label class="form-label fw-bold small">Model <span class="text-danger">*</span></label>'
+        + buildModelIdField(index, row.modelId || '')
         + '  </div>'
         + '  <div class="col-md-5"><label class="form-label fw-bold small">Label</label>'
         + '    <input class="form-control size-md model-label" data-index="' + index + '" value="' + escapeHtml(row.label || '') + '" placeholder="Friendly label">'
@@ -279,7 +307,20 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   editor?.addEventListener('input', syncModelsHidden);
-  editor?.addEventListener('change', syncModelsHidden);
+  editor?.addEventListener('change', (event) => {
+    const sel = event.target.closest('.model-id');
+    if (sel && sel.tagName === 'SELECT') {
+      const index = Number(sel.getAttribute('data-index'));
+      const picked = vendorCatalog.find((m) => String(m.modelId) === String(sel.value));
+      if (picked && rows[index]) {
+        rows[index].modelId = picked.modelId;
+        if (!rows[index].label) rows[index].label = picked.label || picked.modelId;
+        const labelInput = editor.querySelector('.model-label[data-index="' + index + '"]');
+        if (labelInput && !String(labelInput.value || '').trim()) labelInput.value = picked.label || picked.modelId;
+      }
+    }
+    syncModelsHidden();
+  });
   editor?.addEventListener('click', (event) => {
     const btn = event.target.closest('.remove-model');
     if (!btn) return;
@@ -292,6 +333,81 @@ document.addEventListener('DOMContentLoaded', () => {
     rows.push({ modelId: '', label: '', isActive: true });
     renderModels();
   });
+
+  function setVendorModelsStatus(text, isError) {
+    const el = document.getElementById('vendorModelsStatus');
+    if (!el) return;
+    el.textContent = text || '';
+    el.classList.toggle('d-none', !text);
+    el.classList.toggle('text-danger', Boolean(isError));
+    el.classList.toggle('text-muted', !isError);
+  }
+
+  async function fetchVendorModels() {
+    const vendorSelect = document.getElementById('providerVendor');
+    const apiKeyInput = document.getElementById('providerApiKey');
+    const projectInput = document.getElementById('providerProject');
+    const locationInput = document.getElementById('providerLocation');
+    const baseUrlInput = document.getElementById('providerBaseUrl');
+    const btn = document.getElementById('btnFetchVendorModels');
+    const payload = {
+      providerId: vendorSelect ? vendorSelect.value : '',
+      apiKey: apiKeyInput ? apiKeyInput.value : '',
+      project: projectInput ? projectInput.value : '',
+      location: locationInput ? locationInput.value : '',
+      baseUrl: baseUrlInput ? baseUrlInput.value : ''
+    };
+    if (!payload.providerId) {
+      const message = 'Select a vendor on the Configuration tab first.';
+      setVendorModelsStatus(message, true);
+      if (typeof showMessageModal === 'function') {
+        showMessageModal({ title: 'Vendor required', icon: 'warning', message, buttons: [{ text: 'OK', class: 'btn-primary' }] });
+      }
+      return;
+    }
+    if (!providerRecordId && !payload.apiKey) {
+      const message = 'Paste the API key on the Configuration tab before fetching models.';
+      setVendorModelsStatus(message, true);
+      if (typeof showMessageModal === 'function') {
+        showMessageModal({ title: 'API key required', icon: 'warning', message, buttons: [{ text: 'OK', class: 'btn-primary' }] });
+      }
+      return;
+    }
+    if (btn) btn.disabled = true;
+    setVendorModelsStatus('Loading models from vendor…', false);
+    try {
+      const response = await fetch(vendorModelsUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok || data.status !== 'success') throw new Error(data.message || 'Could not load models.');
+      vendorCatalog = Array.isArray(data.models) ? data.models : [];
+      if (!vendorCatalog.length) throw new Error('Vendor returned no generateContent models for this key.');
+      setVendorModelsStatus(vendorCatalog.length + ' model(s) loaded. Pick each model from the list (saved ids match the API).', false);
+      const dl = document.getElementById('vendorModelIdList');
+      if (dl) {
+        dl.innerHTML = vendorCatalog.map((m) => '<option value="' + escapeHtml(m.modelId) + '"></option>').join('');
+      }
+      renderModels();
+    } catch (err) {
+      const message = err.message || 'Fetch failed.';
+      setVendorModelsStatus(message, true);
+      if (typeof showMessageModal === 'function') {
+        showMessageModal({
+          title: 'Could not load models',
+          icon: 'error',
+          message,
+          buttons: [{ text: 'OK', class: 'btn-secondary' }]
+        });
+      }
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  document.getElementById('btnFetchVendorModels')?.addEventListener('click', fetchVendorModels);
 
   renderModels();
 
@@ -334,8 +450,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!window.GenericPicker || !window.GenericPickerPresets) {
       if (typeof showMessageModal === 'function') {
         showMessageModal({ title: 'User picker', icon: 'warning', message: 'The user picker is not available on this page.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
-      } else {
-        alert('User picker is not available on this page.');
       }
       return;
     }

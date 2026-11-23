@@ -75,6 +75,7 @@ const sessionStudentCaseModel = require('../../models/school/sessionStudentCaseM
 const attendanceChangeLogModel = require('../../models/school/attendanceChangeLogModel');
 const schoolAiProviderModel = require('../../models/school/schoolAiProviderModel');
 const schoolAiServiceAssignmentModel = require('../../models/school/schoolAiServiceAssignmentModel');
+const schoolAiServiceDefinitionModel = require('../../models/school/schoolAiServiceDefinitionModel');
 const schoolAiTokenUsageModel = require('../../models/school/schoolAiTokenUsageModel');
 const schoolAiUserUsageLimitModel = require('../../models/school/schoolAiUserUsageLimitModel');
 const { normalizeSkillCode } = require('../../../config/skillDefinitions');
@@ -839,16 +840,19 @@ function createSchoolRepository(config) {
     },
 
     async getById(id, options = {}) {
+      const skipTransform = options.skipTransform === true;
       return runByRepositoryBackend(options, {
         json: async () => {
           if (typeof getById !== 'function') return null;
           const item = await getById(id);
           if (!item) return null;
+          if (skipTransform) return item;
           return typeof transformItem === 'function' ? await transformItem(item) : item;
         },
         mongo: async () => {
           const item = normalizeMongoDocument(await getMongoCollection(collectionName).findOne(resolveMongoIdFilter(id)));
           if (!item) return null;
+          if (skipTransform) return item;
           return typeof transformItem === 'function' ? await transformItem(item, { ...options, backendMode: 'mongo' }) : item;
         }
       }, `school.${entityName || 'entity'}.getById`);
@@ -1478,6 +1482,21 @@ const schoolRepositories = {
     create: schoolAiProviderModel.addProvider,
     update: schoolAiProviderModel.updateProvider,
     remove: schoolAiProviderModel.deleteProvider,
+    normalizePayload: (data, id) => {
+      const payload = { ...(data || {}) };
+      const isCreate = !String(id || '').trim();
+      const hasIncomingKey = Boolean(String(payload.apiKey || '').trim());
+      if (isCreate) {
+        return schoolAiProviderModel.normalizeProviderRecord(payload, null, true);
+      }
+      if (hasIncomingKey) {
+        const normalized = schoolAiProviderModel.normalizeProviderRecord(payload, null, false);
+        delete normalized.apiKey;
+        return normalized;
+      }
+      delete payload.apiKey;
+      return payload;
+    },
     transformList: (rows) => normalizeRows(rows).map((row) => schoolAiProviderModel.sanitizeProviderForRead(row)),
     transformItem: (row) => schoolAiProviderModel.sanitizeProviderForRead(row),
     defaultSearchFields: ['id', 'orgId', 'name', 'providerId', 'notes'],
@@ -1492,6 +1511,17 @@ const schoolRepositories = {
     update: async (id, data) => schoolAiServiceAssignmentModel.upsertAssignment({ ...data, id }),
     remove: schoolAiServiceAssignmentModel.deleteAssignment,
     defaultSearchFields: ['id', 'orgId', 'serviceKey', 'providerRecordId', 'notes'],
+    allowSystemFallback: false
+  }),
+  schoolAiServiceDefinitions: createSchoolRepository({
+    entityName: 'schoolAiServiceDefinitions',
+    collectionName: 'schoolAiServiceDefinitions',
+    getAll: schoolAiServiceDefinitionModel.getAllDefinitions,
+    getById: schoolAiServiceDefinitionModel.getDefinitionById,
+    create: schoolAiServiceDefinitionModel.upsertDefinition,
+    update: async (id, data) => schoolAiServiceDefinitionModel.upsertDefinition({ ...data, id }),
+    remove: schoolAiServiceDefinitionModel.deleteDefinition,
+    defaultSearchFields: ['id', 'orgId', 'serviceKey', 'notes'],
     allowSystemFallback: false
   }),
   schoolAiTokenUsage: createSchoolRepository({

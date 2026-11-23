@@ -58,6 +58,10 @@ module.exports = Object.freeze({
     { key: { id: 1 }, options: { name: 'idx_school_ai_service_assignments_id', unique: true } },
     { key: { orgId: 1, serviceKey: 1 }, options: { name: 'idx_school_ai_service_assignments_org_service', unique: true } }
   ],
+  schoolAiServiceDefinitions: [
+    { key: { id: 1 }, options: { name: 'idx_school_ai_service_definitions_id', unique: true } },
+    { key: { orgId: 1, serviceKey: 1 }, options: { name: 'idx_school_ai_service_definitions_org_service', unique: true } }
+  ],
   schoolAiTokenUsage: [
     { key: { id: 1 }, options: { name: 'idx_school_ai_token_usage_id', unique: true } },
     { key: { orgId: 1, userId: 1, createdAt: -1 }, options: { name: 'idx_school_ai_token_usage_org_user_created' } },

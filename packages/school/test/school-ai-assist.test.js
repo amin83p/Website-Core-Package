@@ -9,7 +9,12 @@ const fs = require('fs');
 const schoolAiProviderModel = require(path.join(ROOT, 'packages/school/MVC/models/school/schoolAiProviderModel'));
 const schoolAiServiceAssignmentModel = require(path.join(ROOT, 'packages/school/MVC/models/school/schoolAiServiceAssignmentModel'));
 const schoolAiRuntimeService = require(path.join(ROOT, 'packages/school/MVC/services/school/schoolAiRuntimeService'));
-const { normalizeBannedUserIds, normalizeModelsList } = require(path.join(ROOT, 'packages/school/MVC/services/school/schoolAiModelUtils'));
+const schoolAiServiceDefinitionModel = require(path.join(ROOT, 'packages/school/MVC/models/school/schoolAiServiceDefinitionModel'));
+const schoolAiServiceExecutionService = require(path.join(ROOT, 'packages/school/MVC/services/school/schoolAiServiceExecutionService'));
+const {
+  normalizeBannedUserIds,
+  normalizeModelsList
+} = require(path.join(ROOT, 'packages/school/MVC/services/school/schoolAiModelUtils'));
 const { periodWindowStart } = require(path.join(ROOT, 'packages/school/MVC/services/school/schoolAiAssistCommon'));
 
 function testModelsNormalize() {
@@ -56,6 +61,56 @@ async function testRuntimeBan() {
   }, /blocked/);
 }
 
+function testDefinitionRequiresKnownService() {
+  assert.throws(() => {
+    schoolAiServiceDefinitionModel.normalizeDefinitionRecord({
+      orgId: 'ORG1',
+      serviceKey: 'unknown.service',
+      prompt: { userPromptTemplate: 'Hello {{x}}' },
+      inputs: [{ id: 'x', type: 'text', label: 'X' }]
+    }, null, true);
+  }, /Unknown AI service key/);
+}
+
+function testBuildPromptSubstitution() {
+  const def = {
+    inputs: [{ id: 'name', type: 'text', label: 'Name' }],
+    prompt: {
+      systemPrompt: 'Sys {{name}}',
+      userPromptTemplate: 'User {{name}}'
+    },
+    output: { mode: 'markdown' }
+  };
+  const built = schoolAiServiceExecutionService.buildPrompt(def, { name: 'Ada' });
+  assert.strictEqual(built.systemPrompt, 'Sys Ada');
+  assert.strictEqual(built.userPrompt, 'User Ada');
+}
+
+function testFormatOutputJsonFence() {
+  const formatted = schoolAiServiceExecutionService.formatOutput(
+    { mode: 'json', jsonSchema: { type: 'object', required: ['summary'], properties: { summary: { type: 'string' } } } },
+    '```json\n{"summary":"ok"}\n```',
+    'trace-1'
+  );
+  assert.strictEqual(formatted.ok, true);
+  assert.deepStrictEqual(formatted.data, { summary: 'ok' });
+}
+
+function testModelsRejectDisplayName() {
+  assert.throws(() => {
+    normalizeModelsList([{ modelId: 'Gemini 3.1 Flash Lite' }], { strict: false });
+  }, /valid API model id/);
+}
+
+function testCoerceInputsRequired() {
+  assert.throws(() => {
+    schoolAiServiceExecutionService.coerceInputs(
+      [{ id: 'need', type: 'text', label: 'Need', required: true }],
+      {}
+    );
+  }, /required/);
+}
+
 function testListPagesIncludeTableModals() {
   const controllerPath = path.join(ROOT, 'packages/school/MVC/controllers/school/schoolAiAssistController.js');
   const controllerSource = fs.readFileSync(controllerPath, 'utf8');
@@ -71,6 +126,11 @@ async function run() {
   testAssignmentRequiresService();
   testPeriodWindowMonthly();
   await testRuntimeBan();
+  testDefinitionRequiresKnownService();
+  testBuildPromptSubstitution();
+  testFormatOutputJsonFence();
+  testModelsRejectDisplayName();
+  testCoerceInputsRequired();
   testListPagesIncludeTableModals();
   console.log('school-ai-assist.test.js: ok');
 }

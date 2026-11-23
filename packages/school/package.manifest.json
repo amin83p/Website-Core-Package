@@ -1490,6 +1490,7 @@
       "subsections": [
         { "id": "446210" },
         { "id": "446211" },
+        { "id": "446214" },
         { "id": "446212" },
         { "id": "446213" }
       ],
@@ -1533,6 +1534,28 @@
       "mainDashboardDisplay": false,
       "navigatorSection": false,
       "homeURL": "/school/ai-assist/service-assignments",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        { "id": "OP1001", "sessionAttempts": 10, "sessionTime": 30, "active": true },
+        { "id": "OP1003", "sessionAttempts": 10, "sessionTime": 30, "active": true }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "446214",
+      "name": "SCHOOL_AI_SERVICE_DEFINITIONS",
+      "category": "SCHOOL",
+      "description": "Inputs, prompts, and output shaping for registered school AI services.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 1,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/ai-assist/service-definitions",
       "inactiveMessage": "",
       "message": "",
       "operations": [
@@ -5248,6 +5271,18 @@
       "tags": [
         "SCHOOL_AI_SERVICE_ASSIGNMENTS",
         "446211"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SCHOOL_AI_SERVICE_DEFINITIONS_001",
+      "name": "SCHOOL_AI_SERVICE_DEFINITIONS",
+      "type": "class",
+      "value": "bi bi-braces",
+      "tags": [
+        "SCHOOL_AI_SERVICE_DEFINITIONS",
+        "446214"
       ],
       "orgId": "SYSTEM",
       "adoptExisting": true
@@ -10975,6 +11010,11 @@
       "entityType": "schoolAiServiceAssignments",
       "label": "School AI Service Assignments",
       "collectionName": "schoolAiServiceAssignments"
+    },
+    {
+      "entityType": "schoolAiServiceDefinitions",
+      "label": "School AI Service Definitions",
+      "collectionName": "schoolAiServiceDefinitions"
     },
     {
       "entityType": "schoolAiTokenUsage",

@@ -4,6 +4,9 @@
   const studentTargetedScope = reportScopeToken === 'each_student' || reportScopeToken === 'selected_students';
   const requestedEditorVariant = String(typeof editorVariant === 'undefined' ? '' : editorVariant).trim().toLowerCase();
   const isV2 = requestedEditorVariant === 'v2';
+  const reportAiAssistSafe = (typeof reportAiAssist !== 'undefined' && reportAiAssist) ? reportAiAssist : { catalog: [], canRun: false };
+  const reportAiAssistCatalog = Array.isArray(reportAiAssistSafe.catalog) ? reportAiAssistSafe.catalog : [];
+  const showReportAiAssistPanel = isV2 && reportAiAssistSafe.canRun && reportAiAssistCatalog.length > 0;
   const orderedFieldsList = fields;
   const hasSharedFields = studentTargetedScope && fields.some((f) => f?.sharedAcrossStudents === true);
   const validation = (typeof validationSummary !== 'undefined' && validationSummary && typeof validationSummary === 'object')
@@ -464,6 +467,18 @@
         <% if (!isV2) { %>
           <a href="/school/reports/instances/export/<%= instance.id %>?download=1" class="btn btn-outline-dark btn-sm"><i class="bi bi-download me-1"></i>Export Payload</a>
         <% } %>
+        <% if (showReportAiAssistPanel) { %>
+          <button
+            type="button"
+            class="btn btn-outline-primary btn-sm report-toolbar-icon-btn"
+            id="btnReportInstanceAiAssist"
+            data-bs-toggle="tooltip"
+            data-bs-placement="bottom"
+            title="AI Assist"
+            aria-label="AI Assist">
+            <i class="bi bi-robot" aria-hidden="true"></i>
+          </button>
+        <% } %>
         <% if (!isReadOnly) { %>
           <% if (isV2) { %>
           <button
@@ -496,6 +511,32 @@
   <% if (showTemplateAheadOfCacheBanner) { %>
     <div class="alert alert-info border-info-subtle mb-4 py-2" role="status">
       <div class="small mb-0">The report template was updated since your last save. Displayed values are from your last save until you use Preview Prefill Updates or save again.</div>
+    </div>
+  <% } %>
+
+  <%
+    const reportAiServiceRunners = (typeof reportAiServices !== 'undefined' && Array.isArray(reportAiServices))
+      ? reportAiServices.filter(Boolean)
+      : [];
+  %>
+  <% if (showReportAiAssistPanel) { %>
+    <%- include('partials/reportAiAssistModal') %>
+  <% } %>
+
+  <% if (reportAiServiceRunners.length && !isV2) { %>
+    <div class="card border-0 shadow-sm mb-4">
+      <button type="button" class="card-header bg-white border-0 w-100 d-flex justify-content-between align-items-center py-3 text-start rounded-top collapsed" data-bs-toggle="collapse" data-bs-target="#reportInstanceAiServicesCollapse" aria-expanded="false">
+        <span class="fw-bold text-body"><i class="bi bi-robot me-2 text-primary"></i>AI services</span>
+        <span class="badge bg-light text-dark border me-2"><%= reportAiServiceRunners.length %></span>
+        <i class="bi bi-chevron-down text-muted" aria-hidden="true"></i>
+      </button>
+      <div id="reportInstanceAiServicesCollapse" class="collapse">
+        <div class="card-body border-top">
+          <% reportAiServiceRunners.forEach((runner) => { %>
+            <%- include('school/aiAssist/partials/schoolAiServiceRunner', { aiServiceRunner: runner }) %>
+          <% }) %>
+        </div>
+      </div>
     </div>
   <% } %>
 
@@ -1354,6 +1395,41 @@
 <%- include('partials/calculatedFieldsRuntime') %>
 <%- include('partials/reportMessageHelpers') %>
 <script src="/scripts/reportAssignmentDelete.js"></script>
+<% if (showReportAiAssistPanel) { %>
+<script src="/scripts/reportAiAssistPanel.js"></script>
+<script>
+  (function () {
+    const catalog = <%- JSON.stringify(reportAiAssistCatalog).replace(/</g, '\\u003c') %>;
+    const instanceForm = document.querySelector('form[action^="/school/reports/instances/edit/"]');
+  function collectInstanceAnswersOverride() {
+    const answersOverride = {};
+    const radioSeen = new Set();
+    instanceForm?.querySelectorAll('.js-report-field[data-field-id]').forEach((control) => {
+      const fieldId = String(control.dataset.fieldId || '').trim();
+      if (!fieldId) return;
+      if (control.type === 'radio') {
+        if (radioSeen.has(fieldId)) return;
+        radioSeen.add(fieldId);
+        const group = instanceForm.querySelectorAll(`.js-report-field[data-field-id="${CSS.escape(fieldId)}"]`);
+        const checked = Array.from(group).find((el) => el.type === 'radio' && el.checked);
+        answersOverride[fieldId] = checked ? String(checked.value || '').trim() : '';
+        return;
+      }
+      if (control.type === 'checkbox') answersOverride[fieldId] = control.checked === true;
+      else answersOverride[fieldId] = control.value;
+    });
+    return { answersOverride };
+  }
+    window.initReportAiAssistPanel({
+      context: 'instance',
+      catalog,
+      identity: { instanceId: <%- JSON.stringify(String(instance?.id || '')) %> },
+      storageKey: 'reportAiAssist:instance:' + <%- JSON.stringify(String(instance?.id || '')) %>,
+      getAnswersOverride: collectInstanceAnswersOverride
+    });
+  })();
+</script>
+<% } %>
 <script>
   (function () {
     const btnClose = document.getElementById('btnCloseReportInstance');

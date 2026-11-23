@@ -75,6 +75,7 @@ const reportRosterService = require('../../services/school/reportRosterService')
 const schoolFileService = require('../../services/school/schoolFileService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 const schoolPersonAccessService = require('../../services/school/schoolPersonAccessService');
+const sessionRosterContactService = require('../../services/school/sessionRosterContactService');
 const schoolRepositories = require('../../repositories/school');
 const schoolRollingEnrollmentAccessService = require('../../services/school/schoolRollingEnrollmentAccessService');
 const classCycleLinkResolutionService = require('../../services/school/classCycleLinkResolutionService');
@@ -4992,6 +4993,10 @@ async function manageSession(req, res) {
             classData?.attendanceRosterPersonOrder
         );
         const hasAttendanceRosterOrder = attendanceRosterPersonOrder.length > 0;
+        const attendanceRosterEmailByPersonId = sessionRosterContactService.buildAttendanceRosterEmailMap(
+            session.roster,
+            sessionPersonsById
+        );
         let canEditClassConductViaMatrix = false;
         try {
             const matrixConductEval = await accessService.evaluateAccess({
@@ -5112,6 +5117,7 @@ async function manageSession(req, res) {
             attendanceRosterPersonOrder,
             hasAttendanceRosterOrder,
             attendanceRosterNicknames: attendanceRosterNicknamesForClass,
+            attendanceRosterEmailByPersonId,
             attendanceExcuseReasons,
             canManageAttendanceExcuseReasons,
             includeModal: true,  

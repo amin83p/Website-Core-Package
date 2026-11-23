@@ -142,6 +142,44 @@ test('mergeMergedAnswersWithRenderCache uses full cache when no refresh keys con
   assert.equal(blended.mergedAnswers.teacher, 'Cached Teacher');
 });
 
+test('mergeMergedAnswersWithRenderCache overlays shared fields from assignment when cache is frozen', () => {
+  const rowId = 'session:SES_1:2026-06-01';
+  const template = {
+    id: 'TPL-SHARED-CACHE',
+    schema: {
+      fields: [
+        { id: 'student_note', type: 'text', sharedAcrossStudents: false },
+        { id: 'shared_note', type: 'textarea', sharedAcrossStudents: true }
+      ]
+    },
+    snapshotKeyRefreshOnOpen: {}
+  };
+  const assignment = {
+    reportScope: 'each_student',
+    sharedAnswersByRowId: {
+      [rowId]: { shared_note: 'from assignment row' }
+    },
+    targetRows: [{ rowId, status: 'active' }]
+  };
+  const instance = {
+    assignmentRowId: rowId,
+    answers: { student_note: 'per student' },
+    prefillSnapshot: {},
+    derivedOverrides: {}
+  };
+  const cached = { student_note: 'per student', shared_note: '' };
+  const blended = reportService.mergeMergedAnswersWithRenderCache({
+    template,
+    instance,
+    assignment,
+    cachedMerged: cached,
+    options: {}
+  });
+  assert.equal(blended.mergedAnswers.shared_note, 'from assignment row');
+  assert.equal(blended.mergedAnswers.student_note, 'per student');
+  assert.equal(blended.usedPartialCache, true);
+});
+
 test('hydrateAnswersFromPrefill does not overwrite stale gradebook answers without refresh flag', () => {
   const template = {
     schema: {

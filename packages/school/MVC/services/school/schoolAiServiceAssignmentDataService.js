@@ -13,7 +13,11 @@ const {
 const ENTITY = 'schoolAiServiceAssignments';
 
 async function validateProviderModel(orgId, providerRecordId, modelEntryId, requestingUser, accessContext) {
-  const raw = await schoolAiProviderDataService.getRawProviderById(providerRecordId);
+  const raw = await schoolAiProviderDataService.getRawProviderById(
+    providerRecordId,
+    requestingUser,
+    accessContext
+  );
   if (!raw) throw new Error('Selected provider key was not found.');
   assertOrgRow(raw, orgId);
   if (raw.isActive === false) throw new Error('Selected provider key is inactive.');

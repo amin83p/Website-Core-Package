@@ -54,6 +54,28 @@ test('resolveSharedAnswersForRow reads sharedAnswersByRowId slice', () => {
   assert.deepEqual(reportAssignmentModel.resolveSharedAnswersForRow(assignment, rowB), {});
 });
 
+test('mergeTemplateData falls back to instance answers when row shared slice is empty', () => {
+  const template = {
+    schema: {
+      fields: [{ id: 'shared_note', type: 'textarea', sharedAcrossStudents: true }]
+    }
+  };
+  const assignment = {
+    reportScope: 'each_student',
+    sharedAnswersByRowId: {},
+    targetRows: [
+      { rowId: rowA, status: 'active' },
+      { rowId: rowB, status: 'active' }
+    ]
+  };
+  const merged = reportService.mergeTemplateData(
+    template,
+    { assignmentRowId: rowA, answers: { shared_note: 'from instance row' } },
+    assignment
+  );
+  assert.equal(merged.shared_note, 'from instance row');
+});
+
 test('mergeTemplateData uses row-scoped shared answers', () => {
   const template = {
     schema: {

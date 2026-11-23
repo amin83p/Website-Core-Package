@@ -3,7 +3,25 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/school/schoolAiAssistController');
-const { requireAuth, requireAccess, trackActionState, SECTIONS, OPERATIONS } = require('./schoolRouteDependencies');
+const { requireAuth, requireAccess, requireAccessAny, trackActionState, SECTIONS, OPERATIONS } = require('./schoolRouteDependencies');
+
+const requireAiServiceDefinitionsRead = requireAccessAny(
+  [
+    SECTIONS.SCHOOL_AI_SERVICE_DEFINITIONS,
+    SECTIONS.SCHOOL_AI_PROVIDER_KEYS,
+    SECTIONS.SCHOOL_AI_SERVICE_ASSIGNMENTS
+  ],
+  OPERATIONS.READ_ALL
+);
+
+const requireAiServiceDefinitionsUpdate = requireAccessAny(
+  [
+    SECTIONS.SCHOOL_AI_SERVICE_DEFINITIONS,
+    SECTIONS.SCHOOL_AI_PROVIDER_KEYS,
+    SECTIONS.SCHOOL_AI_SERVICE_ASSIGNMENTS
+  ],
+  OPERATIONS.UPDATE
+);
 
 router.use(requireAuth);
 
@@ -27,7 +45,7 @@ router.get('/providers/new',
 
 router.post('/providers/new',
   requireAccess(SECTIONS.SCHOOL_AI_PROVIDER_KEYS, OPERATIONS.CREATE),
-  trackActionState(SECTIONS.SCHOOL_AI_PROVIDER_KEYS, OPERATIONS.CREATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_AI_PROVIDER_KEYS, OPERATIONS.CREATE, { requireToken: false }),
   ctrl.createProvider
 );
 
@@ -39,7 +57,7 @@ router.get('/providers/edit/:id',
 
 router.post('/providers/edit/:id',
   requireAccess(SECTIONS.SCHOOL_AI_PROVIDER_KEYS, OPERATIONS.UPDATE),
-  trackActionState(SECTIONS.SCHOOL_AI_PROVIDER_KEYS, OPERATIONS.UPDATE, { requireToken: true }),
+  trackActionState(SECTIONS.SCHOOL_AI_PROVIDER_KEYS, OPERATIONS.UPDATE, { requireToken: false }),
   ctrl.updateProvider
 );
 
@@ -61,6 +79,18 @@ router.post('/providers/default',
   ctrl.setDefaultProvider
 );
 
+router.post('/providers/draft/vendor-models',
+  requireAccess(SECTIONS.SCHOOL_AI_PROVIDER_KEYS, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.SCHOOL_AI_PROVIDER_KEYS, OPERATIONS.CREATE, { requireToken: false }),
+  ctrl.listProviderVendorModels
+);
+
+router.post('/providers/:id/vendor-models',
+  requireAccess(SECTIONS.SCHOOL_AI_PROVIDER_KEYS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_AI_PROVIDER_KEYS, OPERATIONS.UPDATE, { requireToken: false }),
+  ctrl.listProviderVendorModels
+);
+
 router.get('/service-assignments',
   requireAccess(SECTIONS.SCHOOL_AI_SERVICE_ASSIGNMENTS, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_AI_SERVICE_ASSIGNMENTS, OPERATIONS.READ_ALL),
@@ -71,6 +101,30 @@ router.post('/service-assignments/:serviceKey',
   requireAccess(SECTIONS.SCHOOL_AI_SERVICE_ASSIGNMENTS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_AI_SERVICE_ASSIGNMENTS, OPERATIONS.UPDATE, { requireToken: false }),
   ctrl.saveServiceAssignment
+);
+
+router.get('/service-definitions',
+  requireAiServiceDefinitionsRead,
+  trackActionState(SECTIONS.SCHOOL_AI_SERVICE_DEFINITIONS, OPERATIONS.READ_ALL),
+  ctrl.listServiceDefinitions
+);
+
+router.get('/service-definitions/:serviceKey/edit',
+  requireAiServiceDefinitionsUpdate,
+  trackActionState(SECTIONS.SCHOOL_AI_SERVICE_DEFINITIONS, OPERATIONS.UPDATE, { keepActive: true }),
+  ctrl.showEditServiceDefinition
+);
+
+router.post('/service-definitions/:serviceKey',
+  requireAiServiceDefinitionsUpdate,
+  trackActionState(SECTIONS.SCHOOL_AI_SERVICE_DEFINITIONS, OPERATIONS.UPDATE, { requireToken: false }),
+  ctrl.saveServiceDefinition
+);
+
+router.post('/services/:serviceKey/run',
+  requireAiServiceDefinitionsRead,
+  trackActionState(SECTIONS.SCHOOL_AI_SERVICE_DEFINITIONS, OPERATIONS.READ_ALL, { requireToken: false }),
+  ctrl.runSchoolAiService
 );
 
 router.get('/token-usage/limits',

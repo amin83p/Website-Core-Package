@@ -21,9 +21,15 @@ const semiMonthlyReportAssignmentWizardService = require('../../services/school/
 const reportRuleEngineService = require('../../services/school/reportRuleEngineService');
 const reportInstanceSaveService = require('../../services/school/reportInstanceSaveService');
 const reportPrefillRefreshPreviewService = require('../../services/school/reportPrefillRefreshPreviewService');
+const schoolAiAssistController = require('./schoolAiAssistController');
+const reportTemplateAiBindingService = require('../../services/school/reportTemplateAiBindingService');
+const reportAiAssistService = require('../../services/school/reportAiAssistService');
+const schoolAiServiceDefinitionDataService = require('../../services/school/schoolAiServiceDefinitionDataService');
+const schoolAiServiceExecutionService = require('../../services/school/schoolAiServiceExecutionService');
+const reportMatrixService = require('../../services/school/reportMatrixService');
+const { listAiServices, getAiServiceByKey } = require('../../config/schoolAiServiceRegistry');
 const { expandKeysForApply } = require('../../services/school/reportPrefillMirrorKeys');
 const reportInstanceLivePrefillResetService = require('../../services/school/reportInstanceLivePrefillResetService');
-const reportMatrixService = require('../../services/school/reportMatrixService');
 const classAttendanceRosterOrderService = require('../../services/school/classAttendanceRosterOrderService');
 const reportGenerationEngineService = require('../../services/school/reportGenerationEngineService');
 const matrixWindowService = require('../../services/school/matrixWindowService');
@@ -483,7 +489,8 @@ function buildCopiedTemplateDraft(sourceTemplate = {}, templates = [], activeOrg
     allowedReportScopes: reportScopePolicy.resolveAllowedReportScopes(sourceTemplate),
     reportPeriodBase: reportPeriodBasePolicy.resolveReportPeriodFields(sourceTemplate).reportPeriodBase,
     reportPeriodOffset: reportPeriodBasePolicy.resolveReportPeriodFields(sourceTemplate).reportPeriodOffset,
-    targetDepartmentIds: reportTargetDepartmentPolicy.resolveTargetDepartmentFields(sourceTemplate).targetDepartmentIds
+    targetDepartmentIds: reportTargetDepartmentPolicy.resolveTargetDepartmentFields(sourceTemplate).targetDepartmentIds,
+    aiServices: clonePlainValue(sourceTemplate?.aiServices, [])
   };
 }
 
@@ -529,10 +536,27 @@ async function showTemplateForm(req, res) {
       ? await buildInitialTargetDepartments(template, req.user)
       : [];
     const gradebookSkills = await loadReportTemplateGradebookSkills(activeOrgId, req.user);
+    const aiServiceCatalog = listAiServices();
+    const aiServices = reportTemplateAiBindingService.normalizeStoredAiServices(template?.aiServices);
+    const aiDefinitionsByKey = {};
+    const accessContext = { scopeId: req.accessScope };
+    await Promise.all(aiServices.map(async (row) => {
+      if (aiDefinitionsByKey[row.serviceKey]) return;
+      try {
+        const definition = await schoolAiServiceDefinitionDataService.getByServiceKey(
+          row.serviceKey,
+          req.user,
+          accessContext
+        );
+        aiDefinitionsByKey[row.serviceKey] = reportTemplateAiBindingService.sanitizeDefinitionInputsForClient(definition);
+      } catch (_) {
+        aiDefinitionsByKey[row.serviceKey] = [];
+      }
+    }));
 
     res.render('school/report/templateForm', {
       title: isEdit ? 'Edit Report Template' : 'New Report Template',
-      template,
+      template: template ? { ...template, aiServices } : template,
       gradebookSkills,
       funderPickerOptions,
       initialTargetDepartments,
@@ -541,6 +565,8 @@ async function showTemplateForm(req, res) {
       reportScopeDefinitions: reportScopePolicy.REPORT_SCOPE_DEFINITIONS,
       reportPeriodBaseDefinitions: reportPeriodBasePolicy.REPORT_PERIOD_BASE_DEFINITIONS,
       prefillCatalog: reportService.getPrefillCatalog(),
+      aiServiceCatalog,
+      aiDefinitionsByKey,
       includeModal: true,
       user: req.user,
       actionStateId: req.actionStateId
@@ -563,10 +589,27 @@ async function showTemplateCopyForm(req, res) {
     const funderPickerOptions = reportFunderDocxService.buildFunderPickerOptions(activeFunders);
     const initialTargetDepartments = await buildInitialTargetDepartments(template, req.user);
     const gradebookSkills = await loadReportTemplateGradebookSkills(activeOrgId, req.user);
+    const aiServiceCatalog = listAiServices();
+    const aiServices = reportTemplateAiBindingService.normalizeStoredAiServices(template?.aiServices);
+    const aiDefinitionsByKey = {};
+    const accessContext = { scopeId: req.accessScope };
+    await Promise.all(aiServices.map(async (row) => {
+      if (aiDefinitionsByKey[row.serviceKey]) return;
+      try {
+        const definition = await schoolAiServiceDefinitionDataService.getByServiceKey(
+          row.serviceKey,
+          req.user,
+          accessContext
+        );
+        aiDefinitionsByKey[row.serviceKey] = reportTemplateAiBindingService.sanitizeDefinitionInputsForClient(definition);
+      } catch (_) {
+        aiDefinitionsByKey[row.serviceKey] = [];
+      }
+    }));
 
     res.render('school/report/templateForm', {
       title: 'Copy Report Template',
-      template,
+      template: { ...template, aiServices },
       gradebookSkills,
       copySourceTemplate: sourceTemplate,
       funderPickerOptions,
@@ -576,6 +619,8 @@ async function showTemplateCopyForm(req, res) {
       reportScopeDefinitions: reportScopePolicy.REPORT_SCOPE_DEFINITIONS,
       reportPeriodBaseDefinitions: reportPeriodBasePolicy.REPORT_PERIOD_BASE_DEFINITIONS,
       prefillCatalog: reportService.getPrefillCatalog(),
+      aiServiceCatalog,
+      aiDefinitionsByKey,
       includeModal: true,
       user: req.user,
       actionStateId: req.actionStateId
@@ -645,6 +690,15 @@ async function saveTemplate(req, res) {
       && Array.isArray(copySourceTemplate.pdfTemplatesByFunder) && copySourceTemplate.pdfTemplatesByFunder.length) {
       payload.pdfTemplatesByFunder = clonePlainValue(copySourceTemplate.pdfTemplatesByFunder, []);
     }
+
+    const aiServiceValidation = reportTemplateAiBindingService.validateAiServicesForTemplate(payload, {
+      strict: true,
+      prefillCatalog: reportService.getPrefillCatalog()
+    });
+    if (aiServiceValidation.errors.length) {
+      throw new Error(aiServiceValidation.errors.slice(0, 3).join(' '));
+    }
+    payload.aiServices = aiServiceValidation.rows;
 
     const invalidPrefillKeys = reportService.validateTemplatePrefillKeys(payload.schema);
     if (invalidPrefillKeys.length) {
@@ -2173,7 +2227,7 @@ async function buildInstanceEditorRenderContext(req) {
     schoolRollingEnrollmentAccessService.canAccessRollingEnrollment(req.user).catch(() => false)
   ]);
 
-  return {
+  const renderContext = {
     title: `Report Editor: ${template.title}`,
     instance: latestInstance,
     template,
@@ -2210,8 +2264,370 @@ async function buildInstanceEditorRenderContext(req) {
     canOpenGradesMatrix,
     canOpenConductMatrix,
     canOpenClassConductReport,
-    canOpenRollingEnrollment: Boolean(canOpenRollingEnrollment)
+    canOpenRollingEnrollment: Boolean(canOpenRollingEnrollment),
+    reportAiServices: [],
+    reportAiAssist: { context: 'instance', catalog: [], canRun: false, matrixAllowed: false, matrixBlockedReason: '' }
   };
+  const isV2Editor = String(req.path || '').includes('edit-v2');
+  if (isV2Editor) {
+    await attachReportAiAssistPanelContext(
+      renderContext,
+      req,
+      template,
+      mergedDataForValidation || mergedData,
+      latestInstance?.prefillSnapshot,
+      'instance'
+    );
+  } else {
+    await attachReportAiServicesContext(renderContext, req, template, mergedDataForValidation || mergedData);
+  }
+  return renderContext;
+}
+
+async function reportAiAssistPrepare(req, res) {
+  try {
+    const scope = await resolveReportAiAssistScope(req, req.body || {});
+    const definition = await schoolAiServiceDefinitionDataService.getByServiceKey(
+      scope.bindingRow.serviceKey,
+      req.user,
+      { scopeId: req.accessScope }
+    );
+    const inputs = reportTemplateAiBindingService.resolveInputsForService(
+      scope.bindingRow,
+      definition,
+      scope.merged,
+      scope.prefill
+    );
+    const clientOverrides = parseReportAiAssistObject(req.body?.inputs);
+    const mergedInputs = { ...inputs, ...clientOverrides };
+    const entry = reportTemplateAiBindingService.buildCatalogEntryFromBinding(
+      scope.bindingRow,
+      definition,
+      getAiServiceByKey(scope.bindingRow.serviceKey),
+      mergedInputs
+    );
+    return res.json({
+      status: 'success',
+      context: scope.context,
+      bindingRowId: scope.bindingRow.id,
+      service: entry,
+      inputs: mergedInputs
+    });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 400).json({
+      status: 'error',
+      message: error.message || 'Could not prepare AI Assist inputs.'
+    });
+  }
+}
+
+async function reportAiAssistRun(req, res) {
+  try {
+    const scope = await resolveReportAiAssistScope(req, req.body || {});
+    const bodyInputs = parseReportAiAssistObject(req.body?.inputs);
+    const definition = await schoolAiServiceDefinitionDataService.getByServiceKey(
+      scope.bindingRow.serviceKey,
+      req.user,
+      { scopeId: req.accessScope }
+    );
+    const defaults = reportTemplateAiBindingService.resolveInputsForService(
+      scope.bindingRow,
+      definition,
+      scope.merged,
+      scope.prefill
+    );
+    const inputs = { ...defaults, ...bodyInputs };
+    const result = await schoolAiServiceExecutionService.run({
+      serviceKey: scope.bindingRow.serviceKey,
+      inputs,
+      requestingUser: req.user,
+      accessContext: { scopeId: req.accessScope }
+    });
+    return res.json({ status: 'success', result, bindingRowId: scope.bindingRow.id });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 400).json({
+      status: 'error',
+      message: error.message || 'AI Assist run failed.',
+      validationErrors: error.validationErrors || undefined
+    });
+  }
+}
+
+async function userCanRunSchoolAiAssist(req) {
+  const aiAssistSections = [
+    SECTIONS.SCHOOL_AI_SERVICE_DEFINITIONS,
+    SECTIONS.SCHOOL_AI_PROVIDER_KEYS,
+    SECTIONS.SCHOOL_AI_SERVICE_ASSIGNMENTS
+  ];
+  for (const sectionId of aiAssistSections) {
+    // eslint-disable-next-line no-await-in-loop
+    if (await adminAuthorityService.isAdminForRequestAsync(req.user, sectionId, OPERATIONS.READ_ALL, { ipAddress: req.ip })) {
+      return true;
+    }
+    // eslint-disable-next-line no-await-in-loop
+    const evaluation = await accessService.evaluateAccess({
+      user: req.user,
+      sectionId,
+      operationId: OPERATIONS.READ_ALL,
+      ipAddress: req.ip
+    }).catch(() => null);
+    if (evaluation?.allowed) return true;
+  }
+  return false;
+}
+
+function parseReportAiAssistObject(raw) {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  return raw;
+}
+
+async function assertReportMatrixEditorForRequest(req, body = {}) {
+  const assignmentId = String(body.assignmentId || req.params?.assignmentId || '').trim();
+  if (!assignmentId) throw new Error('assignmentId is required.');
+  const resolved = await reportIntegrityService.resolveStartInstanceContext({
+    assignmentId,
+    assignmentRowId: body.assignmentRowId || body.rowId || '',
+    reqUser: req.user,
+    requestedTeacherId: body.teacherId || '',
+    fallbackTeacherId: req.user?.personId || req.user?.id || '',
+    requestedStudentId: ''
+  });
+  if (adminAuthorityService.isSuperAdmin(req.user) || req.adminContext?.isSuperAdmin) {
+    return resolved;
+  }
+  const updateEvaluation = await accessService.evaluateAccess({
+    user: req.user,
+    sectionId: SECTIONS.SCHOOL_REPORTS_INSTANCES,
+    operationId: OPERATIONS.UPDATE,
+    ipAddress: req.ip
+  });
+  if (updateEvaluation?.allowed) {
+    return resolved;
+  }
+  const viewerPersonId = toPublicId(req.user?.personId || req.user?.id || '');
+  if (!viewerPersonId || !idsEqual(resolved.teacherId, viewerPersonId)) {
+    const err = new Error('Only the assigned teacher or a report instance editor can use AI Assist on Fill Reports.');
+    err.statusCode = 403;
+    throw err;
+  }
+  return resolved;
+}
+
+async function resolveReportAiAssistScope(req, body = {}) {
+  const context = String(body.context || 'instance').toLowerCase();
+  const bindingRowId = String(body.bindingRowId || '').trim();
+  if (!bindingRowId) throw new Error('bindingRowId is required.');
+
+  if (context === 'matrix') {
+    const resolved = await assertReportMatrixEditorForRequest(req, body);
+    const analysis = reportTemplateAiBindingService.analyzeAiAssistContexts(resolved.template || {});
+    if (!analysis.matrixAllowed) {
+      throw new Error(analysis.matrixBlockedReason || 'AI Assist is not available on Fill Reports for this template.');
+    }
+    const bindingRow = reportTemplateAiBindingService.findBindingById(resolved.template, bindingRowId);
+    if (!bindingRow) throw new Error('AI service binding not found on this template.');
+    const sharedAnswersOverride = parseReportAiAssistObject(body.sharedAnswersOverride);
+    const commonAnswersOverride = parseReportAiAssistObject(body.commonAnswersOverride);
+    const sharedFromAssignment = reportAssignmentModel.resolveSharedAnswersForRow(
+      resolved.assignment,
+      resolved.assignment?.assignmentRowId || ''
+    );
+    const merged = reportTemplateAiBindingService.resolveMatrixMergedData({
+      template: resolved.template,
+      sharedAnswers: { ...sharedFromAssignment, ...sharedAnswersOverride },
+      commonFieldAnswers: commonAnswersOverride,
+      prefillSnapshot: parseReportAiAssistObject(body.prefillSnapshot)
+    });
+    return {
+      context,
+      bindingRow,
+      template: resolved.template,
+      merged,
+      prefill: parseReportAiAssistObject(body.prefillSnapshot)
+    };
+  }
+
+  const instanceId = String(body.instanceId || req.params?.id || '').trim();
+  if (!instanceId) throw new Error('instanceId is required.');
+  const instance = await reportIntegrityService.getAccessibleInstanceOrThrow(instanceId, req.user);
+  const canEdit = await reportViewService.canEditReportInstanceAnswers(instance, req.user);
+  if (!canEdit) {
+    const err = new Error('This report instance cannot be edited.');
+    err.statusCode = 403;
+    throw err;
+  }
+  const template = await schoolDataService.getDataById('reportTemplates', instance.templateId, req.user);
+  if (!template) throw new Error('Template not found for this report instance.');
+  const assignment = await schoolDataService.getDataById('reportAssignments', instance.assignmentId, req.user);
+  const effectiveAssignment = reportViewService.applyAssignmentRow(
+    assignment,
+    reportViewService.findAssignmentRow(assignment, instance.assignmentRowId || '')
+  );
+  const bindingRow = reportTemplateAiBindingService.findBindingById(template, bindingRowId);
+  if (!bindingRow) throw new Error('AI service binding not found on this template.');
+  const answersOverride = parseReportAiAssistObject(body.answersOverride);
+  const prefill = instance.prefillSnapshot && typeof instance.prefillSnapshot === 'object'
+    ? instance.prefillSnapshot
+    : {};
+  const mergedPack = buildInstanceMergedForAiAssist(
+    template,
+    instance,
+    effectiveAssignment || assignment,
+    answersOverride
+  );
+  return {
+    context: 'instance',
+    bindingRow,
+    template,
+    instance,
+    assignment: effectiveAssignment || assignment,
+    merged: mergedPack.merged,
+    prefill
+  };
+}
+
+function buildInstanceMergedForAiAssist(template, instance, assignment, answersOverride = {}) {
+  const editorMergeOptions = reportService.templateUsesSnapshotScope(template)
+    ? { respectSnapshotKeys: true }
+    : {};
+  const instLocked = String(instance?.status || '').toLowerCase() === 'locked';
+  const renderCacheValid = reportService.isInstanceRenderCacheValid(template, instance);
+  const freezeOnOpen = reportService.shouldFreezeReportInstanceOnOpen(template, instance);
+  let mergedBeforeCalculation;
+  let skipRecalculation = false;
+  if (instLocked) {
+    const uiState = reportService.resolveInstanceMergedStateForUI({
+      template,
+      instance,
+      assignment,
+      options: { scopeOptions: editorMergeOptions }
+    });
+    mergedBeforeCalculation = uiState.mergedAnswers;
+    skipRecalculation = true;
+  } else if (freezeOnOpen && renderCacheValid) {
+    const blended = reportService.mergeMergedAnswersWithRenderCache({
+      template,
+      instance,
+      assignment,
+      cachedMerged: instance.renderCache.mergedAnswers,
+      options: { scopeOptions: editorMergeOptions }
+    });
+    mergedBeforeCalculation = blended.mergedAnswers;
+    skipRecalculation = blended.skipRecalculation;
+  } else {
+    mergedBeforeCalculation = reportService.mergeTemplateData(
+      template,
+      instance,
+      assignment,
+      editorMergeOptions
+    );
+  }
+  if (answersOverride && typeof answersOverride === 'object' && Object.keys(answersOverride).length) {
+    mergedBeforeCalculation = { ...mergedBeforeCalculation, ...answersOverride };
+  }
+  const prepared = reportRuleEngineService.prepareReportAnswersForUI({
+    template,
+    mergedAnswers: mergedBeforeCalculation,
+    prefill: instance.prefillSnapshot || {},
+    skipRecalculation
+  });
+  return {
+    merged: prepared.calculationAnswers || prepared.displayAnswers || mergedBeforeCalculation
+  };
+}
+
+async function attachReportAiAssistPanelContext(renderContext, req, template, mergedDataSource, prefillSnapshot, context = 'instance') {
+  const canEdit = renderContext.canEditReportInstanceAnswers !== false;
+  try {
+    const panel = await reportAiAssistService.buildReportAiAssistCatalog(template || {}, {
+      context,
+      mergedData: mergedDataSource || {},
+      prefillSnapshot: prefillSnapshot || {},
+      reqUser: req.user,
+      accessContext: { scopeId: req.accessScope }
+    });
+    renderContext.reportAiAssist = {
+      context,
+      catalog: panel.catalog,
+      canRun: Boolean(panel.canRun && (context !== 'instance' || canEdit)),
+      matrixAllowed: panel.matrixAllowed,
+      matrixBlockedReason: panel.matrixBlockedReason || ''
+    };
+  } catch (_) {
+    renderContext.reportAiAssist = {
+      context,
+      catalog: [],
+      canRun: false,
+      matrixAllowed: false,
+      matrixBlockedReason: ''
+    };
+  }
+}
+
+async function attachReportAiServicesContext(renderContext, req, template, mergedDataSource) {
+  renderContext.reportAiServices = [];
+  try {
+    if (!(await userCanRunSchoolAiAssist(req))) return;
+    const bindings = reportTemplateAiBindingService.listActiveBindings(template || {});
+    if (!bindings.length) return;
+    const accessContext = { scopeId: req.accessScope };
+    const merged = mergedDataSource && typeof mergedDataSource === 'object' ? mergedDataSource : {};
+    const runners = [];
+    for (const row of bindings) {
+      // eslint-disable-next-line no-await-in-loop
+      const definition = await schoolAiServiceDefinitionDataService.getByServiceKey(
+        row.serviceKey,
+        req.user,
+        accessContext
+      );
+      const inputDefaults = reportTemplateAiBindingService.resolveInputsForService(
+        row,
+        definition,
+        merged,
+        merged
+      );
+      // eslint-disable-next-line no-await-in-loop
+      const runner = await schoolAiAssistController.prepareServiceRunnerContext(row.serviceKey, req, {
+        inputSource: inputDefaults
+      });
+      if (runner && runner.configured && runner.active !== false) {
+        runners.push({
+          ...runner,
+          label: row.label || runner.label,
+          submitLabel: 'Run',
+          formId: `reportInstanceAi_${String(row.id || row.serviceKey).replace(/\W/g, '_')}`,
+          startCollapsed: true
+        });
+      }
+    }
+    renderContext.reportAiServices = runners;
+  } catch (_) {
+    renderContext.reportAiServices = [];
+  }
+}
+
+async function getTemplateAiServiceDefinition(req, res) {
+  try {
+    const serviceKey = String(req.params.serviceKey || '').trim();
+    const registry = getAiServiceByKey(serviceKey);
+    if (!registry) {
+      return res.status(404).json({ status: 'error', message: 'Unknown AI service.' });
+    }
+    const definition = await schoolAiServiceDefinitionDataService.getByServiceKey(
+      serviceKey,
+      req.user,
+      { scopeId: req.accessScope }
+    );
+    return res.json({
+      status: 'success',
+      serviceKey,
+      label: registry.label || serviceKey,
+      description: registry.description || '',
+      inputs: reportTemplateAiBindingService.sanitizeDefinitionInputsForClient(definition)
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message || 'Could not load AI service definition.' });
+  }
 }
 
 async function showInstanceEditor(req, res) {
@@ -2315,6 +2731,39 @@ async function showReportMatrix(req, res) {
     const canUnlockReportInstance = await reportViewService.canUnlockReportInstance(req.user);
     const canReopenReportInstanceToDraft = await reportViewService.canReopenReportInstanceToDraft(req.user);
     const isMatrixAdminViewer = reportViewService.isSchoolReportAdminViewer(req.user);
+    const resolved = await reportIntegrityService.resolveStartInstanceContext({
+      assignmentId: req.params.assignmentId,
+      assignmentRowId: req.query.assignmentRowId || req.query.rowId || '',
+      reqUser: req.user,
+      requestedTeacherId: req.query.teacherId || '',
+      fallbackTeacherId: req.user?.personId || req.user?.id || '',
+      requestedStudentId: ''
+    });
+    const sharedFromAssignment = reportAssignmentModel.resolveSharedAnswersForRow(
+      resolved.assignment,
+      resolved.assignment?.assignmentRowId || ''
+    );
+    const matrixMerged = reportTemplateAiBindingService.resolveMatrixMergedData({
+      template: resolved.template,
+      sharedAnswers: sharedFromAssignment,
+      commonFieldAnswers: {}
+    });
+    const reportAiAssistRender = { context: 'matrix', catalog: [], canRun: false, matrixAllowed: false, matrixBlockedReason: '' };
+    try {
+      const panel = await reportAiAssistService.buildReportAiAssistCatalog(resolved.template || {}, {
+        context: 'matrix',
+        mergedData: matrixMerged,
+        prefillSnapshot: {},
+        reqUser: req.user,
+        accessContext: { scopeId: req.accessScope }
+      });
+      reportAiAssistRender.catalog = panel.catalog;
+      reportAiAssistRender.canRun = panel.canRun;
+      reportAiAssistRender.matrixAllowed = panel.matrixAllowed;
+      reportAiAssistRender.matrixBlockedReason = panel.matrixBlockedReason || '';
+    } catch (_) {
+      // leave defaults
+    }
     return res.render('school/report/instanceMatrix', {
       title: `Fill Reports: ${matrix.templateTitle}`,
       matrix,
@@ -2322,6 +2771,7 @@ async function showReportMatrix(req, res) {
       canUnlockReportInstance,
       canReopenReportInstanceToDraft,
       isMatrixAdminViewer,
+      reportAiAssist: reportAiAssistRender,
       includeModal: true,
       user: req.user,
       actionStateId: req.actionStateId
@@ -3451,6 +3901,9 @@ module.exports = {
   saveTemplate,
   inspectTemplatePdfFields,
   checkTemplateSnapshotCompliance,
+  getTemplateAiServiceDefinition,
+  reportAiAssistPrepare,
+  reportAiAssistRun,
   deleteTemplate,
   listAssignments,
   showAssignmentForm,

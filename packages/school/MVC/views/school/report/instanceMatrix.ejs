@@ -45,6 +45,9 @@
   const sharedFieldsLockReasonSafe = String(matrix?.sharedFieldsLockReason || '').trim();
   const hasSharedFieldsBlock = sharedFields.length > 0;
   const isMatrixAdminViewerSafe = Boolean(typeof isMatrixAdminViewer !== 'undefined' && isMatrixAdminViewer);
+  const reportAiAssistSafe = (typeof reportAiAssist !== 'undefined' && reportAiAssist) ? reportAiAssist : { catalog: [], canRun: false, matrixAllowed: false };
+  const reportAiAssistCatalog = Array.isArray(reportAiAssistSafe.catalog) ? reportAiAssistSafe.catalog : [];
+  const showReportMatrixAiAssist = reportAiAssistSafe.matrixAllowed && reportAiAssistSafe.canRun && reportAiAssistCatalog.length > 0;
   const statusBadgeLabel = (status) => {
     const token = String(status || '').toLowerCase();
     if (token === 'submitted') return 'Submitted (awaiting review)';
@@ -68,6 +71,18 @@
   };
 %>
 <style>
+  .report-matrix-page .report-toolbar-icon-btn {
+    width: 2.125rem;
+    height: 2.125rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    line-height: 1;
+  }
+  .report-matrix-page .report-toolbar-icon-btn .bi {
+    font-size: 1.05rem;
+  }
   .report-matrix-page .matrix-summary-card { min-width: 115px; }
   .report-matrix-page #reportMatrixStudentReports {
     display: flex;
@@ -578,29 +593,97 @@
     </div>
   </div>
 
-  <% if (isMatrixAdminViewerSafe) { %>
-  <div class="card border-0 shadow-sm mb-4" id="reportMatrixNavigation">
+  <div class="card border-0 shadow-sm mb-4" id="reportMatrixToolbar">
     <div class="card-body py-2">
       <div class="d-flex flex-wrap align-items-center gap-2">
-        <% if (matrix.classId && matrix.sessionId) { %>
-          <a href="/school/classes/<%= encodeURIComponent(matrix.classId) %>/sessions/<%= encodeURIComponent(matrix.sessionId) %>" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>Session</a>
+        <% if (isMatrixAdminViewerSafe) { %>
+          <% if (matrix.classId && matrix.sessionId) { %>
+            <a
+              href="/school/classes/<%= encodeURIComponent(matrix.classId) %>/sessions/<%= encodeURIComponent(matrix.sessionId) %>"
+              class="btn btn-outline-secondary btn-sm report-toolbar-icon-btn"
+              data-bs-toggle="tooltip"
+              data-bs-placement="bottom"
+              title="Back to session"
+              aria-label="Back to session">
+              <i class="bi bi-arrow-left" aria-hidden="true"></i>
+            </a>
+          <% } %>
+          <a
+            href="/school/reports/instances"
+            class="btn btn-outline-primary btn-sm report-toolbar-icon-btn"
+            data-bs-toggle="tooltip"
+            data-bs-placement="bottom"
+            title="Report instances"
+            aria-label="Report instances">
+            <i class="bi bi-list-check" aria-hidden="true"></i>
+          </a>
         <% } %>
-        <a href="/school/reports/instances" class="btn btn-outline-primary btn-sm"><i class="bi bi-list-check me-1"></i>Instances</a>
-        <button type="button" class="btn btn-outline-warning btn-sm" id="btnMatrixPrefillPreview"><i class="bi bi-arrow-repeat me-1"></i>Preview Prefill Updates</button>
-        <button type="button" class="btn btn-outline-secondary btn-sm" id="btnMatrixExportDocx"><i class="bi bi-file-earmark-word me-1"></i>Export DOCX</button>
-        <button type="button" class="btn btn-outline-secondary btn-sm" id="btnMatrixExportPdf"><i class="bi bi-file-earmark-pdf me-1"></i>Export PDF</button>
-        <a href="/school/reports/instances/matrix/<%= encodeURIComponent(matrix.assignmentId) %>/export?format=json&download=1" class="btn btn-outline-secondary btn-sm js-export-report-instance"><i class="bi bi-download me-1"></i>Export Payload</a>
+        <% if (showReportMatrixAiAssist) { %>
+          <button
+            type="button"
+            class="btn btn-outline-primary btn-sm report-toolbar-icon-btn"
+            id="btnReportMatrixAiAssist"
+            data-bs-toggle="tooltip"
+            data-bs-placement="bottom"
+            title="AI Assist"
+            aria-label="AI Assist">
+            <i class="bi bi-robot" aria-hidden="true"></i>
+          </button>
+        <% } %>
+        <% if (isMatrixAdminViewerSafe) { %>
+          <button
+            type="button"
+            class="btn btn-outline-warning btn-sm report-toolbar-icon-btn"
+            id="btnMatrixPrefillPreview"
+            data-bs-toggle="tooltip"
+            data-bs-placement="bottom"
+            title="Preview prefill updates"
+            aria-label="Preview prefill updates">
+            <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm report-toolbar-icon-btn"
+            id="btnMatrixExportDocx"
+            data-bs-toggle="tooltip"
+            data-bs-placement="bottom"
+            title="Export DOCX"
+            aria-label="Export DOCX">
+            <i class="bi bi-file-earmark-word" aria-hidden="true"></i>
+          </button>
+          <button
+            type="button"
+            class="btn btn-outline-danger btn-sm report-toolbar-icon-btn"
+            id="btnMatrixExportPdf"
+            data-bs-toggle="tooltip"
+            data-bs-placement="bottom"
+            title="Export PDF"
+            aria-label="Export PDF">
+            <i class="bi bi-file-earmark-pdf" aria-hidden="true"></i>
+          </button>
+          <a
+            href="/school/reports/instances/matrix/<%= encodeURIComponent(matrix.assignmentId) %>/export?format=json&download=1"
+            class="btn btn-outline-secondary btn-sm report-toolbar-icon-btn js-export-report-instance"
+            data-bs-toggle="tooltip"
+            data-bs-placement="bottom"
+            title="Export payload"
+            aria-label="Export payload">
+            <i class="bi bi-download" aria-hidden="true"></i>
+          </a>
+        <% } %>
       </div>
     </div>
   </div>
-  <% } %>
-
   <div class="d-flex flex-wrap gap-2 mb-4">
     <div class="card border-0 shadow-sm matrix-summary-card"><div class="card-body py-2"><div class="small text-muted">Students</div><div class="fs-5 fw-bold" data-progress-key="total"><%= progress.total %></div></div></div>
     <div class="card border-0 shadow-sm matrix-summary-card"><div class="card-body py-2"><div class="small text-muted">Submitted</div><div class="fs-5 fw-bold text-success" data-progress-key="submitted"><%= progress.submitted %></div></div></div>
     <div class="card border-0 shadow-sm matrix-summary-card"><div class="card-body py-2"><div class="small text-muted">Drafts</div><div class="fs-5 fw-bold text-warning" data-progress-key="drafts"><%= progress.drafts %></div></div></div>
     <div class="card border-0 shadow-sm matrix-summary-card"><div class="card-body py-2"><div class="small text-muted">Not started</div><div class="fs-5 fw-bold text-info" data-progress-key="pending"><%= progress.pending %></div></div></div>
   </div>
+
+  <% if (showReportMatrixAiAssist) { %>
+    <%- include('partials/reportAiAssistModal') %>
+  <% } %>
 
   <% if (commonFields.length) { %>
     <div class="card border-0 shadow-sm mb-4" id="reportMatrixCommonFields">
@@ -777,9 +860,9 @@
   <div class="card border-0 shadow-sm mt-4" id="reportMatrixActions">
     <div class="card-body py-2">
       <div class="d-flex flex-wrap align-items-center gap-2 w-100">
-        <button type="button" class="btn btn-primary btn-sm js-matrix-bulk-action" data-action="save" <%= hasEditableRows ? '' : 'disabled' %>><i class="bi bi-save me-1"></i>Save All</button>
-        <button type="button" class="btn btn-success btn-sm js-matrix-bulk-action" data-action="submit" <%= hasSubmittableRows ? '' : 'hidden' %> <%= (hasSubmittableRows && hasEditableRows) ? '' : 'disabled' %>><i class="bi bi-send-check me-1"></i>Submit All Reports</button>
-        <button type="button" class="btn btn-outline-dark btn-sm js-matrix-bulk-action" data-action="lock" <%= hasEditableRows ? '' : 'disabled' %>><i class="bi bi-lock me-1"></i>Lock All Reports</button>
+        <button type="button" class="btn btn-primary btn-sm report-toolbar-icon-btn js-matrix-bulk-action" data-action="save" data-bs-toggle="tooltip" data-bs-placement="top" title="Save all" aria-label="Save all" <%= hasEditableRows ? '' : 'disabled' %>><i class="bi bi-save" aria-hidden="true"></i></button>
+        <button type="button" class="btn btn-success btn-sm report-toolbar-icon-btn js-matrix-bulk-action" data-action="submit" data-bs-toggle="tooltip" data-bs-placement="top" title="Submit all reports" aria-label="Submit all reports" <%= hasSubmittableRows ? '' : 'hidden' %> <%= (hasSubmittableRows && hasEditableRows) ? '' : 'disabled' %>><i class="bi bi-send-check" aria-hidden="true"></i></button>
+        <button type="button" class="btn btn-outline-dark btn-sm report-toolbar-icon-btn js-matrix-bulk-action" data-action="lock" data-bs-toggle="tooltip" data-bs-placement="top" title="Lock all reports" aria-label="Lock all reports" <%= hasEditableRows ? '' : 'disabled' %>><i class="bi bi-lock" aria-hidden="true"></i></button>
         <% if (matrixActionBarStatus) { %>
           <span class="badge <%= matrixActionBarStatus.className %> p-2" id="reportMatrixBulkStatusBadge" title="Every started report in this grid shares this status"><%= matrixActionBarStatus.label %></span>
         <% } else { %>
@@ -796,11 +879,14 @@
         <% } %>
         <button
           type="button"
-          class="btn btn-outline-danger btn-sm ms-md-auto"
+          class="btn btn-outline-danger btn-sm report-toolbar-icon-btn ms-md-auto"
           id="btnMatrixResetFromLive"
-          title="Reload prefill-linked fields from current session and attendance data"
+          data-bs-toggle="tooltip"
+          data-bs-placement="top"
+          title="Reset from live data"
+          aria-label="Reset from live data"
           <%= hasEditableRows ? '' : 'disabled' %>
-        ><i class="bi bi-arrow-clockwise me-1"></i>Reset from live data</button>
+        ><i class="bi bi-arrow-clockwise" aria-hidden="true"></i></button>
       </div>
     </div>
   </div>
@@ -908,6 +994,9 @@
 <%- include('partials/reportPrefillPreviewUi') %>
 <%- include('partials/calculatedFieldsRuntime') %>
 <%- include('partials/reportMessageHelpers') %>
+<% if (showReportMatrixAiAssist) { %>
+<script src="/scripts/reportAiAssistPanel.js"></script>
+<% } %>
 <script src="/scripts/reportAssignmentDelete.js"></script>
 <script src="/scripts/reportSelectField.js"></script>
 <script>
@@ -2713,6 +2802,33 @@
     recalculateCommonCalculatedFields();
     initializeTooltips();
     bindMatrixColumnHeaderTips();
+    <% if (showReportMatrixAiAssist) { %>
+    if (window.initReportAiAssistPanel) {
+      const reportAiAssistCatalog = <%- JSON.stringify(reportAiAssistCatalog).replace(/</g, '\\u003c') %>;
+      const matrixQuery = readReportMatrixQueryParams();
+      const rowId = matrixQuery.assignmentRowId || String(matrixState.assignmentRowId || '').trim();
+      const teacherId = matrixQuery.teacherId || String(matrixState.teacherId || '').trim();
+      window.initReportAiAssistPanel({
+        context: 'matrix',
+        catalog: reportAiAssistCatalog,
+        identity: {
+          assignmentId: String(matrixState.assignmentId || '').trim(),
+          assignmentRowId: rowId,
+          teacherId
+        },
+        storageKey: `reportAiAssist:matrix:${String(matrixState.assignmentId || '')}:${rowId}:${teacherId}`,
+        getAnswersOverride() {
+          return {
+            sharedAnswersOverride: collectControls(document, '.js-matrix-shared-field'),
+            commonAnswersOverride: {
+              ...collectControls(document, '#reportMatrixCommonFields [data-field-id]'),
+              ...collectControls(document, '#reportMatrixSharedFields [data-field-id]:not(.js-matrix-row-field)')
+            }
+          };
+        }
+      });
+    }
+    <% } %>
   })();
 </script>
 

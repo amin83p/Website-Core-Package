@@ -93,7 +93,13 @@
             </span>
           </td>
           <td class="table-actions text-end pe-4">
-            <a class="btn btn-sm btn-filled btn-edit" href="/school/ai-assist/token-usage/<%= item.id %>">Detail</a>
+            <%- include('school/aiAssist/partials/aiAssistRowActions', {
+              rowActionId: 'usage-' + item.id,
+              rowActionTitle: 'Token usage actions',
+              rowActionItems: [
+                { href: '/school/ai-assist/token-usage/' + item.id, label: 'View detail', icon: 'bi-eye', className: 'btn-outline-primary' }
+              ]
+            }) %>
           </td>
         </tr>
       <% }) %>

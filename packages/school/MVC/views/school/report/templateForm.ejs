@@ -39,6 +39,11 @@
       gradebookPeriodSkillsStudent: [],
       examPeriodStudent: []
     };
+  const aiServiceCatalogRows = (typeof aiServiceCatalog !== 'undefined' && Array.isArray(aiServiceCatalog)) ? aiServiceCatalog : [];
+  const initialAiServices = Array.isArray(template?.aiServices) ? template.aiServices : [];
+  const aiDefinitionInputsByKey = (typeof aiDefinitionsByKey !== 'undefined' && aiDefinitionsByKey && typeof aiDefinitionsByKey === 'object')
+    ? aiDefinitionsByKey
+    : {};
   const allPrefillKeys = [
     ...(Array.isArray(prefillCatalogData.common) ? prefillCatalogData.common : []),
     ...(Array.isArray(prefillCatalogData.classOnly) ? prefillCatalogData.classOnly : []),
@@ -346,6 +351,7 @@
     <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
     <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
     <input type="hidden" name="schemaJson" id="schemaJsonInput">
+    <input type="hidden" name="aiServicesJson" id="aiServicesJsonInput">
     <input type="hidden" name="placeholderMapJson" id="placeholderMapJsonInput">
     <input type="hidden" name="pdfFieldMapJson" id="pdfFieldMapJsonInput">
     <input type="hidden" name="allowedReportScopesPresent" value="true">
@@ -545,6 +551,8 @@
       </div>
       </div>
     </div>
+
+    <%- include('school/report/partials/templateFormAiServicesSection', { aiServiceCatalogRows }) %>
 
     <div class="card border-0 shadow-sm mb-3 template-form-section">
       <div class="card-header p-0">
@@ -1576,6 +1584,279 @@
     const snapshotKeyLabelsJsonInput = document.getElementById('snapshotKeyLabelsJsonInput');
     const snapshotKeyDocxAliasesJsonInput = document.getElementById('snapshotKeyDocxAliasesJsonInput');
     const snapshotKeyRefreshOnOpenJsonInput = document.getElementById('snapshotKeyRefreshOnOpenJsonInput');
+    const aiServicesJsonInput = document.getElementById('aiServicesJsonInput');
+    const templateAiServicesList = document.getElementById('templateAiServicesList');
+    const templateAiServicesEmptyHint = document.getElementById('templateAiServicesEmptyHint');
+    const templateAiServiceAddSelect = document.getElementById('templateAiServiceAddSelect');
+    const btnTemplateAiServiceAdd = document.getElementById('btnTemplateAiServiceAdd');
+  const initialAiServicesState = <%- JSON.stringify(initialAiServices).replace(/</g, '\\u003c') %>;
+  const aiDefinitionInputsCache = <%- JSON.stringify(aiDefinitionInputsByKey).replace(/</g, '\\u003c') %>;
+  const aiServiceCatalogClient = <%- JSON.stringify(aiServiceCatalogRows.map((r) => ({ serviceKey: r.serviceKey, label: r.label, description: r.description }))).replace(/</g, '\\u003c') %>;
+  const prefillCatalogKeysClient = <%- JSON.stringify(allPrefillKeys.map((item) => String(item?.key || '').trim()).filter(Boolean)).replace(/</g, '\\u003c') %>;
+    let aiServicesState = Array.isArray(initialAiServicesState) ? JSON.parse(JSON.stringify(initialAiServicesState)) : [];
+    let aiServiceRowCounter = aiServicesState.length;
+
+    function getTemplateFieldIdOptions() {
+      try {
+        const payload = collect({ skipAliasRegeneration: true });
+        const fields = Array.isArray(payload?.schema?.fields) ? payload.schema.fields : [];
+        return fields
+          .map((field) => String(field?.id || '').trim())
+          .filter(Boolean);
+      } catch (_) {
+        return [];
+      }
+    }
+
+    function defaultInputBinding() {
+      return { source: 'empty', value: '' };
+    }
+
+    function normalizeBindingRowClient(binding) {
+      const source = String(binding?.source || 'empty').toLowerCase();
+      const allowed = ['field', 'prefill', 'static', 'empty'];
+      const normalized = allowed.includes(source) ? source : 'empty';
+      return {
+        source: normalized,
+        value: normalized === 'empty' ? '' : String(binding?.value || '').trim()
+      };
+    }
+
+    function ensureBindingsForInputs(row, inputs) {
+      row.inputBindings = row.inputBindings && typeof row.inputBindings === 'object' ? row.inputBindings : {};
+      (Array.isArray(inputs) ? inputs : []).forEach((input) => {
+        const id = String(input?.id || '').trim();
+        if (!id) return;
+        if (!row.inputBindings[id]) row.inputBindings[id] = defaultInputBinding();
+        else row.inputBindings[id] = normalizeBindingRowClient(row.inputBindings[id]);
+      });
+    }
+
+    async function fetchAiServiceInputs(serviceKey) {
+      const key = String(serviceKey || '').trim();
+      if (!key) return [];
+      if (Array.isArray(aiDefinitionInputsCache[key]) && aiDefinitionInputsCache[key].length) {
+        return aiDefinitionInputsCache[key];
+      }
+      const response = await fetch(`/school/reports/templates/ai-service-definitions/${encodeURIComponent(key)}`, {
+        headers: { Accept: 'application/json' }
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.status !== 'success') {
+        throw new Error(payload.message || 'Could not load AI service inputs.');
+      }
+      const inputs = Array.isArray(payload.inputs) ? payload.inputs : [];
+      aiDefinitionInputsCache[key] = inputs;
+      return inputs;
+    }
+
+    function renderBindingValueControl(rowId, inputId, binding, inputMeta) {
+      const source = binding?.source || 'empty';
+      const fieldIds = getTemplateFieldIdOptions();
+      const value = String(binding?.value || '');
+      if (source === 'field') {
+        const options = fieldIds.map((fid) => (
+          `<option value="${escapeHtml(fid)}"${fid === value ? ' selected' : ''}>${escapeHtml(fid)}</option>`
+        )).join('');
+        return `<select class="form-select form-select-sm js-ai-binding-value" data-row-id="${escapeHtml(rowId)}" data-input-id="${escapeHtml(inputId)}"><option value="">Select field…</option>${options}</select>`;
+      }
+      if (source === 'prefill') {
+        const options = prefillCatalogKeysClient.map((key) => (
+          `<option value="${escapeHtml(key)}"${key === value ? ' selected' : ''}>${escapeHtml(key)}</option>`
+        )).join('');
+        return `<select class="form-select form-select-sm js-ai-binding-value" data-row-id="${escapeHtml(rowId)}" data-input-id="${escapeHtml(inputId)}"><option value="">Select prefill key…</option>${options}</select>`;
+      }
+      if (source === 'static') {
+        const rows = (inputMeta?.type === 'textarea' || inputMeta?.type === 'json') ? 4 : 2;
+        return `<textarea class="form-control form-control-sm js-ai-binding-value" data-row-id="${escapeHtml(rowId)}" data-input-id="${escapeHtml(inputId)}" rows="${rows}">${escapeHtml(value)}</textarea>`;
+      }
+      return `<span class="small text-muted">—</span>`;
+    }
+
+    function renderTemplateAiServicesList() {
+      if (!templateAiServicesList) return;
+      if (!aiServicesState.length) {
+        templateAiServicesList.innerHTML = '';
+        templateAiServicesEmptyHint?.classList.remove('d-none');
+        syncAiServicesJson();
+        return;
+      }
+      templateAiServicesEmptyHint?.classList.add('d-none');
+      templateAiServicesList.innerHTML = aiServicesState.map((row) => {
+        const rowId = String(row.id || '');
+        const serviceKey = String(row.serviceKey || '');
+        const catalog = aiServiceCatalogClient.find((s) => s.serviceKey === serviceKey);
+        const inputs = Array.isArray(aiDefinitionInputsCache[serviceKey]) ? aiDefinitionInputsCache[serviceKey] : [];
+        ensureBindingsForInputs(row, inputs);
+        const serviceOptions = aiServiceCatalogClient.map((svc) => (
+          `<option value="${escapeHtml(svc.serviceKey)}"${svc.serviceKey === serviceKey ? ' selected' : ''}>${escapeHtml(svc.label || svc.serviceKey)}</option>`
+        )).join('');
+        const inputRows = inputs.length
+          ? inputs.map((input) => {
+            const inputId = String(input.id || '');
+            const binding = row.inputBindings[inputId] || defaultInputBinding();
+            const sourceOptions = ['empty', 'field', 'prefill', 'static'].map((src) => (
+              `<option value="${src}"${binding.source === src ? ' selected' : ''}>${src}</option>`
+            )).join('');
+            return `<tr>
+              <td class="small fw-semibold">${escapeHtml(input.label || inputId)}<div class="text-muted font-monospace x-small">${escapeHtml(inputId)}</div></td>
+              <td><select class="form-select form-select-sm js-ai-binding-source" data-row-id="${escapeHtml(rowId)}" data-input-id="${escapeHtml(inputId)}">${sourceOptions}</select></td>
+              <td>${renderBindingValueControl(rowId, inputId, binding, input)}</td>
+            </tr>`;
+          }).join('')
+          : '<tr><td colspan="3" class="small text-muted">Select a service or reload inputs.</td></tr>';
+        return `<div class="border rounded p-3 template-ai-service-row" data-row-id="${escapeHtml(rowId)}">
+          <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-3">
+            <div class="d-flex flex-wrap gap-2 align-items-center flex-grow-1">
+              <select class="form-select form-select-sm js-ai-service-key" data-row-id="${escapeHtml(rowId)}" style="max-width: 280px;">${serviceOptions}</select>
+              <input type="text" class="form-control form-control-sm js-ai-service-label" data-row-id="${escapeHtml(rowId)}" placeholder="Display label (optional)" value="${escapeHtml(row.label || '')}" style="max-width: 220px;">
+            </div>
+            <div class="form-check form-switch mb-0">
+              <input class="form-check-input js-ai-service-active" type="checkbox" data-row-id="${escapeHtml(rowId)}"${row.isActive !== false ? ' checked' : ''}>
+              <label class="form-check-label small">Active</label>
+            </div>
+            <button type="button" class="btn btn-outline-danger btn-sm js-ai-service-remove" data-row-id="${escapeHtml(rowId)}"><i class="bi bi-trash"></i></button>
+          </div>
+          ${catalog?.description ? `<p class="small text-muted mb-2">${escapeHtml(catalog.description)}</p>` : ''}
+          <div class="table-responsive">
+            <table class="table table-sm align-middle mb-0">
+              <thead class="table-light"><tr><th>Input</th><th style="width: 140px;">Source</th><th>Value</th></tr></thead>
+              <tbody>${inputRows}</tbody>
+            </table>
+          </div>
+        </div>`;
+      }).join('');
+      syncAiServicesJson();
+    }
+
+    function syncAiServicesJson() {
+      if (!aiServicesJsonInput) return;
+      aiServicesJsonInput.value = JSON.stringify(aiServicesState);
+    }
+
+    function findAiServiceRow(rowId) {
+      return aiServicesState.find((row) => String(row.id) === String(rowId));
+    }
+
+    async function onAiServiceKeyChanged(rowId, serviceKey) {
+      const row = findAiServiceRow(rowId);
+      if (!row) return;
+      row.serviceKey = String(serviceKey || '').trim();
+      row.inputBindings = {};
+      if (!row.serviceKey) {
+        renderTemplateAiServicesList();
+        return;
+      }
+      try {
+        const inputs = await fetchAiServiceInputs(row.serviceKey);
+        ensureBindingsForInputs(row, inputs);
+      } catch (err) {
+        await showReportModal({ title: 'AI service', icon: 'warning', message: err.message || 'Load failed.', buttonClass: 'btn-warning' });
+      }
+      renderTemplateAiServicesList();
+    }
+
+  btnTemplateAiServiceAdd?.addEventListener('click', async () => {
+      const serviceKey = String(templateAiServiceAddSelect?.value || '').trim();
+      if (!serviceKey) return;
+      aiServiceRowCounter += 1;
+      const row = {
+        id: `ai_${aiServiceRowCounter}`,
+        serviceKey,
+        label: '',
+        isActive: true,
+        inputBindings: {}
+      };
+      try {
+        const inputs = await fetchAiServiceInputs(serviceKey);
+        ensureBindingsForInputs(row, inputs);
+      } catch (err) {
+        await showReportModal({ title: 'AI service', icon: 'warning', message: err.message || 'Load failed.', buttonClass: 'btn-warning' });
+        return;
+      }
+      aiServicesState.push(row);
+      if (templateAiServiceAddSelect) templateAiServiceAddSelect.value = '';
+      renderTemplateAiServicesList();
+    });
+
+    templateAiServicesList?.addEventListener('change', (event) => {
+      const sourceSelect = event.target.closest('.js-ai-binding-source');
+      if (sourceSelect) {
+        const row = findAiServiceRow(sourceSelect.dataset.rowId);
+        const inputId = sourceSelect.dataset.inputId;
+        if (row && inputId) {
+          row.inputBindings[inputId] = normalizeBindingRowClient({
+            ...row.inputBindings[inputId],
+            source: sourceSelect.value
+          });
+          renderTemplateAiServicesList();
+        }
+        return;
+      }
+      const valueControl = event.target.closest('.js-ai-binding-value');
+      if (valueControl) {
+        const row = findAiServiceRow(valueControl.dataset.rowId);
+        const inputId = valueControl.dataset.inputId;
+        if (row && inputId) {
+          row.inputBindings[inputId] = normalizeBindingRowClient({
+            ...row.inputBindings[inputId],
+            value: valueControl.value
+          });
+          syncAiServicesJson();
+        }
+        return;
+      }
+      const serviceSelect = event.target.closest('.js-ai-service-key');
+      if (serviceSelect) {
+        void onAiServiceKeyChanged(serviceSelect.dataset.rowId, serviceSelect.value);
+        return;
+      }
+      const activeInput = event.target.closest('.js-ai-service-active');
+      if (activeInput) {
+        const row = findAiServiceRow(activeInput.dataset.rowId);
+        if (row) row.isActive = activeInput.checked;
+        syncAiServicesJson();
+      }
+    });
+
+    templateAiServicesList?.addEventListener('input', (event) => {
+      const labelInput = event.target.closest('.js-ai-service-label');
+      if (labelInput) {
+        const row = findAiServiceRow(labelInput.dataset.rowId);
+        if (row) row.label = labelInput.value;
+        syncAiServicesJson();
+      }
+      const valueControl = event.target.closest('.js-ai-binding-value');
+      if (valueControl && valueControl.tagName === 'TEXTAREA') {
+        const row = findAiServiceRow(valueControl.dataset.rowId);
+        const inputId = valueControl.dataset.inputId;
+        if (row && inputId) {
+          row.inputBindings[inputId] = normalizeBindingRowClient({
+            ...row.inputBindings[inputId],
+            value: valueControl.value
+          });
+          syncAiServicesJson();
+        }
+      }
+    });
+
+    templateAiServicesList?.addEventListener('click', (event) => {
+      const removeBtn = event.target.closest('.js-ai-service-remove');
+      if (!removeBtn) return;
+      const rowId = removeBtn.dataset.rowId;
+      aiServicesState = aiServicesState.filter((row) => String(row.id) !== String(rowId));
+      renderTemplateAiServicesList();
+    });
+
+    (async () => {
+      for (const row of aiServicesState) {
+        if (!row.serviceKey) continue;
+        try {
+          await fetchAiServiceInputs(row.serviceKey);
+        } catch (_) { /* ignore */ }
+      }
+      renderTemplateAiServicesList();
+    })();
 
     function snapshotKeyRefreshOnOpenEnabled(key) {
       const normalized = normalizeSnapshotKeyToken(key);
@@ -4163,6 +4444,7 @@ num(value) <= 95</code></pre>
         return;
       }
       schemaJsonInput.value = JSON.stringify(finalPayload.schema);
+      syncAiServicesJson();
       if (typeof window.__syncRequiredGradebookSkillsJson === 'function') {
         window.__syncRequiredGradebookSkillsJson();
       }

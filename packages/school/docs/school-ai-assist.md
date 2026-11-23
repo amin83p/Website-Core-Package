@@ -8,6 +8,7 @@ School AI Assist is a dedicated navigator (not School Settings) for org-wide AI 
 |-------|------------------|---------|
 | `/school/ai-assist/providers` | `SCHOOL_AI_PROVIDER_KEYS` | API keys, vendor, models[], banned users |
 | `/school/ai-assist/service-assignments` | `SCHOOL_AI_SERVICE_ASSIGNMENTS` | One provider + model per registered service |
+| `/school/ai-assist/service-definitions` | `SCHOOL_AI_SERVICE_DEFINITIONS` | Inputs, prompts, and output mode per registered service |
 | `/school/ai-assist/token-usage` | `SCHOOL_AI_TOKEN_USAGE` | Append-only usage ledger (Consumed Tokens) |
 | `/school/ai-assist/token-usage/limits` | `SCHOOL_AI_USAGE_LIMITS` | Per-user token/request limits (list + form CRUD) |
 
@@ -16,8 +17,60 @@ School AI Assist is a dedicated navigator (not School Settings) for org-wide AI 
 Registered keys live in `packages/school/MVC/config/schoolAiServiceRegistry.js`.
 
 - `school.report_review` — Report Review Service (`planned`)
+- `school.bimpr_goals_checker` — Bi-MPR Goals Checker (`implemented`; preset in `schoolAiServiceDefinitionPresets.js`)
+
+## Report template bindings
+
+On **Reports → Templates**, the **AI services** section lets designers attach multiple registry services to a template. Each definition input binds to a report field, DOCX prefill key, static text, or empty (filled on the instance).
+
+At **report instance edit**, active bindings resolve against merged instance/prefill data. **Report Instance V2** exposes a single **AI Assist** button (modal + persistent results tray) backed by report-scoped APIs that do not require School AI Assist admin **READ_ALL**. The legacy (non-V2) editor still embeds one `schoolAiServiceRunner` per service when the user can access School AI Assist admin.
+
+On **Fill Reports** (matrix), the same **AI Assist** control appears once at the matrix level when every active binding uses only **shared** report fields (or non-field sources). If any binding maps an input to a **private** (per-student) field, matrix AI Assist is hidden; teachers run those services from **Report Instance V2** for the relevant student.
+
+```http
+POST /school/reports/ai-assist/prepare
+POST /school/reports/ai-assist/run
+```
+
+Body includes `context` (`matrix` | `instance`), `bindingRowId`, optional `inputs`, and identity: `instanceId` for V2, or `assignmentId` + `assignmentRowId` + `teacherId` for Fill Reports. Optional `answersOverride` / `sharedAnswersOverride` / `commonAnswersOverride` apply unsaved DOM values at run time.
 
 ## Developer API
+
+Preferred path: load the org definition, then call the execution service (resolves provider/model, builds prompts, shapes output).
+
+```javascript
+const schoolAiServiceExecutionService = require('../services/school/schoolAiServiceExecutionService');
+
+const result = await schoolAiServiceExecutionService.run({
+  serviceKey: 'school.report_review',
+  inputs: { report_text: '...merged report fields...' },
+  requestingUser: req.user,
+  accessContext: { scopeId: req.accessScope }
+});
+// result: { ok, displayText, data?, rawText, traceId, mode, serviceKey, modelId }
+```
+
+HTTP from feature UIs:
+
+```http
+POST /school/ai-assist/services/:serviceKey/run
+Content-Type: application/json
+
+{ "inputs": { "report_text": "..." } }
+```
+
+Embed the runner partial from a controller:
+
+```javascript
+const { prepareServiceRunnerContext } = require('../controllers/school/schoolAiAssistController');
+
+const aiServiceRunner = await prepareServiceRunnerContext('school.report_review', req, {
+  inputSource: mergedReportFields
+});
+// Pass aiServiceRunner to EJS: include school/aiAssist/partials/schoolAiServiceRunner
+```
+
+Lower-level invoke (when you already have a final prompt string):
 
 ```javascript
 const schoolAiRuntimeService = require('../services/school/schoolAiRuntimeService');
@@ -28,9 +81,10 @@ const binding = await schoolAiRuntimeService.resolveForService({
   requestingUser: req.user
 });
 
-const result = await schoolAiProviderInvokeService.sendTextPrompt({
+const llm = await schoolAiProviderInvokeService.sendTextPrompt({
   binding,
-  prompt: 'Summarize this report...',
+  prompt: userPrompt,
+  systemPrompt,
   requestingUser: req.user
 });
 ```
@@ -49,6 +103,7 @@ Every `sendTextPrompt` writes a `schoolAiTokenUsage` row (success or failed).
 |------------|------------|
 | `schoolAiProviders` | `schoolAiProviders` |
 | `schoolAiServiceAssignments` | `schoolAiServiceAssignments` |
+| `schoolAiServiceDefinitions` | `schoolAiServiceDefinitions` |
 | `schoolAiTokenUsage` | `schoolAiTokenUsage` |
 | `schoolAiUserUsageLimits` | `schoolAiUserUsageLimits` |
 

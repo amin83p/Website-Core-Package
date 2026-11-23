@@ -132,16 +132,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
   btnOpenLimitUserPicker?.addEventListener('click', function () {
     if (!window.GenericPicker) {
-      if (typeof showMessageModal === 'function') {
-        showMessageModal({
-          title: 'User picker',
-          icon: 'warning',
-          message: 'The user picker is not available on this page.',
-          buttons: [{ text: 'OK', class: 'btn-primary' }]
-        });
-      } else {
-        alert('The user picker is not available on this page.');
-      }
+      if (typeof showMessageModal !== 'function') return;
+      showMessageModal({
+        title: 'User picker',
+        icon: 'warning',
+        message: 'The user picker is not available on this page.',
+        buttons: [{ text: 'OK', class: 'btn-primary' }]
+      });
       return;
     }
     const factory = window.GenericPickerPresets && typeof window.GenericPickerPresets.user === 'function'
@@ -168,16 +165,13 @@ document.addEventListener('DOMContentLoaded', function () {
   form?.addEventListener('submit', function (event) {
     if (!String(limitUserId?.value || '').trim()) {
       event.preventDefault();
-      if (typeof showMessageModal === 'function') {
-        showMessageModal({
-          title: 'User required',
-          icon: 'warning',
-          message: 'Choose a user with Select user before saving.',
-          buttons: [{ text: 'OK', class: 'btn-primary' }]
-        });
-      } else {
-        alert('Choose a user before saving.');
-      }
+      if (typeof showMessageModal !== 'function') return;
+      showMessageModal({
+        title: 'User required',
+        icon: 'warning',
+        message: 'Choose a user with Select user before saving.',
+        buttons: [{ text: 'OK', class: 'btn-primary' }]
+      });
     }
   });
 });

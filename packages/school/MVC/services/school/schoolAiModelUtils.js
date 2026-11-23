@@ -83,6 +83,12 @@ function normalizeModelsList(rawList, { strict = false } = {}) {
     const modelId = cleanString(row.modelId, { max: 220, allowEmpty: true });
     if (!modelId && strict) throw new Error(`Model row ${index + 1} requires a model id.`);
     if (!modelId) return;
+    if (/\s/.test(modelId)) {
+      throw new Error(`Model row ${index + 1}: "${modelId}" is not a valid API model id (use Fetch from vendor, not the display name).`);
+    }
+    if (modelId.includes('models/')) {
+      throw new Error(`Model row ${index + 1}: use the model id only (e.g. gemini-2.5-flash), without the models/ prefix.`);
+    }
     const key = modelId.toLowerCase();
     if (seen.has(key)) return;
     seen.add(key);

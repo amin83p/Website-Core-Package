@@ -66,8 +66,14 @@
             </span>
           </td>
           <td class="table-actions text-end pe-4">
-            <a href="/<%= newUrl %>/edit/<%= item.id %>" class="btn btn-sm btn-filled btn-edit">Edit</a>
-            <button type="button" class="btn btn-sm btn-filled btn-delete delete-btn" data-id="<%= item.id %>">Delete</button>
+            <%- include('school/aiAssist/partials/aiAssistRowActions', {
+              rowActionId: 'limit-' + item.id,
+              rowActionTitle: 'Usage limit actions',
+              rowActionItems: [
+                { href: '/' + newUrl + '/edit/' + item.id, label: 'Edit', icon: 'bi-pencil-square' },
+                { type: 'delete', id: item.id, label: 'Delete' }
+              ]
+            }) %>
           </td>
         </tr>
       <% }) %>

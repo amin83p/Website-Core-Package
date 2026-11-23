@@ -18,6 +18,7 @@ const reportScopePolicy = require('./reportScopePolicy');
 const reportPeriodBasePolicy = require('./reportPeriodBasePolicy');
 const reportTargetDepartmentPolicy = require('./reportTargetDepartmentPolicy');
 const reportRosterService = require('./reportRosterService');
+const reportTemplateAiBindingService = require('./reportTemplateAiBindingService');
 const reportAssignmentStudentEligibilityService = require('./reportAssignmentStudentEligibilityService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -1181,6 +1182,8 @@ function buildTemplateSavePayload({
   } else {
     payload.snapshotKeyRefreshOnOpen = {};
   }
+
+  payload.aiServices = reportTemplateAiBindingService.normalizeAiServicesFromBody(body, existingTemplate);
 
   return payload;
 }

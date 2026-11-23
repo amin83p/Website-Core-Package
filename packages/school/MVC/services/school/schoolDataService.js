@@ -122,6 +122,7 @@ const SCHOOL_ENTITY_REGISTRY = Object.freeze({
   attendanceChangeLogs: { repository: schoolRepositories.attendanceChangeLogs },
   schoolAiProviders: { repository: schoolRepositories.schoolAiProviders },
   schoolAiServiceAssignments: { repository: schoolRepositories.schoolAiServiceAssignments },
+  schoolAiServiceDefinitions: { repository: schoolRepositories.schoolAiServiceDefinitions },
   schoolAiTokenUsage: { repository: schoolRepositories.schoolAiTokenUsage },
   schoolAiUserUsageLimits: { repository: schoolRepositories.schoolAiUserUsageLimits }
 });

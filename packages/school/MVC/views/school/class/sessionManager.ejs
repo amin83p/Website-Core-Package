@@ -3074,6 +3074,42 @@
                     </div>
                 </div>
 
+                <div class="modal fade" id="attendanceRosterEmailsModal" tabindex="-1" aria-labelledby="attendanceRosterEmailsModalLabel" aria-hidden="true">
+                    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+                        <div class="modal-content">
+                            <div class="modal-header py-2 px-3">
+                                <div>
+                                    <h5 class="modal-title fs-6 fw-bold mb-0" id="attendanceRosterEmailsModalLabel">Student email addresses</h5>
+                                    <div class="small text-muted" id="attendanceRosterEmailsModalSubtitle"><%= session.date || '' %></div>
+                                </div>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body py-2 px-3">
+                                <p class="small text-muted mb-2" id="attendanceRosterEmailsSummary" aria-live="polite"></p>
+                                <div class="table-responsive" style="max-height: min(50vh, 420px);">
+                                    <table class="table table-sm table-hover align-middle mb-0" id="attendanceRosterEmailsTable">
+                                        <thead class="table-light position-sticky top-0">
+                                            <tr>
+                                                <th class="ps-2" style="min-width: 180px;">Student</th>
+                                                <th class="pe-2">Email</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="attendanceRosterEmailsTableBody">
+                                            <tr><td colspan="2" class="text-center text-muted py-4 small">Open this dialog to load the roster list.</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="modal-footer py-2 px-3 flex-wrap gap-2">
+                                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                                <button type="button" class="btn btn-filled btn-primary btn-sm" id="btnCopyAttendanceRosterEmails">
+                                    <i class="bi bi-clipboard me-1" aria-hidden="true"></i>Copy all emails
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="card border-0 shadow-sm">
                     <div class="card-header bg-white border-bottom py-3">
                         <div class="attendance-roster-header">
@@ -3116,6 +3152,11 @@
                                 <button type="button" class="btn btn-outline-secondary btn-sm attendance-status-info-btn" id="btnOpenAttendanceStatusSummary" data-bs-toggle="modal" data-bs-target="#attendanceStatusSummaryModal" aria-controls="attendanceStatusSummaryModal" title="View attendance status counts" aria-label="View attendance status counts">
                                     <i class="bi bi-info-circle" aria-hidden="true"></i>
                                 </button>
+                                <% if (session.roster.length > 0) { %>
+                                <button type="button" class="btn btn-outline-secondary btn-sm attendance-status-info-btn" id="btnOpenAttendanceRosterEmails" data-bs-toggle="modal" data-bs-target="#attendanceRosterEmailsModal" aria-controls="attendanceRosterEmailsModal" title="Student email addresses" aria-label="Student email addresses">
+                                    <i class="bi bi-envelope" aria-hidden="true"></i>
+                                </button>
+                                <% } %>
                                 <% if (!attendanceReadOnly) { %>
                                 <a href="/school/classes/<%= encodeURIComponent(classData.id) %>/attendance-roster-order?sessionId=<%= encodeURIComponent(session.sessionId) %>"
                                    target="_blank"
@@ -5970,6 +6011,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }))) %>;
     const hasAttendanceRosterOrderFlag = <%= (typeof hasAttendanceRosterOrder !== 'undefined' && hasAttendanceRosterOrder) ? 'true' : 'false' %>;
     const attendanceRosterPersonOrderForClient = <%- jsonForScript(typeof attendanceRosterPersonOrder !== 'undefined' ? attendanceRosterPersonOrder : []) %>;
+    const attendanceRosterEmailByPersonId = <%- jsonForScript(typeof attendanceRosterEmailByPersonId !== 'undefined' ? attendanceRosterEmailByPersonId : {}) %>;
     const attendanceDetailsState = <%- jsonForScript((session.roster || []).reduce((acc, student) => {
         const personId = String(student.personId || '').trim();
         if (!personId) return acc;
@@ -12156,6 +12198,141 @@ document.addEventListener('DOMContentLoaded', () => {
         setVal('absent', counts.absent);
         setVal('acf', counts.acf);
         setVal('not_applicable', counts.not_applicable);
+    }
+
+    function rosterEmailIsPlausible(value) {
+        const email = String(value || '').trim();
+        if (!email || !email.includes('@')) return false;
+        const parts = email.split('@');
+        return parts.length === 2 && parts[0].length > 0 && parts[1].length > 0;
+    }
+
+    function formatRosterEmailsForClipboard(entries) {
+        const list = Array.isArray(entries) ? entries : [];
+        const seen = new Set();
+        const ordered = [];
+        list.forEach((entry) => {
+            const email = String(entry?.email || '').trim();
+            if (!rosterEmailIsPlausible(email)) return;
+            const key = email.toLowerCase();
+            if (seen.has(key)) return;
+            seen.add(key);
+            ordered.push(email);
+        });
+        return ordered.join(', ');
+    }
+
+    function getAttendanceRosterEmailsInDomOrder() {
+        const map = (attendanceRosterEmailByPersonId && typeof attendanceRosterEmailByPersonId === 'object')
+            ? attendanceRosterEmailByPersonId
+            : {};
+        const rows = document.querySelectorAll('#attendanceTable tbody tr.roster-row');
+        const result = [];
+        rows.forEach((row) => {
+            const personId = String(row.getAttribute('data-personid') || '').trim();
+            if (!personId) return;
+            const fromMap = map[personId] || {};
+            const name = String(fromMap.name || row.getAttribute('data-student-name') || personId).trim();
+            const email = String(fromMap.email || '').trim();
+            result.push({ personId, name, email });
+        });
+        return result;
+    }
+
+    function renderAttendanceRosterEmailsModal() {
+        const tbody = document.getElementById('attendanceRosterEmailsTableBody');
+        const summaryEl = document.getElementById('attendanceRosterEmailsSummary');
+        const copyBtn = document.getElementById('btnCopyAttendanceRosterEmails');
+        if (!tbody) return;
+        const entries = getAttendanceRosterEmailsInDomOrder();
+        const withEmail = entries.filter((row) => rosterEmailIsPlausible(row.email));
+        if (!entries.length) {
+            tbody.innerHTML = '<tr><td colspan="2" class="text-center text-muted py-4 small">No students on this roster.</td></tr>';
+            if (summaryEl) summaryEl.textContent = '';
+            if (copyBtn) copyBtn.disabled = true;
+            return;
+        }
+        tbody.innerHTML = entries.map((row) => {
+            const emailHtml = row.email
+                ? `<span class="font-monospace small">${scEscapeHtml(row.email)}</span>`
+                : '<span class="text-muted">No email on file</span>';
+            return `<tr><td class="ps-2 fw-semibold">${scEscapeHtml(row.name)}</td><td class="pe-2">${emailHtml}</td></tr>`;
+        }).join('');
+        if (summaryEl) {
+            summaryEl.textContent = `${entries.length} student${entries.length === 1 ? '' : 's'}, ${withEmail.length} with email`;
+        }
+        if (copyBtn) copyBtn.disabled = withEmail.length === 0;
+    }
+
+    async function copyAttendanceRosterEmailsToClipboard() {
+        const entries = getAttendanceRosterEmailsInDomOrder();
+        const payload = formatRosterEmailsForClipboard(entries);
+        if (!payload) {
+            if (typeof showMessageModal === 'function') {
+                await showMessageModal({
+                    title: 'No emails to copy',
+                    icon: 'warning',
+                    message: 'None of the students on this roster have an email address on file.',
+                    buttons: [{ text: 'OK', class: 'btn-primary' }]
+                });
+            }
+            return;
+        }
+        let copied = false;
+        try {
+            if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                await navigator.clipboard.writeText(payload);
+                copied = true;
+            }
+        } catch (_) {
+            copied = false;
+        }
+        if (!copied) {
+            try {
+                const area = document.createElement('textarea');
+                area.value = payload;
+                area.setAttribute('readonly', '');
+                area.style.position = 'fixed';
+                area.style.left = '-9999px';
+                document.body.appendChild(area);
+                area.select();
+                copied = document.execCommand('copy');
+                area.remove();
+            } catch (_) {
+                copied = false;
+            }
+        }
+        if (typeof showMessageModal === 'function') {
+            if (copied) {
+                const count = payload.split(',').length;
+                await showMessageModal({
+                    title: 'Copied',
+                    icon: 'success',
+                    message: `${count} email address${count === 1 ? '' : 'es'} copied. Paste into Bcc or To in your email client.`,
+                    buttons: [{ text: 'OK', class: 'btn-primary' }]
+                });
+            } else {
+                await showMessageModal({
+                    title: 'Copy failed',
+                    icon: 'error',
+                    message: 'Could not copy to the clipboard. Select and copy the addresses from the list manually.',
+                    buttons: [{ text: 'OK', class: 'btn-secondary' }]
+                });
+            }
+        }
+    }
+
+    const attendanceRosterEmailsModalEl = document.getElementById('attendanceRosterEmailsModal');
+    if (attendanceRosterEmailsModalEl) {
+        attendanceRosterEmailsModalEl.addEventListener('show.bs.modal', () => {
+            renderAttendanceRosterEmailsModal();
+        });
+    }
+    const btnCopyAttendanceRosterEmails = document.getElementById('btnCopyAttendanceRosterEmails');
+    if (btnCopyAttendanceRosterEmails) {
+        btnCopyAttendanceRosterEmails.addEventListener('click', () => {
+            void copyAttendanceRosterEmailsToClipboard();
+        });
     }
 
     const attendanceTableEl = document.getElementById('attendanceTable');

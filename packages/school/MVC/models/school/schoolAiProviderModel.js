@@ -86,9 +86,13 @@ function normalizeProviderRecord(record = {}, existing = null, strict = false) {
 
 function sanitizeProviderForRead(record = {}) {
   const row = isPlainObject(record) ? { ...record } : {};
+  const legacyPlain = cleanString(record.apiKey, { max: 8000, allowEmpty: true }) || '';
   delete row.apiKeyEncrypted;
-  row.apiKeyMasked = cleanString(row.apiKeyHint, { max: 30, allowEmpty: true }) || 'Not set';
-  row.hasApiKey = Boolean(row.apiKeyHint);
+  delete row.apiKey;
+  row.apiKeyMasked = cleanString(row.apiKeyHint, { max: 30, allowEmpty: true })
+    || (legacyPlain ? buildKeyHint(legacyPlain) : '')
+    || 'Not set';
+  row.hasApiKey = Boolean(row.apiKeyHint) || Boolean(record.apiKeyEncrypted) || Boolean(legacyPlain);
   row.modelCount = Array.isArray(row.models) ? row.models.length : 0;
   return row;
 }

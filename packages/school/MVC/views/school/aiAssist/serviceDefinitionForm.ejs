@@ -1,0 +1,232 @@
+<%
+  const reg = registry || {};
+  const def = definition || {};
+  const inputsInit = Array.isArray(def.inputs) ? def.inputs : [];
+  const prompt = def.prompt || {};
+  const output = def.output || {};
+  const outputMode = String(output.mode || 'markdown').toLowerCase();
+  const schemaText = output.jsonSchema ? JSON.stringify(output.jsonSchema, null, 2) : '';
+  const types = Array.isArray(inputTypes) ? inputTypes : ['text', 'textarea', 'number', 'boolean', 'select', 'json'];
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const headerBtns = (typeof headerManageBtns !== 'undefined' && Array.isArray(headerManageBtns)) ? headerManageBtns : [];
+  const toolbarBtns = (typeof manageBtns !== 'undefined' && Array.isArray(manageBtns)) ? manageBtns : [];
+  const serviceKey = reg.serviceKey || def.serviceKey || '';
+  const runnerForTest = {
+    serviceKey,
+    label: 'Test this definition',
+    description: 'Runs against the saved definition in the database. Save your changes first, then try sample inputs here before wiring the service into reports.',
+    definition: def,
+    inputDefaults: {},
+    submitLabel: 'Run test',
+    formId: 'aiServiceDefinitionTest',
+    configured: Boolean(prompt.userPromptTemplate && String(prompt.userPromptTemplate).trim()),
+    active: def.isActive !== false,
+    runUrl: '/school/ai-assist/services/' + encodeURIComponent(serviceKey) + '/run',
+    startCollapsed: false,
+    panelVariant: 'definition-test'
+  };
+%>
+
+<div class="sections-page">
+  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <h1 class="page-heading size-md m-0"><i class="bi bi-braces me-2"></i><%= title %></h1>
+      <span class="badge bg-light text-dark border font-monospace"><%= serviceKey %></span>
+    </div>
+    <a href="/school/ai-assist/service-definitions" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i> Back to list
+    </a>
+  </div>
+
+  <% if (headerBtns.length) { %>
+    <div class="d-flex align-items-center flex-wrap gap-2 justify-content-end mb-3">
+      <% headerBtns.forEach((btn) => { %><%- String(btn || '').replace(/\bmb-2\b/g, '') %><% }) %>
+    </div>
+  <% } %>
+  <% if (toolbarBtns.length) { %>
+    <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end mb-4">
+      <% toolbarBtns.forEach((btn) => { %><%- btn %><% }) %>
+    </div>
+  <% } %>
+
+  <div class="form-container wide" style="max-width: 1200px;">
+    <form id="serviceDefinitionForm" method="POST" action="/school/ai-assist/service-definitions/<%= encodeURIComponent(serviceKey) %>">
+      <input type="hidden" name="actionStateId" value="<%= asid %>">
+      <input type="hidden" name="inputsJson" id="inputsJsonField" value="">
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+          <h6 class="fw-bold text-primary mb-3"><i class="bi bi-info-circle me-2"></i>Service</h6>
+          <p class="small text-muted mb-2"><%= reg.description || '' %></p>
+          <div class="form-check form-switch">
+            <input class="form-check-input" type="checkbox" id="defIsActive" name="isActive" value="true"<%= def.isActive !== false ? ' checked' : '' %>>
+            <label class="form-check-label" for="defIsActive">Definition active</label>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <h6 class="fw-bold text-primary m-0"><i class="bi bi-input-cursor-text me-2"></i>Inputs</h6>
+            <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddInputRow"><i class="bi bi-plus-lg me-1"></i>Add input</button>
+          </div>
+          <p class="small text-muted">Use <code>{{input_id}}</code> in prompts. IDs must be unique tokens (letters, numbers, underscore).</p>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle" id="inputsTable">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Label</th>
+                  <th>Type</th>
+                  <th>Required</th>
+                  <th>Default</th>
+                  <th>Help</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="inputsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+          <h6 class="fw-bold text-primary mb-3"><i class="bi bi-chat-quote me-2"></i>Prompts</h6>
+          <div class="mb-3">
+            <label class="form-label fw-bold" for="systemPrompt">System prompt</label>
+            <textarea class="form-control font-monospace" id="systemPrompt" name="systemPrompt" rows="4"><%= prompt.systemPrompt || '' %></textarea>
+          </div>
+          <div class="mb-0">
+            <label class="form-label fw-bold" for="userPromptTemplate">User prompt template <span class="text-danger">*</span></label>
+            <textarea class="form-control font-monospace" id="userPromptTemplate" name="userPromptTemplate" rows="8" required><%= prompt.userPromptTemplate || '' %></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+          <h6 class="fw-bold text-primary mb-3"><i class="bi bi-box-arrow-right me-2"></i>Output</h6>
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label fw-bold" for="outputMode">Mode</label>
+              <select class="form-select" id="outputMode" name="outputMode">
+                <option value="markdown"<%= outputMode === 'markdown' ? ' selected' : '' %>>Markdown / text</option>
+                <option value="text"<%= outputMode === 'text' ? ' selected' : '' %>>Plain text</option>
+                <option value="json"<%= outputMode === 'json' ? ' selected' : '' %>>JSON</option>
+              </select>
+            </div>
+            <div id="jsonOutputFields" class="col-12<%= outputMode === 'json' ? '' : ' d-none' %>">
+              <label class="form-label fw-bold" for="jsonInstructions">JSON instructions</label>
+              <textarea class="form-control" id="jsonInstructions" name="jsonInstructions" rows="3"><%= output.jsonInstructions || '' %></textarea>
+              <label class="form-label fw-bold mt-3" for="jsonSchema">JSON schema (object)</label>
+              <textarea class="form-control font-monospace" id="jsonSchema" name="jsonSchema" rows="8" placeholder='{"type":"object","required":["summary"],"properties":{"summary":{"type":"string"}}}'><%= schemaText %></textarea>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4">
+          <label class="form-label fw-bold" for="notes">Notes</label>
+          <textarea class="form-control" id="notes" name="notes" rows="2"><%= def.notes || '' %></textarea>
+        </div>
+      </div>
+
+      <div class="d-flex flex-wrap gap-2 mb-4">
+        <button type="submit" class="btn btn-filled btn-primary"><i class="bi bi-save me-1"></i>Save definition</button>
+        <a href="/school/ai-assist/service-assignments" class="btn btn-outline-secondary">Service assignments</a>
+      </div>
+    </form>
+
+    <%- include('school/aiAssist/partials/schoolAiServiceRunner', { aiServiceRunner: runnerForTest }) %>
+  </div>
+</div>
+
+<script>
+  (function () {
+    const types = <%- JSON.stringify(types) %>;
+    const initialInputs = <%- JSON.stringify(inputsInit).replace(/</g, '\\u003c') %>;
+    const tbody = document.getElementById('inputsTableBody');
+    const jsonField = document.getElementById('inputsJsonField');
+    const outputMode = document.getElementById('outputMode');
+    const jsonFields = document.getElementById('jsonOutputFields');
+    const form = document.getElementById('serviceDefinitionForm');
+
+    function escapeAttr(value) {
+      return String(value ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    }
+
+    function readRowsFromDom() {
+      const rows = [];
+      tbody.querySelectorAll('tr[data-input-row]').forEach((tr) => {
+        const get = (sel) => tr.querySelector(sel);
+        const id = (get('[data-field="id"]')?.value || '').trim();
+        if (!id) return;
+        const type = get('[data-field="type"]')?.value || 'text';
+        const optionsRaw = get('[data-field="options"]')?.value || '';
+        let options = [];
+        if (type === 'select' && optionsRaw.trim()) {
+          optionsRaw.split(',').map((s) => s.trim()).filter(Boolean).forEach((v) => {
+            options.push({ value: v, label: v });
+          });
+        }
+        rows.push({
+          id,
+          label: (get('[data-field="label"]')?.value || id).trim(),
+          type,
+          required: Boolean(get('[data-field="required"]')?.checked),
+          defaultValue: get('[data-field="defaultValue"]')?.value || '',
+          helpText: get('[data-field="helpText"]')?.value || '',
+          options
+        });
+      });
+      return rows;
+    }
+
+    function syncJsonField() {
+      jsonField.value = JSON.stringify(readRowsFromDom());
+    }
+
+    function addRow(row = {}) {
+      const tr = document.createElement('tr');
+      tr.setAttribute('data-input-row', '1');
+      const typeOptions = types.map((t) => (
+        `<option value="${escapeAttr(t)}"${String(row.type || 'text') === t ? ' selected' : ''}>${escapeAttr(t)}</option>`
+      )).join('');
+      tr.innerHTML = `
+        <td><input class="form-control form-control-sm font-monospace" data-field="id" value="${escapeAttr(row.id || '')}" required></td>
+        <td><input class="form-control form-control-sm" data-field="label" value="${escapeAttr(row.label || '')}"></td>
+        <td><select class="form-select form-select-sm" data-field="type">${typeOptions}</select></td>
+        <td class="text-center"><input type="checkbox" class="form-check-input" data-field="required"${row.required ? ' checked' : ''}></td>
+        <td><input class="form-control form-control-sm" data-field="defaultValue" value="${escapeAttr(row.defaultValue || '')}"></td>
+        <td><input class="form-control form-control-sm" data-field="helpText" value="${escapeAttr(row.helpText || '')}" placeholder="Help"></td>
+        <td><button type="button" class="btn btn-outline-danger btn-sm" data-action="remove"><i class="bi bi-trash"></i></button></td>
+      `;
+      tbody.appendChild(tr);
+      tr.querySelector('[data-action="remove"]').addEventListener('click', () => {
+        tr.remove();
+        syncJsonField();
+      });
+      tr.querySelectorAll('input,select').forEach((el) => {
+        el.addEventListener('change', syncJsonField);
+        el.addEventListener('input', syncJsonField);
+      });
+      syncJsonField();
+    }
+
+    document.getElementById('btnAddInputRow').addEventListener('click', () => {
+      addRow({ id: 'input_' + (tbody.querySelectorAll('tr').length + 1), type: 'text' });
+    });
+
+    (initialInputs.length ? initialInputs : [{ id: 'report_text', label: 'Report text', type: 'textarea', required: true }]).forEach(addRow);
+
+    outputMode.addEventListener('change', () => {
+      const isJson = outputMode.value === 'json';
+      jsonFields.classList.toggle('d-none', !isJson);
+    });
+
+    form.addEventListener('submit', () => syncJsonField());
+  })();
+</script>
