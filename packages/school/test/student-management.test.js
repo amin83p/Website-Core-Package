@@ -28,9 +28,11 @@ test('student management view and client expose workspace', () => {
   assert.match(studentManagementView, /School Student Management/);
   assert.match(studentManagementView, /schoolStudentManagement\.js/);
   assert.match(studentManagementView, /studentClaimNumbersManager\.js/);
+  assert.match(studentManagementView, /studentReferralLinksManager\.js/);
   assert.match(studentManagementView, /rollingStudentClbManager\.js/);
   assert.match(studentManagementScript, /data-hub-students-card="claims"/);
   assert.match(studentManagementScript, /data-hub-students-card="clb"/);
+  assert.match(studentManagementScript, /data-hub-students-card="referrals"/);
   const managementModals = fs.readFileSync(path.join(ROOT, 'MVC', 'views', 'school', 'partials', 'studentManagementModals.ejs'), 'utf8');
   assert.match(managementModals, /personProfileEditModal/);
   assert.match(studentManagementScript, /data-hub-students-person-focus/);
@@ -44,6 +46,7 @@ test('student management view and client expose workspace', () => {
   assert.match(directoryService, /programRegistrations/);
   assert.match(directoryService, /programRegistrationViewService/);
   assert.match(directoryService, /classEnrollments/);
+  assert.match(directoryService, /referralLinks/);
   assert.match(directoryService, /buildClassEnrollmentRows/);
   assert.match(studentManagementScript, /hubStudentsEnrollmentsCard/);
   assert.match(studentManagementScript, /hubStudentsEmptyHero/);
@@ -56,6 +59,11 @@ test('student management view and client expose workspace', () => {
   assert.match(studentManagementScript, /data-hub-students-open="class-conduct-report"/);
   assert.match(studentManagementScript, /data-hub-students-open="person-reports"/);
   assert.match(studentManagementScript, /data-hub-students-open="session-cases"/);
+  assert.match(studentManagementScript, /data-hub-students-open="referral-links"/);
+  assert.match(managementModals, /studentReferralLinksModal/);
+  assert.match(managementModals, /referralQuickCreateModal/);
+  assert.match(managementModals, /modal_GenericPicker/);
+  assert.match(studentManagementView, /schoolReferralQuickCreate\.js/);
   assert.match(studentManagementScript, /hubStudentsBuildAttendanceReportUrl/);
   assert.match(studentManagementScript, /HUB_STUDENTS_EMBED_QUERY/);
   assert.match(studentManagementScript, /smEmbed/);

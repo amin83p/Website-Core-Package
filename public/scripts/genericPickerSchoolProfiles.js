@@ -59,6 +59,26 @@
     }
   });
 
+  core.registerProfile(['referral', 'referrals'], {
+    icon: 'bi-share',
+    getTitle(item) {
+      const first = String(item?.firstName || item?.name?.first || '').trim();
+      const last = String(item?.lastName || item?.name?.last || '').trim();
+      const full = `${first} ${last}`.trim();
+      return full || String(item?.displayName || item?.id || '').trim() || 'Referral contact';
+    },
+    getSummary(item) {
+      const orgs = String(item?.organizationLabels || '').trim();
+      const email = String(item?.email || '').trim();
+      const bits = [];
+      if (orgs) bits.push(orgs);
+      if (email) bits.push(email);
+      const id = String(item?.id || '').trim();
+      if (id) bits.push(id);
+      return bits.join(' | ') || 'Referral record';
+    }
+  });
+
   core.registerProfile(['program', 'programs'], {
     icon: 'bi-journal-bookmark-fill',
     getSummary(item) {

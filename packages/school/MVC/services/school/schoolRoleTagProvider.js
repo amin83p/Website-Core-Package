@@ -15,11 +15,12 @@ function addRoleToIndex(index, personId, roleTag) {
  * Uses the active data backend (JSON files vs Mongo) via school repositories.
  */
 async function buildSchoolRoleIndex() {
-  const [students, teachers, staffs, funders] = await Promise.all([
+  const [students, teachers, staffs, funders, referrals] = await Promise.all([
     schoolRepositories.students.list({ query: {}, scope: { canViewAll: true } }),
     schoolRepositories.teachers.list({ query: {}, scope: { canViewAll: true } }),
     schoolRepositories.staff.list({ query: {}, scope: { canViewAll: true } }),
-    schoolRepositories.funders.list({ query: {}, scope: { canViewAll: true } })
+    schoolRepositories.funders.list({ query: {}, scope: { canViewAll: true } }),
+    schoolRepositories.referrals.list({ query: {}, scope: { canViewAll: true } })
   ]);
 
   const index = new Map();
@@ -38,6 +39,10 @@ async function buildSchoolRoleIndex() {
   (Array.isArray(staffs) ? staffs : []).forEach((st) => {
     if (String(st?.status || '').trim().toLowerCase() === 'archived') return;
     addRoleToIndex(index, st?.personId, 'school_staff');
+  });
+  (Array.isArray(referrals) ? referrals : []).forEach((row) => {
+    if (String(row?.status || '').trim().toLowerCase() === 'archived') return;
+    addRoleToIndex(index, row?.personId, 'school_referral');
   });
   return index;
 }

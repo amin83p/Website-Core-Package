@@ -67,6 +67,11 @@ module.exports = Object.freeze({
     { key: { orgId: 1, userId: 1, createdAt: -1 }, options: { name: 'idx_school_ai_token_usage_org_user_created' } },
     { key: { orgId: 1, serviceKey: 1, createdAt: -1 }, options: { name: 'idx_school_ai_token_usage_org_service_created' } }
   ],
+  schoolReferrals: [
+    { key: { id: 1 }, options: { name: 'idx_school_referrals_id', unique: true } },
+    { key: { orgId: 1, personId: 1 }, options: { name: 'idx_school_referrals_org_person', unique: true } },
+    { key: { orgId: 1, status: 1, 'audit.lastUpdateDateTime': -1 }, options: { name: 'idx_school_referrals_org_status_updated' } }
+  ],
   schoolAiUserUsageLimits: [
     { key: { id: 1 }, options: { name: 'idx_school_ai_user_usage_limits_id', unique: true } },
     {

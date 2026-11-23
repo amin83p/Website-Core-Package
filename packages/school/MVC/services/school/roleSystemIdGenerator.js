@@ -1,6 +1,7 @@
 const ROLE_PREFIXES = Object.freeze({
   teacher: 'TCH',
-  staff: 'STF'
+  staff: 'STF',
+  referral: 'REF'
 });
 
 function generateRoleSystemIdCandidate(roleType, existingIds = new Set()) {

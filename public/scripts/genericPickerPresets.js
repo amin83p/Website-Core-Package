@@ -200,6 +200,13 @@
       apiEndpoint: '/school/programs',
       placeholder: 'Search programs...'
     },
+    referral: {
+      title: 'Select Referral Contact',
+      icon: 'bi-share',
+      apiEndpoint: '/school/referrals',
+      placeholder: 'Search referral contacts...',
+      searchFields: 'id,firstName,lastName,email,phone,organizationLabels'
+    },
     section: {
       title: 'Select Section',
       icon: 'bi-collection',
@@ -281,6 +288,7 @@
     '/operations': 'operation',
     '/persons': 'person',
     '/school/programs': 'program',
+    '/school/referrals': 'referral',
     '/school/programs/api/eligible-administrators': 'person',
     '/school/payrates/api/eligible-persons': 'person',
     '/school/timesheets/api/eligible-persons': 'person',
@@ -323,6 +331,7 @@
       'operation',
       'person',
       'program',
+      'referral',
       'section',
       'session',
       'sessionStatus',
@@ -455,6 +464,7 @@
     operation: (overrides) => byName('operation', overrides),
     person: (overrides) => byName('person', overrides),
     program: (overrides) => byName('program', overrides),
+    referral: (overrides) => byName('referral', overrides),
     section: (overrides) => byName('section', overrides),
     session: (overrides) => byName('session', overrides),
     sessionStatus: (overrides) => byName('sessionStatus', overrides),

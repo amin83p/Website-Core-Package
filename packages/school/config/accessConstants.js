@@ -63,6 +63,7 @@ const SCHOOL_SECTIONS = Object.freeze({
   SCHOOL_FUNDERS: 'SCHOOL_FUNDERS',
   SCHOOL_TEACHERS: 'SCHOOL_TEACHERS',
   SCHOOL_STAFF: 'SCHOOL_STAFF',
+  SCHOOL_REFERRALS: 'SCHOOL_REFERRALS',
   SCHOOL_SUBJECTS: 'SCHOOL_SUBJECTS',
   SCHOOL_TERMS: 'SCHOOL_TERMS',
   SCHOOL_CLASSES: 'SCHOOL_CLASSES',
@@ -140,7 +141,8 @@ const SCHOOL_ROLES = Object.freeze({
   STUDENT: 'school_student',
   FUNDER: 'school_funder',
   TEACHER: 'school_teacher',
-  STAFF: 'school_staff'
+  STAFF: 'school_staff',
+  REFERRAL: 'school_referral'
 });
 
 const SCHOOL_UPLOAD_FOLDERS = Object.freeze({

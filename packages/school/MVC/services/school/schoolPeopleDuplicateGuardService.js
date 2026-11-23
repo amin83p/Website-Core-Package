@@ -18,6 +18,12 @@ const ENTITY_CONFIG = Object.freeze({
     statusField: 'status',
     editUrl: (id) => `/school/staff/edit/${encodeURIComponent(String(id || ''))}`,
     recoveryUrl: '/school/staff/archived'
+  },
+  referrals: {
+    label: 'Referral',
+    statusField: 'status',
+    editUrl: (id) => `/school/referrals/edit/${encodeURIComponent(String(id || ''))}`,
+    recoveryUrl: '/school/referrals/archived'
   }
 });
 

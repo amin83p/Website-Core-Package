@@ -93,6 +93,7 @@ const SCHOOL_ENTITY_REGISTRY = Object.freeze({
   activities: { repository: schoolRepositories.activities },
   teachers: { repository: schoolRepositories.teachers },
   staff: { repository: schoolRepositories.staff },
+  referrals: { repository: schoolRepositories.referrals },
   payRates: { repository: schoolRepositories.payRates },
   sessionStatuses: { repository: schoolRepositories.sessionStatuses },
   skills: { repository: schoolRepositories.skills, allowSystemFallback: true },

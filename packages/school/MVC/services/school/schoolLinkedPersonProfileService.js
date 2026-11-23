@@ -36,6 +36,11 @@ const LINK_TYPE_CONFIG = Object.freeze({
     entityType: 'funders',
     section: SECTIONS.SCHOOL_FUNDERS,
     orgField: 'orgId'
+  },
+  referral: {
+    entityType: 'referrals',
+    section: SECTIONS.SCHOOL_REFERRALS,
+    orgField: 'orgId'
   }
 });
 
@@ -44,7 +49,7 @@ const { validatePersonInput, buildPersonFromBody } = publicRegistrationService;
 function normalizeLinkType(value) {
   const token = String(value || '').trim().toLowerCase();
   if (!LINK_TYPE_CONFIG[token]) {
-    throw new Error('linkType must be student, teacher, staff, or funder.');
+    throw new Error('linkType must be student, teacher, staff, funder, or referral.');
   }
   return token;
 }

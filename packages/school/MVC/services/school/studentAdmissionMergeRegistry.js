@@ -424,6 +424,11 @@ function unionScalarStudentProfile(mainStudent = {}, secondaryStudents = []) {
       .map((row) => JSON.stringify(row))
   );
   const claims = Array.isArray(next.claimNumbers) ? [...next.claimNumbers] : [];
+  const referralLinkSet = new Set(
+    (Array.isArray(next.referralLinks) ? next.referralLinks : [])
+      .map((row) => JSON.stringify(row))
+  );
+  const referralLinks = Array.isArray(next.referralLinks) ? [...next.referralLinks] : [];
   let clbHistory = Array.isArray(next.clbLevelHistory) ? [...next.clbLevelHistory] : [];
   let enrollmentDate = String(next.enrollmentDate || '').trim();
   let notes = String(next.notes || '').trim();
@@ -434,6 +439,13 @@ function unionScalarStudentProfile(mainStudent = {}, secondaryStudents = []) {
       if (!claimSet.has(key)) {
         claimSet.add(key);
         claims.push(row);
+      }
+    });
+    (Array.isArray(stu.referralLinks) ? stu.referralLinks : []).forEach((row) => {
+      const key = JSON.stringify(row);
+      if (!referralLinkSet.has(key)) {
+        referralLinkSet.add(key);
+        referralLinks.push(row);
       }
     });
     clbHistory = clbHistory.concat(Array.isArray(stu.clbLevelHistory) ? stu.clbLevelHistory : []);
@@ -447,6 +459,7 @@ function unionScalarStudentProfile(mainStudent = {}, secondaryStudents = []) {
 
   clbHistory.sort((a, b) => String(a?.effectiveDate || a?.date || '').localeCompare(String(b?.effectiveDate || b?.date || '')));
   next.claimNumbers = claims;
+  next.referralLinks = referralLinks;
   next.clbLevelHistory = clbHistory.slice(0, 100);
   if (enrollmentDate) next.enrollmentDate = enrollmentDate;
   if (notes) next.notes = notes.slice(0, 8000);

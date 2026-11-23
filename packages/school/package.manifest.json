@@ -87,6 +87,24 @@
       "active": true,
       "system": true,
       "adoptExisting": true
+    },
+    {
+      "id": "ROL1008",
+      "key": "school_referral",
+      "label": "School Referral",
+      "description": "School-scoped referral contact role alias for audience targeting.",
+      "domain": "school",
+      "packageName": "SCHOOL",
+      "aliases": [
+        "schoolreferral",
+        "school-referral",
+        "schoolreferrals",
+        "school-referrals",
+        "school_referrals"
+      ],
+      "active": true,
+      "system": true,
+      "adoptExisting": true
     }
   ],
   "sections": [
@@ -2456,6 +2474,9 @@
         },
         {
           "id": "332232"
+        },
+        {
+          "id": "332233"
         }
       ],
       "related": [],
@@ -3722,6 +3743,56 @@
         },
         {
           "id": "OP1004",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
+    },
+    {
+      "id": "332233",
+      "name": "SCHOOL_REFERRALS",
+      "category": "SCHOOL",
+      "description": "Manage school referral contacts and their referring funder organizations.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 5,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/referrals",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1005",
           "sessionAttempts": 10,
           "sessionTime": 30,
           "active": true
@@ -5355,6 +5426,18 @@
       "tags": [
         "SCHOOL_FUNDERS",
         "332232"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SYSTEM_102",
+      "name": "SCHOOL_REFERRALS",
+      "type": "class",
+      "value": "bi bi-share",
+      "tags": [
+        "SCHOOL_REFERRALS",
+        "332233"
       ],
       "orgId": "SYSTEM",
       "adoptExisting": true
@@ -10564,6 +10647,19 @@
       "active": true
     },
     {
+      "id": "school-menu-referrals",
+      "label": "Referrals",
+      "href": "/school/referrals",
+      "icon": "bi bi-share",
+      "visibility": "authenticated",
+      "target": "_self",
+      "category": "School",
+      "active": true,
+      "sectionId": "332233",
+      "symbolId": "SYM_SYSTEM_102",
+      "adoptExisting": true
+    },
+    {
       "id": "school-menu-master-hub",
       "label": "Master Academia Hub",
       "href": "/school/master-hub",
@@ -10689,6 +10785,20 @@
       "target": "_self",
       "category": "School",
       "active": true
+    },
+    {
+      "id": "school-dashboard-referrals",
+      "label": "Referrals",
+      "href": "/school/referrals",
+      "icon": "bi bi-share",
+      "description": "Register referral contacts and link referring funder organizations.",
+      "visibility": "authenticated",
+      "target": "_self",
+      "category": "School",
+      "active": true,
+      "sectionId": "332233",
+      "symbolId": "SYM_SYSTEM_102",
+      "adoptExisting": true
     },
     {
       "id": "school-dashboard-leave-requests",
@@ -10889,6 +10999,11 @@
       "label": "Staff"
     },
     {
+      "entityType": "referrals",
+      "label": "School Referrals",
+      "collectionName": "schoolReferrals"
+    },
+    {
       "entityType": "studentProgramPriorSubjects",
       "label": "Student Program Prior Subjects"
     },
@@ -11039,6 +11154,18 @@
         "mongo"
       ],
       "idempotencyKey": "school:section:school-activities"
+    },
+    {
+      "id": "school-referrals-section",
+      "version": "0.1.2",
+      "description": "Ensure SCHOOL_REFERRALS section, symbol, People dashboard subsection link, role, and access grants are present in MongoDB.",
+      "run": "seeders/school-referrals-section-run.js",
+      "revert": "seeders/school-referrals-section-revert.js",
+      "mode": "upsert",
+      "backendModes": [
+        "mongo"
+      ],
+      "idempotencyKey": "school:section:school-referrals"
     }
   ],
   "migrations": [],

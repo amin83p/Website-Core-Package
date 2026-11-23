@@ -43,6 +43,7 @@ const reportService = require('../../services/school/reportService');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const studentModel = require('../../models/school/studentModel');
+const studentReferralLinkService = require('../../services/school/studentReferralLinkService');
 const { ACADEMIC_STATUSES } = studentModel;
 const { FEE_CATEGORIES } = require('../../models/school/feeCategoryCatalog');
 const { normalizeProgramRegistrationSelections } = require('../../utils/programRegistrationSelectionUtils');
@@ -819,6 +820,17 @@ exports.showForm = async (req, res) => {
         const claimNumbersForView = isEdit
             ? studentModel.cleanClaimNumbers(student?.claimNumbers || [])
             : [];
+        let referralLinksForView = [];
+        if (isEdit) {
+            try {
+                referralLinksForView = await studentReferralLinkService.enrichReferralLinksForApi(
+                    student?.referralLinks || [],
+                    { reqUser: req.user, options: routeAccess(req) }
+                );
+            } catch (_) {
+                referralLinksForView = studentModel.cleanReferralLinks(student?.referralLinks || []);
+            }
+        }
 
         res.render('school/student/studentForm', {
             title: isEdit ? `Edit Student: ${editFormDisplayName} (${editFormRecordId})` : 'Admit New Student',
@@ -841,7 +853,8 @@ exports.showForm = async (req, res) => {
             studentReportInstancesFullListUrl,
             studentReportInstancesAccessNote,
             canEditStudentClb,
-            claimNumbersForView
+            claimNumbersForView,
+            referralLinksForView
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', error, message: error.message, user: req.user });
@@ -984,6 +997,21 @@ exports.saveStudent = async (req, res) => {
             }
         }
 
+        let parsedReferralLinks = null;
+        if (!id && req.body.referralLinks) {
+            try {
+                const raw = typeof req.body.referralLinks === 'string'
+                    ? JSON.parse(req.body.referralLinks)
+                    : req.body.referralLinks;
+                parsedReferralLinks = await studentReferralLinkService.validateAndNormalizeReferralLinks(
+                    raw,
+                    { reqUser: req.user, options: routeAccess(req) }
+                );
+            } catch (error) {
+                throw new Error(error?.message || 'Invalid referral links payload.');
+            }
+        }
+
         const commentsRaw = req.body.newFileComments;
         const newFileComments = Array.isArray(commentsRaw) ? commentsRaw : (commentsRaw ? [commentsRaw] : []);
 
@@ -1060,7 +1088,10 @@ exports.saveStudent = async (req, res) => {
             clbLevelHistory: parsedClbLevelHistory,
             claimNumbers: id
                 ? (existingStudent?.claimNumbers || [])
-                : (parsedClaimNumbers || [])
+                : (parsedClaimNumbers || []),
+            referralLinks: id
+                ? (existingStudent?.referralLinks || [])
+                : (parsedReferralLinks || [])
         };
 
         const accessibleAccounts = !id
@@ -1439,6 +1470,112 @@ exports.putStudentClaimNumbersApi = async (req, res) => {
         return res.status(400).json({
             status: 'error',
             message: error.message || 'Unable to save claim numbers.'
+        });
+    }
+};
+
+async function resolveReferralLinksForApi(student, reqUser, options) {
+    return studentReferralLinkService.enrichReferralLinksForApi(student?.referralLinks, {
+        reqUser,
+        options
+    });
+}
+
+exports.getStudentReferralLinkOptionsApi = async (req, res) => {
+    try {
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const picker = await studentReferralLinkService.buildReferralLinkPickerOptions(
+            req.user,
+            activeOrgId,
+            routeAccess(req)
+        );
+        return res.json({
+            status: 'success',
+            message: 'Referral link options loaded.',
+            data: picker
+        });
+    } catch (error) {
+        return res.status(400).json({
+            status: 'error',
+            message: error.message || 'Unable to load referral link options.'
+        });
+    }
+};
+
+exports.getStudentReferralLinksApi = async (req, res) => {
+    try {
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const studentId = toPublicId(req.params.id);
+        if (!studentId) throw new Error('Student id is required.');
+
+        const student = await dataService.getDataById('students', studentId, req.user, routeAccess(req));
+        if (!student) throw new Error('Student not found.');
+        assertStudentOrgAccess(student, activeOrgId, req.user);
+
+        const referralLinks = await resolveReferralLinksForApi(student, req.user, routeAccess(req));
+        const studentLabel = await resolveStudentLabelForApi(student, req.user);
+
+        return res.json({
+            status: 'success',
+            message: 'Referral links loaded.',
+            data: {
+                studentId,
+                studentLabel,
+                referralLinks
+            }
+        });
+    } catch (error) {
+        return res.status(400).json({
+            status: 'error',
+            message: error.message || 'Unable to load referral links.'
+        });
+    }
+};
+
+exports.putStudentReferralLinksApi = async (req, res) => {
+    try {
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const studentId = toPublicId(req.params.id);
+        if (!studentId) throw new Error('Student id is required.');
+
+        const existingStudent = await dataService.getDataById('students', studentId, req.user, routeAccess(req));
+        if (!existingStudent) throw new Error('Student not found.');
+        assertStudentOrgAccess(existingStudent, activeOrgId, req.user);
+
+        let incomingLinks = req.body?.referralLinks;
+        if (typeof incomingLinks === 'string') {
+            incomingLinks = parseJsonSafe(incomingLinks, null);
+        }
+        if (!Array.isArray(incomingLinks)) {
+            throw new Error('referralLinks must be an array.');
+        }
+
+        const referralLinks = await studentReferralLinkService.validateAndNormalizeReferralLinks(
+            incomingLinks,
+            { reqUser: req.user, options: routeAccess(req) }
+        );
+
+        const updatedStudent = await dataService.updateData(
+            'students',
+            studentId,
+            { ...existingStudent, referralLinks },
+            req.user
+        );
+        const studentLabel = await resolveStudentLabelForApi(updatedStudent, req.user);
+
+        return res.json({
+            status: 'success',
+            message: 'Referral links saved.',
+            data: {
+                studentId,
+                studentLabel,
+                referralLinks: await resolveReferralLinksForApi(updatedStudent, req.user, routeAccess(req))
+            }
+        });
+    } catch (error) {
+        return res.status(400).json({
+            status: 'error',
+            message: error.message || 'Unable to save referral links.'
         });
     }
 };

@@ -18,6 +18,7 @@
   const initClbLevelHistoryJson = JSON.stringify(s.clbLevelHistory || []).replace(/</g, '\\u003c');
   const initProgramRegistrationsJson = JSON.stringify(typeof existingProgramRegistrations !== 'undefined' ? (existingProgramRegistrations || []) : []).replace(/</g, '\\u003c');
   const initClaimNumbersJson = JSON.stringify(typeof claimNumbersForView !== 'undefined' ? (claimNumbersForView || []) : []).replace(/</g, '\\u003c');
+  const initReferralLinksJson = JSON.stringify(typeof referralLinksForView !== 'undefined' ? (referralLinksForView || []) : []).replace(/</g, '\\u003c');
   const canEditStudentClbFlag = typeof canEditStudentClb !== 'undefined' && canEditStudentClb === true;
   const routeIdJson = JSON.stringify(routeId).replace(/</g, '\\u003c');
   const initPersonOrganizationsJson = JSON.stringify(typeof personOrganizations !== 'undefined' ? (personOrganizations || []) : []).replace(/</g, '\\u003c');
@@ -58,6 +59,7 @@
       <input type="hidden" name="attachments" id="hid_attachments" value="[]">
       <input type="hidden" name="clbLevelHistory" id="hid_clbLevelHistory" value="[]">
       <input type="hidden" name="claimNumbers" id="hid_claimNumbers" value="[]">
+      <input type="hidden" name="referralLinks" id="hid_referralLinks" value="[]">
 
       <!-- ActionState anti-tamper token (required for edit/update when middleware is enabled) -->
       <input type="hidden" name="actionStateId" id="hid_actionStateId" value="<%= asid %>">
@@ -430,6 +432,27 @@
                <div class="alert alert-light border mb-0">
                  <i class="bi bi-wallet2 me-2"></i>A separate Student Account is created automatically under the configured Students head account when the student is admitted.
                </div>
+
+               <div class="card border-secondary shadow-sm mt-4 mb-0">
+                 <div class="card-header bg-light d-flex justify-content-between align-items-center flex-wrap gap-2">
+                   <span class="fw-bold"><i class="bi bi-people me-2"></i>Referrals</span>
+                   <% if (canEditStudentClbFlag) { %>
+                   <button type="button" class="btn btn-sm btn-outline-primary fw-bold" id="btnManageStudentReferralLinks">
+                     <i class="bi bi-pencil-square me-1"></i>Manage Referrals
+                   </button>
+                   <% } %>
+                 </div>
+                 <div class="card-body">
+                   <% if (canEditStudentClbFlag) { %>
+                   <div id="studentReferralLinksSummary"></div>
+                   <% if (!isEdit) { %>
+                   <p class="small text-muted mb-0 mt-2">Referral links are stored when you save the new student profile.</p>
+                   <% } %>
+                   <% } else { %>
+                   <p class="small text-muted mb-0">You do not have permission to manage referrals.</p>
+                   <% } %>
+                 </div>
+               </div>
            </div>
 
            <div class="tab-pane fade" id="tab-programs">
@@ -755,10 +778,15 @@
 </div>
 
 <%- include('../partials/studentClaimNumbersModal') %>
+<%- include('../partials/studentReferralLinksModal') %>
+<%- include('../partials/referralQuickCreateModal') %>
 
 <script src="/scripts/clbLevelValueParser.js"></script>
 <script src="/scripts/schoolMessageUi.js"></script>
 <script src="/scripts/studentClaimNumbersManager.js"></script>
+<script src="/scripts/schoolModalStack.js"></script>
+<script src="/scripts/studentReferralLinksManager.js"></script>
+<script src="/scripts/schoolReferralQuickCreate.js"></script>
 <script src="/scripts/canadianAddressAutocomplete.js"></script>
 <script>
   window.__INIT_STUDENT_ATTACHMENTS__ = <%- initAttachmentsJson %>;
@@ -766,6 +794,7 @@
   window.__INIT_STUDENT_PROGRAM_REGISTRATIONS__ = <%- initProgramRegistrationsJson %>;
   window.__STUDENT_ROUTE_ID__ = <%- routeIdJson %>;
   window.__INIT_STUDENT_CLAIM_NUMBERS__ = <%- initClaimNumbersJson %>;
+  window.__INIT_STUDENT_REFERRAL_LINKS__ = <%- initReferralLinksJson %>;
   window.__CAN_EDIT_STUDENT_CLB__ = <%= canEditStudentClbFlag ? 'true' : 'false' %>;
 </script>
 
@@ -2931,6 +2960,7 @@
     syncNewPersonHiddenState();
     wireClbLevelHistoryUi();
     wireStudentClaimNumbersUi();
+    wireStudentReferralLinksUi();
     refreshEditPersonButton();
   });
 
@@ -3002,6 +3032,77 @@
           claimNumbers = Array.isArray(rows) ? rows : claimNumbers;
           renderSummary();
           syncClaimNumbersHiddenField();
+        }
+      });
+    });
+  }
+
+  function wireStudentReferralLinksUi() {
+    const mgr = window.StudentReferralLinksManager;
+    const summaryEl = document.getElementById('studentReferralLinksSummary');
+    const btnManage = document.getElementById('btnManageStudentReferralLinks');
+    const hidReferralLinks = document.getElementById('hid_referralLinks');
+    const studentId = String(studentRouteId || '').trim();
+    const isDraftStudent = !studentId;
+    if (!mgr || !summaryEl || !btnManage) return;
+
+    let referralLinks = Array.isArray(window.__INIT_STUDENT_REFERRAL_LINKS__)
+      ? window.__INIT_STUDENT_REFERRAL_LINKS__.slice()
+      : [];
+
+    const syncReferralLinksHiddenField = () => {
+      if (!isDraftStudent || !hidReferralLinks) return;
+      hidReferralLinks.value = JSON.stringify(referralLinks);
+    };
+    window.syncStudentReferralLinksHiddenField = syncReferralLinksHiddenField;
+
+    const renderSummary = () => mgr.renderSummaryTable(summaryEl, referralLinks);
+
+    async function requestJson(url, method = 'GET', payload = null) {
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'X-AJAX-Request': 'true'
+        },
+        body: payload ? JSON.stringify(payload) : undefined
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok || String(result.status || '').toLowerCase() === 'error') {
+        throw new Error(result?.message || 'Request failed.');
+      }
+      return result;
+    }
+
+    mgr.configure({
+      requestJson,
+      canEdit: window.__CAN_EDIT_STUDENT_CLB__ === true,
+      showModal: () => {
+        const modalEl = document.getElementById('rollingStudentReferralLinksModal');
+        if (!modalEl) return;
+        const bootstrapApi = window.bootstrap || (typeof bootstrap !== 'undefined' ? bootstrap : null);
+        if (bootstrapApi?.Modal) {
+          bootstrapApi.Modal.getOrCreateInstance(modalEl).show();
+        }
+      }
+    });
+
+    renderSummary();
+    syncReferralLinksHiddenField();
+
+    btnManage.addEventListener('click', () => {
+      const studentLabel = document.querySelector('.page-heading')?.textContent?.trim()
+        || document.getElementById('inp_personName')?.value?.trim()
+        || (isDraftStudent ? 'New student' : studentId);
+      mgr.open({
+        studentId: isDraftStudent ? '' : studentId,
+        persistMode: isDraftStudent ? 'local' : 'api',
+        referralLinks: referralLinks.slice(),
+        studentLabel,
+        onSaved: async (rows) => {
+          referralLinks = Array.isArray(rows) ? rows : referralLinks;
+          renderSummary();
+          syncReferralLinksHiddenField();
         }
       });
     });

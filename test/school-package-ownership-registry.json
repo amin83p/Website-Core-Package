@@ -205,6 +205,7 @@
     "schoolIndexModel.js",
     "sessionStatusModel.js",
     "sessionStudentCaseModel.js",
+    "referralModel.js",
     "staffModel.js",
     "studentModel.js",
     "studentProgramPriorSubjectModel.js",

@@ -23,6 +23,7 @@ const ACADEMIC_STATUSES = new Set(['Active', 'Probation', 'Graduated', 'Withdraw
 const CLB_SKILLS = CLB_SKILL_CODES;
 const CLB_LEVEL_HISTORY_MAX = 100;
 const CLAIM_NUMBERS_MAX = 50;
+const REFERRAL_LINKS_MAX = 50;
 const CLB_EVALUATION_TYPES = new Set(['referral', 'placement_test', 'teacher', 'previous_enrollments']);
 const CLB_EVALUATION_LABELS = Object.freeze({
     referral: 'Referral',
@@ -193,6 +194,40 @@ function cleanClaimNumbers(value) {
     return cleaned;
 }
 
+function cleanReferralLinks(value) {
+    if (value === undefined || value === null || value === '') return [];
+    if (!Array.isArray(value)) throw new Error('referralLinks must be an array.');
+    if (value.length > REFERRAL_LINKS_MAX) throw new Error('Too many referral links.');
+
+    const cleaned = value.map((entry, index) => {
+        if (!isPlainObject(entry)) throw new Error('Invalid referral link entry.');
+        const referralId = cleanId(entry.referralId, { max: 64, allowEmpty: false });
+        if (!referralId) throw new Error(`Referral link entry ${index + 1} requires a referral.`);
+        const linkDate = cleanDateISO(entry.linkDate, { allowEmpty: false });
+        if (!linkDate) throw new Error(`Referral link entry ${index + 1} requires a valid date.`);
+        const programId = cleanId(entry.programId, { max: 64, allowEmpty: false });
+        if (!programId) throw new Error(`Referral link entry ${index + 1} requires a program.`);
+        const id = cleanId(entry.id, { max: 64, allowEmpty: true }) || `reflink_${Date.now()}_${index}`;
+        const organizationId = cleanId(entry.organizationId, { max: 64, allowEmpty: true }) || '';
+        return {
+            id,
+            referralId,
+            organizationId,
+            linkDate,
+            programId,
+            comment: cleanString(entry.comment, { max: 500, allowEmpty: true })
+        };
+    });
+
+    cleaned.sort((a, b) => {
+        const dateCmp = String(b.linkDate).localeCompare(String(a.linkDate));
+        if (dateCmp !== 0) return dateCmp;
+        return String(b.id).localeCompare(String(a.id));
+    });
+
+    return cleaned;
+}
+
 function sanitizeStudentInput(input, { isUpdate = false } = {}) {
     if (!isPlainObject(input)) throw new Error('Invalid student payload.');
 
@@ -232,7 +267,8 @@ function sanitizeStudentInput(input, { isUpdate = false } = {}) {
         notes: cleanString(input.notes, { max: 5000, allowEmpty: true }),
         attachments: cleanAttachments(input.attachments),
         clbLevelHistory: cleanClbLevelHistory(input.clbLevelHistory),
-        claimNumbers: cleanClaimNumbers(input.claimNumbers)
+        claimNumbers: cleanClaimNumbers(input.claimNumbers),
+        referralLinks: cleanReferralLinks(input.referralLinks)
     };
 
     // Optional id on create
@@ -390,7 +426,9 @@ module.exports = {
     sanitizeStudentInput,
     cleanClbLevelHistory,
     cleanClaimNumbers,
+    cleanReferralLinks,
     CLAIM_NUMBERS_MAX,
+    REFERRAL_LINKS_MAX,
     CLB_SKILLS,
     CLB_EVALUATION_TYPES: Object.freeze([...CLB_EVALUATION_TYPES]),
     CLB_EVALUATION_LABELS,

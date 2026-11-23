@@ -69,6 +69,21 @@ router.put('/api/:id/claim-numbers',
   trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
   ctrl.putStudentClaimNumbersApi);
 
+router.get('/api/referral-link-options',
+  requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
+  ctrl.getStudentReferralLinkOptionsApi);
+
+router.get('/api/:id/referral-links',
+  requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.READ_ALL, { requireToken: false, keepActive: true }),
+  ctrl.getStudentReferralLinksApi);
+
+router.put('/api/:id/referral-links',
+  requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
+  ctrl.putStudentReferralLinksApi);
+
 router.get('/api/merge-admissions/preview-progress',
   requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),

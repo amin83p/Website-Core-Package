@@ -29,6 +29,7 @@ const timesheetModel = require('../../models/school/timesheetModel');
 const schoolAccountModel = require('../../models/school/schoolAccountModel');
 const teacherModel = require('../../models/school/teacherModel');
 const staffModel = require('../../models/school/staffModel');
+const referralModel = require('../../models/school/referralModel');
 const termModel = require('../../models/school/termModel');
 const transactionJournalModel = require('../../models/school/transactionJournalModel');
 const academicLedgerModel = require('../../models/school/academicLedgerModel');
@@ -1437,6 +1438,18 @@ const schoolRepositories = {
     remove: staffModel.deleteStaff,
     generateMongoCreateId: mongoCreateIdFromAllocator(roleEntityIdService.allocateUniqueStaffSystemId),
     defaultSearchFields: ['id', 'personId', 'status', 'employmentType'],
+    assignmentScopeKind: 'personId'
+  }),
+  referrals: createSchoolRepository({
+    entityName: 'referrals',
+    collectionName: 'schoolReferrals',
+    getAll: referralModel.getAllReferrals,
+    getById: referralModel.getReferralById,
+    create: referralModel.addReferral,
+    update: referralModel.updateReferral,
+    remove: referralModel.deleteReferral,
+    generateMongoCreateId: mongoCreateIdFromAllocator(roleEntityIdService.allocateUniqueReferralSystemId),
+    defaultSearchFields: ['id', 'personId', 'status', 'notes'],
     assignmentScopeKind: 'personId'
   }),
   payRates: createSchoolRepository({

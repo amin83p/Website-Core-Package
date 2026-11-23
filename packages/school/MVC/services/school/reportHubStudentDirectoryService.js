@@ -16,6 +16,7 @@ const { CANONICAL_STUDENT_PICKER_SEARCH_FIELDS } = require('../../../config/stud
 const programRegistrationViewService = require('./programRegistrationViewService');
 const termRegistrationViewService = require('./termRegistrationViewService');
 const { buildClassEnrollmentRows } = require('./studentAcademicOverviewService');
+const studentReferralLinkService = require('./studentReferralLinkService');
 
 const MIN_SEARCH_LENGTH = 3;
 const DEFAULT_SEARCH_LIMIT = 12;
@@ -308,6 +309,19 @@ async function buildPersonalProfile(studentId, req) {
   const feeCategory = normalizeText(student.feeCategory);
   const claimNumbers = resolveClaimNumbersForProfile(student);
   const clbLevelHistory = reportService.getSortedClbLevelHistory(student);
+  let referralLinks = [];
+  try {
+    referralLinks = await studentReferralLinkService.enrichReferralLinksForApi(
+      student?.referralLinks,
+      { reqUser: req.user, options: dataService.buildRouteAccessContext(req) }
+    );
+  } catch (_) {
+    try {
+      referralLinks = studentModel.cleanReferralLinks(student?.referralLinks);
+    } catch (_) {
+      referralLinks = [];
+    }
+  }
 
   let programRegistrations = [];
   let classEnrollments = [];
@@ -382,6 +396,7 @@ async function buildPersonalProfile(studentId, req) {
     academicStatus: normalizeText(student.academicStatus),
     primaryClaimNumber: studentListSearchService.resolvePrimaryClaimNumber(student),
     claimNumbers,
+    referralLinks,
     clbLevelHistory,
     programRegistrations,
     classEnrollments,

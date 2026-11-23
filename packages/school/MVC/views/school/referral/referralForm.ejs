@@ -1,0 +1,526 @@
+<%
+  const r = referral || {};
+  const isEdit = !!r.id;
+  const routeId = (r.id || '');
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '';
+  const entityDisplayName = String(typeof personName !== 'undefined' ? personName : '').trim() || 'Referral contact';
+  const entityRecordId = String(routeId || r.personId || '').trim();
+  const selectedSet = new Set((selectedOrganizationIds || []).map(String));
+%>
+
+<div class="sections-page">
+  <%- include('school/partials/schoolRoleFormPageHeader', {
+    isEdit,
+    entityDisplayName,
+    entityRecordId,
+    headerIcon: 'bi-share',
+    newHeading: 'New Referral',
+    listUrl: '/school/referrals'
+  }) %>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <form id="referralForm" action="<%= (isEdit ? '/school/referrals/edit/' + routeId : '/school/referrals/new') + (asid ? ('?actionStateId=' + encodeURIComponent(asid)) : '') %>" method="POST">
+      <input type="hidden" name="actionStateId" id="hid_actionStateId" value="<%= asid %>">
+      <input type="hidden" name="newPersonEmails" id="hid_newPersonEmails" value="[]">
+      <input type="hidden" name="newPersonPhones" id="hid_newPersonPhones" value="[]">
+      <input type="hidden" name="newPersonAddresses" id="hid_newPersonAddresses" value="[]">
+      <input type="hidden" name="organizationIdsJson" id="hid_organizationIdsJson" value="[]">
+      <script type="application/json" id="init_personOrganizations"><%- JSON.stringify(typeof personOrganizations !== 'undefined' ? (personOrganizations || []) : []).replace(/</g, '\\u003c') %></script>
+      <script type="application/json" id="init_organizationLookup"><%- JSON.stringify(typeof organizationLookup !== 'undefined' ? (organizationLookup || {}) : {}).replace(/</g, '\\u003c') %></script>
+
+      <ul class="nav nav-tabs mb-4" id="referralTabs" role="tablist">
+        <li class="nav-item"><button class="nav-link active fw-bold" data-bs-toggle="tab" data-bs-target="#tab-referral-person" type="button">Step 1: Person</button></li>
+        <li class="nav-item"><button class="nav-link fw-bold" data-bs-toggle="tab" data-bs-target="#tab-referral-details" type="button">Step 2: Referral</button></li>
+      </ul>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body p-4 tab-content">
+          <div class="tab-pane fade show active" id="tab-referral-person">
+          <% if (!isEdit) { %>
+            <div class="alert alert-light border shadow-sm mb-4">
+              <div class="fw-bold mb-2"><i class="bi bi-person-plus me-2"></i>Person Source</div>
+              <div class="d-flex flex-wrap gap-4">
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="personMode" id="personModeExisting" value="existing" checked>
+                  <label class="form-check-label fw-bold" for="personModeExisting">Use Existing Person</label>
+                </div>
+                <div class="form-check">
+                  <input class="form-check-input" type="radio" name="personMode" id="personModeNew" value="new">
+                  <label class="form-check-label fw-bold" for="personModeNew">Create New Person</label>
+                </div>
+              </div>
+            </div>
+          <% } else { %>
+            <input type="hidden" name="personMode" value="existing">
+          <% } %>
+
+          <div id="existingPersonBlock">
+            <div class="row">
+              <div class="col-md-8 mb-3">
+                <label class="form-label fw-bold">Select Person *</label>
+                <div class="input-group">
+                  <input type="hidden" name="personId" id="inp_personId" value="<%= r.personId || '' %>" required>
+                  <input type="text" id="inp_personName" class="form-control size-md bg-white border-primary fw-bold" placeholder="Search Person Directory..." value="<%= personName || '' %>" readonly required>
+                  <button type="button" class="btn btn-primary" id="btnPickPerson" <%= isEdit ? 'disabled' : '' %>><i class="bi bi-search"></i></button>
+                  <button type="button" class="btn <%= canEditLinkedPerson ? 'btn-outline-primary' : 'btn-outline-secondary' %>" id="btnEditPersonProfile" data-link-type="<%= linkedPersonLinkType || 'referral' %>" data-link-id="<%= linkedPersonLinkId || '' %>" data-can-edit-person="<%= canEditLinkedPerson ? 'true' : 'false' %>"><i class="bi <%= canEditLinkedPerson ? 'bi-pencil-square' : 'bi-lock' %>"></i></button>
+                </div>
+              </div>
+              <div class="col-md-4 mb-3">
+                <label class="form-label fw-bold">Referral ID</label>
+                <input type="text" name="referralId" class="form-control size-md font-monospace" value="<%= r.id || '' %>" placeholder="Auto-generated if blank" <%= isEdit ? 'readonly' : '' %>>
+              </div>
+            </div>
+            <div class="card border shadow-sm bg-light-subtle mb-3">
+              <div class="card-header bg-light fw-bold"><i class="bi bi-diagram-3 me-2"></i>Current Person Role Composition</div>
+              <div class="card-body" id="personRoleSummary"></div>
+            </div>
+          </div>
+
+          <% if (!isEdit) { %>
+            <div id="newPersonBlock" class="d-none">
+              <div class="card shadow-sm border-0 mb-3">
+                <div class="card-body">
+                  <h6 class="fw-bold text-uppercase text-muted mb-3">Profile &amp; Identity</h6>
+                  <div class="row g-3 mb-3">
+                    <div class="col-md-4">
+                      <label class="form-label fw-bold">First Name *</label>
+                      <input type="text" name="newPersonFirstName" id="inp_newPersonFirstName" class="form-control size-md">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label fw-bold">Middle Name</label>
+                      <input type="text" name="newPersonMiddleName" class="form-control size-md">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label fw-bold">Last Name *</label>
+                      <input type="text" name="newPersonLastName" id="inp_newPersonLastName" class="form-control size-md">
+                    </div>
+                  </div>
+                  <input type="hidden" name="newPersonActive" value="true">
+                  <div class="row g-3 mb-3">
+                    <div class="col-md-12">
+                      <label class="form-label fw-bold">Preferred Name</label>
+                      <input type="text" name="newPersonPreferredName" class="form-control size-md">
+                    </div>
+                  </div>
+                  <div class="row g-3 mb-3">
+                    <div class="col-md-6">
+                      <label class="form-label fw-bold">Gender *</label>
+                      <select name="newPersonGender" id="inp_newPersonGender" class="form-select size-md">
+                        <option value="">-- Select Gender --</option>
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="nonbinary">Non-binary</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                    <div class="col-md-6">
+                      <label class="form-label fw-bold">Date of Birth *</label>
+                      <input type="date" name="newPersonDateOfBirth" id="inp_newPersonDateOfBirth" class="form-control size-md" value="2000-01-01">
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="row g-3 mb-3">
+                <div class="col-lg-6">
+                  <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-light fw-bold small text-muted">Emails *</div>
+                    <div class="card-body">
+                      <button type="button" class="btn btn-sm btn-outline-primary mb-2" id="btnAddNewPersonEmail"><i class="bi bi-plus-lg"></i> Add</button>
+                      <div id="newPersonEmailsList"></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="col-lg-6">
+                  <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-light fw-bold small text-muted">Phones &amp; Addresses</div>
+                    <div class="card-body">
+                      <button type="button" class="btn btn-sm btn-outline-primary mb-2" id="btnAddNewPersonPhone"><i class="bi bi-plus-lg"></i> Phone</button>
+                      <div id="newPersonPhonesList" class="mb-3"></div>
+                      <button type="button" class="btn btn-sm btn-outline-primary mb-2" id="btnAddNewPersonAddressManual"><i class="bi bi-plus-lg"></i> Address</button>
+                      <div id="newPersonAddressesList"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="mb-3">
+                <label class="form-label fw-bold">Person Notes</label>
+                <textarea name="newPersonNotes" class="form-control size-md" rows="2"></textarea>
+              </div>
+            </div>
+          <% } %>
+          </div>
+
+          <div class="tab-pane fade" id="tab-referral-details">
+          <div class="alert alert-info border-info shadow-sm mb-4">
+            <i class="bi bi-info-circle me-2"></i>Organizations and notes are stored on this referral record only (not on the person profile).
+          </div>
+          <h6 class="fw-bold text-uppercase text-muted mb-3"><i class="bi bi-share me-2"></i>Referral Details</h6>
+          <input type="hidden" name="status" id="hid_referralStatus" value="<%= (r.status || 'Active') %>">
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <div class="form-check form-switch">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="inp_referralStatusActive"
+                  <%= String(r.status || 'Active').trim() === 'Active' ? 'checked' : '' %>
+                >
+                <label class="form-check-label fw-bold" for="inp_referralStatusActive">Active referral</label>
+              </div>
+              <div class="form-text small">When off, the referral is saved as <strong>Archived</strong>. New persons are always created as active profiles.</div>
+            </div>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold">Referral Notes</label>
+            <textarea name="notes" class="form-control size-md" rows="3" placeholder="Referral-specific notes..."><%= r.notes || '' %></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold">Organizations</label>
+            <div class="row g-2">
+              <% (organizationOptions || []).forEach(org => { %>
+                <div class="col-md-6">
+                  <div class="form-check">
+                    <input class="form-check-input referring-org-opt" type="checkbox" value="<%= org.id %>" id="referring_org_<%= org.id %>" <%= selectedSet.has(String(org.id)) ? 'checked' : '' %>>
+                    <label class="form-check-label" for="referring_org_<%= org.id %>"><%= org.label || org.id %></label>
+                  </div>
+                </div>
+              <% }); %>
+            </div>
+            <div class="form-text small">Select every organization this referral contact may use when linked to students.</div>
+          </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="button-row mt-4 pt-3 border-top d-flex flex-wrap gap-2">
+        <button type="button" class="btn btn-outline-primary btn-md" id="btnReferralWizardPrev">Back</button>
+        <button type="button" class="btn btn-filled btn-primary btn-md fw-bold px-4" id="btnReferralWizardNext">Next</button>
+        <button type="submit" class="btn btn-filled btn-success btn-md fw-bold px-4 d-none" id="btnReferralWizardSubmit"><i class="bi bi-check-lg me-1"></i>Save Referral</button>
+        <a href="/school/referrals" class="btn btn-filled btn-secondary btn-md" id="btnReferralCancel">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<%- include('partials/modal_GenericPicker') %>
+<%- include('school/partials/personProfileEditModal') %>
+
+<script>
+(function () {
+  const form = document.getElementById('referralForm');
+  const hidNewPersonEmails = document.getElementById('hid_newPersonEmails');
+  const hidNewPersonPhones = document.getElementById('hid_newPersonPhones');
+  const hidNewPersonAddresses = document.getElementById('hid_newPersonAddresses');
+  const hidOrganizationIdsJson = document.getElementById('hid_organizationIdsJson');
+  const hidReferralStatus = document.getElementById('hid_referralStatus');
+  const inpReferralStatusActive = document.getElementById('inp_referralStatusActive');
+  const personRoleSummary = document.getElementById('personRoleSummary');
+
+  let newPersonEmails = [{ type: 'primary', email: '', isPrimary: true }];
+  let newPersonPhones = [];
+  let newPersonAddresses = [];
+  let selectedPersonOrganizations = [];
+
+  function readJsonSafe(rawValue, fallback) {
+    if (!rawValue) return fallback;
+    try { return JSON.parse(rawValue); } catch { return fallback; }
+  }
+
+  selectedPersonOrganizations = readJsonSafe(document.getElementById('init_personOrganizations')?.textContent, []);
+  const organizationLookup = readJsonSafe(document.getElementById('init_organizationLookup')?.textContent, {});
+
+  function showMsg(opts) {
+    if (typeof showMessageModal === 'function') return showMessageModal(opts);
+    alert(opts?.message || 'Done');
+    return Promise.resolve();
+  }
+
+  function syncNewPersonHiddenState() {
+    if (hidNewPersonEmails) hidNewPersonEmails.value = JSON.stringify(newPersonEmails);
+    if (hidNewPersonPhones) hidNewPersonPhones.value = JSON.stringify(newPersonPhones);
+    if (hidNewPersonAddresses) hidNewPersonAddresses.value = JSON.stringify(newPersonAddresses);
+  }
+
+  function syncOrganizationHiddenState() {
+    if (!hidOrganizationIdsJson) return;
+    const ids = Array.from(document.querySelectorAll('.referring-org-opt:checked')).map((el) => String(el.value || '').trim()).filter(Boolean);
+    hidOrganizationIdsJson.value = JSON.stringify(ids);
+  }
+
+  function syncReferralStatusHiddenState() {
+    if (!hidReferralStatus || !inpReferralStatusActive) return;
+    hidReferralStatus.value = inpReferralStatusActive.checked ? 'Active' : 'Archived';
+  }
+
+  function syncPersonModeUI() {
+    const modeNew = document.getElementById('personModeNew');
+    const existingBlock = document.getElementById('existingPersonBlock');
+    const newBlock = document.getElementById('newPersonBlock');
+    const isNew = modeNew && modeNew.checked;
+    if (existingBlock) existingBlock.classList.toggle('d-none', isNew);
+    if (newBlock) newBlock.classList.toggle('d-none', !isNew);
+    const personIdInput = document.getElementById('inp_personId');
+    const personNameInput = document.getElementById('inp_personName');
+    if (personIdInput) personIdInput.required = !isNew;
+    if (personNameInput) personNameInput.required = !isNew;
+  }
+
+  function resolvePickerPersonLabel(item) {
+    return String(item?.displayName || item?.name || item?.personName || item?.personId || item?.id || '').trim();
+  }
+
+  function renderPersonRoleSummary() {
+    if (!personRoleSummary) return;
+    if (!selectedPersonOrganizations.length) {
+      personRoleSummary.innerHTML = '<div class="text-muted small">No organization memberships to display.</div>';
+      return;
+    }
+    personRoleSummary.innerHTML = selectedPersonOrganizations.map((org) => {
+      const name = organizationLookup[String(org?.orgId || '')] || org?.name || org?.orgId || 'Org';
+      const roles = (Array.isArray(org?.roles) ? org.roles : [org?.role]).filter(Boolean).join(', ') || 'member';
+      return `<div class="mb-2"><strong>${name}</strong><div class="small text-muted">${roles}</div></div>`;
+    }).join('');
+  }
+
+  function renderNewPersonEmails() {
+    const list = document.getElementById('newPersonEmailsList');
+    if (!list) return;
+    list.innerHTML = '';
+    newPersonEmails.forEach((row, index) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'input-group mb-2';
+      wrap.innerHTML = `
+        <select class="form-select size-md email-type"><option value="work">Work</option><option value="personal">Personal</option><option value="primary">Primary</option></select>
+        <input type="email" class="form-control size-md email-value" placeholder="Email">
+        <button type="button" class="btn btn-outline-danger remove-email"><i class="bi bi-trash"></i></button>`;
+      wrap.querySelector('.email-type').value = String(row.type || 'work');
+      wrap.querySelector('.email-value').value = String(row.email || '');
+      wrap.querySelector('.email-type').addEventListener('change', (e) => { newPersonEmails[index].type = e.target.value; syncNewPersonHiddenState(); });
+      wrap.querySelector('.email-value').addEventListener('input', (e) => { newPersonEmails[index].email = e.target.value; syncNewPersonHiddenState(); });
+      wrap.querySelector('.remove-email').addEventListener('click', () => { newPersonEmails.splice(index, 1); renderNewPersonEmails(); });
+      list.appendChild(wrap);
+    });
+    syncNewPersonHiddenState();
+  }
+
+  function renderNewPersonPhones() {
+    const list = document.getElementById('newPersonPhonesList');
+    if (!list) return;
+    list.innerHTML = '';
+    newPersonPhones.forEach((row, index) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'input-group mb-2';
+      wrap.innerHTML = `
+        <select class="form-select size-md phone-type"><option value="mobile">Mobile</option><option value="work">Work</option><option value="home">Home</option></select>
+        <input type="text" class="form-control size-md phone-value" placeholder="Phone number">
+        <button type="button" class="btn btn-outline-danger remove-phone"><i class="bi bi-trash"></i></button>`;
+      wrap.querySelector('.phone-type').value = String(row.type || 'mobile');
+      wrap.querySelector('.phone-value').value = String(row.number || '');
+      wrap.querySelector('.phone-type').addEventListener('change', (e) => { newPersonPhones[index].type = e.target.value; syncNewPersonHiddenState(); });
+      wrap.querySelector('.phone-value').addEventListener('input', (e) => { newPersonPhones[index].number = e.target.value; syncNewPersonHiddenState(); });
+      wrap.querySelector('.remove-phone').addEventListener('click', () => { newPersonPhones.splice(index, 1); renderNewPersonPhones(); });
+      list.appendChild(wrap);
+    });
+    syncNewPersonHiddenState();
+  }
+
+  function renderNewPersonAddresses() {
+    const list = document.getElementById('newPersonAddressesList');
+    if (!list) return;
+    list.innerHTML = '';
+    newPersonAddresses.forEach((row, index) => {
+      const wrap = document.createElement('div');
+      wrap.className = 'border rounded p-2 mb-2 bg-white';
+      wrap.innerHTML = `
+        <div class="row g-2">
+          <div class="col-12"><input class="form-control size-md addr-line1" placeholder="Street"></div>
+          <div class="col-4"><input class="form-control size-md addr-city" placeholder="City"></div>
+          <div class="col-4"><input class="form-control size-md addr-prov" placeholder="Province"></div>
+          <div class="col-4"><input class="form-control size-md addr-post" placeholder="Postal"></div>
+          <div class="col-12 text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-addr"><i class="bi bi-trash"></i></button></div>
+        </div>`;
+      wrap.querySelector('.addr-line1').value = row.line1 || '';
+      wrap.querySelector('.addr-city').value = row.city || '';
+      wrap.querySelector('.addr-prov').value = row.province || '';
+      wrap.querySelector('.addr-post').value = row.postalCode || '';
+      ['line1', 'city', 'province', 'postalCode'].forEach((key) => {
+        const el = wrap.querySelector(key === 'line1' ? '.addr-line1' : key === 'city' ? '.addr-city' : key === 'province' ? '.addr-prov' : '.addr-post');
+        el.addEventListener('input', () => { newPersonAddresses[index][key] = el.value; syncNewPersonHiddenState(); });
+      });
+      wrap.querySelector('.remove-addr').addEventListener('click', () => { newPersonAddresses.splice(index, 1); renderNewPersonAddresses(); });
+      list.appendChild(wrap);
+    });
+    syncNewPersonHiddenState();
+  }
+
+  const referralWizardTabTargets = ['#tab-referral-person', '#tab-referral-details'];
+  let currentReferralWizardStep = 0;
+
+  function syncReferralWizardButtons() {
+    const btnPrev = document.getElementById('btnReferralWizardPrev');
+    const btnNext = document.getElementById('btnReferralWizardNext');
+    const btnSubmit = document.getElementById('btnReferralWizardSubmit');
+    if (btnPrev) btnPrev.classList.toggle('d-none', currentReferralWizardStep === 0);
+    if (btnNext) btnNext.classList.toggle('d-none', currentReferralWizardStep === referralWizardTabTargets.length - 1);
+    if (btnSubmit) btnSubmit.classList.toggle('d-none', currentReferralWizardStep !== referralWizardTabTargets.length - 1);
+  }
+
+  function goReferralWizardStep(step) {
+    const idx = Math.max(0, Math.min(referralWizardTabTargets.length - 1, step));
+    currentReferralWizardStep = idx;
+    const target = referralWizardTabTargets[idx];
+    const btn = document.querySelector('#referralTabs [data-bs-target="' + target + '"]');
+    if (btn && window.bootstrap?.Tab) {
+      window.bootstrap.Tab.getOrCreateInstance(btn).show();
+    }
+    syncReferralWizardButtons();
+  }
+
+  document.addEventListener('DOMContentLoaded', function () {
+    document.querySelectorAll('.referring-org-opt').forEach((el) => el.addEventListener('change', syncOrganizationHiddenState));
+    inpReferralStatusActive?.addEventListener('change', syncReferralStatusHiddenState);
+
+    const pBtn = document.getElementById('btnPickPerson');
+    if (pBtn && !pBtn.disabled) {
+      pBtn.addEventListener('click', () => {
+        GenericPicker.open(GenericPickerPresets.person({
+          title: 'Select Person',
+          apiEndpoint: '/school/referrals/api/eligible-persons',
+          placeholder: 'Search by name or email...',
+          onSelect: (item) => {
+            if (item?.alreadyHasSchoolAccount) {
+              const linked = item.linkedSchoolAccount || {};
+              const targetUrl = linked.archived ? linked.recoveryUrl : linked.editUrl;
+              showMsg({
+                title: 'Referral Already Exists',
+                icon: 'warning',
+                message: `This person already has a Referral contact in the active organization.${targetUrl ? `<br><br><a href="${targetUrl}" class="btn btn-sm btn-outline-primary">Open existing record</a>` : ''}`
+              });
+              return;
+            }
+            const personId = String(item?.personId || item?.id || '').trim();
+            document.getElementById('inp_personId').value = personId;
+            document.getElementById('inp_personName').value = resolvePickerPersonLabel(item) || personId;
+            selectedPersonOrganizations = Array.isArray(item.organizations) ? item.organizations : [];
+            renderPersonRoleSummary();
+            const modeExisting = document.getElementById('personModeExisting');
+            if (modeExisting) { modeExisting.checked = true; syncPersonModeUI(); }
+          }
+        }));
+      });
+    }
+
+    document.getElementById('personModeExisting')?.addEventListener('change', syncPersonModeUI);
+    document.getElementById('personModeNew')?.addEventListener('change', syncPersonModeUI);
+    document.getElementById('btnAddNewPersonEmail')?.addEventListener('click', () => { newPersonEmails.push({ type: 'work', email: '', isPrimary: false }); renderNewPersonEmails(); });
+    document.getElementById('btnAddNewPersonPhone')?.addEventListener('click', () => { newPersonPhones.push({ type: 'mobile', number: '' }); renderNewPersonPhones(); });
+    document.getElementById('btnAddNewPersonAddressManual')?.addEventListener('click', () => { newPersonAddresses.push({ type: 'home', line1: '', city: '', province: '', postalCode: '' }); renderNewPersonAddresses(); });
+
+    const btnEditPerson = document.getElementById('btnEditPersonProfile');
+    if (btnEditPerson && window.SchoolPersonProfileModal) {
+      btnEditPerson.addEventListener('click', () => {
+        if (btnEditPerson.dataset.canEditPerson !== 'true') {
+          showMsg({ title: 'Permission Required', message: 'You do not have permission to edit this person account.' });
+          return;
+        }
+        const personId = document.getElementById('inp_personId')?.value?.trim();
+        if (!personId) return;
+        window.SchoolPersonProfileModal.open({
+          personId,
+          linkType: btnEditPerson.dataset.linkType || 'referral',
+          linkId: btnEditPerson.dataset.linkId || '',
+          organizationLookup,
+          onSaved: ({ displayName, organizations }) => {
+            if (displayName) document.getElementById('inp_personName').value = displayName;
+            selectedPersonOrganizations = Array.isArray(organizations) ? organizations : [];
+            renderPersonRoleSummary();
+          }
+        });
+      });
+    }
+
+    renderNewPersonEmails();
+    renderNewPersonPhones();
+    renderNewPersonAddresses();
+    renderPersonRoleSummary();
+    syncPersonModeUI();
+    syncOrganizationHiddenState();
+    syncReferralStatusHiddenState();
+
+    const dobInput = document.getElementById('inp_newPersonDateOfBirth');
+    if (dobInput && !String(dobInput.value || '').trim()) dobInput.value = '2000-01-01';
+
+    document.getElementById('btnReferralWizardPrev')?.addEventListener('click', () => goReferralWizardStep(currentReferralWizardStep - 1));
+    document.getElementById('btnReferralWizardNext')?.addEventListener('click', () => goReferralWizardStep(currentReferralWizardStep + 1));
+    document.querySelectorAll('#referralTabs .nav-link').forEach((tabBtn) => {
+      tabBtn.addEventListener('shown.bs.tab', function (event) {
+        const target = String(event.target?.getAttribute('data-bs-target') || '').trim();
+        const idx = referralWizardTabTargets.indexOf(target);
+        if (idx >= 0) {
+          currentReferralWizardStep = idx;
+          syncReferralWizardButtons();
+        }
+      });
+    });
+    syncReferralWizardButtons();
+
+    form.addEventListener('submit', async function (e) {
+      e.preventDefault();
+      const submitBtn = form.querySelector('button[type="submit"]');
+      const originalText = submitBtn.innerHTML;
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+
+      try {
+        const personMode = document.querySelector('input[name="personMode"]:checked')?.value || 'existing';
+        if (personMode === 'existing') {
+          const personId = document.getElementById('inp_personId')?.value?.trim();
+          if (!personId) throw new Error('Please select a Person before saving.');
+        } else {
+          const emails = (newPersonEmails || []).filter((x) => String(x?.email || '').trim());
+          if (!emails.length) throw new Error('At least one email is required for the new person.');
+        }
+        syncNewPersonHiddenState();
+        syncOrganizationHiddenState();
+        syncReferralStatusHiddenState();
+
+        const token = document.getElementById('hid_actionStateId')?.value || '';
+        const submitUrl = token && !/[?&]actionStateId=/.test(String(form.action || ''))
+          ? `${form.action}${String(form.action || '').includes('?') ? '&' : '?'}actionStateId=${encodeURIComponent(token)}`
+          : form.action;
+
+        const data = new FormData(form);
+        const response = await fetch(submitUrl, { method: 'POST', headers: { 'X-AJAX-Request': 'true' }, body: data });
+        const result = await response.json().catch(() => ({}));
+        const guarded = typeof window.applyGuardedApiResult === 'function'
+          ? await window.applyGuardedApiResult(result, { busyTitle: 'Save In Progress', replayTitle: 'Save Already Processed' })
+          : { stop: false };
+        if (guarded.stop) {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalText;
+          return;
+        }
+
+        await showMsg({
+          title: result.status === 'success' ? 'Success' : 'Error',
+          icon: result.status === 'success' ? 'success' : 'error',
+          message: result.message || 'Operation completed.',
+          buttons: [{ text: 'OK', class: result.status === 'success' ? 'btn-success' : 'btn-danger' }]
+        });
+
+        if (result.status === 'success') {
+          window.location.href = '/school/referrals';
+        } else {
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = originalText;
+        }
+      } catch (error) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = originalText;
+        await showMsg({ title: 'Error', icon: 'error', message: error.message || 'Save failed.' });
+      }
+    });
+  });
+})();
+</script>

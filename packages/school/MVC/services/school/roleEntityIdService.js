@@ -27,5 +27,6 @@ async function allocateUniqueRoleSystemId(roleType, options = {}) {
 module.exports = {
   allocateUniqueStudentSystemId,
   allocateUniqueTeacherSystemId: (options) => allocateUniqueRoleSystemId('teacher', options),
-  allocateUniqueStaffSystemId: (options) => allocateUniqueRoleSystemId('staff', options)
+  allocateUniqueStaffSystemId: (options) => allocateUniqueRoleSystemId('staff', options),
+  allocateUniqueReferralSystemId: (options) => allocateUniqueRoleSystemId('referral', options)
 };

@@ -887,6 +887,19 @@
       );
       return;
     }
+    if (key === 'referral-links') {
+      const label = String(profile.name || profile.id).trim();
+      if (global.StudentReferralLinksManager) {
+        global.StudentReferralLinksManager.open({
+          studentId: profile.id,
+          studentLabel: label,
+          onSaved: function () {
+            return loadHubStudentProfile(profile.id);
+          }
+        });
+      }
+      return;
+    }
   }
 
   let hubStudentsEmbedModalBound = false;
@@ -1037,6 +1050,53 @@
     ].join('');
   }
 
+  function renderHubStudentsReferralsListHtml(referralLinks) {
+    const rows = Array.isArray(referralLinks) ? referralLinks : [];
+    if (!rows.length) {
+      return '<div class="text-muted small">No referral links on file.</div>';
+    }
+    return [
+      '<div class="hub-students-claims-strip">',
+      rows.map(function (link) {
+        const referralLabel = String(link?.referralLabel || link?.referralId || 'Referral').trim();
+        const orgLabel = String(link?.organizationLabel || link?.organizationId || '').trim();
+        const programLabel = String(link?.programLabel || link?.programId || '').trim();
+        const linkDate = String(link?.linkDate || '').trim();
+        const meta = [orgLabel, linkDate, programLabel].filter(Boolean).join(' · ');
+        return [
+          '<div class="hub-students-claim-chip">',
+          '<div class="hub-students-claim-chip-label">' + escapeHtml(referralLabel) + '</div>',
+          meta ? '<div class="hub-students-claim-chip-number">' + escapeHtml(meta) + '</div>' : '',
+          '</div>'
+        ].join('');
+      }).join(''),
+      '</div>'
+    ].join('');
+  }
+
+  function renderHubStudentsReferralsCard(profile) {
+    const card = document.querySelector('[data-hub-students-card="referrals"]');
+    if (!card) return;
+    if (!profile || !profile.id) {
+      card.innerHTML = [
+        hubStudentsCardHeaderHtml('bi-people', 'Referrals', 'referrals'),
+        '<div class="hub-students-card-empty">Select a student to view referrals.</div>'
+      ].join('');
+      return;
+    }
+    const linkCount = Array.isArray(profile.referralLinks) ? profile.referralLinks.length : 0;
+    const title = 'Referrals' + (linkCount ? ' (' + linkCount + ')' : '');
+    card.innerHTML = [
+      hubStudentsCardHeaderHtml('bi-people', title, 'referrals'),
+      '<div class="hub-students-card-body">',
+      renderHubStudentsReferralsListHtml(profile.referralLinks),
+      '</div>'
+    ].join('');
+    requestAnimationFrame(function () {
+      hubStudentsSyncCardHeights();
+    });
+  }
+
   function renderHubStudentsClaimsCard(profile) {
     const card = document.querySelector('[data-hub-students-card="claims"]');
     if (!card) return;
@@ -1160,6 +1220,7 @@
       renderHubStudentsPersonalCard(null);
       renderHubStudentsClaimsCard(null);
       renderHubStudentsClbCard(null);
+      renderHubStudentsReferralsCard(null);
       renderHubStudentsProgramRegsCard(null);
       renderHubStudentsEnrollmentsCard(null);
       hubStudentsUpdateQuickActionsState(false);
@@ -1190,6 +1251,7 @@
       renderHubStudentsPersonalCard(hubStudentsActiveProfile);
       renderHubStudentsClaimsCard(hubStudentsActiveProfile);
       renderHubStudentsClbCard(hubStudentsActiveProfile);
+      renderHubStudentsReferralsCard(hubStudentsActiveProfile);
       renderHubStudentsProgramRegsCard(hubStudentsActiveProfile);
       renderHubStudentsEnrollmentsCard(hubStudentsActiveProfile);
       hubStudentsUpdateQuickActionsState(Boolean(hubStudentsActiveProfile && hubStudentsActiveProfile.id));
@@ -1201,6 +1263,7 @@
       setHubStudentsPersonalCardError(error.message || 'Unable to load student profile.');
       renderHubStudentsClaimsCard(null);
       renderHubStudentsClbCard(null);
+      renderHubStudentsReferralsCard(null);
       renderHubStudentsProgramRegsCard(null);
       renderHubStudentsEnrollmentsCard(null);
       hubStudentsUpdateQuickActionsState(false);
@@ -1578,9 +1641,25 @@
   }
 
   function hubStudentsMountModalToBody(el) {
+    if (global.SchoolModalStack && typeof global.SchoolModalStack.mountModalToBody === 'function') {
+      return global.SchoolModalStack.mountModalToBody(el);
+    }
     if (!el || el.parentElement === document.body) return el;
     document.body.appendChild(el);
     return el;
+  }
+
+  function hubStudentsRaiseModalAboveStack(el) {
+    if (global.SchoolModalStack && typeof global.SchoolModalStack.raiseAboveOpenModals === 'function') {
+      return global.SchoolModalStack.raiseAboveOpenModals(el);
+    }
+    return null;
+  }
+
+  function hubStudentsClearRaisedModal(el) {
+    if (global.SchoolModalStack && typeof global.SchoolModalStack.clearRaise === 'function') {
+      global.SchoolModalStack.clearRaise(el);
+    }
   }
 
   function hubStudentsShowModal(el) {
@@ -1635,12 +1714,15 @@
       mountModal: hubStudentsMountModalToBody
     };
     const claimEl = document.getElementById('rollingStudentClaimNumbersModal');
+    const refLinkEl = document.getElementById('rollingStudentReferralLinksModal');
     const clbEl = document.getElementById('rollingStudentClbModal');
     if (global.StudentClaimNumbersManager) {
       global.StudentClaimNumbersManager.configure({
         requestJson: shared.requestJson,
         canEdit: canEdit,
         mountModal: shared.mountModal,
+        raiseModal: hubStudentsRaiseModalAboveStack,
+        clearModalStack: hubStudentsClearRaisedModal,
         showModal: function () {
           hubStudentsShowModal(claimEl);
         },
@@ -1649,11 +1731,41 @@
         }
       });
     }
+    const quickReferralEl = document.getElementById('referralQuickCreateModal');
+    if (global.SchoolReferralQuickCreate) {
+      global.SchoolReferralQuickCreate.configure({
+        requestJson: shared.requestJson,
+        mountModal: shared.mountModal,
+        showModal: function () {
+          hubStudentsShowModal(quickReferralEl);
+        },
+        getModalEl: function () {
+          return quickReferralEl;
+        }
+      });
+    }
+    if (global.StudentReferralLinksManager) {
+      global.StudentReferralLinksManager.configure({
+        requestJson: shared.requestJson,
+        canEdit: canEdit,
+        mountModal: shared.mountModal,
+        raiseModal: hubStudentsRaiseModalAboveStack,
+        clearModalStack: hubStudentsClearRaisedModal,
+        showModal: function () {
+          hubStudentsShowModal(refLinkEl);
+        },
+        getModalEl: function () {
+          return refLinkEl;
+        }
+      });
+    }
     if (global.RollingStudentClbManager) {
       global.RollingStudentClbManager.configure({
         requestJson: shared.requestJson,
         canEdit: canEdit,
         mountModal: shared.mountModal,
+        raiseModal: hubStudentsRaiseModalAboveStack,
+        clearModalStack: hubStudentsClearRaisedModal,
         showModal: function () {
           hubStudentsShowModal(clbEl);
         },
@@ -1724,6 +1836,14 @@
       };
       if (cardKey === 'claims' && global.StudentClaimNumbersManager) {
         global.StudentClaimNumbersManager.open({
+          studentId: profile.id,
+          studentLabel: label,
+          openEditorOnShow: isAdd,
+          onSaved: onSaved
+        });
+      }
+      if (cardKey === 'referrals' && global.StudentReferralLinksManager) {
+        global.StudentReferralLinksManager.open({
           studentId: profile.id,
           studentLabel: label,
           openEditorOnShow: isAdd,
@@ -1818,6 +1938,7 @@
       '<button type="button" class="btn btn-sm btn-outline-secondary" data-hub-students-open="class-conduct-report" disabled>Class Conducts</button>',
       '<button type="button" class="btn btn-sm btn-outline-secondary" data-hub-students-open="person-reports" disabled>Reports</button>',
       '<button type="button" class="btn btn-sm btn-outline-secondary" data-hub-students-open="session-cases" disabled>Cases</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary" data-hub-students-open="referral-links" disabled>Referrals</button>',
       '</div>',
       '</div>',
       '<div class="hub-students-workspace-body">',
@@ -1840,6 +1961,7 @@
       '<section class="hub-students-card" data-hub-students-card="claims"></section>',
       '<section class="hub-students-card" data-hub-students-card="clb"></section>',
       '</div>',
+      '<section class="hub-students-card" data-hub-students-card="referrals"></section>',
       '</div>',
       '</div>',
       '</div>',
@@ -1853,6 +1975,7 @@
     renderHubStudentsPersonalCard(null);
     renderHubStudentsClaimsCard(null);
     renderHubStudentsClbCard(null);
+    renderHubStudentsReferralsCard(null);
     renderHubStudentsProgramRegsCard(null);
     renderHubStudentsEnrollmentsCard(null);
     renderHubStudentsEmptyHero();
