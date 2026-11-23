@@ -1,0 +1,109 @@
+{
+  "inputs": [
+    {
+      "id": "goal_1",
+      "label": "Goal 1",
+      "type": "textarea",
+      "required": false,
+      "helpText": "Optional. Up to four goals; leave blank if not used.",
+      "defaultValue": ""
+    },
+    {
+      "id": "goal_2",
+      "label": "Goal 2",
+      "type": "textarea",
+      "required": false,
+      "helpText": "Optional.",
+      "defaultValue": ""
+    },
+    {
+      "id": "goal_3",
+      "label": "Goal 3",
+      "type": "textarea",
+      "required": false,
+      "helpText": "Optional.",
+      "defaultValue": ""
+    },
+    {
+      "id": "goal_4",
+      "label": "Goal 4",
+      "type": "textarea",
+      "required": false,
+      "helpText": "Optional.",
+      "defaultValue": ""
+    },
+    {
+      "id": "student_name",
+      "label": "Student name (for pronouns/naming)",
+      "type": "text",
+      "required": false,
+      "helpText": "Use instead of the word \"client\" when revising goals.",
+      "defaultValue": ""
+    }
+  ],
+  "prompt": {
+    "systemPrompt": "You are an expert editor for Bi-MPR future-goal statements on two-week student evaluation reports.\nRevise only the goal text supplied by the user. Keep the same meaning and intent unless a guideline requires a wording change.\nDo not invent new goals. Skip any goal input that is empty or whitespace-only.\nFor every goal you output, always include changeType and changeSummary so teachers can see what will change before they apply it.",
+    "userPromptTemplate": "Revise each non-empty goal below according to the requirements.\n\nRequirements / expectations / criteria (apply to each revised goal; each single goal must be at most 490 characters including letters, spaces, and punctuation):\n- Write future goals in future tense, singular form.\n- Do not use the word \"client\"; use the student name if provided ({{student_name}}), otherwise \"the student\", or subject pronouns.\n- Avoid unnecessary phrases such as \"Over the next two weeks\" and similar, because the report already refers to two weeks.\n- Do not include book titles, unit titles, unit numbers, or page numbers.\n- Do not use phrases like \"in this period\", \"in the next two weeks\", or equivalent time-frame boilerplate.\n\nChange labeling (per goal object in JSON):\n- changeType \"unchanged\" — wording already meets all rules; revised text matches input except trivial whitespace.\n- changeType \"minor_edit\" — small fixes (tense, pronouns, trimming boilerplate) with same meaning.\n- changeType \"updated\" — meaning preserved but noticeable rewording to meet guidelines.\n- changeType \"replaced\" — substantial rewrite while keeping the same educational intent.\n- changeSummary — one short sentence describing what changed (e.g. \"Replaced 'client' with student name\" or \"No wording changes.\").\n\nInputs:\nGoal 1:\n{{goal_1}}\n\nGoal 2:\n{{goal_2}}\n\nGoal 3:\n{{goal_3}}\n\nGoal 4:\n{{goal_4}}\n\nStudent name (optional): {{student_name}}"
+  },
+  "output": {
+    "mode": "json",
+    "jsonInstructions": "Return a single JSON object only (no markdown fences). Include goal_1 through goal_4 only for goals that had non-empty input; omit keys for blank goals. Each goal value is an object with revised (string, max 490 chars), changeType (unchanged | minor_edit | updated | replaced), and changeSummary (short string). Apply uses revised only. Include notes (string) only for brief cross-goal editor notes; otherwise omit notes.",
+    "jsonSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "goal_1": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "revised": { "type": "string" },
+            "changeType": { "type": "string", "enum": ["unchanged", "minor_edit", "updated", "replaced"] },
+            "changeSummary": { "type": "string" }
+          },
+          "required": ["revised", "changeType", "changeSummary"]
+        },
+        "goal_2": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "revised": { "type": "string" },
+            "changeType": { "type": "string", "enum": ["unchanged", "minor_edit", "updated", "replaced"] },
+            "changeSummary": { "type": "string" }
+          },
+          "required": ["revised", "changeType", "changeSummary"]
+        },
+        "goal_3": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "revised": { "type": "string" },
+            "changeType": { "type": "string", "enum": ["unchanged", "minor_edit", "updated", "replaced"] },
+            "changeSummary": { "type": "string" }
+          },
+          "required": ["revised", "changeType", "changeSummary"]
+        },
+        "goal_4": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "revised": { "type": "string" },
+            "changeType": { "type": "string", "enum": ["unchanged", "minor_edit", "updated", "replaced"] },
+            "changeSummary": { "type": "string" }
+          },
+          "required": ["revised", "changeType", "changeSummary"]
+        },
+        "notes": { "type": "string" }
+      },
+      "x-reportUi": {
+        "layout": "sections",
+        "sections": [
+          { "resultKey": "goal_1", "title": "Goal 1", "actions": ["copy", "apply"], "inputId": "goal_1", "valueField": "revised", "changeTypeField": "changeType", "changeSummaryField": "changeSummary" },
+          { "resultKey": "goal_2", "title": "Goal 2", "actions": ["copy", "apply"], "inputId": "goal_2", "valueField": "revised", "changeTypeField": "changeType", "changeSummaryField": "changeSummary" },
+          { "resultKey": "goal_3", "title": "Goal 3", "actions": ["copy", "apply"], "inputId": "goal_3", "valueField": "revised", "changeTypeField": "changeType", "changeSummaryField": "changeSummary" },
+          { "resultKey": "goal_4", "title": "Goal 4", "actions": ["copy", "apply"], "inputId": "goal_4", "valueField": "revised", "changeTypeField": "changeType", "changeSummaryField": "changeSummary" },
+          { "resultKey": "notes", "title": "Notes", "actions": ["copy"], "inputId": "" }
+        ]
+      }
+    }
+  }
+}

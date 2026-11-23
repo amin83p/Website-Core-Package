@@ -127,6 +127,63 @@ test('analyzeAiAssistContexts allows matrix when only shared field bindings', ()
   assert.equal(analysis.instanceAllowed, true);
 });
 
+test('extractReportOutputUi reads x-reportUi from json schema', () => {
+  const pack = reportTemplateAiBindingService.extractReportOutputUi({
+    mode: 'json',
+    jsonSchema: {
+      type: 'object',
+      properties: { goal_1: { type: 'string' } },
+      'x-reportUi': {
+        layout: 'sections',
+        sections: [
+          { resultKey: 'goal_1', title: 'Goal 1', actions: ['copy', 'apply'], inputId: 'goal_1' }
+        ]
+      }
+    }
+  });
+  assert.equal(pack.outputMode, 'json');
+  assert.equal(pack.reportUi.layout, 'sections');
+  assert.equal(pack.reportUi.sections.length, 1);
+  assert.deepEqual(pack.reportUi.sections[0].actions, ['copy', 'apply']);
+});
+
+test('buildCatalogEntryFromBinding includes outputMode and reportUi', () => {
+  const entry = reportTemplateAiBindingService.buildCatalogEntryFromBinding(
+    {
+      id: 'ai_bimpr',
+      serviceKey: 'school.bimpr_goals_checker',
+      inputBindings: { goal_1: { source: 'field', value: 'futuregoal_listening' } }
+    },
+    {
+      prompt: { userPromptTemplate: 'Goals {{goal_1}}' },
+      inputs: [{ id: 'goal_1', type: 'textarea', label: 'Goal 1' }],
+      output: {
+        mode: 'json',
+        jsonSchema: {
+          type: 'object',
+          properties: { goal_1: { type: 'string' } },
+          'x-reportUi': {
+            layout: 'sections',
+            sections: [{
+              resultKey: 'goal_1',
+              title: 'Goal 1',
+              actions: ['apply'],
+              inputId: 'goal_1',
+              valueField: 'revised',
+              changeTypeField: 'changeType',
+              changeSummaryField: 'changeSummary'
+            }]
+          }
+        }
+      }
+    }
+  );
+  assert.ok(entry);
+  assert.equal(entry.outputMode, 'json');
+  assert.equal(entry.reportUi.sections[0].resultKey, 'goal_1');
+  assert.equal(entry.reportUi.sections[0].valueField, 'revised');
+});
+
 test('listActiveBindings skips inactive rows', () => {
   const rows = reportTemplateAiBindingService.listActiveBindings({
     aiServices: [

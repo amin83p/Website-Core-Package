@@ -88,6 +88,13 @@ function substituteTemplate(template, values = {}) {
   return text.replace(TEMPLATE_TOKEN, (_, id) => stringifyInputValue(values[id]));
 }
 
+function schemaForModelPrompt(jsonSchema) {
+  if (!jsonSchema || typeof jsonSchema !== 'object') return jsonSchema;
+  const clone = JSON.parse(JSON.stringify(jsonSchema));
+  delete clone['x-reportUi'];
+  return clone;
+}
+
 function buildPrompt(definition, coercedInputs = {}) {
   const prompt = definition?.prompt && typeof definition.prompt === 'object' ? definition.prompt : {};
   let systemPrompt = substituteTemplate(prompt.systemPrompt, coercedInputs);
@@ -98,7 +105,7 @@ function buildPrompt(definition, coercedInputs = {}) {
     if (output.jsonInstructions) parts.push(String(output.jsonInstructions).trim());
     if (output.jsonSchema && typeof output.jsonSchema === 'object') {
       parts.push('Respond with JSON only matching this schema (no markdown fences):');
-      parts.push(JSON.stringify(output.jsonSchema));
+      parts.push(JSON.stringify(schemaForModelPrompt(output.jsonSchema)));
     } else {
       parts.push('Respond with JSON only (no markdown fences).');
     }
@@ -142,8 +149,18 @@ function validateJsonOutput(data, jsonSchema = null) {
         errors.push(`Missing required output key "${key}".`);
       }
     });
-    if (jsonSchema.properties && typeof jsonSchema.properties === 'object') {
-      Object.keys(jsonSchema.properties).forEach((key) => {
+    const allowPartial = jsonSchema.additionalProperties === false
+      || Boolean(jsonSchema['x-reportUi']);
+    const properties = jsonSchema.properties && typeof jsonSchema.properties === 'object'
+      ? jsonSchema.properties
+      : {};
+    Object.keys(data).forEach((key) => {
+      if (!Object.prototype.hasOwnProperty.call(properties, key)) {
+        errors.push(`Unexpected output key "${key}".`);
+      }
+    });
+    if (!allowPartial) {
+      Object.keys(properties).forEach((key) => {
         if (!Object.prototype.hasOwnProperty.call(data, key)) {
           errors.push(`Missing expected output key "${key}".`);
         }
@@ -225,6 +242,7 @@ async function run({ serviceKey, inputs = {}, requestingUser, accessContext = {}
 
 module.exports = {
   coerceInputs,
+  schemaForModelPrompt,
   buildPrompt,
   formatOutput,
   extractJsonFromModelText,

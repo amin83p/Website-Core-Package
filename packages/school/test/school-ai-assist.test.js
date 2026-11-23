@@ -96,6 +96,43 @@ function testFormatOutputJsonFence() {
   assert.deepStrictEqual(formatted.data, { summary: 'ok' });
 }
 
+function testBuildPromptStripsReportUiFromSchema() {
+  const built = schoolAiServiceExecutionService.buildPrompt({
+    prompt: { userPromptTemplate: 'Revise goals.' },
+    output: {
+      mode: 'json',
+      jsonSchema: {
+        type: 'object',
+        properties: { goal_1: { type: 'string' } },
+        'x-reportUi': { layout: 'sections', sections: [] }
+      }
+    }
+  }, {});
+  assert.ok(!built.userPrompt.includes('x-reportUi'));
+  assert.ok(built.userPrompt.includes('goal_1'));
+}
+
+function testFormatOutputPartialGoalsWithReportUi() {
+  const formatted = schoolAiServiceExecutionService.formatOutput(
+    {
+      mode: 'json',
+      jsonSchema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          goal_1: { type: 'string' },
+          goal_2: { type: 'string' }
+        },
+        'x-reportUi': { layout: 'sections', sections: [] }
+      }
+    },
+    '{"goal_1":"revised one"}',
+    'trace-2'
+  );
+  assert.strictEqual(formatted.ok, true);
+  assert.deepStrictEqual(formatted.data, { goal_1: 'revised one' });
+}
+
 function testModelsRejectDisplayName() {
   assert.throws(() => {
     normalizeModelsList([{ modelId: 'Gemini 3.1 Flash Lite' }], { strict: false });
@@ -109,6 +146,16 @@ function testCoerceInputsRequired() {
       {}
     );
   }, /required/);
+}
+
+function testBimprPresetLoadsFromJsonFile() {
+  const { getDefinitionPreset, PRESET_DIR } = require(path.join(ROOT, 'packages/school/MVC/config/schoolAiServiceDefinitionPresets'));
+  assert.ok(fs.existsSync(path.join(PRESET_DIR, 'school.bimpr_goals_checker.json')));
+  const preset = getDefinitionPreset('school.bimpr_goals_checker');
+  assert.ok(preset);
+  assert.strictEqual(preset.output.mode, 'json');
+  assert.strictEqual(preset.output.jsonSchema['x-reportUi'].layout, 'sections');
+  assert.strictEqual(preset.inputs.length, 5);
 }
 
 function testListPagesIncludeTableModals() {
@@ -129,8 +176,11 @@ async function run() {
   testDefinitionRequiresKnownService();
   testBuildPromptSubstitution();
   testFormatOutputJsonFence();
+  testBuildPromptStripsReportUiFromSchema();
+  testFormatOutputPartialGoalsWithReportUi();
   testModelsRejectDisplayName();
   testCoerceInputsRequired();
+  testBimprPresetLoadsFromJsonFile();
   testListPagesIncludeTableModals();
   console.log('school-ai-assist.test.js: ok');
 }

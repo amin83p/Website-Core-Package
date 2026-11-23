@@ -1,1 +1,141 @@
-[]
+[
+  {
+    "id": "SCHAIDEF2026112365404",
+    "orgId": "900000",
+    "serviceKey": "school.bimpr_goals_checker",
+    "inputs": [
+      {
+        "id": "goal_1",
+        "label": "Goal 1",
+        "type": "textarea",
+        "required": false,
+        "helpText": "Optional. Up to four goals; leave blank if not used.",
+        "defaultValue": "",
+        "options": []
+      },
+      {
+        "id": "goal_2",
+        "label": "Goal 2",
+        "type": "textarea",
+        "required": false,
+        "helpText": "Optional.",
+        "defaultValue": "",
+        "options": []
+      },
+      {
+        "id": "goal_3",
+        "label": "Goal 3",
+        "type": "textarea",
+        "required": false,
+        "helpText": "Optional.",
+        "defaultValue": "",
+        "options": []
+      },
+      {
+        "id": "goal_4",
+        "label": "Goal 4",
+        "type": "textarea",
+        "required": false,
+        "helpText": "Optional.",
+        "defaultValue": "",
+        "options": []
+      },
+      {
+        "id": "student_name",
+        "label": "Student name (for pronouns/naming)",
+        "type": "text",
+        "required": false,
+        "helpText": "Use instead of the word \"client\" when revising goals.",
+        "defaultValue": "",
+        "options": []
+      }
+    ],
+    "prompt": {
+      "systemPrompt": "You are an expert editor for Bi-MPR future-goal statements on two-week student evaluation reports.\nRevise only the goal text supplied by the user. Keep the same meaning and intent unless a guideline requires a wording change.\nDo not invent new goals. Skip any goal input that is empty or whitespace-only.",
+      "userPromptTemplate": "Revise each non-empty goal below according to the requirements.\n\nRequirements / expectations / criteria (apply to each revised goal; each single goal must be at most 490 characters including letters, spaces, and punctuation):\n- Write future goals in future tense, singular form.\n- Do not use the word \"client\"; use the student name if provided ({{student_name}}), otherwise \"the student\", or subject pronouns.\n- Avoid unnecessary phrases such as \"Over the next two weeks\" and similar, because the report already refers to two weeks.\n- Do not include book titles, unit titles, unit numbers, or page numbers.\n- Do not use phrases like \"in this period\", \"in the next two weeks\", or equivalent time-frame boilerplate.\n\nInputs:\nGoal 1:\n{{goal_1}}\n\nGoal 2:\n{{goal_2}}\n\nGoal 3:\n{{goal_3}}\n\nGoal 4:\n{{goal_4}}\n\nStudent name (optional): {{student_name}}"
+    },
+    "output": {
+      "mode": "json",
+      "jsonSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "goal_1": {
+            "type": "string"
+          },
+          "goal_2": {
+            "type": "string"
+          },
+          "goal_3": {
+            "type": "string"
+          },
+          "goal_4": {
+            "type": "string"
+          },
+          "notes": {
+            "type": "string"
+          }
+        },
+        "x-reportUi": {
+          "layout": "sections",
+          "sections": [
+            {
+              "resultKey": "goal_1",
+              "title": "Goal 1",
+              "actions": [
+                "copy",
+                "apply"
+              ],
+              "inputId": "goal_1"
+            },
+            {
+              "resultKey": "goal_2",
+              "title": "Goal 2",
+              "actions": [
+                "copy",
+                "apply"
+              ],
+              "inputId": "goal_2"
+            },
+            {
+              "resultKey": "goal_3",
+              "title": "Goal 3",
+              "actions": [
+                "copy",
+                "apply"
+              ],
+              "inputId": "goal_3"
+            },
+            {
+              "resultKey": "goal_4",
+              "title": "Goal 4",
+              "actions": [
+                "copy",
+                "apply"
+              ],
+              "inputId": "goal_4"
+            },
+            {
+              "resultKey": "notes",
+              "title": "Notes",
+              "actions": [
+                "copy"
+              ],
+              "inputId": ""
+            }
+          ]
+        }
+      },
+      "jsonInstructions": "Return a single JSON object only (no markdown fences). Include goal_1 through goal_4 only for goals that had non-empty input; omit keys for blank goals. Each revised goal must be at most 490 characters. Include notes only when you have brief material edit notes; otherwise omit the notes key."
+    },
+    "isActive": true,
+    "notes": "Synced from preset JSON (school.bimpr_goals_checker.json).",
+    "audit": {
+      "createUser": "CURSOR_AGENT",
+      "createDateTime": "2026-11-23T18:46:18.488Z",
+      "lastUpdateUser": "CURSOR_AGENT",
+      "lastUpdateDateTime": "2026-11-23T18:46:18.488Z"
+    },
+    "updatedAt": "2026-11-23T18:46:18.489Z"
+  }
+]

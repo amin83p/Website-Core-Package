@@ -160,6 +160,9 @@
       background-color: #f8f9fa;
     }
     .template-scroll-panel .list-group { border-radius: inherit; }
+    body > .dropdown-menu.template-field-dropdown-menu-floating {
+      z-index: 1090;
+    }
   #collapseSnapshotKeys .template-scroll-panel {
     max-height: min(28rem, 62vh);
   }
@@ -2640,6 +2643,47 @@ num(value) <= 95</code></pre>
       return flags.length ? flags.join(' ') : '<span class="text-muted small">None</span>';
     }
 
+    function bindTemplateFieldDropdown(toggle) {
+      if (!toggle || typeof bootstrap === 'undefined' || !bootstrap.Dropdown) return null;
+      const dropdownRoot = toggle.closest('.js-template-field-dropdown');
+      const menu = dropdownRoot?.querySelector('.dropdown-menu');
+      if (!dropdownRoot || !menu) return null;
+      const existing = bootstrap.Dropdown.getInstance(toggle);
+      if (existing) existing.dispose();
+      new bootstrap.Dropdown(toggle, {
+        popperConfig(defaultConfig) {
+          const config = typeof defaultConfig === 'object' && defaultConfig ? { ...defaultConfig } : {};
+          config.strategy = 'fixed';
+          const modifiers = Array.isArray(config.modifiers) ? config.modifiers.slice() : [];
+          modifiers.push({ name: 'preventOverflow', options: { boundary: 'viewport', padding: 8 } });
+          modifiers.push({ name: 'flip', options: { fallbackPlacements: ['bottom-end', 'top-end', 'bottom-start', 'top-start'] } });
+          config.modifiers = modifiers;
+          return config;
+        }
+      });
+      toggle.addEventListener('show.bs.dropdown', () => {
+        if (menu.parentElement !== document.body) {
+          menu.dataset.returnToParent = '1';
+          document.body.appendChild(menu);
+        }
+        menu.classList.add('template-field-dropdown-menu-floating', 'show');
+      });
+      toggle.addEventListener('hidden.bs.dropdown', () => {
+        menu.classList.remove('template-field-dropdown-menu-floating', 'show');
+        if (menu.dataset.returnToParent === '1' && dropdownRoot.isConnected) {
+          dropdownRoot.appendChild(menu);
+          delete menu.dataset.returnToParent;
+        }
+      });
+      return toggle;
+    }
+
+    function bindTemplateFieldDropdowns() {
+      document.querySelectorAll('#fieldRowsBody .js-template-field-dropdown [data-bs-toggle="dropdown"]').forEach((el) => {
+        bindTemplateFieldDropdown(el);
+      });
+    }
+
     function renderFieldRows() {
       if (!Array.isArray(fieldsState) || !fieldsState.length) {
         tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-4">No fields yet. Click "Add Field" to start.</td></tr>';
@@ -2676,7 +2720,7 @@ num(value) <= 95</code></pre>
             <td><span class="badge bg-secondary-subtle text-secondary border">${escapeHtml(field.type || 'text')}</span></td>
             <td>${buildFlagsHtml(field)}</td>
             <td class="text-center">
-              <div class="dropdown">
+              <div class="dropdown js-template-field-dropdown">
                 <button type="button" class="btn btn-sm btn-outline-secondary" data-bs-toggle="dropdown" aria-expanded="false" title="Field actions">
                   <i class="bi bi-three-dots-vertical"></i>
                 </button>
@@ -2692,6 +2736,7 @@ num(value) <= 95</code></pre>
         `;
       }).join('');
       refreshPrefillKeyOptionsDatalist();
+      bindTemplateFieldDropdowns();
     }
 
     function collect({ skipAliasRegeneration = false } = {}) {

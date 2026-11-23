@@ -122,6 +122,7 @@
               <textarea class="form-control" id="jsonInstructions" name="jsonInstructions" rows="3"><%= output.jsonInstructions || '' %></textarea>
               <label class="form-label fw-bold mt-3" for="jsonSchema">JSON schema (object)</label>
               <textarea class="form-control font-monospace" id="jsonSchema" name="jsonSchema" rows="8" placeholder='{"type":"object","required":["summary"],"properties":{"summary":{"type":"string"}}}'><%= schemaText %></textarea>
+              <div class="form-text">For report AI Assist section cards, add <code>x-reportUi</code> with <code>layout: "sections"</code> and <code>sections[]</code> (<code>resultKey</code>, <code>title</code>, <code>actions</code>, <code>inputId</code>). For structured goal objects, set <code>valueField</code> (text to apply), <code>changeTypeField</code>, and <code>changeSummaryField</code> so the UI shows update / replace badges. UI metadata is not sent to the model.</div>
             </div>
           </div>
         </div>

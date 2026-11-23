@@ -1,29 +1,47 @@
 <div class="modal fade" id="reportAiAssistModal" tabindex="-1" aria-labelledby="reportAiAssistModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-scrollable modal-lg">
-    <div class="modal-content">
-      <div class="modal-header py-2">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header py-3 report-ai-modal-header">
         <div>
-          <h5 class="modal-title fw-bold" id="reportAiAssistModalLabel"><i class="bi bi-robot me-2 text-primary"></i>AI Assist</h5>
+          <h5 class="modal-title fw-bold mb-1" id="reportAiAssistModalLabel">
+            <span class="report-ai-icon-chip me-2" aria-hidden="true"><i class="bi bi-stars"></i></span>AI Assist
+          </h5>
           <div class="small text-muted" id="reportAiAssistModalSubtitle"></div>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
-      <div class="modal-body">
+      <div class="modal-body pt-2">
         <div id="reportAiAssistServicePickerWrap" class="mb-3 d-none">
           <label class="form-label fw-semibold" for="reportAiAssistServiceSelect">Service</label>
           <select id="reportAiAssistServiceSelect" class="form-select size-md"></select>
         </div>
         <p class="small text-muted mb-3" id="reportAiAssistServiceDescription"></p>
         <div id="reportAiAssistInputsHost" class="row g-3 mb-3"></div>
-        <div id="reportAiAssistModalResult" class="d-none border rounded bg-light p-3">
-          <div class="d-flex justify-content-between align-items-center mb-2">
-            <span class="fw-semibold small text-uppercase text-muted">Result</span>
-            <button type="button" class="btn btn-outline-secondary btn-sm" id="reportAiAssistModalCopyResult"><i class="bi bi-clipboard me-1"></i>Copy</button>
+        <div id="reportAiAssistModalResult" class="d-none report-ai-result-panel" role="region" aria-live="polite" aria-label="AI Assist result">
+          <div class="report-ai-result-panel-accent" aria-hidden="true"></div>
+          <div class="report-ai-result-panel-inner">
+            <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+              <div class="d-flex align-items-start gap-2">
+                <span class="report-ai-result-status-icon" id="reportAiAssistModalResultIcon" aria-hidden="true">
+                  <i class="bi bi-check-lg"></i>
+                </span>
+                <div>
+                  <div class="fw-bold text-body" id="reportAiAssistModalResultTitle">AI response</div>
+                  <div class="small text-muted" id="reportAiAssistModalResultMeta"></div>
+                </div>
+              </div>
+              <div class="d-flex flex-wrap align-items-center gap-2">
+                <span class="badge rounded-pill report-ai-mode-badge d-none" id="reportAiAssistModalResultMode"></span>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="reportAiAssistModalCopyResult">
+                  <i class="bi bi-clipboard me-1"></i>Copy
+                </button>
+              </div>
+            </div>
+            <div id="reportAiAssistModalResultBody" class="report-ai-result-body" data-plain-text=""></div>
           </div>
-          <pre id="reportAiAssistModalResultBody" class="small mb-0" style="white-space: pre-wrap; max-height: 280px; overflow: auto;"></pre>
         </div>
       </div>
-      <div class="modal-footer py-2 flex-wrap gap-2">
+      <div class="modal-footer py-2 flex-wrap gap-2 border-top-0 pt-0">
         <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
         <button type="button" class="btn btn-filled btn-primary btn-sm" id="reportAiAssistModalRunBtn">
           <i class="bi bi-stars me-1"></i>Perform AI Assist
@@ -33,10 +51,270 @@
   </div>
 </div>
 
-<div id="reportAiAssistResultsTray" class="card border-0 shadow-sm mb-4 d-none">
-  <div class="card-header bg-white py-2 d-flex justify-content-between align-items-center">
-    <span class="fw-bold"><i class="bi bi-robot me-2 text-primary"></i>AI Assist results</span>
-    <button type="button" class="btn btn-outline-secondary btn-sm" id="reportAiAssistTrayClearBtn">Clear</button>
+<div id="reportAiAssistResultsTray" class="card border-0 shadow-sm mb-4 d-none report-ai-results-tray">
+  <div class="card-header bg-white py-2 px-3 d-flex justify-content-between align-items-center border-bottom gap-2">
+    <button
+      type="button"
+      class="btn btn-link text-decoration-none text-body p-0 d-flex align-items-center gap-2 flex-grow-1 report-ai-tray-collapse-btn"
+      data-bs-toggle="collapse"
+      data-bs-target="#reportAiAssistResultsTrayCollapse"
+      aria-expanded="true"
+      aria-controls="reportAiAssistResultsTrayCollapse"
+      id="reportAiAssistTrayToggleBtn"
+    >
+      <span class="report-ai-icon-chip report-ai-icon-chip-sm" aria-hidden="true"><i class="bi bi-collection"></i></span>
+      <span class="fw-bold">AI Assist results</span>
+      <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill d-none" id="reportAiAssistResultsTrayCount">0</span>
+      <i class="bi bi-chevron-down ms-auto report-ai-tray-chevron" id="reportAiAssistTrayToggleIcon" aria-hidden="true"></i>
+    </button>
+    <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0" id="reportAiAssistTrayClearBtn">
+      <i class="bi bi-trash3 me-1"></i>Clear
+    </button>
   </div>
-  <div class="card-body p-3" id="reportAiAssistResultsTrayBody"></div>
+  <div id="reportAiAssistResultsTrayCollapse" class="collapse show">
+    <div class="card-body p-3 p-md-4" id="reportAiAssistResultsTrayBody"></div>
+  </div>
 </div>
+
+<style>
+  .report-ai-modal-header {
+    background: linear-gradient(135deg, rgba(var(--bs-primary-rgb), 0.08) 0%, rgba(var(--bs-primary-rgb), 0.02) 55%, transparent 100%);
+    border-bottom: 1px solid rgba(var(--bs-primary-rgb), 0.12);
+  }
+  .report-ai-icon-chip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2rem;
+    height: 2rem;
+    border-radius: 0.65rem;
+    background: linear-gradient(145deg, rgba(var(--bs-primary-rgb), 0.18), rgba(var(--bs-primary-rgb), 0.06));
+    color: var(--bs-primary);
+    vertical-align: middle;
+  }
+  .report-ai-icon-chip-sm {
+    width: 1.75rem;
+    height: 1.75rem;
+    font-size: 0.9rem;
+  }
+  .report-ai-result-panel {
+    position: relative;
+    border-radius: 0.75rem;
+    overflow: hidden;
+    border: 1px solid rgba(var(--bs-success-rgb), 0.22);
+    background: linear-gradient(160deg, rgba(var(--bs-success-rgb), 0.07), rgba(var(--bs-body-bg-rgb, 255, 255, 255), 1) 42%);
+    box-shadow: 0 0.35rem 1rem rgba(var(--bs-primary-rgb), 0.06);
+  }
+  .report-ai-result-panel.is-error {
+    border-color: rgba(var(--bs-danger-rgb), 0.28);
+    background: linear-gradient(160deg, rgba(var(--bs-danger-rgb), 0.08), rgba(var(--bs-body-bg-rgb, 255, 255, 255), 1) 50%);
+  }
+  .report-ai-result-panel-accent {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: linear-gradient(180deg, var(--bs-success), rgba(var(--bs-success-rgb), 0.45));
+  }
+  .report-ai-result-panel.is-error .report-ai-result-panel-accent {
+    background: linear-gradient(180deg, var(--bs-danger), rgba(var(--bs-danger-rgb), 0.5));
+  }
+  .report-ai-result-panel-inner {
+    padding: 1rem 1.1rem 1.1rem 1.25rem;
+  }
+  .report-ai-result-status-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 50%;
+    background: rgba(var(--bs-success-rgb), 0.15);
+    color: var(--bs-success);
+    flex-shrink: 0;
+  }
+  .report-ai-result-panel.is-error .report-ai-result-status-icon {
+    background: rgba(var(--bs-danger-rgb), 0.14);
+    color: var(--bs-danger);
+  }
+  .report-ai-mode-badge {
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    font-size: 0.65rem;
+  }
+  .report-ai-result-body {
+    max-height: 320px;
+    overflow: auto;
+    padding: 0.85rem 1rem;
+    border-radius: 0.55rem;
+    background: rgba(var(--bs-body-bg-rgb, 255, 255, 255), 0.85);
+    border: 1px solid rgba(var(--bs-border-color-rgb, 0, 0, 0), 0.08);
+    font-size: 0.92rem;
+    line-height: 1.55;
+    color: var(--bs-body-color);
+  }
+  .report-ai-result-body.report-ai-result-json {
+    font-family: var(--bs-font-monospace);
+    font-size: 0.82rem;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .report-ai-result-body.report-ai-result-structured {
+    max-height: 420px;
+    padding: 0.35rem 0.15rem;
+    background: transparent;
+    border: none;
+  }
+  .report-ai-result-section {
+    position: relative;
+    overflow: hidden;
+    border-radius: 0.65rem !important;
+    background: rgba(var(--bs-body-bg-rgb, 255, 255, 255), 0.92);
+    box-shadow: 0 0.2rem 0.65rem rgba(var(--bs-primary-rgb), 0.07) !important;
+  }
+  .report-ai-section-accent {
+    position: absolute;
+    left: 0;
+    top: 0;
+    bottom: 0;
+    width: 4px;
+    background: linear-gradient(180deg, rgba(var(--bs-secondary-rgb), 0.35), rgba(var(--bs-secondary-rgb), 0.12));
+  }
+  .report-ai-section--unchanged .report-ai-section-accent {
+    background: linear-gradient(180deg, rgba(var(--bs-secondary-rgb), 0.55), rgba(var(--bs-secondary-rgb), 0.2));
+  }
+  .report-ai-section--minor .report-ai-section-accent {
+    background: linear-gradient(180deg, rgba(var(--bs-info-rgb), 0.85), rgba(var(--bs-info-rgb), 0.35));
+  }
+  .report-ai-section--updated .report-ai-section-accent {
+    background: linear-gradient(180deg, rgba(var(--bs-warning-rgb), 0.9), rgba(var(--bs-warning-rgb), 0.35));
+  }
+  .report-ai-section--replaced .report-ai-section-accent {
+    background: linear-gradient(180deg, rgba(var(--bs-primary-rgb), 0.85), rgba(var(--bs-primary-rgb), 0.35));
+  }
+  .report-ai-section-title {
+    font-size: 0.92rem;
+  }
+  .report-ai-change-badge {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    vertical-align: middle;
+  }
+  .report-ai-change-callout {
+    padding: 0.45rem 0.65rem;
+    border-radius: 0.45rem;
+    background: rgba(var(--bs-primary-rgb), 0.06);
+    border: 1px solid rgba(var(--bs-primary-rgb), 0.12);
+    color: var(--bs-body-color);
+    line-height: 1.45;
+  }
+  .report-ai-change-callout-label {
+    font-weight: 600;
+    color: var(--bs-primary);
+  }
+  .report-ai-section-text {
+    font-size: 0.9rem;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+    padding: 0.55rem 0.7rem;
+    border-radius: 0.45rem;
+    background: rgba(var(--bs-secondary-rgb), 0.06);
+    border: 1px solid rgba(var(--bs-border-color-rgb, 0, 0, 0), 0.08);
+  }
+  .report-ai-result-section .card-header {
+    border-bottom: none;
+  }
+  .report-ai-result-body .report-ai-result-heading {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin: 0.75rem 0 0.35rem;
+    color: var(--bs-primary);
+  }
+  .report-ai-result-body .report-ai-result-heading:first-child {
+    margin-top: 0;
+  }
+  .report-ai-result-body .report-ai-result-para {
+    margin: 0 0 0.5rem;
+  }
+  .report-ai-result-body .report-ai-result-list {
+    margin: 0 0 0.65rem;
+    padding-left: 1.25rem;
+  }
+  .report-ai-result-body .report-ai-inline-code {
+    font-size: 0.85em;
+    padding: 0.1em 0.35em;
+    border-radius: 0.25rem;
+    background: rgba(var(--bs-secondary-rgb), 0.12);
+  }
+  .report-ai-tray-card {
+    position: relative;
+    border-radius: 0.75rem;
+    border: 1px solid rgba(var(--bs-border-color-rgb, 0, 0, 0), 0.12);
+    background: var(--bs-body-bg);
+    padding: 0;
+    margin-bottom: 1rem;
+    overflow: hidden;
+    box-shadow: 0 0.2rem 0.65rem rgba(0, 0, 0, 0.04);
+  }
+  .report-ai-tray-card:last-child {
+    margin-bottom: 0;
+  }
+  .report-ai-tray-card-accent {
+    height: 3px;
+    background: linear-gradient(90deg, var(--bs-primary), rgba(var(--bs-primary-rgb), 0.35));
+  }
+  .report-ai-tray-card-inner {
+    padding: 0.9rem 1rem 1rem;
+  }
+  .report-ai-tray-card.is-error .report-ai-tray-card-accent {
+    background: linear-gradient(90deg, var(--bs-danger), rgba(var(--bs-danger-rgb), 0.35));
+  }
+  .report-ai-results-tray .report-ai-tray-title {
+    font-size: 0.95rem;
+  }
+  .report-ai-tray-collapse-btn {
+    border: 0;
+    text-align: left;
+    min-height: 2.25rem;
+  }
+  .report-ai-tray-chevron {
+    font-size: 0.9rem;
+    color: var(--bs-secondary);
+    transition: transform 0.2s ease;
+  }
+  .report-ai-tray-collapse-btn[aria-expanded="false"] .report-ai-tray-chevron {
+    transform: rotate(-90deg);
+  }
+  .report-ai-tray-card--focus {
+    outline: 2px solid rgba(var(--bs-primary-rgb), 0.45);
+    outline-offset: 2px;
+    box-shadow: 0 0.35rem 1rem rgba(var(--bs-primary-rgb), 0.12) !important;
+  }
+  .report-ai-tray-card-toggle {
+    color: var(--bs-secondary);
+    text-decoration: none;
+    line-height: 1;
+    padding: 0.15rem 0.35rem;
+  }
+  .report-ai-tray-card-toggle:hover {
+    color: var(--bs-primary);
+  }
+  .report-ai-tray-card-toggle[aria-expanded="false"] .report-ai-tray-card-chevron {
+    transform: rotate(-90deg);
+  }
+  .report-ai-tray-card-chevron {
+    transition: transform 0.2s ease;
+    font-size: 0.85rem;
+  }
+  .report-ai-tray-card-header {
+    cursor: default;
+  }
+  .report-ai-tray-card-body-wrap {
+    padding-top: 0.35rem;
+  }
+</style>

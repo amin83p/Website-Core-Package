@@ -1,114 +1,70 @@
 'use strict';
 
 /**
- * Suggested inputs/prompts for registered services when no org-specific row exists yet.
- * Admins can change these in School AI Assist → Service Definitions.
+ * Default service definitions when no org-specific row exists yet.
+ * Each registered preset is a JSON file:
+ *   packages/school/MVC/config/schoolAiServiceDefinitionPresets/<serviceKey>.json
+ * Admins can copy output.jsonSchema (including x-reportUi) into
+ * School AI Assist → Service Definitions → Edit → JSON schema.
  */
 
-const PRESETS = Object.freeze({
-  'school.bimpr_goals_checker': Object.freeze({
-    inputs: [
-      {
-        id: 'goal_1',
-        label: 'Goal 1',
-        type: 'textarea',
-        required: false,
-        helpText: 'Optional. Up to four goals; leave blank if not used.',
-        defaultValue: ''
-      },
-      {
-        id: 'goal_2',
-        label: 'Goal 2',
-        type: 'textarea',
-        required: false,
-        helpText: 'Optional.',
-        defaultValue: ''
-      },
-      {
-        id: 'goal_3',
-        label: 'Goal 3',
-        type: 'textarea',
-        required: false,
-        helpText: 'Optional.',
-        defaultValue: ''
-      },
-      {
-        id: 'goal_4',
-        label: 'Goal 4',
-        type: 'textarea',
-        required: false,
-        helpText: 'Optional.',
-        defaultValue: ''
-      },
-      {
-        id: 'student_name',
-        label: 'Student name (for pronouns/naming)',
-        type: 'text',
-        required: false,
-        helpText: 'Use instead of the word "client" when revising goals.',
-        defaultValue: ''
-      }
-    ],
-    prompt: Object.freeze({
-      systemPrompt: `You are an expert editor for Bi-MPR future-goal statements on two-week student evaluation reports.
-Revise only the goal text supplied by the user. Keep the same meaning and intent unless a guideline requires a wording change.
-Do not invent new goals. Skip any goal input that is empty or whitespace-only.`,
-      userPromptTemplate: `Revise each non-empty goal below according to the requirements. Return one revised block per goal that had input.
+const fs = require('fs');
+const path = require('path');
 
-Requirements / expectations / criteria (apply to each revised goal; each single goal must be at most 490 characters including letters, spaces, and punctuation):
-- Write future goals in future tense, singular form.
-- Do not use the word "client"; use the student name if provided ({{student_name}}), otherwise "the student", or subject pronouns.
-- Avoid unnecessary phrases such as "Over the next two weeks" and similar, because the report already refers to two weeks.
-- Do not include book titles, unit titles, unit numbers, or page numbers.
-- Do not use phrases like "in this period", "in the next two weeks", or equivalent time-frame boilerplate.
+const PRESET_DIR = path.join(__dirname, 'schoolAiServiceDefinitionPresets');
+const presetCache = new Map();
 
-Inputs:
-Goal 1:
-{{goal_1}}
+function listPresetServiceKeys() {
+  if (!fs.existsSync(PRESET_DIR)) return [];
+  return fs.readdirSync(PRESET_DIR)
+    .filter((name) => name.endsWith('.json'))
+    .map((name) => name.slice(0, -5));
+}
 
-Goal 2:
-{{goal_2}}
-
-Goal 3:
-{{goal_3}}
-
-Goal 4:
-{{goal_4}}
-
-Student name (optional): {{student_name}}
-
-Output format (markdown):
-For each goal that had non-empty input, output a section:
-
-## Goal N (revised)
-<revised text only, max 490 characters>
-
-If a goal was empty, omit its section entirely.
-After all sections, add:
-
-## Notes
-Brief bullet list of material edits you made (optional, keep short).`
-    }),
-    output: Object.freeze({
-      mode: 'markdown',
-      jsonSchema: null,
-      jsonInstructions: ''
-    })
-  })
-});
+function loadPresetFile(serviceKey = '') {
+  const key = String(serviceKey || '').trim();
+  if (!key) return null;
+  if (presetCache.has(key)) return presetCache.get(key);
+  const filePath = path.join(PRESET_DIR, `${key}.json`);
+  if (!fs.existsSync(filePath)) {
+    presetCache.set(key, null);
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+    presetCache.set(key, parsed);
+    return parsed;
+  } catch (_) {
+    presetCache.set(key, null);
+    return null;
+  }
+}
 
 function getDefinitionPreset(serviceKey = '') {
-  const key = String(serviceKey || '').trim();
-  const preset = PRESETS[key];
-  if (!preset) return null;
+  const preset = loadPresetFile(serviceKey);
+  if (!preset || typeof preset !== 'object') return null;
+  const output = preset.output && typeof preset.output === 'object'
+    ? JSON.parse(JSON.stringify(preset.output))
+    : {};
   return {
-    inputs: preset.inputs.map((row) => ({ ...row, options: Array.isArray(row.options) ? [...row.options] : [] })),
-    prompt: { ...preset.prompt },
-    output: { ...preset.output }
+    inputs: Array.isArray(preset.inputs)
+      ? preset.inputs.map((row) => ({ ...row, options: Array.isArray(row.options) ? [...row.options] : [] }))
+      : [],
+    prompt: preset.prompt && typeof preset.prompt === 'object' ? { ...preset.prompt } : {},
+    output
   };
 }
 
+function getPresetJsonSchema(serviceKey = '') {
+  const preset = loadPresetFile(serviceKey);
+  const schema = preset?.output?.jsonSchema;
+  return schema && typeof schema === 'object' ? schema : null;
+}
+
 module.exports = {
-  PRESETS,
-  getDefinitionPreset
+  PRESET_DIR,
+  listPresetServiceKeys,
+  loadPresetFile,
+  getDefinitionPreset,
+  getPresetJsonSchema
 };

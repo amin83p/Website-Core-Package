@@ -248,6 +248,42 @@ function findBindingById(template = {}, bindingRowId = '') {
   return listActiveBindings(template).find((row) => cleanText(row.id) === token) || null;
 }
 
+function extractReportOutputUi(output = {}) {
+  const out = output && typeof output === 'object' ? output : {};
+  const mode = cleanText(out.mode).toLowerCase() || 'markdown';
+  const jsonSchema = out.jsonSchema && typeof out.jsonSchema === 'object' ? out.jsonSchema : null;
+  const rawUi = jsonSchema && jsonSchema['x-reportUi'] && typeof jsonSchema['x-reportUi'] === 'object'
+    ? jsonSchema['x-reportUi']
+    : null;
+  let reportUi = null;
+  if (rawUi && Array.isArray(rawUi.sections)) {
+    const sections = rawUi.sections.map((row) => {
+      if (!row || typeof row !== 'object') return null;
+      const resultKey = cleanText(row.resultKey);
+      if (!resultKey) return null;
+      const actions = Array.isArray(row.actions)
+        ? row.actions.map((a) => cleanText(a).toLowerCase()).filter(Boolean)
+        : [];
+      return {
+        resultKey,
+        title: cleanText(row.title) || resultKey,
+        actions,
+        inputId: cleanText(row.inputId) || resultKey,
+        valueField: cleanText(row.valueField) || '',
+        changeTypeField: cleanText(row.changeTypeField) || 'changeType',
+        changeSummaryField: cleanText(row.changeSummaryField) || 'changeSummary'
+      };
+    }).filter(Boolean);
+    if (sections.length) {
+      reportUi = {
+        layout: cleanText(rawUi.layout) || 'sections',
+        sections
+      };
+    }
+  }
+  return { outputMode: mode, reportUi };
+}
+
 function buildCatalogEntryFromBinding(bindingRow, definition = {}, registry = null, resolvedInputs = {}) {
   const reg = registry || getAiServiceByKey(bindingRow.serviceKey);
   if (!reg) return null;
@@ -257,6 +293,7 @@ function buildCatalogEntryFromBinding(bindingRow, definition = {}, registry = nu
   const inputBindings = bindingRow?.inputBindings && typeof bindingRow.inputBindings === 'object'
     ? bindingRow.inputBindings
     : {};
+  const outputPack = extractReportOutputUi(definition?.output);
   return {
     bindingRowId: bindingRow.id,
     serviceKey: bindingRow.serviceKey,
@@ -265,6 +302,8 @@ function buildCatalogEntryFromBinding(bindingRow, definition = {}, registry = nu
     inputs: sanitizeDefinitionInputsForClient(definition),
     inputDefaults: resolvedInputs,
     inputBindings,
+    outputMode: outputPack.outputMode,
+    reportUi: outputPack.reportUi,
     configured,
     active
   };
@@ -299,5 +338,6 @@ module.exports = {
   analyzeAiAssistContexts,
   resolveMatrixMergedData,
   findBindingById,
+  extractReportOutputUi,
   buildCatalogEntryFromBinding
 };
