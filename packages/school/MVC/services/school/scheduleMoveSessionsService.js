@@ -530,6 +530,217 @@ function classifyMoveEnrollments({
   return rows;
 }
 
+function classAllowsEnrollmentProgram(period = {}, targetClass = {}) {
+  const allowed = Array.isArray(targetClass?.allowedProgramTerms) ? targetClass.allowedProgramTerms : [];
+  if (!allowed.length) return [];
+  const programId = toPublicId(period?.programId);
+  if (!programId) {
+    return [{
+      code: 'PROGRAM_REQUIRED',
+      message: 'This enrollment has no program, but the target class only allows specific programs.'
+    }];
+  }
+  const matches = allowed.filter((row) => idsEqual(row?.programId, programId));
+  if (!matches.length) {
+    return [{
+      code: 'PROGRAM_NOT_ALLOWED',
+      message: 'This enrollment\'s program is not allowed on the target class.'
+    }];
+  }
+  const termId = toPublicId(period?.termId);
+  if (!termId) return [];
+  const requiringTerm = matches.filter((row) => toPublicId(row?.termId));
+  if (!requiringTerm.length) return [];
+  const termOk = requiringTerm.some((row) => idsEqual(row?.termId, termId))
+    || matches.some((row) => !toPublicId(row?.termId));
+  if (!termOk) {
+    return [{
+      code: 'TERM_NOT_ALLOWED',
+      message: 'This enrollment\'s term is not allowed for its program on the target class.'
+    }];
+  }
+  return [];
+}
+
+function annotateEnrollmentBlockers(blockers = [], row = {}) {
+  const label = String(row.studentLabel || row.studentId || '').trim();
+  return (Array.isArray(blockers) ? blockers : []).map((blocker) => {
+    const message = String(blocker?.message || '').trim();
+    return {
+      ...blocker,
+      periodId: toPublicId(row.periodId),
+      studentLabel: label,
+      message: label && message ? `${label}: ${message}` : (message || 'Enrollment move is blocked.')
+    };
+  });
+}
+
+function buildScheduleMoveEnrollmentPayload(row, period, targetClass) {
+  const targetCapacity = dependencies.classSessionCapacityService.resolveClassMaxCapacity(targetClass);
+  return {
+    close: {
+      effectiveDate: row.closeDate,
+      reason: 'Sessions moved to another class.'
+    },
+    target: {
+      classId: toPublicId(targetClass.id),
+      startDate: row.newStartDate,
+      endDate: row.endDate,
+      targetSessionCount: row.targetSessionCount,
+      targetHours: row.targetHours,
+      funder: {
+        funderId: period.funderId || 'self',
+        funderType: period.funderType || 'self'
+      },
+      reasonStart: 'Continued after sessions were moved to this class.',
+      status: String(period.status || 'active').trim().toLowerCase() || 'active',
+      claimNumber: period.claimNumber || '',
+      claimNumberId: period.claimNumberId || '',
+      sessionCountPolicy: period.sessionCountPolicy,
+      programId: period.programId,
+      termId: period.termId,
+      programRegistrationId: period.programRegistrationId,
+      sessionCapacityType: targetCapacity === 1 ? 'one_on_one' : (period.sessionCapacityType || 'group'),
+      notes: period.notes || ''
+    }
+  };
+}
+
+function buildScheduleMoveContext({ selectedSessions = [], sessionPlans = [], targetSessionsAfter = [] } = {}) {
+  const plans = Array.isArray(sessionPlans) ? sessionPlans : [];
+  return {
+    prefilledSessionTransferPlan: {
+      sourceSessionIds: (Array.isArray(selectedSessions) ? selectedSessions : []).map(sessionIdentity),
+      plans: [],
+      targetUnmarkSessionIds: resolveTargetUnmarkSessionIdsFromPlans(plans, targetSessionsAfter),
+      createCount: plans.filter((plan) => plan.action === 'create').length,
+      reuseCount: plans.filter((plan) => plan.action === 'reuse').length
+    }
+  };
+}
+
+function computeTargetSessionsAfterPlans({
+  targetClass,
+  sourceSessions = [],
+  targetSessions = [],
+  sessionPlans = []
+} = {}) {
+  const teacher = resolveTargetTeacher(targetClass);
+  const sourceById = new Map(
+    (Array.isArray(sourceSessions) ? sourceSessions : []).map((session) => [sessionIdentity(session), session])
+  );
+  const beforeIds = new Set(
+    (Array.isArray(targetSessions) ? targetSessions : []).map((session) => sessionIdentity(session)).filter(Boolean)
+  );
+  let targetSessionsWorking = (Array.isArray(targetSessions) ? targetSessions : []).slice();
+  const createdSessionIds = [];
+  (Array.isArray(sessionPlans) ? sessionPlans : []).forEach((plan) => {
+    const sourceSession = sourceById.get(toPublicId(plan.sourceSessionId || ''));
+    if (!sourceSession) return;
+    if (plan.action === 'create') {
+      const session = buildCreatedSession({
+        classId: targetClass.id,
+        sourceSession,
+        plan,
+        existingSessions: targetSessionsWorking,
+        teacher
+      });
+      targetSessionsWorking.push(session);
+      createdSessionIds.push(session.sessionId);
+      return;
+    }
+    const targetId = toPublicId(plan.targetSessionId || '');
+    targetSessionsWorking = targetSessionsWorking.map((session) => {
+      if (!idsEqual(sessionIdentity(session), targetId)) return session;
+      return { ...session, roster: mergeRoster(session.roster, sourceSession.roster) };
+    });
+  });
+  const newlyCreated = createdSessionIds.length
+    ? createdSessionIds
+    : targetSessionsWorking
+      .map((session) => sessionIdentity(session))
+      .filter((id) => id && !beforeIds.has(id));
+  return { sessions: targetSessionsWorking, createdSessionIds: newlyCreated };
+}
+
+async function previewScheduleMoveEnrollments({
+  context,
+  enrollments = [],
+  sessionPlans = [],
+  reqUser,
+  orgId,
+  accessContext
+} = {}) {
+  const enrollmentPreviews = [];
+  const enrollmentBlockers = [];
+  const enrollmentWarnings = [];
+  if (!context?.targetClass) {
+    return { enrollmentPreviews, enrollmentBlockers, enrollmentWarnings };
+  }
+  const simulated = computeTargetSessionsAfterPlans({
+    targetClass: context.targetClass,
+    sourceSessions: context.selectedSessions,
+    targetSessions: context.targetSessions,
+    sessionPlans
+  });
+  const scheduleMoveContext = buildScheduleMoveContext({
+    selectedSessions: context.selectedSessions,
+    sessionPlans,
+    targetSessionsAfter: simulated.sessions
+  });
+  const enrollmentMove = resolveEnrollmentMoveService();
+  const moveOptions = {
+    accessContext,
+    sessionsTransferredByScheduleMove: true,
+    prefilledSessionTransferPlan: scheduleMoveContext.prefilledSessionTransferPlan
+  };
+
+  for (const row of Array.isArray(enrollments) ? enrollments : []) {
+    const period = context.sourcePeriods.find((item) => idsEqual(item.id, row.periodId));
+    if (!period) continue;
+
+    if (row.action === 'reassign') {
+      const rawBlockers = classAllowsEnrollmentProgram(period, context.targetClass);
+      const blockers = annotateEnrollmentBlockers(rawBlockers, row);
+      const canApply = blockers.length === 0;
+      if (!canApply) enrollmentBlockers.push(...blockers);
+      enrollmentPreviews.push({
+        periodId: toPublicId(row.periodId),
+        canApply,
+        blockers,
+        warnings: [],
+        summary: canApply ? 'Update enrollment onto target class.' : '',
+        previewHash: ''
+      });
+      continue;
+    }
+
+    const payload = buildScheduleMoveEnrollmentPayload(row, period, context.targetClass);
+    const movePreview = await enrollmentMove.previewMoveEnrollment({
+      sourcePeriodId: period.id,
+      payload,
+      reqUser,
+      orgId,
+      options: moveOptions
+    });
+    const blockers = annotateEnrollmentBlockers(movePreview.blockers || [], row);
+    const warnings = Array.isArray(movePreview.warnings) ? movePreview.warnings : [];
+    const canApply = movePreview.canApply === true;
+    if (!canApply) enrollmentBlockers.push(...blockers);
+    enrollmentWarnings.push(...warnings);
+    enrollmentPreviews.push({
+      periodId: toPublicId(row.periodId),
+      canApply,
+      blockers,
+      warnings,
+      summary: String(movePreview.summary || '').trim(),
+      previewHash: String(movePreview.previewHash || '').trim()
+    });
+  }
+
+  return { enrollmentPreviews, enrollmentBlockers, enrollmentWarnings };
+}
+
 function buildMovePreviewHash(payload) {
   return crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex');
 }
@@ -634,7 +845,7 @@ async function buildMovePreview({
       cycleEndDate: context.targetClass.cycleEndDate
     });
   }
-  const blockers = [...capacityBlockers, ...conflict.blockers];
+  let blockers = [...capacityBlockers, ...conflict.blockers];
   const labeled = [];
   for (const row of enrollments) {
     let label = row.studentId;
@@ -646,26 +857,69 @@ async function buildMovePreview({
     }
     labeled.push({ ...row, studentLabel: label });
   }
+
+  let enrollmentPreviews = [];
+  let enrollmentWarnings = [];
+  const startToken = String(startTime || '').trim();
+  if (context.targetClass && startToken && blockers.length === 0) {
+    const enrollmentPreview = await previewScheduleMoveEnrollments({
+      context,
+      enrollments: labeled,
+      sessionPlans: conflict.plans,
+      reqUser,
+      orgId: toPublicId(context.sourceClass.orgId),
+      accessContext
+    });
+    enrollmentPreviews = enrollmentPreview.enrollmentPreviews;
+    enrollmentWarnings = enrollmentPreview.enrollmentWarnings;
+    if (enrollmentPreview.enrollmentBlockers.length) {
+      blockers = [...blockers, ...enrollmentPreview.enrollmentBlockers];
+    }
+  }
+
+  const previewByPeriod = new Map(
+  enrollmentPreviews.map((row) => [toPublicId(row.periodId), row])
+  );
+  const labeledWithPreview = labeled.map((row) => {
+    const previewRow = previewByPeriod.get(toPublicId(row.periodId));
+    if (!previewRow) return { ...row, canApply: true, blockers: [] };
+    return {
+      ...row,
+      canApply: previewRow.canApply === true,
+      blockers: previewRow.blockers || [],
+      summary: previewRow.summary || '',
+      enrollmentPreviewHash: previewRow.previewHash || ''
+    };
+  });
+
+  const sessionPlanSummary = {
+    createCount: conflict.plans.filter((plan) => plan.action === 'create').length,
+    reuseCount: conflict.plans.filter((plan) => plan.action === 'reuse').length
+  };
+
   const hashPayload = {
     sourceClassId: toPublicId(context.sourceClass.id),
     targetClassId: toPublicId(context.targetClass?.id),
-    startTime: String(startTime || '').trim(),
+    startTime: startToken,
     sessionIds: context.selectedSessions.map(sessionIdentity).sort(),
     plans: conflict.plans,
-    enrollments: labeled.map((row) => ({
+    enrollments: labeledWithPreview.map((row) => ({
       periodId: row.periodId,
       action: row.action,
       closeDate: row.closeDate,
       newStartDate: row.newStartDate,
       endDate: row.endDate,
       targetHours: row.targetHours,
-      targetSessionCount: row.targetSessionCount
+      targetSessionCount: row.targetSessionCount,
+      canApply: row.canApply === true,
+      blockerCodes: (row.blockers || []).map((blocker) => String(blocker.code || '').trim()).filter(Boolean).sort()
     }))
   };
+  const notices = [...(conflict.notices || []), ...enrollmentWarnings];
   return {
     canContinue: blockers.length === 0 && Boolean(context.targetClass),
     blockers,
-    notices: conflict.notices,
+    notices,
     sourceCapacity,
     targetCapacity,
     targetClass: context.targetClass ? {
@@ -674,7 +928,8 @@ async function buildMovePreview({
     } : null,
     firstSelectedDate: selectedDates[0] || '',
     sessionPlans: conflict.plans,
-    enrollments: labeled,
+    sessionPlanSummary,
+    enrollments: labeledWithPreview,
     previewHash: buildMovePreviewHash(hashPayload)
   };
 }
@@ -738,6 +993,10 @@ async function applyEnrollmentRow({
 } = {}) {
   const targetCapacity = dependencies.classSessionCapacityService.resolveClassMaxCapacity(targetClass);
   if (row.action === 'reassign') {
+    const programBlockers = classAllowsEnrollmentProgram(period, targetClass);
+    if (programBlockers.length) {
+      throw new Error(programBlockers[0].message || 'Enrollment cannot be moved to the target class.');
+    }
     const patch = {
       classId: toPublicId(targetClass.id),
       updatedBy: toPublicId(reqUser?.id || reqUser?.userId || 'system')
@@ -745,33 +1004,7 @@ async function applyEnrollmentRow({
     if (targetCapacity === 1) patch.sessionCapacityType = 'one_on_one';
     return dependencies.schoolRepositories.classEnrollmentPeriods.update(period.id, patch, { allowClassChange: true });
   }
-  const payload = {
-    close: {
-      effectiveDate: row.closeDate,
-      reason: 'Sessions moved to another class.'
-    },
-    target: {
-      classId: toPublicId(targetClass.id),
-      startDate: row.newStartDate,
-      endDate: row.endDate,
-      targetSessionCount: row.targetSessionCount,
-      targetHours: row.targetHours,
-      funder: {
-        funderId: period.funderId || 'self',
-        funderType: period.funderType || 'self'
-      },
-      reasonStart: 'Continued after sessions were moved to this class.',
-      status: String(period.status || 'active').trim().toLowerCase() || 'active',
-      claimNumber: period.claimNumber || '',
-      claimNumberId: period.claimNumberId || '',
-      sessionCountPolicy: period.sessionCountPolicy,
-      programId: period.programId,
-      termId: period.termId,
-      programRegistrationId: period.programRegistrationId,
-      sessionCapacityType: targetCapacity === 1 ? 'one_on_one' : (period.sessionCapacityType || 'group'),
-      notes: period.notes || ''
-    }
-  };
+  const payload = buildScheduleMoveEnrollmentPayload(row, period, targetClass);
   const enrollmentMove = resolveEnrollmentMoveService();
   const moveOptions = { accessContext };
   if (scheduleMoveContext?.prefilledSessionTransferPlan) {
@@ -838,34 +1071,15 @@ async function applySessionTransferPlans({
       rollbackTargetSessions: Array.isArray(targetSessions) ? targetSessions : []
     };
   }
-  const teacher = resolveTargetTeacher(targetClass);
-  const sourceById = new Map(
-    (Array.isArray(sourceSessions) ? sourceSessions : []).map((session) => [sessionIdentity(session), session])
-  );
   const targetSessionsBefore = JSON.parse(JSON.stringify(Array.isArray(targetSessions) ? targetSessions : []));
-  let targetSessionsWorking = targetSessionsBefore.slice();
-  const created = [];
-  plans.forEach((plan) => {
-    const sourceSession = sourceById.get(toPublicId(plan.sourceSessionId || ''));
-    if (!sourceSession) return;
-    if (plan.action === 'create') {
-      const session = buildCreatedSession({
-        classId: targetClass.id,
-        sourceSession,
-        plan,
-        existingSessions: targetSessionsWorking,
-        teacher
-      });
-      targetSessionsWorking.push(session);
-      created.push(session.sessionId);
-      return;
-    }
-    const targetId = toPublicId(plan.targetSessionId || '');
-    targetSessionsWorking = targetSessionsWorking.map((session) => {
-      if (!idsEqual(sessionIdentity(session), targetId)) return session;
-      return { ...session, roster: mergeRoster(session.roster, sourceSession.roster) };
-    });
+  const computed = computeTargetSessionsAfterPlans({
+    targetClass,
+    sourceSessions,
+    targetSessions: targetSessionsBefore,
+    sessionPlans: plans
   });
+  const targetSessionsWorking = computed.sessions;
+  const created = computed.createdSessionIds;
   await dependencies.schoolDataService.saveClassSessions(
     targetClass.id,
     targetSessionsWorking,
@@ -957,92 +1171,102 @@ async function applyMoveSessions({
     reqUser,
     accessContext
   });
-  const teacher = resolveTargetTeacher(context.targetClass);
+  const blockedEnrollment = (Array.isArray(preview.enrollments) ? preview.enrollments : [])
+    .find((row) => row.canApply === false);
+  if (blockedEnrollment) {
+    const message = blockedEnrollment.blockers?.[0]?.message
+      || 'Resolve enrollment issues before moving sessions.';
+    const error = new Error(message);
+    error.preview = preview;
+    throw error;
+  }
+
+  let rollbackTargetSessions = JSON.parse(JSON.stringify(context.targetSessions));
+  let targetSessionsAfter = context.targetSessions.slice();
+  let created = [];
+  try {
+    const transfer = await applySessionTransferPlans({
+      sourceClass: context.sourceClass,
+      targetClass: context.targetClass,
+      sourceSessions: context.selectedSessions,
+      targetSessions: context.targetSessions,
+      sessionPlans: preview.sessionPlans,
+      reqUser,
+      accessContext
+    });
+    rollbackTargetSessions = transfer.rollbackTargetSessions;
+    targetSessionsAfter = transfer.targetSessionsAfter;
+    created = transfer.createdSessionIds;
+
+    const orgId = toPublicId(context.sourceClass.orgId);
+    const scheduleMoveContext = buildScheduleMoveContext({
+      selectedSessions: context.selectedSessions,
+      sessionPlans: preview.sessionPlans,
+      targetSessionsAfter
+    });
+    for (const row of preview.enrollments) {
+      const period = context.sourcePeriods.find((item) => idsEqual(item.id, row.periodId));
+      if (!period) continue;
+      const hooks = typeof buildEngineHooks === 'function'
+        ? buildEngineHooks(req, context.targetClass)
+        : {};
+      await applyEnrollmentRow({
+        row,
+        period,
+        targetClass: context.targetClass,
+        reqUser,
+        orgId,
+        engineHooks: hooks,
+        scheduleMoveContext,
+        accessContext
+      });
+    }
+
+    await removeSourceSessionsAfterTransfer({
+      sourceClassId: context.sourceClass.id,
+      sourceSessions: context.sourceSessions,
+      sourceSessionIdsToRemove: context.selectedSessions.map(sessionIdentity),
+      reqUser,
+      accessContext
+    });
+  } catch (error) {
+    await rollbackTargetSessionTransfer({
+      targetClassId: context.targetClass.id,
+      rollbackTargetSessions,
+      reqUser,
+      accessContext
+    });
+    if (!error.preview) error.preview = preview;
+    throw error;
+  }
+
   const sourceById = new Map(context.selectedSessions.map((session) => [sessionIdentity(session), session]));
-  let targetSessions = context.targetSessions.slice();
-  const created = [];
+  const targetClassIdToken = toPublicId(context.targetClass.id);
+  const createIds = Array.isArray(created) ? created.slice() : [];
   const upsertedSessions = [];
   preview.sessionPlans.forEach((plan) => {
-    const sourceSession = sourceById.get(plan.sourceSessionId);
+    const sourceSession = sourceById.get(toPublicId(plan.sourceSessionId));
     if (!sourceSession) return;
-    const targetClassId = toPublicId(context.targetClass.id);
     const upsertDate = normalizeDateOnly(plan.date) || sessionDate(sourceSession);
     if (plan.action === 'create') {
-      const session = buildCreatedSession({
-        classId: context.targetClass.id,
-        sourceSession,
-        plan,
-        existingSessions: targetSessions,
-        teacher
-      });
-      targetSessions.push(session);
-      created.push(session.sessionId);
-      upsertedSessions.push({
-        classId: targetClassId,
-        sessionId: session.sessionId,
-        date: upsertDate
-      });
+      const sessionId = toPublicId(createIds.shift() || '');
+      if (sessionId) upsertedSessions.push({ classId: targetClassIdToken, sessionId, date: upsertDate });
       return;
     }
-    targetSessions = targetSessions.map((session) => {
-      if (!idsEqual(sessionIdentity(session), plan.targetSessionId)) return session;
-      return { ...session, roster: mergeRoster(session.roster, sourceSession.roster) };
-    });
     upsertedSessions.push({
-      classId: targetClassId,
+      classId: targetClassIdToken,
       sessionId: toPublicId(plan.targetSessionId),
       date: upsertDate
     });
   });
-  await dependencies.schoolDataService.saveClassSessions(
-    context.targetClass.id,
-    targetSessions,
-    reqUser,
-    accessContext
-  );
 
-  const orgId = toPublicId(context.sourceClass.orgId);
-  const scheduleMoveContext = {
-    prefilledSessionTransferPlan: {
-      sourceSessionIds: context.selectedSessions.map((session) => sessionIdentity(session)),
-      plans: [],
-      targetUnmarkSessionIds: resolveTargetUnmarkSessionIdsFromPlans(preview.sessionPlans, targetSessions),
-      createCount: created.length,
-      reuseCount: preview.sessionPlans.filter((plan) => plan.action === 'reuse').length
-    }
-  };
-  for (const row of preview.enrollments) {
-    const period = context.sourcePeriods.find((item) => idsEqual(item.id, row.periodId));
-    if (!period) continue;
-    const hooks = typeof buildEngineHooks === 'function'
-      ? buildEngineHooks(req, context.targetClass)
-      : {};
-    await applyEnrollmentRow({
-      row,
-      period,
-      targetClass: context.targetClass,
-      reqUser,
-      orgId,
-      engineHooks: hooks,
-      scheduleMoveContext,
-      accessContext
-    });
-  }
-
-  const removeIds = new Set(context.selectedSessions.map(sessionIdentity));
-  const remaining = context.sourceSessions.filter((session) => !removeIds.has(sessionIdentity(session)));
-  await dependencies.schoolDataService.saveClassSessions(
-    context.sourceClass.id,
-    remaining,
-    reqUser,
-    accessContext
-  );
   const sourceClassId = toPublicId(context.sourceClass.id);
   const removedSessions = context.selectedSessions.map((session) => ({
     classId: sourceClassId,
     sessionId: toPublicId(sessionIdentity(session)),
     date: sessionDate(session)
   })).filter((row) => row.sessionId && row.date);
+  const removeIds = new Set(context.selectedSessions.map(sessionIdentity));
 
   return {
     createdSessionIds: created,
@@ -1086,6 +1310,11 @@ module.exports = {
   buildMovePreviewHash,
   parseSelectedSessionIds,
   buildMovePreview,
+  buildScheduleMoveEnrollmentPayload,
+  buildScheduleMoveContext,
+  classAllowsEnrollmentProgram,
+  previewScheduleMoveEnrollments,
+  computeTargetSessionsAfterPlans,
   resolveEnrollmentMoveService,
   applyMoveSessions,
   __setDependenciesForTest,

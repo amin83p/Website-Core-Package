@@ -93,7 +93,8 @@
         return;
       }
       el.classList.remove('d-none', 'alert-warning', 'alert-info', 'alert-danger');
-      el.classList.add(kind === 'info' ? 'alert-info' : 'alert-warning');
+      const alertKind = kind === 'info' ? 'alert-info' : (kind === 'danger' ? 'alert-danger' : 'alert-warning');
+      el.classList.add(alertKind);
       el.innerHTML = list.map((row, index) => {
         const message = escapeHtml(typeof row === 'string' ? row : (row.message || ''));
         const sessions = Array.isArray(row?.sessions) ? row.sessions : [];
@@ -119,6 +120,22 @@
       const next = document.getElementById('btn_scheduleMoveNext');
       if (back) back.classList.toggle('d-none', step === 'class');
       if (next) next.textContent = step === 'enrollments' ? 'Move' : 'Next';
+      syncMoveButtonState(state.preview);
+    }
+
+    function syncMoveButtonState(preview) {
+      const next = document.getElementById('btn_scheduleMoveNext');
+      if (!next) return;
+      if (state.step !== 'enrollments') {
+        next.disabled = false;
+        return;
+      }
+      next.disabled = !preview || preview.canContinue !== true;
+    }
+
+    function enrollmentReviewBlockers(preview) {
+      const blockers = Array.isArray(preview?.blockers) ? preview.blockers : [];
+      return blockers.filter((row) => row?.periodId || row?.studentLabel);
     }
 
     function selectionContext() {
@@ -179,6 +196,17 @@
     }
 
     function renderEnrollmentStep(preview) {
+      const planSummary = document.getElementById('scheduleMoveSessionPlanSummary');
+      const summary = preview?.sessionPlanSummary || {};
+      const plans = Array.isArray(preview?.sessionPlans) ? preview.sessionPlans : [];
+      const reuseCount = Number(summary.reuseCount) || plans.filter((row) => row.action === 'reuse').length;
+      const createCount = Number(summary.createCount) || plans.filter((row) => row.action === 'create').length;
+      if (planSummary) {
+        planSummary.textContent = plans.length
+          ? `On the target class: ${reuseCount} session(s) reuse existing slots, ${createCount} new session(s) will be created.`
+          : '';
+      }
+      setAlert('scheduleMoveEnrollmentBlockers', enrollmentReviewBlockers(preview), 'danger');
       const tbody = document.getElementById('scheduleMoveEnrollmentTbody');
       const rows = Array.isArray(preview?.enrollments) ? preview.enrollments : [];
       if (tbody) {
@@ -189,12 +217,18 @@
               : 'Update onto target class';
             const dates = row.action === 'close_and_open'
               ? `Close ${row.closeDate || '—'} · Start ${row.newStartDate || '—'}`
-              : `Starts ${row.startDate || '—'}`;
-            return `<tr><td>${escapeHtml(row.studentLabel || row.studentId)}</td><td>${escapeHtml(action)}</td><td>${escapeHtml(dates)}</td></tr>`;
+              : `Starts ${row.startDate || row.newStartDate || '—'}`;
+            const status = row.canApply === false
+              ? `<span class="text-danger">Blocked</span>`
+              : '<span class="text-success">Ready</span>';
+            return `<tr><td>${escapeHtml(row.studentLabel || row.studentId)}</td><td>${escapeHtml(action)}</td><td>${escapeHtml(dates)}</td><td>${status}</td></tr>`;
           }).join('')
-          : '<tr><td colspan="3" class="text-muted">No open enrollments cover the selected sessions. The sessions will still be moved.</td></tr>';
+          : '<tr><td colspan="4" class="text-muted">No open enrollments cover the selected sessions. The sessions will still be moved.</td></tr>';
       }
-      setAlert('scheduleMoveApplyNotices', preview?.notices || [], 'info');
+      const infoNotices = (Array.isArray(preview?.notices) ? preview.notices : [])
+        .filter((row) => String(row?.code || '').toUpperCase() !== 'SESSION_TRANSFER_ALREADY_APPLIED');
+      setAlert('scheduleMoveApplyNotices', infoNotices, 'info');
+      syncMoveButtonState(preview);
     }
 
     function openClassPicker() {
@@ -263,13 +297,35 @@
           const preview = await refreshPreview();
           renderTimeStep(preview);
           if (preview?.blockers?.length) return;
+          if (preview?.canContinue !== true) {
+            await deps.uiAlert?.(
+              preview.blockers?.[0]?.message || 'Resolve the listed issues before continuing.',
+              'Move Sessions/Enrollments',
+              { icon: 'warning' }
+            );
+            return;
+          }
           renderEnrollmentStep(preview);
           showStep('enrollments');
           return;
         }
-        const preview = state.preview;
-        if (!preview?.previewHash) return;
         const next = document.getElementById('btn_scheduleMoveNext');
+        let preview;
+        try {
+          preview = await refreshPreview();
+          renderEnrollmentStep(preview);
+        } catch (error) {
+          await deps.uiAlert?.(error.message || 'Unable to refresh the move preview.', 'Move Sessions/Enrollments', { icon: 'warning' });
+          return;
+        }
+        if (!preview?.previewHash || preview.canContinue !== true) {
+          await deps.uiAlert?.(
+            preview?.blockers?.[0]?.message || 'Resolve the listed issues before moving.',
+            'Move Sessions/Enrollments',
+            { icon: 'warning' }
+          );
+          return;
+        }
         if (next) next.disabled = true;
         try {
           const applyRes = await postJson('/school/schedules/api/move-sessions/apply', {
@@ -336,6 +392,9 @@
       renderClassStep(null);
       setAlert('scheduleMoveTimeBlockers', [], 'warning');
       setAlert('scheduleMoveTimeNotices', [], 'info');
+      setAlert('scheduleMoveEnrollmentBlockers', [], 'danger');
+      const planSummary = document.getElementById('scheduleMoveSessionPlanSummary');
+      if (planSummary) planSummary.textContent = '';
       showStep('class');
       deps.showBootstrapModal?.(document.getElementById('scheduleMoveSessionsModal'));
     }

@@ -31,7 +31,10 @@
         </div>
 
         <div class="d-none" data-move-step="enrollments">
-          <p class="small text-muted">Enrollments that cover the selected sessions. An enrollment that started before the first selected session is closed on the original class and opened on the target class. An enrollment that starts on that first session is updated onto the target class.</p>
+          <p class="small text-muted">Review sessions and enrollments below. Nothing is changed until you choose Move.</p>
+          <div class="small mb-2" id="scheduleMoveSessionPlanSummary" aria-live="polite"></div>
+          <div class="alert alert-warning py-2 small d-none" id="scheduleMoveEnrollmentBlockers" role="alert"></div>
+          <p class="small text-muted mb-2">Enrollments that cover the selected sessions. An enrollment that started before the first selected session is closed on the original class and opened on the target class. An enrollment that starts on that first session is updated onto the target class.</p>
           <div class="table-responsive border rounded">
             <table class="table table-sm align-middle mb-0">
               <thead class="table-light">
@@ -39,6 +42,7 @@
                   <th>Student</th>
                   <th>Action</th>
                   <th>Dates</th>
+                  <th>Status</th>
                 </tr>
               </thead>
               <tbody id="scheduleMoveEnrollmentTbody"></tbody>

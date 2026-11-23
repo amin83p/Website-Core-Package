@@ -178,6 +178,111 @@ test('enrollment that already started is closed, and one that starts on the firs
   assert.equal(early.endDate, '');
 });
 
+test('buildMovePreview blocks when enrollment move preview cannot apply', async (t) => {
+  const sourceSessions = [
+    { sessionId: 'SES_1', date: '2026-06-01', startTime: '09:00', endTime: '10:00', roster: [] }
+  ];
+  const sourcePeriods = [period({ id: 'PER_EARLY', studentId: 'STU_EARLY', startDate: '2026-05-01' })];
+  moveService.__setDependenciesForTest({
+    schoolDataService: {
+      getDataById: async (collection, id) => {
+        if (collection === 'classes' && id === 'CLS_SOURCE') return sourceClass;
+        if (collection === 'classes' && id === 'CLS_TARGET') {
+          return { ...targetClass, allowedProgramTerms: [{ programId: 'PRG_OTHER' }] };
+        }
+        if (collection === 'students') return { id: 'STU_EARLY', displayName: 'Student Early' };
+        return null;
+      },
+      getClassSessions: async (id) => (id === 'CLS_SOURCE' ? sourceSessions : []),
+      getClassEnrollmentPeriodsByClassId: async (id) => (id === 'CLS_SOURCE' ? sourcePeriods : [])
+    },
+    enrollmentMoveService: {
+      previewMoveEnrollment: async () => ({
+        canApply: false,
+        blockers: [{ code: 'TARGET_ALIGNMENT', message: 'Program is not allowed on the target class.' }],
+        warnings: [],
+        previewHash: 'blocked'
+      }),
+      applyMoveEnrollment: async () => ({})
+    }
+  });
+  t.after(() => moveService.__resetDependenciesForTest());
+
+  const preview = await moveService.buildMovePreview({
+    classId: 'CLS_SOURCE',
+    targetClassId: 'CLS_TARGET',
+    startTime: '10:00',
+    sessionIds: ['SES_1'],
+    reqUser: { id: 'USER_1' }
+  });
+  assert.equal(preview.canContinue, false);
+  assert.match(preview.blockers[0]?.message || '', /Program is not allowed/i);
+});
+
+test('apply rolls back target sessions when an enrollment move fails', async (t) => {
+  const saved = [];
+  const sourceSessions = [
+  { sessionId: 'SES_1', date: '2026-06-01', startTime: '09:00', endTime: '10:00', roster: [] }
+  ];
+  const targetSessions = [];
+  const sourcePeriods = [period({ id: 'PER_EARLY', studentId: 'STU_EARLY', startDate: '2026-05-01' })];
+  let applyCalls = 0;
+  moveService.__setDependenciesForTest({
+    schoolDataService: {
+      getDataById: async (collection, id) => {
+        if (collection === 'classes' && id === 'CLS_SOURCE') return sourceClass;
+        if (collection === 'classes' && id === 'CLS_TARGET') return targetClass;
+        if (collection === 'students') return { id: 'STU_EARLY', displayName: 'Student Early' };
+        return null;
+      },
+      getClassSessions: async (id) => (id === 'CLS_SOURCE' ? sourceSessions : targetSessions),
+      getClassEnrollmentPeriodsByClassId: async (id) => (id === 'CLS_SOURCE' ? sourcePeriods : []),
+      saveClassSessions: async (id, sessions) => {
+        saved.push({ id, sessions: JSON.parse(JSON.stringify(sessions)) });
+      }
+    },
+    schoolRepositories: {
+      classEnrollmentPeriods: {
+        update: async () => ({})
+      }
+    },
+    enrollmentMoveService: {
+      previewMoveEnrollment: async () => ({ canApply: true, previewHash: 'move-hash', blockers: [] }),
+      applyMoveEnrollment: async () => {
+        applyCalls += 1;
+        throw new Error('Enrollment move failed.');
+      }
+    }
+  });
+  t.after(() => moveService.__resetDependenciesForTest());
+
+  const preview = await moveService.buildMovePreview({
+    classId: 'CLS_SOURCE',
+    targetClassId: 'CLS_TARGET',
+    startTime: '10:00',
+    sessionIds: ['SES_1'],
+    reqUser: { id: 'USER_1' }
+  });
+
+  await assert.rejects(
+    () => moveService.applyMoveSessions({
+      classId: 'CLS_SOURCE',
+      targetClassId: 'CLS_TARGET',
+      startTime: '10:00',
+      sessionIds: ['SES_1'],
+      previewHash: preview.previewHash,
+      reqUser: { id: 'USER_1' }
+    }),
+    /Enrollment move failed/
+  );
+  assert.equal(applyCalls, 1);
+  const targetSaves = saved.filter((row) => row.id === 'CLS_TARGET');
+  assert.ok(targetSaves.length >= 2, 'target sessions should be saved then rolled back');
+  assert.deepEqual(targetSaves[targetSaves.length - 1].sessions, []);
+  const sourceSave = saved.find((row) => row.id === 'CLS_SOURCE');
+  assert.equal(sourceSave, undefined, 'source sessions should not be removed after failed apply');
+});
+
 test('apply creates only missing sessions, keeps matches, moves enrollments, and removes source sessions', async (t) => {
   const saved = [];
   const updates = [];
@@ -299,10 +404,19 @@ test('resolveEnrollmentMoveService recovers from circular-require stub', () => {
 
 test('move sessions wizard is wired to the schedule rail', () => {
   const view = fs.readFileSync(path.join(__dirname, '../MVC/views/school/schedule/personScheduleAdmin.ejs'), 'utf8');
+  const adminScripts = fs.readFileSync(
+    path.join(__dirname, '../MVC/views/school/schedule/partials/personScheduleScriptsAdmin.ejs'),
+    'utf8'
+  );
+  const moveModal = fs.readFileSync(
+    path.join(__dirname, '../MVC/views/school/schedule/partials/scheduleMoveSessionsModal.ejs'),
+    'utf8'
+  );
   const routes = fs.readFileSync(path.join(__dirname, '../MVC/routes/scheduleRoutes.js'), 'utf8');
   const viewer = fs.readFileSync(path.join(__dirname, '../public/scripts/masterScheduleViewer.js'), 'utf8');
   assert.match(view, /scheduleMoveSessionsModal/);
-  assert.match(view, /masterScheduleMoveSessions\.js/);
+  assert.match(adminScripts, /masterScheduleMoveSessions\.js/);
+  assert.match(moveModal, /scheduleMoveEnrollmentBlockers/);
   assert.match(routes, /\/api\/move-sessions\/preview/);
   assert.match(routes, /\/api\/move-sessions\/apply/);
   assert.match(viewer, /move-enrollments/);
@@ -314,4 +428,6 @@ test('move sessions wizard is wired to the schedule rail', () => {
   assert.match(moveScript, /upsertedSessions/);
   assert.match(moveScript, /defaultStartTimeFromSessions/);
   assert.match(moveScript, /setMoveStartTimeInput\(defaultStartTimeFromSessions/);
+  assert.match(moveScript, /scheduleMoveEnrollmentBlockers/);
+  assert.match(moveScript, /refreshPreview/);
 });
