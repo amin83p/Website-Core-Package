@@ -91,6 +91,44 @@ test('buildStudentAttendanceExcelWorkbook creates one sheet per class', async ()
   assert.equal(workbook.getWorksheet(2).name, 'Beta Class');
 });
 
+test('buildStudentAttendanceExcelWorkbook includes minute summary on class matrix sheets', async () => {
+  const alphaPayload = sampleClassPayload('Alpha Class', '2026-09-08');
+  alphaPayload.sessions = [{
+    id: 's1',
+    date: '2026-09-08',
+    startTime: '09:00',
+    endTime: '12:00'
+  }];
+  alphaPayload.matrix[0].records = [{
+    sessionId: 's1',
+    date: '2026-09-08',
+    status: 'present',
+    scheduledMinutes: 180
+  }];
+  const { buffer } = await attendanceExcelExportService.buildStudentAttendanceExcelWorkbook([
+    { payload: alphaPayload, sheetName: 'Alpha Class' }
+  ], {
+    studentName: 'Ada Lovelace',
+    startDate: '2026-09-01',
+    endDate: '2026-09-30'
+  });
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  const sheet = workbook.getWorksheet(1);
+  const text = collectWorksheetText(sheet);
+  assert.match(text, /Present/);
+  assert.match(text, /Absent Excused/);
+  assert.match(text, /Left Early/);
+  assert.match(text, /180 min/);
+  assert.doesNotMatch(text, /Attendance notes/);
+  const presentRow = firstWorksheetRowMatching(sheet, /^Present$/);
+  assert.ok(presentRow);
+  assert.equal(
+    sheet.getCell(presentRow, 1).fill?.fgColor?.argb,
+    attendanceExcelExportService.STATUS_FILL_ARGB.present
+  );
+});
+
 function cellValueAsText(cell) {
   if (cell?.value == null || cell.value === '') return '';
   if (Array.isArray(cell.value?.richText)) {
@@ -564,6 +602,63 @@ test('formatOfficialSessionDateTimeHeading includes date and session times', () 
   assert.match(heading, /12:00/);
 });
 
+test('computeExportMinuteTotalsForOfficialClassRow scopes totals to one class row', () => {
+  const betaOnly = attendanceExcelExportService.computeExportMinuteTotalsForOfficialClassRow(
+    {
+      sessionDateSet: new Set(['2026-09-08']),
+      sessionsByDate: new Map([
+        ['2026-09-08', { date: '2026-09-08', startTime: '14:00', endTime: '16:00' }]
+      ]),
+      recordsByDate: new Map([
+        ['2026-09-08', { status: 'absent', absenceExcused: true }]
+      ])
+    },
+    ['2026-09-08', '2026-09-09']
+  );
+  assert.deepEqual(betaOnly, {
+    presentMinutes: 0,
+    absentMinutes: 0,
+    absentExcusedMinutes: 120,
+    lateMinutes: 0,
+    leftEarlyMinutes: 0
+  });
+});
+
+test('computeExportMinuteTotalsForOfficial aggregates present, absent excused, and late minutes', () => {
+  const totals = attendanceExcelExportService.computeExportMinuteTotalsForOfficial({
+    unionSessionDates: ['2026-09-08', '2026-09-09'],
+    classRows: [
+      {
+        sessionDateSet: new Set(['2026-09-08', '2026-09-09']),
+        sessionsByDate: new Map([
+          ['2026-09-08', { date: '2026-09-08', startTime: '09:00', endTime: '12:00' }],
+          ['2026-09-09', { date: '2026-09-09', startTime: '09:00', endTime: '12:00' }]
+        ]),
+        recordsByDate: new Map([
+          ['2026-09-08', { status: 'present' }],
+          ['2026-09-09', { status: 'late', lateMinutes: 12, lateExcused: true }]
+        ])
+      },
+      {
+        sessionDateSet: new Set(['2026-09-08']),
+        sessionsByDate: new Map([
+          ['2026-09-08', { date: '2026-09-08', startTime: '14:00', endTime: '16:00' }]
+        ]),
+        recordsByDate: new Map([
+          ['2026-09-08', { status: 'absent', absenceExcused: true }]
+        ])
+      }
+    ]
+  });
+  assert.deepEqual(totals, {
+    presentMinutes: 348,
+    absentMinutes: 0,
+    absentExcusedMinutes: 120,
+    lateMinutes: 12,
+    leftEarlyMinutes: 0
+  });
+});
+
 test('buildOfficialStudentAttendanceExcelWorkbook uses class rows and union day columns', async () => {
   const exportModel = {
     student: { name: 'Ada Lovelace', email: 'ada@example.com' },
@@ -632,6 +727,27 @@ test('buildOfficialStudentAttendanceExcelWorkbook uses class rows and union day 
   assert.match(text, /Attendance Report - September 01, 2026 - September 30, 2026/);
   assert.match(text, /Alpha Class/);
   assert.match(text, /Beta Class/);
+  assert.match(text, /Attendance minutes \(all classes\)/);
+  assert.match(text, /Attendance minutes — Alpha Class/);
+  assert.match(text, /Attendance minutes — Beta Class/);
+  assert.match(text, /Present/);
+  assert.match(text, /Absent Excused/);
+  assert.match(text, /Left Early/);
+  assert.match(text, /348 min/);
+  assert.match(text, /120 min/);
+  assert.match(text, /12 min/);
+  const attendanceNotesRow = firstWorksheetRowMatching(sheet, /^Attendance notes$/);
+  const presentSummaryRow = firstWorksheetRowMatching(sheet, /^Present$/);
+  const absentExcusedSummaryRow = firstWorksheetRowMatching(sheet, /^Absent Excused$/);
+  assert.ok(attendanceNotesRow);
+  assert.ok(presentSummaryRow);
+  assert.ok(absentExcusedSummaryRow);
+  assert.ok(presentSummaryRow < attendanceNotesRow);
+  assert.ok(absentExcusedSummaryRow < attendanceNotesRow);
+  assert.equal(
+    sheet.getCell(presentSummaryRow, 1).fill?.fgColor?.argb,
+    attendanceExcelExportService.STATUS_FILL_ARGB.present
+  );
   assert.match(text, /Attendance notes/);
   assert.match(text, /medical appointment/);
   assert.match(text, /family matter/);

@@ -580,7 +580,11 @@ async function collectStudentClassMatrixPayloadsForExport(req, options = {}) {
     const entry = {
       classId,
       className,
-      payload: filteredPayload
+      payload: {
+        ...filteredPayload,
+        classDataForExport: classRow,
+        orgPolicyCatalog
+      }
     };
     studentAttendanceReportClassOrderService.attachScheduleSortFields(entry, sessions, {
       startDate,
@@ -595,6 +599,7 @@ async function collectStudentClassMatrixPayloadsForExport(req, options = {}) {
     student,
     startDate,
     endDate,
+    orgPolicyCatalog,
     entries
   };
 }
@@ -835,6 +840,7 @@ async function buildOfficialStudentAttendanceExportModel(req, options = {}) {
   const claimStudent = studentProfile || collected.student || null;
 
   const unionSessionDates = buildUnionSessionDatesFromExportEntries(entries);
+  const orgPolicyCatalog = collected.orgPolicyCatalog || entries[0]?.payload?.orgPolicyCatalog || {};
   const headerClaimEntriesByKey = new Map();
   const classRows = [];
 
@@ -866,6 +872,8 @@ async function buildOfficialStudentAttendanceExportModel(req, options = {}) {
       sessionDateSet: buildClassSessionDateSet(payload),
       sessionsByDate: buildSessionsByDateFromMatrixPayload(payload),
       recordsByDate: buildRecordsByDateFromMatrixPayload(payload),
+      classDataForExport: payload.classDataForExport || {},
+      orgPolicyCatalog: payload.orgPolicyCatalog || orgPolicyCatalog,
       studentRow
     });
   }
@@ -882,6 +890,7 @@ async function buildOfficialStudentAttendanceExportModel(req, options = {}) {
     unionSessionDates,
     claimNumbersDisplay: formatClaimNumbersDisplay(Array.from(headerClaimEntriesByKey.values())),
     claimHeaderDisplay: formatOfficialClaimHeaderLine(Array.from(headerClaimEntriesByKey.values())),
+    orgPolicyCatalog,
     classRows
   };
 }

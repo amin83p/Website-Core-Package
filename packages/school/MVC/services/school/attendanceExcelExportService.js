@@ -12,6 +12,7 @@ const {
   normalizeAttendanceTimingExcuseFlag,
   isAbsenceExcused,
   isAbsentLikeStatus,
+  isNotApplicableStatus,
   normalizeLegacyAbsenceExcusedRecord
 } = attendanceMatrixMetricsService;
 
@@ -1138,12 +1139,18 @@ function writeAttendanceMatrixBlockOnce(sheet, payload = {}, options = {}) {
     }
   }
 
-  const endRow = bodyRow - 1;
+  const tableEndRow = bodyRow - 1;
+  const minuteTotals = computeExportMinuteTotalsForMatrixPayload(payload);
+  const endRow = writeAttendanceMinuteSummaryTable(sheet, minuteTotals, {
+    labelCol: funderCol,
+    labelMergeEndCol: numCol,
+    valueCol: lastNameCol
+  }, tableEndRow);
 
   if (Number.isFinite(attendanceRowHeight) && attendanceRowHeight > 0) {
     sheet.getRow(headerRowIndex).height = attendanceRowHeight;
     sheet.getRow(weekdayRowIndex).height = attendanceRowHeight;
-    for (let row = weekdayRowIndex + 1; row <= endRow; row += 1) {
+    for (let row = weekdayRowIndex + 1; row <= tableEndRow; row += 1) {
       sheet.getRow(row).height = attendanceRowHeight;
     }
   }
@@ -1490,13 +1497,213 @@ function styleOfficialAppendixMergedRow(sheet, row, startCol, endCol, styleOptio
   }
 }
 
+const EXPORT_MINUTE_SUMMARY_ROWS = Object.freeze([
+  Object.freeze({ label: 'Present', totalKey: 'presentMinutes', legend: { status: ATTENDANCE_STATUS.PRESENT } }),
+  Object.freeze({ label: 'Absent', totalKey: 'absentMinutes', legend: { status: ATTENDANCE_STATUS.ABSENT } }),
+  Object.freeze({ label: 'Absent Excused', totalKey: 'absentExcusedMinutes', legend: { status: ATTENDANCE_STATUS.EXCUSED } }),
+  Object.freeze({ label: 'Late', totalKey: 'lateMinutes', legend: { status: ATTENDANCE_STATUS.LATE } }),
+  Object.freeze({ label: 'Left Early', totalKey: 'leftEarlyMinutes', legend: { ...TIMING_LEGEND_ENTRIES[0] } })
+]);
+
+function roundExportMinuteTotal(value) {
+  return Math.round((Number(value) || 0) * 10) / 10;
+}
+
+function createEmptyExportMinuteTotals() {
+  return {
+    presentMinutes: 0,
+    absentMinutes: 0,
+    absentExcusedMinutes: 0,
+    lateMinutes: 0,
+    leftEarlyMinutes: 0
+  };
+}
+
+function resolveScheduledMinutesForExportRecord(record = {}, session = {}, classData = {}, orgPolicyCatalog = {}) {
+  const policy = attendanceMatrixMetricsService.resolvePolicyForScheduledMinutes(
+    classData,
+    orgPolicyCatalog,
+    record?.scheduledMinutes
+  );
+  const recSched = Number(record?.scheduledMinutes);
+  if (Number.isFinite(recSched) && recSched > 0) return recSched;
+  return attendanceMatrixMetricsService.scheduledMinutesFromSession(session, policy.scheduledMinutes);
+}
+
+function recordIsInScopeForMinuteTotals(record = {}) {
+  const attendance = resolveExportRecordAttendanceStatus(record);
+  if (isNotApplicableStatus(attendance)) return false;
+  return true;
+}
+
+function accumulateExportMinuteTotalsFromRecord(totals, record = {}, session = {}, classData = {}, orgPolicyCatalog = {}) {
+  if (!recordIsInScopeForMinuteTotals(record)) return totals;
+
+  const policy = attendanceMatrixMetricsService.resolvePolicyForScheduledMinutes(
+    classData,
+    orgPolicyCatalog,
+    record?.scheduledMinutes
+  );
+  const sched = resolveScheduledMinutesForExportRecord(record, session, classData, orgPolicyCatalog);
+  const timing = attendanceMatrixMetricsService.normalizeAttendanceTimingFields(record);
+  totals.lateMinutes += timing.lateMinutes;
+  totals.leftEarlyMinutes += timing.earlyLeaveMinutes;
+
+  if (isOfficialExcusedAbsence(record)) {
+    totals.absentExcusedMinutes += sched;
+    return totals;
+  }
+  if (isOfficialUnexcusedAbsence(record)) {
+    totals.absentMinutes += sched;
+    return totals;
+  }
+
+  const attendance = resolveExportRecordAttendanceStatus(record);
+  const ratio = attendanceMatrixMetricsService.computePresenceRatio(
+    { ...record, status: attendance || record.status },
+    policy
+  );
+  totals.presentMinutes += sched * Math.max(0, Math.min(1, ratio));
+  return totals;
+}
+
+function finalizeExportMinuteTotals(totals = {}) {
+  return {
+    presentMinutes: roundExportMinuteTotal(totals.presentMinutes),
+    absentMinutes: roundExportMinuteTotal(totals.absentMinutes),
+    absentExcusedMinutes: roundExportMinuteTotal(totals.absentExcusedMinutes),
+    lateMinutes: roundExportMinuteTotal(totals.lateMinutes),
+    leftEarlyMinutes: roundExportMinuteTotal(totals.leftEarlyMinutes)
+  };
+}
+
+function computeExportMinuteTotalsForOfficialClassRow(classRow = {}, unionSessionDates = []) {
+  const totals = createEmptyExportMinuteTotals();
+  const dates = Array.isArray(unionSessionDates) ? unionSessionDates : [];
+  const sessionDateSet = classRow?.sessionDateSet instanceof Set ? classRow.sessionDateSet : new Set();
+  const recordsByDate = classRow?.recordsByDate instanceof Map ? classRow.recordsByDate : new Map();
+  const sessionsByDate = classRow?.sessionsByDate instanceof Map ? classRow.sessionsByDate : new Map();
+  const classData = classRow?.classDataForExport && typeof classRow.classDataForExport === 'object'
+    ? classRow.classDataForExport
+    : {};
+  const orgPolicyCatalog = classRow?.orgPolicyCatalog || {};
+  dates.forEach((date) => {
+    if (!sessionDateSet.has(date)) return;
+    const record = recordsByDate.get(date) || {};
+    const session = sessionsByDate.get(date) || { date };
+    accumulateExportMinuteTotalsFromRecord(totals, record, session, classData, orgPolicyCatalog);
+  });
+  return finalizeExportMinuteTotals(totals);
+}
+
+function computeExportMinuteTotalsForOfficial({ classRows = [], unionSessionDates = [] } = {}) {
+  const totals = createEmptyExportMinuteTotals();
+  const dates = Array.isArray(unionSessionDates) ? unionSessionDates : [];
+  (Array.isArray(classRows) ? classRows : []).forEach((classRow) => {
+    const classTotals = computeExportMinuteTotalsForOfficialClassRow(classRow, dates);
+    totals.presentMinutes += classTotals.presentMinutes;
+    totals.absentMinutes += classTotals.absentMinutes;
+    totals.absentExcusedMinutes += classTotals.absentExcusedMinutes;
+    totals.lateMinutes += classTotals.lateMinutes;
+    totals.leftEarlyMinutes += classTotals.leftEarlyMinutes;
+  });
+  return finalizeExportMinuteTotals(totals);
+}
+
+function computeExportMinuteTotalsForMatrixPayload(payload = {}) {
+  const totals = createEmptyExportMinuteTotals();
+  const sessions = Array.isArray(payload.sessions) ? payload.sessions : [];
+  const matrix = Array.isArray(payload.matrix) ? payload.matrix : [];
+  const studentRow = matrix[0] || {};
+  const records = Array.isArray(studentRow._rollupRecords) && studentRow._rollupRecords.length
+    ? studentRow._rollupRecords
+    : (Array.isArray(studentRow.records) ? studentRow.records : []);
+  const recordBySessionId = new Map(
+    records.map((record) => [String(record?.sessionId || '').trim(), record])
+  );
+  const classData = payload.classDataForExport && typeof payload.classDataForExport === 'object'
+    ? payload.classDataForExport
+    : {};
+  const orgPolicyCatalog = payload.orgPolicyCatalog || {};
+  sessions.forEach((session, sessionIdx) => {
+    const record = recordBySessionId.get(String(session?.id || session?.sessionId || '').trim())
+      || records[sessionIdx]
+      || {};
+    accumulateExportMinuteTotalsFromRecord(totals, record, session, classData, orgPolicyCatalog);
+  });
+  return finalizeExportMinuteTotals(totals);
+}
+
+function formatExportMinuteSummaryValue(minutes) {
+  const value = roundExportMinuteTotal(minutes);
+  const text = Number.isInteger(value) ? String(value) : String(value);
+  return `${text} min`;
+}
+
+function applyMinuteSummaryValueCellStyle(cell) {
+  cell.font = { size: 11, color: { argb: DARK_TEXT_ARGB }, name: 'Calibri' };
+  applyTableCellBorder(cell);
+  applyVerticalMiddle(cell, { horizontal: 'right' });
+}
+
+function writeAttendanceMinuteSummaryTable(sheet, totals = {}, layout = {}, startAfterRow = 1, options = {}) {
+  const labelCol = Math.max(1, Number(layout.labelCol) || 1);
+  const labelMergeEndCol = Math.max(labelCol, Number(layout.labelMergeEndCol) || labelCol + 1);
+  const valueCol = Math.max(labelMergeEndCol + 1, Number(layout.valueCol) || labelMergeEndCol + 1);
+  const valueMergeEndCol = Number(layout.valueMergeEndCol);
+  const titleMergeEndCol = Math.max(
+    valueCol,
+    labelMergeEndCol,
+    Number(layout.titleMergeEndCol) || valueCol
+  );
+  const skipLeadingGap = options.skipLeadingGap === true;
+  let row = startAfterRow + (skipLeadingGap ? 0 : STUDENT_EXCEL_BLOCK_GAP_ROWS);
+  const title = clean(layout.title);
+  if (title) {
+    const titleColor = clean(layout.titleColorArgb) || OFFICIAL_APPENDIX_SECTION_COLOR_ARGB;
+    styleOfficialAppendixMergedRow(sheet, row, labelCol, titleMergeEndCol, {
+      bold: true,
+      wrapText: false,
+      colorArgb: titleColor,
+      size: 12
+    });
+    sheet.getCell(row, labelCol).value = title;
+    row += 1;
+  }
+  EXPORT_MINUTE_SUMMARY_ROWS.forEach((entry) => {
+    const labelCell = sheet.getCell(row, labelCol);
+    labelCell.value = entry.label;
+    applyLegendCellStyle(labelCell, entry.legend);
+    applyVerticalMiddle(labelCell);
+    if (labelMergeEndCol > labelCol) {
+      mergeHeaderBlock(sheet, row, labelCol, labelMergeEndCol);
+      for (let col = labelCol + 1; col <= labelMergeEndCol; col += 1) {
+        applyLegendCellStyle(sheet.getCell(row, col), entry.legend);
+        applyVerticalMiddle(sheet.getCell(row, col));
+      }
+    }
+    const valueCell = sheet.getCell(row, valueCol);
+    valueCell.value = formatExportMinuteSummaryValue(totals[entry.totalKey]);
+    applyMinuteSummaryValueCellStyle(valueCell);
+    if (Number.isFinite(valueMergeEndCol) && valueMergeEndCol > valueCol) {
+      mergeHeaderBlock(sheet, row, valueCol, valueMergeEndCol);
+      for (let col = valueCol + 1; col <= valueMergeEndCol; col += 1) {
+        applyMinuteSummaryValueCellStyle(sheet.getCell(row, col));
+      }
+    }
+    row += 1;
+  });
+  return row - 1;
+}
+
 function writeOfficialAttendanceNotesAppendix(
   sheet,
   {
     classRows = [],
     unionSessionDates = [],
     numCol,
-    mergeEndCol
+    mergeEndCol,
+    minuteSummaryLayout = null
   } = {},
   startRow = 1
 ) {
@@ -1543,6 +1750,23 @@ function writeOfficialAttendanceNotesAppendix(
       sessionsByDate,
       noteDates
     );
+
+    if (minuteSummaryLayout && typeof minuteSummaryLayout === 'object') {
+      const classTotals = computeExportMinuteTotalsForOfficialClassRow(classRow, dates);
+      const classTitle = `Attendance minutes — ${formatOfficialExportClassName(classRow?.className, classRow?.teacherName)}`;
+      row = writeAttendanceMinuteSummaryTable(
+        sheet,
+        classTotals,
+        {
+          ...minuteSummaryLayout,
+          title: classTitle,
+          titleColorArgb: OFFICIAL_APPENDIX_CLASS_COLOR_ARGB,
+          titleMergeEndCol: mergeEndCol
+        },
+        row,
+        { skipLeadingGap: true }
+      ) + 1;
+    }
 
     styleOfficialAppendixMergedRow(sheet, row, numCol, mergeEndCol, {
       bold: true,
@@ -1936,13 +2160,24 @@ function writeOfficialStudentAttendanceBlockOnce(sheet, exportModel = {}, option
     }
   }
 
-  let endRow = bodyRow - 1;
-  endRow = writeOfficialAttendanceNotesAppendix(sheet, {
+  const officialMinuteSummaryLayout = {
+    labelCol: appendixStartCol,
+    labelMergeEndCol: appendixStartCol + 1,
+    valueCol: classEndCol,
+    titleMergeEndCol: mergeEndCol
+  };
+  const minuteTotals = computeExportMinuteTotalsForOfficial({ classRows, unionSessionDates });
+  const summaryEndRow = writeAttendanceMinuteSummaryTable(sheet, minuteTotals, {
+    ...officialMinuteSummaryLayout,
+    title: 'Attendance minutes (all classes)'
+  }, tableEndRow);
+  let endRow = writeOfficialAttendanceNotesAppendix(sheet, {
     classRows,
     unionSessionDates,
     numCol: appendixStartCol,
-    mergeEndCol
-  }, bodyRow);
+    mergeEndCol,
+    minuteSummaryLayout: officialMinuteSummaryLayout
+  }, summaryEndRow);
 
   return {
     legend,
@@ -2216,5 +2451,11 @@ module.exports = {
   writeOfficialStudentAttendanceBlock,
   buildAttendanceExcelWorkbook,
   buildStudentAttendanceExcelWorkbook,
-  buildOfficialStudentAttendanceExcelWorkbook
+  buildOfficialStudentAttendanceExcelWorkbook,
+  computeExportMinuteTotalsForOfficial,
+  computeExportMinuteTotalsForOfficialClassRow,
+  computeExportMinuteTotalsForMatrixPayload,
+  writeAttendanceMinuteSummaryTable,
+  EXPORT_MINUTE_SUMMARY_ROWS,
+  roundExportMinuteTotal
 };
