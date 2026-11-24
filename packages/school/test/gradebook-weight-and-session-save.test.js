@@ -169,6 +169,53 @@ test('normalizeSessionGradebooksFromRequest clears scoreComments for absent stud
   assert.equal(normalized[0].scoreComments.p2, 'Keep me');
 });
 
+test('normalizeSessionGradebooksFromRequest persists period log scores for person ids not on session roster', () => {
+  const normalized = sessionGradebookService.normalizeSessionGradebooksFromRequest([
+    {
+      id: 'gb1',
+      name: 'Period summary',
+      weight: 10,
+      totalScore: 10,
+      includeInGradeCalculation: true,
+      periodPerformanceLog: true,
+      scores: { 'REPORT-ONLY-PID': 8, p1: 9 }
+    }
+  ], {
+    personIds: ['p1'],
+    attendanceByPerson: new Map([['p1', 'present']]),
+    existingGradebookById: new Map(),
+    sessionSkillPolicy: { selectableIds: [], catalog: [] },
+    mergeHistoricalGradebookSkills: (_incoming, _existing, _ids) => []
+  });
+
+  assert.equal(normalized[0].scores['REPORT-ONLY-PID'], 8);
+  assert.equal(normalized[0].scores.p1, 9);
+});
+
+test('normalizeSessionGradebooksFromRequest persists periodLogExcludedPersonIds for period log activities', () => {
+  const normalized = sessionGradebookService.normalizeSessionGradebooksFromRequest([
+    {
+      id: 'gb1',
+      name: 'Period summary',
+      weight: 10,
+      totalScore: 10,
+      includeInGradeCalculation: true,
+      periodPerformanceLog: true,
+      periodLogExcludedPersonIds: ['p2', ''],
+      scores: { p1: 7 }
+    }
+  ], {
+    personIds: ['p1', 'p2'],
+    attendanceByPerson: new Map([['p1', 'present'], ['p2', 'present']]),
+    existingGradebookById: new Map(),
+    sessionSkillPolicy: { selectableIds: [], catalog: [] },
+    mergeHistoricalGradebookSkills: (_incoming, _existing, _ids) => []
+  });
+
+  assert.deepEqual(normalized[0].periodLogExcludedPersonIds, ['p2']);
+  assert.equal(normalized[0].scores.p1, 7);
+});
+
 test('normalizeSessionGradebooksFromRequest keeps scores and comments for absent students when periodPerformanceLog', () => {
   const normalized = sessionGradebookService.normalizeSessionGradebooksFromRequest([
     {
@@ -230,4 +277,7 @@ test('sessionManager supports period performance log activity modal and persiste
   assert.match(sessionManagerSource, /gbModalPeriodPerformanceLog/);
   assert.match(sessionManagerSource, /periodPerformanceLog/);
   assert.match(sessionManagerSource, /gbIsPersonGradeBlockedForActivity/);
+  assert.match(sessionManagerSource, /gbPeriodLogEligibleRoster/);
+  assert.match(sessionManagerSource, /periodLogExcludedPersonIds/);
+  assert.match(sessionManagerSource, /gb-period-log-exclude/);
 });

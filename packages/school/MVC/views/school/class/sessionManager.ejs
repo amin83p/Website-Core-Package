@@ -4243,7 +4243,7 @@
                     <label class="form-check-label" for="gbModalPeriodPerformanceLog">Log period performance (not a real activity)</label>
                 </div>
                 <div class="alert alert-info border small mb-0 mt-2 d-none" id="gbModalPeriodPerformanceLogHelp" role="note">
-                    This activity is for logging student performance over a period, not for a real in-class activity. Use it to save scores, points, or grades for reports—especially when you have not had scored activities for some skills in the report period and those inputs would otherwise be zero or N/A. You can record performance as you see it for that period. This activity cannot be used for make-up.
+                    This activity is for logging student performance over a period, not for a real in-class activity. It lists every student who has a report instance for this session (matched to attendance names when possible). Remove anyone who should not receive an overall grade. You can record performance as you see it for that period. This activity cannot be used for make-up.
                 </div>
             </div>
             <div class="modal-footer bg-light">
@@ -7893,6 +7893,7 @@ document.addEventListener('DOMContentLoaded', () => {
             applySessionGradebookSkillCoverageSummary(result);
             renderSessionReportInstances();
             renderSessionStatusButtons();
+            if (typeof gbRenderList === 'function') gbRenderList();
         } finally {
             if (btn) btn.disabled = false;
             if (typeof window.hideLoading === 'function') window.hideLoading({ force: true });
@@ -11084,6 +11085,193 @@ document.addEventListener('DOMContentLoaded', () => {
         return gbIsPersonGradeBlocked(personId);
     }
 
+    function gbNormalizePersonId(value) {
+        return String(value || '').trim();
+    }
+
+    function gbResolveReportRowPersonId(row) {
+        if (!row || typeof row !== 'object') return '';
+        const fromDto = gbNormalizePersonId(row.personId);
+        if (fromDto) return fromDto;
+        const studentId = gbNormalizePersonId(row.studentId);
+        if (!studentId) return '';
+        if (gradebookRoster.some(({ personId }) => gbNormalizePersonId(personId) === studentId)) {
+            return studentId;
+        }
+        const lower = studentId.toLowerCase();
+        const rosterMatch = gradebookRoster.find(({ personId }) => (
+            gbNormalizePersonId(personId).toLowerCase() === lower
+        ));
+        if (rosterMatch) return gbNormalizePersonId(rosterMatch.personId);
+        return studentId;
+    }
+
+    function gbReportRowTargetsStudent(row) {
+        if (!row || typeof row !== 'object') return false;
+        const scope = String(row.scope || '').trim().toLowerCase();
+        if (scope === 'each_student' || scope === 'selected_students') return true;
+        if (scope === 'class') return false;
+        const pid = gbResolveReportRowPersonId(row);
+        const studentName = String(row.studentName || '').trim().toLowerCase();
+        return Boolean(pid) && studentName && studentName !== 'whole class';
+    }
+
+    function gbCollectReportInstancePersonIds() {
+        const ids = new Set();
+        (Array.isArray(sessionReportInstancesState) ? sessionReportInstancesState : []).forEach((row) => {
+            if (!gbReportRowTargetsStudent(row)) return;
+            const pid = gbResolveReportRowPersonId(row);
+            if (pid) ids.add(pid);
+        });
+        return ids;
+    }
+
+    function gbSessionHasStudentReportInstances() {
+        if (gbCollectReportInstancePersonIds().size > 0) return true;
+        return (Array.isArray(sessionReportInstancesState) ? sessionReportInstancesState : [])
+            .some((row) => gbReportRowTargetsStudent(row));
+    }
+
+    function gbFindAttendanceRosterRowForReport(reportRow) {
+        if (!reportRow) return null;
+        const reportPid = gbNormalizePersonId(reportRow.personId) || gbResolveReportRowPersonId(reportRow);
+        if (reportPid) {
+            const lower = reportPid.toLowerCase();
+            const byId = gradebookRoster.find((row) => {
+                const pid = gbNormalizePersonId(row.personId);
+                return pid === reportPid || pid.toLowerCase() === lower;
+            });
+            if (byId) return byId;
+        }
+        const reportName = String(reportRow.studentName || '').trim().toLowerCase();
+        if (!reportName || reportName === 'whole class') return null;
+        return gradebookRoster.find((row) => String(row.name || '').trim().toLowerCase() === reportName) || null;
+    }
+
+    function gbPersonHasSessionReportInstance(personId) {
+        const pid = gbNormalizePersonId(personId);
+        if (!pid) return false;
+        return (Array.isArray(sessionReportInstancesState) ? sessionReportInstancesState : []).some((reportRow) => {
+            if (!gbReportRowTargetsStudent(reportRow)) return false;
+            const rosterRow = gbFindAttendanceRosterRowForReport(reportRow);
+            return rosterRow && gbNormalizePersonId(rosterRow.personId) === pid;
+        });
+    }
+
+    function gbPeriodLogStudentRowFromReport(reportRow) {
+        const attendanceRow = gbFindAttendanceRosterRowForReport(reportRow);
+        if (attendanceRow) {
+            return {
+                personId: gbNormalizePersonId(attendanceRow.personId),
+                name: String(attendanceRow.name || 'Student').trim(),
+                periodLogOnAttendance: true
+            };
+        }
+        const personId = gbNormalizePersonId(reportRow.personId)
+            || gbResolveReportRowPersonId(reportRow)
+            || gbNormalizePersonId(reportRow.studentId);
+        const name = String(reportRow.studentName || personId || 'Student').trim();
+        if (!personId) return null;
+        return { personId, name, periodLogOnAttendance: false };
+    }
+
+    /** Period log rows: one row per student-targeted report instance for this session (attendance match when possible). */
+    function gbPeriodLogEligibleRoster() {
+        const seen = new Set();
+        const out = [];
+        (Array.isArray(sessionReportInstancesState) ? sessionReportInstancesState : []).forEach((reportRow) => {
+            if (!gbReportRowTargetsStudent(reportRow)) return;
+            const row = gbPeriodLogStudentRowFromReport(reportRow);
+            if (!row) return;
+            const pid = gbNormalizePersonId(row.personId);
+            if (!pid || seen.has(pid)) return;
+            seen.add(pid);
+            out.push(row);
+        });
+        return out;
+    }
+
+    function gbPeriodLogReportRowsMissingFromAttendance() {
+        return gbPeriodLogEligibleRoster().filter((row) => row.periodLogOnAttendance === false).length;
+    }
+
+    function gbPeriodLogActivityHasEnteredScore(gb) {
+        if (!gb?.scores || typeof gb.scores !== 'object') return false;
+        return Object.values(gb.scores).some((v) => v !== null && v !== undefined && String(v).trim() !== '');
+    }
+
+    function gbPeriodLogRosterFromExistingScores(gb) {
+        if (!gb || !gb.scores || typeof gb.scores !== 'object') return [];
+        const excluded = gbGetPeriodLogExcludedSet(gb);
+        const eligibleById = new Map(
+            gbPeriodLogEligibleRoster().map((row) => [gbNormalizePersonId(row.personId), row])
+        );
+        return Object.keys(gb.scores)
+            .map((key) => {
+                const pid = gbNormalizePersonId(key);
+                if (!pid || excluded.has(pid)) return null;
+                const raw = gb.scores[key];
+                if (raw === null || raw === undefined || String(raw).trim() === '') return null;
+                const meta = eligibleById.get(pid);
+                if (meta) return meta;
+                const rosterRow = gradebookRoster.find((row) => gbNormalizePersonId(row.personId) === pid);
+                if (rosterRow) {
+                    return {
+                        personId: pid,
+                        name: String(rosterRow.name || 'Student').trim(),
+                        periodLogOnAttendance: true
+                    };
+                }
+                return { personId: pid, name: pid, periodLogOnAttendance: false };
+            })
+            .filter(Boolean);
+    }
+
+    function gbGetPeriodLogExcludedSet(gb) {
+        return new Set(
+            (Array.isArray(gb?.periodLogExcludedPersonIds) ? gb.periodLogExcludedPersonIds : [])
+                .map(gbNormalizePersonId)
+                .filter(Boolean)
+        );
+    }
+
+    function gbRosterRowsForActivity(gb) {
+        if (gb && gb.periodPerformanceLog) {
+            const excluded = gbGetPeriodLogExcludedSet(gb);
+            let rows = gbPeriodLogEligibleRoster().filter(({ personId }) => !excluded.has(gbNormalizePersonId(personId)));
+            if (!rows.length && gbPeriodLogActivityHasEnteredScore(gb)) {
+                rows = gbPeriodLogRosterFromExistingScores(gb);
+            }
+            return rows;
+        }
+        return gradebookRoster;
+    }
+
+    function gbPrunePeriodLogScores(gb) {
+        if (!gb || !gb.periodPerformanceLog) return;
+        const allowed = new Set(gbRosterRowsForActivity(gb).map((row) => gbNormalizePersonId(row.personId)));
+        Object.keys(gb.scores || {}).forEach((pid) => {
+            if (allowed.has(gbNormalizePersonId(pid))) return;
+            gb.scores[pid] = null;
+            if (gb.scoreComments && typeof gb.scoreComments === 'object') delete gb.scoreComments[pid];
+        });
+    }
+
+    function gbExcludePersonFromPeriodLog(gb, personId) {
+        if (!gb || !gb.periodPerformanceLog || gbReadOnly) return;
+        const pid = gbNormalizePersonId(personId);
+        if (!pid) return;
+        if (!Array.isArray(gb.periodLogExcludedPersonIds)) gb.periodLogExcludedPersonIds = [];
+        if (!gb.periodLogExcludedPersonIds.some((row) => gbNormalizePersonId(row) === pid)) {
+            gb.periodLogExcludedPersonIds.push(pid);
+        }
+        gb.scores[pid] = null;
+        if (gb.scoreComments && typeof gb.scoreComments === 'object') delete gb.scoreComments[pid];
+        gbPrunePeriodLogScores(gb);
+        gbRenderList();
+        markSessionAutosaveGradebookDirty();
+    }
+
     function gbUpdatePeriodPerformanceLogHelpVisibility() {
         const cb = document.getElementById('gbModalPeriodPerformanceLog');
         const help = document.getElementById('gbModalPeriodPerformanceLogHelp');
@@ -11351,6 +11539,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 activityContent: String(gb.activityContent || ''),
                 includeInGradeCalculation: gb.includeInGradeCalculation !== false,
                 periodPerformanceLog: Boolean(gb.periodPerformanceLog),
+                periodLogExcludedPersonIds: Array.isArray(gb.periodLogExcludedPersonIds)
+                    ? gb.periodLogExcludedPersonIds.map(gbNormalizePersonId).filter(Boolean)
+                    : [],
                 scores,
                 scoreComments,
                 attachments,
@@ -11498,7 +11689,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function gbSyncScoresFromInputs() {
         gradebooksState.forEach((gb) => {
             const total = Number(gb.totalScore);
-            gradebookRoster.forEach(({ personId }) => {
+            const rosterRows = gbRosterRowsForActivity(gb);
+            rosterRows.forEach(({ personId }) => {
                 const pid = String(personId);
                 const makeupRole = gb.makeupRoles && gb.makeupRoles[pid] ? String(gb.makeupRoles[pid]).trim() : '';
                 if (makeupRole === 'done') return;
@@ -11530,6 +11722,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (wtCell) wtCell.textContent = gbFormatWeightContribution(n, total, gbExplicitWeight(gb));
                 markSessionAutosaveGradebookDirty();
             });
+            if (gb.periodPerformanceLog) gbPrunePeriodLogScores(gb);
         });
     }
 
@@ -11584,15 +11777,31 @@ document.addEventListener('DOMContentLoaded', () => {
                 <button type="button" class="btn btn-outline-danger btn-sm gb-del" data-gb-id="${gbEscapeHtml(gb.id)}" title="Remove"><i class="bi bi-trash"></i></button>`;
             const chevronCls = collapsed ? 'bi-chevron-right' : 'bi-chevron-down';
 
-            const rows = gradebookRoster.length
-                ? gradebookRoster.map(({ personId, name }) => {
+            const activityRoster = gbRosterRowsForActivity(gb);
+            const canRenderStudentRows = gradebookRoster.length > 0
+                || (gb.periodPerformanceLog && activityRoster.length > 0);
+            const rows = canRenderStudentRows
+                ? (gb.periodPerformanceLog && !activityRoster.length
+                    ? `<tr><td colspan="5" class="text-muted small ps-3 py-2">No student report instances for this session. Assign reports on the Report instances tab, then refresh.</td></tr>`
+                    : activityRoster.map((row) => {
+                    const personId = row.personId;
+                    const name = row.name;
                     const pid = String(personId);
+                    const periodLogAttendanceBadge = gb.periodPerformanceLog && row.periodLogOnAttendance === false
+                        ? '<span class="badge bg-warning-subtle text-dark border ms-1">Not on attendance</span>'
+                        : '';
+                    const periodLogExcludeBtn = gb.periodPerformanceLog && !gbReadOnly
+                        ? `<button type="button" class="btn btn-outline-secondary btn-sm py-0 px-1 gb-period-log-exclude" data-gb-id="${gbEscapeHtml(gb.id)}" data-person-id="${gbEscapeHtml(pid)}" title="Remove from this period log (no overall grade)" aria-label="Remove from period log"><i class="bi bi-person-dash" aria-hidden="true"></i></button>`
+                        : '';
+                    const nameCell = periodLogExcludeBtn
+                        ? `<div class="d-flex align-items-center justify-content-between gap-2"><span>${gbEscapeHtml(name)}${periodLogAttendanceBadge}</span>${periodLogExcludeBtn}</div>`
+                        : `${gbEscapeHtml(name)}${periodLogAttendanceBadge}`;
                     const makeupRole = gb.makeupSource && gb.makeupRoles ? String(gb.makeupRoles[pid] || '').trim() : '';
                     if (makeupRole === 'done') {
                         const sc = gb.scores[pid];
                         const val = sc !== null && sc !== undefined && !Number.isNaN(Number(sc)) ? String(sc) : '';
                         return `<tr class="gb-row-makeup-done">
-                        <td class="ps-3">${gbEscapeHtml(name)}</td>
+                        <td class="ps-3">${nameCell}</td>
                         <td style="max-width:140px;"><span class="badge bg-success-subtle text-success border me-1">Done</span><span class="fw-semibold">${gbEscapeHtml(val || '—')}</span></td>
                         <td class="gb-pct small text-nowrap">${gbFormatPct(sc, total)}</td>
                         <td class="gb-wt-pct small text-nowrap">${gbFormatWeightContribution(sc, total, explicitWeight)}</td>
@@ -11614,7 +11823,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             blockedLabel = 'Make-up blocked';
                         }
                         return `<tr class="${rowClass}">
-                        <td class="ps-3">${gbEscapeHtml(name)}</td>
+                        <td class="ps-3">${nameCell}</td>
                         <td class="text-muted"><span class="badge bg-light text-muted border">${gbEscapeHtml(blockedLabel)}</span></td>
                         <td class="text-muted">N/A</td>
                         <td class="text-muted">N/A</td>
@@ -11624,7 +11833,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const sc = gb.scores[pid];
                     const val = sc !== null && sc !== undefined && !Number.isNaN(Number(sc)) ? String(sc) : '';
                     return `<tr>
-                    <td class="ps-3">${gbEscapeHtml(name)}</td>
+                    <td class="ps-3">${nameCell}</td>
                     <td style="max-width:140px;">
                         <input type="number" class="form-control form-control-sm gb-score-input" data-gb-id="${gbEscapeHtml(gb.id)}" data-person-id="${gbEscapeHtml(pid)}"
                             min="0" max="${total}" step="any" ${gbReadOnly ? 'disabled' : ''} value="${gbEscapeHtml(val)}" placeholder="—">
@@ -11633,7 +11842,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     <td class="gb-wt-pct small text-nowrap">${gbFormatWeightContribution(sc, total, explicitWeight)}</td>
                     <td class="text-center">${gbRenderCommentButton(gb, pid, name)}</td>
                 </tr>`;
-                }).join('')
+                }).join(''))
                 : `<tr><td colspan="5" class="text-muted small ps-3 py-2">No students on the attendance roster yet. Add enrollments to enter scores; saved activities and settings are shown below.</td></tr>`;
 
             parts.push(`
@@ -11724,6 +11933,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     btn.getAttribute('data-person-id'),
                     btn.getAttribute('data-student-name') || ''
                 );
+            });
+        });
+        host.querySelectorAll('.gb-period-log-exclude').forEach((btn) => {
+            btn.addEventListener('click', () => {
+                const gid = btn.getAttribute('data-gb-id');
+                const pid = btn.getAttribute('data-person-id');
+                const gb = gradebooksState.find((g) => String(g.id) === String(gid));
+                if (!gb) return;
+                gbExcludePersonFromPeriodLog(gb, pid);
             });
         });
     }
@@ -11869,7 +12087,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 periodLogCb.checked = true;
             }
         }
-        if (periodLogWrap) periodLogWrap.classList.toggle('d-none', hidePeriodLogOption);
+        const canOfferPeriodLog = gbSessionHasStudentReportInstances();
+        if (periodLogWrap) periodLogWrap.classList.toggle('d-none', hidePeriodLogOption || !canOfferPeriodLog);
+        if (!canOfferPeriodLog && periodLogCb && !isEdit) periodLogCb.checked = false;
         gbUpdatePeriodPerformanceLogHelpVisibility();
         gbRenderModalAttachmentsList();
         gbUpdateModalWeightPreview();
@@ -11914,6 +12134,15 @@ document.addEventListener('DOMContentLoaded', () => {
         const includeInGradeCalculation = document.getElementById('gbModalInclude').checked;
         const periodPerformanceLog = document.getElementById('gbModalPeriodPerformanceLog')?.checked === true;
 
+        if (periodPerformanceLog && !gbSessionHasStudentReportInstances()) {
+            void sessionMessageBox({
+                title: 'Report instances required',
+                icon: 'warning',
+                message: 'Period performance log activities are only available when this session has student report instances assigned. Use Report instances to assign reports first.'
+            });
+            return;
+        }
+
         if (!name) {
             void sessionMessageBox({
                 title: 'Name required',
@@ -11954,7 +12183,9 @@ document.addEventListener('DOMContentLoaded', () => {
         } else {
             const scores = {};
             const scoreComments = {};
-            gradebookRoster.forEach(({ personId }) => {
+            const periodLogExcludedPersonIds = [];
+            const rosterSeed = periodPerformanceLog ? gbPeriodLogEligibleRoster() : gradebookRoster;
+            rosterSeed.forEach(({ personId }) => {
                 scores[String(personId)] = null;
             });
             gradebooksState.push({
@@ -11967,6 +12198,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 activityContent,
                 includeInGradeCalculation,
                 periodPerformanceLog,
+                periodLogExcludedPersonIds,
                 scores,
                 scoreComments,
                 attachments: gbModalAttachmentsState.map((row) => ({ ...row }))

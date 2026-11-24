@@ -386,11 +386,19 @@ async function buildSessionReportInstanceRows({
   );
   const resolveInstanceRowPersonId = (row) => {
     const studentId = toPublicId(row?.studentId);
-    return studentIdToPersonId.get(studentId) || studentId || '';
+    if (!studentId) return '';
+    const mapped = studentIdToPersonId.get(studentId);
+    if (mapped) return mapped;
+    const byPersonId = studentRows.find((studentRow) => idsEqual(studentRow?.personId, studentId));
+    if (byPersonId) return toPublicId(byPersonId.personId);
+    return studentId;
   };
 
   return visibleRows
-    .map((row) => mapRowToDto(row, resolvedViewerContext.assignmentMap))
+    .map((row) => ({
+      ...mapRowToDto(row, resolvedViewerContext.assignmentMap),
+      personId: resolveInstanceRowPersonId(row)
+    }))
     .sort((a, b) => {
       const titleCompare = String(a.templateTitle || '').localeCompare(String(b.templateTitle || ''));
       if (titleCompare) return titleCompare;

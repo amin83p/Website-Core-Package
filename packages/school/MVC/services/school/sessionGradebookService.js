@@ -103,12 +103,24 @@ function normalizeSessionGradebooksFromRequest(rawList, context = {}) {
 
     const gbId = String(gb.id || '').trim() || `gb_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     const periodPerformanceLog = Boolean(gb.periodPerformanceLog);
+    const periodLogExcludedPersonIds = periodPerformanceLog
+      ? (Array.isArray(gb.periodLogExcludedPersonIds) ? gb.periodLogExcludedPersonIds : [])
+        .map((pid) => String(pid || '').trim())
+        .filter(Boolean)
+      : [];
     const rawScores = gb.scores && typeof gb.scores === 'object' ? gb.scores : {};
     const rawScoreComments = gb.scoreComments && typeof gb.scoreComments === 'object' ? gb.scoreComments : {};
     const scores = {};
     const scoreComments = {};
 
-    for (const pid of personIds) {
+    const personIdsForScores = periodPerformanceLog
+      ? [...new Set([
+        ...personIds,
+        ...Object.keys(rawScores).map((id) => String(id || '').trim()).filter(Boolean)
+      ])]
+      : personIds;
+
+    for (const pid of personIdsForScores) {
       const att = attendanceByPerson.has(pid) ? attendanceByPerson.get(pid) : '';
       const isGradeBlocked = !periodPerformanceLog && (
         attendanceMatrixMetricsService.isUnmarkedAttendanceStatus(att)
@@ -158,6 +170,9 @@ function normalizeSessionGradebooksFromRequest(rawList, context = {}) {
       activityContent: String(gb.activityContent || ''),
       includeInGradeCalculation: Boolean(gb.includeInGradeCalculation),
       periodPerformanceLog,
+      ...(periodPerformanceLog && periodLogExcludedPersonIds.length
+        ? { periodLogExcludedPersonIds }
+        : (periodPerformanceLog ? { periodLogExcludedPersonIds: [] } : {})),
       scores,
       scoreComments,
       attachments: sanitizeGradebookAttachments(gb.attachments)
