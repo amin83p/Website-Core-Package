@@ -1061,10 +1061,131 @@
   const HUB_TIMELINE_DRAG_CLICK_PX = 8;
   const HUB_TIMELINE_STEM_FIRST_ON_DATE_PX = 48;
   const HUB_TIMELINE_ELBOW_DRAG_SCALE = 0.95;
+  const HUB_TIMELINE_ZOOM_MIN = 1;
+  const HUB_TIMELINE_ZOOM_MAX = 4;
+  const HUB_TIMELINE_ZOOM_STEP = 0.12;
 
   let hubStudentsTimelineLiveLayouts = null;
   let hubStudentsTimelineActiveStudentId = '';
   let hubStudentsTimelineDragState = null;
+  let hubStudentsTimelinePanState = null;
+  let hubStudentsTimelineZoom = { level: HUB_TIMELINE_ZOOM_MIN, baseAxisPx: 0 };
+
+  function hubStudentsResetTimelineZoom() {
+    hubStudentsTimelineZoom = { level: HUB_TIMELINE_ZOOM_MIN, baseAxisPx: 0 };
+    hubStudentsTimelinePanState = null;
+    const trackScroll = document.querySelector('#hubStudentsTimelineModal .hub-students-timeline-track-scroll');
+    if (trackScroll) {
+      trackScroll.classList.remove(
+        'hub-students-timeline-track-scroll--zoomed',
+        'hub-students-timeline-track-scroll--pan-ready',
+        'is-panning'
+      );
+      trackScroll.scrollLeft = 0;
+    }
+  }
+
+  function hubStudentsSyncTimelineZoomUi(scroll) {
+    if (!scroll) return;
+    const zoomed = hubStudentsTimelineZoom.level > HUB_TIMELINE_ZOOM_MIN + 0.001;
+    scroll.classList.toggle('hub-students-timeline-track-scroll--zoomed', zoomed);
+    scroll.classList.toggle('hub-students-timeline-track-scroll--pan-ready', zoomed);
+    if (!zoomed) {
+      scroll.classList.remove('is-panning');
+      scroll.scrollLeft = 0;
+    }
+  }
+
+  function hubStudentsSyncTimelineRangeWidth(track) {
+    const rangeSync = document.getElementById('hubStudentsTimelineRangeSync');
+    if (!rangeSync || !track) return;
+    rangeSync.style.width = track.style.width || '';
+    rangeSync.style.minWidth = track.style.minWidth || '';
+    rangeSync.style.maxWidth = track.style.maxWidth || '';
+    rangeSync.style.marginLeft = track.style.marginLeft || '';
+    rangeSync.style.marginRight = track.style.marginRight || '';
+  }
+
+  function hubStudentsChangeTimelineZoom(delta, wheelEvent) {
+    const track = document.getElementById('hubStudentsTimelineTrack');
+    if (!track) return;
+    const prevLevel = hubStudentsTimelineZoom.level;
+    const next = Math.min(
+      HUB_TIMELINE_ZOOM_MAX,
+      Math.max(HUB_TIMELINE_ZOOM_MIN, hubStudentsTimelineZoom.level + delta)
+    );
+    if (Math.abs(next - hubStudentsTimelineZoom.level) < 0.001) return;
+    const scroll = track.parentElement;
+    const prevScrollWidth = scroll ? scroll.scrollWidth : 0;
+    const prevScrollLeft = scroll ? scroll.scrollLeft : 0;
+    const prevTrackW = track.offsetWidth || Math.round(hubStudentsTimelineZoom.baseAxisPx * prevLevel);
+    hubStudentsTimelineZoom.level = next;
+    hubStudentsApplyTimelineTrackWidth(track);
+    hubStudentsSyncTimelineRangeWidth(track);
+    if (scroll) {
+      const newScrollWidth = scroll.scrollWidth;
+      if (wheelEvent && Number.isFinite(wheelEvent.clientX)) {
+        const rect = scroll.getBoundingClientRect();
+        const pointerInView = wheelEvent.clientX - rect.left;
+        const anchorContentX = prevScrollLeft + pointerInView;
+        const ratio = prevScrollWidth > 0 ? anchorContentX / prevScrollWidth : 0;
+        const nextLeft = ratio * newScrollWidth - pointerInView;
+        const maxScroll = Math.max(0, newScrollWidth - scroll.clientWidth);
+        scroll.scrollLeft = Math.max(0, Math.min(maxScroll, nextLeft));
+      } else if (prevTrackW > 0 && prevLevel > HUB_TIMELINE_ZOOM_MIN) {
+        const scale = track.offsetWidth / prevTrackW;
+        scroll.scrollLeft = Math.max(0, prevScrollLeft * scale);
+      } else if (prevLevel <= HUB_TIMELINE_ZOOM_MIN + 0.001) {
+        scroll.scrollLeft = 0;
+      }
+    }
+    hubStudentsTimelineRecalcTrackPadding(track, hubStudentsTimelineLiveLayouts);
+  }
+
+  function hubStudentsTimelineCanPanView(event) {
+    if (!event || event.button !== 0) return false;
+    if (hubStudentsTimelineZoom.level <= HUB_TIMELINE_ZOOM_MIN + 0.001) return false;
+    if (hubStudentsTimelineDragState) return false;
+    const target = event.target;
+    if (target && target.closest && target.closest('[data-hub-timeline-draggable]')) return false;
+    return true;
+  }
+
+  function hubStudentsStartTimelinePan(event, scrollEl) {
+    if (!scrollEl || !hubStudentsTimelineCanPanView(event)) return;
+    hubStudentsHideTimelineTip();
+    hubStudentsTimelinePanState = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startScrollLeft: scrollEl.scrollLeft,
+      moved: false
+    };
+    scrollEl.classList.add('is-panning');
+    try {
+      scrollEl.setPointerCapture(event.pointerId);
+    } catch (captureError) { /* ignore */ }
+  }
+
+  function hubStudentsMoveTimelinePan(event, scrollEl) {
+    const pan = hubStudentsTimelinePanState;
+    if (!pan || !scrollEl || event.pointerId !== pan.pointerId) return;
+    const dx = event.clientX - pan.startX;
+    if (Math.abs(dx) > HUB_TIMELINE_DRAG_CLICK_PX) pan.moved = true;
+    scrollEl.scrollLeft = pan.startScrollLeft - dx;
+    if (pan.moved) event.preventDefault();
+  }
+
+  function hubStudentsEndTimelinePan(event, scrollEl) {
+    const pan = hubStudentsTimelinePanState;
+    if (!pan || !scrollEl || event.pointerId !== pan.pointerId) return;
+    scrollEl.classList.remove('is-panning');
+    hubStudentsTimelinePanState = null;
+    try {
+      if (scrollEl.hasPointerCapture(event.pointerId)) {
+        scrollEl.releasePointerCapture(event.pointerId);
+      }
+    } catch (releaseError) { /* ignore */ }
+  }
 
   function hubStudentsTimelineDisplayPercent(percent, nudgePercent) {
     const raw = Math.min(100, Math.max(0, Number(percent) || 0))
@@ -1079,7 +1200,7 @@
   }
 
   function hubStudentsTimelineMarkerAnchorPercent(layout) {
-    return hubStudentsTimelineDisplayPercent(layout?.percent, 0);
+    return hubStudentsTimelineDisplayPercent(layout?.percent, layout?.axisNudgePercent);
   }
 
   function hubStudentsTimelineSignedElbow(branchSide, elbowPx) {
@@ -1428,17 +1549,42 @@
     return sideOrdinal % 2 === 0 ? 'left' : 'right';
   }
 
-  function hubStudentsApplyTimelineTrackWidth(track) {
-    if (!track) return { availW: 0, trackW: 0 };
+  function hubStudentsApplyTimelineTrackWidth(track, options) {
+    const opts = options && typeof options === 'object' ? options : {};
+    if (!track) return { availW: 0, trackW: 0, axisTarget: 0, baseAxisPx: 0, zoomLevel: HUB_TIMELINE_ZOOM_MIN };
     const scroll = track.parentElement;
     const availW = scroll && scroll.clientWidth > 0 ? scroll.clientWidth : 0;
-    const axisTarget = availW > 0 ? Math.round(availW * HUB_TIMELINE_AXIS_WIDTH_RATIO) : 960;
+    const computedBase = availW > 0 ? Math.round(availW * HUB_TIMELINE_AXIS_WIDTH_RATIO) : 960;
+    if (opts.captureBase === true || !hubStudentsTimelineZoom.baseAxisPx) {
+      hubStudentsTimelineZoom.baseAxisPx = computedBase;
+    }
+    const baseAxis = hubStudentsTimelineZoom.baseAxisPx || computedBase;
+    const level = Math.min(
+      HUB_TIMELINE_ZOOM_MAX,
+      Math.max(HUB_TIMELINE_ZOOM_MIN, Number(hubStudentsTimelineZoom.level) || HUB_TIMELINE_ZOOM_MIN)
+    );
+    hubStudentsTimelineZoom.level = level;
+    const axisTarget = Math.round(baseAxis * level);
     track.style.width = String(axisTarget) + 'px';
     track.style.minWidth = '0';
-    track.style.maxWidth = availW > 0 ? String(axisTarget) + 'px' : 'none';
-    track.style.marginLeft = 'auto';
-    track.style.marginRight = 'auto';
-    return { availW: availW, trackW: axisTarget, axisTarget: axisTarget };
+    track.style.maxWidth = String(axisTarget) + 'px';
+    if (level <= HUB_TIMELINE_ZOOM_MIN + 0.001) {
+      track.style.marginLeft = 'auto';
+      track.style.marginRight = 'auto';
+      if (scroll) scroll.scrollLeft = 0;
+    } else {
+      track.style.marginLeft = '0';
+      track.style.marginRight = '0';
+    }
+    hubStudentsSyncTimelineZoomUi(scroll);
+    hubStudentsSyncTimelineRangeWidth(track);
+    return {
+      availW: availW,
+      trackW: axisTarget,
+      axisTarget: axisTarget,
+      baseAxisPx: baseAxis,
+      zoomLevel: level
+    };
   }
 
   function hubStudentsAssignTimelineLayout(events, minDate, maxDate) {
@@ -1741,7 +1887,7 @@
     await hubStudentsTimelineForcePaint();
     track.innerHTML = layouts.map(hubStudentsRenderTimelineMarker).join('');
     track.setAttribute('role', 'list');
-    hubStudentsApplyTimelineTrackWidth(track);
+    hubStudentsApplyTimelineTrackWidth(track, { captureBase: true });
 
     hubStudentsUpdateTimelineAxisProgress(100, 'Timeline ready.');
     await hubStudentsTimelineForcePaint();
@@ -1865,6 +2011,7 @@
       if (minLabel) minLabel.textContent = '…';
       if (maxLabel) maxLabel.textContent = '…';
     }
+    hubStudentsResetTimelineZoom();
     const track = document.getElementById('hubStudentsTimelineTrack');
     if (track) track.innerHTML = '';
     hubStudentsSetTimelineLoading(true);
@@ -2026,9 +2173,47 @@
     });
     if (trackScroll) {
       trackScroll.addEventListener('scroll', hubStudentsHideTimelineTip);
+      trackScroll.addEventListener('wheel', function (event) {
+        if (!event.ctrlKey && !event.metaKey) return;
+        event.preventDefault();
+        const delta = event.deltaY > 0 ? -HUB_TIMELINE_ZOOM_STEP : HUB_TIMELINE_ZOOM_STEP;
+        hubStudentsChangeTimelineZoom(delta, event);
+      }, { passive: false });
+      trackScroll.addEventListener('pointerdown', function (event) {
+        hubStudentsStartTimelinePan(event, trackScroll);
+      });
+      trackScroll.addEventListener('pointermove', function (event) {
+        hubStudentsMoveTimelinePan(event, trackScroll);
+      });
+      trackScroll.addEventListener('pointerup', function (event) {
+        hubStudentsEndTimelinePan(event, trackScroll);
+      });
+      trackScroll.addEventListener('pointercancel', function (event) {
+        hubStudentsEndTimelinePan(event, trackScroll);
+      });
     }
+    track.addEventListener('pointerdown', function (event) {
+      if (event.target && event.target.closest('[data-hub-timeline-draggable]')) return;
+      if (!trackScroll) return;
+      hubStudentsStartTimelinePan(event, trackScroll);
+    });
+    track.addEventListener('pointermove', function (event) {
+      if (!hubStudentsTimelinePanState) return;
+      hubStudentsMoveTimelinePan(event, trackScroll);
+    });
+    track.addEventListener('pointerup', function (event) {
+      if (!hubStudentsTimelinePanState) return;
+      hubStudentsEndTimelinePan(event, trackScroll);
+    });
+    track.addEventListener('pointercancel', function (event) {
+      if (!hubStudentsTimelinePanState) return;
+      hubStudentsEndTimelinePan(event, trackScroll);
+    });
     if (timelineModal) {
-      timelineModal.addEventListener('hidden.bs.modal', hubStudentsHideTimelineTip);
+      timelineModal.addEventListener('hidden.bs.modal', function () {
+        hubStudentsHideTimelineTip();
+        hubStudentsResetTimelineZoom();
+      });
     }
     window.addEventListener('scroll', hubStudentsHideTimelineTip, true);
   }

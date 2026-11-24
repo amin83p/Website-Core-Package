@@ -156,6 +156,40 @@
     min-height: 18rem;
   }
 
+  #hubStudentsTimelineModal .hub-students-timeline-range-sync {
+    box-sizing: border-box;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: auto;
+    margin-right: auto;
+    padding: 0 2.5%;
+    font-size: 0.8rem;
+    color: #64748b;
+    min-height: 1.25rem;
+    margin-bottom: 0.35rem;
+    pointer-events: none;
+    user-select: none;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-range-sync-label {
+    white-space: nowrap;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-track-scroll.hub-students-timeline-track-scroll--zoomed {
+    overflow-x: auto;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-track-scroll.hub-students-timeline-track-scroll--pan-ready {
+    cursor: grab;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-track-scroll.hub-students-timeline-track-scroll--pan-ready.is-panning {
+    cursor: grabbing;
+    user-select: none;
+  }
+
   #hubStudentsTimelineModal .hub-students-timeline-track {
     position: relative;
     box-sizing: border-box;

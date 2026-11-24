@@ -68,6 +68,11 @@ test('student management view and client expose workspace', () => {
   assert.match(studentManagementScript, /hubStudentsOptimizeTimelineLayouts/);
   assert.match(studentManagementScript, /data-hub-timeline-draggable/);
   assert.match(studentManagementScript, /hubStudentsTimelineLayoutPrefsKey/);
+  assert.match(studentManagementScript, /HUB_TIMELINE_ZOOM/);
+  assert.match(studentManagementScript, /hubStudentsTimelinePanState/);
+  assert.match(studentManagementScript, /track-scroll--zoomed/);
+  assert.match(studentManagementScript, /ctrlKey/);
+  assert.match(managementModals, /Ctrl\+wheel/);
   assert.doesNotMatch(studentManagementScript, /hub-students-timeline-dot-date/);
   assert.doesNotMatch(studentManagementScript, /hub-students-timeline-vline/);
   assert.doesNotMatch(studentManagementScript, /hub-students-timeline-joint-h/);
@@ -79,6 +84,8 @@ test('student management view and client expose workspace', () => {
   assert.match(managementStyles, /hub-students-timeline-elbow-corner/);
   assert.match(managementStyles, /--elbow-w/);
   assert.match(managementStyles, /hub-students-timeline-event-date/);
+  assert.match(managementStyles, /hub-students-timeline-track-scroll--zoomed/);
+  assert.match(managementModals, /hubStudentsTimelineRangeSync/);
   assert.match(managementModals, /id="hubStudentsTimelineModal"/);
   assert.match(managementModals, /id="hubStudentsTimelineLoadStatus"/);
   assert.match(studentManagementScript, /hubStudentsUpdateTimelineAxisProgress/);
