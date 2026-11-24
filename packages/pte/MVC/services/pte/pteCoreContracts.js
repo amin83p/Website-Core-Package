@@ -35,9 +35,15 @@ const {
 } = requireCoreModule('MVC/utils/generalTools');
 const {
   isRailwayProxyMode,
+  isAzureBlobMode,
   getGatewayBaseUrl,
   getGatewayTimeoutMs
 } = requireCoreModule('MVC/utils/uploadModeUtils');
+const uploadStoragePolicy = requireCoreModule('MVC/services/uploadStoragePolicyService');
+
+function isRemoteUploadMode() {
+  return uploadStoragePolicy.isRemoteUploadBackend();
+}
 const uploadPathUtils = requireCoreModule('MVC/utils/uploadPathUtils');
 const { resolveCanonicalOrganizationName } = requireCoreModule('MVC/utils/organizationDisplay');
 const repositoryBackendSelector = requireCoreModule('MVC/repositories/backend/repositoryBackendSelector');
@@ -91,6 +97,8 @@ module.exports = {
   inferSearchableFields,
   isAjax,
   isRailwayProxyMode,
+  isAzureBlobMode,
+  isRemoteUploadMode,
   getGatewayBaseUrl,
   getGatewayTimeoutMs,
   uploadPathUtils,

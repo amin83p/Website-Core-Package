@@ -435,6 +435,10 @@ async function gatewayDownloadByUploadUrl(uploadUrl = '') {
 
 async function downloadRemoteUploadFile(scopeKey = '', relativePath = '') {
   const uploadStoragePolicy = require('./uploadStoragePolicyService');
+  if (uploadStoragePolicy.isAzureBlobBackend()) {
+    const uploadRemoteDriver = require('./uploadRemoteDriverService');
+    return uploadRemoteDriver.downloadRemoteUploadFile(scopeKey, relativePath);
+  }
   const strictGateway = uploadStoragePolicy.isRailwayGatewayBackend();
 
   if (uploadStoragePolicy.allowLocalUploadFallback()) {

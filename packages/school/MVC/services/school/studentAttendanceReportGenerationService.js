@@ -275,7 +275,7 @@ function parseExportConcurrency(options = {}) {
   let concurrency = sarExportConfigService.getExportConcurrency();
   try {
     const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
-    if (uploadStorage.isRailwayGatewayBackend()) {
+    if (uploadStorage.isRemoteUploadBackend()) {
       concurrency = format === 'docx' ? 1 : Math.min(concurrency, 2);
     }
   } catch {
@@ -1237,7 +1237,7 @@ async function exportStudentAttendanceReportSelections(req, options = {}) {
   ctx.exportBatchCache = exportBatchCache;
   const studentMap = new Map(ctx.students.map((row) => [clean(row.personId), row]));
   const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
-  const gatewayDocx = format === 'docx' && uploadStorage.isRailwayGatewayBackend();
+  const gatewayDocx = format === 'docx' && uploadStorage.isRemoteUploadBackend();
 
   const jobId = clean(options.jobId);
   let scratchDir = null;

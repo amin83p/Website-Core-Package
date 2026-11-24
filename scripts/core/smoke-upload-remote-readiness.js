@@ -56,4 +56,13 @@ if (backend === 'railway_gateway') {
   ok('gateway env vars present');
 }
 
+if (backend === 'azure_blob') {
+  try {
+    uploadStoragePolicy.assertAzureBlobReady();
+    ok('azure blob env/container validation passed');
+  } catch (error) {
+    fail(error.message || String(error));
+  }
+}
+
 ok('readiness complete — run manual matrix in docs/upload-remote-smoke-matrix.md');

@@ -321,7 +321,7 @@ async function generateSourceBatch(request = {}, reqUser) {
   const uploadStorage = requireCoreModule('MVC/services/uploadStorageService');
   const anyDocxSource = sourceRuns.some((row) => clean(row?.format).toLowerCase() === 'docx');
   let concurrency = sarExportConfigService.getExportConcurrency();
-  if (uploadStorage.isRailwayGatewayBackend()) {
+  if (uploadStorage.isRemoteUploadBackend()) {
     concurrency = anyDocxSource ? 1 : Math.min(concurrency, 2);
   }
   const warnings = [];

@@ -17,7 +17,7 @@ function resolveMulterStoredRef(file = {}) {
   try {
     return uploadStorage.normalizeReference(rawRef);
   } catch (error) {
-    if (uploadStorage.isRailwayGatewayBackend()) {
+    if (uploadStorage.isRemoteUploadBackend()) {
       throw new Error('Uploaded file must be stored as an /uploads/ URL.');
     }
     throw error;
@@ -45,7 +45,7 @@ function normalizePersistedUploadRef(value = '') {
   try {
     return uploadStorage.normalizeReference(token);
   } catch (error) {
-    if (uploadStorage.isRailwayGatewayBackend()) {
+    if (uploadStorage.isRemoteUploadBackend()) {
       throw new Error('File reference must be an /uploads/ URL when using remote upload storage.');
     }
     throw error;

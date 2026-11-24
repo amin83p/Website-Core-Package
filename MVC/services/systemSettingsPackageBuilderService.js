@@ -2743,9 +2743,10 @@ function createService(overrides = {}) {
     const uploadRoot = uploadPathUtils.getUploadRootAbsolute();
     const backendMode = cleanText(options.backendMode, 40).toLowerCase() || 'json';
     const originOrgId = normalizeOrgToken(options.originOrgId || '');
+    const remoteUploadBackend = uploadStoragePolicy.isRemoteUploadBackend();
     const canUseGatewayFallback = Boolean(
-      deps.isRailwayProxyMode()
-      && cleanText(deps.getGatewayBaseUrl(), 2000)
+      remoteUploadBackend
+      && (uploadStoragePolicy.isAzureBlobBackend() || cleanText(deps.getGatewayBaseUrl(), 2000))
       && deps.fileGatewayClientService
       && typeof deps.fileGatewayClientService.downloadRemoteUploadFile === 'function'
     );

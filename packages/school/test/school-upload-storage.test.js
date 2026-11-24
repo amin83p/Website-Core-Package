@@ -21,6 +21,7 @@ test.beforeEach(async () => {
   await ensureTestUploadRoot();
   settingService.getValue = (section, key) => {
     if (section === 'app' && key === 'uploadsPath') return TEST_UPLOAD_ROOT;
+    if (section === 'app' && key === 'uploadStorageBackend') return 'local';
     return ORIGINAL_GET_VALUE.call(settingService, section, key);
   };
 });

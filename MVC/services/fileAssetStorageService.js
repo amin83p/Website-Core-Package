@@ -4,17 +4,7 @@ const path = require('path');
 const uploadPathUtils = require('../utils/uploadPathUtils');
 const pathResolver = require('../utils/pathResolver');
 const uploadStoragePolicy = require('./uploadStoragePolicyService');
-const {
-  gatewayUploadBlob,
-  downloadRemoteUploadFile,
-  gatewayDeleteByUploadUrl,
-  gatewayDeleteByRelativePath,
-  gatewayMoveItem,
-  gatewayCopyItem,
-  gatewayRenameItem,
-  gatewayCreateFolder,
-  gatewayListDirectory
-} = require('./fileGatewayClientService');
+const uploadRemoteDriver = require('./uploadRemoteDriverService');
 const { getGatewayBaseUrl } = require('../utils/uploadModeUtils');
 
 function clean(value) {
@@ -131,13 +121,13 @@ function serializeGatewayResult(result = {}, originalName = '', mimeType = '') {
 
 async function ensureDirectory(scopeKey = '', relativeDir = '') {
   const safeDir = cleanRelativePath(relativeDir);
-  if (uploadStoragePolicy.isRailwayGatewayBackend()) {
+  if (uploadStoragePolicy.isRemoteUploadBackend()) {
     const parts = safeDir.split('/').filter(Boolean);
     let current = '';
     for (const part of parts) {
       try {
         // eslint-disable-next-line no-await-in-loop
-        await gatewayCreateFolder({
+        await uploadRemoteDriver.createFolder({
           scopeKey: normalizeScopeKey(scopeKey),
           relativeDir: current,
           folderName: part
@@ -166,19 +156,21 @@ async function saveBuffer({ scopeKey = 'GLOBAL', relativeDir = '', fileName = ''
   const safeDir = cleanRelativePath(relativeDir);
   const source = Buffer.isBuffer(buffer) ? buffer : Buffer.from(buffer || '');
 
-  if (uploadStoragePolicy.isRailwayGatewayBackend()) {
-  if (overwrite) {
-    await gatewayDeleteByUploadUrl(uploadsUrlForParts(scopeKey, safeDir, safeName)).catch((error) => {
-      if (!/not found/i.test(String(error?.message || ''))) throw error;
-    });
-  }
+  if (uploadStoragePolicy.isRemoteUploadBackend()) {
+    uploadStoragePolicy.assertStorageReadyForOperation();
+    if (overwrite) {
+      await uploadRemoteDriver.deleteByUploadUrl(uploadsUrlForParts(scopeKey, safeDir, safeName)).catch((error) => {
+        if (!/not found/i.test(String(error?.message || ''))) throw error;
+      });
+    }
     const blob = new Blob([source], { type: clean(mimeType) || 'application/octet-stream' });
-    const result = await gatewayUploadBlob({
+    const result = await uploadRemoteDriver.uploadBlob({
       scopeKey: normalizeScopeKey(scopeKey),
       relativeDir: safeDir,
       desiredName: safeName,
       blob,
-      mimeType
+      mimeType,
+      overwrite
     });
     return {
       ...serializeGatewayResult(result, originalName || safeName, mimeType),
@@ -217,10 +209,10 @@ async function readUploadReferenceBufferFromDisk(token = '', diskPath = '') {
   };
 }
 
-async function readUploadReferenceBufferFromGateway(token = '', parsed = null) {
+async function readUploadReferenceBufferFromRemote(token = '', parsed = null) {
   const resolved = parsed || parseUploadReference(token);
   if (!resolved) throw new Error('Invalid upload URL.');
-  const remote = await downloadRemoteUploadFile(resolved.scopeKey, resolved.relativePath);
+  const remote = await uploadRemoteDriver.downloadRemoteUploadFile(resolved.scopeKey, resolved.relativePath);
   const arrayBuffer = await remote.blob.arrayBuffer();
   return {
     buffer: Buffer.from(arrayBuffer),
@@ -235,18 +227,18 @@ async function readUploadReferenceBuffer(token = '') {
   if (!parsed) throw new Error('Invalid upload URL.');
   const diskPath = uploadPathUtils.fromUploadsUrlToDiskPath(token);
 
-  if (uploadStoragePolicy.isRailwayGatewayBackend()) {
-    uploadStoragePolicy.assertRailwayGatewayReady();
-    return readUploadReferenceBufferFromGateway(token, parsed);
+  if (uploadStoragePolicy.isRemoteUploadBackend()) {
+    uploadStoragePolicy.assertStorageReadyForOperation();
+    return readUploadReferenceBufferFromRemote(token, parsed);
   }
 
   const fromDisk = await readUploadReferenceBufferFromDisk(token, diskPath);
   if (fromDisk) return fromDisk;
 
   const gatewayBaseUrl = getGatewayBaseUrl();
-  if (gatewayBaseUrl && !uploadStoragePolicy.isRailwayGatewayBackend()) {
+  if (gatewayBaseUrl && !uploadStoragePolicy.isRemoteUploadBackend()) {
     try {
-      return await readUploadReferenceBufferFromGateway(token, parsed);
+      return await readUploadReferenceBufferFromRemote(token, parsed);
     } catch (gatewayError) {
       if (!/not found|ENOENT|404/i.test(String(gatewayError?.message || ''))) {
         throw gatewayError;
@@ -282,8 +274,8 @@ async function readBuffer(ref = '') {
 
 async function listDirectory({ scopeKey = 'GLOBAL', relativeDir = '' } = {}) {
   const safeDir = cleanRelativePath(relativeDir);
-  if (uploadStoragePolicy.isRailwayGatewayBackend()) {
-    const result = await gatewayListDirectory({
+  if (uploadStoragePolicy.isRemoteUploadBackend()) {
+    const result = await uploadRemoteDriver.listDirectory({
       scopeKey: normalizeScopeKey(scopeKey),
       relativeDir: safeDir
     });
@@ -318,8 +310,8 @@ async function listDirectory({ scopeKey = 'GLOBAL', relativeDir = '' } = {}) {
 async function deleteByUploadUrl(uploadUrl = '') {
   const token = clean(uploadUrl);
   if (!token) return false;
-  if (uploadStoragePolicy.isRailwayGatewayBackend() && isUploadReference(token)) {
-    await gatewayDeleteByUploadUrl(token);
+  if (uploadStoragePolicy.isRemoteUploadBackend() && isUploadReference(token)) {
+    await uploadRemoteDriver.deleteByUploadUrl(token);
     return true;
   }
   const diskPath = uploadPathUtils.fromUploadsUrlToDiskPath(token) || (path.isAbsolute(token) ? token : '');
@@ -331,8 +323,8 @@ async function deleteByUploadUrl(uploadUrl = '') {
 async function deleteRelativePath({ scopeKey = 'GLOBAL', relativePath = '' } = {}) {
   const safePath = cleanRelativePath(relativePath);
   if (!safePath) return false;
-  if (uploadStoragePolicy.isRailwayGatewayBackend()) {
-    await gatewayDeleteByRelativePath({ scopeKey: normalizeScopeKey(scopeKey), relativePath: safePath });
+  if (uploadStoragePolicy.isRemoteUploadBackend()) {
+    await uploadRemoteDriver.deleteByRelativePath({ scopeKey: normalizeScopeKey(scopeKey), relativePath: safePath });
     return true;
   }
   const target = pathResolver.resolveSafePath(localScopeRoot(scopeKey), safePath);
@@ -349,8 +341,8 @@ async function moveUploadReference({ sourceRef = '', destinationScopeKey = '', d
   const destScope = normalizeScopeKey(destinationScopeKey || parsed.scopeKey);
   const destDir = cleanRelativePath(destinationDir);
 
-  if (uploadStoragePolicy.isRailwayGatewayBackend()) {
-    const result = await gatewayMoveItem({
+  if (uploadStoragePolicy.isRemoteUploadBackend()) {
+    const result = await uploadRemoteDriver.moveItem({
       sourceScopeKey: parsed.scopeKey,
       sourceRelativePath: parsed.relativePath,
       destinationScopeKey: destScope,
@@ -387,8 +379,8 @@ async function copyRelativePath({ sourceScopeKey = '', sourceRelativePath = '', 
   const safeDestinationName = clean(destinationName) ? cleanFileName(destinationName) : '';
   if (!sourcePath) return null;
 
-  if (uploadStoragePolicy.isRailwayGatewayBackend()) {
-    const copied = await gatewayCopyItem({
+  if (uploadStoragePolicy.isRemoteUploadBackend()) {
+    const copied = await uploadRemoteDriver.copyItem({
       sourceScopeKey: normalizeScopeKey(sourceScopeKey),
       sourceRelativePath: sourcePath,
       destinationScopeKey: destScope,
@@ -396,7 +388,7 @@ async function copyRelativePath({ sourceScopeKey = '', sourceRelativePath = '', 
     });
     const finalName = clean(copied?.finalName);
     if (safeDestinationName && finalName && finalName !== safeDestinationName) {
-      await gatewayRenameItem({
+      await uploadRemoteDriver.renameItem({
         scopeKey: destScope,
         relativePath: [destDir, finalName].filter(Boolean).join('/'),
         newName: safeDestinationName
@@ -418,7 +410,7 @@ async function copyRelativePath({ sourceScopeKey = '', sourceRelativePath = '', 
 async function sendDownload(res, ref = '', downloadName = '') {
   const token = clean(ref);
   if (!token) throw new Error('File reference is required.');
-  if (!uploadStoragePolicy.isRailwayGatewayBackend() && (isUploadReference(token) || path.isAbsolute(token))) {
+  if (!uploadStoragePolicy.isRemoteUploadBackend() && (isUploadReference(token) || path.isAbsolute(token))) {
     const diskPath = isUploadReference(token) ? uploadPathUtils.fromUploadsUrlToDiskPath(token) : token;
     if (!diskPath) throw new Error('Unable to resolve file path.');
     if (!uploadPathUtils.isInsideUploadRoot(diskPath)) {

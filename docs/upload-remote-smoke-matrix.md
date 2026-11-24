@@ -2,6 +2,10 @@
 
 Use with `UPLOAD_MODE=railway_proxy`, `RAILWAY_GATEWAY_BASE_URL`, and `FILE_GATEWAY_SHARED_KEY` set on the app and gateway host.
 
+For **Azure Blob**, set `UPLOAD_MODE=azure_blob` (or App Defaults), `AZURE_STORAGE_CONNECTION_STRING`, and `app.azureBlobContainer` (or `AZURE_STORAGE_CONTAINER`). Run `node scripts/core/smoke-upload-remote-readiness.js`.
+
+**Automated tests:** `npm run test:upload-storage` stubs `app.uploadStorageBackend` to `local` via [`test/helpers/uploadModeTestIsolation.js`](../test/helpers/uploadModeTestIsolation.js) so local-mode cases are not affected by `data/systemSettings.json`. **Live Azure / Railway checks** remain manual per the matrix below.
+
 Run automated readiness checks first (loads project `.env` like `app.js`):
 
 ```bash

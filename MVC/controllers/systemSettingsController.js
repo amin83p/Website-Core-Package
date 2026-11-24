@@ -28,6 +28,8 @@ const loginGreetingAudioService = require('../services/loginGreetingAudioService
 const publicPageContentSettingsDataService = require('../services/publicPageContentSettingsDataService');
 const coreFilesService = require('../services/coreFilesService');
 const coreUploadRefService = require('../services/coreUploadRefService');
+const uploadStoragePolicy = require('../services/uploadStoragePolicyService');
+const { normalizeUploadModeToken } = require('../utils/uploadModeUtils');
 const localPackageSyncService = require('../services/localPackageSyncService');
 const { checkAdminVerificationCode } = require('../utils/encyptors');
 const { getPackageStorageRootAbsolute, getPackageStorageRootResolution } = require('../utils/packageStoragePathUtils');
@@ -272,12 +274,37 @@ exports.showAppSettings = async (req, res) => {
       loginGreetingAudioDisplay: loginGreetingAudioService.enrichForDisplay(
         loginGreetingAudioService.rawLoginGreetingSource(settings?.app)
       ),
-      newsCategories
+      newsCategories,
+      uploadStorageBackendEffective: getStorageBackendLabel(),
+      uploadStorageBackendFromEnv: Boolean(String(process.env.UPLOAD_MODE || '').trim()),
+      uploadStorageHealth: uploadStoragePolicy.getUploadStorageHealthSummary()
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
   }
 };
+
+function getStorageBackendLabel() {
+  try {
+    return uploadStoragePolicy.getStorageBackend();
+  } catch (_) {
+    return 'local';
+  }
+}
+
+function parseUploadStorageBackendInput(value, fallback = 'local') {
+  const token = normalizeUploadModeToken(value);
+  if (token) return token;
+  return normalizeUploadModeToken(fallback) || 'local';
+}
+
+function parseUploadRemoteReadModeInput(value, fallback = '') {
+  const token = String(value || '').trim().toLowerCase();
+  if (token === 'proxy' || token === 'redirect') return token;
+  const base = String(fallback || '').trim().toLowerCase();
+  if (base === 'proxy' || base === 'redirect') return base;
+  return '';
+}
 
 exports.validateIntegrationVariableKey = async (req, res) => {
   try {
@@ -680,6 +707,16 @@ exports.updateAppSettings = async (req, res) => {
         publicSiteUrl: publicSiteUrlParse.url,
         // Save raw string exactly as typed (e.g., "uploads" or "/app/uploads")
         uploadsPath: req.body.uploadsPath,
+        uploadStorageBackend: parseUploadStorageBackendInput(
+          req.body.uploadStorageBackend,
+          existingApp.uploadStorageBackend || 'local'
+        ),
+        azureBlobContainer: cleanFormText(req.body.azureBlobContainer, 120) || 'uploads',
+        azureBlobPrefix: cleanFormText(req.body.azureBlobPrefix, 200),
+        uploadRemoteReadMode: parseUploadRemoteReadModeInput(
+          req.body.uploadRemoteReadMode,
+          existingApp.uploadRemoteReadMode || ''
+        ),
         brand: {
           appName: req.body.appName,
           appShortName: req.body.appShortName,

@@ -9,6 +9,7 @@ const fileAssetStorage = require('./fileAssetStorageService');
 const coreFilesService = require('./coreFilesService');
 const uploadPathUtils = require('../utils/uploadPathUtils');
 const { streamUploadFromGateway } = require('./uploadGatewayStreamService');
+const { streamUploadFromAzureBlob } = require('./uploadAzureBlobStreamService');
 
 function clean(value) {
   return String(value || '').trim();
@@ -29,8 +30,8 @@ function normalizeReference(ref = '') {
   }
   const fromDisk = uploadPathUtils.fromDiskPathToUploadsUrl(token);
   if (fromDisk) return fromDisk;
-  if (uploadStoragePolicy.isRailwayGatewayBackend()) {
-    throw new Error('Stored file reference must be an /uploads/ URL when using railway_proxy mode.');
+  if (uploadStoragePolicy.isRemoteUploadBackend()) {
+    throw new Error('Stored file reference must be an /uploads/ URL when using remote upload storage.');
   }
   throw new Error('Unable to normalize upload reference.');
 }
@@ -63,7 +64,7 @@ async function persistMulterUploads({ category = '', req = {}, options = {} } = 
       file.storedRef = normalizeReference(storedRef);
       file.uploadUrl = file.storedRef;
       file.storagePath = file.storedRef;
-      if (uploadStoragePolicy.isRailwayGatewayBackend()) {
+      if (uploadStoragePolicy.isRemoteUploadBackend()) {
         file.path = file.storedRef;
       }
     }
@@ -157,6 +158,9 @@ async function streamPublicUpload(req, res) {
   if (uploadStoragePolicy.isRailwayGatewayBackend()) {
     return streamUploadFromGateway(req, res);
   }
+  if (uploadStoragePolicy.isAzureBlobBackend()) {
+    return streamUploadFromAzureBlob(req, res);
+  }
   return null;
 }
 
@@ -177,7 +181,7 @@ async function readUploadedFileAsUtf8(file = {}) {
     const { buffer } = await readBuffer(ref);
     return Buffer.from(buffer).toString('utf8');
   }
-  if (uploadStoragePolicy.isRailwayGatewayBackend()) {
+  if (uploadStoragePolicy.isRemoteUploadBackend()) {
     throw new Error('Uploaded file must be stored as an /uploads/ URL when using remote upload storage.');
   }
   const diskPath = path.isAbsolute(rawRef) ? rawRef : path.resolve(process.cwd(), rawRef);
@@ -202,6 +206,7 @@ async function removeUploadedMulterFile(fileOrRef = '') {
 module.exports = {
   getStorageBackend: uploadStoragePolicy.getStorageBackend,
   isRailwayGatewayBackend: uploadStoragePolicy.isRailwayGatewayBackend,
+  isAzureBlobBackend: uploadStoragePolicy.isAzureBlobBackend,
   isRemoteUploadBackend: uploadStoragePolicy.isRemoteUploadBackend,
   assertStorageReady: assertReady,
   isUploadReference: fileAssetStorage.isUploadReference,

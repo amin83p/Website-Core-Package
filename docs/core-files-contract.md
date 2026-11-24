@@ -7,7 +7,7 @@ Primary implementation: `MVC/services/coreFilesService.js`.
 ## Goals
 
 - Keep upload/file runtime behavior compatible with existing routes and payloads.
-- Centralize storage-mode branching (`local` vs `railway_proxy`).
+- Centralize storage-mode branching (`local`, `railway_proxy`, `azure_blob`) via `uploadRemoteDriverService`.
 - Centralize folder/category mapping and path safety.
 - Give package code a stable contract so storage architecture can change later without package rewrites.
 

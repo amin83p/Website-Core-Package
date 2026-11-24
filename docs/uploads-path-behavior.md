@@ -1,4 +1,4 @@
-# Upload Path Behavior (Local vs Railway Gateway)
+# Upload Path Behavior (Local vs Remote Backends)
 
 All durable upload/read/delete operations go through **`MVC/services/uploadStorageService.js`**. Packages (including school) must not import gateway clients, upload mode helpers, or legacy asset storage modules directly.
 
@@ -6,36 +6,39 @@ All durable upload/read/delete operations go through **`MVC/services/uploadStora
 
 | Source | Keys |
 |--------|------|
-| `.env` | `UPLOAD_MODE` (`local` or `railway_proxy`; `s3` reserved), `RAILWAY_GATEWAY_BASE_URL`, `FILE_GATEWAY_SHARED_KEY`, `UPLOAD_REMOTE_READ_MODE` (`redirect` default, or `proxy`), optional `UPLOAD_STORAGE_STRICT_BOOT` (default `true`) |
-| System Settings | `app.uploadsPath`, `uploadFolders.*` |
+| **App Defaults** | `app.uploadStorageBackend` (`local`, `railway_proxy`, `azure_blob`), `app.uploadsPath`, `app.azureBlobContainer`, `app.azureBlobPrefix`, `app.uploadRemoteReadMode` (`redirect` or `proxy`), `uploadFolders.*` |
+| **`.env` (override)** | `UPLOAD_MODE` (when set, overrides App Defaults), `RAILWAY_GATEWAY_BASE_URL`, `FILE_GATEWAY_SHARED_KEY`, `AZURE_STORAGE_CONNECTION_STRING` or `AZURE_STORAGE_ACCOUNT` + `AZURE_STORAGE_ACCOUNT_KEY`, optional `AZURE_STORAGE_CONTAINER`, `UPLOAD_REMOTE_READ_MODE`, `UPLOAD_STORAGE_STRICT_BOOT` (default `true`) |
 
 Public URLs are always `/uploads/...`; physical storage depends on backend:
 
-- **`local`** — files on disk under `app.uploadsPath` (must exist and be writable; no silent fallback to project `uploads/` when misconfigured).
-- **`railway_proxy`** — backend is **`railway_gateway`**: reads/writes go through the signed gateway to the Railway volume. **No local disk fallback** when the gateway URL or shared key is missing or requests fail.
-- Multer still writes a **staging copy** under `app.uploadsPath` before mirroring to the gateway; that path must be writable in both modes (boot validation checks it for `railway_proxy` as well).
+- **`local`** — files on disk under `app.uploadsPath` (must exist and be writable).
+- **`railway_proxy`** — backend **`railway_gateway`**: signed HTTP gateway to the Railway volume. No local disk fallback for durable reads.
+- **`azure_blob`** — Azure Blob Storage in the configured container; blob keys mirror `/uploads/GLOBAL/...` and `/uploads/ORG_{orgId}/...` layout (optional `app.azureBlobPrefix`).
+- **`s3`** — reserved; not implemented yet.
+
+Multer still writes a **staging copy** under `app.uploadsPath` before mirroring to remote storage; that path must be writable when using `railway_proxy` or `azure_blob`.
 
 ## Boot validation
 
-After settings load, `uploadStoragePolicyService.validateUploadStorageAtBoot()` runs. With strict boot (default), misconfiguration prevents startup with a clear error. Set `UPLOAD_STORAGE_STRICT_BOOT=false` only for local development when you intentionally run with incomplete gateway env.
+After settings load, `uploadStoragePolicyService.validateUploadStorageAtBoot()` runs. With strict boot (default), misconfiguration prevents startup with a clear error.
 
 ## Multer and File Manager
 
-- Multer still stages to the configured upload root; **`uploadStorageService.persistMulterUploads`** mirrors to the gateway in `railway_proxy` and sets **`storedRef`** on each file (also used by **`getStoredFilePath`** / **`getStoredFileUrl`**).
-- CSV and text imports read uploaded files via **`uploadStorageService.readUploadedFileAsUtf8`** so gateway-backed uploads work after staging is removed.
-- File Manager storage operations use **`uploadStorageService.fileManager.*`** (list, upload, move, rename, delete, create folder).
-- HTTP **`GET /uploads/...`** in gateway mode never serves stale files from project `uploads/` or misconfigured roots first; it uses **`uploadStorageService.streamPublicUpload`** (redirect to public gateway URL by default).
+- **`uploadStorageService.persistMulterUploads`** mirrors staged files to the active remote driver and sets **`storedRef`** `/uploads/...` on each file.
+- File Manager uses **`uploadStorageService.fileManager.*`** (backed by **`uploadRemoteDriverService`** in remote modes).
+- HTTP **`GET /uploads/...`** in remote modes uses **`uploadStorageService.streamPublicUpload`** (Railway gateway redirect/proxy or Azure SAS redirect/proxy).
 
 ## Remote mode rules (no local cache)
 
-When **`uploadStoragePolicyService.preferRemoteUploadReads()`** is true (`railway_proxy` today; S3 later):
+When **`uploadStoragePolicyService.preferRemoteUploadReads()`** is true:
 
-- Do **not** read upload bytes from `app.uploadsPath`, project `uploads/`, or `resolveExistingUploadDiskPath` before the gateway.
-- Persist only **`/uploads/...` URLs** in Mongo/JSON (use **`coreUploadRefService.resolveMulterStoredRef`** or **`uploadStorageService.normalizeReference`** after upload).
-- Do **not** store multer **`file.path`** disk paths as the durable reference.
-- **`UPLOAD_REMOTE_READ_MODE=proxy`** buffers one response in memory (not disk); default **`redirect`** sends the browser to the gateway host.
+- Do **not** read durable upload bytes from `app.uploadsPath` before the remote backend.
+- Persist only **`/uploads/...` URLs** in Mongo/JSON.
+- **`allowLocalUploadFallback()`** is **false**.
 
-Low-level gateway code may call **`allowLocalUploadFallback()`** before optional local reads; it is **false** in remote backends.
+## Switching backends
+
+Changing App Defaults (or `UPLOAD_MODE`) does **not** migrate files. Copy blobs or use `scripts/maintenance/migrate-uploads-to-azure-blob.js` before cutover.
 
 ## Package usage
 

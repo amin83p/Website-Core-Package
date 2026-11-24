@@ -19,6 +19,7 @@ module.exports = {
   inferSearchableFields: coreContracts.inferSearchableFields,
   isAjax: coreContracts.isAjax,
   isRailwayProxyMode: coreContracts.isRailwayProxyMode,
+  isRemoteUploadMode: coreContracts.isRemoteUploadMode,
   getGatewayBaseUrl: coreContracts.getGatewayBaseUrl,
   getGatewayTimeoutMs: coreContracts.getGatewayTimeoutMs,
   assertCreateOrgContextOrThrow: coreContracts.assertCreateOrgContextOrThrow,

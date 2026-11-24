@@ -161,6 +161,10 @@ const DEFAULTS = {
     defaultTimezone: 'UTC',
     publicSiteUrl: '',
     uploadsPath: 'uploads', // Store as string, resolve at runtime
+    uploadStorageBackend: 'local',
+    azureBlobContainer: 'uploads',
+    azureBlobPrefix: '',
+    uploadRemoteReadMode: '',
     uploadFolders: uploadFolderSettingsService.getDefaultUploadFolders(),
     brand: DEFAULT_APP_BRAND,
     contact: DEFAULT_APP_CONTACT,

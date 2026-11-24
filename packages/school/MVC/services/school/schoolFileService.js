@@ -23,7 +23,7 @@ function resolveMulterStoredRef(file = {}) {
   try {
     return uploadStorage.normalizeReference(rawRef);
   } catch (error) {
-    if (uploadStorage.isRailwayGatewayBackend()) {
+    if (uploadStorage.isRemoteUploadBackend()) {
       throw new Error('Uploaded file must be stored as an /uploads/ URL.');
     }
     throw error;

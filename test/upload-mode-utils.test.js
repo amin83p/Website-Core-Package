@@ -2,9 +2,15 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const uploadModeUtils = require('../MVC/utils/uploadModeUtils');
+const {
+  installUploadModeTestIsolation,
+  stubUploadStorageBackend
+} = require('./helpers/uploadModeTestIsolation');
 
 const ORIGINAL_UPLOAD_MODE = process.env.UPLOAD_MODE;
 const ORIGINAL_GATEWAY_BASE = process.env.RAILWAY_GATEWAY_BASE_URL;
+
+installUploadModeTestIsolation(test);
 
 test.afterEach(() => {
   if (ORIGINAL_UPLOAD_MODE === undefined) delete process.env.UPLOAD_MODE;
@@ -26,8 +32,35 @@ test('shouldPersistUploadsViaRemoteGateway is true in railway_proxy even without
   assert.equal(uploadModeUtils.shouldPersistUploadsViaRemoteGateway(), true);
 });
 
+test('shouldPersistUploadsViaRemoteGateway is true in azure_blob mode', () => {
+  process.env.UPLOAD_MODE = 'azure_blob';
+  assert.equal(uploadModeUtils.shouldPersistUploadsViaRemoteGateway(), true);
+  delete process.env.UPLOAD_MODE;
+});
+
 test('shouldPersistUploadsViaRemoteGateway is true when railway_proxy and gateway base URL are set', () => {
   process.env.UPLOAD_MODE = 'railway_proxy';
   process.env.RAILWAY_GATEWAY_BASE_URL = 'https://equportal.app/';
   assert.equal(uploadModeUtils.shouldPersistUploadsViaRemoteGateway(), true);
+});
+
+test('getUploadMode uses app.uploadStorageBackend when UPLOAD_MODE is unset', () => {
+  delete process.env.UPLOAD_MODE;
+  stubUploadStorageBackend('railway_proxy');
+  assert.equal(uploadModeUtils.getUploadMode(), 'railway_proxy');
+  assert.equal(uploadModeUtils.shouldPersistUploadsViaRemoteGateway(), true);
+});
+
+test('getUploadMode uses azure_blob from app settings when UPLOAD_MODE is unset', () => {
+  delete process.env.UPLOAD_MODE;
+  stubUploadStorageBackend('azure_blob');
+  assert.equal(uploadModeUtils.getUploadMode(), 'azure_blob');
+  assert.equal(uploadModeUtils.shouldPersistUploadsViaRemoteGateway(), true);
+});
+
+test('UPLOAD_MODE env overrides app.uploadStorageBackend', () => {
+  process.env.UPLOAD_MODE = 'local';
+  stubUploadStorageBackend('railway_proxy');
+  assert.equal(uploadModeUtils.getUploadMode(), 'local');
+  assert.equal(uploadModeUtils.shouldPersistUploadsViaRemoteGateway(), false);
 });

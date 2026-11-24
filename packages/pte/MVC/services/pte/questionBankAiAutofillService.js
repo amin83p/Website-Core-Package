@@ -8,6 +8,7 @@ const {
   settingService,
   coreFilesService,
   isRailwayProxyMode,
+  isRemoteUploadMode,
   getGatewayBaseUrl,
   getGatewayTimeoutMs
 } = require('./pteCoreDependencies');
@@ -3834,7 +3835,7 @@ function buildRemoteMediaUrlCandidates(mediaRow = {}) {
 }
 
 async function fetchRemoteMediaBuffer(mediaRow = {}, kind = '', maxBytes = AI_ASSIST_MEDIA_MAX_BYTES) {
-  if (!isRailwayProxyMode()) {
+  if (!isRemoteUploadMode()) {
     return { buffer: null, mimeType: '', url: '', error: '', tried: 0 };
   }
 

@@ -54,6 +54,7 @@ test.beforeEach(async () => {
     if (section === 'app' && key === 'uploadsPath') return TEST_UPLOAD_ROOT;
     if (section === 'app' && key === 'defaultPageSize') return '25';
     if (section === 'app' && key === 'uploadFolders') return {};
+    if (section === 'app' && key === 'uploadStorageBackend') return 'local';
     return ORIGINAL_GET_VALUE.call(settingService, section, key);
   };
   await resetTestUploads();

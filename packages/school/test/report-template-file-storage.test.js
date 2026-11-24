@@ -7,6 +7,9 @@ const uploadFolderSettingsService = require('../../../MVC/services/uploadFolderS
 const reportDocxRenderService = require('../MVC/services/school/reportDocxRenderService');
 const reportViewService = require('../MVC/services/school/reportViewService');
 const uploadPathUtils = require('../../../MVC/utils/uploadPathUtils');
+const { installUploadModeTestIsolation } = require('../../../test/helpers/uploadModeTestIsolation');
+
+installUploadModeTestIsolation(test);
 
 test('school report template uploads resolve to school-reports folder category', () => {
   const category = uploadStorageService.resolveUploadCategory('school-reports');

@@ -593,8 +593,8 @@ function normalizeStoredUploadRef(storedPath = '', storedUrl = '') {
   try {
     return uploadStorage.normalizeReference(combined);
   } catch (error) {
-    if (uploadStorage.isRailwayGatewayBackend()) {
-      throw new Error('Uploaded file must be stored as an /uploads/ URL when using railway_proxy mode.');
+    if (uploadStorage.isRemoteUploadBackend()) {
+      throw new Error('Uploaded file must be stored as an /uploads/ URL when using remote upload storage.');
     }
     return combined;
   }

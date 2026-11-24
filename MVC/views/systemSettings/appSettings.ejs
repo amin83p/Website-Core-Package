@@ -71,6 +71,10 @@
   const integrationVarFormRows = (typeof integrationVariableRows !== 'undefined' && Array.isArray(integrationVariableRows))
     ? integrationVariableRows
     : [{ key: '', isSecret: false, value: '', valueHint: '', hasStoredSecret: false }];
+  const uploadBackendSaved = String(appSettings.uploadStorageBackend || 'local').trim().toLowerCase() || 'local';
+  const uploadBackendEffective = String(typeof uploadStorageBackendEffective !== 'undefined' ? uploadStorageBackendEffective : uploadBackendSaved).trim().toLowerCase();
+  const uploadHealth = (typeof uploadStorageHealth !== 'undefined' && uploadStorageHealth) ? uploadStorageHealth : { ok: true, issues: [] };
+  const uploadRemoteReadMode = String(appSettings.uploadRemoteReadMode || '').toLowerCase();
   const timezoneGroups = tzOptions.reduce((acc, row) => {
     const group = String(row?.group || 'Other').trim() || 'Other';
     if (!acc[group]) acc[group] = [];
@@ -102,6 +106,11 @@
         <li class="nav-item" role="presentation">
           <button class="nav-link fw-semibold" id="app-operational-tab" data-bs-toggle="tab" data-bs-target="#app-operational-pane" type="button" role="tab" aria-controls="app-operational-pane" aria-selected="false">
             <i class="bi bi-sliders me-1"></i> Operational Defaults
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link fw-semibold" id="app-upload-storage-tab" data-bs-toggle="tab" data-bs-target="#app-upload-storage-pane" type="button" role="tab" aria-controls="app-upload-storage-pane" aria-selected="false">
+            <i class="bi bi-cloud-upload me-1"></i> Upload Storage
           </button>
         </li>
         <li class="nav-item" role="presentation">
@@ -652,7 +661,7 @@
       <div class="card mb-4 shadow-sm border-0">
         <div class="card-header bg-white border-0 pb-0">
           <h5 class="fw-bold mb-1"><i class="bi bi-sliders text-primary me-2"></i>Operational Defaults</h5>
-          <p class="text-muted small mb-0">Controls pagination, search behavior, and upload destination.</p>
+          <p class="text-muted small mb-0">Controls pagination, search behavior, timezone, and public site URL.</p>
         </div>
         <div class="card-body p-4">
             
@@ -731,16 +740,82 @@
                 <div class="form-text">Optional per-app override. Leave empty to use repo `config/build-version.json`, then env/git fallback. Deploy pipelines may also set optional `commitAt` in that file.</div>
             </div>
 
+        </div>
+      </div>
+        </div>
+
+        <div class="tab-pane fade" id="app-upload-storage-pane" role="tabpanel" aria-labelledby="app-upload-storage-tab" tabindex="0">
+      <div class="card mb-4 shadow-sm border-0">
+        <div class="card-header bg-white border-0 pb-0">
+          <h5 class="fw-bold mb-1"><i class="bi bi-cloud-upload text-primary me-2"></i>Upload Storage</h5>
+          <p class="text-muted small mb-0">Backend for durable files (<code>/uploads/...</code>), multer staging path, and remote read behavior. Credentials stay in environment variables.</p>
+        </div>
+        <div class="card-body p-4">
             <div class="mb-4">
-                <label class="form-label fw-bold text-primary">Uploads Directory (Absolute or Relative)</label>
-                <input type="text" name="uploadsPath" class="form-control font-monospace" 
+                <label class="form-label fw-bold text-primary" for="uploadStorageBackend">Upload storage backend</label>
+                <select class="form-select" id="uploadStorageBackend" name="uploadStorageBackend">
+                    <option value="local" <%= uploadBackendSaved === 'local' ? 'selected' : '' %>>Local disk (app.uploadsPath)</option>
+                    <option value="railway_proxy" <%= uploadBackendSaved === 'railway_proxy' ? 'selected' : '' %>>Railway file gateway</option>
+                    <option value="azure_blob" <%= uploadBackendSaved === 'azure_blob' ? 'selected' : '' %>>Azure Blob Storage</option>
+                </select>
+                <div class="form-text text-muted">
+                    Effective runtime backend: <code><%= uploadBackendEffective %></code>.
+                    <% if (typeof uploadStorageBackendFromEnv !== 'undefined' && uploadStorageBackendFromEnv) { %>
+                    <strong>UPLOAD_MODE</strong> in the environment overrides this dropdown.
+                    <% } %>
+                    See <code>docs/uploads-path-behavior.md</code>. Switching backends does not migrate existing files.
+                </div>
+                <% if (uploadHealth.issues && uploadHealth.issues.length) { %>
+                <div class="alert alert-warning py-2 px-3 mt-2 mb-0 small">
+                    <strong>Storage check:</strong>
+                    <ul class="mb-0 ps-3">
+                        <% uploadHealth.issues.forEach((issue) => { %>
+                        <li><%= issue %></li>
+                        <% }) %>
+                    </ul>
+                </div>
+                <% } %>
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label fw-bold text-primary" for="uploadsPath">Uploads directory (absolute or relative)</label>
+                <input type="text" id="uploadsPath" name="uploadsPath" class="form-control font-monospace"
                        value="<%= settings.app.uploadsPath %>" placeholder="/app/uploads or uploads">
                 <div class="form-text text-muted">
-                    <i class="bi bi-info-circle me-1"></i>
-                    <strong>Examples:</strong> Use a relative path like <code>uploads</code> (project root) or an absolute path like <code>/app/uploads</code> (Railway volume).
+                    <strong>Local mode:</strong> durable files live here.
+                    <strong>Remote modes:</strong> writable folder for multer staging before files are mirrored to Railway or Azure.
                 </div>
             </div>
 
+            <div class="mb-0 border rounded p-3 bg-light">
+                <div class="fw-bold mb-2">Azure Blob (when backend is Azure)</div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label" for="azureBlobContainer">Container name</label>
+                        <input type="text" class="form-control font-monospace" id="azureBlobContainer" name="azureBlobContainer"
+                               value="<%= settings.app.azureBlobContainer || 'uploads' %>" placeholder="uploads">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label" for="azureBlobPrefix">Optional blob prefix</label>
+                        <input type="text" class="form-control font-monospace" id="azureBlobPrefix" name="azureBlobPrefix"
+                               value="<%= settings.app.azureBlobPrefix || '' %>" placeholder="e.g. prod">
+                    </div>
+                </div>
+                <div class="row g-3 mt-1">
+                    <div class="col-md-6">
+                        <label class="form-label" for="uploadRemoteReadMode">Public /uploads read mode</label>
+                        <select class="form-select" id="uploadRemoteReadMode" name="uploadRemoteReadMode">
+                            <option value="" <%= !uploadRemoteReadMode ? 'selected' : '' %>>Default (redirect / SAS)</option>
+                            <option value="redirect" <%= uploadRemoteReadMode === 'redirect' ? 'selected' : '' %>>Redirect</option>
+                            <option value="proxy" <%= uploadRemoteReadMode === 'proxy' ? 'selected' : '' %>>Proxy through app</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-text text-muted mt-2 mb-0">
+                    Set <code>AZURE_STORAGE_CONNECTION_STRING</code> or <code>AZURE_STORAGE_ACCOUNT</code> + <code>AZURE_STORAGE_ACCOUNT_KEY</code> in the environment.
+                    Railway mode uses <code>RAILWAY_GATEWAY_BASE_URL</code> and <code>FILE_GATEWAY_SHARED_KEY</code>.
+                </div>
+            </div>
         </div>
       </div>
         </div>

@@ -6,6 +6,9 @@ const path = require('path');
 const uploadStoragePolicy = require('../MVC/services/uploadStoragePolicyService');
 const uploadStorageService = require('../MVC/services/uploadStorageService');
 const { shouldServePublicUploadsFromRemoteOnly } = require('../MVC/utils/uploadPublicRoutePolicy');
+const { installUploadModeTestIsolation } = require('./helpers/uploadModeTestIsolation');
+
+installUploadModeTestIsolation(test);
 
 const ORIGINAL_UPLOAD_MODE = process.env.UPLOAD_MODE;
 const ORIGINAL_GATEWAY_BASE = process.env.RAILWAY_GATEWAY_BASE_URL;
@@ -62,6 +65,40 @@ test('preferRemoteUploadReads is true for s3 mode', () => {
   assert.equal(uploadStoragePolicy.preferRemoteUploadReads(), true);
   assert.equal(uploadStoragePolicy.allowLocalUploadFallback(), false);
   assert.throws(() => uploadStoragePolicy.assertS3BackendReady(), /not configured yet/);
+});
+
+test('getStorageBackend maps azure_blob to azure_blob', () => {
+  process.env.UPLOAD_MODE = 'azure_blob';
+  assert.equal(uploadStoragePolicy.getStorageBackend(), 'azure_blob');
+  assert.equal(uploadStoragePolicy.isAzureBlobBackend(), true);
+  assert.equal(uploadStoragePolicy.preferRemoteUploadReads(), true);
+  delete process.env.UPLOAD_MODE;
+});
+
+test('assertAzureBlobReady throws when credentials or container missing', () => {
+  process.env.UPLOAD_MODE = 'azure_blob';
+  delete process.env.AZURE_STORAGE_CONNECTION_STRING;
+  delete process.env.AZURE_STORAGE_ACCOUNT;
+  delete process.env.AZURE_STORAGE_ACCOUNT_KEY;
+  assert.throws(() => uploadStoragePolicy.assertAzureBlobReady(), /credentials/i);
+  process.env.AZURE_STORAGE_CONNECTION_STRING = 'UseDevelopmentStorage=true';
+});
+
+test('normalizeReference rejects bare disk paths in azure_blob mode', () => {
+  process.env.UPLOAD_MODE = 'azure_blob';
+  process.env.AZURE_STORAGE_CONNECTION_STRING = 'UseDevelopmentStorage=true';
+  assert.throws(
+    () => uploadStorageService.normalizeReference('C:\\temp\\not-uploads.docx'),
+    /must be an \/uploads\/ URL/
+  );
+});
+
+test('supportsGatewayOrgBackup is railway only', () => {
+  process.env.UPLOAD_MODE = 'railway_proxy';
+  assert.equal(uploadStoragePolicy.supportsGatewayOrgBackup(), true);
+  process.env.UPLOAD_MODE = 'azure_blob';
+  assert.equal(uploadStoragePolicy.supportsGatewayOrgBackup(), false);
+  delete process.env.UPLOAD_MODE;
 });
 
 test('app.js serves public uploads from remote before local disk lookup', () => {

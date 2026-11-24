@@ -574,7 +574,7 @@ async function getClassSessions(classId) {
             // Try the next configured/default location.
         }
     }
-    if (!uploadStorage.isRailwayGatewayBackend()) {
+    if (!uploadStorage.isRemoteUploadBackend()) {
         const legacySessionsPath = path.join(legacyStorageBasePath, String(classId), 'sessions.json');
         try {
             const data = await fs.readFile(legacySessionsPath, 'utf8');

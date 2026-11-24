@@ -5,6 +5,9 @@ const fs = require('fs');
 
 const uploadStorage = require('../MVC/services/uploadStorageService');
 const uploadPathUtils = require('../MVC/utils/uploadPathUtils');
+const { installUploadModeTestIsolation } = require('./helpers/uploadModeTestIsolation');
+
+installUploadModeTestIsolation(test);
 
 const ORIGINAL_UPLOAD_MODE = process.env.UPLOAD_MODE;
 

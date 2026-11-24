@@ -105,7 +105,7 @@ function resolvePdfTemplateReadRef(pdfTemplate = {}) {
 async function readPdfTemplateBuffer(pdfTemplate = {}) {
   const filePath = resolvePdfTemplateReadRef(pdfTemplate);
   if (!filePath) throw new Error('This report template has no PDF file configured. Upload a PDF template first.');
-  const useUploadStorage = uploadStorage.isUploadReference(filePath) || uploadStorage.isRailwayGatewayBackend();
+  const useUploadStorage = uploadStorage.isUploadReference(filePath) || uploadStorage.isRemoteUploadBackend();
   try {
     const binary = useUploadStorage
       ? (await uploadStorage.readBuffer(

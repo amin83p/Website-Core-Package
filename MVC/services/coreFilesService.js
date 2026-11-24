@@ -8,16 +8,7 @@ const uploadFolderSettingsService = require('./uploadFolderSettingsService');
 const uploadCategoryResolverService = require('./uploadCategoryResolverService');
 const adminAuthorityService = require('./adminAuthorityService');
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
-const {
-  gatewayUploadFile,
-  gatewayDeleteByUploadUrl,
-  gatewayDeleteByRelativePath,
-  gatewayMoveItem,
-  gatewayCopyItem,
-  gatewayRenameItem,
-  gatewayCreateFolder,
-  gatewayListDirectory
-} = require('./fileGatewayClientService');
+const uploadRemoteDriver = require('./uploadRemoteDriverService');
 
 /**
  * Core Files Service Contract (v1)
@@ -150,10 +141,10 @@ function collectRequestFiles(req = {}) {
 }
 
 async function mirrorUploadedFilesIfNeeded(req = {}, fixedCategory = '') {
-  if (!uploadStoragePolicy.isRailwayGatewayBackend()) {
+  if (!uploadStoragePolicy.isRemoteUploadBackend()) {
     return;
   }
-  uploadStoragePolicy.assertRailwayGatewayReady();
+  uploadStoragePolicy.assertStorageReadyForOperation();
   const requestPath = String(req.originalUrl || req.url || '').toLowerCase();
   if (requestPath.includes('/internal/file-gateway/')) return;
   if (requestPath.includes('/files/upload')) return;
@@ -179,7 +170,7 @@ async function mirrorUploadedFilesIfNeeded(req = {}, fixedCategory = '') {
     const desiredName = parts.pop() || clean(file.originalname || file.filename);
     const relativeDir = parts.join('/');
 
-    const gatewayResult = await gatewayUploadFile({
+    const gatewayResult = await uploadRemoteDriver.uploadFile({
       scopeKey,
       relativeDir,
       desiredName,
@@ -218,7 +209,7 @@ async function deleteFilePaths(filePaths = []) {
       if (!target) return;
       if (isUploadReference(target)) {
         if (uploadStoragePolicy.isRemoteUploadBackend()) {
-          await gatewayDeleteByUploadUrl(target);
+          await uploadRemoteDriver.deleteByUploadUrl(target);
           return;
         }
         const diskPath = uploadPathUtils.fromUploadsUrlToDiskPath(target);
@@ -511,8 +502,8 @@ function movePathSafe(sourcePath, destinationPath) {
 }
 
 async function listContextDirectory(context = {}) {
-  if (uploadStoragePolicy.isRailwayGatewayBackend()) {
-    const gatewayResult = await gatewayListDirectory({
+  if (uploadStoragePolicy.isRemoteUploadBackend()) {
+    const gatewayResult = await uploadRemoteDriver.listDirectory({
       scopeKey: context.scopeKey,
       relativeDir: context.relativeSub
     });
@@ -540,8 +531,8 @@ async function listContextDirectory(context = {}) {
 }
 
 async function listDirectoryByScope({ scopeKey = '', relativeDir = '' } = {}) {
-  if (uploadStoragePolicy.isRailwayGatewayBackend()) {
-    const gatewayResult = await gatewayListDirectory({
+  if (uploadStoragePolicy.isRemoteUploadBackend()) {
+    const gatewayResult = await uploadRemoteDriver.listDirectory({
       scopeKey,
       relativeDir
     });
@@ -579,7 +570,7 @@ async function transferSingleItem({ operation = 'move', sourceContext = {}, dest
 
   let finalName = '';
   let targetPath = '';
-  if (uploadStoragePolicy.isRailwayGatewayBackend()) {
+  if (uploadStoragePolicy.isRemoteUploadBackend()) {
     const payload = {
       sourceScopeKey: sourceContext.scopeKey,
       sourceRelativePath: sourceContext.relativeSub,
@@ -587,8 +578,8 @@ async function transferSingleItem({ operation = 'move', sourceContext = {}, dest
       destinationRelativeDir: destinationContext.relativeSub
     };
     const result = operation === 'copy'
-      ? await gatewayCopyItem(payload)
-      : await gatewayMoveItem(payload);
+      ? await uploadRemoteDriver.copyItem(payload)
+      : await uploadRemoteDriver.moveItem(payload);
     finalName = clean(result?.finalName || path.basename(sourceContext.relativeSub));
     targetPath = buildOperationDestinationPath(destinationContext, finalName);
   } else {
@@ -618,8 +609,8 @@ async function transferSingleItem({ operation = 'move', sourceContext = {}, dest
 
 async function deletePathByContext(context = {}) {
   if (!context.relativeSub) throw new Error('Cannot delete root drives.');
-  if (uploadStoragePolicy.isRailwayGatewayBackend()) {
-    await gatewayDeleteByRelativePath({
+  if (uploadStoragePolicy.isRemoteUploadBackend()) {
+    await uploadRemoteDriver.deleteByRelativePath({
       scopeKey: context.scopeKey,
       relativePath: context.relativeSub
     });
@@ -644,8 +635,8 @@ async function renamePathByContext(sourceContext = {}, newName = '') {
   let targetPath = [parentPath, safeName].filter(Boolean).join('/').replace(/\\/g, '/');
   let finalName = safeName;
 
-  if (uploadStoragePolicy.isRailwayGatewayBackend()) {
-    const result = await gatewayRenameItem({
+  if (uploadStoragePolicy.isRemoteUploadBackend()) {
+    const result = await uploadRemoteDriver.renameItem({
       scopeKey: sourceContext.scopeKey,
       relativePath: sourceContext.relativeSub,
       newName: safeName
@@ -674,8 +665,8 @@ async function renamePathByContext(sourceContext = {}, newName = '') {
 
 async function createFolderByContext(context = {}, folderName = '') {
   const safeFolderName = assertValidName(folderName, 'folder name');
-  if (uploadStoragePolicy.isRailwayGatewayBackend()) {
-    await gatewayCreateFolder({
+  if (uploadStoragePolicy.isRemoteUploadBackend()) {
+    await uploadRemoteDriver.createFolder({
       scopeKey: context.scopeKey,
       relativeDir: context.relativeSub,
       folderName: safeFolderName
@@ -726,7 +717,7 @@ function getWebUrl(scopeId, subfolder, filename) {
 
 async function uploadFilesToContext({ context = {}, files = [], relativePaths = [] } = {}) {
   const baseTargetDir = context.targetPath;
-  if (!uploadStoragePolicy.isRailwayGatewayBackend()) {
+  if (!uploadStoragePolicy.isRemoteUploadBackend()) {
     pathResolver.ensureDir(baseTargetDir);
   }
 
@@ -743,8 +734,8 @@ async function uploadFilesToContext({ context = {}, files = [], relativePaths = 
       const { relativeDir, fileName } = splitFilePath(relativeFromClient, file.originalname);
       const finalSubfolder = [context.relativeSub, relativeDir].filter(Boolean).join('/').replace(/\\/g, '/');
 
-      if (uploadStoragePolicy.isRailwayGatewayBackend()) {
-        const gatewayResult = await gatewayUploadFile({
+      if (uploadStoragePolicy.isRemoteUploadBackend()) {
+        const gatewayResult = await uploadRemoteDriver.uploadFile({
           scopeKey: context.scopeKey,
           relativeDir: finalSubfolder,
           desiredName: fileName,

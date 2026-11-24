@@ -363,9 +363,18 @@ exports.listFolderLibrary = async (req, res) => {
 exports.downloadOrgBackup = async (req, res) => {
   try {
     const { orgId } = await assertOrgBackupRequest(req);
-    if (uploadStoragePolicy.isRailwayGatewayBackend()) {
+    if (uploadStoragePolicy.supportsGatewayOrgBackup()) {
       const gatewayResponse = await gatewayDownloadOrgBackup({ orgId });
       return pipeGatewayBackupResponse(res, gatewayResponse, orgFileBackupService.getBackupFileName(orgId));
+    }
+    if (uploadStoragePolicy.isAzureBlobBackend()) {
+      const orgFileBackupRemoteService = require('../services/orgFileBackupRemoteService');
+      const archive = await orgFileBackupRemoteService.createOrgBackupArchive(orgId);
+      try {
+        return res.download(archive.archivePath, archive.fileName);
+      } finally {
+        await archive.cleanup();
+      }
     }
 
     const archive = await orgFileBackupService.createOrgBackupArchive(orgId);
@@ -381,20 +390,28 @@ exports.restoreOrgBackup = async (req, res) => {
     const { orgId } = await assertOrgBackupRequest(req);
     if (!req.file || !req.file.buffer) throw new Error('Select an organization backup file to restore.');
 
-    const result = uploadStoragePolicy.isRailwayGatewayBackend()
-      ? await gatewayRestoreOrgBackup({
+    let result;
+    if (uploadStoragePolicy.supportsGatewayOrgBackup()) {
+      result = await gatewayRestoreOrgBackup({
         orgId,
         buffer: req.file.buffer,
         fileName: req.file.originalname || 'org-upload-backup.tar.gz',
         mimeType: req.file.mimetype || 'application/gzip'
-      })
-      : {
+      });
+    } else if (uploadStoragePolicy.isAzureBlobBackend()) {
+      const orgFileBackupRemoteService = require('../services/orgFileBackupRemoteService');
+      result = await orgFileBackupRemoteService.restoreOrgBackupFromBuffer(orgId, req.file.buffer, {
+        fileName: req.file.originalname || 'org-upload-backup.tar.gz'
+      });
+    } else {
+      result = {
         status: 'success',
         message: 'Organization files restored.',
         report: await orgFileBackupService.restoreOrgBackupFromBuffer(orgId, req.file.buffer, {
           fileName: req.file.originalname || 'org-upload-backup.tar.gz'
         })
       };
+    }
 
     return res.json({
       status: 'success',
@@ -410,7 +427,7 @@ exports.restoreOrgBackup = async (req, res) => {
 exports.downloadFile = (req, res) => {
   try {
     const requestedPath = coreFilesService.sanitizeDrivePath(req.query.path || '');
-    if (uploadStoragePolicy.isRailwayGatewayBackend()) {
+    if (uploadStoragePolicy.isRemoteUploadBackend()) {
       if (!requestedPath) return res.status(400).send('Invalid path');
       return res.redirect(`/uploads/${encodeURI(requestedPath)}`);
     }

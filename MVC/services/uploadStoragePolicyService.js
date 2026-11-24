@@ -1,11 +1,18 @@
 const fs = require('fs');
 const path = require('path');
 const uploadPathUtils = require('../utils/uploadPathUtils');
-const { getUploadMode, getGatewayBaseUrl } = require('../utils/uploadModeUtils');
+const {
+  getUploadMode,
+  getGatewayBaseUrl,
+  getAzureBlobContainerFromSettings,
+  MODE_AZURE_BLOB,
+  MODE_RAILWAY_PROXY
+} = require('../utils/uploadModeUtils');
 const settingService = require('./settingService');
 
 const STORAGE_BACKEND_LOCAL = 'local';
 const STORAGE_BACKEND_RAILWAY_GATEWAY = 'railway_gateway';
+const STORAGE_BACKEND_AZURE_BLOB = 'azure_blob';
 const STORAGE_BACKEND_S3 = 's3';
 
 function clean(value) {
@@ -14,7 +21,8 @@ function clean(value) {
 
 function getStorageBackend() {
   const mode = getUploadMode();
-  if (mode === 'railway_proxy') return STORAGE_BACKEND_RAILWAY_GATEWAY;
+  if (mode === MODE_RAILWAY_PROXY) return STORAGE_BACKEND_RAILWAY_GATEWAY;
+  if (mode === MODE_AZURE_BLOB) return STORAGE_BACKEND_AZURE_BLOB;
   if (mode === 's3') return STORAGE_BACKEND_S3;
   return STORAGE_BACKEND_LOCAL;
 }
@@ -23,12 +31,16 @@ function isRailwayGatewayBackend() {
   return getStorageBackend() === STORAGE_BACKEND_RAILWAY_GATEWAY;
 }
 
+function isAzureBlobBackend() {
+  return getStorageBackend() === STORAGE_BACKEND_AZURE_BLOB;
+}
+
 function isS3Backend() {
   return getStorageBackend() === STORAGE_BACKEND_S3;
 }
 
 function isRemoteUploadBackend() {
-  return isRailwayGatewayBackend() || isS3Backend();
+  return isRailwayGatewayBackend() || isAzureBlobBackend() || isS3Backend();
 }
 
 function preferRemoteUploadReads() {
@@ -36,9 +48,57 @@ function preferRemoteUploadReads() {
 }
 
 function allowLocalUploadFallback() {
-  // Remote backends (Railway volume gateway today; S3-compatible backends later) must not
-  // read stale copies from the configured local uploadsPath or project uploads folder.
   return !isRemoteUploadBackend();
+}
+
+function supportsGatewayOrgBackup() {
+  return isRailwayGatewayBackend();
+}
+
+function resolveAzureConnectionString() {
+  return clean(process.env.AZURE_STORAGE_CONNECTION_STRING)
+    || clean(process.env.AZURE_STORAGE_CONNECTIONSTRING);
+}
+
+function resolveAzureAccountCredentials() {
+  const account = clean(process.env.AZURE_STORAGE_ACCOUNT);
+  const key = clean(process.env.AZURE_STORAGE_ACCOUNT_KEY);
+  if (account && key) return { account, key };
+  return null;
+}
+
+function assertAzureBlobReady() {
+  if (!isAzureBlobBackend()) return;
+  const container = getAzureBlobContainerFromSettings();
+  const connectionString = resolveAzureConnectionString();
+  const accountCreds = resolveAzureAccountCredentials();
+  if (!container) {
+    throw new Error(
+      'Upload storage is azure_blob but app.azureBlobContainer is empty. Set it in App Defaults or AZURE_STORAGE_CONTAINER.'
+    );
+  }
+  if (!connectionString && !accountCreds) {
+    throw new Error(
+      'Upload storage is azure_blob but Azure credentials are missing. Set AZURE_STORAGE_CONNECTION_STRING or AZURE_STORAGE_ACCOUNT + AZURE_STORAGE_ACCOUNT_KEY.'
+    );
+  }
+}
+
+function getUploadStorageHealthSummary() {
+  const backend = getStorageBackend();
+  const summary = { backend, ok: true, issues: [] };
+  if (backend === STORAGE_BACKEND_RAILWAY_GATEWAY) {
+    if (!getGatewayBaseUrl()) summary.issues.push('RAILWAY_GATEWAY_BASE_URL is not set.');
+    if (!clean(process.env.FILE_GATEWAY_SHARED_KEY || '')) summary.issues.push('FILE_GATEWAY_SHARED_KEY is not set.');
+  } else if (backend === STORAGE_BACKEND_AZURE_BLOB) {
+    try {
+      assertAzureBlobReady();
+    } catch (error) {
+      summary.issues.push(error.message);
+    }
+  }
+  summary.ok = summary.issues.length === 0;
+  return summary;
 }
 
 function assertRailwayGatewayReady() {
@@ -85,12 +145,12 @@ function resolveConfiguredUploadRootStrict() {
 }
 
 function assertLocalUploadRootReady() {
-  if (isRailwayGatewayBackend()) return;
+  if (isRemoteUploadBackend()) return;
   resolveConfiguredUploadRootStrict();
 }
 
 function assertMulterStagingRootReady() {
-  if (!isRailwayGatewayBackend()) return;
+  if (!isRemoteUploadBackend()) return;
   resolveConfiguredUploadRootStrict();
 }
 
@@ -102,6 +162,10 @@ function assertS3BackendReady() {
 function assertStorageReadyForOperation() {
   if (isRailwayGatewayBackend()) {
     assertRailwayGatewayReady();
+    return;
+  }
+  if (isAzureBlobBackend()) {
+    assertAzureBlobReady();
     return;
   }
   if (isS3Backend()) {
@@ -119,6 +183,17 @@ function validateUploadStorageAtBoot(options = {}) {
   if (backend === STORAGE_BACKEND_RAILWAY_GATEWAY) {
     try {
       assertRailwayGatewayReady();
+    } catch (error) {
+      issues.push(error.message);
+    }
+    try {
+      assertMulterStagingRootReady();
+    } catch (error) {
+      issues.push(error.message);
+    }
+  } else if (backend === STORAGE_BACKEND_AZURE_BLOB) {
+    try {
+      assertAzureBlobReady();
     } catch (error) {
       issues.push(error.message);
     }
@@ -156,14 +231,19 @@ function validateUploadStorageAtBoot(options = {}) {
 module.exports = {
   STORAGE_BACKEND_LOCAL,
   STORAGE_BACKEND_RAILWAY_GATEWAY,
+  STORAGE_BACKEND_AZURE_BLOB,
   STORAGE_BACKEND_S3,
   getStorageBackend,
   isRailwayGatewayBackend,
+  isAzureBlobBackend,
   isS3Backend,
   isRemoteUploadBackend,
   preferRemoteUploadReads,
   allowLocalUploadFallback,
+  supportsGatewayOrgBackup,
+  getUploadStorageHealthSummary,
   assertS3BackendReady,
+  assertAzureBlobReady,
   assertRailwayGatewayReady,
   assertLocalUploadRootReady,
   assertMulterStagingRootReady,

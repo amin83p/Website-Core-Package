@@ -160,7 +160,7 @@ function getDocxDependencies() {
 }
 
 async function fetchDocxBinaryFromStorage(filePath = '') {
-  const useUploadStorage = uploadStorage.isUploadReference(filePath) || uploadStorage.isRailwayGatewayBackend();
+  const useUploadStorage = uploadStorage.isUploadReference(filePath) || uploadStorage.isRemoteUploadBackend();
   if (useUploadStorage) {
     const readRef = uploadStorage.isUploadReference(filePath) ? filePath : normalizeUploadReadRef(filePath);
     return (await uploadStorage.readBuffer(readRef)).buffer;

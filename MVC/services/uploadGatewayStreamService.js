@@ -1,7 +1,11 @@
 'use strict';
 
 const uploadPathUtils = require('../utils/uploadPathUtils');
-const { getGatewayBaseUrl, isBrowserUnsafeGatewayBaseUrl } = require('../utils/uploadModeUtils');
+const {
+  getGatewayBaseUrl,
+  isBrowserUnsafeGatewayBaseUrl,
+  getUploadRemoteReadMode
+} = require('../utils/uploadModeUtils');
 const { downloadRemoteUploadFile } = require('./fileGatewayClientService');
 
 function clean(value) {
@@ -9,7 +13,7 @@ function clean(value) {
 }
 
 function shouldRedirectRemoteUploadRead() {
-  return clean(process.env.UPLOAD_REMOTE_READ_MODE).toLowerCase() !== 'proxy';
+  return getUploadRemoteReadMode() !== 'proxy';
 }
 
 function buildPublicGatewayUploadUrlFromRequest(req = {}) {
