@@ -958,16 +958,488 @@
     }
   }
 
+  function hubStudentsTimelineLoadUi(active) {
+    const wrap = document.getElementById('hubStudentsTimelineWrap');
+    const track = document.getElementById('hubStudentsTimelineTrack');
+    const status = document.getElementById('hubStudentsTimelineLoadStatus');
+    const hint = wrap ? wrap.querySelector('.hub-students-timeline-adjust-hint') : null;
+    const legend = wrap ? wrap.querySelector('.hub-students-timeline-legend') : null;
+    const truncated = document.getElementById('hubStudentsTimelineTruncated');
+    if (wrap) wrap.classList.toggle('hub-students-timeline-wrap--loading', active);
+    if (track) track.classList.toggle('is-loading', active);
+    if (status) status.classList.toggle('d-none', !active);
+    if (hint) hint.classList.toggle('d-none', active);
+    if (legend) legend.classList.toggle('d-none', active);
+    if (truncated && active) truncated.classList.add('d-none');
+  }
+
+  function hubStudentsUpdateTimelineAxisProgress(percent, note) {
+    const pct = Math.min(100, Math.max(0, Math.round(Number(percent) || 0)));
+    const track = document.getElementById('hubStudentsTimelineTrack');
+    const status = document.getElementById('hubStudentsTimelineLoadStatus');
+    if (track) track.style.setProperty('--axis-progress', String(pct));
+    if (status) status.textContent = String(pct) + '% · ' + String(note || '');
+  }
+
   function hubStudentsSetTimelineLoading(visible) {
-    const loading = document.getElementById('hubStudentsTimelineLoading');
-    if (loading) loading.classList.toggle('d-none', !visible);
+    hubStudentsTimelineLoadUi(visible);
+    if (visible) hubStudentsUpdateTimelineAxisProgress(0, 'Starting…');
+  }
+
+  function hubStudentsTimelineLoadingYield() {
+    return new Promise(function (resolve) {
+      if (typeof global.requestAnimationFrame === 'function') {
+        global.requestAnimationFrame(resolve);
+      } else {
+        setTimeout(resolve, 0);
+      }
+    });
+  }
+
+  function hubStudentsTimelineForcePaint() {
+    return hubStudentsTimelineLoadingYield().then(function () {
+      return new Promise(function (resolve) {
+        setTimeout(resolve, 16);
+      });
+    });
+  }
+
+  async function hubStudentsFetchTimelineWithProgress(studentId) {
+    const fetchNotes = [
+      'Loading enrollments, CLB, reports, and related events…',
+      'Loading referrals, activities, and cases…',
+      'Waiting for server response…'
+    ];
+    let creepPct = 28;
+    let noteIdx = 0;
+    hubStudentsUpdateTimelineAxisProgress(creepPct, fetchNotes[noteIdx]);
+    await hubStudentsTimelineForcePaint();
+    const creepTimer = setInterval(function () {
+      if (creepPct >= 38) return;
+      creepPct += 1;
+      noteIdx = (noteIdx + 1) % fetchNotes.length;
+      hubStudentsUpdateTimelineAxisProgress(creepPct, fetchNotes[noteIdx]);
+    }, 400);
+    try {
+      return await hubStudentsFetchTimeline(studentId);
+    } finally {
+      clearInterval(creepTimer);
+    }
+  }
+
+  function hubStudentsTimelineBucketKey(percent) {
+    return Number(percent).toFixed(3);
   }
 
   const HUB_TIMELINE_STEM_BASE_PX = 56;
   const HUB_TIMELINE_STEM_STEP_PX = 52;
   const HUB_TIMELINE_EVENT_CARD_APPROX_PX = 52;
-  const HUB_TIMELINE_ELBOW_APPROX_PX = 24;
+  const HUB_TIMELINE_ELBOW_BASE_PX = 22;
+  const HUB_TIMELINE_ELBOW_STEP_PX = 18;
+  const HUB_TIMELINE_ELBOW_LEFT_INDENT_PX = 8;
+  const HUB_TIMELINE_ELBOW_CROWD_PX = 10;
+  const HUB_TIMELINE_ELBOW_APPROX_PX = 56;
   const HUB_TIMELINE_MAX_BELOW_PER_BUCKET = 2;
+  const HUB_TIMELINE_AXIS_WIDTH_RATIO = 0.95;
+  const HUB_TIMELINE_AXIS_EDGE_PAD_PCT = 2.5;
+  const HUB_TIMELINE_EDGE_RIGHT_PCT = 86;
+  const HUB_TIMELINE_EDGE_LEFT_PCT = 14;
+  const HUB_TIMELINE_EDGE_MAX_EFFECTIVE_PCT = 95.5;
+  const HUB_TIMELINE_CARD_WIDTH_PX = 176;
+  const HUB_TIMELINE_CARD_HEIGHT_PX = 58;
+  const HUB_TIMELINE_STEM_MIN_PX = 40;
+  const HUB_TIMELINE_STEM_MAX_PX = 680;
+  const HUB_TIMELINE_ELBOW_MAX_PX = 280;
+  const HUB_TIMELINE_ELBOW_MIN_PX = 0;
+
+  function hubStudentsTimelineResolveElbowPx(value, fallbackPx) {
+    const n = Number(value);
+    if (Number.isFinite(n)) return Math.max(HUB_TIMELINE_ELBOW_MIN_PX, n);
+    return fallbackPx == null ? HUB_TIMELINE_ELBOW_BASE_PX : fallbackPx;
+  }
+  const HUB_TIMELINE_LAYOUT_PREFS_PREFIX = 'hubStudentsTimelineLayout:';
+  const HUB_TIMELINE_DRAG_CLICK_PX = 8;
+  const HUB_TIMELINE_STEM_FIRST_ON_DATE_PX = 48;
+  const HUB_TIMELINE_ELBOW_DRAG_SCALE = 0.95;
+
+  let hubStudentsTimelineLiveLayouts = null;
+  let hubStudentsTimelineActiveStudentId = '';
+  let hubStudentsTimelineDragState = null;
+
+  function hubStudentsTimelineDisplayPercent(percent, nudgePercent) {
+    const raw = Math.min(100, Math.max(0, Number(percent) || 0))
+      + (Number(nudgePercent) || 0);
+    const p = Math.min(100, Math.max(0, raw));
+    const pad = HUB_TIMELINE_AXIS_EDGE_PAD_PCT;
+    return pad + (p * (100 - pad * 2) / 100);
+  }
+
+  function hubStudentsTimelineLayoutEffectivePercent(layout) {
+    return Number(layout?.percent) || 0;
+  }
+
+  function hubStudentsTimelineMarkerAnchorPercent(layout) {
+    return hubStudentsTimelineDisplayPercent(layout?.percent, 0);
+  }
+
+  function hubStudentsTimelineSignedElbow(branchSide, elbowPx) {
+    const elbow = hubStudentsTimelineResolveElbowPx(elbowPx, 0);
+    return branchSide === 'left' ? -elbow : elbow;
+  }
+
+  function hubStudentsTimelineApplySignedElbowDrag(layout, startSignedElbow, dx, limits) {
+    const cap = limits.elbowMax;
+    const signed = startSignedElbow + dx * HUB_TIMELINE_ELBOW_DRAG_SCALE;
+    if (signed >= 0) {
+      layout.branchSide = 'right';
+      layout.elbowWPx = Math.min(cap, Math.max(HUB_TIMELINE_ELBOW_MIN_PX, Math.round(signed)));
+    } else {
+      layout.branchSide = 'left';
+      layout.elbowWPx = Math.min(cap, Math.max(HUB_TIMELINE_ELBOW_MIN_PX, Math.round(-signed)));
+    }
+  }
+
+  function hubStudentsTimelineSignedStem(side, stemLen) {
+    const stem = Math.max(0, Number(stemLen) || 0);
+    return side === 'above' ? -stem : stem;
+  }
+
+  function hubStudentsTimelineApplySignedStemDrag(layout, drag, dy, limits, clientY) {
+    const cap = limits.stemMax;
+    const signed = drag.startSignedStem + dy;
+    const prevSide = drag.startSide === 'above' ? 'above' : 'below';
+    if (signed >= 0) {
+      layout.side = 'below';
+      layout.stemLen = Math.min(cap, Math.max(0, Math.round(signed)));
+    } else {
+      layout.side = 'above';
+      layout.stemLen = Math.min(cap, Math.max(0, Math.round(-signed)));
+    }
+    const sideFlipped = layout.side !== prevSide;
+    if (sideFlipped) {
+      drag.startSide = layout.side;
+      drag.startSignedStem = hubStudentsTimelineSignedStem(layout.side, layout.stemLen);
+      drag.startStemLen = layout.stemLen;
+      drag.startY = clientY;
+    }
+    return sideFlipped;
+  }
+
+  function hubStudentsTimelineDragLimits(track) {
+    const scroll = track && track.parentElement;
+    const viewH = scroll && scroll.clientHeight > 0 ? scroll.clientHeight : 520;
+    const stemMax = Math.min(
+      HUB_TIMELINE_STEM_MAX_PX,
+      Math.max(360, Math.floor(viewH * 0.48))
+    );
+    const elbowMax = Math.min(HUB_TIMELINE_ELBOW_MAX_PX, Math.max(220, Math.floor(viewH * 0.22)));
+    return { stemMax: stemMax, elbowMax: elbowMax, viewH: viewH };
+  }
+
+  function hubStudentsTimelineLayoutPrefsKey(studentId) {
+    return HUB_TIMELINE_LAYOUT_PREFS_PREFIX + String(studentId || '').trim();
+  }
+
+  function hubStudentsLoadTimelineLayoutPrefs(studentId) {
+    try {
+      const raw = global.localStorage.getItem(hubStudentsTimelineLayoutPrefsKey(studentId));
+      if (!raw) return {};
+      const bag = JSON.parse(raw);
+      return bag && typeof bag === 'object' ? bag : {};
+    } catch (error) {
+      return {};
+    }
+  }
+
+  function hubStudentsSaveTimelineLayoutPref(studentId, eventId, patch) {
+    const id = String(eventId || '').trim();
+    const sid = String(studentId || '').trim();
+    if (!id || !sid || !patch || typeof patch !== 'object') return;
+    const bag = hubStudentsLoadTimelineLayoutPrefs(sid);
+    bag[id] = Object.assign({}, bag[id] || {}, patch);
+    try {
+      global.localStorage.setItem(hubStudentsTimelineLayoutPrefsKey(sid), JSON.stringify(bag));
+    } catch (error) { /* quota */ }
+  }
+
+  function hubStudentsApplyTimelineLayoutPrefs(layouts, studentId) {
+    const prefs = hubStudentsLoadTimelineLayoutPrefs(studentId);
+    return (Array.isArray(layouts) ? layouts : []).map(function (layout) {
+      const eventId = String(layout?.event?.id || '').trim();
+      const pref = eventId ? prefs[eventId] : null;
+      if (!pref) return layout;
+      const next = Object.assign({}, layout);
+      if (pref.side === 'above' || pref.side === 'below') next.side = pref.side;
+      if (pref.branchSide === 'left' || pref.branchSide === 'right') next.branchSide = pref.branchSide;
+      if (Number.isFinite(Number(pref.stemLen))) next.stemLen = Number(pref.stemLen);
+      if (Number.isFinite(Number(pref.elbowWPx))) next.elbowWPx = Number(pref.elbowWPx);
+      if (pref.manual === true) {
+        next.manualLayout = true;
+        next.axisNudgePercent = 0;
+      } else if (Number.isFinite(Number(pref.axisNudgePercent))) {
+        next.axisNudgePercent = Number(pref.axisNudgePercent);
+      }
+      return next;
+    });
+  }
+
+  function hubStudentsTimelineOverlapArea(a, b) {
+    const left = Math.max(a.x, b.x);
+    const right = Math.min(a.x + a.w, b.x + b.w);
+    const top = Math.max(a.y, b.y);
+    const bottom = Math.min(a.y + a.h, b.y + b.h);
+    if (right <= left || bottom <= top) return 0;
+    return (right - left) * (bottom - top);
+  }
+
+  function hubStudentsTimelineCollectOccupancyRects(layout, trackW) {
+    const tw = Math.max(1, Number(trackW) || 960);
+    const displayPct = hubStudentsTimelineMarkerAnchorPercent(layout);
+    const dotX = (displayPct / 100) * tw;
+    const stemLen = Math.max(HUB_TIMELINE_STEM_MIN_PX, Number(layout.stemLen) || HUB_TIMELINE_STEM_BASE_PX);
+    const elbowW = hubStudentsTimelineResolveElbowPx(layout.elbowWPx, HUB_TIMELINE_ELBOW_BASE_PX);
+    const branchSide = layout.branchSide === 'left' ? 'left' : 'right';
+    const side = layout.side === 'above' ? 'above' : 'below';
+    const cardW = HUB_TIMELINE_CARD_WIDTH_PX;
+    const cardH = HUB_TIMELINE_CARD_HEIGHT_PX;
+    const pad = 6;
+    const stemRect = {
+      x: dotX - 4,
+      y: side === 'below' ? 0 : -stemLen,
+      w: 8,
+      h: stemLen
+    };
+    let cardX = branchSide === 'right' ? dotX + elbowW - 2 : dotX - elbowW - cardW;
+    let cardY = side === 'below' ? stemLen - cardH + 8 : -stemLen - 8;
+    const cardRect = { x: cardX, y: cardY, w: cardW, h: cardH + pad };
+    return [stemRect, cardRect];
+  }
+
+  function hubStudentsTimelineLayoutScore(layout, trackW, placedRects) {
+    const rects = hubStudentsTimelineCollectOccupancyRects(layout, trackW);
+    let score = 0;
+    const bucket = hubStudentsTimelineBucketKey(layout.percent);
+    placedRects.forEach(function (placed) {
+      rects.forEach(function (rect) {
+        const overlap = hubStudentsTimelineOverlapArea(rect, placed);
+        score += overlap;
+        if (overlap > 0 && placed.bucket === bucket) score += overlap * 1.5;
+      });
+    });
+    const cardRect = rects[1];
+    if (cardRect.x < 0) score += Math.abs(cardRect.x) * 12;
+    if (cardRect.x + cardRect.w > trackW) score += (cardRect.x + cardRect.w - trackW) * 12;
+    score += (Number(layout.stemLen) || 0) * 0.035;
+    score += (Number(layout.elbowWPx) || 0) * 0.02;
+    return score;
+  }
+
+  function hubStudentsTimelineUniqueSortedInts(values, minVal, maxVal) {
+    const seen = {};
+    const out = [];
+    (Array.isArray(values) ? values : []).forEach(function (raw) {
+      const n = Math.min(maxVal, Math.max(minVal, Math.round(Number(raw))));
+      if (!Number.isFinite(n) || seen[n]) return;
+      seen[n] = true;
+      out.push(n);
+    });
+    return out.sort(function (a, b) { return a - b; });
+  }
+
+  function hubStudentsTimelineLayoutCandidates(layout) {
+    const p = Number(layout.percent) || 0;
+    const baseStem = Number(layout.stemLen) || HUB_TIMELINE_STEM_BASE_PX;
+    const baseElbow = hubStudentsTimelineResolveElbowPx(layout.elbowWPx, HUB_TIMELINE_ELBOW_BASE_PX);
+    const stems = hubStudentsTimelineUniqueSortedInts([
+      baseStem,
+      baseStem + HUB_TIMELINE_STEM_STEP_PX,
+      baseStem + HUB_TIMELINE_STEM_STEP_PX * 2,
+      baseStem + HUB_TIMELINE_STEM_STEP_PX * 3,
+      baseStem + HUB_TIMELINE_STEM_STEP_PX * 4,
+      baseStem - HUB_TIMELINE_STEM_STEP_PX,
+      HUB_TIMELINE_STEM_FIRST_ON_DATE_PX,
+      HUB_TIMELINE_STEM_BASE_PX + (Number(layout.laneIdx) + 1) * HUB_TIMELINE_STEM_STEP_PX
+    ], HUB_TIMELINE_STEM_MIN_PX, HUB_TIMELINE_STEM_MAX_PX);
+    const elbows = hubStudentsTimelineUniqueSortedInts([
+      0,
+      baseElbow,
+      baseElbow + HUB_TIMELINE_ELBOW_STEP_PX,
+      baseElbow + HUB_TIMELINE_ELBOW_STEP_PX * 2,
+      HUB_TIMELINE_ELBOW_BASE_PX,
+      HUB_TIMELINE_ELBOW_BASE_PX + (Number(layout.laneIdx) + 1) * HUB_TIMELINE_ELBOW_STEP_PX
+    ], HUB_TIMELINE_ELBOW_MIN_PX, HUB_TIMELINE_ELBOW_MAX_PX);
+    const preferredBranch = layout.branchSide === 'left' ? 'left' : 'right';
+    const altBranch = preferredBranch === 'left' ? 'right' : 'left';
+    const branches = [preferredBranch, altBranch];
+    const out = [];
+    branches.forEach(function (branch) {
+      if (p >= HUB_TIMELINE_EDGE_RIGHT_PCT && branch === 'right') return;
+      if (p <= HUB_TIMELINE_EDGE_LEFT_PCT && branch === 'left') return;
+      stems.forEach(function (stemLen) {
+        elbows.forEach(function (elbowWPx) {
+          out.push(Object.assign({}, layout, {
+            stemLen: stemLen,
+            elbowWPx: elbowWPx,
+            branchSide: branch,
+            axisNudgePercent: 0
+          }));
+        });
+      });
+    });
+    return out;
+  }
+
+  async function hubStudentsOptimizeTimelineLayouts(layouts, trackW, onProgress) {
+    const items = (Array.isArray(layouts) ? layouts : []).slice()
+      .sort(function (a, b) {
+        return Number(a.percent) - Number(b.percent)
+          || String(a.event?.id || '').localeCompare(String(b.event?.id || ''));
+      });
+    const placed = [];
+    const tw = Math.max(1, Number(trackW) || 960);
+    const total = items.length;
+    for (let index = 0; index < items.length; index += 1) {
+      const layout = items[index];
+      if (layout.manualLayout === true) {
+        hubStudentsTimelineCollectOccupancyRects(layout, tw).forEach(function (rect) {
+          placed.push(Object.assign({}, rect, {
+            bucket: hubStudentsTimelineBucketKey(layout.percent)
+          }));
+        });
+      } else {
+        let best = null;
+        let bestScore = Infinity;
+        hubStudentsTimelineLayoutCandidates(layout).forEach(function (candidate) {
+          const score = hubStudentsTimelineLayoutScore(candidate, tw, placed);
+          if (score < bestScore) {
+            bestScore = score;
+            best = candidate;
+          }
+        });
+        const chosen = best || layout;
+        Object.assign(layout, {
+          stemLen: chosen.stemLen,
+          elbowWPx: chosen.elbowWPx,
+          branchSide: chosen.branchSide,
+          axisNudgePercent: 0
+        });
+        hubStudentsTimelineCollectOccupancyRects(layout, tw).forEach(function (rect) {
+          placed.push(Object.assign({}, rect, {
+            bucket: hubStudentsTimelineBucketKey(layout.percent)
+          }));
+        });
+      }
+      if (onProgress && (index % 3 === 0 || index === total - 1)) {
+        const pct = 80 + Math.round(((index + 1) / Math.max(1, total)) * 10);
+        onProgress(pct, 'Organizing cards (stem, indent, and side)…');
+        await hubStudentsTimelineForcePaint();
+      }
+    }
+    return hubStudentsClampTimelineEdgeLayouts(items);
+  }
+
+  function hubStudentsFindTimelineLayoutByEventId(eventId) {
+    const id = String(eventId || '').trim();
+    if (!id || !Array.isArray(hubStudentsTimelineLiveLayouts)) return null;
+    return hubStudentsTimelineLiveLayouts.find(function (layout) {
+      return String(layout?.event?.id || '') === id;
+    }) || null;
+  }
+
+  function hubStudentsApplyTimelineMarkerLayout(marker, layout) {
+    if (!marker || !layout) return;
+    const side = layout.side === 'above' ? 'above' : 'below';
+    const branchSide = layout.branchSide === 'left' ? 'left' : 'right';
+    marker.className = 'hub-students-timeline-marker hub-students-timeline-marker--' + side
+      + ' hub-students-timeline-marker--branch-' + branchSide;
+    const stemLen = Math.round(Number(layout.stemLen) || HUB_TIMELINE_STEM_BASE_PX);
+    const elbowWPx = Math.round(hubStudentsTimelineResolveElbowPx(layout.elbowWPx, HUB_TIMELINE_ELBOW_BASE_PX));
+    marker.style.left = String(hubStudentsTimelineMarkerAnchorPercent(layout)) + '%';
+    marker.style.setProperty('--stem-len', String(stemLen) + 'px');
+    marker.style.setProperty('--elbow-w', String(elbowWPx) + 'px');
+    const elbow = marker.querySelector('.hub-students-timeline-elbow');
+    if (elbow) {
+      elbow.className = 'hub-students-timeline-elbow hub-students-timeline-elbow--' + side
+        + ' hub-students-timeline-elbow--branch-' + branchSide;
+    }
+    const stem = marker.querySelector('.hub-students-timeline-stem');
+    if (stem) stem.className = 'hub-students-timeline-stem hub-students-timeline-stem--' + side;
+  }
+
+  function hubStudentsTimelineRecalcTrackPadding(track, layouts) {
+    if (!track) return;
+    let maxBelowPx = 80;
+    let maxAbovePx = 80;
+    (Array.isArray(layouts) ? layouts : []).forEach(function (layout) {
+      const elbowW = hubStudentsTimelineResolveElbowPx(layout.elbowWPx, HUB_TIMELINE_ELBOW_APPROX_PX);
+      const totalStem = (Number(layout.stemLen) || 0) + HUB_TIMELINE_EVENT_CARD_APPROX_PX + elbowW;
+      if (layout.side === 'above') {
+        if (totalStem > maxAbovePx) maxAbovePx = totalStem;
+      } else if (totalStem > maxBelowPx) {
+        maxBelowPx = totalStem;
+      }
+    });
+    track.style.paddingTop = String(Math.ceil(maxAbovePx) + 32) + 'px';
+    track.style.paddingBottom = String(Math.ceil(maxBelowPx) + 32) + 'px';
+  }
+
+  function hubStudentsClampTimelineEdgeLayouts(layouts, options) {
+    const items = Array.isArray(layouts) ? layouts : [];
+    const freezeAxisNudge = Boolean(options && options.freezeAxisNudge);
+    const allowBranchChoice = Boolean(options && options.allowBranchChoice);
+    items.forEach(function (layout) {
+      const p = Number(layout.percent);
+      if (p >= HUB_TIMELINE_EDGE_RIGHT_PCT) {
+        if (!allowBranchChoice) layout.branchSide = 'left';
+        if (!freezeAxisNudge) {
+          if ((Number(layout.axisNudgePercent) || 0) > 0) {
+            layout.axisNudgePercent = 0;
+          }
+          const eff = hubStudentsTimelineLayoutEffectivePercent(layout);
+          if (eff > HUB_TIMELINE_EDGE_MAX_EFFECTIVE_PCT) {
+            layout.axisNudgePercent = (Number(layout.axisNudgePercent) || 0)
+              - (eff - HUB_TIMELINE_EDGE_MAX_EFFECTIVE_PCT);
+          }
+        }
+      } else if (p <= HUB_TIMELINE_EDGE_LEFT_PCT) {
+        if (!allowBranchChoice) layout.branchSide = 'right';
+        if (!freezeAxisNudge) {
+          if ((Number(layout.axisNudgePercent) || 0) < 0) {
+            layout.axisNudgePercent = 0;
+          }
+          const eff = hubStudentsTimelineLayoutEffectivePercent(layout);
+          if (eff < HUB_TIMELINE_EDGE_LEFT_PCT) {
+            layout.axisNudgePercent = (Number(layout.axisNudgePercent) || 0)
+              + (HUB_TIMELINE_EDGE_LEFT_PCT - eff);
+          }
+        }
+      }
+    });
+    return items;
+  }
+
+  function hubStudentsResolveTimelineBranchSide(side, sideOrdinal, percent) {
+    const p = Number(percent) || 0;
+    if (p >= 88) return 'left';
+    if (p <= 12) return 'right';
+    if (side === 'below') {
+      return sideOrdinal % 2 === 0 ? 'right' : 'left';
+    }
+    return sideOrdinal % 2 === 0 ? 'left' : 'right';
+  }
+
+  function hubStudentsApplyTimelineTrackWidth(track) {
+    if (!track) return { availW: 0, trackW: 0 };
+    const scroll = track.parentElement;
+    const availW = scroll && scroll.clientWidth > 0 ? scroll.clientWidth : 0;
+    const axisTarget = availW > 0 ? Math.round(availW * HUB_TIMELINE_AXIS_WIDTH_RATIO) : 960;
+    track.style.width = String(axisTarget) + 'px';
+    track.style.minWidth = '0';
+    track.style.maxWidth = availW > 0 ? String(axisTarget) + 'px' : 'none';
+    track.style.marginLeft = 'auto';
+    track.style.marginRight = 'auto';
+    return { availW: availW, trackW: axisTarget, axisTarget: axisTarget };
+  }
 
   function hubStudentsAssignTimelineLayout(events, minDate, maxDate) {
     const rows = Array.isArray(events) ? events : [];
@@ -985,6 +1457,7 @@
 
     const belowByBucket = {};
     const aboveByBucket = {};
+    const bucketBranchAnchor = {};
     let belowTotal = 0;
     let aboveTotal = 0;
 
@@ -1017,16 +1490,32 @@
         aboveTotal += 1;
       }
 
-      let crowdNeighbors = 0;
-      positioned.forEach(function (other) {
-        if (other === row) return;
-        if (Math.abs(other.percent - row.percent) < 5) crowdNeighbors += 1;
-      });
+      const sideOrdinal = side === 'below' ? belowTotal : aboveTotal;
+      const p = row.percent;
+      let stemLen = HUB_TIMELINE_STEM_BASE_PX + (laneIdx + 1) * HUB_TIMELINE_STEM_STEP_PX;
+      let branchSide = hubStudentsResolveTimelineBranchSide(side, sideOrdinal, p);
+      let elbowWPx = HUB_TIMELINE_ELBOW_BASE_PX + laneIdx * HUB_TIMELINE_ELBOW_STEP_PX;
 
-      const stemLen = HUB_TIMELINE_STEM_BASE_PX
-        + (laneIdx + 1) * HUB_TIMELINE_STEM_STEP_PX
-        + crowdNeighbors * 28
-        + (globalIndex % 5) * 14;
+      if (laneIdx === 0) {
+        stemLen = HUB_TIMELINE_STEM_FIRST_ON_DATE_PX;
+        elbowWPx = HUB_TIMELINE_ELBOW_MIN_PX;
+        bucketBranchAnchor[bucket] = branchSide;
+      } else {
+        stemLen = HUB_TIMELINE_STEM_FIRST_ON_DATE_PX
+          + (laneIdx + 1) * HUB_TIMELINE_STEM_STEP_PX;
+        const anchorBranch = bucketBranchAnchor[bucket];
+        if (anchorBranch) {
+          branchSide = anchorBranch === 'left' ? 'right' : 'left';
+          if (p >= HUB_TIMELINE_EDGE_RIGHT_PCT) branchSide = 'left';
+          if (p <= HUB_TIMELINE_EDGE_LEFT_PCT) branchSide = 'right';
+          const sameBranchAsFirst = branchSide === anchorBranch;
+          elbowWPx = sameBranchAsFirst
+            ? HUB_TIMELINE_ELBOW_BASE_PX + (laneIdx + 1) * HUB_TIMELINE_ELBOW_STEP_PX
+            : HUB_TIMELINE_ELBOW_MIN_PX;
+        } else {
+          elbowWPx = HUB_TIMELINE_ELBOW_MIN_PX;
+        }
+      }
 
       return {
         event: row.event,
@@ -1034,7 +1523,10 @@
         percent: row.percent,
         side: side,
         stemLen: stemLen,
-        laneIdx: laneIdx
+        laneIdx: laneIdx,
+        branchSide: branchSide,
+        elbowWPx: elbowWPx,
+        axisNudgePercent: 0
       };
     });
   }
@@ -1130,18 +1622,24 @@
     const event = layout?.event;
     const typeClass = hubStudentsTimelineTypeClass(event?.type);
     const label = escapeHtml(String(event?.label || event?.type || 'Event'));
-    const dateLabel = escapeHtml(formatHubDateKey(String(layout?.dateKey || event?.date || '')));
+    const dateRaw = String(layout?.dateKey || event?.date || '').trim();
+    const dateLabel = escapeHtml(formatHubDateKey(dateRaw, { year: 'numeric', month: 'short', day: 'numeric' }));
     const tipText = escapeHtml(hubStudentsFormatTimelineTipText(event || {}));
     const actionAttr = hubStudentsEncodeTimelineAction(event?.action);
     const eventId = escapeHtml(String(event?.id || ''));
     const side = layout?.side === 'above' ? 'above' : 'below';
     const stemLen = Number(layout?.stemLen) || HUB_TIMELINE_STEM_BASE_PX;
+    const elbowWPx = hubStudentsTimelineResolveElbowPx(layout?.elbowWPx, HUB_TIMELINE_ELBOW_BASE_PX);
     const percent = Number(layout?.percent);
-    const branchSide = (Number(layout?.laneIdx) || 0) % 2 === 0 ? 'right' : 'left';
-    const leftStyle = Number.isFinite(percent) ? ('left:' + String(percent) + '%;') : '';
+    const branchSide = layout?.branchSide === 'left' ? 'left' : 'right';
+    const leftStyle = Number.isFinite(percent)
+      ? ('left:' + String(hubStudentsTimelineMarkerAnchorPercent(layout)) + '%;')
+      : '';
+    const cssVars = '--stem-len:' + String(stemLen) + 'px;--elbow-w:' + String(elbowWPx) + 'px;';
     const cardHtml = [
       '<button type="button" class="hub-students-timeline-event ' + typeClass + '"',
       ' data-hub-timeline-event-id="' + eventId + '"',
+      ' data-hub-timeline-draggable="1"',
       ' data-hub-timeline-action="' + actionAttr + '"',
       ' data-tip="' + tipText + '"',
       ' data-tip-bg="#0f172a" data-tip-fg="#ffffff" data-tip-border="#0d6efd"',
@@ -1150,27 +1648,29 @@
       '<span class="hub-students-timeline-event-label">' + label + '</span>',
       '</button>'
     ].join('');
-    const jointH = '<span class="hub-students-timeline-joint-h" aria-hidden="true"></span>';
-    const footClass = 'hub-students-timeline-joint-foot hub-students-timeline-joint-foot--' + branchSide;
-    const footHtml = [
-      '<div class="' + footClass + '">',
-      branchSide === 'right' ? jointH + cardHtml : cardHtml + jointH,
+    const dotWrap = [
+      '<div class="hub-students-timeline-dot-wrap">',
+      '<span class="hub-students-timeline-dot" aria-hidden="true"></span>',
       '</div>'
     ].join('');
-    const vlineHtml = '<span class="hub-students-timeline-vline" style="height:' + String(stemLen) + 'px;" aria-hidden="true"></span>';
-    const armHtml = side === 'above' ? footHtml + vlineHtml : vlineHtml + footHtml;
+    const elbowHtml = [
+      '<div class="hub-students-timeline-elbow hub-students-timeline-elbow--' + side + ' hub-students-timeline-elbow--branch-' + branchSide + '">',
+      '<span class="hub-students-timeline-elbow-corner" aria-hidden="true"></span>',
+      cardHtml,
+      '</div>'
+    ].join('');
     return [
-      '<div class="hub-students-timeline-marker hub-students-timeline-marker--' + side + '"',
-      ' style="' + leftStyle + '--stem-len:' + String(stemLen) + 'px;" role="listitem">',
+      '<div class="hub-students-timeline-marker hub-students-timeline-marker--' + side + ' hub-students-timeline-marker--branch-' + branchSide + '"',
+      ' style="' + leftStyle + cssVars + '" role="listitem">',
       '<div class="hub-students-timeline-stem hub-students-timeline-stem--' + side + '">',
-      '<span class="hub-students-timeline-dot" aria-hidden="true"></span>',
-      '<div class="hub-students-timeline-arm">' + armHtml + '</div>',
+      dotWrap,
+      elbowHtml,
       '</div>',
       '</div>'
     ].join('');
   }
 
-  function hubStudentsRenderTimeline(timeline) {
+  async function hubStudentsRenderTimeline(timeline) {
     const wrap = document.getElementById('hubStudentsTimelineWrap');
     const empty = document.getElementById('hubStudentsTimelineEmpty');
     const track = document.getElementById('hubStudentsTimelineTrack');
@@ -1187,48 +1687,73 @@
     const minDate = String(range.minDate || '').trim();
     const maxDate = String(range.maxDate || '').trim();
 
+    hubStudentsUpdateTimelineAxisProgress(46, 'Reading student profile and date range…');
+    await hubStudentsTimelineForcePaint();
+
     if (titleEl) {
       const name = String(student.name || student.id || 'Student').trim();
       titleEl.textContent = name ? 'Timeline — ' + name : 'Student timeline';
     }
+    if (minLabel) minLabel.textContent = minDate || '…';
+    if (maxLabel) maxLabel.textContent = maxDate || '…';
 
-    hubStudentsSetTimelineLoading(false);
     if (!events.length || !minDate || !maxDate) {
+      hubStudentsUpdateTimelineAxisProgress(100, 'No dated events to display.');
+      await hubStudentsTimelineForcePaint();
       wrap.classList.add('d-none');
       empty.classList.remove('d-none');
       track.innerHTML = '';
+      track.classList.remove('is-loading');
       if (truncated) truncated.classList.add('d-none');
+      hubStudentsTimelineLoadUi(false);
       return;
     }
 
     empty.classList.add('d-none');
-    wrap.classList.remove('d-none');
-    if (minLabel) minLabel.textContent = minDate;
-    if (maxLabel) maxLabel.textContent = maxDate;
     if (truncated) truncated.classList.toggle('d-none', payload.truncated !== true);
 
-    const layouts = hubStudentsAssignTimelineLayout(events, minDate, maxDate);
-    let maxBelowPx = 80;
-    let maxAbovePx = 80;
-    let belowCount = 0;
-    let aboveCount = 0;
-    layouts.forEach(function (layout) {
-      const totalStem = (Number(layout.stemLen) || 0) + HUB_TIMELINE_EVENT_CARD_APPROX_PX + HUB_TIMELINE_ELBOW_APPROX_PX;
-      if (layout.side === 'above') {
-        aboveCount += 1;
-        if (totalStem > maxAbovePx) maxAbovePx = totalStem;
-      } else {
-        belowCount += 1;
-        if (totalStem > maxBelowPx) maxBelowPx = totalStem;
-      }
-    });
-    const trackMinWidth = Math.max(960, layouts.length * 72);
-    track.style.minWidth = String(trackMinWidth) + 'px';
-    track.style.paddingTop = String(Math.ceil(maxAbovePx) + 32) + 'px';
-    track.style.paddingBottom = String(Math.ceil(maxBelowPx) + 32) + 'px';
+    const studentId = String(student.id || '').trim();
+    hubStudentsTimelineActiveStudentId = studentId;
+    hubStudentsApplyTimelineTrackWidth(track);
 
+    hubStudentsUpdateTimelineAxisProgress(56, 'Placing ' + String(events.length) + ' events on the axis…');
+    await hubStudentsTimelineForcePaint();
+    let layouts = hubStudentsAssignTimelineLayout(events, minDate, maxDate);
+
+    hubStudentsUpdateTimelineAxisProgress(68, 'Applying saved card layout preferences…');
+    await hubStudentsTimelineForcePaint();
+    layouts = hubStudentsApplyTimelineLayoutPrefs(layouts, studentId);
+
+    const scroll = track.parentElement;
+    const estTrackW = scroll && scroll.clientWidth > 0
+      ? Math.round(scroll.clientWidth * HUB_TIMELINE_AXIS_WIDTH_RATIO)
+      : 960;
+
+    hubStudentsUpdateTimelineAxisProgress(72, 'Organizing cards (stem, indent, and side)…');
+    await hubStudentsTimelineForcePaint();
+    layouts = await hubStudentsOptimizeTimelineLayouts(layouts, estTrackW, function (pct, note) {
+      hubStudentsUpdateTimelineAxisProgress(pct, note);
+    });
+    hubStudentsTimelineLiveLayouts = layouts;
+    hubStudentsTimelineRecalcTrackPadding(track, layouts);
+
+    hubStudentsUpdateTimelineAxisProgress(92, 'Drawing timeline cards and connectors…');
+    await hubStudentsTimelineForcePaint();
     track.innerHTML = layouts.map(hubStudentsRenderTimelineMarker).join('');
     track.setAttribute('role', 'list');
+    hubStudentsApplyTimelineTrackWidth(track);
+
+    hubStudentsUpdateTimelineAxisProgress(100, 'Timeline ready.');
+    await hubStudentsTimelineForcePaint();
+    if (typeof global.requestAnimationFrame === 'function') {
+      await new Promise(function (resolve) {
+        global.requestAnimationFrame(function () {
+          hubStudentsApplyTimelineTrackWidth(track);
+          resolve();
+        });
+      });
+    }
+    hubStudentsTimelineLoadUi(false);
   }
 
   async function hubStudentsFetchTimeline(studentId) {
@@ -1333,14 +1858,27 @@
     const wrap = document.getElementById('hubStudentsTimelineWrap');
     if (!modalEl) return;
     if (empty) empty.classList.add('d-none');
-    if (wrap) wrap.classList.add('d-none');
+    if (wrap) {
+      wrap.classList.remove('d-none');
+      const minLabel = document.getElementById('hubStudentsTimelineMinLabel');
+      const maxLabel = document.getElementById('hubStudentsTimelineMaxLabel');
+      if (minLabel) minLabel.textContent = '…';
+      if (maxLabel) maxLabel.textContent = '…';
+    }
+    const track = document.getElementById('hubStudentsTimelineTrack');
+    if (track) track.innerHTML = '';
     hubStudentsSetTimelineLoading(true);
     hubStudentsShowModal(modalEl);
     try {
-      const timeline = await hubStudentsFetchTimeline(profile.id);
-      hubStudentsRenderTimeline(timeline);
+      await hubStudentsTimelineForcePaint();
+      hubStudentsUpdateTimelineAxisProgress(14, 'Opening timeline for the selected student…');
+      await hubStudentsTimelineForcePaint();
+      const timeline = await hubStudentsFetchTimelineWithProgress(profile.id);
+      hubStudentsUpdateTimelineAxisProgress(40, 'Events received — building timeline…');
+      await hubStudentsTimelineForcePaint();
+      await hubStudentsRenderTimeline(timeline);
     } catch (error) {
-      hubStudentsSetTimelineLoading(false);
+      hubStudentsTimelineLoadUi(false);
       if (empty) {
         empty.textContent = String(error?.message || 'Unable to load timeline.');
         empty.classList.remove('d-none');
@@ -1356,9 +1894,114 @@
     const trackScroll = document.querySelector('#hubStudentsTimelineModal .hub-students-timeline-track-scroll');
     const timelineModal = document.getElementById('hubStudentsTimelineModal');
     if (!track) return;
+    track.addEventListener('pointerdown', function (event) {
+      const btn = event.target && event.target.closest('[data-hub-timeline-draggable][data-hub-timeline-event-id]');
+      if (!btn || !track.contains(btn)) return;
+      if (event.button !== 0) return;
+      const eventId = btn.getAttribute('data-hub-timeline-event-id') || '';
+      const layout = hubStudentsFindTimelineLayoutByEventId(eventId);
+      const marker = btn.closest('.hub-students-timeline-marker');
+      if (!layout || !marker) return;
+      hubStudentsHideTimelineTip();
+      hubStudentsTimelineDragState = {
+        pointerId: event.pointerId,
+        btn: btn,
+        marker: marker,
+        eventId: eventId,
+        startX: event.clientX,
+        startY: event.clientY,
+        moved: false,
+        startStemLen: Number(layout.stemLen) || HUB_TIMELINE_STEM_BASE_PX,
+        startElbowWPx: hubStudentsTimelineResolveElbowPx(layout.elbowWPx, HUB_TIMELINE_ELBOW_BASE_PX),
+        startBranch: layout.branchSide === 'left' ? 'left' : 'right',
+        startSignedElbow: hubStudentsTimelineSignedElbow(
+          layout.branchSide === 'left' ? 'left' : 'right',
+          layout.elbowWPx
+        ),
+        side: layout.side === 'above' ? 'above' : 'below',
+        startSide: layout.side === 'above' ? 'above' : 'below',
+        startSignedStem: hubStudentsTimelineSignedStem(
+          layout.side === 'above' ? 'above' : 'below',
+          layout.stemLen
+        )
+      };
+      btn.setPointerCapture(event.pointerId);
+    });
+    track.addEventListener('pointermove', function (event) {
+      const drag = hubStudentsTimelineDragState;
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      const dx = event.clientX - drag.startX;
+      const dy = event.clientY - drag.startY;
+      if (!drag.moved) {
+        if (Math.abs(dx) <= HUB_TIMELINE_DRAG_CLICK_PX && Math.abs(dy) <= HUB_TIMELINE_DRAG_CLICK_PX) {
+          return;
+        }
+        drag.moved = true;
+        track.classList.add('is-adjusting');
+        event.preventDefault();
+      }
+      const layout = hubStudentsFindTimelineLayoutByEventId(drag.eventId);
+      if (!layout) return;
+      const limits = hubStudentsTimelineDragLimits(track);
+      layout.axisNudgePercent = 0;
+      const dyFromAnchor = event.clientY - drag.startY;
+      const dxFromAnchor = event.clientX - drag.startX;
+      hubStudentsTimelineApplySignedStemDrag(
+        layout,
+        drag,
+        dyFromAnchor,
+        limits,
+        event.clientY
+      );
+      hubStudentsTimelineApplySignedElbowDrag(
+        layout,
+        drag.startSignedElbow,
+        dxFromAnchor,
+        limits
+      );
+      hubStudentsClampTimelineEdgeLayouts([layout], {
+        freezeAxisNudge: true,
+        allowBranchChoice: true
+      });
+      layout.manualLayout = true;
+      hubStudentsApplyTimelineMarkerLayout(drag.marker, layout);
+      hubStudentsTimelineRecalcTrackPadding(track, hubStudentsTimelineLiveLayouts);
+    });
+    function hubStudentsEndTimelineDrag(event) {
+      const drag = hubStudentsTimelineDragState;
+      if (!drag || event.pointerId !== drag.pointerId) return;
+      if (drag.moved) {
+        if (drag.btn) drag.btn.__hubTimelineDragMoved = true;
+        const layout = hubStudentsFindTimelineLayoutByEventId(drag.eventId);
+        if (layout && hubStudentsTimelineActiveStudentId) {
+          hubStudentsSaveTimelineLayoutPref(hubStudentsTimelineActiveStudentId, drag.eventId, {
+            side: layout.side,
+            branchSide: layout.branchSide,
+            stemLen: layout.stemLen,
+            elbowWPx: layout.elbowWPx,
+            axisNudgePercent: 0,
+            manual: true
+          });
+        }
+      }
+      try {
+        if (drag.btn && drag.btn.hasPointerCapture(event.pointerId)) {
+          drag.btn.releasePointerCapture(event.pointerId);
+        }
+      } catch (releaseError) { /* */ }
+      hubStudentsTimelineDragState = null;
+      track.classList.remove('is-adjusting');
+    }
+    track.addEventListener('pointerup', hubStudentsEndTimelineDrag);
+    track.addEventListener('pointercancel', hubStudentsEndTimelineDrag);
     track.addEventListener('click', function (event) {
+      if (hubStudentsTimelineDragState) return;
       const btn = event.target && event.target.closest('[data-hub-timeline-action]');
       if (!btn) return;
+      if (btn.__hubTimelineDragMoved) {
+        btn.__hubTimelineDragMoved = false;
+        return;
+      }
       const raw = btn.getAttribute('data-hub-timeline-action') || '{}';
       let action = {};
       try {

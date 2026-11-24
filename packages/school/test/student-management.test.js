@@ -63,7 +63,25 @@ test('student management view and client expose workspace', () => {
   assert.match(studentManagementScript, /data-hub-students-open="timeline"/);
   assert.match(studentManagementScript, /hubStudentsHandleTimelineEventAction/);
   assert.match(studentManagementScript, /hubStudentsTimelineTrack/);
+  assert.match(studentManagementScript, /hub-students-timeline-elbow-corner/);
+  assert.match(studentManagementScript, /hub-students-timeline-event-date/);
+  assert.match(studentManagementScript, /hubStudentsOptimizeTimelineLayouts/);
+  assert.match(studentManagementScript, /data-hub-timeline-draggable/);
+  assert.match(studentManagementScript, /hubStudentsTimelineLayoutPrefsKey/);
+  assert.doesNotMatch(studentManagementScript, /hub-students-timeline-dot-date/);
+  assert.doesNotMatch(studentManagementScript, /hub-students-timeline-vline/);
+  assert.doesNotMatch(studentManagementScript, /hub-students-timeline-joint-h/);
+  assert.match(studentManagementScript, /elbowWPx/);
+  const managementStyles = fs.readFileSync(
+    path.join(ROOT, 'MVC', 'views', 'school', 'partials', 'studentManagementStyles.ejs'),
+    'utf8'
+  );
+  assert.match(managementStyles, /hub-students-timeline-elbow-corner/);
+  assert.match(managementStyles, /--elbow-w/);
+  assert.match(managementStyles, /hub-students-timeline-event-date/);
   assert.match(managementModals, /id="hubStudentsTimelineModal"/);
+  assert.match(managementModals, /id="hubStudentsTimelineLoadStatus"/);
+  assert.match(studentManagementScript, /hubStudentsUpdateTimelineAxisProgress/);
   assert.match(managementModals, /studentReferralLinksModal/);
   assert.match(managementModals, /referralQuickCreateModal/);
   assert.match(managementModals, /modal_GenericPicker/);

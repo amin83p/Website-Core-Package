@@ -111,10 +111,6 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body" id="hubStudentsTimelineModalBody">
-        <div class="hub-students-timeline-loading text-muted small d-flex align-items-center gap-2" id="hubStudentsTimelineLoading">
-          <span class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></span>
-          Loading timeline…
-        </div>
         <div class="hub-students-timeline-empty d-none text-muted small text-center py-4" id="hubStudentsTimelineEmpty">
           No dated events were found for this student.
         </div>
@@ -124,11 +120,15 @@
             <span id="hubStudentsTimelineMaxLabel"></span>
           </div>
           <div class="hub-students-timeline-track-scroll">
-            <div class="hub-students-timeline-track" id="hubStudentsTimelineTrack" role="list"></div>
+            <p class="hub-students-timeline-load-status small text-muted text-center mb-2 d-none" id="hubStudentsTimelineLoadStatus" role="status" aria-live="polite"></p>
+            <div class="hub-students-timeline-track" id="hubStudentsTimelineTrack" role="list" style="--axis-progress: 0;"></div>
           </div>
           <div class="hub-students-timeline-truncated d-none alert alert-warning py-2 small mt-3" id="hubStudentsTimelineTruncated" role="status">
             Some activities or cases were omitted because of list size limits. Use the related tools for the full lists.
           </div>
+          <p class="hub-students-timeline-adjust-hint small text-muted mb-2 mb-md-0">
+            Drag up/down: shorten the vertical stem to zero on the timeline, then keep going to move the card above or below the axis (opposite of where it started); stem length can grow again on that side. Drag horizontally to shrink the L-indent to zero, then cross left/right of the stem. The dot stays on its date. Saved per student in this browser.
+          </p>
           <div class="hub-students-timeline-legend small text-muted mt-3 d-flex flex-wrap gap-2" aria-hidden="true">
             <span class="hub-students-timeline-legend-item hub-students-timeline-type--enrollment">Enrollments</span>
             <span class="hub-students-timeline-legend-item hub-students-timeline-type--clb">CLB</span>
