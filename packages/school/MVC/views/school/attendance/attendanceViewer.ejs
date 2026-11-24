@@ -258,6 +258,18 @@
     .schedule-shell .range-chip.active {
         box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.15);
     }
+    #attendanceMatrixExportModal .modal-header { border-bottom: 1px solid #e9ecef; }
+    #attendanceMatrixExportModal .modal-footer { border-top: 1px solid #e9ecef; background: #f8f9fa; }
+    .amx-export-table-wrap { max-height: min(480px, 55vh); overflow: auto; border: 1px solid #e9ecef; border-radius: 10px; }
+    .amx-export-class-chip {
+        display: inline-flex; align-items: center; gap: 0.35rem;
+        border: 1px solid #dce9ff; background: #f8fbff; border-radius: 999px;
+        padding: 0.2rem 0.55rem; font-size: 0.82rem; margin: 0.15rem;
+    }
+    .amx-export-preview-class-title { font-weight: 600; font-size: 0.92rem; margin: 0.75rem 0 0.35rem; }
+    .amx-export-matrix-table { font-size: 0.72rem; margin-bottom: 0.5rem; }
+    .amx-export-matrix-table th, .amx-export-matrix-table td { vertical-align: middle; padding: 0.2rem 0.25rem; white-space: nowrap; }
+    .amx-export-matrix-table select.form-select { font-size: 0.68rem; padding: 0.1rem 1.25rem 0.1rem 0.25rem; min-width: 4.5rem; }
 </style>
 <link rel="stylesheet" href="/styles/schedule-viewer.css">
 <link rel="stylesheet" href="/styles/school-matrix-expand.css">
@@ -276,7 +288,7 @@
   const showAttendancePrintBtn = typeof canPrintMatrix !== 'undefined' && canPrintMatrix === true;
   const attendanceOptionalBtns = [];
   if (showAttendanceExportBtn) {
-    attendanceOptionalBtns.push('<button type="button" id="btn_exportAttendanceExcel" class="btn btn-filled btn-success btn-md me-2 mb-2" disabled title="Load the matrix first"><i class="bi bi-cloud-download me-1"></i> Export</button>');
+    attendanceOptionalBtns.push('<button type="button" id="btn_exportAttendanceExcel" class="btn btn-filled btn-success btn-md me-2 mb-2" title="Export attendance matrix to Excel"><i class="bi bi-cloud-download me-1"></i> Export</button>');
   }
   if (showAttendancePrintBtn) {
     attendanceOptionalBtns.push('<button type="button" id="btn_printAttendanceMatrix" class="btn btn-filled btn-edit btn-md me-2 mb-2" disabled title="Load the matrix first">🖨 Print</button>');
@@ -441,6 +453,47 @@
             </div>
             <div class="modal-body">
                 <div id="attendanceMatrixLegendModalBody" class="attendance-legend-modal-body"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="modal fade" id="attendanceMatrixExportModal" tabindex="-1" aria-labelledby="attendanceMatrixExportModalLabel" aria-hidden="true" data-bs-backdrop="static">
+    <div class="modal-dialog modal-dialog-centered" id="attendanceMatrixExportModalDialog">
+        <div class="modal-content">
+            <div class="modal-header py-2 px-3">
+                <h6 class="modal-title mb-0 fw-semibold" id="attendanceMatrixExportModalLabel">
+                    <i class="bi bi-file-earmark-spreadsheet me-1"></i>Export attendance Excel
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-muted mb-3">Choose how to export the attendance matrix for substitute teachers or records.</p>
+                <div class="form-check mb-2">
+                    <input class="form-check-input" type="radio" name="attendanceMatrixExportMode" id="attendanceMatrixExportModeCurrent" value="current" checked>
+                    <label class="form-check-label" for="attendanceMatrixExportModeCurrent">Current matrix export (loaded class, visible students)</label>
+                </div>
+                <div class="form-check mb-3">
+                    <input class="form-check-input" type="radio" name="attendanceMatrixExportMode" id="attendanceMatrixExportModeMulti" value="multi">
+                    <label class="form-check-label" for="attendanceMatrixExportModeMulti">Multi-class substitute export (one sheet per class; Excel dropdowns on attendance cells)</label>
+                </div>
+                <div id="attendanceMatrixExportMultiPanel" class="d-none border rounded p-3 bg-light-subtle">
+                    <p class="small text-muted mb-2">Pick classes to include. Each sheet omits the minute summary; attendance cells use Excel dropdowns matching that sheet&rsquo;s legend only (statuses enabled for the class, plus LE / L/LE when shown in the legend).</p>
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                        <span class="small fw-semibold text-muted">Classes</span>
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="btn_attendanceExportAddClass">
+                            <i class="bi bi-plus-lg me-1"></i>Add class
+                        </button>
+                    </div>
+                    <div id="attendanceMatrixExportClassList" class="mb-2"></div>
+                    <p class="small text-muted mb-0 d-none" id="attendanceMatrixExportClassEmpty">Add at least one class to generate the workbook.</p>
+                </div>
+            </div>
+            <div class="modal-footer py-2 flex-wrap gap-2 justify-content-end">
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-success btn-sm" id="btn_attendanceMatrixExportConfirm">
+                    <i class="bi bi-cloud-download me-1"></i><span id="attendanceMatrixExportConfirmLabel">Export</span>
+                </button>
             </div>
         </div>
     </div>
@@ -2086,6 +2139,15 @@ document.addEventListener('DOMContentLoaded', () => {
     window.CAN_VIEW_ATTENDANCE_ROLLUPS = <%= (typeof canViewRollups !== 'undefined' && canViewRollups) ? 'true' : 'false' %>;
     window.CAN_VIEW_ATTENDANCE_CHANGE_LOG = <%= (typeof canViewChangeHistory !== 'undefined' && canViewChangeHistory) ? 'true' : 'false' %>;
     window.CAN_VIEW_ATTENDANCE_FIELDS = <%= (typeof canViewRosterFields !== 'undefined' && canViewRosterFields) ? 'true' : 'false' %>;
+    if (window.CAN_EXPORT_ATTENDANCE) {
+        const exportBtn = document.getElementById('btn_exportAttendanceExcel');
+        if (exportBtn) {
+            exportBtn.disabled = false;
+            exportBtn.title = 'Export attendance matrix to Excel';
+        }
+    }
+    window.__allAttendanceStatuses = <%- JSON.stringify(typeof allAttendanceStatuses !== 'undefined' ? allAttendanceStatuses : []).replace(/</g, '\\u003c') %>;
+    window.__attendanceStatusMeta = <%- JSON.stringify(typeof attendanceStatusMeta !== 'undefined' ? attendanceStatusMeta : {}).replace(/</g, '\\u003c') %>;
 
     if (typeof bootstrap !== 'undefined') {
         detailsModalInstance = new bootstrap.Modal(document.getElementById('cellDetailsModal'));
@@ -2246,16 +2308,34 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    function isAttendanceMatrixLoadedForCurrentExport() {
+        const classId = String(document.getElementById('filter_classId')?.value || window.currentMatrixData?.classId || '').trim();
+        return Boolean(window.currentMatrixData?.status === 'success' && classId);
+    }
+
+    function syncAttendanceMatrixExportModalAvailability() {
+        const loaded = isAttendanceMatrixLoadedForCurrentExport();
+        const currentRadio = document.getElementById('attendanceMatrixExportModeCurrent');
+        const multiRadio = document.getElementById('attendanceMatrixExportModeMulti');
+        const currentLabel = document.querySelector('label[for="attendanceMatrixExportModeCurrent"]');
+        if (currentRadio) {
+            currentRadio.disabled = !loaded;
+            if (!loaded && currentRadio.checked && multiRadio) {
+                multiRadio.checked = true;
+            }
+        }
+        if (currentLabel) {
+            currentLabel.classList.toggle('opacity-50', !loaded);
+            currentLabel.title = loaded ? '' : 'Load a class on the matrix page first';
+        }
+        syncAttendanceMatrixExportModalLayout();
+    }
+
     function setAttendancePrintEnabled(enabled) {
         const printBtn = document.getElementById('btn_printAttendanceMatrix');
         if (printBtn) {
             printBtn.disabled = !enabled;
             printBtn.title = enabled ? 'Print attendance matrix for the loaded range' : 'Load the matrix first';
-        }
-        const exportBtn = document.getElementById('btn_exportAttendanceExcel');
-        if (exportBtn) {
-            exportBtn.disabled = !enabled;
-            exportBtn.title = enabled ? 'Export attendance matrix to Excel for the loaded range' : 'Load the matrix first';
         }
         const nickBtn = document.getElementById('btn_attendanceMatrixRosterNicknames');
         if (nickBtn) {
@@ -2273,38 +2353,237 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    function exportAttendanceExcel() {
-        if (!window.currentMatrixData || window.currentMatrixData.status !== 'success') {
+    const attendanceExportCustomState = {
+        classes: []
+    };
+
+    function getAttendanceMatrixExportDateRange() {
+        return {
+            startDate: String(document.getElementById('filter_startDate')?.value || '').trim(),
+            endDate: String(document.getElementById('filter_endDate')?.value || '').trim()
+        };
+    }
+
+    function getSelectedAttendanceMatrixExportMode() {
+        const checked = document.querySelector('#attendanceMatrixExportModal input[name="attendanceMatrixExportMode"]:checked');
+        return String(checked?.value || 'current').trim() === 'multi' ? 'multi' : 'current';
+    }
+
+    function syncAttendanceMatrixExportModalLayout() {
+        const mode = getSelectedAttendanceMatrixExportMode();
+        const panel = document.getElementById('attendanceMatrixExportMultiPanel');
+        const confirmLabel = document.getElementById('attendanceMatrixExportConfirmLabel');
+        if (panel) panel.classList.toggle('d-none', mode !== 'multi');
+        if (confirmLabel) confirmLabel.textContent = mode === 'multi' ? 'Generate Excel' : 'Export';
+    }
+
+    function renderAttendanceMatrixExportClassList() {
+        const host = document.getElementById('attendanceMatrixExportClassList');
+        const emptyHint = document.getElementById('attendanceMatrixExportClassEmpty');
+        if (!host) return;
+        const rows = attendanceExportCustomState.classes;
+        if (!rows.length) {
+            host.innerHTML = '';
+            if (emptyHint) emptyHint.classList.remove('d-none');
+            return;
+        }
+        if (emptyHint) emptyHint.classList.add('d-none');
+        host.innerHTML = rows.map((row, index) => {
+            const classId = attEscapeHtml(row.classId || '');
+            const title = attEscapeHtml(row.title || row.classId || 'Class');
+            const primary = row.isPrimary ? ' <span class="badge text-bg-light border">Loaded</span>' : '';
+            return `<span class="amx-export-class-chip" data-class-id="${classId}">
+                <span>${title}${primary}</span>
+                <button type="button" class="btn btn-link btn-sm text-danger p-0 js-amx-export-remove-class" data-index="${index}" title="Remove class" aria-label="Remove ${title}">&times;</button>
+            </span>`;
+        }).join('');
+    }
+
+    function seedAttendanceMatrixExportClasses() {
+        attendanceExportCustomState.classes = [];
+        const classId = String(document.getElementById('filter_classId')?.value || window.currentMatrixData?.classId || '').trim();
+        const className = String(document.getElementById('filter_className')?.value || window.currentMatrixData?.className || '').trim();
+        if (classId && window.currentMatrixData?.status === 'success') {
+            attendanceExportCustomState.classes.push({
+                classId,
+                title: className || classId,
+                isPrimary: true
+            });
+        }
+        renderAttendanceMatrixExportClassList();
+    }
+
+    function openAttendanceMatrixExportModal() {
+        if (!window.CAN_EXPORT_ATTENDANCE) return;
+        const { startDate, endDate } = getAttendanceMatrixExportDateRange();
+        if (!startDate || !endDate) {
             showAttendanceMatrixMessage({
-                title: 'Nothing to export',
+                title: 'Date range required',
                 icon: 'warning',
-                message: 'Load an attendance matrix for a class first.',
-                buttons: [{ text: 'Close', class: 'btn-secondary' }]
+                message: 'Select a start and end date before exporting.'
             });
             return;
+        }
+        const currentRadio = document.getElementById('attendanceMatrixExportModeCurrent');
+        if (currentRadio) currentRadio.checked = true;
+        seedAttendanceMatrixExportClasses();
+        syncAttendanceMatrixExportModalAvailability();
+        const modalEl = document.getElementById('attendanceMatrixExportModal');
+        if (modalEl && window.bootstrap?.Modal) {
+            window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        } else {
+            runAttendanceMatrixCurrentExportDownload();
+        }
+    }
+
+    function buildAttendanceMatrixCurrentExportUrl() {
+        if (!window.currentMatrixData || window.currentMatrixData.status !== 'success') {
+            throw new Error('Load an attendance matrix for a class first.');
         }
         const classId = String(document.getElementById('filter_classId')?.value || window.currentMatrixData.classId || '').trim();
-        const startDate = String(document.getElementById('filter_startDate')?.value || '').trim();
-        const endDate = String(document.getElementById('filter_endDate')?.value || '').trim();
-        if (!classId) {
-            showAttendanceMatrixMessage({
-                title: 'Class required',
-                icon: 'warning',
-                message: 'Select a class and load the matrix before exporting.',
-                buttons: [{ text: 'Close', class: 'btn-secondary' }]
-            });
-            return;
-        }
+        const { startDate, endDate } = getAttendanceMatrixExportDateRange();
+        if (!classId) throw new Error('Select a class and load the matrix before exporting.');
         const params = new URLSearchParams({ classId });
         if (startDate) params.set('startDate', startDate);
         if (endDate) params.set('endDate', endDate);
         const visibleIds = Array.from(getAttendanceVisiblePersonIds() || []).filter(Boolean);
-        params.set('personIds', visibleIds.join(','));
+        if (visibleIds.length) params.set('personIds', visibleIds.join(','));
         const sessionIds = (window.currentMatrixData?.sessions || [])
             .map((sessionRow) => String(sessionRow?.id || '').trim())
             .filter(Boolean);
         if (sessionIds.length) params.set('sessionIds', sessionIds.join(','));
-        window.location.href = `/school/attendances/api/export.xlsx?${params.toString()}`;
+        return `/school/attendances/api/export.xlsx?${params.toString()}`;
+    }
+
+    function runAttendanceMatrixCurrentExportDownload() {
+        try {
+            window.location.href = buildAttendanceMatrixCurrentExportUrl();
+        } catch (error) {
+            showAttendanceMatrixMessage({
+                title: 'Nothing to export',
+                icon: 'warning',
+                message: error.message || 'Unable to export.'
+            });
+        }
+    }
+
+    function downloadBlobResponse(blob, filename) {
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.download = filename || 'attendance_export.xlsx';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 2000);
+    }
+
+    function parseContentDispositionFilename(headerValue = '') {
+        const token = String(headerValue || '').trim();
+        const match = token.match(/filename\*?=(?:UTF-8''|")?([^";]+)/i);
+        if (!match || !match[1]) return '';
+        try {
+            return decodeURIComponent(match[1].replace(/"/g, ''));
+        } catch (_) {
+            return match[1].replace(/"/g, '');
+        }
+    }
+
+    async function runAttendanceMatrixMultiClassExport() {
+        const classes = attendanceExportCustomState.classes;
+        if (!classes.length) {
+            showAttendanceMatrixMessage({
+                title: 'Classes required',
+                icon: 'warning',
+                message: 'Add at least one class to generate a multi-class export.'
+            });
+            return;
+        }
+        const { startDate, endDate } = getAttendanceMatrixExportDateRange();
+        const body = {
+            startDate,
+            endDate,
+            classes: classes.map((classRow) => {
+                const entry = { classId: String(classRow.classId || '').trim() };
+                if (classRow.isPrimary) {
+                    const visibleIds = Array.from(getAttendanceVisiblePersonIds() || []).filter(Boolean);
+                    if (visibleIds.length) entry.personIds = visibleIds;
+                    const sessionIds = (window.currentMatrixData?.sessions || [])
+                        .map((sessionRow) => String(sessionRow?.id || '').trim())
+                        .filter(Boolean);
+                    if (sessionIds.length) entry.sessionIds = sessionIds;
+                }
+                return entry;
+            })
+        };
+        let busyToken = null;
+        if (typeof window.showLoading === 'function') {
+            busyToken = window.showLoading({
+                title: 'Exporting Excel',
+                note: 'Building multi-class attendance workbook…',
+                operation: 'Attendance Matrix Export'
+            });
+        }
+        try {
+            const res = await fetch('/school/attendances/api/export-custom.xlsx', {
+                method: 'POST',
+                headers: {
+                    accept: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'content-type': 'application/json',
+                    'x-ajax-request': 'true'
+                },
+                body: JSON.stringify(body)
+            });
+            if (!res.ok) {
+                const errPayload = await res.json().catch(() => ({}));
+                throw new Error(errPayload.message || 'Unable to export multi-class workbook.');
+            }
+            const blob = await res.blob();
+            const filename = parseContentDispositionFilename(res.headers.get('content-disposition'))
+                || 'Attendance_Multi.xlsx';
+            downloadBlobResponse(blob, filename);
+        } catch (error) {
+            showAttendanceMatrixMessage({
+                title: 'Export failed',
+                icon: 'error',
+                message: error.message || 'Unable to export multi-class workbook.'
+            });
+        } finally {
+            if (busyToken && typeof window.hideLoading === 'function') window.hideLoading(busyToken);
+        }
+    }
+
+    async function confirmAttendanceMatrixExport() {
+        const mode = getSelectedAttendanceMatrixExportMode();
+        if (mode === 'current' && !isAttendanceMatrixLoadedForCurrentExport()) {
+            showAttendanceMatrixMessage({
+                title: 'Class required',
+                icon: 'warning',
+                message: 'Load a class on the attendance matrix before using the current export option.'
+            });
+            return;
+        }
+        if (mode === 'current') {
+            const modalEl = document.getElementById('attendanceMatrixExportModal');
+            if (modalEl && window.bootstrap?.Modal) {
+                window.bootstrap.Modal.getInstance(modalEl)?.hide();
+            }
+            runAttendanceMatrixCurrentExportDownload();
+            return;
+        }
+        await runAttendanceMatrixMultiClassExport();
+    }
+
+    function addAttendanceMatrixExportClass(item = {}) {
+        const classId = String(item.id || item.classId || '').trim();
+        if (!classId) return;
+        if (attendanceExportCustomState.classes.some((row) => row.classId === classId)) return;
+        attendanceExportCustomState.classes.push({
+            classId,
+            title: String(item.title || item.name || classId).trim(),
+            isPrimary: false
+        });
+        renderAttendanceMatrixExportClassList();
     }
 
     document.getElementById('btn_clearClass')?.addEventListener('click', () => {
@@ -3875,7 +4154,36 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.getElementById('btn_printAttendanceMatrix')?.addEventListener('click', () => openAttendancePrint());
-    document.getElementById('btn_exportAttendanceExcel')?.addEventListener('click', () => exportAttendanceExcel());
+    document.getElementById('btn_exportAttendanceExcel')?.addEventListener('click', () => openAttendanceMatrixExportModal());
+
+    document.querySelectorAll('#attendanceMatrixExportModal input[name="attendanceMatrixExportMode"]').forEach((input) => {
+        input.addEventListener('change', () => {
+            syncAttendanceMatrixExportModalAvailability();
+            if (getSelectedAttendanceMatrixExportMode() === 'multi') renderAttendanceMatrixExportClassList();
+        });
+    });
+
+    document.getElementById('btn_attendanceExportAddClass')?.addEventListener('click', () => {
+        if (typeof GenericPicker === 'undefined' || typeof GenericPickerPresets === 'undefined') return;
+        GenericPicker.open(GenericPickerPresets.class({
+            title: 'Add class to export',
+            icon: 'bi-book',
+            onSelect: (item) => addAttendanceMatrixExportClass(item)
+        }));
+    });
+
+    document.getElementById('attendanceMatrixExportClassList')?.addEventListener('click', (event) => {
+        const btn = event.target.closest('.js-amx-export-remove-class');
+        if (!btn) return;
+        const index = Number.parseInt(String(btn.getAttribute('data-index') || ''), 10);
+        if (!Number.isFinite(index) || index < 0) return;
+        attendanceExportCustomState.classes.splice(index, 1);
+        renderAttendanceMatrixExportClassList();
+    });
+
+    document.getElementById('btn_attendanceMatrixExportConfirm')?.addEventListener('click', () => {
+        void confirmAttendanceMatrixExport();
+    });
 
     // --- 4. Interactive Note Saving Logic ---
     document.getElementById('btn_saveComment').addEventListener('click', async () => {

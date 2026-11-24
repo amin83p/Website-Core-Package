@@ -25,19 +25,28 @@ test('attendance viewer uses shared Export button look and wires xlsx after load
   assert.match(viewer, />\s*Export\s*</);
   assert.doesNotMatch(viewer, /Export Excel/);
   assert.match(viewer, /btn_printAttendanceMatrix/);
-  assert.match(viewer, /exportAttendanceExcel\(/);
+  assert.match(viewer, /openAttendanceMatrixExportModal/);
+  assert.match(viewer, /attendanceMatrixExportModal/);
+  assert.doesNotMatch(viewer, /js-amx-export-status/);
+  assert.match(viewer, /Excel dropdowns on attendance cells/);
   assert.match(viewer, /\/school\/attendances\/api\/export\.xlsx/);
+  assert.match(viewer, /\/school\/attendances\/api\/export-custom\.xlsx/);
   assert.match(viewer, /personIds/);
   assert.match(viewer, /sessionIds/);
   assert.match(viewer, /getAttendanceVisiblePersonIds/);
-  assert.match(viewer, /exportBtn\.disabled = !enabled/);
+  assert.doesNotMatch(viewer, /exportBtn\.disabled = !enabled/);
+  assert.match(viewer, /isAttendanceMatrixLoadedForCurrentExport/);
+  assert.match(viewer, /syncAttendanceMatrixExportModalAvailability/);
 });
 
 test('attendance routes expose export.xlsx with same access gate as matrix data', () => {
   const routes = read('MVC/routes/attendanceRoutes.js');
   assert.match(routes, /\/api\/export\.xlsx/);
   assert.match(routes, /exportAttendanceExcel/);
-  assert.match(routes, /\/api\/export\.xlsx'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_ATTENDANCES,\s*OPERATIONS\.EXPORT\)/);
+  assert.match(routes, /\/api\/export-custom\.xlsx/);
+  assert.match(routes, /exportAttendanceExcelCustom/);
+  assert.match(routes, /\/api\/export\.xlsx'[\s\S]*?requireAttendanceOperation\(OPERATIONS\.EXPORT\)/);
+  assert.match(routes, /\/api\/export-custom\.xlsx'[\s\S]*?requireAttendanceOperation\(OPERATIONS\.EXPORT\)/);
   assert.match(routes, /\/settings'[\s\S]*?requireAccess\(SECTIONS\.SCHOOL_SETTINGS,\s*OPERATIONS\.READ_ALL\)/);
 });
 
@@ -707,4 +716,132 @@ test('workbook layout: Att %, banding, title/class/teacher, Fatima fills, notes,
   // CLBs column width fits content (not a fixed oversized default)
   assert.ok(sheet.getColumn(9).width >= 12);
   assert.ok(sheet.getColumn(9).width <= 42);
+});
+
+const SAMPLE_MATRIX_PAYLOAD = Object.freeze({
+  className: 'EAL Morning',
+  teacherName: 'Fatima Majoka',
+  startDate: '2026-07-01',
+  endDate: '2026-07-31',
+  enabledAttendanceStatuses: ['present', 'late', 'excused', 'absent', 'not_applicable'],
+  sessions: [{ id: 's1', date: '2026-07-20' }],
+  matrix: [{
+    personId: 'PER_1',
+    firstName: 'Ada',
+    lastName: 'Lovelace',
+    records: [{ sessionId: 's1', date: '2026-07-20', status: 'present' }],
+    summary: { performancePercent: 100 }
+  }]
+});
+
+test('applyAttendanceExportOverrides changes matrix cell status without mutating input', () => {
+  const payload = structuredClone(SAMPLE_MATRIX_PAYLOAD);
+  const updated = attendanceExcelExportService.applyAttendanceExportOverrides(payload, {
+    'PER_1|s1': 'absent'
+  });
+  assert.equal(payload.matrix[0].records[0].status, 'present');
+  assert.equal(updated.matrix[0].records[0].status, 'absent');
+  assert.equal(attendanceExcelExportService.formatExportCellDisplay(updated.matrix[0].records[0]), 'A');
+});
+
+test('buildAttendanceMultiClassExcelWorkbook creates one sheet per class without minute summary', async () => {
+  const classB = structuredClone(SAMPLE_MATRIX_PAYLOAD);
+  classB.className = 'EAL Afternoon';
+  const { buffer } = await attendanceExcelExportService.buildAttendanceMultiClassExcelWorkbook(
+    [SAMPLE_MATRIX_PAYLOAD, classB],
+    { startDate: '2026-07-01', endDate: '2026-07-31' }
+  );
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  assert.equal(workbook.worksheets.length, 2);
+  const sheet = workbook.getWorksheet(1);
+  let hasMinuteSummary = false;
+  for (let row = 1; row <= sheet.rowCount; row += 1) {
+    const label = String(sheet.getCell(row, 1).value || '').trim();
+    if (attendanceExcelExportService.EXPORT_MINUTE_SUMMARY_ROWS.some((entry) => entry.label === label)) {
+      hasMinuteSummary = true;
+      break;
+    }
+  }
+  assert.equal(hasMinuteSummary, false);
+  let presentCode = null;
+  for (let row = 1; row <= sheet.rowCount; row += 1) {
+    if (String(sheet.getCell(row, 3).value || '') === 'Lovelace') {
+      presentCode = sheet.getCell(row, 5).value;
+      break;
+    }
+  }
+  assert.equal(presentCode, 'P');
+});
+
+test('buildAttendanceMultiClassExcelWorkbook adds list validation on attendance cells', async () => {
+  const { buffer } = await attendanceExcelExportService.buildAttendanceMultiClassExcelWorkbook(
+    [SAMPLE_MATRIX_PAYLOAD],
+    { startDate: '2026-07-01', endDate: '2026-07-31' }
+  );
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  const sheet = workbook.getWorksheet(1);
+  let dropdownCell = null;
+  for (let row = 1; row <= sheet.rowCount; row += 1) {
+    const cell = sheet.getCell(row, 5);
+    if (cell?.dataValidation?.type === 'list') {
+      dropdownCell = cell;
+      break;
+    }
+  }
+  assert.ok(dropdownCell, 'expected at least one attendance cell with list validation');
+  assert.equal(dropdownCell.dataValidation.allowBlank, true);
+  const expectedList = attendanceExcelExportService.buildAttendanceDropdownOptionsFromLegend(
+    attendanceExcelExportService.buildLegendEntries(SAMPLE_MATRIX_PAYLOAD.enabledAttendanceStatuses)
+  ).formulae;
+  assert.equal(
+    String(dropdownCell.dataValidation.formulae?.[0] || ''),
+    expectedList
+  );
+  assert.doesNotMatch(String(dropdownCell.dataValidation.formulae?.[0] || ''), /ACF/);
+  const conditionalRules = Array.isArray(sheet.conditionalFormattings)
+    ? sheet.conditionalFormattings.flatMap((block) => block.rules || [])
+    : [];
+  assert.ok(conditionalRules.length >= 4, 'expected legend-based conditional fill rules');
+  assert.ok(
+    conditionalRules.some((rule) => String(rule?.formulae?.[0] || '').includes('"P"')),
+    'expected Present fill rule'
+  );
+  assert.ok(
+    conditionalRules.some((rule) => rule?.type === 'cellIs' && rule?.operator === 'equal'),
+    'expected cellIs equal conditional formatting'
+  );
+  assert.equal(dropdownCell.fill?.fgColor?.argb || dropdownCell.fill?.bgColor?.argb, undefined);
+});
+
+test('multi-class dropdown list omits statuses not in class legend (e.g. ACF)', async () => {
+  const payload = {
+    ...SAMPLE_MATRIX_PAYLOAD,
+    enabledAttendanceStatuses: ['present', 'absent', 'not_applicable']
+  };
+  const { buffer } = await attendanceExcelExportService.buildAttendanceMultiClassExcelWorkbook(
+    [payload],
+    { startDate: '2026-07-01', endDate: '2026-07-31' }
+  );
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.load(buffer);
+  const sheet = workbook.getWorksheet(1);
+  let dropdownCell = null;
+  for (let row = 1; row <= sheet.rowCount; row += 1) {
+    const cell = sheet.getCell(row, 5);
+    if (cell?.dataValidation?.type === 'list') {
+      dropdownCell = cell;
+      break;
+    }
+  }
+  assert.ok(dropdownCell);
+  const listFormula = String(dropdownCell.dataValidation.formulae?.[0] || '');
+  assert.match(listFormula, /P/);
+  assert.match(listFormula, /A/);
+  assert.doesNotMatch(listFormula, /ACF/);
+  const options = attendanceExcelExportService.buildAttendanceDropdownOptionsFromLegend(
+    attendanceExcelExportService.buildLegendEntries(['present', 'absent', 'not_applicable'])
+  );
+  assert.equal(options.codes.includes('ACF'), false);
 });

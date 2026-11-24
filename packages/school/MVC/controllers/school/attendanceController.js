@@ -526,7 +526,9 @@ async function showAttendancePage(req, res) {
             attendanceActionLimits,
             canOpenRollingEnrollment,
             attendanceExcuseReasons,
-            canManageAttendanceExcuseReasons
+            canManageAttendanceExcuseReasons,
+            allAttendanceStatuses: attendanceMatrixMetricsService.ALL_ATTENDANCE_STATUSES_ORDERED,
+            attendanceStatusMeta: attendanceMatrixMetricsService.ATTENDANCE_STATUS_META
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
@@ -1156,6 +1158,91 @@ async function exportAttendanceExcel(req, res) {
             return res.status(400).json({ status: 'error', message: error.message });
         }
         return res.status(400).send(error.message || 'Unable to export attendance Excel.');
+    }
+}
+
+function normalizeExportClassBodyEntry(entry = {}) {
+    const classId = String(entry?.classId || '').trim();
+    if (!classId) return null;
+    const personIds = entry?.personIds != null
+        ? (Array.isArray(entry.personIds) ? entry.personIds : String(entry.personIds).split(','))
+        : null;
+    const sessionIds = entry?.sessionIds != null
+        ? (Array.isArray(entry.sessionIds) ? entry.sessionIds : String(entry.sessionIds).split(','))
+        : null;
+    return {
+        classId,
+        personIds: personIds
+            ? personIds.map((id) => String(id || '').trim()).filter(Boolean)
+            : null,
+        sessionIds: sessionIds
+            ? sessionIds.map((id) => String(id || '').trim()).filter(Boolean)
+            : null
+    };
+}
+
+async function exportAttendanceExcelCustom(req, res) {
+    try {
+        const attendanceAccess = await resolveAttendanceAccessForRequest(req);
+        assertAttendanceAccess(attendanceAccess, 'canExportExcel', 'You do not have permission to export attendance.');
+        const body = req.body && typeof req.body === 'object' ? req.body : {};
+        const startDate = String(body.startDate || '').trim();
+        const endDate = String(body.endDate || '').trim();
+        const classEntries = (Array.isArray(body.classes) ? body.classes : [])
+            .map((entry) => normalizeExportClassBodyEntry(entry))
+            .filter(Boolean);
+        if (!classEntries.length) {
+            throw new Error('At least one class is required.');
+        }
+
+        const exportPayloads = [];
+        for (const entry of classEntries) {
+            const syntheticReq = {
+                ...req,
+                query: {
+                    classId: entry.classId,
+                    startDate,
+                    endDate
+                }
+            };
+            if (entry.personIds?.length) {
+                syntheticReq.query.personIds = entry.personIds.join(',');
+            }
+            if (entry.sessionIds?.length) {
+                syntheticReq.query.sessionIds = entry.sessionIds.join(',');
+            }
+
+            const payload = await buildAttendanceMatrixPayload(syntheticReq, {
+                applyWindow: false,
+                filterSessionIds: entry.sessionIds,
+                filterPersonIds: entry.personIds
+            });
+            const classData = await getAttendanceClassOrThrow(req, entry.classId);
+            const orgPolicyCatalog = await attendanceMatrixPolicyModel.getPolicyCatalogForOrg(
+                String(req.user?.activeOrgId || classData?.orgId || '').trim()
+            );
+            const filteredPayload = matrixRollupService.recomputeAttendanceMatrixRollups(payload, {
+                classData,
+                orgPolicyCatalog
+            });
+            exportPayloads.push(filteredPayload);
+        }
+
+        const { buffer, filename } = await attendanceExcelExportService.buildAttendanceMultiClassExcelWorkbook(
+            exportPayloads,
+            { startDate, endDate }
+        );
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.setHeader('Content-Length', buffer.length);
+        return res.status(200).send(buffer);
+    } catch (error) {
+        const wantsJson = String(req.headers.accept || '').includes('application/json')
+            || String(req.headers['x-ajax-request'] || '') === 'true';
+        if (wantsJson) {
+            return res.status(400).json({ status: 'error', message: error.message });
+        }
+        return res.status(400).send(error.message || 'Unable to export custom attendance Excel.');
     }
 }
 
@@ -2415,6 +2502,7 @@ module.exports = {
     getFunderStudentSelection,
     postAttendanceRollups,
     exportAttendanceExcel,
+    exportAttendanceExcelCustom,
     uploadAttendanceFile,
     addAttendanceComment,
     updateAttendanceRosterCell,

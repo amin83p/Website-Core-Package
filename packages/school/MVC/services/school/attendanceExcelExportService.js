@@ -349,6 +349,86 @@ function formatExportCellDisplay(record = {}) {
   return resolveExportCellPresentation(record).code;
 }
 
+function buildAttendanceDropdownOptionsFromLegend(legendEntries = []) {
+  const entries = Array.isArray(legendEntries) ? legendEntries : [];
+  const codes = [];
+  const fillRules = [];
+  entries.forEach((entry) => {
+    const code = clean(entry?.code);
+    if (!code) return;
+    if (!codes.includes(code)) codes.push(code);
+    const fillArgb = resolveLegendEntryFillArgb(entry);
+    if (!fillArgb) return;
+    if (!fillRules.some((row) => row.code === code)) {
+      fillRules.push({ code, fillArgb });
+    }
+  });
+  return {
+    formulae: codes.length ? `"${codes.join(',')}"` : '',
+    fillRules,
+    codes
+  };
+}
+
+function buildAttendanceStatusDropdownFormulae(enabledAttendanceStatuses = []) {
+  const legend = buildLegendEntries(enabledAttendanceStatuses);
+  return buildAttendanceDropdownOptionsFromLegend(legend).formulae;
+}
+
+function applyAttendanceStatusCellDropdown(cell, dropdownFormulae = '') {
+  if (!cell || !dropdownFormulae) return;
+  cell.dataValidation = {
+    type: 'list',
+    allowBlank: true,
+    formulae: [dropdownFormulae]
+  };
+}
+
+function buildAttendanceMatrixCellRangeRef(sheet, startCol, startRow, endCol, endRow) {
+  if (!sheet || !startRow || !endRow || startRow > endRow) return '';
+  return `${sheet.getCell(startRow, startCol).address}:${sheet.getCell(endRow, endCol).address}`;
+}
+
+function excelCellIsEqualFormula(code = '') {
+  const token = String(code || '').replace(/"/g, '""');
+  return `"${token}"`;
+}
+
+function applyAttendanceDropdownStatusConditionalFormatting(sheet, ref = '', fillRules = []) {
+  if (!ref || typeof sheet?.addConditionalFormatting !== 'function') return;
+  const entries = Array.isArray(fillRules) ? fillRules : [];
+  if (!entries.length) return;
+  const rules = entries.map((entry, idx) => ({
+    type: 'cellIs',
+    operator: 'equal',
+    priority: idx + 1,
+    formulae: [excelCellIsEqualFormula(entry.code)],
+    style: {
+      fill: {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: entry.fillArgb },
+        bgColor: { argb: entry.fillArgb }
+      }
+    }
+  }));
+  rules.push({
+    type: 'cellIs',
+    operator: 'equal',
+    priority: rules.length + 1,
+    formulae: ['""'],
+    style: {
+      fill: {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FFFFFFFF' },
+        bgColor: { argb: 'FFFFFFFF' }
+      }
+    }
+  });
+  sheet.addConditionalFormatting({ ref, rules });
+}
+
 function statusFillArgb(status, { forLegend = false } = {}) {
   const normalized = normalizeAttendanceStatusForSave(status, '');
   if (!normalized) return '';
@@ -467,12 +547,12 @@ function applyOfficialConsolidatedAttendanceCellStyle(cell, record = {}) {
   applyVerticalMiddle(cell, { horizontal: 'center', wrapText: false });
 }
 
-function applyStatusCellStyle(cell, statusOrRecord, { wrapText = false } = {}) {
+function applyStatusCellStyle(cell, statusOrRecord, { wrapText = false, skipFill = false } = {}) {
   const record = statusOrRecord && typeof statusOrRecord === 'object'
     ? statusOrRecord
     : { status: statusOrRecord };
   const { fillArgb } = resolveExportCellPresentation(record);
-  if (fillArgb) applySolidFill(cell, fillArgb);
+  if (!skipFill && fillArgb) applySolidFill(cell, fillArgb);
   cell.font = {
     bold: false,
     size: 11,
@@ -855,6 +935,64 @@ function buildStudentAttendanceExcelFilename({ studentName, startDate, endDate }
   return `Attendance_${studentPart}_${rangePart}.xlsx`.replace(/\s+/g, '_');
 }
 
+function buildMultiClassExportFilename({ startDate, endDate } = {}) {
+  const rangePart = [clean(startDate), clean(endDate)].filter(Boolean).join('_to_') || 'range';
+  return `Attendance_Multi_${rangePart}.xlsx`.replace(/\s+/g, '_');
+}
+
+function normalizeExportOverrideKey(personId = '', sessionId = '') {
+  return `${clean(personId)}|${clean(sessionId)}`;
+}
+
+function applyAttendanceExportOverrides(payload = {}, overrides = {}) {
+  if (!overrides || typeof overrides !== 'object') return payload;
+  const entries = Object.entries(overrides).filter(([key]) => clean(key).includes('|'));
+  if (!entries.length) return payload;
+
+  const overrideMap = new Map(entries.map(([key, value]) => [clean(key), clean(value).toLowerCase()]));
+  const matrix = Array.isArray(payload.matrix) ? payload.matrix : [];
+  const nextMatrix = matrix.map((student) => {
+    const personId = clean(student?.personId);
+    const records = Array.isArray(student?.records) ? student.records : [];
+    const nextRecords = records.map((record) => {
+      const sessionId = clean(record?.sessionId);
+      const key = normalizeExportOverrideKey(personId, sessionId);
+      if (!overrideMap.has(key)) return record;
+      const rawNext = overrideMap.get(key);
+      if (!rawNext || rawNext === '__unmarked__') {
+        return {
+          ...record,
+          status: '',
+          absenceExcused: false,
+          lateMinutes: 0,
+          earlyLeaveMinutes: 0
+        };
+      }
+      const nextStatus = normalizeAttendanceStatusForSave(rawNext, '');
+      const clone = { ...record, status: nextStatus };
+      if (nextStatus === ATTENDANCE_STATUS.EXCUSED) {
+        clone.status = ATTENDANCE_STATUS.EXCUSED;
+        clone.absenceExcused = true;
+        clone.lateMinutes = 0;
+        clone.earlyLeaveMinutes = 0;
+      } else if (nextStatus === ATTENDANCE_STATUS.ABSENT || nextStatus === ATTENDANCE_STATUS.ACF) {
+        clone.absenceExcused = false;
+      } else if (nextStatus === ATTENDANCE_STATUS.PRESENT || nextStatus === ATTENDANCE_STATUS.NOT_APPLICABLE) {
+        clone.absenceExcused = false;
+        clone.lateMinutes = 0;
+        clone.earlyLeaveMinutes = 0;
+      } else if (nextStatus === ATTENDANCE_STATUS.LATE) {
+        clone.absenceExcused = false;
+        clone.earlyLeaveMinutes = 0;
+        if (!(Number(clone.lateMinutes) > 0)) clone.lateMinutes = 1;
+      }
+      return clone;
+    });
+    return { ...student, records: nextRecords };
+  });
+  return { ...payload, matrix: nextMatrix };
+}
+
 function sanitizeExcelSheetName(value = '', usedNames = new Set()) {
   let base = clean(value)
     .replace(/[\\/*?:[\]]/g, '')
@@ -944,6 +1082,8 @@ function writeAttendanceMatrixBlockOnce(sheet, payload = {}, options = {}) {
   const monthBlockHeaderMode = options.monthBlockHeaderMode === 'compact' ? 'compact' : 'full';
   const sessionColumnWidth = resolveSessionColumnWidth(options);
   const attendanceRowHeight = Number(options.attendanceRowHeight);
+  const attendanceCellDropdowns = options.attendanceCellDropdowns === true;
+  let attendanceDropdownCells = 0;
   const rowAt = (relativeOneBased) => startRow + relativeOneBased - 1;
 
   const sessions = Array.isArray(payload.sessions) ? payload.sessions : [];
@@ -951,6 +1091,10 @@ function writeAttendanceMatrixBlockOnce(sheet, payload = {}, options = {}) {
   const enabledAttendanceStatuses = payload.enabledAttendanceStatuses
     || attendanceMatrixMetricsService.resolveEnabledAttendanceStatuses({});
   const legend = buildLegendEntries(enabledAttendanceStatuses);
+  const dropdownOptions = attendanceCellDropdowns
+    ? buildAttendanceDropdownOptionsFromLegend(legend)
+    : null;
+  const statusDropdownFormulae = dropdownOptions?.formulae || '';
   const className = clean(payload.className) || 'Class';
   const teacherName = clean(payload.teacherName);
   const title = resolveAttendanceTitle({
@@ -1097,7 +1241,14 @@ function writeAttendanceMatrixBlockOnce(sheet, payload = {}, options = {}) {
       const cell = sheet.getCell(bodyRow, firstSessionCol + sessionIdx);
       const displayValue = formatExportCellDisplay(record);
       cell.value = displayValue;
-      applyStatusCellStyle(cell, record, { wrapText: false });
+      applyStatusCellStyle(cell, record, {
+        wrapText: false,
+        skipFill: attendanceCellDropdowns
+      });
+      if (attendanceCellDropdowns) {
+        applyAttendanceStatusCellDropdown(cell, statusDropdownFormulae);
+        attendanceDropdownCells += 1;
+      }
       const noteOptions = {
         receiverName: [firstName, lastName].filter(Boolean).join(' ') || clean(student.name),
         receiverEmail: clean(student.email)
@@ -1140,12 +1291,31 @@ function writeAttendanceMatrixBlockOnce(sheet, payload = {}, options = {}) {
   }
 
   const tableEndRow = bodyRow - 1;
-  const minuteTotals = computeExportMinuteTotalsForMatrixPayload(payload);
-  const endRow = writeAttendanceMinuteSummaryTable(sheet, minuteTotals, {
-    labelCol: funderCol,
-    labelMergeEndCol: numCol,
-    valueCol: lastNameCol
-  }, tableEndRow);
+  const firstAttendanceDataRow = weekdayRowIndex + 1;
+  if (attendanceCellDropdowns && sessions.length && tableEndRow >= firstAttendanceDataRow) {
+    const attendanceRef = buildAttendanceMatrixCellRangeRef(
+      sheet,
+      firstSessionCol,
+      firstAttendanceDataRow,
+      firstSessionCol + sessions.length - 1,
+      tableEndRow
+    );
+    applyAttendanceDropdownStatusConditionalFormatting(
+      sheet,
+      attendanceRef,
+      dropdownOptions?.fillRules || []
+    );
+  }
+  const includeMinuteSummary = options.includeMinuteSummary !== false;
+  let endRow = tableEndRow;
+  if (includeMinuteSummary) {
+    const minuteTotals = computeExportMinuteTotalsForMatrixPayload(payload);
+    endRow = writeAttendanceMinuteSummaryTable(sheet, minuteTotals, {
+      labelCol: funderCol,
+      labelMergeEndCol: numCol,
+      valueCol: lastNameCol
+    }, tableEndRow);
+  }
 
   if (Number.isFinite(attendanceRowHeight) && attendanceRowHeight > 0) {
     sheet.getRow(headerRowIndex).height = attendanceRowHeight;
@@ -1162,7 +1332,8 @@ function writeAttendanceMatrixBlockOnce(sheet, payload = {}, options = {}) {
     threadedCommentTargets,
     endRow,
     headerRowIndex,
-    weekdayRowIndex
+    weekdayRowIndex,
+    attendanceDropdownCells
   };
 }
 
@@ -1954,6 +2125,52 @@ async function buildAttendanceExcelWorkbook(payload = {}) {
   };
 }
 
+async function buildAttendanceMultiClassExcelWorkbook(classPayloads = [], meta = {}) {
+  const payloads = (Array.isArray(classPayloads) ? classPayloads : [])
+    .filter((payload) => payload && typeof payload === 'object');
+  if (!payloads.length) {
+    throw new Error('No attendance sheets to export.');
+  }
+  const workbook = new ExcelJS.Workbook();
+  workbook.creator = 'School Attendance';
+  workbook.created = new Date();
+  const threadedCommentTargets = [];
+  let firstLegend = null;
+  let firstTitle = null;
+  const usedSheetNames = new Set();
+
+  payloads.forEach((payload) => {
+    const requestedName = clean(payload.className) || 'Class';
+    const sheetName = sanitizeExcelSheetName(requestedName, usedSheetNames);
+    const sheet = workbook.addWorksheet(sheetName, {
+      views: [{ state: 'frozen', xSplit: 4, ySplit: 0 }]
+    });
+    const blockResult = writeAttendanceMatrixBlockOnce(sheet, payload, {
+      startRow: 1,
+      applyColumnWidths: true,
+      includeMinuteSummary: false,
+      attendanceCellDropdowns: true
+    });
+    if (blockResult.weekdayRowIndex != null) {
+      sheet.views = [{ state: 'frozen', xSplit: 4, ySplit: blockResult.weekdayRowIndex }];
+    }
+    if (!firstLegend) firstLegend = blockResult.legend;
+    if (!firstTitle) firstTitle = blockResult.title;
+    threadedCommentTargets.push(...(blockResult.threadedCommentTargets || []));
+  });
+
+  const buffer = await writeWorkbookBuffer(workbook, threadedCommentTargets);
+  return {
+    buffer,
+    filename: buildMultiClassExportFilename({
+      startDate: meta.startDate || payloads[0]?.startDate,
+      endDate: meta.endDate || payloads[0]?.endDate
+    }),
+    legend: firstLegend,
+    title: firstTitle
+  };
+}
+
 function writeOfficialStudentAttendanceBlockOnce(sheet, exportModel = {}, options = {}) {
   const startRow = Math.max(1, Number(options.startRow) || 1);
   const applySessionColumnWidthsOnly = options.applySessionColumnWidthsOnly === true;
@@ -2450,6 +2667,14 @@ module.exports = {
   resolveOfficialClassBufferColumnWidth,
   writeOfficialStudentAttendanceBlock,
   buildAttendanceExcelWorkbook,
+  buildAttendanceMultiClassExcelWorkbook,
+  buildMultiClassExportFilename,
+  applyAttendanceExportOverrides,
+  normalizeExportOverrideKey,
+  buildAttendanceStatusDropdownFormulae,
+  buildAttendanceDropdownOptionsFromLegend,
+  applyAttendanceStatusCellDropdown,
+  applyAttendanceDropdownStatusConditionalFormatting,
   buildStudentAttendanceExcelWorkbook,
   buildOfficialStudentAttendanceExcelWorkbook,
   computeExportMinuteTotalsForOfficial,

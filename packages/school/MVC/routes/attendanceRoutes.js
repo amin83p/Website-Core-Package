@@ -129,6 +129,11 @@ router.get('/api/export.xlsx',
   trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.EXPORT, { keepActive: true }),
   ctrl.exportAttendanceExcel);
 
+router.post('/api/export-custom.xlsx',
+  requireAttendanceOperation(OPERATIONS.EXPORT),
+  trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.EXPORT, { keepActive: true }),
+  ctrl.exportAttendanceExcelCustom);
+
 router.get('/api/active-classes',
   requireAttendanceOperation(OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.SCHOOL_ATTENDANCES, OPERATIONS.READ_ALL, { keepActive: true }),
