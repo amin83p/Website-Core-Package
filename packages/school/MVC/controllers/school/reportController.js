@@ -1531,6 +1531,15 @@ async function saveAssignment(req, res) {
         nextAssignment: { ...existing, ...basePayload, id },
         reqUser: req.user
       });
+      const templateSyncEdit = await classReferenceSyncService.syncReportInstanceTemplatesForAssignmentSave({
+        assignmentId: id,
+        previousAssignment: existing,
+        nextAssignment: { ...existing, ...basePayload, id },
+        reqUser: req.user
+      });
+      if (templateSyncEdit.errors.length) {
+        throw new Error(templateSyncEdit.errors.join('; '));
+      }
       await classReferenceSyncService.notifyClassReferencesChanged({
         classId,
         reason: `report_assignment_saved:${id}`,
@@ -1544,6 +1553,15 @@ async function saveAssignment(req, res) {
         nextAssignment: { ...existing, ...basePayload, id: upsertExistingId },
         reqUser: req.user
       });
+      const templateSyncUpsert = await classReferenceSyncService.syncReportInstanceTemplatesForAssignmentSave({
+        assignmentId: upsertExistingId,
+        previousAssignment: existing,
+        nextAssignment: { ...existing, ...basePayload, id: upsertExistingId },
+        reqUser: req.user
+      });
+      if (templateSyncUpsert.errors.length) {
+        throw new Error(templateSyncUpsert.errors.join('; '));
+      }
       await classReferenceSyncService.notifyClassReferencesChanged({
         classId,
         reason: `report_assignment_saved:${upsertExistingId}`,

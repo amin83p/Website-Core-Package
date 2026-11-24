@@ -100,7 +100,7 @@
                 <% } %>
               <% } %>
             </select>
-            <div class="form-text" id="assignmentTemplateHelp">Default template for new target rows. Existing rows keep the template they were created with.</div>
+            <div class="form-text" id="assignmentTemplateHelp">Default template for new target rows. Each row can use a different template when you add or edit a row.</div>
           </div>
 
           <div class="col-md-4">
@@ -197,6 +197,14 @@
         <div class="col-12 d-none" id="rowModalTemplateSection"></div>
 
         <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label fw-bold" for="rowModalTemplateSelect">Report template</label>
+            <select class="form-select" id="rowModalTemplateSelect" disabled>
+              <option value="">Select a class to load templates…</option>
+            </select>
+            <div class="form-text" id="rowModalTemplateHelp">Choose the template for this row before saving the assignment.</div>
+          </div>
+
           <div class="col-md-3">
             <label class="form-label fw-bold">Target Mode</label>
             <select class="form-select" id="rowModalTargetType">
@@ -498,6 +506,8 @@
     const classIdInput = document.getElementById('classIdInput');
     const classTitleInput = document.getElementById('classTitleInput');
     const templateSelect = document.getElementById('assignmentTemplateSelect');
+    const rowModalTemplateSelect = document.getElementById('rowModalTemplateSelect');
+    const rowModalTemplateHelp = document.getElementById('rowModalTemplateHelp');
     const templateHelp = document.getElementById('assignmentTemplateHelp');
     const initialSelectedTemplateId = <%- JSON.stringify(selectedTemplateId || '') %>;
     let assignmentTemplateCatalog = new Map();
@@ -616,10 +626,60 @@
       document.getElementById('reportScopeLockHelp')?.classList.toggle('d-none', !locked);
     }
 
+    function getRowModalSelectedTemplateId() {
+      return String(rowModalTemplateSelect?.value || modalFields.templateId?.value || '').trim();
+    }
+
+    function syncRowModalTemplateHiddenFields() {
+      const templateId = getRowModalSelectedTemplateId();
+      const meta = templateId ? assignmentTemplateCatalog.get(templateId) : null;
+      const version = meta?.version != null ? Math.max(1, Number(meta.version) || 1) : 1;
+      if (modalFields.templateId) modalFields.templateId.value = templateId;
+      if (modalFields.templateVersion) modalFields.templateVersion.value = templateId ? String(version) : '';
+      return { templateId, templateVersion: version, meta };
+    }
+
+    function populateRowModalTemplateSelect(preferredTemplateId = '') {
+      if (!rowModalTemplateSelect) return;
+      const formatLabel = typeof window.formatReportTemplateOptionLabel === 'function'
+        ? window.formatReportTemplateOptionLabel
+        : (row) => String(row?.title || row?.id || 'Template');
+      const entries = [...assignmentTemplateCatalog.entries()];
+      const preferred = String(preferredTemplateId || getSelectedAssignmentTemplateId() || '').trim();
+      if (!entries.length) {
+        rowModalTemplateSelect.disabled = true;
+        rowModalTemplateSelect.innerHTML = '<option value="">No active templates for this class</option>';
+        if (rowModalTemplateHelp) {
+          rowModalTemplateHelp.textContent = 'Select a class on the assignment form to load templates.';
+        }
+        syncRowModalTemplateHiddenFields();
+        updateRowModalTemplateSection();
+        return;
+      }
+      rowModalTemplateSelect.disabled = false;
+      rowModalTemplateSelect.innerHTML = [
+        '<option value="" disabled>Select a template…</option>',
+        ...entries.map(([id, row]) => {
+          const selected = preferred && id === preferred ? ' selected' : '';
+          return `<option value="${escapeHtml(id)}"${selected}>${escapeHtml(formatLabel(row))}</option>`;
+        })
+      ].join('');
+      if (preferred && assignmentTemplateCatalog.has(preferred)) {
+        rowModalTemplateSelect.value = preferred;
+      } else if (getSelectedAssignmentTemplateId() && assignmentTemplateCatalog.has(getSelectedAssignmentTemplateId())) {
+        rowModalTemplateSelect.value = getSelectedAssignmentTemplateId();
+      }
+      if (rowModalTemplateHelp) {
+        rowModalTemplateHelp.textContent = 'Overrides the assignment default for this row only.';
+      }
+      syncRowModalTemplateHiddenFields();
+      updateRowModalTemplateSection();
+    }
+
     function updateRowModalTemplateSection() {
       const section = document.getElementById('rowModalTemplateSection');
       if (!section) return;
-      const rowTemplateId = String(modalFields.templateId?.value || '').trim();
+      const rowTemplateId = getRowModalSelectedTemplateId();
       const defaultTemplateId = getSelectedAssignmentTemplateId();
       if (!rowTemplateId || !defaultTemplateId || rowTemplateId === defaultTemplateId) {
         section.classList.add('d-none');
@@ -629,6 +689,13 @@
       const rowVersion = String(modalFields.templateVersion?.value || '1').trim() || '1';
       section.classList.remove('d-none');
       section.innerHTML = `<div class="alert alert-secondary py-2 mb-0 small">This row uses template <strong>${escapeHtml(formatAssignmentTemplateLabel(rowTemplateId))}</strong> (v${escapeHtml(rowVersion)}). The assignment default is <strong>${escapeHtml(formatAssignmentTemplateLabel(defaultTemplateId))}</strong>.</div>`;
+    }
+
+    function applyRowModalTemplateConductDefault() {
+      const templateId = getRowModalSelectedTemplateId();
+      const meta = templateId ? assignmentTemplateCatalog.get(templateId) : null;
+      if (!meta || !modalFields.conductRequiredBeforeFill) return;
+      modalFields.conductRequiredBeforeFill.checked = meta.conductRequiredBeforeFill !== false;
     }
 
     function applyAssignmentTemplateMetaFromSelection() {
@@ -683,6 +750,9 @@
           : `${active.length} active templates for this class delivery department.`;
       }
       applyAssignmentTemplateMetaFromSelection();
+      if (rowModalTemplateSelect && !modalEl?.classList.contains('show')) {
+        populateRowModalTemplateSelect(getRowModalSelectedTemplateId() || preserve);
+      }
     }
 
     async function loadAssignmentTemplatesForClass(classId, preserveTemplateId) {
@@ -1299,19 +1369,20 @@
 
     async function applyRowSuggestedStartDate() {
       const sessionDate = toDateOnly(modalFields.sessionDate.value || '');
-      const templateId = getSelectedAssignmentTemplateId();
+      const templateId = getRowModalSelectedTemplateId() || getSelectedAssignmentTemplateId();
       const classId = String(classIdInput?.value || '').trim();
       const hintEl = document.getElementById('rowModalReportStartDateHint');
       if (!sessionDate || !templateId || !window.resolveSuggestedReportStartDate) {
         if (hintEl) hintEl.textContent = '';
         return;
       }
+      const rowMeta = assignmentTemplateCatalog.get(templateId);
       const reportScope = getCurrentReportScope();
       const targetStudentIds = uniq(rowModalStudentIds);
       const result = await window.resolveSuggestedReportStartDate({
         template: {
-          reportPeriodBase: selectedTemplateReportPeriodBase,
-          reportPeriodOffset: selectedTemplateReportPeriodOffset
+          reportPeriodBase: rowMeta?.reportPeriodBase ?? selectedTemplateReportPeriodBase,
+          reportPeriodOffset: rowMeta?.reportPeriodOffset ?? selectedTemplateReportPeriodOffset
         },
         sessionDate,
         classId,
@@ -1351,10 +1422,11 @@
       modalFields.allocatedHours.value = normalized.allocatedHours || '';
       modalFields.status.value = normalized.status || 'active';
       modalFields.notes.value = normalized.notes || '';
-      modalFields.templateId.value = normalized.templateId || '';
-      modalFields.templateVersion.value = normalized.templateVersion !== '' && normalized.templateVersion != null
-        ? String(normalized.templateVersion)
-        : '';
+      const rowTemplateId = String(normalized.templateId || getSelectedAssignmentTemplateId() || '').trim();
+      populateRowModalTemplateSelect(rowTemplateId);
+      if (normalized.templateVersion !== '' && normalized.templateVersion != null) {
+        modalFields.templateVersion.value = String(normalized.templateVersion);
+      }
       rowModalStudentIds = uniq(normalized.targetStudentIds || []);
       renderRowModalStudentSummary();
       setModalTargetMode();
@@ -1368,8 +1440,9 @@
     function rowFromModal() {
       const targetType = String(modalFields.targetType.value || 'session') === 'date' ? 'date' : 'session';
       const session = targetType === 'session' ? getSessionById(modalFields.sessionId.value) : null;
-      const existingTemplateId = String(modalFields.templateId?.value || '').trim();
-      const existingTemplateVersion = modalFields.templateVersion?.value;
+      const rowTemplate = syncRowModalTemplateHiddenFields();
+      const existingTemplateId = rowTemplate.templateId;
+      const existingTemplateVersion = rowTemplate.templateVersion;
       const stamp = getAssignmentTemplateStamp();
       const isNewRow = getModalTargetRowIndex() === null;
       return normalizeTargetRow({
@@ -1391,12 +1464,10 @@
         status: modalFields.status.value,
         notes: modalFields.notes.value,
         targetStudentIds: [...rowModalStudentIds],
-        templateId: existingTemplateId || (isNewRow ? stamp.templateId : ''),
+        templateId: existingTemplateId || stamp.templateId,
         templateVersion: existingTemplateId
-          ? (existingTemplateVersion !== '' && existingTemplateVersion != null
-            ? Math.max(1, Number(existingTemplateVersion) || 1)
-            : stamp.templateVersion)
-          : (isNewRow ? stamp.templateVersion : '')
+          ? Math.max(1, Number(existingTemplateVersion) || stamp.templateVersion)
+          : stamp.templateVersion
       });
     }
 
@@ -1408,6 +1479,7 @@
     }
 
     function validateRow(row, label = 'Target row') {
+      if (!String(row.templateId || '').trim()) return `${label}: select a report template.`;
       if (!row.teacherId) return `${label}: select one teacher.`;
       if (row.targetType === 'session') {
         if (!row.sessionId) return `${label}: select a session.`;
@@ -2052,6 +2124,12 @@
 
     modalFields.targetType?.addEventListener('change', setModalTargetMode);
     modalFields.teacherId?.addEventListener('change', updateTeacherWarning);
+    rowModalTemplateSelect?.addEventListener('change', () => {
+      syncRowModalTemplateHiddenFields();
+      applyRowModalTemplateConductDefault();
+      updateRowModalTemplateSection();
+      applyRowSuggestedStartDate().catch(() => {});
+    });
 
     document.getElementById('btnPickRowSession')?.addEventListener('click', () => {
       if (!String(classIdInput.value || '').trim()) {

@@ -52,6 +52,74 @@ test('notifyClassReferencesChanged updates class metadata and rebuilds indexes',
   }
 });
 
+test('syncReportInstanceTemplatesForAssignmentSave updates instances when row template changes', async () => {
+  const originalFetch = schoolDataService.fetchData;
+  const originalUpdate = schoolDataService.updateData;
+
+  const updates = [];
+  schoolDataService.fetchData = async (entityType, query) => {
+    if (entityType === 'reportInstances' && query?.assignmentId__eq === 'RA-TPL') {
+      return [
+        {
+          id: 'RI-1',
+          assignmentId: 'RA-TPL',
+          assignmentRowId: 'ROW-A',
+          templateId: 'TPL-OLD',
+          templateVersion: 1,
+          audit: {}
+        },
+        {
+          id: 'RI-2',
+          assignmentId: 'RA-TPL',
+          assignmentRowId: 'ROW-B',
+          templateId: 'TPL-KEEP',
+          templateVersion: 2,
+          audit: {}
+        }
+      ];
+    }
+    return [];
+  };
+  schoolDataService.updateData = async (entityType, id, patch) => {
+    updates.push({ entityType, id, patch });
+    return { id, ...patch };
+  };
+
+  try {
+    const result = await classReferenceSyncService.syncReportInstanceTemplatesForAssignmentSave({
+      assignmentId: 'RA-TPL',
+      previousAssignment: {
+        id: 'RA-TPL',
+        templateId: 'TPL-DEFAULT',
+        templateVersion: 1,
+        targetRows: [
+          { rowId: 'ROW-A', templateId: 'TPL-OLD', templateVersion: 1 },
+          { rowId: 'ROW-B', templateId: 'TPL-KEEP', templateVersion: 2 }
+        ]
+      },
+      nextAssignment: {
+        id: 'RA-TPL',
+        templateId: 'TPL-DEFAULT',
+        templateVersion: 1,
+        targetRows: [
+          { rowId: 'ROW-A', templateId: 'TPL-NEW', templateVersion: 3 },
+          { rowId: 'ROW-B', templateId: 'TPL-KEEP', templateVersion: 2 }
+        ]
+      },
+      reqUser: REQ_USER
+    });
+    assert.equal(result.updatedCount, 1);
+    assert.equal(updates.length, 1);
+    assert.equal(updates[0].id, 'RI-1');
+    assert.equal(updates[0].patch.templateId, 'TPL-NEW');
+    assert.equal(updates[0].patch.templateVersion, 3);
+    assert.equal(updates[0].patch.renderCache, null);
+  } finally {
+    schoolDataService.fetchData = originalFetch;
+    schoolDataService.updateData = originalUpdate;
+  }
+});
+
 test('cleanupReportInstancesForRemovedTargetRows deletes instances for removed rows', async () => {
   const originalFetch = schoolDataService.fetchData;
   const originalGetById = schoolDataService.getDataById;

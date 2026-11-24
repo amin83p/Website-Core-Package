@@ -71,6 +71,8 @@ test('assign report modal uses template dropdown markup', () => {
 test('assignment form uses template dropdown with class-scoped fetch', () => {
   const assignmentForm = read('MVC/views/school/report/assignmentForm.ejs');
   assert.match(assignmentForm, /id="assignmentTemplateSelect"/);
+  assert.match(assignmentForm, /id="rowModalTemplateSelect"/);
+  assert.match(assignmentForm, /populateRowModalTemplateSelect/);
   assert.match(assignmentForm, /loadAssignmentTemplatesForClass/);
   assert.doesNotMatch(assignmentForm, /btnPickTemplate/);
 });

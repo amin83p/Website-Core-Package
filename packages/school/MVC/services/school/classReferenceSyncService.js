@@ -165,6 +165,88 @@ async function cleanupReportInstancesForRemovedTargetRows({
   return { deletedCount, errors };
 }
 
+async function syncReportInstanceTemplatesForAssignmentSave({
+  assignmentId,
+  previousAssignment,
+  nextAssignment,
+  reqUser
+} = {}) {
+  const normalizedAssignmentId = toPublicId(assignmentId);
+  if (!normalizedAssignmentId || !previousAssignment || !nextAssignment) {
+    return { updatedCount: 0, errors: [] };
+  }
+
+  const previousRows = collectTargetRowsById(previousAssignment);
+  const nextRows = collectTargetRowsById(nextAssignment);
+  const changedRowTemplates = [];
+  nextRows.forEach((nextRow, rowId) => {
+    const previousRow = previousRows.get(rowId) || {};
+    const previousResolved = reportAssignmentModel.resolveTargetRowTemplateFields(previousAssignment, previousRow);
+    const nextResolved = reportAssignmentModel.resolveTargetRowTemplateFields(nextAssignment, nextRow);
+    const templateIdChanged = !idsEqual(
+      toPublicId(previousResolved?.templateId),
+      toPublicId(nextResolved?.templateId)
+    );
+    const versionChanged = Number(previousResolved?.templateVersion || 0) !== Number(nextResolved?.templateVersion || 0);
+    if (templateIdChanged || versionChanged) {
+      changedRowTemplates.push({
+        rowId,
+        previousTemplateId: toPublicId(previousResolved?.templateId),
+        nextTemplateId: toPublicId(nextResolved?.templateId),
+        nextTemplateVersion: Number(nextResolved?.templateVersion || 1) || 1
+      });
+    }
+  });
+
+  if (!changedRowTemplates.length) {
+    return { updatedCount: 0, errors: [] };
+  }
+
+  const instances = await schoolDataService.fetchData(
+    'reportInstances',
+    { page: 1, assignmentId__eq: normalizedAssignmentId, limit: 10000 },
+    reqUser
+  );
+  const rowMetaById = new Map(
+    changedRowTemplates.map((entry) => [entry.rowId, entry])
+  );
+  const errors = [];
+  let updatedCount = 0;
+  const now = new Date().toISOString();
+
+  for (const instance of Array.isArray(instances) ? instances : []) {
+    const rowId = toPublicId(instance?.assignmentRowId || instance?.rowId);
+    const rowMeta = rowId ? rowMetaById.get(rowId) : null;
+    if (!rowMeta) continue;
+    const instanceTemplateId = toPublicId(instance?.templateId);
+    if (
+      idsEqual(instanceTemplateId, rowMeta.nextTemplateId)
+      && Number(instance?.templateVersion || 0) === rowMeta.nextTemplateVersion
+    ) {
+      continue;
+    }
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      await schoolDataService.updateData('reportInstances', instance.id, {
+        templateId: rowMeta.nextTemplateId,
+        templateVersion: rowMeta.nextTemplateVersion,
+        renderCache: null,
+        audit: {
+          ...(instance?.audit && typeof instance.audit === 'object' ? instance.audit : {}),
+          lastUpdateUser: reqUser?.id || '',
+          lastUpdateDateTime: now,
+          templateRelinkedAt: now
+        }
+      }, reqUser);
+      updatedCount += 1;
+    } catch (error) {
+      errors.push(`${toPublicId(instance?.id)}: ${error.message}`);
+    }
+  }
+
+  return { updatedCount, errors };
+}
+
 async function listReportInstancesForRemovedTargetStudents({
   assignmentId,
   previousAssignment,
@@ -388,6 +470,7 @@ async function notifyAfterExamMutation({ allocation, reqUser } = {}) {
 module.exports = {
   notifyClassReferencesChanged,
   cleanupReportInstancesForRemovedTargetRows,
+  syncReportInstanceTemplatesForAssignmentSave,
   listReportInstancesForRemovedTargetStudents,
   listStaleReportInstancesForAssignmentTargetRows,
   cleanupReportInstancesForRemovedTargetStudents,

@@ -17,6 +17,44 @@ const schoolPersonAccessService = require('./schoolPersonAccessService');
 const classEnrollmentDeleteService = require('./classEnrollmentDeleteService');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
+function resolveInstanceExpectedTemplateFields(instance = {}, assignment = {}) {
+  const assignmentRow = reportAssignmentModel.findEffectiveTargetRow(
+    assignment,
+    instance?.assignmentRowId || ''
+  );
+  const rowTemplate = reportAssignmentModel.resolveTargetRowTemplateFields(assignment, assignmentRow);
+  return {
+    assignmentRowId: toPublicId(assignmentRow?.rowId || instance?.assignmentRowId),
+    expectedTemplateId: toPublicId(rowTemplate?.templateId) || toPublicId(assignment?.templateId),
+    expectedTemplateVersion: Number(rowTemplate?.templateVersion || assignment?.templateVersion || 1) || 1
+  };
+}
+
+async function relinkInstanceTemplateFromAssignmentRow(instance, assignment, reqUser) {
+  if (!instance || !assignment) return instance;
+  const { expectedTemplateId, expectedTemplateVersion } = resolveInstanceExpectedTemplateFields(instance, assignment);
+  const instanceTemplateId = toPublicId(instance?.templateId);
+  const instanceTemplateVersion = Number(instance?.templateVersion || 0) || 0;
+  const templateMatches = idsEqual(instanceTemplateId, expectedTemplateId)
+    && (!expectedTemplateVersion || instanceTemplateVersion === expectedTemplateVersion);
+  if (templateMatches) return instance;
+
+  const now = new Date().toISOString();
+  const patch = {
+    templateId: expectedTemplateId,
+    templateVersion: expectedTemplateVersion,
+    renderCache: null,
+    audit: {
+      ...(instance?.audit && typeof instance.audit === 'object' ? instance.audit : {}),
+      lastUpdateUser: reqUser?.id || '',
+      lastUpdateDateTime: now,
+      templateRelinkedAt: now
+    }
+  };
+  const updated = await schoolDataService.updateData('reportInstances', instance.id, patch, reqUser);
+  return updated || { ...instance, ...patch };
+}
+
 function resolveRowValidationScope({
   rowValidationMode = '',
   validateOnlyRowIds = null,
@@ -501,12 +539,7 @@ function assertInstanceAssignmentConsistency(instance, assignment) {
   if (!idsEqual(instance?.classId, assignment?.classId)) {
     throw new Error('Report instance no longer matches its assignment class.');
   }
-  const assignmentRow = reportAssignmentModel.findEffectiveTargetRow(
-    assignment,
-    instance?.assignmentRowId || ''
-  );
-  const rowTemplate = reportAssignmentModel.resolveTargetRowTemplateFields(assignment, assignmentRow);
-  const expectedTemplateId = toPublicId(rowTemplate?.templateId) || toPublicId(assignment?.templateId);
+  const { expectedTemplateId } = resolveInstanceExpectedTemplateFields(instance, assignment);
   if (!idsEqual(instance?.templateId, expectedTemplateId)) {
     throw new Error('Report instance no longer matches its assignment template.');
   }
@@ -1243,8 +1276,9 @@ const reportIntegrityService = {
       throw new Error('Instance is not accessible in this organization.');
     }
     const assignment = await schoolRepositories.reportAssignments.getById(instance.assignmentId);
-    assertInstanceAssignmentConsistency(instance, assignment);
-    return instance;
+    const relinked = await relinkInstanceTemplateFromAssignmentRow(instance, assignment, reqUser);
+    assertInstanceAssignmentConsistency(relinked, assignment);
+    return relinked;
   },
 
   async getEditableInstanceOrThrow(instanceId, reqUser) {
