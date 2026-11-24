@@ -25,7 +25,7 @@ const manifest = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.manifest.js
 
 test('student management view and client expose workspace', () => {
   assert.match(studentManagementView, /schoolStudentManagementWorkspace/);
-  assert.match(studentManagementView, /School Student Management/);
+  assert.match(studentManagementView, /Student File Management/);
   assert.match(studentManagementView, /schoolStudentManagement\.js/);
   assert.match(studentManagementView, /studentClaimNumbersManager\.js/);
   assert.match(studentManagementView, /studentReferralLinksManager\.js/);
@@ -60,6 +60,10 @@ test('student management view and client expose workspace', () => {
   assert.match(studentManagementScript, /data-hub-students-open="person-reports"/);
   assert.match(studentManagementScript, /data-hub-students-open="session-cases"/);
   assert.match(studentManagementScript, /data-hub-students-open="referral-links"/);
+  assert.match(studentManagementScript, /data-hub-students-open="timeline"/);
+  assert.match(studentManagementScript, /hubStudentsHandleTimelineEventAction/);
+  assert.match(studentManagementScript, /hubStudentsTimelineTrack/);
+  assert.match(managementModals, /id="hubStudentsTimelineModal"/);
   assert.match(managementModals, /studentReferralLinksModal/);
   assert.match(managementModals, /referralQuickCreateModal/);
   assert.match(managementModals, /modal_GenericPicker/);
@@ -92,6 +96,8 @@ test('student management routes and controller are registered', () => {
   assert.match(managementRoutes, /\/api\/students\/search/);
   assert.match(managementRoutes, /\/api\/students\/summary/);
   assert.match(managementRoutes, /\/api\/students\/:studentId\/profile/);
+  assert.match(managementRoutes, /\/api\/students\/:studentId\/timeline/);
+  assert.match(managementController, /exports\.getHubStudentTimeline/);
   assert.match(managementController, /exports\.showStudentManagementPage/);
   assert.match(managementController, /school\/studentManagement/);
   assert.doesNotMatch(reportHubRoutes, /\/api\/students\/search/);

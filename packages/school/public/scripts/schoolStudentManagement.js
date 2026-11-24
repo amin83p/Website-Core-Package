@@ -900,6 +900,494 @@
       }
       return;
     }
+    if (key === 'timeline') {
+      void hubStudentsOpenTimelineModal();
+      return;
+    }
+  }
+
+  let hubStudentsTimelineModalBound = false;
+
+  function hubStudentsHideTimelineModal() {
+    const modalEl = document.getElementById('hubStudentsTimelineModal');
+    if (!modalEl || !global.bootstrap?.Modal) return;
+    const inst = global.bootstrap.Modal.getInstance(modalEl);
+    if (inst) inst.hide();
+  }
+
+  function hubStudentsTimelineTypeClass(type) {
+    const token = String(type || '').trim().toLowerCase();
+    if (token.indexOf('class_enrollment') === 0 || token === 'student_enrollment_start') {
+      return 'hub-students-timeline-type--enrollment';
+    }
+    if (token.indexOf('clb') === 0) return 'hub-students-timeline-type--clb';
+    if (token.indexOf('referral') === 0) return 'hub-students-timeline-type--referral';
+    if (token.indexOf('report') === 0) return 'hub-students-timeline-type--report';
+    if (token.indexOf('session_case') === 0 || token.indexOf('case') === 0) {
+      return 'hub-students-timeline-type--case';
+    }
+    if (token.indexOf('activity') === 0) return 'hub-students-timeline-type--activity';
+    if (token.indexOf('registration') >= 0) return 'hub-students-timeline-type--registration';
+    return 'hub-students-timeline-type--registration';
+  }
+
+  function hubStudentsTimelineParseDate(iso) {
+    const text = String(iso || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return null;
+    const parts = text.split('-').map(Number);
+    return new Date(parts[0], parts[1] - 1, parts[2]);
+  }
+
+  function hubStudentsTimelinePositionPercent(dateText, minDate, maxDate) {
+    const date = hubStudentsTimelineParseDate(dateText);
+    const min = hubStudentsTimelineParseDate(minDate);
+    const max = hubStudentsTimelineParseDate(maxDate);
+    if (!date || !min || !max) return 50;
+    if (min.getTime() === max.getTime()) return 50;
+    const span = max.getTime() - min.getTime();
+    const offset = date.getTime() - min.getTime();
+    const pct = (offset / span) * 100;
+    return Math.min(100, Math.max(0, pct));
+  }
+
+  function hubStudentsEncodeTimelineAction(action) {
+    try {
+      return escapeHtml(JSON.stringify(action && typeof action === 'object' ? action : {}));
+    } catch (error) {
+      return escapeHtml('{}');
+    }
+  }
+
+  function hubStudentsSetTimelineLoading(visible) {
+    const loading = document.getElementById('hubStudentsTimelineLoading');
+    if (loading) loading.classList.toggle('d-none', !visible);
+  }
+
+  const HUB_TIMELINE_STEM_BASE_PX = 56;
+  const HUB_TIMELINE_STEM_STEP_PX = 52;
+  const HUB_TIMELINE_EVENT_CARD_APPROX_PX = 52;
+  const HUB_TIMELINE_ELBOW_APPROX_PX = 24;
+  const HUB_TIMELINE_MAX_BELOW_PER_BUCKET = 2;
+
+  function hubStudentsAssignTimelineLayout(events, minDate, maxDate) {
+    const rows = Array.isArray(events) ? events : [];
+    const positioned = rows.map(function (event) {
+      const dateKey = String(event?.date || '').trim();
+      return {
+        event: event,
+        dateKey: dateKey,
+        percent: hubStudentsTimelinePositionPercent(dateKey, minDate, maxDate)
+      };
+    }).sort(function (a, b) {
+      return a.percent - b.percent
+        || String(a.event?.id || '').localeCompare(String(b.event?.id || ''));
+    });
+
+    const belowByBucket = {};
+    const aboveByBucket = {};
+    let belowTotal = 0;
+    let aboveTotal = 0;
+
+    return positioned.map(function (row, globalIndex) {
+      const bucket = row.percent.toFixed(3);
+      if (!belowByBucket[bucket]) belowByBucket[bucket] = 0;
+      if (!aboveByBucket[bucket]) aboveByBucket[bucket] = 0;
+
+      const bucketCount = belowByBucket[bucket] + aboveByBucket[bucket];
+      let side = 'below';
+      if (bucketCount > 0) {
+        side = bucketCount % 2 === 0 ? 'below' : 'above';
+        if (side === 'below' && belowByBucket[bucket] >= HUB_TIMELINE_MAX_BELOW_PER_BUCKET) {
+          side = 'above';
+        }
+      } else if (belowTotal > aboveTotal) {
+        side = 'above';
+      } else if (globalIndex % 2 === 1) {
+        side = 'above';
+      }
+
+      let laneIdx = 0;
+      if (side === 'below') {
+        laneIdx = belowByBucket[bucket];
+        belowByBucket[bucket] += 1;
+        belowTotal += 1;
+      } else {
+        laneIdx = aboveByBucket[bucket];
+        aboveByBucket[bucket] += 1;
+        aboveTotal += 1;
+      }
+
+      let crowdNeighbors = 0;
+      positioned.forEach(function (other) {
+        if (other === row) return;
+        if (Math.abs(other.percent - row.percent) < 5) crowdNeighbors += 1;
+      });
+
+      const stemLen = HUB_TIMELINE_STEM_BASE_PX
+        + (laneIdx + 1) * HUB_TIMELINE_STEM_STEP_PX
+        + crowdNeighbors * 28
+        + (globalIndex % 5) * 14;
+
+      return {
+        event: row.event,
+        dateKey: row.dateKey,
+        percent: row.percent,
+        side: side,
+        stemLen: stemLen,
+        laneIdx: laneIdx
+      };
+    });
+  }
+
+  function hubStudentsFormatTimelineTipText(event) {
+    const bag = event && typeof event === 'object' ? event : {};
+    const dateRaw = String(bag.date || bag.dateKey || '').trim();
+    const dateLine = dateRaw ? ('Date: ' + formatHubDateKey(dateRaw)) : '';
+    const tooltipLines = Array.isArray(bag.tooltipLines) ? bag.tooltipLines : [];
+    if (tooltipLines.length) {
+      return [dateLine]
+        .concat(tooltipLines.map(function (line) { return String(line || '').trim(); }).filter(Boolean))
+        .filter(Boolean)
+        .join('\n');
+    }
+    const title = String(bag.label || bag.type || 'Event').trim();
+    const detail = String(bag.sublabel || '').trim();
+    const typeLabel = String(bag.type || '').trim().replace(/_/g, ' ');
+    return [dateLine, title, detail, typeLabel].filter(Boolean).join('\n');
+  }
+
+  let hubStudentsTimelineTipEl = null;
+  let hubStudentsTimelineTipAnchor = null;
+
+  function hubStudentsEnsureTimelineTip() {
+    if (hubStudentsTimelineTipEl && hubStudentsTimelineTipEl.isConnected) return hubStudentsTimelineTipEl;
+    hubStudentsTimelineTipEl = document.createElement('div');
+    hubStudentsTimelineTipEl.className = 'sch-event-tip';
+    hubStudentsTimelineTipEl.setAttribute('role', 'tooltip');
+    hubStudentsTimelineTipEl.hidden = true;
+    document.body.appendChild(hubStudentsTimelineTipEl);
+    return hubStudentsTimelineTipEl;
+  }
+
+  function hubStudentsHideTimelineTip() {
+    const tipEl = hubStudentsTimelineTipEl;
+    if (!tipEl) return;
+    tipEl.classList.remove('is-visible', 'is-below');
+    tipEl.hidden = true;
+    tipEl.innerHTML = '';
+    hubStudentsTimelineTipAnchor = null;
+  }
+
+  function hubStudentsShowTimelineTip(target) {
+    if (!target) return;
+    const tipEl = hubStudentsEnsureTimelineTip();
+    const label = String(target.getAttribute('data-tip') || '').trim();
+    if (!label) {
+      hubStudentsHideTimelineTip();
+      return;
+    }
+    const tipBg = target.getAttribute('data-tip-bg') || '#0f172a';
+    const tipFg = target.getAttribute('data-tip-fg') || '#ffffff';
+    const tipBorder = target.getAttribute('data-tip-border') || '#0d6efd';
+    const parts = label.split('\n').map(function (part) {
+      return String(part || '').trim();
+    }).filter(Boolean);
+    tipEl.innerHTML = parts.map(function (part, index) {
+      const isDate = /^Date:/i.test(part);
+      return [
+        '<span class="sch-tip-line',
+        index > 0 ? ' sch-tip-sub' : '',
+        isDate ? ' sch-tip-date' : '',
+        '">',
+        escapeHtml(part),
+        '</span>'
+      ].join('');
+    }).join('');
+    tipEl.style.background = tipBg;
+    tipEl.style.color = tipFg;
+    tipEl.style.borderColor = tipBorder;
+    tipEl.style.setProperty('--sch-tip-arrow', tipBg);
+    tipEl.hidden = false;
+    tipEl.classList.remove('is-below');
+    const rect = target.getBoundingClientRect();
+    let left = rect.left + (rect.width / 2);
+    const tipWidth = tipEl.offsetWidth || 160;
+    const tipHeight = tipEl.offsetHeight || 80;
+    const pad = 10;
+    left = Math.max(pad + tipWidth / 2, Math.min(left, window.innerWidth - pad - tipWidth / 2));
+    tipEl.style.left = String(left) + 'px';
+    if ((rect.top - tipHeight - 14) < pad) {
+      tipEl.classList.add('is-below');
+      tipEl.style.top = String(Math.min(window.innerHeight - pad - tipHeight, rect.bottom)) + 'px';
+    } else {
+      tipEl.style.top = String(Math.max(8, rect.top)) + 'px';
+    }
+    tipEl.classList.add('is-visible');
+    hubStudentsTimelineTipAnchor = target;
+  }
+
+  function hubStudentsRenderTimelineMarker(layout) {
+    const event = layout?.event;
+    const typeClass = hubStudentsTimelineTypeClass(event?.type);
+    const label = escapeHtml(String(event?.label || event?.type || 'Event'));
+    const dateLabel = escapeHtml(formatHubDateKey(String(layout?.dateKey || event?.date || '')));
+    const tipText = escapeHtml(hubStudentsFormatTimelineTipText(event || {}));
+    const actionAttr = hubStudentsEncodeTimelineAction(event?.action);
+    const eventId = escapeHtml(String(event?.id || ''));
+    const side = layout?.side === 'above' ? 'above' : 'below';
+    const stemLen = Number(layout?.stemLen) || HUB_TIMELINE_STEM_BASE_PX;
+    const percent = Number(layout?.percent);
+    const branchSide = (Number(layout?.laneIdx) || 0) % 2 === 0 ? 'right' : 'left';
+    const leftStyle = Number.isFinite(percent) ? ('left:' + String(percent) + '%;') : '';
+    const cardHtml = [
+      '<button type="button" class="hub-students-timeline-event ' + typeClass + '"',
+      ' data-hub-timeline-event-id="' + eventId + '"',
+      ' data-hub-timeline-action="' + actionAttr + '"',
+      ' data-tip="' + tipText + '"',
+      ' data-tip-bg="#0f172a" data-tip-fg="#ffffff" data-tip-border="#0d6efd"',
+      ' aria-describedby="hubStudentsTimelineTip">',
+      '<span class="hub-students-timeline-event-date">' + dateLabel + '</span>',
+      '<span class="hub-students-timeline-event-label">' + label + '</span>',
+      '</button>'
+    ].join('');
+    const jointH = '<span class="hub-students-timeline-joint-h" aria-hidden="true"></span>';
+    const footClass = 'hub-students-timeline-joint-foot hub-students-timeline-joint-foot--' + branchSide;
+    const footHtml = [
+      '<div class="' + footClass + '">',
+      branchSide === 'right' ? jointH + cardHtml : cardHtml + jointH,
+      '</div>'
+    ].join('');
+    const vlineHtml = '<span class="hub-students-timeline-vline" style="height:' + String(stemLen) + 'px;" aria-hidden="true"></span>';
+    const armHtml = side === 'above' ? footHtml + vlineHtml : vlineHtml + footHtml;
+    return [
+      '<div class="hub-students-timeline-marker hub-students-timeline-marker--' + side + '"',
+      ' style="' + leftStyle + '--stem-len:' + String(stemLen) + 'px;" role="listitem">',
+      '<div class="hub-students-timeline-stem hub-students-timeline-stem--' + side + '">',
+      '<span class="hub-students-timeline-dot" aria-hidden="true"></span>',
+      '<div class="hub-students-timeline-arm">' + armHtml + '</div>',
+      '</div>',
+      '</div>'
+    ].join('');
+  }
+
+  function hubStudentsRenderTimeline(timeline) {
+    const wrap = document.getElementById('hubStudentsTimelineWrap');
+    const empty = document.getElementById('hubStudentsTimelineEmpty');
+    const track = document.getElementById('hubStudentsTimelineTrack');
+    const minLabel = document.getElementById('hubStudentsTimelineMinLabel');
+    const maxLabel = document.getElementById('hubStudentsTimelineMaxLabel');
+    const truncated = document.getElementById('hubStudentsTimelineTruncated');
+    const titleEl = document.getElementById('hubStudentsTimelineModalLabel');
+    if (!wrap || !empty || !track) return;
+
+    const payload = timeline && typeof timeline === 'object' ? timeline : {};
+    const student = payload.student && typeof payload.student === 'object' ? payload.student : {};
+    const range = payload.range && typeof payload.range === 'object' ? payload.range : {};
+    const events = Array.isArray(payload.events) ? payload.events : [];
+    const minDate = String(range.minDate || '').trim();
+    const maxDate = String(range.maxDate || '').trim();
+
+    if (titleEl) {
+      const name = String(student.name || student.id || 'Student').trim();
+      titleEl.textContent = name ? 'Timeline — ' + name : 'Student timeline';
+    }
+
+    hubStudentsSetTimelineLoading(false);
+    if (!events.length || !minDate || !maxDate) {
+      wrap.classList.add('d-none');
+      empty.classList.remove('d-none');
+      track.innerHTML = '';
+      if (truncated) truncated.classList.add('d-none');
+      return;
+    }
+
+    empty.classList.add('d-none');
+    wrap.classList.remove('d-none');
+    if (minLabel) minLabel.textContent = minDate;
+    if (maxLabel) maxLabel.textContent = maxDate;
+    if (truncated) truncated.classList.toggle('d-none', payload.truncated !== true);
+
+    const layouts = hubStudentsAssignTimelineLayout(events, minDate, maxDate);
+    let maxBelowPx = 80;
+    let maxAbovePx = 80;
+    let belowCount = 0;
+    let aboveCount = 0;
+    layouts.forEach(function (layout) {
+      const totalStem = (Number(layout.stemLen) || 0) + HUB_TIMELINE_EVENT_CARD_APPROX_PX + HUB_TIMELINE_ELBOW_APPROX_PX;
+      if (layout.side === 'above') {
+        aboveCount += 1;
+        if (totalStem > maxAbovePx) maxAbovePx = totalStem;
+      } else {
+        belowCount += 1;
+        if (totalStem > maxBelowPx) maxBelowPx = totalStem;
+      }
+    });
+    const trackMinWidth = Math.max(960, layouts.length * 72);
+    track.style.minWidth = String(trackMinWidth) + 'px';
+    track.style.paddingTop = String(Math.ceil(maxAbovePx) + 32) + 'px';
+    track.style.paddingBottom = String(Math.ceil(maxBelowPx) + 32) + 'px';
+
+    track.innerHTML = layouts.map(hubStudentsRenderTimelineMarker).join('');
+    track.setAttribute('role', 'list');
+  }
+
+  async function hubStudentsFetchTimeline(studentId) {
+    const id = String(studentId || '').trim();
+    const response = await fetch('' + API_BASE + '/students/' + encodeURIComponent(id) + '/timeline', {
+      headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      credentials: 'same-origin'
+    });
+    const payload = await response.json().catch(function () {
+      return { status: 'error', message: 'Unable to load timeline.' };
+    });
+    if (!response.ok || payload.status !== 'success') {
+      throw new Error(payload.message || 'Unable to load timeline.');
+    }
+    return payload.timeline || null;
+  }
+
+  function hubStudentsHandleTimelineEventAction(action) {
+    const profile = hubStudentsRequireSelectedProfile();
+    if (!profile) return;
+    const bag = action && typeof action === 'object' ? action : {};
+    const kind = String(bag.kind || '').trim();
+
+    if (kind === 'noop') return;
+
+    if (kind === 'enrollment_close') {
+      const row = bag.enrollmentRow;
+      if (row && global.SchoolStudentManagementEnrollmentClose) {
+        hubStudentsHideTimelineModal();
+        global.SchoolStudentManagementEnrollmentClose.openForEnrollment(row);
+      }
+      return;
+    }
+
+    if (kind === 'enrollment_edit_embed' || kind === 'embed_url') {
+      const url = String(bag.url || '').trim();
+      const title = String(bag.title || 'Details').trim();
+      if (!url) {
+        void hubStudentsShowSimpleMsg('Unavailable', 'warning', 'This item does not have a linked page.');
+        return;
+      }
+      hubStudentsHideTimelineModal();
+      hubStudentsOpenEmbedModal(title, url);
+      return;
+    }
+
+    if (kind === 'manager_clb') {
+      const label = String(profile.name || profile.id).trim();
+      if (global.RollingStudentClbManager) {
+        hubStudentsHideTimelineModal();
+        global.RollingStudentClbManager.open({
+          studentId: profile.id,
+          studentLabel: label,
+          onSaved: function () {
+            return loadHubStudentProfile(profile.id);
+          }
+        });
+      }
+      return;
+    }
+
+    if (kind === 'manager_referrals') {
+      const label = String(profile.name || profile.id).trim();
+      if (global.StudentReferralLinksManager) {
+        hubStudentsHideTimelineModal();
+        global.StudentReferralLinksManager.open({
+          studentId: profile.id,
+          studentLabel: label,
+          onSaved: function () {
+            return loadHubStudentProfile(profile.id);
+          }
+        });
+      }
+      return;
+    }
+
+    if (kind === 'person_reports') {
+      const personId = String(profile.personId || '').trim();
+      if (!personId) return;
+      hubStudentsHideTimelineModal();
+      hubStudentsOpenEmbedModal('Reports', hubStudentsBuildPersonReportsUrl(personId));
+      return;
+    }
+
+    if (kind === 'session_cases_day') {
+      const personId = String(bag.personId || profile.personId || '').trim();
+      const day = String(bag.date || '').trim();
+      hubStudentsHideTimelineModal();
+      hubStudentsOpenEmbedModal(
+        'Student cases',
+        hubStudentsBuildSessionCasesUrl(personId, day, day)
+      );
+      return;
+    }
+  }
+
+  async function hubStudentsOpenTimelineModal() {
+    const profile = hubStudentsRequireSelectedProfile();
+    if (!profile) return;
+    const modalEl = document.getElementById('hubStudentsTimelineModal');
+    const empty = document.getElementById('hubStudentsTimelineEmpty');
+    const wrap = document.getElementById('hubStudentsTimelineWrap');
+    if (!modalEl) return;
+    if (empty) empty.classList.add('d-none');
+    if (wrap) wrap.classList.add('d-none');
+    hubStudentsSetTimelineLoading(true);
+    hubStudentsShowModal(modalEl);
+    try {
+      const timeline = await hubStudentsFetchTimeline(profile.id);
+      hubStudentsRenderTimeline(timeline);
+    } catch (error) {
+      hubStudentsSetTimelineLoading(false);
+      if (empty) {
+        empty.textContent = String(error?.message || 'Unable to load timeline.');
+        empty.classList.remove('d-none');
+      }
+      if (wrap) wrap.classList.add('d-none');
+    }
+  }
+
+  function bindHubStudentsTimelineModal() {
+    if (hubStudentsTimelineModalBound) return;
+    hubStudentsTimelineModalBound = true;
+    const track = document.getElementById('hubStudentsTimelineTrack');
+    const trackScroll = document.querySelector('#hubStudentsTimelineModal .hub-students-timeline-track-scroll');
+    const timelineModal = document.getElementById('hubStudentsTimelineModal');
+    if (!track) return;
+    track.addEventListener('click', function (event) {
+      const btn = event.target && event.target.closest('[data-hub-timeline-action]');
+      if (!btn) return;
+      const raw = btn.getAttribute('data-hub-timeline-action') || '{}';
+      let action = {};
+      try {
+        action = JSON.parse(raw);
+      } catch (parseError) {
+        action = {};
+      }
+      hubStudentsHideTimelineTip();
+      hubStudentsHandleTimelineEventAction(action);
+    });
+    track.addEventListener('pointerover', function (event) {
+      const btn = event.target && event.target.closest('[data-hub-timeline-action][data-tip]');
+      if (!btn || !track.contains(btn)) return;
+      hubStudentsShowTimelineTip(btn);
+    });
+    track.addEventListener('pointerout', function (event) {
+      const btn = event.target && event.target.closest('[data-hub-timeline-action][data-tip]');
+      const related = event.relatedTarget;
+      if (!btn) return;
+      if (related && btn.contains(related)) return;
+      if (hubStudentsTimelineTipAnchor === btn) hubStudentsHideTimelineTip();
+    });
+    if (trackScroll) {
+      trackScroll.addEventListener('scroll', hubStudentsHideTimelineTip);
+    }
+    if (timelineModal) {
+      timelineModal.addEventListener('hidden.bs.modal', hubStudentsHideTimelineTip);
+    }
+    window.addEventListener('scroll', hubStudentsHideTimelineTip, true);
   }
 
   let hubStudentsEmbedModalBound = false;
@@ -936,6 +1424,7 @@
 
   function bindHubStudentsQuickActions() {
     bindHubStudentsEmbedModals();
+    bindHubStudentsTimelineModal();
     hubStudentsGetQuickActionButtons().forEach(function (btn) {
       btn.addEventListener('click', function () {
         if (btn.disabled) return;
@@ -1939,6 +2428,7 @@
       '<button type="button" class="btn btn-sm btn-outline-secondary" data-hub-students-open="person-reports" disabled>Reports</button>',
       '<button type="button" class="btn btn-sm btn-outline-secondary" data-hub-students-open="session-cases" disabled>Cases</button>',
       '<button type="button" class="btn btn-sm btn-outline-secondary" data-hub-students-open="referral-links" disabled>Referrals</button>',
+      '<button type="button" class="btn btn-sm btn-outline-secondary" data-hub-students-open="timeline" disabled>Timeline</button>',
       '</div>',
       '</div>',
       '<div class="hub-students-workspace-body">',

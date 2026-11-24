@@ -128,6 +128,227 @@
     gap: 0.35rem;
   }
 
+  #hubStudentsTimelineModal.hub-students-timeline-modal .modal-content {
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+
+  #hubStudentsTimelineModal .modal-body {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-wrap {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-track-scroll {
+    flex: 1;
+    overflow: auto;
+    padding: 0.25rem 0 0.75rem;
+    min-height: 18rem;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-track {
+    position: relative;
+    box-sizing: border-box;
+    min-width: 100%;
+    margin: 0 1.5rem;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-track::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 50%;
+    height: 4px;
+    background: #64748b;
+    border-radius: 2px;
+    transform: translateY(-50%);
+    z-index: 0;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-marker {
+    position: absolute;
+    top: 50%;
+    width: 0;
+    height: 0;
+    z-index: 1;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-stem {
+    position: absolute;
+    left: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-start;
+    pointer-events: none;
+    transform: translateX(-50%);
+    gap: 0;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-stem--below {
+    top: 0;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-stem--above {
+    bottom: 0;
+    top: auto;
+    flex-direction: column-reverse;
+    justify-content: flex-start;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-dot {
+    display: block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #1e293b;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px #94a3b8;
+    flex: 0 0 auto;
+    z-index: 2;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-stem--below .hub-students-timeline-dot {
+    transform: translateY(-50%);
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-stem--above .hub-students-timeline-dot {
+    transform: translateY(50%);
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-arm {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex: 0 0 auto;
+    --hub-timeline-elbow-w: 1.35rem;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-vline {
+    display: block;
+    width: 2px;
+    min-height: 32px;
+    height: var(--stem-len, 48px);
+    background: #94a3b8;
+    flex: 0 0 auto;
+    border-radius: 1px;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-joint-foot {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    flex: 0 0 auto;
+    gap: 0;
+    margin-top: -1px;
+    line-height: 0;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-joint-foot--right {
+    align-self: flex-start;
+    margin-left: calc(50% - 1px);
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-joint-foot--left {
+    align-self: flex-end;
+    margin-right: calc(50% - 1px);
+    flex-direction: row-reverse;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-joint-h {
+    display: block;
+    width: var(--hub-timeline-elbow-w);
+    height: 2px;
+    background: #94a3b8;
+    flex: 0 0 auto;
+    border-radius: 0;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-event {
+    display: block;
+    position: relative;
+    pointer-events: auto;
+    width: max-content;
+    max-width: 11rem;
+    text-align: left;
+    border: 1px solid #cbd5e1;
+    border-left-width: 3px;
+    border-radius: 0.4rem;
+    background: #fff;
+    padding: 0.35rem 0.5rem;
+    font-size: 0.74rem;
+    line-height: 1.3;
+    cursor: pointer;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.08);
+    flex: 0 0 auto;
+    margin: 0;
+    z-index: 1;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-joint-foot--right .hub-students-timeline-event {
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-joint-foot--left .hub-students-timeline-event {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-event-date {
+    display: block;
+    font-size: 0.64rem;
+    font-weight: 600;
+    color: #64748b;
+    margin-bottom: 0.12rem;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-event:hover,
+  #hubStudentsTimelineModal .hub-students-timeline-event:focus-visible {
+    background: #f8fafc;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25);
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-event-label {
+    font-weight: 600;
+    display: block;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-event-sublabel {
+    color: #64748b;
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 10rem;
+  }
+
+  #hubStudentsTimelineModal .hub-students-timeline-type--enrollment { border-left-color: #2563eb; }
+  #hubStudentsTimelineModal .hub-students-timeline-type--clb { border-left-color: #7c3aed; }
+  #hubStudentsTimelineModal .hub-students-timeline-type--referral { border-left-color: #0891b2; }
+  #hubStudentsTimelineModal .hub-students-timeline-type--report { border-left-color: #ca8a04; }
+  #hubStudentsTimelineModal .hub-students-timeline-type--case { border-left-color: #dc2626; }
+  #hubStudentsTimelineModal .hub-students-timeline-type--activity { border-left-color: #16a34a; }
+  #hubStudentsTimelineModal .hub-students-timeline-type--registration { border-left-color: #4f46e5; }
+
+  #hubStudentsTimelineModal .hub-students-timeline-legend-item {
+    padding: 0.15rem 0.45rem;
+    border-radius: 0.25rem;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+  }
+
   #hubStudentsEmbedModal.hub-students-embed-modal {
     z-index: 1065;
   }

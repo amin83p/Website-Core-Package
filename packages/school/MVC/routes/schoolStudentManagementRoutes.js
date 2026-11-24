@@ -31,4 +31,9 @@ router.get('/api/students/:studentId/profile',
   trackActionState(SECTIONS.SCHOOL_STUDENT_MANAGEMENT, OPERATIONS.READ_ALL),
   ctrl.getHubStudentProfile);
 
+router.get('/api/students/:studentId/timeline',
+  requireAccess(SECTIONS.SCHOOL_STUDENTS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.SCHOOL_STUDENT_MANAGEMENT, OPERATIONS.READ_ALL),
+  ctrl.getHubStudentTimeline);
+
 module.exports = router;

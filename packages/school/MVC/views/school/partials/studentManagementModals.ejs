@@ -103,6 +103,49 @@
   </div>
 </div>
 
+<div class="modal fade hub-students-timeline-modal" id="hubStudentsTimelineModal" tabindex="-1" aria-labelledby="hubStudentsTimelineModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-fullscreen modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header py-2">
+        <h5 class="modal-title fw-bold" id="hubStudentsTimelineModalLabel">Student timeline</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="hubStudentsTimelineModalBody">
+        <div class="hub-students-timeline-loading text-muted small d-flex align-items-center gap-2" id="hubStudentsTimelineLoading">
+          <span class="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></span>
+          Loading timeline…
+        </div>
+        <div class="hub-students-timeline-empty d-none text-muted small text-center py-4" id="hubStudentsTimelineEmpty">
+          No dated events were found for this student.
+        </div>
+        <div class="hub-students-timeline-wrap d-none" id="hubStudentsTimelineWrap">
+          <div class="hub-students-timeline-range d-flex justify-content-between small text-muted mb-2">
+            <span id="hubStudentsTimelineMinLabel"></span>
+            <span id="hubStudentsTimelineMaxLabel"></span>
+          </div>
+          <div class="hub-students-timeline-track-scroll">
+            <div class="hub-students-timeline-track" id="hubStudentsTimelineTrack" role="list"></div>
+          </div>
+          <div class="hub-students-timeline-truncated d-none alert alert-warning py-2 small mt-3" id="hubStudentsTimelineTruncated" role="status">
+            Some activities or cases were omitted because of list size limits. Use the related tools for the full lists.
+          </div>
+          <div class="hub-students-timeline-legend small text-muted mt-3 d-flex flex-wrap gap-2" aria-hidden="true">
+            <span class="hub-students-timeline-legend-item hub-students-timeline-type--enrollment">Enrollments</span>
+            <span class="hub-students-timeline-legend-item hub-students-timeline-type--clb">CLB</span>
+            <span class="hub-students-timeline-legend-item hub-students-timeline-type--referral">Referrals</span>
+            <span class="hub-students-timeline-legend-item hub-students-timeline-type--report">Reports</span>
+            <span class="hub-students-timeline-legend-item hub-students-timeline-type--case">Cases</span>
+            <span class="hub-students-timeline-legend-item hub-students-timeline-type--activity">Activities</span>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade hub-students-embed-modal" id="hubStudentsEmbedModal" tabindex="-1" aria-labelledby="hubStudentsEmbedModalLabel" aria-hidden="true" data-bs-backdrop="static">
   <div class="modal-dialog modal-dialog-scrollable hub-students-embed-dialog">
     <div class="modal-content border-0 shadow">

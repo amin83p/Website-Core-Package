@@ -1,4 +1,5 @@
 const reportHubStudentDirectoryService = require('../../services/school/reportHubStudentDirectoryService');
+const studentFileTimelineService = require('../../services/school/studentFileTimelineService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
@@ -72,6 +73,19 @@ exports.getHubStudentPopulationSummary = async (req, res) => {
     res.status(statusCode).json({
       status: 'error',
       message: error.message || 'Unable to load student population summary.'
+    });
+  }
+};
+
+exports.getHubStudentTimeline = async (req, res) => {
+  try {
+    const timeline = await studentFileTimelineService.buildStudentFileTimeline(req.params.studentId, req);
+    res.json({ status: 'success', timeline });
+  } catch (error) {
+    const statusCode = error.statusCode || 400;
+    res.status(statusCode).json({
+      status: 'error',
+      message: error.message || 'Unable to load student timeline.'
     });
   }
 };
