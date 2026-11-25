@@ -1424,7 +1424,7 @@
       context: 'instance',
       catalog,
       identity: { instanceId: <%- JSON.stringify(String(instance?.id || '')) %> },
-      storageKey: 'reportAiAssist:instance:' + <%- JSON.stringify(String(instance?.id || '')) %>,
+      canClearTray: <%- JSON.stringify(Boolean(reportAiAssistSafe.canClearTray)) %>,
       getAnswersOverride: collectInstanceAnswersOverride
     });
   })();

@@ -61,6 +61,26 @@
     });
   }
 
+  async function deleteReportMatrixInstance(assignmentId, instanceId, options = {}) {
+    const assignment = String(assignmentId || '').trim();
+    const id = String(instanceId || '').trim();
+    if (!assignment || !id) throw new Error('Assignment and report instance are required.');
+    const body = {
+      assignmentRowId: String(options.assignmentRowId || '').trim(),
+      studentId: String(options.studentId || '').trim(),
+      sessionDate: String(options.sessionDate || '').trim()
+    };
+    return fetchJson(
+      `/school/reports/instances/matrix/${encodeURIComponent(assignment)}/delete-instance/${encodeURIComponent(id)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        actionStateId: options.actionStateId,
+        body: JSON.stringify(body)
+      }
+    );
+  }
+
   async function fetchAssignmentDeletePreview(assignmentId) {
     const id = String(assignmentId || '').trim();
     if (!id) throw new Error('Assignment is required.');
@@ -198,6 +218,26 @@
     return global.confirm(String(message || ''));
   }
 
+  async function confirmMatrixRemoveReport(reportTitle, studentName) {
+    const title = String(reportTitle || 'this report').trim() || 'this report';
+    const student = String(studentName || 'this student').trim() || 'this student';
+    const message = `Remove ${title} for ${student} from this session?\n\nAny saved draft is deleted and the student is unassigned for this report period. This cannot be undone.`;
+    if (typeof global.showMessageModal === 'function') {
+      const result = await global.showMessageModal({
+        title: 'Remove report from session?',
+        icon: 'warning',
+        message,
+        size: 'md',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary btn-md' },
+          { text: 'Remove', class: 'btn-danger btn-md' }
+        ]
+      });
+      return result === 'Remove';
+    }
+    return global.confirm(message);
+  }
+
   async function confirmReopen(message, title = 'Reopen Report') {
     if (typeof global.showMessageModal === 'function') {
       const result = await global.showMessageModal({
@@ -234,6 +274,8 @@
     withLoading,
     fetchJson,
     deleteReportInstance,
+    deleteReportMatrixInstance,
+    confirmMatrixRemoveReport,
     unlockReportInstance,
     reopenReportInstance,
     fetchAssignmentDeletePreview,

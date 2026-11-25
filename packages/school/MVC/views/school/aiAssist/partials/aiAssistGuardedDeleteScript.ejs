@@ -1,0 +1,81 @@
+<%
+  const deleteBasePath = typeof deleteBasePath !== 'undefined' ? String(deleteBasePath || '').replace(/\/+$/, '') : '';
+  const deleteEntityLabel = typeof deleteEntityLabel !== 'undefined' ? String(deleteEntityLabel) : 'this item';
+  const deleteConfirmTitle = typeof deleteConfirmTitle !== 'undefined' ? String(deleteConfirmTitle) : 'Confirm deletion';
+  const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? String(actionStateId) : '';
+%>
+<%- include('school/aiAssist/partials/aiAssistMessageHelpers') %>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const actionStateId = <%- JSON.stringify(asid) %>;
+  const basePath = <%- JSON.stringify(deleteBasePath) %>;
+  const entityLabel = <%- JSON.stringify(deleteEntityLabel) %>;
+  const confirmTitle = <%- JSON.stringify(deleteConfirmTitle) %>;
+
+  function showMessage(options) {
+    if (window.SchoolAiAssistMessaging && typeof window.SchoolAiAssistMessaging.show === 'function') {
+      return window.SchoolAiAssistMessaging.show(options);
+    }
+    if (typeof showMessageModal === 'function') {
+      return showMessageModal(options);
+    }
+    return Promise.resolve(undefined);
+  }
+
+  document.querySelectorAll('.delete-btn').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = btn.getAttribute('data-id');
+      if (!id || !basePath) return;
+
+      const result = await showMessage({
+        title: confirmTitle,
+        icon: 'warning',
+        message: 'Are you sure you want to delete <b>' + entityLabel + '</b>? This cannot be undone.',
+        buttons: [
+          { text: 'Cancel', class: 'btn-secondary', value: false },
+          { text: 'Delete', class: 'btn-danger', value: true }
+        ]
+      });
+      const approved = result === true || result === 'Delete' || (result && result.value === true);
+      if (!approved) return;
+
+      try {
+        const payload = new URLSearchParams();
+        if (actionStateId) payload.set('actionStateId', actionStateId);
+        const response = await fetch(basePath + '/delete/' + encodeURIComponent(id), {
+          method: 'POST',
+          headers: {
+            'X-AJAX-Request': 'true',
+            'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'
+          },
+          body: payload.toString()
+        });
+        const json = await response.json().catch(() => ({}));
+        const guarded = typeof window.applyGuardedApiResult === 'function'
+          ? await window.applyGuardedApiResult(json, { busyTitle: 'Delete in progress', replayTitle: 'Delete already processed' })
+          : { stop: false };
+        if (guarded.stop) return;
+        if (!response.ok || json.status !== 'success') {
+          throw new Error(json.message || 'Delete failed.');
+        }
+        btn.closest('tr')?.remove();
+        const tbody = document.querySelector('#first-table tbody');
+        const remaining = tbody ? tbody.querySelectorAll('tr').length : 0;
+        if (tbody && remaining === 0) {
+          const colCount = document.querySelectorAll('#first-table thead th').length || 1;
+          tbody.innerHTML = '<tr><td colspan="' + colCount + '" class="text-center py-5 text-muted">No records found.</td></tr>';
+        }
+      } catch (error) {
+        await showMessage({
+          title: 'Delete failed',
+          icon: 'error',
+          message: error?.message || 'Unable to delete.',
+          buttons: [{ text: 'OK', class: 'btn-danger' }]
+        });
+      }
+    });
+  });
+});
+</script>

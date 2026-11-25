@@ -711,7 +711,14 @@ test('report matrix routes and UI expose bulk actions, grouping, and accessible 
 
   assert.match(routes, /\/instances\/matrix\/:assignmentId/);
   assert.match(routes, /\/instances\/matrix\/:assignmentId\/save-row/);
+  assert.match(routes, /\/instances\/matrix\/:assignmentId\/delete-instance\/:instanceId/);
   assert.match(routes, /\/instances\/matrix\/:assignmentId\/save-all/);
+  assert.match(matrixView, /js-matrix-delete-instance/);
+  assert.match(matrixView, /CAN_REMOVE_REPORT_INSTANCES/);
+  assert.match(
+    read('packages/school/public/scripts/reportAssignmentDelete.js'),
+    /deleteReportMatrixInstance/
+  );
   assert.match(read('packages/school/MVC/controllers/school/reportController.js'), /matrixAction === 'lock'[\s\S]*reportMatrixService\.lockMatrixRows/);
   assert.match(routes, /\/instances\/matrix\/:assignmentId\/prefill-preview/);
   assert.match(routes, /\/instances\/matrix\/:assignmentId\/prefill-apply/);

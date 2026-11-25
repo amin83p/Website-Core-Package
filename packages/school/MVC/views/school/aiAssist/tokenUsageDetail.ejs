@@ -23,6 +23,36 @@
     <% } %>
     <dt class="col-sm-3">Request summary</dt><dd class="col-sm-9"><pre class="small mb-0"><%= row.requestSummary || '' %></pre></dd>
     <dt class="col-sm-3">Response summary</dt><dd class="col-sm-9"><pre class="small mb-0"><%= row.responseSummary || '' %></pre></dd>
+    <% if (String(row.usageSource || '').trim() === 'report_ai_assist') { %>
+      <dt class="col-sm-3">Report context</dt>
+      <dd class="col-sm-9"><code><%= row.reportContext || '' %></code></dd>
+      <% if (row.reportInstanceId) { %>
+        <dt class="col-sm-3">Report instance</dt><dd class="col-sm-9"><code><%= row.reportInstanceId %></code></dd>
+      <% } %>
+      <% if (row.reportAssignmentId) { %>
+        <dt class="col-sm-3">Report assignment</dt><dd class="col-sm-9"><code><%= row.reportAssignmentId %></code></dd>
+      <% } %>
+      <% if (row.reportAssignmentRowId) { %>
+        <dt class="col-sm-3">Assignment row</dt><dd class="col-sm-9"><code><%= row.reportAssignmentRowId %></code></dd>
+      <% } %>
+      <% if (row.reportTeacherId) { %>
+        <dt class="col-sm-3">Teacher</dt><dd class="col-sm-9"><code><%= row.reportTeacherId %></code></dd>
+      <% } %>
+      <% if (row.reportTemplateId) { %>
+        <dt class="col-sm-3">Template</dt><dd class="col-sm-9"><code><%= row.reportTemplateId %></code></dd>
+      <% } %>
+      <% if (row.bindingRowId) { %>
+        <dt class="col-sm-3">AI binding</dt><dd class="col-sm-9"><code><%= row.bindingRowId %></code></dd>
+      <% } %>
+      <dt class="col-sm-3">Run inputs</dt>
+      <dd class="col-sm-9">
+        <pre class="small mb-0"><%= JSON.stringify(row.inputPayload || {}, null, 2) %></pre>
+      </dd>
+      <dt class="col-sm-3">Run output</dt>
+      <dd class="col-sm-9">
+        <pre class="small mb-0"><%= JSON.stringify(row.outputPayload || {}, null, 2) %></pre>
+      </dd>
+    <% } %>
   </dl>
 
   <a href="/school/ai-assist/token-usage" class="btn btn-outline-secondary">Back to list</a>

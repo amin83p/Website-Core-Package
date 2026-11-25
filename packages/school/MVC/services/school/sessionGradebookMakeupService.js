@@ -1,7 +1,11 @@
 const attendanceMatrixMetricsService = require('./attendanceMatrixMetricsService');
-const { addDaysToDateKey } = require('./sessionAttendanceEditAccessService');
+const sessionAccessPolicyService = require('./sessionAccessPolicyService');
+const {
+  addDaysToDateKey,
+  endOfMonthDateKey
+} = require('./sessionAttendanceEditAccessService');
 
-const MAKEUP_SOURCE_LOOKBACK_DAYS = 15;
+const MAKEUP_SOURCE_LOOKBACK_DAYS = sessionAccessPolicyService.DEFAULT_GRADEBOOK_ACTIVITY_MAKEUP.lookbackDays;
 
 const ATT = attendanceMatrixMetricsService.ATTENDANCE_STATUS;
 
@@ -98,6 +102,133 @@ function compareSessionDateDesc(a, b) {
   const timeA = String(a?.startTime || '');
   const timeB = String(b?.startTime || '');
   return timeB.localeCompare(timeA);
+}
+
+function cleanDateKey(value) {
+  const token = String(value || '').trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(token) ? token : '';
+}
+
+function compareDateKeys(left = '', right = '') {
+  return String(left || '').localeCompare(String(right || ''));
+}
+
+function startOfWeekMondayDateKey(dateKey = '') {
+  const token = cleanDateKey(dateKey);
+  if (!token) return '';
+  const [year, month, day] = token.split('-').map((part) => Number(part));
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const weekday = date.getUTCDay();
+  const daysFromMonday = weekday === 0 ? 6 : weekday - 1;
+  return addDaysToDateKey(token, -daysFromMonday);
+}
+
+function startOfMonthDateKey(dateKey = '') {
+  const token = cleanDateKey(dateKey);
+  if (!token) return '';
+  const [year, month] = token.split('-');
+  return `${year}-${month}-01`;
+}
+
+function normalizeMakeupPolicy(makeupPolicy) {
+  if (makeupPolicy && typeof makeupPolicy === 'object' && makeupPolicy.windowType) {
+    return sessionAccessPolicyService.normalizeGradebookActivityMakeupSettings(makeupPolicy);
+  }
+  return sessionAccessPolicyService.normalizeGradebookActivityMakeupSettings({});
+}
+
+function resolveGradebookMakeupSourceDateBounds({ currentSessionDate, makeupPolicy } = {}) {
+  const current = cleanDateKey(currentSessionDate);
+  if (!current) return { minDate: '', maxDate: '' };
+
+  const policy = normalizeMakeupPolicy(makeupPolicy);
+  const windowType = policy.windowType;
+  const dayBeforeCurrent = addDaysToDateKey(current, -1);
+  if (!dayBeforeCurrent) return { minDate: '', maxDate: '' };
+
+  const weekStart = startOfWeekMondayDateKey(current);
+  let minDate = '';
+  let maxDate = dayBeforeCurrent;
+
+  switch (windowType) {
+    case 'last_n_days': {
+      const days = Number(policy.lookbackDays) || MAKEUP_SOURCE_LOOKBACK_DAYS;
+      minDate = addDaysToDateKey(current, -days);
+      break;
+    }
+    case 'this_week':
+      minDate = weekStart;
+      break;
+    case 'this_month':
+      minDate = startOfMonthDateKey(current);
+      break;
+    case 'last_week':
+      minDate = addDaysToDateKey(weekStart, -7);
+      maxDate = addDaysToDateKey(weekStart, -1);
+      break;
+    case 'last_two_weeks':
+      minDate = addDaysToDateKey(weekStart, -14);
+      maxDate = addDaysToDateKey(weekStart, -1);
+      break;
+    case 'month_half': {
+      const dayOfMonth = Number(current.split('-')[2]);
+      if (!Number.isFinite(dayOfMonth) || dayOfMonth < 1) {
+        return { minDate: '', maxDate: '' };
+      }
+      if (dayOfMonth <= 15) {
+        minDate = startOfMonthDateKey(current);
+        const halfEnd = `${current.slice(0, 8)}15`;
+        maxDate = compareDateKeys(halfEnd, dayBeforeCurrent) <= 0 ? halfEnd : dayBeforeCurrent;
+      } else {
+        minDate = `${current.slice(0, 8)}16`;
+        const halfEnd = endOfMonthDateKey(current);
+        maxDate = compareDateKeys(halfEnd, dayBeforeCurrent) <= 0 ? halfEnd : dayBeforeCurrent;
+      }
+      break;
+    }
+    default:
+      minDate = addDaysToDateKey(current, -MAKEUP_SOURCE_LOOKBACK_DAYS);
+  }
+
+  if (minDate && maxDate && compareDateKeys(minDate, maxDate) > 0) {
+    return { minDate: '', maxDate: '' };
+  }
+  return { minDate, maxDate };
+}
+
+function isSessionDateWithinMakeupSourceWindow(sessionDate, bounds = {}) {
+  const date = cleanDateKey(sessionDate);
+  const minDate = cleanDateKey(bounds.minDate);
+  const maxDate = cleanDateKey(bounds.maxDate);
+  if (!date || !minDate || !maxDate) return false;
+  if (compareDateKeys(minDate, maxDate) > 0) return false;
+  return compareDateKeys(date, minDate) >= 0 && compareDateKeys(date, maxDate) <= 0;
+}
+
+function describeGradebookActivityMakeupWindow(makeupPolicy) {
+  const policy = normalizeMakeupPolicy(makeupPolicy);
+  const labels = {
+    month_half: 'the same half of the calendar month as this session (1st–15th or 16th–end)',
+    last_week: 'the previous calendar week',
+    last_two_weeks: 'the two calendar weeks before this week',
+    this_week: 'this calendar week',
+    this_month: 'this calendar month',
+    last_n_days: `up to the last ${policy.lookbackDays || MAKEUP_SOURCE_LOOKBACK_DAYS} days`
+  };
+  return labels[policy.windowType] || labels.last_n_days;
+}
+
+function assertSourceSessionWithinMakeupWindow(sourceSession, currentSession, makeupPolicy) {
+  const sourceDate = String(sourceSession?.date || '').trim();
+  const currentDate = String(currentSession?.date || '').trim();
+  const bounds = resolveGradebookMakeupSourceDateBounds({
+    currentSessionDate: currentDate,
+    makeupPolicy
+  });
+  if (!isSessionDateWithinMakeupSourceWindow(sourceDate, bounds)) {
+    const description = describeGradebookActivityMakeupWindow(makeupPolicy);
+    throw new Error(`That source session is outside the allowed make-up window (${description} before this session).`);
+  }
 }
 
 function hasDuplicateMakeupLink(currentSession, sourceSessionId, sourceGradebookId) {
@@ -210,12 +341,13 @@ function resolveEffectiveGradebookScoreForStudent({
   return null;
 }
 
-function listMakeupPickerRows({ allSessions = [], currentSession = {} } = {}) {
+function listMakeupPickerRows({ allSessions = [], currentSession = {}, makeupPolicy } = {}) {
   const currentSessionId = cleanId(currentSession?.sessionId || currentSession?.id);
   const currentDate = String(currentSession?.date || '').trim();
-  const minSessionDate = currentDate
-    ? addDaysToDateKey(currentDate, -MAKEUP_SOURCE_LOOKBACK_DAYS)
-    : '';
+  const bounds = resolveGradebookMakeupSourceDateBounds({
+    currentSessionDate: currentDate,
+    makeupPolicy
+  });
   const rows = [];
 
   const candidates = (Array.isArray(allSessions) ? allSessions : [])
@@ -223,8 +355,8 @@ function listMakeupPickerRows({ allSessions = [], currentSession = {} } = {}) {
       const sid = cleanId(session?.sessionId || session?.id);
       if (!sid || sid === currentSessionId) return false;
       const date = String(session?.date || '').trim();
-      if (currentDate && date && date > currentDate) return false;
-      if (minSessionDate && date && date < minSessionDate) return false;
+      if (currentDate && date && date >= currentDate) return false;
+      if (!isSessionDateWithinMakeupSourceWindow(date, bounds)) return false;
       return true;
     })
     .sort(compareSessionDateDesc);
@@ -234,7 +366,7 @@ function listMakeupPickerRows({ allSessions = [], currentSession = {} } = {}) {
     const sessionDate = String(session?.date || '').trim();
     const startTime = String(session?.startTime || '').trim();
     (Array.isArray(session?.gradebooks) ? session.gradebooks : []).forEach((gb) => {
-      if (!isOriginalGradebookActivity(gb)) return;
+      if (!isMakeupSourceEligibleActivity(gb)) return;
       const gradebookId = cleanId(gb?.id);
       if (!gradebookId) return;
       rows.push({
@@ -332,7 +464,8 @@ function previewMakeupGradebook({
   currentSession = {},
   sourceSessionId,
   sourceGradebookId,
-  currentPersonIds = []
+  currentPersonIds = [],
+  makeupPolicy
 } = {}) {
   const messages = [];
   const srcSid = cleanId(sourceSessionId);
@@ -342,6 +475,21 @@ function previewMakeupGradebook({
   );
   if (!sourceSession) {
     return { status: 'blocked', messages: ['Source session was not found.'], cohort: null };
+  }
+  const sourceDate = String(sourceSession?.date || '').trim();
+  const currentDate = String(currentSession?.date || '').trim();
+  const bounds = resolveGradebookMakeupSourceDateBounds({
+    currentSessionDate: currentDate,
+    makeupPolicy
+  });
+  if (sourceDate && !isSessionDateWithinMakeupSourceWindow(sourceDate, bounds)) {
+    return {
+      status: 'blocked',
+      messages: [
+        `That source session is outside the allowed make-up window (${describeGradebookActivityMakeupWindow(makeupPolicy)} before this session).`
+      ],
+      cohort: null
+    };
   }
   const sourceGradebook = (Array.isArray(sourceSession?.gradebooks) ? sourceSession.gradebooks : [])
     .find((row) => cleanId(row?.id) === srcGb);
@@ -421,7 +569,9 @@ function normalizeMakeupGradebookOnSave(gb, context = {}) {
   const {
     personIds = [],
     attendanceByPerson = new Map(),
-    sourceSessionsById = new Map()
+    sourceSessionsById = new Map(),
+    currentSessionDate = '',
+    gradebookActivityMakeup
   } = context;
   const srcSid = cleanId(gb?.makeupSource?.sessionId);
   const srcGb = cleanId(gb?.makeupSource?.gradebookId);
@@ -431,6 +581,14 @@ function normalizeMakeupGradebookOnSave(gb, context = {}) {
   const sourceGradebook = sourceSession
     ? (Array.isArray(sourceSession.gradebooks) ? sourceSession.gradebooks : []).find((row) => cleanId(row?.id) === srcGb)
     : null;
+
+  if (sourceSession) {
+    assertSourceSessionWithinMakeupWindow(
+      sourceSession,
+      { date: currentSessionDate },
+      gradebookActivityMakeup
+    );
+  }
 
   const cohort = classifyMakeupCohort({
     sourceSession: sourceSession || { roster: [] },
@@ -486,6 +644,10 @@ function normalizeMakeupGradebookOnSave(gb, context = {}) {
 
 module.exports = {
   MAKEUP_SOURCE_LOOKBACK_DAYS,
+  resolveGradebookMakeupSourceDateBounds,
+  isSessionDateWithinMakeupSourceWindow,
+  describeGradebookActivityMakeupWindow,
+  normalizeMakeupPolicy,
   isOriginalGradebookActivity,
   isMakeupSourceEligibleActivity,
   isMakeupLinkedGradebookActivity,

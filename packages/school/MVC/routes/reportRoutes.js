@@ -834,6 +834,11 @@ router.post('/ai-assist/run',
   trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, { requireToken: false }),
   ctrl.reportAiAssistRun);
 
+router.post('/ai-assist/history',
+  requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE),
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, { requireToken: false }),
+  ctrl.reportAiAssistHistory);
+
 router.get('/instances',
   requireAccess(REPORT_INSTANCE_SECTION, OPERATIONS.READ_ALL),
   trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.READ_ALL),
@@ -862,6 +867,15 @@ router.post('/instances/matrix/:assignmentId/save-row',
     allowInactiveTokenFallback: true
   }),
   ctrl.saveReportMatrixRow);
+
+router.post('/instances/matrix/:assignmentId/delete-instance/:instanceId',
+  requireReportMatrixEditorAccess,
+  trackActionState(REPORT_INSTANCE_SECTION, OPERATIONS.UPDATE, {
+    requireToken: true,
+    allowOperationTokenFallback: true,
+    allowInactiveTokenFallback: true
+  }),
+  ctrl.deleteReportMatrixInstance);
 
 router.post('/instances/matrix/:assignmentId/save-all',
   requireReportMatrixEditorAccess,

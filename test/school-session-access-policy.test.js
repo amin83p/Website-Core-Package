@@ -43,6 +43,8 @@ test('session access policy service normalizes defaults and validates templates'
   assert.equal(policy.completedSessionConductEdit.enabled, true);
   assert.equal(policy.completedSessionCurriculumEdit.enabled, true);
   assert.equal(policy.completedSessionStudentCasesEdit.enabled, true);
+  assert.equal(policy.gradebookActivityMakeup.windowType, 'last_n_days');
+  assert.equal(policy.gradebookActivityMakeup.lookbackDays, 15);
 
   const normalized = sessionAccessPolicyService.validatePolicyInput({
     uncompletedSessionNotification: {
@@ -75,11 +77,26 @@ test('session access policy service normalizes defaults and validates templates'
       enabled: true,
       windowType: 'end_of_week',
       daysAfterSession: null
+    },
+    gradebookActivityMakeup: {
+      windowType: 'this_month',
+      lookbackDays: null
     }
   });
+  assert.equal(normalized.gradebookActivityMakeup.windowType, 'this_month');
   assert.equal(normalized.uncompletedSessionNotification.channels.email.sendWhen, 'next_day');
   assert.equal(normalized.uncompletedSessionNotification.channels.sms.sessionDateRange.daysBeforeToday, 5);
   assert.equal(normalized.completedSessionAttendanceEdit.daysAfterSession, 4);
+
+  assert.throws(
+    () => sessionAccessPolicyService.validatePolicyInput({
+      gradebookActivityMakeup: {
+        windowType: 'last_n_days',
+        lookbackDays: null
+      }
+    }),
+    /Days before session is required/
+  );
 
   assert.throws(
     () => sessionAccessPolicyService.validatePolicyInput({

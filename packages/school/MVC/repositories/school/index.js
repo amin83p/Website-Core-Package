@@ -1543,7 +1543,7 @@ const schoolRepositories = {
     getAll: schoolAiTokenUsageModel.getAllUsage,
     getById: schoolAiTokenUsageModel.getUsageById,
     create: schoolAiTokenUsageModel.appendUsage,
-    update: async () => { throw new Error('AI token usage rows are append-only.'); },
+    update: async (id, data) => schoolAiTokenUsageModel.patchUsageById(id, data),
     remove: async () => { throw new Error('AI token usage rows cannot be deleted.'); },
     mongoRemoveUnsupported: true,
     mongoRemoveMessage: 'AI token usage rows cannot be deleted.',

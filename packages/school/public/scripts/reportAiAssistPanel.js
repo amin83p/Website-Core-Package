@@ -9,11 +9,68 @@
       .replace(/"/g, '&quot;');
   }
 
+  function buildReportAiAssistJsonHeaders() {
+    const headers = {
+      'Content-Type': 'application/json',
+      Accept: 'application/json'
+    };
+    const csrfToken = String(document.querySelector('meta[name="csrf-token"]')?.content || '').trim();
+    if (csrfToken) {
+      headers['csrf-token'] = csrfToken;
+      headers['x-csrf-token'] = csrfToken;
+    }
+    const actionStateId = String(
+      document.querySelector('input[name="actionStateId"]')?.value
+      || document.getElementById('actionStateIdRef')?.dataset?.id
+      || document.getElementById('actionStateIdRef')?.getAttribute('data-id')
+      || ''
+    ).trim();
+    if (actionStateId) headers['X-Action-State-Id'] = actionStateId;
+    return headers;
+  }
+
   function formatRunResult(result) {
     if (!result || typeof result !== 'object') return '';
     if (result.ok === false && result.error) return 'Error: ' + String(result.error);
     if (result.data && typeof result.data === 'object') return JSON.stringify(result.data, null, 2);
     return String(result.displayText || result.rawText || '');
+  }
+
+  function resolveTrayInputPayload(payload) {
+    if (!payload || typeof payload !== 'object') return null;
+    if (payload.resolved && typeof payload.resolved === 'object' && !Array.isArray(payload.resolved)) {
+      return payload;
+    }
+    return { resolved: payload };
+  }
+
+  function formatTrayInputsPlainText(inputPayload) {
+    const shaped = resolveTrayInputPayload(inputPayload);
+    if (!shaped) return '';
+    try {
+      return JSON.stringify(shaped, null, 2);
+    } catch (_) {
+      return '';
+    }
+  }
+
+  function buildTrayInputsHtml(row) {
+    const plain = formatTrayInputsPlainText(row?.inputPayload);
+    if (!plain || plain === '{}' || plain === '{\n  "resolved": {}\n}') return '';
+    const inputsCollapseId = `${trayCardCollapseDomId(row.usageRecordId || row.bindingRowId)}_inputs`;
+    return `<div class="report-ai-tray-inputs mt-3">
+      <button
+        type="button"
+        class="btn btn-link btn-sm p-0 text-decoration-none report-ai-tray-inputs-toggle"
+        data-bs-toggle="collapse"
+        data-bs-target="#${escapeHtml(inputsCollapseId)}"
+        aria-expanded="false"
+        aria-controls="${escapeHtml(inputsCollapseId)}"
+      ><i class="bi bi-sliders me-1" aria-hidden="true"></i>Inputs used for this run</button>
+      <div id="${escapeHtml(inputsCollapseId)}" class="collapse mt-2">
+        <div class="report-ai-result-body report-ai-result-json small" data-plain-text="${escapeHtml(plain)}">${escapeHtml(plain)}</div>
+      </div>
+    </div>`;
   }
 
   function summarizeRunResult(result) {
@@ -331,9 +388,10 @@
     this.context = String(options.context || 'instance');
     this.catalog = Array.isArray(options.catalog) ? options.catalog : [];
     this.identity = options.identity && typeof options.identity === 'object' ? options.identity : {};
-    this.storageKey = String(options.storageKey || '').trim();
     this.getAnswersOverride = typeof options.getAnswersOverride === 'function' ? options.getAnswersOverride : () => ({});
-    this.results = new Map();
+    this.canClearTray = options.canClearTray === true;
+    this.runHistory = [];
+    this.trayHiddenLocally = false;
     this.modalEl = document.getElementById('reportAiAssistModal');
     this.modal = null;
     this.serviceSelect = document.getElementById('reportAiAssistServiceSelect');
@@ -352,31 +410,73 @@
     this.trayCount = document.getElementById('reportAiAssistResultsTrayCount');
     this.trayCollapseEl = document.getElementById('reportAiAssistResultsTrayCollapse');
     this.trayToggleBtn = document.getElementById('reportAiAssistTrayToggleBtn');
-    this.loadStoredResults();
     this.bindEvents();
-    this.renderTray();
+    const loadHistory = () => { void this.loadHistoryFromServer(); };
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', loadHistory, { once: true });
+    } else {
+      loadHistory();
+    }
   }
 
-  ReportAiAssistPanel.prototype.loadStoredResults = function () {
-    if (!this.storageKey) return;
-    try {
-      const raw = sessionStorage.getItem(this.storageKey);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      if (!parsed || typeof parsed !== 'object') return;
-      Object.entries(parsed).forEach(([key, value]) => {
-        if (value && typeof value === 'object') this.results.set(key, value);
-      });
-    } catch (_) { /* ignore */ }
+  ReportAiAssistPanel.prototype.buildHistoryBody = function () {
+    const body = { context: this.context };
+    if (this.context === 'matrix') {
+      body.assignmentId = this.identity.assignmentId;
+      body.assignmentRowId = this.identity.assignmentRowId || '';
+      body.teacherId = this.identity.teacherId || '';
+    } else {
+      body.instanceId = this.identity.instanceId;
+    }
+    return body;
   };
 
-  ReportAiAssistPanel.prototype.persistResults = function () {
-    if (!this.storageKey) return;
+  ReportAiAssistPanel.prototype.mapHistoryRunToTrayRow = function (run) {
+    const result = run?.outputPayload && typeof run.outputPayload === 'object' ? run.outputPayload : {};
+    const summary = summarizeRunResult(result);
+    const catalogEntry = this.catalog.find((row) => String(row.bindingRowId) === String(run.bindingRowId)) || null;
+    const isFailed = String(run?.status || '').toLowerCase() === 'failed' || summary.isError;
+    const failedMessage = isFailed && !summary.text
+      ? String(result.error || run.outputPayload?.error || 'AI Assist run failed.')
+      : summary.text;
+    return {
+      usageRecordId: String(run.usageRecordId || run.id || '').trim(),
+      bindingRowId: run.bindingRowId,
+      label: run.label || catalogEntry?.label,
+      ranByUserId: run.ranByUserId || '',
+      ranByLabel: run.ranByLabel || run.ranByUserId || '',
+      text: failedMessage,
+      mode: summary.mode || result.mode || 'markdown',
+      isError: isFailed,
+      isJson: summary.isJson,
+      resultData: summary.resultData || result.data || null,
+      reportUi: run.reportUi || catalogEntry?.reportUi || null,
+      entrySnapshot: {
+        inputBindings: catalogEntry?.inputBindings || null,
+        reportUi: run.reportUi || catalogEntry?.reportUi || null
+      },
+      at: run.at || new Date().toISOString(),
+      traceId: run.traceId || summary.traceId || '',
+      inputPayload: run.inputPayload || null
+    };
+  };
+
+  ReportAiAssistPanel.prototype.loadHistoryFromServer = async function () {
+  const historyBody = this.buildHistoryBody();
     try {
-      const out = {};
-      this.results.forEach((value, key) => { out[key] = value; });
-      sessionStorage.setItem(this.storageKey, JSON.stringify(out));
-    } catch (_) { /* ignore */ }
+      const response = await fetch('/school/reports/ai-assist/history', {
+        method: 'POST',
+        headers: buildReportAiAssistJsonHeaders(),
+        body: JSON.stringify(historyBody)
+      });
+      const payload = await response.json().catch(() => ({}));
+      if (!response.ok || payload.status !== 'success') return;
+      const sorted = (Array.isArray(payload.runs) ? payload.runs : []).slice().sort(
+        (a, b) => String(b?.at || '').localeCompare(String(a?.at || ''))
+      );
+      this.runHistory = sorted.map((run) => this.mapHistoryRunToTrayRow(run));
+      if (!this.trayHiddenLocally) this.renderTray();
+    } catch (_) { /* ignore — tray empty until user runs or reload */ }
   };
 
   ReportAiAssistPanel.prototype.getSelectedEntry = function () {
@@ -453,10 +553,22 @@
     return `Running ${label}…`;
   };
 
+  ReportAiAssistPanel.prototype.findTrayRowByUsageId = function (usageRecordId) {
+    const token = String(usageRecordId || '').trim();
+    if (!token) return null;
+    return this.runHistory.find((row) => String(row?.usageRecordId || '') === token) || null;
+  };
+
+  ReportAiAssistPanel.prototype.findLatestTrayRowForBinding = function (bindingRowId) {
+    const token = String(bindingRowId || '').trim();
+    if (!token) return null;
+    return this.runHistory.find((row) => String(row?.bindingRowId || '') === token) || null;
+  };
+
   ReportAiAssistPanel.prototype.resolveEntrySnapshot = function (bindingRowId) {
     const id = String(bindingRowId || '').trim();
     if (!id) return this._lastRunEntry || null;
-    const stored = this.results.get(id);
+    const stored = this.findLatestTrayRowForBinding(id);
     if (stored?.entrySnapshot) return stored.entrySnapshot;
     return this.catalog.find((row) => String(row.bindingRowId) === id) || this._lastRunEntry || null;
   };
@@ -505,7 +617,11 @@
     if (!copyBtn && !applyBtn) return;
     const bindingRowId = String((copyBtn || applyBtn).getAttribute('data-binding-id') || '').trim();
     const sectionKey = String((copyBtn || applyBtn).getAttribute('data-section-key') || '').trim();
-    const stored = bindingRowId ? this.results.get(bindingRowId) : null;
+    const card = (copyBtn || applyBtn).closest('.report-ai-tray-card');
+    const usageId = String(card?.getAttribute('data-tray-id') || '').trim();
+    const stored = usageId
+      ? this.findTrayRowByUsageId(usageId)
+      : (bindingRowId ? this.findLatestTrayRowForBinding(bindingRowId) : null);
     const data = stored?.resultData;
     const entry = this.resolveEntrySnapshot(bindingRowId);
     const section = entry?.reportUi?.sections?.find((row) => String(row?.resultKey || '') === sectionKey) || {
@@ -579,7 +695,7 @@
     if (bindingRowId) {
       const token = String(bindingRowId);
       card = [...this.tray.querySelectorAll('.report-ai-tray-card')].find(
-        (el) => String(el.getAttribute('data-tray-id') || '') === token
+        (el) => String(el.getAttribute('data-binding-id') || '') === token
       );
     } else {
       card = this.tray.querySelector('.report-ai-tray-card');
@@ -603,7 +719,7 @@
     }
   };
 
-  ReportAiAssistPanel.prototype.buildTrayCardHtml = function (row) {
+  ReportAiAssistPanel.prototype.buildTrayCardHtml = function (row, expandDefault) {
     const summary = {
       text: row.text,
       mode: row.mode || 'markdown',
@@ -615,14 +731,20 @@
     const reportUi = row.reportUi || row.entrySnapshot?.reportUi || null;
     const rendered = renderResultBodyHtml(summary, reportUi, row.bindingRowId);
     const when = row.at ? new Date(row.at).toLocaleString() : '';
+    const ranBy = String(row.ranByLabel || '').trim();
+    const metaLine = [when, ranBy ? `Ran by ${ranBy}` : ''].filter(Boolean).join(' · ');
     const title = escapeHtml(row.label || row.bindingRowId);
     const errorClass = summary.isError ? ' is-error' : '';
     const bodyClass = rendered.json
       ? ' report-ai-result-json'
       : (rendered.structured ? ' report-ai-result-structured' : ' report-ai-result-markdown');
     const bodyContent = rendered.json ? escapeHtml(rendered.plain) : rendered.html;
-    const collapseId = trayCardCollapseDomId(row.bindingRowId);
-    return `<article class="report-ai-tray-card${errorClass}" data-tray-id="${escapeHtml(row.bindingRowId)}">
+    const collapseId = trayCardCollapseDomId(row.usageRecordId || row.bindingRowId);
+    const inputsHtml = buildTrayInputsHtml(row);
+    const isOpen = expandDefault === true;
+    const collapseClass = isOpen ? 'collapse show' : 'collapse';
+    const trayKey = String(row.usageRecordId || row.bindingRowId || '').trim();
+    return `<article class="report-ai-tray-card${errorClass}" data-tray-id="${escapeHtml(trayKey)}" data-binding-id="${escapeHtml(row.bindingRowId)}">
       <div class="report-ai-tray-card-accent" aria-hidden="true"></div>
       <div class="report-ai-tray-card-inner">
         <div class="report-ai-tray-card-header d-flex flex-wrap justify-content-between align-items-start gap-2">
@@ -632,24 +754,25 @@
               class="btn btn-link report-ai-tray-card-toggle p-0 flex-shrink-0"
               data-bs-toggle="collapse"
               data-bs-target="#${escapeHtml(collapseId)}"
-              aria-expanded="true"
+              aria-expanded="${isOpen ? 'true' : 'false'}"
               aria-controls="${escapeHtml(collapseId)}"
               title="Show or hide result"
             ><i class="bi bi-chevron-down report-ai-tray-card-chevron" aria-hidden="true"></i></button>
             <span class="report-ai-icon-chip report-ai-icon-chip-sm flex-shrink-0" aria-hidden="true"><i class="bi bi-${summary.isError ? 'exclamation-lg' : 'stars'}"></i></span>
             <div class="min-w-0">
               <div class="fw-semibold report-ai-tray-title text-truncate">${title}</div>
-              ${when ? `<div class="small text-muted">${escapeHtml(when)}</div>` : ''}
+              ${metaLine ? `<div class="small text-muted">${escapeHtml(metaLine)}</div>` : ''}
             </div>
           </div>
           <div class="d-flex flex-wrap align-items-center gap-2">
             ${!summary.isError ? `<span class="badge rounded-pill report-ai-mode-badge text-bg-light border">${escapeHtml(modeBadgeLabel(summary.mode))}</span>` : ''}
-            <button type="button" class="btn btn-outline-secondary btn-sm js-report-ai-tray-copy" data-copy-id="${escapeHtml(row.bindingRowId)}"><i class="bi bi-clipboard me-1"></i>Copy</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm js-report-ai-tray-copy" data-copy-id="${escapeHtml(trayKey)}"><i class="bi bi-clipboard me-1"></i>Copy</button>
           </div>
         </div>
-        <div id="${escapeHtml(collapseId)}" class="collapse show report-ai-tray-card-collapse">
+        <div id="${escapeHtml(collapseId)}" class="${collapseClass} report-ai-tray-card-collapse">
           <div class="report-ai-tray-card-body-wrap">
             <div class="report-ai-result-body${bodyClass}" data-plain-text="${escapeHtml(rendered.plain)}">${bodyContent}</div>
+            ${inputsHtml}
             ${summary.traceId ? `<div class="small text-muted mt-2 font-monospace">Trace: ${escapeHtml(summary.traceId)}</div>` : ''}
           </div>
         </div>
@@ -709,7 +832,7 @@
     try {
       const response = await fetch('/school/reports/ai-assist/prepare', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        headers: buildReportAiAssistJsonHeaders(),
         body: JSON.stringify(this.buildRequestBody(entry.bindingRowId, {}))
       });
       const payload = await response.json().catch(() => ({}));
@@ -752,7 +875,7 @@
       updateAiAssistWaiting(this.buildRunWaitingNote(entry, 'remote'), serviceOperation);
       const response = await fetch('/school/reports/ai-assist/run', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        headers: buildReportAiAssistJsonHeaders(),
         body: JSON.stringify(this.buildRequestBody(entry.bindingRowId, inputs))
       });
       updateAiAssistWaiting(this.buildRunWaitingNote(entry, 'finish'), serviceOperation);
@@ -765,24 +888,8 @@
         reportUi: entry.reportUi || null,
         outputMode: entry.outputMode || summary.mode
       };
-      this.results.set(entry.bindingRowId, {
-        bindingRowId: entry.bindingRowId,
-        label: entry.label,
-        text: summary.text,
-        mode: summary.mode,
-        isError: summary.isError,
-        isJson: summary.isJson,
-        resultData: summary.resultData || null,
-        reportUi: entry.reportUi || null,
-        entrySnapshot: {
-          inputBindings: entry.inputBindings,
-          reportUi: entry.reportUi || null
-        },
-        at: new Date().toISOString(),
-        traceId: summary.traceId
-      });
-      this.persistResults();
-      this.renderTray();
+      this.trayHiddenLocally = false;
+      await this.loadHistoryFromServer();
       if (summary.isError) {
         this.paintModalResult(summary, entry.label || entry.serviceKey, entry);
       } else {
@@ -805,18 +912,18 @@
 
   ReportAiAssistPanel.prototype.renderTray = function () {
     if (!this.tray || !this.trayBody) return;
-    if (!this.results.size) {
+    if (this.trayHiddenLocally || !this.runHistory.length) {
       this.tray.classList.add('d-none');
       this.trayBody.innerHTML = '';
       return;
     }
     this.tray.classList.remove('d-none');
-    const rows = [...this.results.values()];
+    const rows = this.runHistory;
     if (this.trayCount) {
       this.trayCount.textContent = String(rows.length);
       this.trayCount.classList.toggle('d-none', rows.length < 2);
     }
-    this.trayBody.innerHTML = rows.slice().reverse().map((row) => this.buildTrayCardHtml(row)).join('');
+    this.trayBody.innerHTML = rows.map((row, index) => this.buildTrayCardHtml(row, index === 0)).join('');
   };
 
   ReportAiAssistPanel.prototype.bindEvents = function () {
@@ -845,18 +952,20 @@
       const btn = event.target.closest('.js-report-ai-tray-copy');
       if (!btn) return;
       const id = btn.getAttribute('data-copy-id');
-      const row = id ? this.results.get(id) : null;
+      const row = id ? this.findTrayRowByUsageId(id) : null;
       const copyPayload = row?.reportUi?.layout === 'sections' && row.resultData
         ? formatSectionPlainText(row.resultData, row.reportUi)
         : (row?.text || '');
       const ok = await copyText(copyPayload);
       notify(ok ? 'Copied' : 'Copy failed', ok ? 'success' : 'warning', ok ? 'Result copied to clipboard.' : 'Could not copy.');
     });
-    document.getElementById('reportAiAssistTrayClearBtn')?.addEventListener('click', () => {
-      this.results.clear();
-      this.persistResults();
-      this.renderTray();
-    });
+    if (this.canClearTray) {
+      document.getElementById('reportAiAssistTrayClearBtn')?.addEventListener('click', () => {
+        this.trayHiddenLocally = true;
+        this.runHistory = [];
+        this.renderTray();
+      });
+    }
   };
 
   window.ReportAiAssistPanel = ReportAiAssistPanel;

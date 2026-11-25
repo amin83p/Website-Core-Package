@@ -863,6 +863,37 @@
               </div>
             </div>
 
+            <div class="border rounded rollup-feature-card p-0 mb-4" id="cardGradebookActivityMakeup">
+              <div class="d-flex align-items-center justify-content-between gap-2 p-3 border-bottom">
+                <button class="session-notification-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#gradebookActivityMakeupCollapse" aria-expanded="true" aria-controls="gradebookActivityMakeupCollapse">
+                  <i class="bi bi-chevron-down" aria-hidden="true"></i>
+                  <i class="bi bi-journal-plus text-primary" aria-hidden="true"></i>
+                  <span>Gradebook activity make-up source window</span>
+                </button>
+              </div>
+              <div class="collapse show p-3" id="gradebookActivityMakeupCollapse">
+                <p class="small text-muted mt-0 mb-3">When a teacher adds a make-up activity on Manage Session, only earlier sessions within this window can be used as the source activity.</p>
+                <div class="row g-3 align-items-end">
+                  <div class="col-md-6">
+                    <label class="form-label fw-semibold" for="gradebookActivityMakeupWindowType">Allowed source sessions</label>
+                    <select class="form-select" id="gradebookActivityMakeupWindowType" <%= canUpdateFlag ? '' : 'disabled' %>>
+                      <option value="month_half">Same month half (1st–15th or 16th–end)</option>
+                      <option value="last_week">Last week</option>
+                      <option value="last_two_weeks">Last two weeks</option>
+                      <option value="this_week">This week</option>
+                      <option value="this_month">This month</option>
+                      <option value="last_n_days">Up to last N days</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label fw-semibold" for="gradebookActivityMakeupLookbackDays">Days before session</label>
+                    <input class="form-control" type="number" min="1" max="365" step="1" id="gradebookActivityMakeupLookbackDays" <%= canUpdateFlag ? '' : 'disabled' %>>
+                  </div>
+                </div>
+                <p class="small text-muted mt-2 mb-0" id="gradebookActivityMakeupPreview"></p>
+              </div>
+            </div>
+
             <div class="border rounded rollup-feature-card p-0 mb-4" id="cardSessionCompletedEditWindows">
               <div class="d-flex align-items-center justify-content-between gap-2 p-3 border-bottom">
                 <button class="session-notification-section-toggle" type="button" data-bs-toggle="collapse" data-bs-target="#sessionCompletedEditWindowsCollapse" aria-expanded="true" aria-controls="sessionCompletedEditWindowsCollapse">
@@ -4486,6 +4517,10 @@
     }, {});
     return {
       ...completedSessionEditPolicies,
+      gradebookActivityMakeup: {
+        windowType: document.getElementById('gradebookActivityMakeupWindowType')?.value || 'last_n_days',
+        lookbackDays: document.getElementById('gradebookActivityMakeupLookbackDays')?.value || ''
+      },
       naAttendanceVisibility: {
         teacherNa: document.getElementById('naVisibilityTeacherNa')?.checked === true,
         onHoldNa: document.getElementById('naVisibilityOnHoldNa')?.checked === true,
@@ -4530,6 +4565,33 @@
       }
       preview.textContent = message;
     });
+    refreshGradebookActivityMakeupPanel();
+  }
+
+  function describeGradebookActivityMakeupWindowClient(policy = {}) {
+    const windowType = policy.windowType || 'last_n_days';
+    const days = Number(policy.lookbackDays) || 15;
+    const labels = {
+      month_half: 'the same half of the calendar month as the session (1st–15th or 16th–end)',
+      last_week: 'the previous calendar week',
+      last_two_weeks: 'the two calendar weeks before that week',
+      this_week: 'the current calendar week',
+      this_month: 'the current calendar month',
+      last_n_days: `up to the last ${days} day(s)`
+    };
+    return labels[windowType] || labels.last_n_days;
+  }
+
+  function refreshGradebookActivityMakeupPanel() {
+    const windowType = document.getElementById('gradebookActivityMakeupWindowType')?.value || 'last_n_days';
+    const daysField = document.getElementById('gradebookActivityMakeupLookbackDays');
+    if (daysField) {
+      daysField.disabled = !canUpdate || windowType !== 'last_n_days';
+    }
+    const preview = document.getElementById('gradebookActivityMakeupPreview');
+    if (!preview) return;
+    const lookbackDays = daysField?.value || sessionAccessPolicy?.gradebookActivityMakeup?.lookbackDays || 15;
+    preview.textContent = `Example: on Manage Session, teachers could pick source activities from sessions dated within ${describeGradebookActivityMakeupWindowClient({ windowType, lookbackDays })} before the current session.`;
   }
 
   function renderSessionAccessSettings() {
@@ -4548,6 +4610,12 @@
       if (daysAfterEl) daysAfterEl.value = edit.daysAfterSession || '';
     });
 
+    const makeup = sessionAccessPolicy?.gradebookActivityMakeup || {};
+    const makeupWindowTypeEl = document.getElementById('gradebookActivityMakeupWindowType');
+    const makeupLookbackEl = document.getElementById('gradebookActivityMakeupLookbackDays');
+    if (makeupWindowTypeEl) makeupWindowTypeEl.value = makeup.windowType || 'last_n_days';
+    if (makeupLookbackEl) makeupLookbackEl.value = makeup.lookbackDays ?? 15;
+
     const naVisibility = sessionAccessPolicy?.naAttendanceVisibility || {};
     const teacherNaEl = document.getElementById('naVisibilityTeacherNa');
     if (teacherNaEl) teacherNaEl.checked = naVisibility.teacherNa !== false;
@@ -4561,6 +4629,8 @@
   }
 
   [
+    'gradebookActivityMakeupWindowType',
+    'gradebookActivityMakeupLookbackDays',
     'sessionAttendanceEditEnabled',
     'sessionAttendanceEditWindowType',
     'sessionAttendanceEditDaysAfter',
@@ -4580,8 +4650,11 @@
     'sessionStudentCasesEditWindowType',
     'sessionStudentCasesEditDaysAfter'
   ].forEach((id) => {
-    document.getElementById(id)?.addEventListener('change', refreshSessionAccessPanels);
-    document.getElementById(id)?.addEventListener('input', refreshSessionAccessPanels);
+    const handler = id.startsWith('gradebookActivityMakeup')
+      ? refreshGradebookActivityMakeupPanel
+      : refreshSessionAccessPanels;
+    document.getElementById(id)?.addEventListener('change', handler);
+    document.getElementById(id)?.addEventListener('input', handler);
   });
 
   document.getElementById('sessionAccessSettingsForm')?.addEventListener('submit', async (event) => {

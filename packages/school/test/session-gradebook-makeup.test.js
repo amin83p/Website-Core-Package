@@ -52,7 +52,11 @@ test('listMakeupPickerRows excludes makeup derivatives and current session', () 
       }]
     }
   ];
-  const rows = makeupService.listMakeupPickerRows({ allSessions: sessions, currentSession: SESSION_B });
+  const rows = makeupService.listMakeupPickerRows({
+    allSessions: sessions,
+    currentSession: SESSION_B,
+    makeupPolicy: DEFAULT_MAKEUP_POLICY
+  });
   assert.equal(rows.length, 1);
   assert.equal(rows[0].gradebookId, 'GB1');
   assert.equal(rows[0].sessionId, 'SES_A');
@@ -73,6 +77,8 @@ test('partitionGradebooksForSessionManagerClient splits makeup-linked activities
   assert.equal(makeupLinked[0].id, 'GB_MU');
 });
 
+const DEFAULT_MAKEUP_POLICY = { windowType: 'last_n_days', lookbackDays: 15 };
+
 test('listMakeupPickerRows excludes sessions older than lookback window', () => {
   const sessions = [
     {
@@ -83,9 +89,61 @@ test('listMakeupPickerRows excludes sessions older than lookback window', () => 
     SESSION_A,
     SESSION_B
   ];
-  const rows = makeupService.listMakeupPickerRows({ allSessions: sessions, currentSession: SESSION_B });
+  const rows = makeupService.listMakeupPickerRows({
+    allSessions: sessions,
+    currentSession: SESSION_B,
+    makeupPolicy: DEFAULT_MAKEUP_POLICY
+  });
   assert.equal(rows.length, 1);
   assert.equal(rows[0].gradebookId, 'GB1');
+});
+
+test('listMakeupPickerRows respects this_week window', () => {
+  const current = { sessionId: 'SES_CUR', date: '2026-09-17', gradebooks: [] };
+  const sessions = [
+    { sessionId: 'SES_MON', date: '2026-09-15', gradebooks: [{ id: 'GB_W', name: 'W', totalScore: 10 }] },
+    { sessionId: 'SES_PRIOR', date: '2026-09-08', gradebooks: [{ id: 'GB_P', name: 'P', totalScore: 10 }] },
+    current
+  ];
+  const rows = makeupService.listMakeupPickerRows({
+    allSessions: sessions,
+    currentSession: current,
+    makeupPolicy: { windowType: 'this_week', lookbackDays: null }
+  });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].gradebookId, 'GB_W');
+});
+
+test('listMakeupPickerRows respects month_half window', () => {
+  const current = { sessionId: 'SES_CUR', date: '2026-09-20', gradebooks: [] };
+  const sessions = [
+    { sessionId: 'SES_FIRST_HALF', date: '2026-09-10', gradebooks: [{ id: 'GB_1', name: '1', totalScore: 10 }] },
+    { sessionId: 'SES_SECOND', date: '2026-09-18', gradebooks: [{ id: 'GB_2', name: '2', totalScore: 10 }] },
+    current
+  ];
+  const rows = makeupService.listMakeupPickerRows({
+    allSessions: sessions,
+    currentSession: current,
+    makeupPolicy: { windowType: 'month_half', lookbackDays: null }
+  });
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].gradebookId, 'GB_2');
+});
+
+test('previewMakeupGradebook blocks source outside configured window', () => {
+  const preview = makeupService.previewMakeupGradebook({
+    allSessions: [
+      { sessionId: 'SES_A', date: '2026-08-01', gradebooks: [{ id: 'GB1', name: 'Q', totalScore: 10, scores: { P2: null } }], roster: SESSION_A.roster },
+      SESSION_B
+    ],
+    currentSession: SESSION_B,
+    sourceSessionId: 'SES_A',
+    sourceGradebookId: 'GB1',
+    currentPersonIds: ['P2'],
+    makeupPolicy: DEFAULT_MAKEUP_POLICY
+  });
+  assert.equal(preview.status, 'blocked');
+  assert.match(preview.messages.join(' '), /outside the allowed make-up window/i);
 });
 
 test('listMakeupPickerRows excludes period performance log activities', () => {
@@ -106,7 +164,11 @@ test('listMakeupPickerRows excludes period performance log activities', () => {
     },
     SESSION_B
   ];
-  const rows = makeupService.listMakeupPickerRows({ allSessions: sessions, currentSession: SESSION_B });
+  const rows = makeupService.listMakeupPickerRows({
+    allSessions: sessions,
+    currentSession: SESSION_B,
+    makeupPolicy: DEFAULT_MAKEUP_POLICY
+  });
   assert.equal(rows.length, 1);
   assert.equal(rows[0].gradebookId, 'GB1');
   assert.equal(makeupService.isMakeupSourceEligibleActivity({ id: 'GB_LOG', periodPerformanceLog: true }), false);
@@ -201,7 +263,9 @@ test('normalizeMakeupGradebookOnSave forces done scores from source', () => {
   }, {
     personIds: ['P1', 'P2'],
     attendanceByPerson: new Map([['P1', 'present'], ['P2', 'present']]),
-    sourceSessionsById: new Map([['SES_A', SESSION_A]])
+    sourceSessionsById: new Map([['SES_A', SESSION_A]]),
+    currentSessionDate: SESSION_B.date,
+    gradebookActivityMakeup: DEFAULT_MAKEUP_POLICY
   });
   assert.equal(normalized.includeInGradeCalculation, false);
   assert.equal(normalized.scores.P1, 8);
@@ -212,6 +276,7 @@ test('sessionManager includes make-up CTA and picker modal hooks', () => {
   assert.match(sessionManagerSource, /btnOpenGradebookMakeupPicker/);
   assert.match(sessionManagerSource, /session-gradebook-makeup-btn/);
   assert.match(sessionManagerSource, /gradebookMakeupPickerModal/);
+  assert.match(sessionManagerSource, /gbMakeupPickerWindowDescription/);
   assert.match(sessionManagerSource, /gradebooks\/makeup-sources/);
   assert.match(sessionManagerSource, /gradebooks\/makeup-activities/);
   assert.match(sessionManagerSource, /sessionGradebooksInline/);

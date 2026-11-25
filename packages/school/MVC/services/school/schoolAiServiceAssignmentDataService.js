@@ -77,6 +77,16 @@ const schoolAiServiceAssignmentDataService = {
       notes: cleanString(payload?.notes, { max: 4000, allowEmpty: true }) || '',
       lastUpdateUser: String(requestingUser?.id || 'SYSTEM')
     };
+    const existingRows = await schoolDataService.fetchAllData(
+      ENTITY,
+      { orgId__eq: orgId, serviceKey__eq: key },
+      requestingUser,
+      accessContext
+    );
+    const existing = Array.isArray(existingRows) && existingRows.length ? existingRows[0] : null;
+    if (existing?.id) {
+      return schoolDataService.updateData(ENTITY, existing.id, body, requestingUser, { accessContext });
+    }
     return schoolDataService.addData(ENTITY, body, requestingUser, { accessContext });
   },
 

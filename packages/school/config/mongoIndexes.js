@@ -65,7 +65,9 @@ module.exports = Object.freeze({
   schoolAiTokenUsage: [
     { key: { id: 1 }, options: { name: 'idx_school_ai_token_usage_id', unique: true } },
     { key: { orgId: 1, userId: 1, createdAt: -1 }, options: { name: 'idx_school_ai_token_usage_org_user_created' } },
-    { key: { orgId: 1, serviceKey: 1, createdAt: -1 }, options: { name: 'idx_school_ai_token_usage_org_service_created' } }
+    { key: { orgId: 1, serviceKey: 1, createdAt: -1 }, options: { name: 'idx_school_ai_token_usage_org_service_created' } },
+    { key: { orgId: 1, reportInstanceId: 1, bindingRowId: 1, createdAt: -1 }, options: { name: 'idx_school_ai_token_usage_report_instance' } },
+    { key: { orgId: 1, reportAssignmentId: 1, reportAssignmentRowId: 1, reportTeacherId: 1, bindingRowId: 1, createdAt: -1 }, options: { name: 'idx_school_ai_token_usage_report_matrix' } }
   ],
   schoolReferrals: [
     { key: { id: 1 }, options: { name: 'idx_school_referrals_id', unique: true } },

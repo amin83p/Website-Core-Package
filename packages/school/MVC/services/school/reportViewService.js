@@ -67,6 +67,34 @@ async function canReopenReportInstanceToDraft(reqUser) {
   return isReportInstanceAdminEditor(reqUser);
 }
 
+async function canRemoveReportInstancesFromMatrix(reqUser, matrixContext = {}) {
+  if (schoolAdminAccessService.isSuperAdmin(reqUser)) return true;
+  const classId = String(matrixContext.classId || '').trim();
+  const sessionId = String(matrixContext.sessionId || '').trim();
+  if (classId && sessionId) {
+    const evaluation = await accessService.evaluateAccess({
+      user: reqUser,
+      sectionId: SECTIONS.SCHOOL_SESSIONS,
+      operationId: OPERATIONS.UPDATE
+    }).catch(() => null);
+    return Boolean(evaluation?.allowed);
+  }
+  const deleteEval = await accessService.evaluateAccess({
+    user: reqUser,
+    sectionId: SECTIONS.SCHOOL_REPORTS_INSTANCES,
+    operationId: OPERATIONS.DELETE
+  }).catch(() => null);
+  return Boolean(deleteEval?.allowed);
+}
+
+async function assertCanRemoveReportInstancesFromMatrix(reqUser, matrixContext = {}) {
+  const allowed = await canRemoveReportInstancesFromMatrix(reqUser, matrixContext);
+  if (!allowed) {
+    throw new Error('You do not have permission to remove report instances from this matrix.');
+  }
+  return true;
+}
+
 function isVisualOnlyReportField(field = {}) {
   const type = String(field?.type || '').trim().toLowerCase();
   return type === 'section' || type === 'subheader' || type === 'row_break';
@@ -2425,6 +2453,8 @@ module.exports = {
   canEditReportInstanceAnswers,
   canUnlockReportInstance,
   canReopenReportInstanceToDraft,
+  canRemoveReportInstancesFromMatrix,
+  assertCanRemoveReportInstancesFromMatrix,
   canExportReportInstance,
   isTeacherModifiableInstanceStatus,
   templateHasSharedStudentFields,

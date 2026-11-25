@@ -3,6 +3,7 @@
 const schoolAiServiceDefinitionDataService = require('./schoolAiServiceDefinitionDataService');
 const schoolAiRuntimeService = require('./schoolAiRuntimeService');
 const schoolAiProviderInvokeService = require('./schoolAiProviderInvokeService');
+const schoolAiTokenUsageDataService = require('./schoolAiTokenUsageDataService');
 const { getActiveOrgIdOrThrow } = require('./schoolAiAssistCommon');
 
 const TEMPLATE_TOKEN = /\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}/g;
@@ -206,7 +207,14 @@ function formatOutput(outputSpec = {}, modelText = '', traceId = '') {
   };
 }
 
-async function run({ serviceKey, inputs = {}, requestingUser, accessContext = {} } = {}) {
+async function run({
+  serviceKey,
+  inputs = {},
+  requestingUser,
+  accessContext = {},
+  usageMeta = null,
+  inputPayload = null
+} = {}) {
   const orgId = getActiveOrgIdOrThrow(requestingUser);
   const definition = await schoolAiServiceDefinitionDataService.getDefinitionForRun(
     serviceKey,
@@ -221,6 +229,11 @@ async function run({ serviceKey, inputs = {}, requestingUser, accessContext = {}
   }
   const coerced = coerceInputs(definition.inputs, inputs);
   const { systemPrompt, userPrompt } = buildPrompt(definition, coerced);
+  const resolvedForRecord = inputPayload != null ? inputPayload : inputs;
+  const isReportAssist = String(usageMeta?.usageSource || '') === schoolAiTokenUsageDataService.REPORT_AI_SOURCE;
+  const inputPayloadForRecord = isReportAssist
+    ? schoolAiTokenUsageDataService.buildReportInputPayloadSnapshot(resolvedForRecord, coerced)
+    : (resolvedForRecord || coerced);
   const binding = await schoolAiRuntimeService.resolveForService(
     { serviceKey, requestingUser },
     accessContext
@@ -229,14 +242,19 @@ async function run({ serviceKey, inputs = {}, requestingUser, accessContext = {}
     binding,
     prompt: userPrompt,
     systemPrompt,
-    requestingUser
+    requestingUser,
+    usageMeta,
+    inputPayload: inputPayloadForRecord,
+    accessContext
   });
   const formatted = formatOutput(definition.output, llm.text, llm.traceId);
   return {
-  ...formatted,
+    ...formatted,
     serviceKey,
     modelId: llm.modelUsed || binding.modelId,
-    traceId: llm.traceId || formatted.traceId
+    traceId: llm.traceId || formatted.traceId,
+    usageRecordId: llm.usageRecordId || null,
+    inputPayloadSnapshot: inputPayloadForRecord
   };
 }
 

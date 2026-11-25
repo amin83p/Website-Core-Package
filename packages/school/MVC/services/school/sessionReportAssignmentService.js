@@ -832,6 +832,64 @@ async function removeStudentFromSessionReportAssignment({
   return { assignment: nextAssignment };
 }
 
+async function removeReportInstanceFromAssignmentContext({
+  instanceId,
+  assignmentId = '',
+  assignmentRowId = '',
+  studentId = '',
+  reqUser,
+  sessionUnassignContext = null
+} = {}) {
+  const normalizedInstanceId = String(instanceId || '').trim();
+  if (!normalizedInstanceId || normalizedInstanceId.startsWith('pending-')) {
+    throw new Error('Report instance is required.');
+  }
+
+  const instance = await reportIntegrityService.assertInstanceDeletable(normalizedInstanceId, reqUser);
+  const expectedAssignmentId = toPublicId(assignmentId);
+  if (expectedAssignmentId && !idsEqual(instance.assignmentId, expectedAssignmentId)) {
+    throw new Error('This report instance does not belong to this assignment.');
+  }
+
+  if (sessionUnassignContext) {
+    const expectedClassId = toPublicId(sessionUnassignContext.expectedClassId);
+    const expectedSessionId = toPublicId(sessionUnassignContext.expectedSessionId);
+    if (expectedClassId && !idsEqual(instance.classId, expectedClassId)) {
+      throw new Error('This report instance does not belong to this session.');
+    }
+    if (expectedSessionId && !idsEqual(instance.sessionId, expectedSessionId)) {
+      throw new Error('This report instance does not belong to this session.');
+    }
+  }
+
+  const resolvedAssignmentId = toPublicId(instance.assignmentId);
+  const resolvedAssignmentRowId = String(assignmentRowId || instance.assignmentRowId || '').trim();
+  const resolvedStudentId = toPublicId(studentId || instance.studentId);
+
+  await schoolDataService.deleteData('reportInstances', normalizedInstanceId, reqUser);
+  await classReferenceSyncService.notifyAfterReportDelete({ record: instance, reqUser: reqUser });
+
+  if (sessionUnassignContext && sessionUnassignContext.classData && sessionUnassignContext.session) {
+    await removeStudentFromSessionReportAssignment({
+      assignmentId: resolvedAssignmentId,
+      assignmentRowId: resolvedAssignmentRowId,
+      studentId: resolvedStudentId,
+      classData: sessionUnassignContext.classData,
+      session: sessionUnassignContext.session,
+      sessions: sessionUnassignContext.sessions || [],
+      sessionRoster: sessionUnassignContext.sessionRoster || [],
+      reqUser
+    });
+  }
+
+  return {
+    instanceId: normalizedInstanceId,
+    assignmentId: resolvedAssignmentId,
+    assignmentRowId: resolvedAssignmentRowId,
+    studentId: resolvedStudentId
+  };
+}
+
 module.exports = {
   addMinutes,
   buildSessionTargetRow,
@@ -848,5 +906,6 @@ module.exports = {
   resolveTeacherName,
   resolveWizardRowStudentIds,
   removeStudentFromSessionReportAssignment,
+  removeReportInstanceFromAssignmentContext,
   upsertSessionTargetRowForAssignment
 };

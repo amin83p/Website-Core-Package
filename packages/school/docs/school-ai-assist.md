@@ -66,9 +66,12 @@ The **`school.bimpr_goals_checker`** preset uses JSON with goals `goal_1`–`goa
 ```http
 POST /school/reports/ai-assist/prepare
 POST /school/reports/ai-assist/run
+POST /school/reports/ai-assist/history
 ```
 
 Body includes `context` (`matrix` | `instance`), `bindingRowId`, optional `inputs`, and identity: `instanceId` for V2, or `assignmentId` + `assignmentRowId` + `teacherId` for Fill Reports. Optional `answersOverride` / `sharedAnswersOverride` / `commonAnswersOverride` apply unsaved DOM values at run time. JSON runs return `result.data` (parsed object) plus `displayText`.
+
+Each report run is recorded on `SCHOOL_AI_TOKEN_USAGE` with `usageSource: report_ai_assist`, full `inputPayload` (`resolved` merged field values plus `coerced` values sent to the model) / `outputPayload`, and report scope ids. The Instance V2 and Fill Reports AI Assist tray loads all runs for the current report scope via `POST /school/reports/ai-assist/history` (newest first; only the latest run is expanded by default). Each tray card shows run time and who ran the assist (`ranByLabel`). Optional `bindingRowId` filters to one binding. Run responses include `usageRecordId`.
 
 ## Developer API
 
@@ -132,6 +135,10 @@ const llm = await schoolAiProviderInvokeService.sendTextPrompt({
 3. Service assignment, with fallback to org default provider + first active model when missing.
 
 Every `sendTextPrompt` writes a `schoolAiTokenUsage` row (success or failed).
+
+## Google Gemini (API key provider)
+
+School AI Assist uses **`@google/genai`** (not the deprecated `@google/generative-ai`) for the **`google-gemini`** provider in `packages/school/MVC/services/school/ai/providers/googleGeminiService.js`. Requests use the stable Gemini API **v1** surface; the client enables built-in exponential backoff retries on **408, 429, and 5xx** (including **503** high-demand responses). Other packages (IELTS, PTE, Benchpath) may still use the legacy SDK until migrated.
 
 ## Data entities
 

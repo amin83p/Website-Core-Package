@@ -14,6 +14,9 @@ const reportAssignmentModel = require('../../models/school/reportAssignmentModel
 const classAttendanceRosterOrderService = require('./classAttendanceRosterOrderService');
 const reportInstanceLivePrefillResetService = require('./reportInstanceLivePrefillResetService');
 const reportPrefillRefreshPreviewService = require('./reportPrefillRefreshPreviewService');
+const sessionReportAssignmentService = require('./sessionReportAssignmentService');
+const sessionDeliveryEscalatedAccessService = require('./sessionDeliveryEscalatedAccessService');
+const schoolRecordAccessService = require('./schoolRecordAccessService');
 
 const VISUAL_TYPES = new Set(['section', 'subheader', 'row_break']);
 const STUDENT_NAME_KEYS = new Set([
@@ -1355,6 +1358,64 @@ async function buildMatrixExportPayload({ assignmentId, assignmentRowId = '', te
   };
 }
 
+async function deleteMatrixReportInstance({
+  assignmentId,
+  instanceId,
+  assignmentRowId = '',
+  studentId = '',
+  sessionDate = '',
+  reqUser,
+  req
+} = {}) {
+  const resolved = await resolveMatrixBase({ assignmentId, assignmentRowId, reqUser });
+  const assignment = resolved.assignment;
+  const classId = toPublicId(assignment.classId);
+  const sessionId = clean(assignment.sessionId);
+  await reportViewService.assertCanRemoveReportInstancesFromMatrix(reqUser, {
+    classId,
+    sessionId
+  });
+
+  let sessionUnassignContext = null;
+  if (classId && sessionId) {
+    const ctx = await sessionDeliveryEscalatedAccessService.loadSessionManageContext(req, {
+      classId,
+      sessionId,
+      sessionDate: sessionDate || clean(assignment.sessionDate)
+    });
+    const { classData, sessions } = ctx;
+    const { session } = sessionDeliveryEscalatedAccessService.findSessionInList(
+      sessions,
+      sessionId,
+      sessionDate || clean(assignment.sessionDate)
+    );
+    if (!session) throw new Error('Session not found.');
+    schoolRecordAccessService.assertSessionAccessible({
+      classRow: classData,
+      session,
+      access: schoolRecordAccessService.resolveAccessFromRequest(req),
+      context: 'manageSession'
+    });
+    sessionUnassignContext = {
+      classData,
+      session,
+      sessions,
+      sessionRoster: Array.isArray(session?.roster) ? session.roster.map((row) => ({ ...row })) : [],
+      expectedClassId: classId,
+      expectedSessionId: sessionId
+    };
+  }
+
+  return sessionReportAssignmentService.removeReportInstanceFromAssignmentContext({
+    instanceId,
+    assignmentId: assignment.id,
+    assignmentRowId: assignmentRowId || resolved.assignmentRowId,
+    studentId,
+    reqUser,
+    sessionUnassignContext
+  });
+}
+
 module.exports = {
   isVisualField,
   isCalculatedField,
@@ -1377,5 +1438,6 @@ module.exports = {
   buildMatrixPrefillPreview,
   applyMatrixPrefill,
   resetMatrixFromLivePrefill,
-  buildMatrixExportPayload
+  buildMatrixExportPayload,
+  deleteMatrixReportInstance
 };

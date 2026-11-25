@@ -1,4 +1,4 @@
-const { GoogleGenerativeAI } = require('@google/generative-ai');
+const { GoogleGenAI } = require('@google/genai');
 
 const PROVIDER_ID = 'google-gemini';
 const PROVIDER_LABEL = 'Google Gemini';
@@ -12,6 +12,7 @@ const MODEL_PREFERENCE = Object.freeze([
   'gemini-1.5-pro',
   'gemini-1.5-flash'
 ]);
+const GEMINI_HTTP_RETRY_STATUS_CODES = Object.freeze([408, 429, 500, 502, 503, 504]);
 const GEMINI_RESPONSE_SCHEMA_UNSUPPORTED_KEYS = new Set([
   'additionalProperties'
 ]);
@@ -76,7 +77,15 @@ function assertApiKey(credentials = {}) {
 function getClient(credentials = {}) {
   const apiKey = assertApiKey(credentials);
   if (clientCache.has(apiKey)) return clientCache.get(apiKey);
-  const client = new GoogleGenerativeAI(apiKey);
+  const client = new GoogleGenAI({
+    apiKey,
+    httpOptions: {
+      retryOptions: {
+        attempts: 5,
+        httpStatusCodes: GEMINI_HTTP_RETRY_STATUS_CODES.slice()
+      }
+    }
+  });
   clientCache.set(apiKey, client);
   return client;
 }
@@ -153,7 +162,7 @@ async function fetchModelRows(credentials = {}, options = {}) {
   }
 
   try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`);
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1/models?key=${encodeURIComponent(apiKey)}`);
     if (!response.ok) throw new Error(`Model listing failed with status ${response.status}.`);
     const payload = await response.json();
     const normalizedRows = Array.isArray(payload?.models)
@@ -376,8 +385,8 @@ function sanitizeGenerationConfigForMeta(config = {}) {
   return clone;
 }
 
-function extractUsage(result, response) {
-  const usage = response?.usageMetadata || result?.response?.usageMetadata || null;
+function extractUsage(response) {
+  const usage = response?.usageMetadata || null;
   if (!usage || typeof usage !== 'object') return null;
   return {
     promptTokenCount: usage.promptTokenCount ?? null,
@@ -455,7 +464,6 @@ async function sendMessage(messages, options = {}) {
   const timeoutMs = Number(options?.timeoutMs || DEFAULT_TIMEOUT_MS);
   const normalizedPayload = normalizeMessages(messages);
   const requestHeaders = buildNoCacheHeaders({ disableCache });
-  const modelRequestOptions = requestHeaders ? { customHeaders: requestHeaders } : undefined;
 
   let modelToUse = await resolveDefaultModelInternal(explicitModelId, credentials, {
     forceRefresh: disableCache,
@@ -464,34 +472,41 @@ async function sendMessage(messages, options = {}) {
 
   const executeRequest = async (activeModelId, retriedFromModel = null) => {
     const client = getClient(credentials);
-    const model = client.getGenerativeModel({ model: activeModelId }, modelRequestOptions);
-    const chatOptions = {
-      history: normalizedPayload.history,
-      generationConfig
-    };
+    const chatConfig = { ...generationConfig };
     if (normalizedPayload.systemInstruction) {
-      chatOptions.systemInstruction = toGeminiSystemInstruction(normalizedPayload.systemInstruction);
-    }
-
-    const chat = model.startChat(chatOptions);
-    const singleRequestOptions = {};
-    if (Number.isFinite(timeoutMs) && timeoutMs > 0) {
-      singleRequestOptions.timeout = timeoutMs;
-    }
-    if (options?.abortSignal) {
-      singleRequestOptions.signal = options.abortSignal;
+      chatConfig.systemInstruction = toGeminiSystemInstruction(normalizedPayload.systemInstruction);
     }
     if (requestHeaders) {
-      singleRequestOptions.customHeaders = requestHeaders;
+      chatConfig.httpOptions = { headers: requestHeaders };
     }
+
+    const chat = client.chats.create({
+      model: activeModelId,
+      history: normalizedPayload.history,
+      config: chatConfig
+    });
+
+    const sendConfig = {};
+    const sendHttpOptions = {};
+    if (Number.isFinite(timeoutMs) && timeoutMs > 0) {
+      sendHttpOptions.timeout = timeoutMs;
+    }
+    if (requestHeaders) {
+      sendHttpOptions.headers = requestHeaders;
+    }
+    if (Object.keys(sendHttpOptions).length) {
+      sendConfig.httpOptions = sendHttpOptions;
+    }
+    if (options?.abortSignal) {
+      sendConfig.abortSignal = options.abortSignal;
+    }
+
     const run = async () => {
       try {
-        const result = await chat.sendMessage(
-          normalizedPayload.lastMessageParts,
-          singleRequestOptions
-        );
-        const response = await result.response;
-        return { result, response };
+        return await chat.sendMessage({
+          message: normalizedPayload.lastMessageParts,
+          config: Object.keys(sendConfig).length ? sendConfig : undefined
+        });
       } catch (error) {
         const isAbort =
           String(error?.name || '').toLowerCase() === 'aborterror' ||
@@ -506,13 +521,17 @@ async function sendMessage(messages, options = {}) {
       }
     };
 
-    const { result, response } = await withTimeout(run(), timeoutMs, s(options?.requestLabel));
+    const response = await withTimeout(run(), timeoutMs, s(options?.requestLabel));
+    const textValue = response?.text;
+    const text = typeof textValue === 'string'
+      ? textValue
+      : (typeof textValue === 'function' ? String(textValue.call(response) || '') : '');
     return {
       provider: PROVIDER_ID,
       modelUsed: activeModelId,
-      text: String(response?.text?.() || ''),
+      text: String(text || ''),
       raw: response,
-      usage: extractUsage(result, response),
+      usage: extractUsage(response),
       requestMeta: buildRequestMeta({
         requestLabel: options?.requestLabel,
         timeoutMs,

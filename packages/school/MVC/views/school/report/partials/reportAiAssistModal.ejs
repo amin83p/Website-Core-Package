@@ -67,9 +67,16 @@
       <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill d-none" id="reportAiAssistResultsTrayCount">0</span>
       <i class="bi bi-chevron-down ms-auto report-ai-tray-chevron" id="reportAiAssistTrayToggleIcon" aria-hidden="true"></i>
     </button>
-    <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0" id="reportAiAssistTrayClearBtn">
-      <i class="bi bi-trash3 me-1"></i>Clear
-    </button>
+    <% const canClearReportAiAssistTray = Boolean(
+      typeof reportAiAssist !== 'undefined'
+      && reportAiAssist
+      && reportAiAssist.canClearTray
+    ); %>
+    <% if (canClearReportAiAssistTray) { %>
+      <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0" id="reportAiAssistTrayClearBtn">
+        <i class="bi bi-trash3 me-1"></i>Clear
+      </button>
+    <% } %>
   </div>
   <div id="reportAiAssistResultsTrayCollapse" class="collapse show">
     <div class="card-body p-3 p-md-4" id="reportAiAssistResultsTrayBody"></div>

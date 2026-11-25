@@ -16,6 +16,18 @@ const WINDOW_TYPE_VALUES = Object.freeze([
   'timesheet_period',
   'days_after_session'
 ]);
+const GRADEBOOK_ACTIVITY_MAKEUP_WINDOW_TYPES = Object.freeze([
+  'month_half',
+  'last_week',
+  'last_two_weeks',
+  'this_week',
+  'this_month',
+  'last_n_days'
+]);
+const DEFAULT_GRADEBOOK_ACTIVITY_MAKEUP = Object.freeze({
+  windowType: 'last_n_days',
+  lookbackDays: 15
+});
 const COMPLETED_SESSION_EDIT_POLICY_KEYS = Object.freeze([
   'completedSessionAttendanceEdit',
   'completedSessionNotesEdit',
@@ -123,7 +135,8 @@ const DEFAULT_POLICY = Object.freeze({
     approvedLeaveNa: true,
     makeupRequiredNa: false,
     capReachedNa: false
-  })
+  }),
+  gradebookActivityMakeup: DEFAULT_GRADEBOOK_ACTIVITY_MAKEUP
 });
 
 const NA_VISIBILITY_LOCKED = Object.freeze({
@@ -243,6 +256,29 @@ function normalizeDaysAfterSession(value) {
   const parsed = Number.parseInt(String(value ?? '').trim(), 10);
   if (!Number.isFinite(parsed) || parsed < 1) return null;
   return Math.min(parsed, 365);
+}
+
+function normalizeGradebookActivityMakeupWindowType(value, fallback = DEFAULT_GRADEBOOK_ACTIVITY_MAKEUP.windowType) {
+  const token = cleanText(value, { max: 64 }).toLowerCase();
+  return GRADEBOOK_ACTIVITY_MAKEUP_WINDOW_TYPES.includes(token) ? token : fallback;
+}
+
+function normalizeGradebookActivityMakeupLookbackDays(value, fallback = DEFAULT_GRADEBOOK_ACTIVITY_MAKEUP.lookbackDays) {
+  const parsed = normalizeDaysAfterSession(value);
+  if (parsed != null) return parsed;
+  const fallbackParsed = normalizeDaysAfterSession(fallback);
+  return fallbackParsed != null ? fallbackParsed : DEFAULT_GRADEBOOK_ACTIVITY_MAKEUP.lookbackDays;
+}
+
+function normalizeGradebookActivityMakeupSettings(
+  input = {},
+  fallback = DEFAULT_POLICY.gradebookActivityMakeup
+) {
+  const windowType = normalizeGradebookActivityMakeupWindowType(input?.windowType, fallback?.windowType);
+  const lookbackDays = windowType === 'last_n_days'
+    ? normalizeGradebookActivityMakeupLookbackDays(input?.lookbackDays, fallback?.lookbackDays)
+    : null;
+  return { windowType, lookbackDays };
 }
 
 function normalizeChannelSchedule(input = {}, legacy = {}, fallback = DEFAULT_CHANNEL_SCHEDULE) {
@@ -400,6 +436,10 @@ function normalizePolicyFromStored(input = {}) {
     naAttendanceVisibility: normalizeNaAttendanceVisibility(
       input.naAttendanceVisibility,
       DEFAULT_POLICY.naAttendanceVisibility
+    ),
+    gradebookActivityMakeup: normalizeGradebookActivityMakeupSettings(
+      input.gradebookActivityMakeup,
+      DEFAULT_POLICY.gradebookActivityMakeup
     )
   };
 }
@@ -436,7 +476,34 @@ function validateChannelSessionDateRanges(notification = {}) {
   }
 }
 
+function resolvePolicyInputObject(input = {}) {
+  if (typeof input.policy === 'string' && input.policy.trim()) {
+    try {
+      return JSON.parse(input.policy);
+    } catch (_) {
+      const error = new Error('Session access settings must be valid JSON.');
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+  if (input.policy && typeof input.policy === 'object' && !Array.isArray(input.policy)) {
+    return input.policy;
+  }
+  return input;
+}
+
 function validatePolicyInput(input = {}) {
+  const policyInput = resolvePolicyInputObject(input);
+  const rawMakeup = policyInput?.gradebookActivityMakeup;
+  if (rawMakeup && String(rawMakeup.windowType || '').trim().toLowerCase() === 'last_n_days') {
+    const days = normalizeDaysAfterSession(rawMakeup.lookbackDays);
+    if (!days) {
+      const error = new Error('Days before session is required for the gradebook make-up source window.');
+      error.statusCode = 400;
+      throw error;
+    }
+  }
+
   const normalized = normalizePolicyFromForm(input);
   COMPLETED_SESSION_EDIT_POLICY_KEYS.forEach((key) => {
     const sectionPolicy = normalized?.[key] || {};
@@ -489,7 +556,10 @@ module.exports = {
   DAILY_DIGEST_SESSION_ID,
   SESSION_DATE_RANGE_TYPES,
   WINDOW_TYPE_VALUES,
+  GRADEBOOK_ACTIVITY_MAKEUP_WINDOW_TYPES,
+  DEFAULT_GRADEBOOK_ACTIVITY_MAKEUP,
   COMPLETED_SESSION_EDIT_POLICY_KEYS,
+  normalizeGradebookActivityMakeupSettings,
   NA_VISIBILITY_LOCKED,
   NA_VISIBILITY_POLICY_KEYS,
   TEMPLATE_TOKENS,

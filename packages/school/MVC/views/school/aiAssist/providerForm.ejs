@@ -196,12 +196,22 @@
   </div>
 </div>
 
-<%- include('partials/modal') %>
 <%- include('partials/modal_GenericPicker', { user }) %>
+<%- include('school/aiAssist/partials/aiAssistMessageHelpers') %>
 
 <script type="application/json" id="initialModels"><%- JSON.stringify(models).replace(/</g, '\\u003c') %></script>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
+  function showAiAssistMessage(options) {
+    if (window.SchoolAiAssistMessaging && typeof window.SchoolAiAssistMessaging.show === 'function') {
+      return window.SchoolAiAssistMessaging.show(options);
+    }
+    if (typeof showMessageModal === 'function') {
+      return showMessageModal(options);
+    }
+    return Promise.resolve();
+  }
+
   const form = document.getElementById('schoolAiProviderForm');
   const editor = document.getElementById('modelsEditor');
   const hiddenModels = document.getElementById('modelsJson');
@@ -360,17 +370,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (!payload.providerId) {
       const message = 'Select a vendor on the Configuration tab first.';
       setVendorModelsStatus(message, true);
-      if (typeof showMessageModal === 'function') {
-        showMessageModal({ title: 'Vendor required', icon: 'warning', message, buttons: [{ text: 'OK', class: 'btn-primary' }] });
-      }
+      showAiAssistMessage({ title: 'Vendor required', icon: 'warning', message, buttons: [{ text: 'OK', class: 'btn-primary' }] });
       return;
     }
     if (!providerRecordId && !payload.apiKey) {
       const message = 'Paste the API key on the Configuration tab before fetching models.';
       setVendorModelsStatus(message, true);
-      if (typeof showMessageModal === 'function') {
-        showMessageModal({ title: 'API key required', icon: 'warning', message, buttons: [{ text: 'OK', class: 'btn-primary' }] });
-      }
+      showAiAssistMessage({ title: 'API key required', icon: 'warning', message, buttons: [{ text: 'OK', class: 'btn-primary' }] });
       return;
     }
     if (btn) btn.disabled = true;
@@ -394,14 +400,12 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch (err) {
       const message = err.message || 'Fetch failed.';
       setVendorModelsStatus(message, true);
-      if (typeof showMessageModal === 'function') {
-        showMessageModal({
-          title: 'Could not load models',
-          icon: 'error',
-          message,
-          buttons: [{ text: 'OK', class: 'btn-secondary' }]
-        });
-      }
+      showAiAssistMessage({
+        title: 'Could not load models',
+        icon: 'error',
+        message,
+        buttons: [{ text: 'OK', class: 'btn-secondary' }]
+      });
     } finally {
       if (btn) btn.disabled = false;
     }
@@ -448,9 +452,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   btnBannedPicker?.addEventListener('click', () => {
     if (!window.GenericPicker || !window.GenericPickerPresets) {
-      if (typeof showMessageModal === 'function') {
-        showMessageModal({ title: 'User picker', icon: 'warning', message: 'The user picker is not available on this page.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
-      }
+      showAiAssistMessage({ title: 'User picker', icon: 'warning', message: 'The user picker is not available on this page.', buttons: [{ text: 'OK', class: 'btn-primary' }] });
       return;
     }
     window.GenericPicker.open(window.GenericPickerPresets.user({

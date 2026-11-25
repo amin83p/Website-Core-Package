@@ -105,11 +105,21 @@
   </div>
 </div>
 
-<%- include('partials/modal') %>
 <%- include('partials/modal_GenericPicker', { user }) %>
+<%- include('school/aiAssist/partials/aiAssistMessageHelpers') %>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+  function showAiAssistMessage(options) {
+    if (window.SchoolAiAssistMessaging && typeof window.SchoolAiAssistMessaging.show === 'function') {
+      return window.SchoolAiAssistMessaging.show(options);
+    }
+    if (typeof showMessageModal === 'function') {
+      return showMessageModal(options);
+    }
+    return Promise.resolve();
+  }
+
   const form = document.getElementById('usageLimitForm');
   const limitUserId = document.getElementById('limitUserId');
   const limitUserDisplay = document.getElementById('limitUserDisplay');
@@ -132,8 +142,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
   btnOpenLimitUserPicker?.addEventListener('click', function () {
     if (!window.GenericPicker) {
-      if (typeof showMessageModal !== 'function') return;
-      showMessageModal({
+      showAiAssistMessage({
         title: 'User picker',
         icon: 'warning',
         message: 'The user picker is not available on this page.',
@@ -165,8 +174,7 @@ document.addEventListener('DOMContentLoaded', function () {
   form?.addEventListener('submit', function (event) {
     if (!String(limitUserId?.value || '').trim()) {
       event.preventDefault();
-      if (typeof showMessageModal !== 'function') return;
-      showMessageModal({
+      showAiAssistMessage({
         title: 'User required',
         icon: 'warning',
         message: 'Choose a user with Select user before saving.',

@@ -87,3 +87,9 @@
   baseUrlPath: newUrl
 }) %>
 <%- include('partials/tablePages-end') %>
+<%- include('school/aiAssist/partials/aiAssistGuardedDeleteScript', {
+  deleteBasePath: '/school/ai-assist/token-usage/limits',
+  deleteEntityLabel: 'usage limit',
+  deleteConfirmTitle: 'Delete usage limit',
+  actionStateId: typeof actionStateId !== 'undefined' ? actionStateId : ''
+}) %>

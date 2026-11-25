@@ -23,9 +23,11 @@ const reportInstanceSaveService = require('../../services/school/reportInstanceS
 const reportPrefillRefreshPreviewService = require('../../services/school/reportPrefillRefreshPreviewService');
 const schoolAiAssistController = require('./schoolAiAssistController');
 const reportTemplateAiBindingService = require('../../services/school/reportTemplateAiBindingService');
+const schoolAdminAccessService = require('../../services/school/schoolAdminAccessService');
 const reportAiAssistService = require('../../services/school/reportAiAssistService');
 const schoolAiServiceDefinitionDataService = require('../../services/school/schoolAiServiceDefinitionDataService');
 const schoolAiServiceExecutionService = require('../../services/school/schoolAiServiceExecutionService');
+const schoolAiTokenUsageDataService = require('../../services/school/schoolAiTokenUsageDataService');
 const reportMatrixService = require('../../services/school/reportMatrixService');
 const { listAiServices, getAiServiceByKey } = require('../../config/schoolAiServiceRegistry');
 const { expandKeysForApply } = require('../../services/school/reportPrefillMirrorKeys');
@@ -79,6 +81,48 @@ function formatPersonDisplayName(person) {
   const combined = `${first} ${last}`.trim();
   if (combined) return combined;
   return String(person?.displayName || person?.fullName || person?.id || '').trim();
+}
+
+async function buildReportAiRunActorCache(rows, reqUser) {
+  const cache = new Map();
+  const unique = [...new Set((Array.isArray(rows) ? rows : [])
+    .map((row) => String(row?.userId || '').trim())
+    .filter(Boolean))];
+  const viewerAccountId = toPublicId(reqUser?.id || '');
+  const viewerPersonId = toPublicId(reqUser?.personId || '');
+  await Promise.all(unique.map(async (uid) => {
+    if (cache.has(uid)) return;
+    if (idsEqual(uid, viewerAccountId)) {
+      let label = '';
+      if (viewerPersonId) {
+        try {
+          const person = await schoolPersonAccessService.getPersonById({ reqUser, personId: viewerPersonId });
+          label = formatPersonDisplayName(person);
+        } catch (_) { /* ignore */ }
+      }
+      cache.set(uid, label || String(reqUser?.username || reqUser?.email || 'You').trim());
+      return;
+    }
+    if (viewerPersonId && idsEqual(uid, viewerPersonId)) {
+      try {
+        const person = await schoolPersonAccessService.getPersonById({ reqUser, personId: viewerPersonId });
+        cache.set(uid, formatPersonDisplayName(person) || uid);
+      } catch (_) {
+        cache.set(uid, uid);
+      }
+      return;
+    }
+    try {
+      const person = await schoolPersonAccessService.getPersonById({ reqUser, personId: uid });
+      const label = formatPersonDisplayName(person);
+      if (label) {
+        cache.set(uid, label);
+        return;
+      }
+    } catch (_) { /* ignore */ }
+    cache.set(uid, uid);
+  }));
+  return cache;
 }
 
 function buildReportInstanceDetailsForView(inst, {
@@ -2342,14 +2386,57 @@ async function reportAiAssistPrepare(req, res) {
   }
 }
 
+function buildReportUsageMeta(scope = {}, body = {}) {
+  const bindingRowId = String(scope.bindingRow?.id || body.bindingRowId || '').trim();
+  const templateId = String(scope.template?.id || '').trim();
+  const base = {
+    usageSource: schoolAiTokenUsageDataService.REPORT_AI_SOURCE,
+    reportContext: String(scope.context || 'instance').toLowerCase(),
+    reportTemplateId: templateId,
+    bindingRowId
+  };
+  if (base.reportContext === 'matrix') {
+    return {
+      ...base,
+      reportAssignmentId: String(scope.assignmentId || body.assignmentId || scope.assignment?.id || '').trim(),
+      reportAssignmentRowId: String(scope.assignmentRowId || body.assignmentRowId || body.rowId || '').trim(),
+      reportTeacherId: String(scope.teacherId || body.teacherId || '').trim()
+    };
+  }
+  return {
+    ...base,
+    reportInstanceId: String(scope.instance?.id || body.instanceId || '').trim()
+  };
+}
+
+async function enrichReportAiUsageRecord(usageRecordId, scope, inputs, result, requestingUser, accessContext) {
+  const id = String(usageRecordId || '').trim();
+  if (!id) return null;
+  const usageMeta = buildReportUsageMeta(scope);
+  const outputPayload = schoolAiTokenUsageDataService.buildOutputPayloadSnapshot(result);
+  const inputPayload = result?.inputPayloadSnapshot
+    || schoolAiTokenUsageDataService.buildReportInputPayloadSnapshot(inputs);
+  return schoolAiTokenUsageDataService.enrichUsageRecord(id, {
+    ...usageMeta,
+    inputPayload,
+    outputPayload,
+    status: result?.ok === false ? 'failed' : 'success',
+    errorMessage: result?.error ? String(result.error).slice(0, 2000) : '',
+    responseSummary: String(result?.displayText || result?.rawText || '').slice(0, 500)
+  }, requestingUser, accessContext);
+}
+
 async function reportAiAssistRun(req, res) {
+  const accessContext = { scopeId: req.accessScope };
+  let scope = null;
+  let inputs = {};
   try {
-    const scope = await resolveReportAiAssistScope(req, req.body || {});
+    scope = await resolveReportAiAssistScope(req, req.body || {});
     const bodyInputs = parseReportAiAssistObject(req.body?.inputs);
     const definition = await schoolAiServiceDefinitionDataService.getByServiceKey(
       scope.bindingRow.serviceKey,
       req.user,
-      { scopeId: req.accessScope }
+      accessContext
     );
     const defaults = reportTemplateAiBindingService.resolveInputsForService(
       scope.bindingRow,
@@ -2357,19 +2444,120 @@ async function reportAiAssistRun(req, res) {
       scope.merged,
       scope.prefill
     );
-    const inputs = { ...defaults, ...bodyInputs };
+    inputs = { ...defaults, ...bodyInputs };
+    const usageMeta = buildReportUsageMeta(scope, req.body || {});
     const result = await schoolAiServiceExecutionService.run({
       serviceKey: scope.bindingRow.serviceKey,
       inputs,
       requestingUser: req.user,
-      accessContext: { scopeId: req.accessScope }
+      accessContext,
+      usageMeta,
+      inputPayload: inputs
     });
-    return res.json({ status: 'success', result, bindingRowId: scope.bindingRow.id });
+    await enrichReportAiUsageRecord(result.usageRecordId, scope, inputs, result, req.user, accessContext);
+    return res.json({
+      status: 'success',
+      result,
+      bindingRowId: scope.bindingRow.id,
+      usageRecordId: result.usageRecordId || null
+    });
   } catch (error) {
+    if (error?.usageRecordId && scope) {
+      try {
+        await schoolAiTokenUsageDataService.enrichUsageRecord(error.usageRecordId, {
+          ...buildReportUsageMeta(scope, req.body || {}),
+          inputPayload: schoolAiTokenUsageDataService.buildReportInputPayloadSnapshot(inputs),
+          status: 'failed',
+          errorMessage: error?.message || 'AI Assist run failed.'
+        }, req.user, accessContext);
+      } catch (_) { /* ignore secondary enrich failure */ }
+    } else if (scope?.bindingRow?.serviceKey) {
+      try {
+        const orgId = getActiveOrgIdOrThrow(req.user);
+        const attemptedInputs = Object.keys(inputs || {}).length
+          ? inputs
+          : { ...parseReportAiAssistObject(req.body?.inputs) };
+        await schoolAiTokenUsageDataService.recordCall({
+          orgId,
+          userId: String(req.user?.id || req.user?.personId || '').trim(),
+          serviceKey: scope.bindingRow.serviceKey,
+          status: 'failed',
+          errorMessage: String(error?.message || 'AI Assist run failed.').slice(0, 2000),
+          ...buildReportUsageMeta(scope, req.body || {}),
+          inputPayload: schoolAiTokenUsageDataService.buildReportInputPayloadSnapshot(attemptedInputs)
+        }, req.user, accessContext);
+      } catch (_) { /* ignore secondary usage write failure */ }
+    }
     return res.status(Number(error?.statusCode) || 400).json({
       status: 'error',
       message: error.message || 'AI Assist run failed.',
-      validationErrors: error.validationErrors || undefined
+      validationErrors: error.validationErrors || undefined,
+      usageRecordId: error?.usageRecordId || null
+    });
+  }
+}
+
+async function reportAiAssistHistory(req, res) {
+  try {
+    const accessContext = { scopeId: req.accessScope };
+    const scope = await resolveReportAiAssistHistoryScope(req, req.body || {});
+    const usageMeta = buildReportUsageMeta(scope, req.body || {});
+    const bindingFilter = String(req.body?.bindingRowId || '').trim();
+    const rows = await schoolAiTokenUsageDataService.listReportAiAssistHistory({
+      reportContext: usageMeta.reportContext,
+      reportInstanceId: usageMeta.reportInstanceId,
+      reportAssignmentId: usageMeta.reportAssignmentId,
+      reportAssignmentRowId: usageMeta.reportAssignmentRowId,
+      reportTeacherId: usageMeta.reportTeacherId,
+      bindingRowId: bindingFilter || '',
+      limit: req.body?.limit
+    }, req.user, accessContext);
+
+    const actorCache = await buildReportAiRunActorCache(rows, req.user);
+    const runs = await Promise.all(rows.map(async (row) => {
+      const bindingRowId = String(row?.bindingRowId || '').trim();
+      const bindingRow = bindingRowId
+        ? reportTemplateAiBindingService.findBindingById(scope.template, bindingRowId)
+        : null;
+      const serviceKey = String(row?.serviceKey || bindingRow?.serviceKey || '').trim();
+      const registry = serviceKey ? getAiServiceByKey(serviceKey) : null;
+      let reportUi = null;
+      if (bindingRow && serviceKey) {
+        const definition = await schoolAiServiceDefinitionDataService.getByServiceKey(
+          serviceKey,
+          req.user,
+          accessContext
+        );
+        const entry = reportTemplateAiBindingService.buildCatalogEntryFromBinding(
+          bindingRow,
+          definition,
+          registry,
+          schoolAiTokenUsageDataService.resolveReportInputPayload(row?.inputPayload)
+        );
+        reportUi = entry?.reportUi || (definition?.output?.jsonSchema?.['x-reportUi'] || null);
+      }
+      const ranByUserId = String(row?.userId || '').trim();
+      return {
+        usageRecordId: row.id,
+        bindingRowId,
+        serviceKey,
+        label: registry?.label || bindingRow?.label || serviceKey,
+        at: row.createdAt,
+        traceId: row.traceId,
+        status: row.status,
+        ranByUserId,
+        ranByLabel: actorCache.get(ranByUserId) || ranByUserId || '',
+        inputPayload: row.inputPayload || {},
+        outputPayload: row.outputPayload || {},
+        reportUi
+      };
+    }));
+
+    return res.json({ status: 'success', runs });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 400).json({
+      status: 'error',
+      message: error.message || 'Could not load AI Assist history.'
     });
   }
 }
@@ -2434,6 +2622,59 @@ async function assertReportMatrixEditorForRequest(req, body = {}) {
   return resolved;
 }
 
+async function resolveReportAiAssistHistoryScope(req, body = {}) {
+  const context = String(body.context || 'instance').toLowerCase();
+  const bindingRowId = String(body.bindingRowId || '').trim();
+
+  if (context === 'matrix') {
+    const resolved = await assertReportMatrixEditorForRequest(req, body);
+    const analysis = reportTemplateAiBindingService.analyzeAiAssistContexts(resolved.template || {});
+    if (!analysis.matrixAllowed) {
+      throw new Error(analysis.matrixBlockedReason || 'AI Assist is not available on Fill Reports for this template.');
+    }
+    const bindingRow = bindingRowId
+      ? reportTemplateAiBindingService.findBindingById(resolved.template, bindingRowId)
+      : null;
+    if (bindingRowId && !bindingRow) throw new Error('AI service binding not found on this template.');
+    return {
+      context,
+      bindingRow,
+      template: resolved.template,
+      assignment: resolved.assignment,
+      assignmentId: resolved.assignment?.id || String(body.assignmentId || '').trim(),
+      assignmentRowId: String(resolved.assignmentRowId || body.assignmentRowId || body.rowId || '').trim(),
+      teacherId: String(resolved.teacherId || body.teacherId || '').trim(),
+      merged: {},
+      prefill: {}
+    };
+  }
+
+  const instanceId = String(body.instanceId || req.params?.id || '').trim();
+  if (!instanceId) throw new Error('instanceId is required.');
+  const instance = await reportIntegrityService.getAccessibleInstanceOrThrow(instanceId, req.user);
+  const canEdit = await reportViewService.canEditReportInstanceAnswers(instance, req.user);
+  if (!canEdit) {
+    const err = new Error('This report instance cannot be edited.');
+    err.statusCode = 403;
+    throw err;
+  }
+  const template = await schoolDataService.getDataById('reportTemplates', instance.templateId, req.user);
+  if (!template) throw new Error('Template not found for this report instance.');
+  const bindingRow = bindingRowId
+    ? reportTemplateAiBindingService.findBindingById(template, bindingRowId)
+    : null;
+  if (bindingRowId && !bindingRow) throw new Error('AI service binding not found on this template.');
+  return {
+    context: 'instance',
+    bindingRow,
+    template,
+    instance,
+    assignment: null,
+    merged: {},
+    prefill: {}
+  };
+}
+
 async function resolveReportAiAssistScope(req, body = {}) {
   const context = String(body.context || 'instance').toLowerCase();
   const bindingRowId = String(body.bindingRowId || '').trim();
@@ -2463,6 +2704,10 @@ async function resolveReportAiAssistScope(req, body = {}) {
       context,
       bindingRow,
       template: resolved.template,
+      assignment: resolved.assignment,
+      assignmentId: resolved.assignment?.id || String(body.assignmentId || '').trim(),
+      assignmentRowId: String(resolved.assignmentRowId || body.assignmentRowId || body.rowId || '').trim(),
+      teacherId: String(resolved.teacherId || body.teacherId || '').trim(),
       merged,
       prefill: parseReportAiAssistObject(body.prefillSnapshot)
     };
@@ -2559,6 +2804,7 @@ function buildInstanceMergedForAiAssist(template, instance, assignment, answersO
 
 async function attachReportAiAssistPanelContext(renderContext, req, template, mergedDataSource, prefillSnapshot, context = 'instance') {
   const canEdit = renderContext.canEditReportInstanceAnswers !== false;
+  const canClearTray = await schoolAdminAccessService.canClearReportAiAssistTrayAsync(req.user);
   try {
     const panel = await reportAiAssistService.buildReportAiAssistCatalog(template || {}, {
       context,
@@ -2572,7 +2818,8 @@ async function attachReportAiAssistPanelContext(renderContext, req, template, me
       catalog: panel.catalog,
       canRun: Boolean(panel.canRun && (context !== 'instance' || canEdit)),
       matrixAllowed: panel.matrixAllowed,
-      matrixBlockedReason: panel.matrixBlockedReason || ''
+      matrixBlockedReason: panel.matrixBlockedReason || '',
+      canClearTray
     };
   } catch (_) {
     renderContext.reportAiAssist = {
@@ -2580,7 +2827,8 @@ async function attachReportAiAssistPanelContext(renderContext, req, template, me
       catalog: [],
       canRun: false,
       matrixAllowed: false,
-      matrixBlockedReason: ''
+      matrixBlockedReason: '',
+      canClearTray
     };
   }
 }
@@ -2769,7 +3017,15 @@ async function showReportMatrix(req, res) {
       sharedAnswers: sharedFromAssignment,
       commonFieldAnswers: {}
     });
-    const reportAiAssistRender = { context: 'matrix', catalog: [], canRun: false, matrixAllowed: false, matrixBlockedReason: '' };
+    const canClearReportAiAssistTray = await schoolAdminAccessService.canClearReportAiAssistTrayAsync(req.user);
+    const reportAiAssistRender = {
+      context: 'matrix',
+      catalog: [],
+      canRun: false,
+      matrixAllowed: false,
+      matrixBlockedReason: '',
+      canClearTray: canClearReportAiAssistTray
+    };
     try {
       const panel = await reportAiAssistService.buildReportAiAssistCatalog(resolved.template || {}, {
         context: 'matrix',
@@ -2785,12 +3041,17 @@ async function showReportMatrix(req, res) {
     } catch (_) {
       // leave defaults
     }
+    const canRemoveReportInstances = await reportViewService.canRemoveReportInstancesFromMatrix(req.user, {
+      classId: matrix.classId,
+      sessionId: matrix.sessionId
+    });
     return res.render('school/report/instanceMatrix', {
       title: `Fill Reports: ${matrix.templateTitle}`,
       matrix,
       canExportReportInstance,
       canUnlockReportInstance,
       canReopenReportInstanceToDraft,
+      canRemoveReportInstances,
       isMatrixAdminViewer,
       reportAiAssist: reportAiAssistRender,
       includeModal: true,
@@ -2803,6 +3064,28 @@ async function showReportMatrix(req, res) {
       message: error.message,
       user: req.user
     });
+  }
+}
+
+async function deleteReportMatrixInstance(req, res) {
+  try {
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    await reportMatrixService.deleteMatrixReportInstance({
+      assignmentId: req.params.assignmentId,
+      instanceId: req.params.instanceId,
+      assignmentRowId: body.assignmentRowId || '',
+      studentId: body.studentId || '',
+      sessionDate: body.sessionDate || '',
+      reqUser: req.user,
+      req
+    });
+    return res.json({
+      status: 'success',
+      message: 'Report instance removed.',
+      actionStateId: req.actionStateId || ''
+    });
+  } catch (error) {
+    return schoolDeletionGuardService.handleDeleteError(req, res, error);
   }
 }
 
@@ -3925,6 +4208,7 @@ module.exports = {
   getTemplateAiServiceDefinition,
   reportAiAssistPrepare,
   reportAiAssistRun,
+  reportAiAssistHistory,
   deleteTemplate,
   listAssignments,
   showAssignmentForm,
@@ -3951,6 +4235,7 @@ module.exports = {
   showInstanceEditorV2,
   showReportMatrix,
   getReportMatrixData,
+  deleteReportMatrixInstance,
   saveReportMatrixRow,
   saveReportMatrixRows,
   previewReportMatrixPrefill,

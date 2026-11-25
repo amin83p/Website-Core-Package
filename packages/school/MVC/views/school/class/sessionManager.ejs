@@ -4262,9 +4262,9 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p class="small text-muted mb-3">Choose an original activity from an earlier session in this class (within the last <strong id="gbMakeupPickerLookbackDays">15</strong> days before this session). Make-up copies are not listed here. Period performance log activities are not listed.</p>
+                <p class="small text-muted mb-3">Choose an original activity from an earlier session in this class (<span id="gbMakeupPickerWindowDescription">within your school&apos;s allowed window before this session</span>). Make-up copies are not listed here. Period performance log activities are not listed.</p>
                 <div id="gbMakeupPickerLoading" class="text-muted small d-none">Loading activities…</div>
-                <div id="gbMakeupPickerEmpty" class="alert alert-light border small d-none mb-0">No gradebook activities were found in the last 15 days before this session.</div>
+                <div id="gbMakeupPickerEmpty" class="alert alert-light border small d-none mb-0">No gradebook activities were found in the allowed window before this session.</div>
                 <div class="table-responsive" id="gbMakeupPickerTableWrap">
                     <table class="table table-sm table-hover align-middle mb-0">
                         <thead class="table-light">
@@ -12237,12 +12237,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(payload.message || 'Unable to load make-up activities.');
             }
             const rows = Array.isArray(payload.rows) ? payload.rows : [];
-            const lookbackDays = Number(payload.lookbackDays) || 15;
-            const lookbackEl = document.getElementById('gbMakeupPickerLookbackDays');
-            if (lookbackEl) lookbackEl.textContent = String(lookbackDays);
-            if (emptyEl) {
-                emptyEl.textContent = `No gradebook activities were found in the last ${lookbackDays} days before this session.`;
+            const makeupWindow = payload.makeupWindow && typeof payload.makeupWindow === 'object' ? payload.makeupWindow : {};
+            const windowDescription = String(makeupWindow.description || '').trim();
+            const descriptionEl = document.getElementById('gbMakeupPickerWindowDescription');
+            if (descriptionEl && windowDescription) {
+                descriptionEl.textContent = `within ${windowDescription} before this session`;
             }
+            const emptyMessage = windowDescription
+                ? `No gradebook activities were found within ${windowDescription} before this session.`
+                : 'No gradebook activities were found in the allowed window before this session.';
+            if (emptyEl) emptyEl.textContent = emptyMessage;
             if (!rows.length) {
                 if (emptyEl) emptyEl.classList.remove('d-none');
                 return;

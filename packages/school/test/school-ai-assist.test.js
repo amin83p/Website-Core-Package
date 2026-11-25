@@ -166,6 +166,72 @@ function testListPagesIncludeTableModals() {
   assert.match(controllerSource, /listUsageLimits[\s\S]*includeModal_Table:\s*true/);
 }
 
+function testReportAiAssistHistoryWiring() {
+  const routesSource = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/routes/reportRoutes.js'), 'utf8');
+  assert.match(routesSource, /\/ai-assist\/history/);
+  assert.match(routesSource, /reportAiAssistHistory/);
+
+  const tokenUsageDataService = require(path.join(ROOT, 'packages/school/MVC/services/school/schoolAiTokenUsageDataService'));
+  assert.strictEqual(typeof tokenUsageDataService.enrichUsageRecord, 'function');
+  assert.strictEqual(typeof tokenUsageDataService.listReportAiAssistHistory, 'function');
+  assert.strictEqual(typeof tokenUsageDataService.buildReportInputPayloadSnapshot, 'function');
+  const inputSnap = tokenUsageDataService.buildReportInputPayloadSnapshot({ goal_1: 'A' }, { goal_1: 'A' });
+  assert.ok(inputSnap && inputSnap.resolved && inputSnap.coerced);
+  assert.strictEqual(tokenUsageDataService.REPORT_AI_SOURCE, 'report_ai_assist');
+
+  const tokenUsageModel = require(path.join(ROOT, 'packages/school/MVC/models/school/schoolAiTokenUsageModel'));
+  assert.match(String(tokenUsageModel.normalizeUsageRecord), /usageSource/);
+  assert.match(String(tokenUsageModel.normalizeUsageRecord), /inputPayload/);
+
+  const panelSource = fs.readFileSync(path.join(ROOT, 'packages/school/public/scripts/reportAiAssistPanel.js'), 'utf8');
+  assert.match(panelSource, /loadHistoryFromServer/);
+  assert.match(panelSource, /runHistory/);
+  assert.match(panelSource, /buildReportAiAssistJsonHeaders/);
+  assert.doesNotMatch(panelSource, /sessionStorage/);
+
+  const controllerSource = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/controllers/school/reportController.js'), 'utf8');
+  assert.match(controllerSource, /ranByLabel/);
+  assert.match(controllerSource, /canClearTray/);
+  const adminAccessSource = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/services/school/schoolAdminAccessService.js'), 'utf8');
+  assert.match(adminAccessSource, /canClearReportAiAssistTrayAsync/);
+  const modalPartial = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/views/school/report/partials/reportAiAssistModal.ejs'), 'utf8');
+  assert.match(modalPartial, /canClearReportAiAssistTray/);
+  assert.match(controllerSource, /reportAiAssistHistory/);
+  assert.match(controllerSource, /enrichReportAiUsageRecord/);
+  assert.match(controllerSource, /usageRecordId/);
+
+  const invokeSource = fs.readFileSync(path.join(ROOT, 'packages/school/MVC/services/school/schoolAiProviderInvokeService.js'), 'utf8');
+  assert.match(invokeSource, /usageRecordId/);
+}
+
+function testAiAssistPagesUseMessageModalPartial() {
+  const controllerPath = path.join(ROOT, 'packages/school/MVC/controllers/school/schoolAiAssistController.js');
+  const controllerSource = fs.readFileSync(controllerPath, 'utf8');
+  const viewsDir = path.join(ROOT, 'packages/school/MVC/views/school/aiAssist');
+  const requiredModalRenders = [
+    'showCreateProvider',
+    'showEditProvider',
+    'showServiceAssignments',
+    'listServiceDefinitions',
+    'showEditServiceDefinition',
+    'showTokenUsageDetail'
+  ];
+  requiredModalRenders.forEach((handler) => {
+    const pattern = new RegExp(`${handler}[\\s\\S]*?includeModal:\\s*true`);
+    assert.match(controllerSource, pattern, `Expected ${handler} to pass includeModal: true`);
+  });
+
+  const providerList = fs.readFileSync(path.join(viewsDir, 'providerList.ejs'), 'utf8');
+  const usageLimitList = fs.readFileSync(path.join(viewsDir, 'usageLimitList.ejs'), 'utf8');
+  const providerForm = fs.readFileSync(path.join(viewsDir, 'providerForm.ejs'), 'utf8');
+  const runnerPartial = fs.readFileSync(path.join(viewsDir, 'partials/schoolAiServiceRunner.ejs'), 'utf8');
+  assert.doesNotMatch(providerForm, /include\('partials\/modal'\)/, 'Provider form should rely on layout message modal');
+  assert.match(providerList, /aiAssistGuardedDeleteScript/);
+  assert.match(usageLimitList, /aiAssistGuardedDeleteScript/);
+  assert.match(runnerPartial, /SchoolAiAssistMessaging/);
+  assert.doesNotMatch(runnerPartial, /window\.alert/);
+}
+
 async function run() {
   testModelsNormalize();
   testBanNormalize();
@@ -182,6 +248,8 @@ async function run() {
   testCoerceInputsRequired();
   testBimprPresetLoadsFromJsonFile();
   testListPagesIncludeTableModals();
+  testReportAiAssistHistoryWiring();
+  testAiAssistPagesUseMessageModalPartial();
   console.log('school-ai-assist.test.js: ok');
 }
 

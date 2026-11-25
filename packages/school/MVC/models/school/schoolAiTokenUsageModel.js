@@ -26,6 +26,20 @@ function cleanNonNegativeInt(value, fallback = null) {
   return n;
 }
 
+const PAYLOAD_JSON_MAX_CHARS = 65536;
+
+function sanitizeJsonPayload(value) {
+  if (value === undefined || value === null || value === '') return null;
+  if (!isPlainObject(value) && !Array.isArray(value)) return null;
+  try {
+    const text = JSON.stringify(value);
+    if (text.length <= PAYLOAD_JSON_MAX_CHARS) return JSON.parse(text);
+    return { _payloadTruncated: true, preview: text.slice(0, 8000) };
+  } catch (_) {
+    return null;
+  }
+}
+
 function normalizeUsageRecord(record = {}, strict = false) {
   const input = isPlainObject(record) ? record : {};
   const orgId = cleanId(input.orgId, { max: 120, allowEmpty: false });
@@ -52,6 +66,16 @@ function normalizeUsageRecord(record = {}, strict = false) {
     durationMs: cleanNonNegativeInt(input.durationMs, null),
     requestSummary: cleanString(input.requestSummary, { max: 500, allowEmpty: true }) || '',
     responseSummary: cleanString(input.responseSummary, { max: 500, allowEmpty: true }) || '',
+    usageSource: cleanString(input.usageSource, { max: 80, allowEmpty: true }) || '',
+    reportContext: cleanString(input.reportContext, { max: 20, allowEmpty: true }) || '',
+    reportInstanceId: cleanId(input.reportInstanceId, { max: 120, allowEmpty: true }) || '',
+    reportAssignmentId: cleanId(input.reportAssignmentId, { max: 120, allowEmpty: true }) || '',
+    reportAssignmentRowId: cleanId(input.reportAssignmentRowId, { max: 120, allowEmpty: true }) || '',
+    reportTeacherId: cleanId(input.reportTeacherId, { max: 120, allowEmpty: true }) || '',
+    reportTemplateId: cleanId(input.reportTemplateId, { max: 120, allowEmpty: true }) || '',
+    bindingRowId: cleanId(input.bindingRowId, { max: 120, allowEmpty: true }) || '',
+    inputPayload: sanitizeJsonPayload(input.inputPayload),
+    outputPayload: sanitizeJsonPayload(input.outputPayload),
     createdAt: cleanString(input.createdAt, { max: 80, allowEmpty: true }) || now
   };
 }
@@ -78,9 +102,23 @@ async function appendUsage(payload = {}) {
   });
 }
 
+async function patchUsageById(id, patch = {}) {
+  return queueWrite(async () => {
+    const rows = await getAllUsage();
+    const index = rows.findIndex((row) => idsEqual(row?.id, id));
+    if (index < 0) throw new Error('Usage record not found.');
+    const merged = normalizeUsageRecord({ ...rows[index], ...patch, id: rows[index].id }, false);
+    rows[index] = merged;
+    await fs.writeFile(DATA_PATH, JSON.stringify(rows, null, 2));
+    return merged;
+  });
+}
+
 module.exports = {
   normalizeUsageRecord,
+  sanitizeJsonPayload,
   getAllUsage,
   getUsageById,
-  appendUsage
+  appendUsage,
+  patchUsageById
 };

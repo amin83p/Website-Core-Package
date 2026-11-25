@@ -18,6 +18,7 @@
   ));
   const canUnlockReportInstanceSafe = Boolean(typeof canUnlockReportInstance !== 'undefined' && canUnlockReportInstance);
   const canReopenReportInstanceSafe = Boolean(typeof canReopenReportInstanceToDraft !== 'undefined' && canReopenReportInstanceToDraft);
+  const canRemoveReportInstancesSafe = Boolean(typeof canRemoveReportInstances !== 'undefined' && canRemoveReportInstances);
   const startedRows = rows.filter((row) => row.instanceId && !row.isPending);
   const uniformStatus = (() => {
     if (!startedRows.length) return '';
@@ -556,6 +557,20 @@
     border-color: #f59e0b;
     background: #fef3c7;
   }
+  .report-matrix-page .matrix-row-icon-btn--danger,
+  .report-matrix-table-scope .matrix-row-icon-btn--danger {
+    color: #b91c1c;
+    border-color: #fca5a5;
+    background: #fef2f2;
+  }
+  .report-matrix-page .matrix-row-icon-btn--danger:hover,
+  .report-matrix-page .matrix-row-icon-btn--danger:focus-visible,
+  .report-matrix-table-scope .matrix-row-icon-btn--danger:hover,
+  .report-matrix-table-scope .matrix-row-icon-btn--danger:focus-visible {
+    color: #991b1b;
+    border-color: #f87171;
+    background: #fee2e2;
+  }
 </style>
 
 <div class="sections-page report-matrix-page">
@@ -799,6 +814,9 @@
                     <% if (isMatrixAdminViewerSafe && row.instanceId && String(row.status || '').toLowerCase() !== 'locked') { %>
                       <button type="button" class="matrix-row-icon-btn js-matrix-prefill-preview" data-student-id="<%= row.studentId %>" data-student-name="<%= row.studentName %>" title="Preview prefill for this student" aria-label="Preview prefill for <%= row.studentName %>"><i class="bi bi-arrow-repeat" aria-hidden="true"></i></button>
                     <% } %>
+                    <% if (canRemoveReportInstancesSafe && row.instanceId && String(row.status || '').toLowerCase() !== 'locked') { %>
+                      <button type="button" class="matrix-row-icon-btn matrix-row-icon-btn--danger js-matrix-delete-instance" data-instance-id="<%= row.instanceId %>" data-student-id="<%= row.studentId %>" data-student-name="<%= row.studentName %>" data-report-title="<%= matrix.templateTitle || 'this report' %>" title="Remove report instance" aria-label="Remove report instance for <%= row.studentName %>"><i class="bi bi-trash" aria-hidden="true"></i></button>
+                    <% } %>
                   </div>
                 </div>
               </td>
@@ -1015,6 +1033,7 @@
     window.CAN_REOPEN_REPORT_INSTANCE = <%- JSON.stringify(typeof canReopenReportInstanceToDraft !== 'undefined' && !!canReopenReportInstanceToDraft) %>;
     window.MATRIX_HAS_SHARED_FIELDS = <%- JSON.stringify(hasSharedFieldsBlock) %>;
     window.CAN_UNLOCK_REPORT_INSTANCE = <%- JSON.stringify(typeof canUnlockReportInstance !== 'undefined' && !!canUnlockReportInstance) %>;
+    window.CAN_REMOVE_REPORT_INSTANCES = <%- JSON.stringify(canRemoveReportInstancesSafe) %>;
     window.IS_MATRIX_ADMIN_VIEWER = <%- JSON.stringify(isMatrixAdminViewerSafe) %>;
 
     function initializeTooltips() {
@@ -1419,6 +1438,9 @@
       const openBtn = openHref
         ? `<a href="${reportMatrixEscapeHtml(openHref)}" class="matrix-row-icon-btn js-matrix-open" target="_blank" rel="noopener noreferrer" title="Open individual report" aria-label="Open individual report"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i></a>`
         : '';
+      const deleteBtn = window.CAN_REMOVE_REPORT_INSTANCES && row.instanceId && statusToken !== 'locked'
+        ? `<button type="button" class="matrix-row-icon-btn matrix-row-icon-btn--danger js-matrix-delete-instance" data-instance-id="${reportMatrixEscapeHtml(row.instanceId)}" data-student-id="${reportMatrixEscapeHtml(row.studentId)}" data-student-name="${reportMatrixEscapeHtml(row.studentName)}" data-report-title="${reportMatrixEscapeHtml(matrixState.templateTitle || 'this report')}" title="Remove report instance" aria-label="Remove report instance for ${reportMatrixEscapeHtml(row.studentName)}"><i class="bi bi-trash" aria-hidden="true"></i></button>`
+        : '';
       const cells = tableFields.map((field) => {
         const noteClass = matrixIsNoteField(field) ? ' class="matrix-note-cell"' : '';
         return `<td data-matrix-cell="${reportMatrixEscapeHtml(field.id)}"${noteClass}>${buildReportMatrixFieldHtml(field, row)}</td>`;
@@ -1433,6 +1455,7 @@
               ${reopenBtn}
               ${unlockBtn}
               ${prefillBtn}
+              ${deleteBtn}
             </div>
           </div>
         </td>
@@ -1937,7 +1960,7 @@
 
     function syncRowLifecycleActions(row, rowState) {
       if (!row) return;
-      row.querySelectorAll('.js-matrix-reopen-instance, .js-matrix-unlock-instance').forEach((el) => el.remove());
+      row.querySelectorAll('.js-matrix-reopen-instance, .js-matrix-unlock-instance, .js-matrix-delete-instance').forEach((el) => el.remove());
       const instanceId = String(rowState?.instanceId || '').trim();
       const status = String(rowState?.status || '').toLowerCase();
       const studentName = String(rowState?.studentName || rowState?.studentId || '');
@@ -1967,6 +1990,19 @@
         btn.setAttribute('aria-label', 'Unlock returns the report to submitted');
         btn.innerHTML = '<i class="bi bi-unlock" aria-hidden="true"></i>';
         host.appendChild(btn);
+      }
+      if (window.CAN_REMOVE_REPORT_INSTANCES && status !== 'locked') {
+        const delBtn = document.createElement('button');
+        delBtn.type = 'button';
+        delBtn.className = 'matrix-row-icon-btn matrix-row-icon-btn--danger js-matrix-delete-instance';
+        delBtn.dataset.instanceId = instanceId;
+        delBtn.dataset.studentId = String(rowState?.studentId || '');
+        delBtn.dataset.studentName = studentName;
+        delBtn.dataset.reportTitle = String(matrixState?.templateTitle || 'this report');
+        delBtn.title = 'Remove report instance';
+        delBtn.setAttribute('aria-label', `Remove report instance for ${studentName}`);
+        delBtn.innerHTML = '<i class="bi bi-trash" aria-hidden="true"></i>';
+        host.appendChild(delBtn);
       }
     }
 
@@ -2519,6 +2555,43 @@
       window.location.reload();
     }
 
+    async function runMatrixDeleteInstance(deleteBtn) {
+      const api = window.ReportAssignmentDelete;
+      if (!api || typeof api.deleteReportMatrixInstance !== 'function') {
+        await showReportMatrixMessage({
+          title: 'Unable to Remove',
+          icon: 'error',
+          message: 'Delete helpers are unavailable. Hard-refresh the page (Ctrl+F5) and try again.'
+        });
+        return;
+      }
+      const instanceId = String(deleteBtn.getAttribute('data-instance-id') || '').trim();
+      const studentId = String(deleteBtn.getAttribute('data-student-id') || '').trim();
+      const studentName = String(deleteBtn.getAttribute('data-student-name') || 'this student').trim() || 'this student';
+      const reportTitle = String(deleteBtn.getAttribute('data-report-title') || matrixState.templateTitle || 'this report').trim() || 'this report';
+      if (!instanceId) return;
+      const sessionLinked = Boolean(String(matrixState.sessionId || '').trim());
+      const confirmed = sessionLinked
+        ? await api.confirmMatrixRemoveReport(reportTitle, studentName)
+        : await api.confirmDelete(`Delete report for ${studentName}? This cannot be undone.`, 'Delete Report Instance');
+      if (!confirmed) return;
+      try {
+        await api.withLoading('Removing report instance...', () => api.deleteReportMatrixInstance(matrixState.assignmentId, instanceId, {
+          assignmentRowId: matrixState.assignmentRowId || '',
+          studentId,
+          sessionDate: matrixState.sessionDate || '',
+          actionStateId: matrixActionStateId()
+        }));
+        window.location.reload();
+      } catch (error) {
+        await showReportMatrixMessage({
+          title: 'Unable to Remove',
+          icon: 'error',
+          message: error?.message || 'Could not remove report instance.'
+        });
+      }
+    }
+
     document.addEventListener('click', function (event) {
       const reopenBtn = event.target.closest('.js-matrix-reopen-instance');
       if (reopenBtn) {
@@ -2538,6 +2611,13 @@
           instanceId: unlockBtn.getAttribute('data-instance-id'),
           studentName: unlockBtn.getAttribute('data-student-name') || ''
         }]);
+        return;
+      }
+      const deleteBtn = event.target.closest('.js-matrix-delete-instance');
+      if (deleteBtn) {
+        if (!window.CAN_REMOVE_REPORT_INSTANCES) return;
+        event.preventDefault();
+        void runMatrixDeleteInstance(deleteBtn);
       }
     });
 
@@ -2805,18 +2885,19 @@
     <% if (showReportMatrixAiAssist) { %>
     if (window.initReportAiAssistPanel) {
       const reportAiAssistCatalog = <%- JSON.stringify(reportAiAssistCatalog).replace(/</g, '\\u003c') %>;
+      const reportAiAssistCanClearTray = <%- JSON.stringify(Boolean(reportAiAssistSafe.canClearTray)) %>;
       const matrixQuery = readReportMatrixQueryParams();
       const rowId = matrixQuery.assignmentRowId || String(matrixState.assignmentRowId || '').trim();
       const teacherId = matrixQuery.teacherId || String(matrixState.teacherId || '').trim();
       window.initReportAiAssistPanel({
         context: 'matrix',
         catalog: reportAiAssistCatalog,
+        canClearTray: reportAiAssistCanClearTray,
         identity: {
           assignmentId: String(matrixState.assignmentId || '').trim(),
           assignmentRowId: rowId,
           teacherId
         },
-        storageKey: `reportAiAssist:matrix:${String(matrixState.assignmentId || '')}:${rowId}:${teacherId}`,
         getAnswersOverride() {
           return {
             sharedAnswersOverride: collectControls(document, '.js-matrix-shared-field'),

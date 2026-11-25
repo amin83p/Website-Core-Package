@@ -105,6 +105,7 @@
   </div>
 </div>
 
+<%- include('school/aiAssist/partials/aiAssistMessageHelpers') %>
 <script>
   (function () {
     const form = document.getElementById(<%- JSON.stringify(formId) %>);
@@ -120,15 +121,18 @@
     let hasCompletedRun = false;
 
     function showAssistMessage({ title, icon, message }) {
-      if (typeof showMessageModal === 'function') {
-        return showMessageModal({
-          title: title || 'School AI Assist',
-          icon: icon || 'info',
-          message: message || '',
-          buttons: [{ text: 'OK', class: icon === 'error' ? 'btn-secondary' : 'btn-primary' }]
-        });
+      const options = {
+        title: title || 'School AI Assist',
+        icon: icon || 'info',
+        message: message || '',
+        buttons: [{ text: 'OK', class: icon === 'error' ? 'btn-secondary' : 'btn-primary' }]
+      };
+      if (window.SchoolAiAssistMessaging && typeof window.SchoolAiAssistMessaging.show === 'function') {
+        return window.SchoolAiAssistMessaging.show(options);
       }
-      window.alert(message || title || 'School AI Assist');
+      if (typeof showMessageModal === 'function') {
+        return showMessageModal(options);
+      }
       return Promise.resolve();
     }
 

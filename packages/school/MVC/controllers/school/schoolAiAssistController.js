@@ -85,6 +85,7 @@ exports.showCreateProvider = async (req, res) => {
       title: 'Create School AI Provider',
       provider: null,
       providerOptions: schoolAiProviderDataService.getProviderOptions(),
+      includeModal: true,
       user: req.user,
       actionStateId: req?.actionStateId || ''
     });
@@ -103,6 +104,7 @@ exports.showEditProvider = async (req, res) => {
       title: 'Edit School AI Provider',
       provider: { ...provider, models: raw?.models || [], bannedUserIds: raw?.bannedUserIds || [] },
       providerOptions: schoolAiProviderDataService.getProviderOptions(),
+      includeModal: true,
       user: req.user,
       actionStateId: req?.actionStateId || ''
     });
@@ -220,6 +222,7 @@ exports.showTokenUsageDetail = async (req, res) => {
     return res.render('school/aiAssist/tokenUsageDetail', {
       title: 'AI Token Usage Detail',
       usage: row,
+      includeModal: true,
       user: req.user,
       navButtons: navButtons()
     });

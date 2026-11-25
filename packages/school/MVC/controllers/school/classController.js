@@ -5575,16 +5575,28 @@ async function deleteSessionReportInstance(req, res) {
 
         const isPendingSlot = normalizedInstanceId.startsWith('pending-');
         if (!isPendingSlot) {
-            const instance = await reportIntegrityService.assertInstanceDeletable(normalizedInstanceId, req.user);
-            if (!idsEqual(instance.classId, classId) || !idsEqual(instance.sessionId, sessionId)) {
-                throw new Error('This report instance does not belong to this session.');
-            }
-            assignmentId = assignmentId || toPublicId(instance.assignmentId);
-            assignmentRowId = assignmentRowId || String(instance.assignmentRowId || '').trim();
-            studentId = studentId || toPublicId(instance.studentId);
-            await schoolDataService.deleteData('reportInstances', normalizedInstanceId, req.user);
-            await classReferenceSyncService.notifyAfterReportDelete({ record: instance, reqUser: req.user });
-        } else if (!assignmentId || !studentId) {
+            await sessionReportAssignmentService.removeReportInstanceFromAssignmentContext({
+                instanceId: normalizedInstanceId,
+                assignmentId,
+                assignmentRowId,
+                studentId,
+                reqUser: req.user,
+                sessionUnassignContext: {
+                    classData,
+                    session,
+                    sessions,
+                    sessionRoster: enrichedRoster,
+                    expectedClassId: classId,
+                    expectedSessionId: sessionId
+                }
+            });
+            return res.json({
+                status: 'success',
+                message: 'Report removed from this session.',
+                actionStateId: req.actionStateId || ''
+            });
+        }
+        if (!assignmentId || !studentId) {
             throw new Error('Assignment context is required to remove this report from the session.');
         }
 
@@ -7434,13 +7446,17 @@ async function normalizeSessionGradebooksForSave(classData, session, rawList, re
             .map((row) => [String(row?.sessionId || row?.id || '').trim(), row])
             .filter(([id]) => id)
     );
+    const accessPolicy = await sessionAccessPolicyModel.getPolicyForOrg(classData?.orgId || '');
+    const gradebookActivityMakeup = accessPolicy?.gradebookActivityMakeup || {};
     return sessionGradebookService.normalizeSessionGradebooksFromRequest(rawList, {
         personIds,
         attendanceByPerson,
         existingGradebookById,
         sessionSkillPolicy,
         mergeHistoricalGradebookSkills,
-        sourceSessionsById
+        sourceSessionsById,
+        currentSessionDate: String(session?.date || '').trim(),
+        gradebookActivityMakeup
     });
 }
 
@@ -7501,15 +7517,26 @@ async function assertSessionGradebookEditable(req, { classId, sessionId }) {
 async function getGradebookMakeupSources(req, res) {
     try {
         const { id: classId, sessionId } = req.params;
-        const { sessions, session } = await assertSessionGradebookEditable(req, { classId, sessionId });
+        const { classData, sessions, session } = await assertSessionGradebookEditable(req, { classId, sessionId });
+        const accessPolicy = await sessionAccessPolicyModel.getPolicyForOrg(classData?.orgId || getActiveOrgIdOrThrow(req.user));
+        const makeupPolicy = accessPolicy?.gradebookActivityMakeup || {};
         const rows = sessionGradebookMakeupService.listMakeupPickerRows({
             allSessions: sessions,
-            currentSession: session
+            currentSession: session,
+            makeupPolicy
         });
+        const description = sessionGradebookMakeupService.describeGradebookActivityMakeupWindow(makeupPolicy);
         return res.json({
             status: 'success',
             rows,
-            lookbackDays: sessionGradebookMakeupService.MAKEUP_SOURCE_LOOKBACK_DAYS
+            lookbackDays: makeupPolicy.windowType === 'last_n_days'
+                ? (Number(makeupPolicy.lookbackDays) || sessionGradebookMakeupService.MAKEUP_SOURCE_LOOKBACK_DAYS)
+                : null,
+            makeupWindow: {
+                windowType: makeupPolicy.windowType || 'last_n_days',
+                lookbackDays: makeupPolicy.lookbackDays ?? null,
+                description
+            }
         });
     } catch (error) {
         return res.status(400).json({ status: 'error', message: error.message });
@@ -7540,6 +7567,8 @@ async function postGradebookMakeupFrom(req, res) {
         }
 
         const { classData, sessions, session } = await assertSessionGradebookEditable(req, { classId, sessionId });
+        const accessPolicy = await sessionAccessPolicyModel.getPolicyForOrg(classData?.orgId || getActiveOrgIdOrThrow(req.user));
+        const makeupPolicy = accessPolicy?.gradebookActivityMakeup || {};
         const enrichedRoster = await buildEnrichedSessionRosterForMutation({
             classData,
             session,
@@ -7552,7 +7581,8 @@ async function postGradebookMakeupFrom(req, res) {
             currentSession: session,
             sourceSessionId,
             sourceGradebookId,
-            currentPersonIds
+            currentPersonIds,
+            makeupPolicy
         });
 
         return res.json({

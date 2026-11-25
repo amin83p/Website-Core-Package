@@ -1397,7 +1397,18 @@
   const HUB_TIMELINE_ELBOW_LEFT_INDENT_PX = 8;
   const HUB_TIMELINE_ELBOW_CROWD_PX = 10;
   const HUB_TIMELINE_ELBOW_APPROX_PX = 56;
-  const HUB_TIMELINE_MAX_BELOW_PER_BUCKET = 2;
+  const HUB_TIMELINE_MAX_CARDS_PER_BUCKET_PER_SIDE = (function () {
+    const api = typeof HubStudentTimelineLayoutBalance !== 'undefined'
+      ? HubStudentTimelineLayoutBalance
+      : null;
+    return api && Number(api.HUB_TIMELINE_MAX_CARDS_PER_BUCKET_PER_SIDE) > 0
+      ? Number(api.HUB_TIMELINE_MAX_CARDS_PER_BUCKET_PER_SIDE)
+      : 2;
+  })();
+
+  function hubStudentsTimelineBalanceApi() {
+    return typeof HubStudentTimelineLayoutBalance !== 'undefined' ? HubStudentTimelineLayoutBalance : null;
+  }
   const HUB_TIMELINE_AXIS_WIDTH_RATIO = 0.95;
   const HUB_TIMELINE_AXIS_EDGE_PAD_PCT = 2.5;
   const HUB_TIMELINE_EDGE_RIGHT_PCT = 86;
@@ -1558,7 +1569,10 @@
   }
 
   function hubStudentsTimelineMarkerAnchorPercent(layout) {
-    return hubStudentsTimelineDisplayPercent(layout?.percent, layout?.axisNudgePercent);
+    const nudge = layout && layout.manualLayout === true
+      ? (Number(layout.axisNudgePercent) || 0)
+      : 0;
+    return hubStudentsTimelineDisplayPercent(layout?.percent, nudge);
   }
 
   function hubStudentsTimelineSignedElbow(branchSide, elbowPx) {
@@ -1694,7 +1708,7 @@
     return [stemRect, cardRect];
   }
 
-  function hubStudentsTimelineLayoutScore(layout, trackW, placedRects) {
+  function hubStudentsTimelineLayoutScore(layout, trackW, placedRects, placedLayouts) {
     const rects = hubStudentsTimelineCollectOccupancyRects(layout, trackW);
     let score = 0;
     const bucket = hubStudentsTimelineBucketKey(layout.percent);
@@ -1710,6 +1724,32 @@
     if (cardRect.x + cardRect.w > trackW) score += (cardRect.x + cardRect.w - trackW) * 12;
     score += (Number(layout.stemLen) || 0) * 0.035;
     score += (Number(layout.elbowWPx) || 0) * 0.02;
+
+    const balance = hubStudentsTimelineBalanceApi();
+    const layoutsForBalance = Array.isArray(placedLayouts) ? placedLayouts : [];
+    if (balance && layoutsForBalance.length) {
+      const candSide = layout.side === 'above' ? 'above' : 'below';
+      const percent = Number(layout.percent) || 0;
+      score += balance.hubTimelineLayoutRegionalLoad(
+        layoutsForBalance,
+        percent,
+        candSide,
+        balance.HUB_TIMELINE_REGIONAL_WINDOW_PCT
+      ) * 0.08;
+      const belowLoad = balance.hubTimelineLayoutSideLoad(layoutsForBalance, 'below');
+      const aboveLoad = balance.hubTimelineLayoutSideLoad(layoutsForBalance, 'above');
+      const candFoot = balance.hubTimelineLayoutSideFootprint(layout);
+      const afterBelow = belowLoad + (candSide === 'below' ? candFoot : 0);
+      const afterAbove = aboveLoad + (candSide === 'above' ? candFoot : 0);
+      const imbalanceBefore = Math.abs(belowLoad - aboveLoad);
+      const imbalanceAfter = Math.abs(afterBelow - afterAbove);
+      score -= Math.max(0, imbalanceBefore - imbalanceAfter) * 0.15;
+      if (candSide === 'below' && belowLoad > aboveLoad) {
+        score += (belowLoad - aboveLoad) * 0.05;
+      } else if (candSide === 'above' && aboveLoad > belowLoad) {
+        score += (aboveLoad - belowLoad) * 0.05;
+      }
+    }
     return score;
   }
 
@@ -1765,7 +1805,75 @@
         });
       });
     });
+    if (layout.manualLayout === true) return out;
+    const flippedSide = layout.side === 'above' ? 'below' : 'above';
+    out.slice().forEach(function (candidate) {
+      out.push(Object.assign({}, candidate, { side: flippedSide }));
+    });
     return out;
+  }
+
+  function hubStudentsTimelinePushPlacedOccupancy(layout, trackW, placed, placedLayouts) {
+    const meta = {
+      bucket: hubStudentsTimelineBucketKey(layout.percent),
+      side: layout.side === 'above' ? 'above' : 'below',
+      percent: Number(layout.percent) || 0
+    };
+    hubStudentsTimelineCollectOccupancyRects(layout, trackW).forEach(function (rect) {
+      placed.push(Object.assign({}, rect, meta));
+    });
+    if (Array.isArray(placedLayouts)) {
+      placedLayouts.push({
+        percent: meta.percent,
+        side: meta.side,
+        stemLen: Number(layout.stemLen) || HUB_TIMELINE_STEM_BASE_PX
+      });
+    }
+  }
+
+  function hubStudentsTimelineLayoutCrowding(layout, layouts, trackW) {
+    const tw = Math.max(1, Number(trackW) || 960);
+    const selfRects = hubStudentsTimelineCollectOccupancyRects(layout, tw);
+    let crowd = 0;
+    (Array.isArray(layouts) ? layouts : []).forEach(function (other) {
+      if (other === layout) return;
+      hubStudentsTimelineCollectOccupancyRects(other, tw).forEach(function (orect) {
+        selfRects.forEach(function (srect) {
+          crowd += hubStudentsTimelineOverlapArea(srect, orect);
+        });
+      });
+    });
+    return crowd;
+  }
+
+  function hubStudentsRebalanceTimelineSides(layouts, trackW) {
+    const tw = Math.max(1, Number(trackW) || 960);
+    const items = Array.isArray(layouts) ? layouts : [];
+    const REBALANCE_EPS = 1.5;
+    const reorder = items.map(function (_, index) { return index; }).filter(function (index) {
+      return items[index].manualLayout !== true;
+    });
+    reorder.sort(function (a, b) {
+      return hubStudentsTimelineLayoutCrowding(items[b], items, tw)
+        - hubStudentsTimelineLayoutCrowding(items[a], items, tw);
+    });
+    reorder.forEach(function (index) {
+      const layout = items[index];
+      const placed = [];
+      const placedLayouts = [];
+      items.forEach(function (other, otherIndex) {
+        if (otherIndex === index) return;
+        hubStudentsTimelinePushPlacedOccupancy(other, tw, placed, placedLayouts);
+      });
+      const curScore = hubStudentsTimelineLayoutScore(layout, tw, placed, placedLayouts);
+      const flippedSide = layout.side === 'above' ? 'below' : 'above';
+      const flipped = Object.assign({}, layout, { side: flippedSide });
+      const flipScore = hubStudentsTimelineLayoutScore(flipped, tw, placed, placedLayouts);
+      if (flipScore + REBALANCE_EPS < curScore) {
+        layout.side = flippedSide;
+      }
+    });
+    return items;
   }
 
   async function hubStudentsOptimizeTimelineLayouts(layouts, trackW, onProgress) {
@@ -1775,21 +1883,18 @@
           || String(a.event?.id || '').localeCompare(String(b.event?.id || ''));
       });
     const placed = [];
+    const placedLayouts = [];
     const tw = Math.max(1, Number(trackW) || 960);
     const total = items.length;
     for (let index = 0; index < items.length; index += 1) {
       const layout = items[index];
       if (layout.manualLayout === true) {
-        hubStudentsTimelineCollectOccupancyRects(layout, tw).forEach(function (rect) {
-          placed.push(Object.assign({}, rect, {
-            bucket: hubStudentsTimelineBucketKey(layout.percent)
-          }));
-        });
+        hubStudentsTimelinePushPlacedOccupancy(layout, tw, placed, placedLayouts);
       } else {
         let best = null;
         let bestScore = Infinity;
         hubStudentsTimelineLayoutCandidates(layout).forEach(function (candidate) {
-          const score = hubStudentsTimelineLayoutScore(candidate, tw, placed);
+          const score = hubStudentsTimelineLayoutScore(candidate, tw, placed, placedLayouts);
           if (score < bestScore) {
             bestScore = score;
             best = candidate;
@@ -1800,13 +1905,10 @@
           stemLen: chosen.stemLen,
           elbowWPx: chosen.elbowWPx,
           branchSide: chosen.branchSide,
+          side: chosen.side === 'above' ? 'above' : 'below',
           axisNudgePercent: 0
         });
-        hubStudentsTimelineCollectOccupancyRects(layout, tw).forEach(function (rect) {
-          placed.push(Object.assign({}, rect, {
-            bucket: hubStudentsTimelineBucketKey(layout.percent)
-          }));
-        });
+        hubStudentsTimelinePushPlacedOccupancy(layout, tw, placed, placedLayouts);
       }
       if (onProgress && (index % 3 === 0 || index === total - 1)) {
         const pct = 80 + Math.round(((index + 1) / Math.max(1, total)) * 10);
@@ -1814,6 +1916,7 @@
         await hubStudentsTimelineForcePaint();
       }
     }
+    hubStudentsRebalanceTimelineSides(items, tw);
     return hubStudentsClampTimelineEdgeLayouts(items);
   }
 
@@ -1870,28 +1973,11 @@
       const p = Number(layout.percent);
       if (p >= HUB_TIMELINE_EDGE_RIGHT_PCT) {
         if (!allowBranchChoice) layout.branchSide = 'left';
-        if (!freezeAxisNudge) {
-          if ((Number(layout.axisNudgePercent) || 0) > 0) {
-            layout.axisNudgePercent = 0;
-          }
-          const eff = hubStudentsTimelineLayoutEffectivePercent(layout);
-          if (eff > HUB_TIMELINE_EDGE_MAX_EFFECTIVE_PCT) {
-            layout.axisNudgePercent = (Number(layout.axisNudgePercent) || 0)
-              - (eff - HUB_TIMELINE_EDGE_MAX_EFFECTIVE_PCT);
-          }
-        }
       } else if (p <= HUB_TIMELINE_EDGE_LEFT_PCT) {
         if (!allowBranchChoice) layout.branchSide = 'right';
-        if (!freezeAxisNudge) {
-          if ((Number(layout.axisNudgePercent) || 0) < 0) {
-            layout.axisNudgePercent = 0;
-          }
-          const eff = hubStudentsTimelineLayoutEffectivePercent(layout);
-          if (eff < HUB_TIMELINE_EDGE_LEFT_PCT) {
-            layout.axisNudgePercent = (Number(layout.axisNudgePercent) || 0)
-              + (HUB_TIMELINE_EDGE_LEFT_PCT - eff);
-          }
-        }
+      }
+      if (!freezeAxisNudge && layout.manualLayout !== true) {
+        layout.axisNudgePercent = 0;
       }
     });
     return items;
@@ -1964,23 +2050,24 @@
     const bucketBranchAnchor = {};
     let belowTotal = 0;
     let aboveTotal = 0;
+    const assignedLayouts = [];
+    const balance = hubStudentsTimelineBalanceApi();
 
-    return positioned.map(function (row, globalIndex) {
+    return positioned.map(function (row) {
       const bucket = row.percent.toFixed(3);
       if (!belowByBucket[bucket]) belowByBucket[bucket] = 0;
       if (!aboveByBucket[bucket]) aboveByBucket[bucket] = 0;
 
-      const bucketCount = belowByBucket[bucket] + aboveByBucket[bucket];
       let side = 'below';
-      if (bucketCount > 0) {
-        side = bucketCount % 2 === 0 ? 'below' : 'above';
-        if (side === 'below' && belowByBucket[bucket] >= HUB_TIMELINE_MAX_BELOW_PER_BUCKET) {
-          side = 'above';
-        }
-      } else if (belowTotal > aboveTotal) {
-        side = 'above';
-      } else if (globalIndex % 2 === 1) {
-        side = 'above';
+      if (balance && typeof balance.pickHubTimelineLayoutSide === 'function') {
+        side = balance.pickHubTimelineLayoutSide({
+          percent: row.percent,
+          bucket: bucket,
+          belowByBucket: belowByBucket,
+          aboveByBucket: aboveByBucket,
+          assignedLayouts: assignedLayouts,
+          maxPerBucketPerSide: HUB_TIMELINE_MAX_CARDS_PER_BUCKET_PER_SIDE
+        });
       }
 
       let laneIdx = 0;
@@ -2020,6 +2107,12 @@
           elbowWPx = HUB_TIMELINE_ELBOW_MIN_PX;
         }
       }
+
+      assignedLayouts.push({
+        percent: row.percent,
+        side: side,
+        stemLen: stemLen
+      });
 
       return {
         event: row.event,

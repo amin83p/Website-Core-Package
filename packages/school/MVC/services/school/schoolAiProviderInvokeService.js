@@ -12,10 +12,21 @@ function tokenSummary(response = {}) {
   };
 }
 
-async function sendTextPrompt({ binding, prompt, requestingUser, systemPrompt, requestLabel, timeoutMs } = {}) {
+async function sendTextPrompt({
+  binding,
+  prompt,
+  requestingUser,
+  systemPrompt,
+  requestLabel,
+  timeoutMs,
+  usageMeta,
+  inputPayload,
+  accessContext
+} = {}) {
   if (!binding) throw new Error('AI binding is required.');
   const started = Date.now();
   const traceId = `school-ai-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  const usageExtras = usageMeta && typeof usageMeta === 'object' ? { ...usageMeta } : {};
   try {
     const response = await aiProviderService.sendTextPrompt({
       prompt,
@@ -27,7 +38,7 @@ async function sendTextPrompt({ binding, prompt, requestingUser, systemPrompt, r
       timeoutMs
     });
     const usage = tokenSummary(response);
-    await schoolAiTokenUsageDataService.recordCall({
+    const usageRecord = await schoolAiTokenUsageDataService.recordCall({
       orgId: binding.orgId,
       userId: binding.userId,
       serviceKey: binding.serviceKey,
@@ -39,11 +50,14 @@ async function sendTextPrompt({ binding, prompt, requestingUser, systemPrompt, r
       durationMs: Date.now() - started,
       requestSummary: String(prompt || '').slice(0, 500),
       responseSummary: String(response?.text || '').slice(0, 500),
-      usage
+      usage,
+      inputPayload,
+      accessContext,
+      ...usageExtras
     }, requestingUser);
-    return { ...response, traceId };
+    return { ...response, traceId, usageRecordId: usageRecord?.id || null };
   } catch (error) {
-    await schoolAiTokenUsageDataService.recordCall({
+    const usageRecord = await schoolAiTokenUsageDataService.recordCall({
       orgId: binding.orgId,
       userId: binding.userId,
       serviceKey: binding.serviceKey,
@@ -54,9 +68,14 @@ async function sendTextPrompt({ binding, prompt, requestingUser, systemPrompt, r
       errorMessage: error?.message || 'AI request failed',
       traceId,
       durationMs: Date.now() - started,
-      requestSummary: String(prompt || '').slice(0, 500)
+      requestSummary: String(prompt || '').slice(0, 500),
+      inputPayload,
+      accessContext,
+      ...usageExtras
     }, requestingUser);
-    throw error;
+    const failed = error instanceof Error ? error : new Error(String(error));
+    failed.usageRecordId = usageRecord?.id || null;
+    throw failed;
   }
 }
 

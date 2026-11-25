@@ -65,3 +65,9 @@
   baseUrlPath: newUrl
 }) %>
 <%- include('partials/tablePages-end') %>
+<%- include('school/aiAssist/partials/aiAssistGuardedDeleteScript', {
+  deleteBasePath: '/school/ai-assist/providers',
+  deleteEntityLabel: 'provider key',
+  deleteConfirmTitle: 'Delete provider key',
+  actionStateId: typeof actionStateId !== 'undefined' ? actionStateId : ''
+}) %>

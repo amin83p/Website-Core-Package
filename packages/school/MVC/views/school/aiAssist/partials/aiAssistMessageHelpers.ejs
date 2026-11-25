@@ -1,0 +1,45 @@
+<script>
+(function () {
+  if (window.SchoolAiAssistMessaging && window.SchoolAiAssistMessaging.ready) return;
+
+  function isMessageModalReady() {
+    return typeof window.showMessageModal === 'function' && document.getElementById('messageModal');
+  }
+
+  function whenMessageModalReady(fn) {
+    if (typeof fn !== 'function') return;
+    if (isMessageModalReady()) {
+      fn();
+      return;
+    }
+    let tries = 0;
+    const timer = setInterval(() => {
+      tries += 1;
+      if (isMessageModalReady() || tries > 60) {
+        clearInterval(timer);
+        fn();
+      }
+    }, 50);
+  }
+
+  function showAiAssistMessage(opts) {
+    const options = opts && typeof opts === 'object' ? opts : {};
+    return new Promise((resolve) => {
+      whenMessageModalReady(() => {
+        if (isMessageModalReady()) {
+          resolve(window.showMessageModal(options));
+          return;
+        }
+        resolve(undefined);
+      });
+    });
+  }
+
+  window.SchoolAiAssistMessaging = {
+    ready: true,
+    isReady: isMessageModalReady,
+    whenReady: whenMessageModalReady,
+    show: showAiAssistMessage
+  };
+})();
+</script>
