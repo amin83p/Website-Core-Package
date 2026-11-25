@@ -121,7 +121,9 @@ test('overallReportInstanceModel stores selectedPdfKey and generated pdfKey', ()
 
 test('overallTemplateForm includes PDF template designer section', () => {
   const view = fs.readFileSync(overallTemplateFormPath, 'utf8');
-  assert.match(view, /PDF Templates/);
+  assert.match(view, /js-field-open-editor/);
+  assert.match(view, /overall-field-dropdown-menu-floating .js-field-action/);
+  assert.match(view, /Default PDF Template File/);
   assert.match(view, /name="pdfTemplate"/);
   assert.match(view, /funderPdfKeys/);
   assert.match(view, /pdfFieldMapEditor/);

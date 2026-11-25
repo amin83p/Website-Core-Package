@@ -479,6 +479,12 @@ test('student form includes CLB history UI and hidden JSON field', () => {
   assert.match(rollingSource, /applyDefaultRollingClbEvaluationTypeForNewEntry/);
 });
 
+test('prefill catalog exposes CLB_latest_result_recorded_at for snapshot and overall sources', () => {
+  const catalogKeys = Object.values(reportService.getPrefillCatalog()).flat().map((row) => row.key);
+  assert.ok(catalogKeys.includes('CLB_latest_result_recorded_at'));
+  assert.equal(reportService.isKnownPrefillKey('CLB_latest_result_recorded_at'), true);
+});
+
 test('student form create defaults cover DOB, email, admission, country, fee, and CLB dash', () => {
   const source = read('packages/school/MVC/views/school/student/studentForm.ejs');
   assert.match(source, /inp_newPersonDateOfBirth[^>]*value="2000-01-01"/);

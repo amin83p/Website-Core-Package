@@ -3954,17 +3954,7 @@ num(value) <= 95</code></pre>
       refreshCalculationFieldList();
     });
 
-    tbody.addEventListener('click', async (e) => {
-      const openEditorBtn = e.target.closest('.js-field-open-editor');
-      if (openEditorBtn) {
-        const openIndex = Number(openEditorBtn.getAttribute('data-index'));
-        if (Number.isInteger(openIndex) && openIndex >= 0 && openIndex < fieldsState.length) {
-          openFieldEditor(openIndex);
-        }
-        return;
-      }
-      const actionBtn = e.target.closest('.js-field-action');
-      if (!actionBtn) return;
+    async function handleTemplateFieldRowAction(actionBtn) {
       const action = String(actionBtn.getAttribute('data-action') || '').trim().toLowerCase();
       const index = Number(actionBtn.getAttribute('data-index'));
       if (!Number.isInteger(index) || index < 0 || index >= fieldsState.length) return;
@@ -4001,9 +3991,31 @@ num(value) <= 95</code></pre>
         fieldsState.splice(index, 1);
         renderFieldRows();
       }
+    }
+
+    document.addEventListener('click', async (e) => {
+      const actionBtn = e.target.closest?.('.js-field-action');
+      if (!actionBtn) return;
+      const inTable = Boolean(tbody?.contains(actionBtn));
+      const inFloatingMenu = Boolean(actionBtn.closest('.template-field-dropdown-menu-floating'));
+      if (!inTable && !inFloatingMenu) return;
+      await handleTemplateFieldRowAction(actionBtn);
+    });
+
+    tbody.addEventListener('click', (e) => {
+      const openEditorBtn = e.target.closest('.js-field-open-editor');
+      if (!openEditorBtn) return;
+      const openIndex = Number(openEditorBtn.getAttribute('data-index'));
+      if (Number.isInteger(openIndex) && openIndex >= 0 && openIndex < fieldsState.length) {
+        openFieldEditor(openIndex);
+      }
     });
 
     tbody.addEventListener('dragstart', (e) => {
+      if (!e.target.closest('.field-drag-handle')) {
+        e.preventDefault();
+        return;
+      }
       const row = e.target.closest('tr[data-index]');
       if (!row) return;
       dragIndex = Number(row.getAttribute('data-index'));

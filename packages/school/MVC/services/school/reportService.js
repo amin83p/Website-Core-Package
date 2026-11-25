@@ -241,6 +241,7 @@ const PREFILL_CATALOG = Object.freeze({
     Object.freeze({ key: 'CLB_current_reading', label: 'CLB Current Reading', description: 'Current CLB level for reading from the latest student profile history entry on or before the report due date.' }),
     Object.freeze({ key: 'CLB_current_writing', label: 'CLB Current Writing', description: 'Current CLB level for writing from the latest student profile history entry on or before the report due date.' }),
     Object.freeze({ key: 'CLB_latest_recorded_at', label: 'CLB Latest Recorded Date', description: 'Recorded date of the latest CLB history entry on or before the report due date.' }),
+    Object.freeze({ key: 'CLB_latest_result_recorded_at', label: 'CLB Latest Result Recorded Date', description: 'Result recorded date on that CLB history entry (use with report_period_due_date to decide whether CLB_result_* values were known for the report period).' }),
     Object.freeze({ key: 'CLB_result_listening', label: 'CLB Result Listening', description: 'CLB result for listening from the latest student profile history entry on or before the report due date.' }),
     Object.freeze({ key: 'CLB_result_speaking', label: 'CLB Result Speaking', description: 'CLB result for speaking from the latest student profile history entry on or before the report due date.' }),
     Object.freeze({ key: 'CLB_result_reading', label: 'CLB Result Reading', description: 'CLB result for reading from the latest student profile history entry on or before the report due date.' }),

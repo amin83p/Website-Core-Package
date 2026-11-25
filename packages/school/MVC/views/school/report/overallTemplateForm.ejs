@@ -11,6 +11,21 @@
   .overall-field-handle { cursor: grab; }
   .overall-picker-summary { min-height: 38px; }
   .overall-field-visual { background: #fcfcff; }
+  .overall-field-main-cell .overall-field-label-edit {
+    font-weight: 600;
+    color: var(--bs-body-color);
+    text-decoration: none;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    text-align: left;
+    display: block;
+  }
+  .overall-field-main-cell .overall-field-label-edit:hover,
+  .overall-field-main-cell .overall-field-label-edit:focus-visible {
+    color: var(--bs-primary);
+    text-decoration: underline;
+  }
   .overall-field-dropdown-menu-floating { z-index: 1080; }
   .template-form-section {
     border: 1px solid rgba(15, 23, 42, 0.08) !important;
@@ -882,7 +897,7 @@
             </div>
             ${docxShortcut ? `<button type="button" draggable="false" class="btn btn-outline-secondary btn-sm js-copy-key" data-key="${escapeHtml(docxShortcut)}" title="Copy DOCX shortcut"><i class="bi bi-clipboard"></i></button>` : ''}
           </div>`;
-      return `<tr class="overall-field-row${visual ? ' overall-field-visual' : ''}" draggable="true" data-index="${index}"><td class="text-center"><span class="overall-field-handle text-muted"><i class="bi bi-grip-vertical"></i></span><span class="badge bg-light text-dark border ms-1">${index + 1}</span></td><td><strong>${escapeHtml(field.label || field.id)}</strong><div class="small text-muted font-monospace">${escapeHtml(field.id || '')}</div></td><td><span class="badge bg-light text-dark border">${escapeHtml(field.type)}</span></td><td>${flags}</td><td class="small">${docxShortcutCell}</td><td><div class="dropdown js-overall-field-dropdown"><button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown"><i class="bi bi-three-dots-vertical"></i></button><ul class="dropdown-menu dropdown-menu-end"><li><button type="button" class="dropdown-item js-field-action" data-action="edit" data-index="${index}"><i class="bi bi-pencil me-2"></i>Edit</button></li><li><button type="button" class="dropdown-item js-field-action" data-action="duplicate" data-index="${index}"><i class="bi bi-files me-2"></i>Duplicate</button></li><li><button type="button" class="dropdown-item js-field-action" data-action="up" data-index="${index}" ${index === 0 ? 'disabled' : ''}><i class="bi bi-arrow-up me-2"></i>Move Up</button></li><li><button type="button" class="dropdown-item js-field-action" data-action="down" data-index="${index}" ${index === fields.length - 1 ? 'disabled' : ''}><i class="bi bi-arrow-down me-2"></i>Move Down</button></li><li><hr class="dropdown-divider"></li><li><button type="button" class="dropdown-item text-danger js-field-action" data-action="delete" data-index="${index}"><i class="bi bi-trash me-2"></i>Delete</button></li></ul></div></td></tr>`;
+      return `<tr class="overall-field-row${visual ? ' overall-field-visual' : ''}" draggable="true" data-index="${index}"><td class="text-center"><span class="overall-field-handle text-muted"><i class="bi bi-grip-vertical"></i></span><span class="badge bg-light text-dark border ms-1">${index + 1}</span></td><td class="overall-field-main-cell"><button type="button" class="overall-field-label-edit js-field-open-editor" data-index="${index}" title="Edit field">${escapeHtml(field.label || field.id)}</button><div class="small text-muted font-monospace">${escapeHtml(field.id || '')}</div></td><td><span class="badge bg-light text-dark border">${escapeHtml(field.type)}</span></td><td>${flags}</td><td class="small">${docxShortcutCell}</td><td><div class="dropdown js-overall-field-dropdown"><button type="button" class="btn btn-outline-secondary btn-sm" data-bs-toggle="dropdown" title="Field actions"><i class="bi bi-three-dots-vertical"></i></button><ul class="dropdown-menu dropdown-menu-end"><li><button type="button" class="dropdown-item js-field-action" data-action="edit" data-index="${index}"><i class="bi bi-pencil me-2"></i>Edit</button></li><li><button type="button" class="dropdown-item js-field-action" data-action="duplicate" data-index="${index}"><i class="bi bi-files me-2"></i>Duplicate</button></li><li><button type="button" class="dropdown-item js-field-action" data-action="up" data-index="${index}" ${index === 0 ? 'disabled' : ''}><i class="bi bi-arrow-up me-2"></i>Move Up</button></li><li><button type="button" class="dropdown-item js-field-action" data-action="down" data-index="${index}" ${index === fields.length - 1 ? 'disabled' : ''}><i class="bi bi-arrow-down me-2"></i>Move Down</button></li><li><hr class="dropdown-divider"></li><li><button type="button" class="dropdown-item text-danger js-field-action" data-action="delete" data-index="${index}"><i class="bi bi-trash me-2"></i>Delete</button></li></ul></div></td></tr>`;
     }).join('');
     renderKeyCatalog();
     bindOverallFieldDropdowns();
@@ -1312,6 +1327,14 @@
       showReportModal({ title: 'Invalid DOCX Shortcut', message: error.message, icon: 'error' });
     }
   });
+  fieldRows.addEventListener('click', (event) => {
+    const openEditorBtn = event.target.closest('.js-field-open-editor');
+    if (!openEditorBtn) return;
+    const index = Number(openEditorBtn.dataset.index);
+    if (Number.isInteger(index) && index >= 0 && index < fields.length) {
+      openField(index);
+    }
+  });
   fieldRows.addEventListener('click', async event => {
     const button = event.target.closest('.js-field-action');
     if (!button) return;
@@ -1323,6 +1346,10 @@
     await handleOverallFieldAction(button);
   });
   fieldRows.addEventListener('dragstart', event => {
+    if (!event.target.closest('.overall-field-handle')) {
+      event.preventDefault();
+      return;
+    }
     const row = event.target.closest('.overall-field-row');
     dragFieldIndex = row ? Number(row.dataset.index) : -1;
     if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
