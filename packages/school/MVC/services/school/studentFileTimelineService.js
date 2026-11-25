@@ -9,6 +9,7 @@ const reportHubStudentDirectoryService = require('./reportHubStudentDirectorySer
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const { getActiveOrgIdOrThrow } = requireCoreModule('MVC/utils/orgContextUtils');
+const { buildEnrollmentOnHoldDeepLinkUrl } = require('./studentAcademicOverviewService');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_CASE_ROWS = 400;
@@ -33,15 +34,143 @@ function sortTimelineEvents(events) {
   });
 }
 
+function timelineEventEndDate(row) {
+  const endDate = normalizeText(row?.endDate);
+  if (isValidTimelineDate(endDate)) return endDate;
+  return '';
+}
+
+function collectTimelineEventDates(row) {
+  const bag = [];
+  const start = normalizeText(row?.date);
+  if (isValidTimelineDate(start)) bag.push(start);
+  const end = timelineEventEndDate(row);
+  if (end && end !== start) bag.push(end);
+  return bag;
+}
+
 function computeTimelineDateRange(events) {
-  const dates = (Array.isArray(events) ? events : [])
-    .map((row) => normalizeText(row?.date))
-    .filter(isValidTimelineDate)
-    .sort();
+  const dates = [];
+  (Array.isArray(events) ? events : []).forEach((row) => {
+    collectTimelineEventDates(row).forEach((d) => dates.push(d));
+  });
+  dates.sort();
   if (!dates.length) {
     return { minDate: '', maxDate: '' };
   }
   return { minDate: dates[0], maxDate: dates[dates.length - 1] };
+}
+
+const TIMELINE_SOURCE_KEYS = Object.freeze([
+  'enrollment',
+  'registration',
+  'clb',
+  'referral',
+  'report',
+  'case',
+  'activity'
+]);
+
+const TIMELINE_SOURCE_LABELS = Object.freeze({
+  enrollment: 'Enrollments',
+  registration: 'Program / term registrations',
+  clb: 'CLB',
+  referral: 'Referrals',
+  report: 'Reports',
+  case: 'Session cases',
+  activity: 'Activities'
+});
+
+function resolveTimelineEventSource(type) {
+  const token = normalizeText(type).toLowerCase();
+  if (token === 'student_enrollment_start' || token.indexOf('class_enrollment') === 0) {
+    return 'enrollment';
+  }
+  if (token === 'program_registration' || token === 'term_registration') {
+    return 'registration';
+  }
+  if (token.indexOf('clb') === 0) return 'clb';
+  if (token.indexOf('referral') === 0) return 'referral';
+  if (token.indexOf('report') === 0) return 'report';
+  if (token.indexOf('session_case') === 0) return 'case';
+  if (token.indexOf('activity') === 0) return 'activity';
+  if (token.indexOf('registration') >= 0) return 'registration';
+  return 'registration';
+}
+
+function normalizeTimelineSources(sources) {
+  const raw = Array.isArray(sources) ? sources : [];
+  const picked = new Set();
+  raw.forEach((row) => {
+    const key = normalizeText(row).toLowerCase();
+    if (TIMELINE_SOURCE_KEYS.includes(key)) picked.add(key);
+  });
+  if (!picked.size) return [...TIMELINE_SOURCE_KEYS];
+  return TIMELINE_SOURCE_KEYS.filter((key) => picked.has(key));
+}
+
+function parseTimelineLoadQuery(query) {
+  const q = query && typeof query === 'object' ? query : {};
+  let sourceList = [];
+  if (Array.isArray(q.sources)) {
+    sourceList = q.sources;
+  } else if (typeof q.sources === 'string' && q.sources.trim()) {
+    sourceList = q.sources.split(',').map((part) => part.trim()).filter(Boolean);
+  }
+  const startDate = isValidTimelineDate(q.startDate) ? normalizeText(q.startDate) : '';
+  const endDate = isValidTimelineDate(q.endDate) ? normalizeText(q.endDate) : '';
+  return {
+    sources: normalizeTimelineSources(sourceList),
+    startDate,
+    endDate
+  };
+}
+
+function timelineSpanOverlapsFilter(row, rangeStart, rangeEnd) {
+  const spanStart = normalizeText(row?.date);
+  const spanEnd = timelineEventEndDate(row) || spanStart;
+  if (!isValidTimelineDate(spanStart)) return false;
+  const effectiveEnd = isValidTimelineDate(spanEnd) ? spanEnd : spanStart;
+  if (rangeStart && effectiveEnd < rangeStart) return false;
+  if (rangeEnd && spanStart > rangeEnd) return false;
+  return true;
+}
+
+function filterTimelineEventsByDateRange(events, startDate, endDate) {
+  const start = isValidTimelineDate(startDate) ? normalizeText(startDate) : '';
+  const end = isValidTimelineDate(endDate) ? normalizeText(endDate) : '';
+  if (!start && !end) return [...(Array.isArray(events) ? events : [])];
+  return (Array.isArray(events) ? events : []).filter((row) => {
+    if (normalizeText(row?.display).toLowerCase() === 'span') {
+      return timelineSpanOverlapsFilter(row, start, end);
+    }
+    const date = normalizeText(row?.date);
+    if (!isValidTimelineDate(date)) return false;
+    if (start && date < start) return false;
+    if (end && date > end) return false;
+    return true;
+  });
+}
+
+function countEventsBySource(events) {
+  const counts = {};
+  TIMELINE_SOURCE_KEYS.forEach((key) => {
+    counts[key] = 0;
+  });
+  (Array.isArray(events) ? events : []).forEach((row) => {
+    const source = normalizeText(row?.source) || resolveTimelineEventSource(row?.type);
+    if (Object.prototype.hasOwnProperty.call(counts, source)) {
+      counts[source] += 1;
+    }
+  });
+  return counts;
+}
+
+function buildTimelineSourceCatalog() {
+  return TIMELINE_SOURCE_KEYS.map((key) => ({
+    key,
+    label: TIMELINE_SOURCE_LABELS[key] || key
+  }));
 }
 
 function makeEventId(parts) {
@@ -50,7 +179,26 @@ function makeEventId(parts) {
 
 function pushEvent(bag, event) {
   if (!event || !isValidTimelineDate(event.date)) return;
-  bag.push(event);
+  const type = normalizeText(event.type);
+  bag.push({
+    ...event,
+    source: normalizeText(event.source) || resolveTimelineEventSource(type)
+  });
+}
+
+function pushSpanEvent(bag, event) {
+  if (!event || normalizeText(event.display).toLowerCase() !== 'span') return;
+  const start = normalizeText(event.date);
+  const end = timelineEventEndDate(event);
+  if (!isValidTimelineDate(start) || !isValidTimelineDate(end)) return;
+  if (end < start) return;
+  const type = normalizeText(event.type);
+  bag.push({
+    ...event,
+    display: 'span',
+    endDate: end,
+    source: normalizeText(event.source) || resolveTimelineEventSource(type)
+  });
 }
 
 function readActivityFirstDate(row) {
@@ -130,6 +278,18 @@ function buildEnrollmentTooltipLines(row) {
   return lines;
 }
 
+function buildOnHoldTooltipLines(hold, enrollmentRow) {
+  const lines = [];
+  const classTitle = normalizeText(enrollmentRow?.classTitle);
+  if (classTitle) lines.push(`Class: ${classTitle}`);
+  lines.push(`On hold: ${normalizeText(hold?.startDate)} to ${normalizeText(hold?.endDate)}`);
+  const reason = normalizeText(hold?.reason);
+  if (reason) lines.push(`Reason: ${reason}`);
+  const sessionCount = Array.isArray(hold?.sessionIds) ? hold.sessionIds.length : 0;
+  if (sessionCount) lines.push(`Sessions marked N/A: ${sessionCount}`);
+  return lines;
+}
+
 function resolveActivitySkillLabels(row, skillLabelById) {
   const ids = Array.isArray(row?.skillIds) ? row.skillIds : [];
   const names = ids.map((rawId) => {
@@ -159,20 +319,17 @@ async function buildSkillLabelMap(req) {
   return map;
 }
 
-async function buildStudentFileTimeline(studentId, req) {
-  const normalizedStudentId = toPublicId(studentId);
-  if (!normalizedStudentId) {
-    const error = new Error('Student is required.');
-    error.statusCode = 400;
-    throw error;
-  }
-
+async function collectStudentFileTimelineEvents(normalizedStudentId, req, sourcesSet) {
+  const include = (key) => sourcesSet.has(key);
   const profile = await reportHubStudentDirectoryService.buildPersonalProfile(normalizedStudentId, req);
   const personId = toPublicId(profile?.personId);
-  const skillLabelById = await buildSkillLabelMap(req);
+  const skillLabelById = include('activity')
+    ? await buildSkillLabelMap(req)
+    : new Map();
   const events = [];
   let truncated = false;
 
+  if (include('enrollment')) {
   pushEvent(events, {
     id: makeEventId(['student_enrollment', normalizedStudentId]),
     date: normalizeText(profile?.enrollmentDate),
@@ -182,7 +339,9 @@ async function buildStudentFileTimeline(studentId, req) {
     tooltipLines: ['School enrollment date'],
     action: { kind: 'noop' }
   });
+  }
 
+  if (include('registration')) {
   (Array.isArray(profile?.programRegistrations) ? profile.programRegistrations : []).forEach((row) => {
     const regId = normalizeText(row?.id);
     pushEvent(events, {
@@ -230,7 +389,9 @@ async function buildStudentFileTimeline(studentId, req) {
       }
     });
   });
+  }
 
+  if (include('enrollment')) {
   (Array.isArray(profile?.classEnrollments) ? profile.classEnrollments : []).forEach((row) => {
     const enrollmentId = normalizeText(row?.id);
     const classTitle = normalizeText(row?.classTitle || row?.classId);
@@ -273,8 +434,45 @@ async function buildStudentFileTimeline(studentId, req) {
         enrollmentRow: actionRow
       }
     });
-  });
 
+    const holds = Array.isArray(row?.enrollmentHoldPeriods) ? row.enrollmentHoldPeriods : [];
+    holds.forEach((hold) => {
+      if (String(hold?.status || 'applied').toLowerCase() !== 'applied') return;
+      const holdId = normalizeText(hold?.id);
+      const holdStart = normalizeText(hold?.startDate);
+      const holdEnd = normalizeText(hold?.endDate);
+      const holdTip = buildOnHoldTooltipLines(hold, actionRow);
+      const deepBase = buildEnrollmentOnHoldDeepLinkUrl({
+        editUrl: actionRow.editUrl,
+        periodId: enrollmentId,
+        holdId
+      });
+      const onHoldUrl = deepBase ? withSmEmbed(deepBase) : (actionRow.editUrl ? withSmEmbed(actionRow.editUrl) : '');
+      const isRolling = onHoldUrl.indexOf('/rolling-enrollment') >= 0;
+      pushSpanEvent(events, {
+        id: makeEventId(['class_enrollment_on_hold', enrollmentId, holdId]),
+        date: holdStart,
+        endDate: holdEnd,
+        type: 'class_enrollment_on_hold',
+        display: 'span',
+        label: 'On hold',
+        sublabel: classTitle,
+        tooltipLines: holdTip,
+        source: 'enrollment',
+        action: {
+          kind: isRolling ? 'enrollment_on_hold_embed' : 'enrollment_edit_embed',
+          title: classTitle ? `On hold — ${classTitle}` : 'On hold',
+          url: onHoldUrl,
+          enrollmentRow: actionRow,
+          holdId,
+          periodId: enrollmentId
+        }
+      });
+    });
+  });
+  }
+
+  if (include('clb')) {
   const clbHistory = reportService.getSortedClbLevelHistory({ clbLevelHistory: profile?.clbLevelHistory });
   clbHistory.forEach((entry) => {
     const entryId = normalizeText(entry?.id);
@@ -301,7 +499,9 @@ async function buildStudentFileTimeline(studentId, req) {
       });
     }
   });
+  }
 
+  if (include('referral')) {
   (Array.isArray(profile?.referralLinks) ? profile.referralLinks : []).forEach((link, index) => {
     const linkKey = normalizeText(link?.id) || String(index);
     pushEvent(events, {
@@ -317,8 +517,9 @@ async function buildStudentFileTimeline(studentId, req) {
       action: { kind: 'manager_referrals', studentId: normalizedStudentId, linkId: linkKey }
     });
   });
+  }
 
-  if (personId) {
+  if (include('report') && personId) {
     try {
       const reportBundle = await studentReportInstancesService.listStudentReportInstancesForForm({
         reqUser: req.user,
@@ -357,7 +558,7 @@ async function buildStudentFileTimeline(studentId, req) {
     }
   }
 
-  if (personId) {
+  if (include('case') && personId) {
     try {
       const caseWorkspace = await sessionStudentCaseWorkspaceService.listSessionStudentCasesForRequest(req, {
         queryInput: { studentPersonId: personId },
@@ -395,7 +596,7 @@ async function buildStudentFileTimeline(studentId, req) {
     }
   }
 
-  if (personId) {
+  if (include('activity') && personId) {
     try {
       const activities = await dataService.fetchAllData(
         'activities',
@@ -451,26 +652,91 @@ async function buildStudentFileTimeline(studentId, req) {
     }
   }
 
-  const sorted = sortTimelineEvents(events);
-  const range = computeTimelineDateRange(sorted);
-
   return {
     student: {
       id: normalizedStudentId,
       personId: personId || '',
       name: normalizeText(profile?.name)
     },
+    events,
+    truncated: truncated === true
+  };
+}
+
+async function buildStudentFileTimeline(studentId, req, options = {}) {
+  const normalizedStudentId = toPublicId(studentId);
+  if (!normalizedStudentId) {
+    const error = new Error('Student is required.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const opt = options && typeof options === 'object' ? options : {};
+  const sourceList = normalizeTimelineSources(opt.sources);
+  const sourcesSet = new Set(sourceList);
+  const startDate = isValidTimelineDate(opt.startDate) ? normalizeText(opt.startDate) : '';
+  const endDate = isValidTimelineDate(opt.endDate) ? normalizeText(opt.endDate) : '';
+
+  const collected = await collectStudentFileTimelineEvents(normalizedStudentId, req, sourcesSet);
+  const sortedBeforeDate = sortTimelineEvents(collected.events);
+  const fullRange = computeTimelineDateRange(sortedBeforeDate);
+  const dateFiltered = filterTimelineEventsByDateRange(sortedBeforeDate, startDate, endDate);
+  const sorted = sortTimelineEvents(dateFiltered);
+  const range = computeTimelineDateRange(sorted);
+
+  const appliedRange = {
+    startDate: startDate || range.minDate || fullRange.minDate,
+    endDate: endDate || range.maxDate || fullRange.maxDate
+  };
+
+  return {
+    student: collected.student,
     range,
     events: sorted,
-    truncated: truncated === true
+    truncated: collected.truncated === true,
+    meta: {
+      fullRange,
+      appliedRange,
+      appliedSources: sourceList,
+      countsBySource: countEventsBySource(sortedBeforeDate)
+    }
+  };
+}
+
+async function buildStudentFileTimelineLoadOptions(studentId, req) {
+  const normalizedStudentId = toPublicId(studentId);
+  if (!normalizedStudentId) {
+    const error = new Error('Student is required.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const sourcesSet = new Set(TIMELINE_SOURCE_KEYS);
+  const collected = await collectStudentFileTimelineEvents(normalizedStudentId, req, sourcesSet);
+  const sorted = sortTimelineEvents(collected.events);
+  return {
+    fullRange: computeTimelineDateRange(sorted),
+    sources: buildTimelineSourceCatalog(),
+    countsBySource: countEventsBySource(sorted)
   };
 }
 
 module.exports = {
   buildStudentFileTimeline,
+  buildStudentFileTimelineLoadOptions,
   sortTimelineEvents,
   computeTimelineDateRange,
   isValidTimelineDate,
   buildClbTooltipLines,
-  buildEnrollmentTooltipLines
+  buildEnrollmentTooltipLines,
+  buildOnHoldTooltipLines,
+  pushSpanEvent,
+  timelineSpanOverlapsFilter,
+  TIMELINE_SOURCE_KEYS,
+  TIMELINE_SOURCE_LABELS,
+  resolveTimelineEventSource,
+  normalizeTimelineSources,
+  parseTimelineLoadQuery,
+  filterTimelineEventsByDateRange,
+  countEventsBySource
 };

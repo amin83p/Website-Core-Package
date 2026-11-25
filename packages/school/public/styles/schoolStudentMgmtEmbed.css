@@ -58,3 +58,8 @@ html.school-sm-embed-iframe .report-instance-page > .card.border-0.shadow-sm.mb-
 html.school-sm-embed-iframe .report-instance-page > .card.border-0.shadow-sm.mb-4:has(#reportInstanceDetailsToggle) {
   display: none !important;
 }
+
+/* Rolling enrollment: hide table page heading, nav buttons, and toolbars in the hub iframe */
+html.school-sm-embed-iframe .rolling-enrollment-page .sections-page > .d-flex {
+  display: none !important;
+}

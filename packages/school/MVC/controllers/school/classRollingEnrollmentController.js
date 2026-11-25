@@ -2,6 +2,7 @@
 const fs = require('fs').promises;
 const path = require('path');
 const schoolDataService = require('../../services/school/schoolDataService');
+const schoolStudentMgmtEmbedService = require('../../services/school/schoolStudentMgmtEmbedService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const { resolveCoreRoot } = require('../../services/school/schoolCoreModuleResolver');
 const dataService = requireCoreModule('MVC/services/dataService'); 
@@ -1574,7 +1575,8 @@ async function showRollingEnrollmentPage(req, res) {
       canOpenStudentAttendanceReport: (await attendanceAccessService.buildAttendanceReportAccess(req.user, req.ip)).canOpenReport,
       canOpenAttendanceMatrix: (await attendanceAccessService.buildAttendanceAccess(req.user, req.ip)).canOpenMatrix,
       enrollmentCloseReasons,
-      canManageEnrollmentCloseReasons
+      canManageEnrollmentCloseReasons,
+      ...schoolStudentMgmtEmbedService.embedRenderLocals(req, { htmlClass: 'rolling-enrollment-page' })
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', error, message: error.message, user: req.user });

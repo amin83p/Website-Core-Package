@@ -103,12 +103,67 @@
   </div>
 </div>
 
+<div class="modal fade" id="hubStudentsTimelineLoadModal" tabindex="-1" aria-labelledby="hubStudentsTimelineLoadModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable hub-students-timeline-load-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold" id="hubStudentsTimelineLoadModalLabel">Load student timeline</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="hubStudentsTimelineLoadBusy" class="text-center py-4" role="status" aria-live="polite">
+          <span class="spinner-border text-primary" aria-hidden="true"></span>
+          <div class="small text-muted fw-semibold mt-2">Loading available dates and event types…</div>
+        </div>
+        <div id="hubStudentsTimelineLoadForm" class="d-none">
+          <p class="text-muted small mb-2" id="hubStudentsTimelineLoadSpanHint">Available span: —</p>
+          <div class="hub-students-timeline-load-shortcuts mb-3" role="group" aria-label="Timeline range shortcuts" id="hubStudentsTimelineLoadShortcuts">
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-hub-timeline-range="full">Full span</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-hub-timeline-range="last-12-months">Last 12 months</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-hub-timeline-range="last-6-months">Last 6 months</button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" data-hub-timeline-range="last-3-months">Last 3 months</button>
+          </div>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label" for="hubStudentsTimelineLoadStart">From</label>
+              <input type="date" class="form-control" id="hubStudentsTimelineLoadStart" autocomplete="off">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="hubStudentsTimelineLoadEnd">To</label>
+              <input type="date" class="form-control" id="hubStudentsTimelineLoadEnd" autocomplete="off">
+            </div>
+          </div>
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+            <span class="fw-semibold small">Events to include</span>
+            <span class="btn-group btn-group-sm" role="group" aria-label="Select event sources">
+              <button type="button" class="btn btn-outline-secondary" id="hubStudentsTimelineSourcesAll">All</button>
+              <button type="button" class="btn btn-outline-secondary" id="hubStudentsTimelineSourcesNone">None</button>
+            </span>
+          </div>
+          <div class="hub-students-timeline-source-list" id="hubStudentsTimelineSourceList" role="group" aria-label="Timeline event categories"></div>
+          <div class="small text-danger mt-2 d-none" id="hubStudentsTimelineLoadError" role="alert"></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-primary" id="hubStudentsTimelineLoadConfirm" disabled>Load timeline</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade hub-students-timeline-modal" id="hubStudentsTimelineModal" tabindex="-1" aria-labelledby="hubStudentsTimelineModalLabel" aria-hidden="true">
   <div class="modal-dialog modal-fullscreen modal-dialog-scrollable">
     <div class="modal-content">
-      <div class="modal-header py-2">
-        <h5 class="modal-title fw-bold" id="hubStudentsTimelineModalLabel">Student timeline</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      <div class="modal-header py-2 hub-students-timeline-modal-header">
+        <h5 class="modal-title fw-bold mb-0" id="hubStudentsTimelineModalLabel">Student timeline</h5>
+        <div class="hub-students-timeline-modal-header-actions ms-auto d-flex align-items-center gap-2">
+          <button type="button" class="hub-students-timeline-filters-btn" id="hubStudentsTimelineChangeFilters" title="Change date range and event sources">
+            <i class="bi bi-sliders hub-students-timeline-filters-btn-icon" aria-hidden="true"></i>
+            <span class="hub-students-timeline-filters-btn-text">Range &amp; sources</span>
+          </button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
       </div>
       <div class="modal-body" id="hubStudentsTimelineModalBody">
         <div class="hub-students-timeline-empty d-none text-muted small text-center py-4" id="hubStudentsTimelineEmpty">
@@ -126,16 +181,33 @@
           <div class="hub-students-timeline-truncated d-none alert alert-warning py-2 small mt-3" id="hubStudentsTimelineTruncated" role="status">
             Some activities or cases were omitted because of list size limits. Use the related tools for the full lists.
           </div>
-          <p class="hub-students-timeline-adjust-hint small text-muted mb-2 mb-md-0">
-            Drag up/down: shorten the vertical stem to zero on the timeline, then keep going to move the card above or below the axis (opposite of where it started); stem length can grow again on that side. Drag horizontally to shrink the L-indent to zero, then cross left/right of the stem. The dot stays on its date. Saved per student in this browser. Ctrl+wheel (Cmd+wheel on Mac) zooms the timeline length; when zoomed, drag empty space or use the horizontal scrollbar to pan.
-          </p>
-          <div class="hub-students-timeline-legend small text-muted mt-3 d-flex flex-wrap gap-2" aria-hidden="true">
-            <span class="hub-students-timeline-legend-item hub-students-timeline-type--enrollment">Enrollments</span>
-            <span class="hub-students-timeline-legend-item hub-students-timeline-type--clb">CLB</span>
-            <span class="hub-students-timeline-legend-item hub-students-timeline-type--referral">Referrals</span>
-            <span class="hub-students-timeline-legend-item hub-students-timeline-type--report">Reports</span>
-            <span class="hub-students-timeline-legend-item hub-students-timeline-type--case">Cases</span>
-            <span class="hub-students-timeline-legend-item hub-students-timeline-type--activity">Activities</span>
+          <div class="hub-students-timeline-legend-bar mt-3">
+            <div class="hub-students-timeline-legend small d-flex flex-wrap gap-2" id="hubStudentsTimelineLegend" role="group" aria-label="Show or hide event types on the timeline">
+              <button type="button" class="hub-students-timeline-legend-item hub-students-timeline-type--enrollment" data-timeline-source="enrollment" role="switch" aria-pressed="true">Enrollments</button>
+              <button type="button" class="hub-students-timeline-legend-item hub-students-timeline-type--registration" data-timeline-source="registration" role="switch" aria-pressed="true">Registrations</button>
+              <button type="button" class="hub-students-timeline-legend-item hub-students-timeline-type--clb" data-timeline-source="clb" role="switch" aria-pressed="true">CLB</button>
+              <button type="button" class="hub-students-timeline-legend-item hub-students-timeline-type--referral" data-timeline-source="referral" role="switch" aria-pressed="true">Referrals</button>
+              <button type="button" class="hub-students-timeline-legend-item hub-students-timeline-type--report" data-timeline-source="report" role="switch" aria-pressed="true">Reports</button>
+              <button type="button" class="hub-students-timeline-legend-item hub-students-timeline-type--case" data-timeline-source="case" role="switch" aria-pressed="true">Cases</button>
+              <button type="button" class="hub-students-timeline-legend-item hub-students-timeline-type--activity" data-timeline-source="activity" role="switch" aria-pressed="true">Activities</button>
+            </div>
+            <div class="hub-students-timeline-help-anchor" id="hubStudentsTimelineHelpAnchor">
+              <button type="button" class="hub-students-timeline-legend-item hub-students-timeline-help-btn" id="hubStudentsTimelineHelpBtn" aria-expanded="false" aria-controls="hubStudentsTimelineHelpPanel" aria-label="Timeline interaction help">
+                <i class="bi bi-info-circle me-1" aria-hidden="true"></i>How to adjust
+              </button>
+              <div class="hub-students-timeline-help-panel d-none" id="hubStudentsTimelineHelpPanel" role="dialog" aria-labelledby="hubStudentsTimelineHelpTitle">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                  <span class="fw-bold small" id="hubStudentsTimelineHelpTitle">Timeline interaction help</span>
+                  <button type="button" class="btn-close btn-close-sm mt-1" id="hubStudentsTimelineHelpClose" aria-label="Close help"></button>
+                </div>
+                <div class="hub-students-timeline-help-body small text-start">
+                  <p class="mb-2"><strong>Drag up/down</strong> — shorten the vertical stem to zero on the timeline, then keep going to move the card above or below the axis (opposite of where it started); stem length can grow again on that side.</p>
+                  <p class="mb-2"><strong>Drag horizontally</strong> — shrink the L-indent to zero, then cross left or right of the stem. The dot stays on its date.</p>
+                  <p class="mb-2">Layout preferences are saved per student in this browser.</p>
+                  <p class="mb-0"><strong>Ctrl+wheel</strong> (Cmd+wheel on Mac) zooms the timeline length; when zoomed, drag empty space or use the horizontal scrollbar to pan.</p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

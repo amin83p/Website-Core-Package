@@ -393,6 +393,121 @@
     });
   }
 
+  function hubStudentsBuildOnHoldOpenUrl(enrollment, hold) {
+    const editUrl = String(enrollment?.editUrl || '').trim();
+    const periodId = String(enrollment?.id || '').trim();
+    const holdId = String(hold?.id || '').trim();
+    if (!editUrl || !periodId) return editUrl;
+    if (editUrl.indexOf('/rolling-enrollment') < 0) return editUrl;
+    try {
+      const base = (global.location && global.location.origin) ? global.location.origin : 'http://localhost';
+      const parsed = new URL(editUrl, base);
+      parsed.searchParams.set('openOnHold', '1');
+      parsed.searchParams.set('periodId', periodId);
+      if (holdId) parsed.searchParams.set('holdId', holdId);
+      return hubStudentsNormalizeEmbedUrl(parsed.pathname + parsed.search + parsed.hash);
+    } catch (error) {
+      const join = editUrl.indexOf('?') >= 0 ? '&' : '?';
+      let out = editUrl + join + 'openOnHold=1&periodId=' + encodeURIComponent(periodId);
+      if (holdId) out += '&holdId=' + encodeURIComponent(holdId);
+      return hubStudentsNormalizeEmbedUrl(out);
+    }
+  }
+
+  function hubStudentsCollectAppliedOnHolds(classEnrollments) {
+    const bag = [];
+    (Array.isArray(classEnrollments) ? classEnrollments : []).forEach(function (enrollment) {
+      const holds = Array.isArray(enrollment?.enrollmentHoldPeriods) ? enrollment.enrollmentHoldPeriods : [];
+      holds.forEach(function (hold) {
+        if (String(hold?.status || 'applied').toLowerCase() !== 'applied') return;
+        const start = String(hold?.startDate || '').trim();
+        const end = String(hold?.endDate || '').trim();
+        if (!start || !end) return;
+        bag.push({ hold: hold, enrollment: enrollment });
+      });
+    });
+    return bag.sort(function (a, b) {
+      const endCmp = String(b.hold?.endDate || '').localeCompare(String(a.hold?.endDate || ''));
+      if (endCmp !== 0) return endCmp;
+      return String(b.hold?.startDate || '').localeCompare(String(a.hold?.startDate || ''));
+    });
+  }
+
+  function hubStudentsFormatOnHoldDateRange(hold) {
+    const start = String(hold?.startDate || '').trim();
+    const end = String(hold?.endDate || '').trim();
+    if (!start && !end) return '—';
+    if (start && end) return start + ' → ' + end;
+    return start || end;
+  }
+
+  function renderHubStudentsOnHoldsListHtml(classEnrollments) {
+    const rows = hubStudentsCollectAppliedOnHolds(classEnrollments);
+    if (!rows.length) {
+      return '<div class="text-muted small">No on-hold periods on file.</div>';
+    }
+    return [
+      '<ul class="hub-students-onhold-list">',
+      rows.map(function (row) {
+        const hold = row.hold || {};
+        const enrollment = row.enrollment || {};
+        const classTitle = String(enrollment?.classTitle || enrollment?.classId || 'Class').trim();
+        const reason = String(hold?.reason || '').trim();
+        const sessionCount = Array.isArray(hold?.sessionIds) ? hold.sessionIds.length : 0;
+        const openUrl = hubStudentsBuildOnHoldOpenUrl(enrollment, hold);
+        const openBtn = openUrl
+          ? hubStudentsSideBtnAction(
+            'Open',
+            ' data-hub-students-open-on-hold="1"'
+            + ' data-hub-on-hold-url="' + escapeHtml(openUrl) + '"'
+            + ' data-hub-on-hold-title="' + escapeHtml('On hold — ' + classTitle) + '"',
+            'secondary'
+          )
+          : '';
+        return [
+          '<li class="hub-students-onhold-item">',
+          '<div class="hub-students-onhold-main">',
+          '<div class="hub-students-onhold-title"><i class="bi bi-pause-circle me-1 text-secondary" aria-hidden="true"></i>',
+          escapeHtml(classTitle),
+          '</div>',
+          '<div class="hub-students-onhold-dates">' + escapeHtml(hubStudentsFormatOnHoldDateRange(hold)) + '</div>',
+          reason ? '<div class="hub-students-onhold-reason">' + escapeHtml(reason) + '</div>' : '',
+          sessionCount ? '<div class="hub-students-onhold-meta text-muted small">' + escapeHtml(String(sessionCount) + ' session(s) marked N/A') + '</div>' : '',
+          '</div>',
+          '<div class="hub-students-side-card-actions hub-students-onhold-actions">',
+          openBtn,
+          '</div>',
+          '</li>'
+        ].join('');
+      }).join(''),
+      '</ul>'
+    ].join('');
+  }
+
+  function renderHubStudentsOnHoldsCard(profile) {
+    const body = document.getElementById('hubStudentsOnHoldsBody');
+    if (!body) return;
+    if (!profile || !profile.id) {
+      body.innerHTML = '';
+      return;
+    }
+    body.innerHTML = renderHubStudentsOnHoldsListHtml(profile.classEnrollments);
+    requestAnimationFrame(function () {
+      hubStudentsSyncCardHeights();
+    });
+  }
+
+  function setHubStudentsOnHoldsCardLoading() {
+    const body = document.getElementById('hubStudentsOnHoldsBody');
+    if (!body) return;
+    body.innerHTML = [
+      '<div class="text-muted small d-flex align-items-center">',
+      '<span class="spinner-border spinner-border-sm text-secondary me-2" role="status"></span>',
+      'Loading on-hold periods…',
+      '</div>'
+    ].join('');
+  }
+
   function setHubStudentsEnrollmentsCardLoading() {
     const body = document.getElementById('hubStudentsEnrollmentsBody');
     if (!body) return;
@@ -621,6 +736,7 @@
     const cardStack = document.getElementById('hubStudentsCardStack');
     const programCard = document.getElementById('hubStudentsProgramRegsCard');
     const enrollmentsCard = document.getElementById('hubStudentsEnrollmentsCard');
+    const onHoldsCard = document.getElementById('hubStudentsOnHoldsCard');
     const showStudent = mode === 'student';
     const showLogo = mode === 'logo' || mode === 'logo-loading';
     if (emptyHero) {
@@ -637,6 +753,7 @@
     if (cardStack) cardStack.classList.toggle('d-none', !showStudent);
     if (programCard) programCard.classList.toggle('d-none', !showStudent);
     if (enrollmentsCard) enrollmentsCard.classList.toggle('d-none', !showStudent);
+    if (onHoldsCard) onHoldsCard.classList.toggle('d-none', !showStudent);
     requestAnimationFrame(function () {
       hubStudentsSyncCardHeights();
     });
@@ -654,6 +771,21 @@
     const bag = params instanceof URLSearchParams ? params : new URLSearchParams(params || '');
     bag.set(HUB_STUDENTS_EMBED_QUERY, '1');
     return bag;
+  }
+
+  function hubStudentsNormalizeEmbedUrl(url) {
+    const raw = String(url || '').trim();
+    if (!raw) return '';
+    try {
+      const base = (global.location && global.location.origin) ? global.location.origin : 'http://localhost';
+      const parsed = new URL(raw, base);
+      parsed.searchParams.set(HUB_STUDENTS_EMBED_QUERY, '1');
+      return parsed.pathname + parsed.search + parsed.hash;
+    } catch (error) {
+      if (/[?&]smEmbed=1(?:&|$)/.test(raw)) return raw;
+      const join = raw.indexOf('?') >= 0 ? '&' : '?';
+      return raw + join + HUB_STUDENTS_EMBED_QUERY + '=1';
+    }
   }
 
   function hubStudentsGetQuickActionButtons() {
@@ -922,13 +1054,14 @@
     const modalEl = document.getElementById('hubStudentsEmbedModal');
     const frame = document.getElementById('hubStudentsEmbedFrame');
     const titleEl = document.getElementById('hubStudentsEmbedModalLabel');
-    if (!modalEl || !frame || !url) return;
+    const embedUrl = hubStudentsNormalizeEmbedUrl(url);
+    if (!modalEl || !frame || !embedUrl) return;
     if (titleEl) titleEl.textContent = String(title || 'School tool').trim() || 'School tool';
     hubStudentsSetEmbedLoading(true);
     frame.onload = function () {
       hubStudentsSetEmbedLoading(false);
     };
-    frame.src = url;
+    frame.src = embedUrl;
     hubStudentsShowModal(modalEl);
   }
 
@@ -1059,12 +1192,100 @@
       return;
     }
     if (key === 'timeline') {
-      void hubStudentsOpenTimelineModal();
+      void hubStudentsOpenTimelineLoadModal(false);
       return;
     }
   }
 
   let hubStudentsTimelineModalBound = false;
+  let hubStudentsTimelineLoadModalBound = false;
+  let hubStudentsTimelineRawPayload = null;
+  let hubStudentsTimelineHiddenSources = new Set();
+  let hubStudentsTimelineLoadFullRange = { minDate: '', maxDate: '' };
+  let hubStudentsTimelineLastLoadPrefs = { startDate: '', endDate: '', sources: [] };
+
+  const HUB_TIMELINE_SOURCE_KEYS = [
+    'enrollment',
+    'registration',
+    'clb',
+    'referral',
+    'report',
+    'case',
+    'activity'
+  ];
+
+  function hubStudentsTimelineSourceTypeClass(sourceKey) {
+    const key = String(sourceKey || '').trim().toLowerCase();
+    if (HUB_TIMELINE_SOURCE_KEYS.indexOf(key) >= 0) {
+      return 'hub-students-timeline-type--' + key;
+    }
+    return 'hub-students-timeline-type--registration';
+  }
+
+  function hubStudentsTimelineEventTypeClass(event) {
+    const row = event && typeof event === 'object' ? event : {};
+    const source = String(row.source || '').trim();
+    if (source) return hubStudentsTimelineSourceTypeClass(source);
+    return hubStudentsTimelineTypeClass(row.type);
+  }
+
+  function hubStudentsIsTimelineSpanEvent(event) {
+    const row = event && typeof event === 'object' ? event : {};
+    return String(row.display || '').trim().toLowerCase() === 'span';
+  }
+
+  function hubStudentsResolveTimelineEventSource(type) {
+    const token = String(type || '').trim().toLowerCase();
+    if (token === 'student_enrollment_start' || token.indexOf('class_enrollment') === 0) {
+      return 'enrollment';
+    }
+    if (token === 'program_registration' || token === 'term_registration') return 'registration';
+    if (token.indexOf('clb') === 0) return 'clb';
+    if (token.indexOf('referral') === 0) return 'referral';
+    if (token.indexOf('report') === 0) return 'report';
+    if (token.indexOf('session_case') === 0) return 'case';
+    if (token.indexOf('activity') === 0) return 'activity';
+    if (token.indexOf('registration') >= 0) return 'registration';
+    return 'registration';
+  }
+
+  function hubStudentsTimelineEventSource(event) {
+    const row = event && typeof event === 'object' ? event : {};
+  return String(row.source || '').trim() || hubStudentsResolveTimelineEventSource(row.type);
+  }
+
+  function hubStudentsFilterTimelineEventsByVisibility(events) {
+    const list = Array.isArray(events) ? events : [];
+    if (!hubStudentsTimelineHiddenSources.size) return list.slice();
+    return list.filter(function (event) {
+      return !hubStudentsTimelineHiddenSources.has(hubStudentsTimelineEventSource(event));
+    });
+  }
+
+  function hubStudentsTimelineAppliedRange(payload) {
+    const meta = payload && payload.meta && typeof payload.meta === 'object' ? payload.meta : {};
+    const applied = meta.appliedRange && typeof meta.appliedRange === 'object' ? meta.appliedRange : {};
+    const range = payload && payload.range && typeof payload.range === 'object' ? payload.range : {};
+    const start = String(applied.startDate || range.minDate || '').trim();
+    const end = String(applied.endDate || range.maxDate || '').trim();
+    return { minDate: start, maxDate: end };
+  }
+
+  function hubStudentsSyncTimelineLegendUi() {
+    const legend = document.getElementById('hubStudentsTimelineLegend');
+    if (!legend) return;
+    legend.querySelectorAll('[data-timeline-source]').forEach(function (btn) {
+      const key = String(btn.getAttribute('data-timeline-source') || '').trim();
+      const on = !hubStudentsTimelineHiddenSources.has(key);
+      btn.classList.toggle('is-off', !on);
+      btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+  }
+
+  function hubStudentsResetTimelineLegendVisibility() {
+    hubStudentsTimelineHiddenSources = new Set();
+    hubStudentsSyncTimelineLegendUi();
+  }
 
   function hubStudentsHideTimelineModal() {
     const modalEl = document.getElementById('hubStudentsTimelineModal');
@@ -1075,6 +1296,9 @@
 
   function hubStudentsTimelineTypeClass(type) {
     const token = String(type || '').trim().toLowerCase();
+    if (token === 'class_enrollment_on_hold') {
+      return 'hub-students-timeline-type--on-hold';
+    }
     if (token.indexOf('class_enrollment') === 0 || token === 'student_enrollment_start') {
       return 'hub-students-timeline-type--enrollment';
     }
@@ -1120,14 +1344,13 @@
     const wrap = document.getElementById('hubStudentsTimelineWrap');
     const track = document.getElementById('hubStudentsTimelineTrack');
     const status = document.getElementById('hubStudentsTimelineLoadStatus');
-    const hint = wrap ? wrap.querySelector('.hub-students-timeline-adjust-hint') : null;
-    const legend = wrap ? wrap.querySelector('.hub-students-timeline-legend') : null;
+    const legendBar = wrap ? wrap.querySelector('.hub-students-timeline-legend-bar') : null;
     const truncated = document.getElementById('hubStudentsTimelineTruncated');
     if (wrap) wrap.classList.toggle('hub-students-timeline-wrap--loading', active);
     if (track) track.classList.toggle('is-loading', active);
     if (status) status.classList.toggle('d-none', !active);
-    if (hint) hint.classList.toggle('d-none', active);
-    if (legend) legend.classList.toggle('d-none', active);
+    if (legendBar) legendBar.classList.toggle('d-none', active);
+    if (active) hubStudentsSetTimelineHelpOpen(false);
     if (truncated && active) truncated.classList.add('d-none');
   }
 
@@ -1160,29 +1383,6 @@
         setTimeout(resolve, 16);
       });
     });
-  }
-
-  async function hubStudentsFetchTimelineWithProgress(studentId) {
-    const fetchNotes = [
-      'Loading enrollments, CLB, reports, and related events…',
-      'Loading referrals, activities, and cases…',
-      'Waiting for server response…'
-    ];
-    let creepPct = 28;
-    let noteIdx = 0;
-    hubStudentsUpdateTimelineAxisProgress(creepPct, fetchNotes[noteIdx]);
-    await hubStudentsTimelineForcePaint();
-    const creepTimer = setInterval(function () {
-      if (creepPct >= 38) return;
-      creepPct += 1;
-      noteIdx = (noteIdx + 1) % fetchNotes.length;
-      hubStudentsUpdateTimelineAxisProgress(creepPct, fetchNotes[noteIdx]);
-    }, 400);
-    try {
-      return await hubStudentsFetchTimeline(studentId);
-    } finally {
-      clearInterval(creepTimer);
-    }
   }
 
   function hubStudentsTimelineBucketKey(percent) {
@@ -1838,7 +2038,11 @@
   function hubStudentsFormatTimelineTipText(event) {
     const bag = event && typeof event === 'object' ? event : {};
     const dateRaw = String(bag.date || bag.dateKey || '').trim();
-    const dateLine = dateRaw ? ('Date: ' + formatHubDateKey(dateRaw)) : '';
+    const endRaw = String(bag.endDate || '').trim();
+    let dateLine = dateRaw ? ('Date: ' + formatHubDateKey(dateRaw)) : '';
+    if (hubStudentsIsTimelineSpanEvent(bag) && dateRaw && endRaw) {
+      dateLine = 'From: ' + formatHubDateKey(dateRaw) + ' · To: ' + formatHubDateKey(endRaw);
+    }
     const tooltipLines = Array.isArray(bag.tooltipLines) ? bag.tooltipLines : [];
     if (tooltipLines.length) {
       return [dateLine]
@@ -1922,9 +2126,37 @@
     hubStudentsTimelineTipAnchor = target;
   }
 
+  function hubStudentsRenderTimelineSpan(event, axisMinDate, axisMaxDate) {
+    const start = String(event?.date || '').trim();
+    const end = String(event?.endDate || '').trim() || start;
+    if (!start || !end) return '';
+    const typeClass = hubStudentsTimelineEventTypeClass(event);
+    const leftPct = hubStudentsTimelinePositionPercent(start, axisMinDate, axisMaxDate);
+    const rightPct = hubStudentsTimelinePositionPercent(end, axisMinDate, axisMaxDate);
+    const widthPct = Math.max(0.4, rightPct - leftPct);
+    const tipText = escapeHtml(hubStudentsFormatTimelineTipText(event || {}));
+    const actionAttr = hubStudentsEncodeTimelineAction(event?.action);
+    const eventId = escapeHtml(String(event?.id || ''));
+    const label = escapeHtml(String(event?.label || 'On hold'));
+    return [
+      '<button type="button" class="hub-students-timeline-span ' + typeClass + '"',
+      ' style="left:' + String(leftPct) + '%;width:' + String(widthPct) + '%;"',
+      ' data-hub-timeline-event-id="' + eventId + '"',
+      ' data-hub-timeline-span="1"',
+      ' data-hub-timeline-action="' + actionAttr + '"',
+      ' data-tip="' + tipText + '"',
+      ' data-tip-bg="#334155" data-tip-fg="#f8fafc" data-tip-border="#94a3b8"',
+      ' aria-label="' + label + '">',
+      '<span class="hub-students-timeline-span-cap hub-students-timeline-span-cap--start" aria-hidden="true"></span>',
+      '<span class="hub-students-timeline-span-cap hub-students-timeline-span-cap--end" aria-hidden="true"></span>',
+      '<span class="visually-hidden">' + label + '</span>',
+      '</button>'
+    ].join('');
+  }
+
   function hubStudentsRenderTimelineMarker(layout) {
     const event = layout?.event;
-    const typeClass = hubStudentsTimelineTypeClass(event?.type);
+    const typeClass = hubStudentsTimelineEventTypeClass(event);
     const label = escapeHtml(String(event?.label || event?.type || 'Event'));
     const dateRaw = String(layout?.dateKey || event?.date || '').trim();
     const dateLabel = escapeHtml(formatHubDateKey(dateRaw, { year: 'numeric', month: 'short', day: 'numeric' }));
@@ -1964,7 +2196,7 @@
       '</div>'
     ].join('');
     return [
-      '<div class="hub-students-timeline-marker hub-students-timeline-marker--' + side + ' hub-students-timeline-marker--branch-' + branchSide + '"',
+      '<div class="hub-students-timeline-marker ' + typeClass + ' hub-students-timeline-marker--' + side + ' hub-students-timeline-marker--branch-' + branchSide + '"',
       ' style="' + leftStyle + cssVars + '" role="listitem">',
       '<div class="hub-students-timeline-stem hub-students-timeline-stem--' + side + '">',
       dotWrap,
@@ -1974,7 +2206,9 @@
     ].join('');
   }
 
-  async function hubStudentsRenderTimeline(timeline) {
+  async function hubStudentsRenderTimeline(timeline, renderOpts) {
+    const opts = renderOpts && typeof renderOpts === 'object' ? renderOpts : {};
+    const visibilityOnly = opts.visibilityOnly === true;
     const wrap = document.getElementById('hubStudentsTimelineWrap');
     const empty = document.getElementById('hubStudentsTimelineEmpty');
     const track = document.getElementById('hubStudentsTimelineTrack');
@@ -1985,27 +2219,52 @@
     if (!wrap || !empty || !track) return;
 
     const payload = timeline && typeof timeline === 'object' ? timeline : {};
+    if (!visibilityOnly) {
+      hubStudentsTimelineRawPayload = payload;
+      hubStudentsResetTimelineLegendVisibility();
+    }
     const student = payload.student && typeof payload.student === 'object' ? payload.student : {};
-    const range = payload.range && typeof payload.range === 'object' ? payload.range : {};
-    const events = Array.isArray(payload.events) ? payload.events : [];
-    const minDate = String(range.minDate || '').trim();
-    const maxDate = String(range.maxDate || '').trim();
+    const applied = hubStudentsTimelineAppliedRange(payload);
+    const axisMinDate = String(applied.minDate || '').trim();
+    const axisMaxDate = String(applied.maxDate || '').trim();
+    const allEvents = Array.isArray(payload.events) ? payload.events : [];
+    const events = hubStudentsFilterTimelineEventsByVisibility(allEvents);
+    const spanEvents = events.filter(hubStudentsIsTimelineSpanEvent);
+    const pointEvents = events.filter(function (row) {
+      return !hubStudentsIsTimelineSpanEvent(row);
+    });
 
-    hubStudentsUpdateTimelineAxisProgress(46, 'Reading student profile and date range…');
-    await hubStudentsTimelineForcePaint();
+    if (!visibilityOnly) {
+      hubStudentsUpdateTimelineAxisProgress(46, 'Reading student profile and date range…');
+      await hubStudentsTimelineForcePaint();
+    }
 
     if (titleEl) {
       const name = String(student.name || student.id || 'Student').trim();
       titleEl.textContent = name ? 'Timeline — ' + name : 'Student timeline';
     }
-    if (minLabel) minLabel.textContent = minDate || '…';
-    if (maxLabel) maxLabel.textContent = maxDate || '…';
+    if (minLabel) minLabel.textContent = axisMinDate || '…';
+    if (maxLabel) maxLabel.textContent = axisMaxDate || '…';
 
-    if (!events.length || !minDate || !maxDate) {
-      hubStudentsUpdateTimelineAxisProgress(100, 'No dated events to display.');
-      await hubStudentsTimelineForcePaint();
+    if (!events.length || !axisMinDate || !axisMaxDate) {
+      if (!visibilityOnly) {
+        hubStudentsUpdateTimelineAxisProgress(100, allEvents.length
+          ? 'No events match the current visibility filters.'
+          : 'No dated events to display.');
+        await hubStudentsTimelineForcePaint();
+      }
+      if (visibilityOnly && allEvents.length && axisMinDate && axisMaxDate) {
+        empty.classList.remove('d-none');
+        wrap.classList.remove('d-none');
+        track.innerHTML = '';
+        hubStudentsTimelineLoadUi(false);
+        return;
+      }
       wrap.classList.add('d-none');
       empty.classList.remove('d-none');
+      empty.textContent = allEvents.length
+        ? 'No events are visible for the selected filters. Adjust the legend toggles or reload with different sources and dates.'
+        : 'No dated events were found for this student with the selected range and sources.';
       track.innerHTML = '';
       track.classList.remove('is-loading');
       if (truncated) truncated.classList.add('d-none');
@@ -2014,18 +2273,25 @@
     }
 
     empty.classList.add('d-none');
+
     if (truncated) truncated.classList.toggle('d-none', payload.truncated !== true);
 
     const studentId = String(student.id || '').trim();
     hubStudentsTimelineActiveStudentId = studentId;
-    hubStudentsApplyTimelineTrackWidth(track);
+    if (!visibilityOnly) {
+      hubStudentsApplyTimelineTrackWidth(track);
+    }
 
-    hubStudentsUpdateTimelineAxisProgress(56, 'Placing ' + String(events.length) + ' events on the axis…');
-    await hubStudentsTimelineForcePaint();
-    let layouts = hubStudentsAssignTimelineLayout(events, minDate, maxDate);
+    if (!visibilityOnly) {
+      hubStudentsUpdateTimelineAxisProgress(56, 'Placing ' + String(pointEvents.length) + ' events on the axis…');
+      await hubStudentsTimelineForcePaint();
+    }
+    let layouts = hubStudentsAssignTimelineLayout(pointEvents, axisMinDate, axisMaxDate);
 
-    hubStudentsUpdateTimelineAxisProgress(68, 'Applying saved card layout preferences…');
-    await hubStudentsTimelineForcePaint();
+    if (!visibilityOnly) {
+      hubStudentsUpdateTimelineAxisProgress(68, 'Applying saved card layout preferences…');
+      await hubStudentsTimelineForcePaint();
+    }
     layouts = hubStudentsApplyTimelineLayoutPrefs(layouts, studentId);
 
     const scroll = track.parentElement;
@@ -2033,22 +2299,37 @@
       ? Math.round(scroll.clientWidth * HUB_TIMELINE_AXIS_WIDTH_RATIO)
       : 960;
 
-    hubStudentsUpdateTimelineAxisProgress(72, 'Organizing cards (stem, indent, and side)…');
-    await hubStudentsTimelineForcePaint();
-    layouts = await hubStudentsOptimizeTimelineLayouts(layouts, estTrackW, function (pct, note) {
-      hubStudentsUpdateTimelineAxisProgress(pct, note);
-    });
+    if (!visibilityOnly) {
+      hubStudentsUpdateTimelineAxisProgress(72, 'Organizing cards (stem, indent, and side)…');
+      await hubStudentsTimelineForcePaint();
+    }
+    layouts = await hubStudentsOptimizeTimelineLayouts(layouts, estTrackW, visibilityOnly
+      ? null
+      : function (pct, note) {
+        hubStudentsUpdateTimelineAxisProgress(pct, note);
+      });
     hubStudentsTimelineLiveLayouts = layouts;
     hubStudentsTimelineRecalcTrackPadding(track, layouts);
 
-    hubStudentsUpdateTimelineAxisProgress(92, 'Drawing timeline cards and connectors…');
-    await hubStudentsTimelineForcePaint();
-    track.innerHTML = layouts.map(hubStudentsRenderTimelineMarker).join('');
+    if (!visibilityOnly) {
+      hubStudentsUpdateTimelineAxisProgress(92, 'Drawing timeline cards and connectors…');
+      await hubStudentsTimelineForcePaint();
+    }
+    const spanLayerHtml = spanEvents.length
+      ? '<div class="hub-students-timeline-span-layer" aria-hidden="false">' +
+        spanEvents.map(function (row) {
+          return hubStudentsRenderTimelineSpan(row, axisMinDate, axisMaxDate);
+        }).join('') +
+        '</div>'
+      : '';
+    track.innerHTML = spanLayerHtml + layouts.map(hubStudentsRenderTimelineMarker).join('');
     track.setAttribute('role', 'list');
-    hubStudentsApplyTimelineTrackWidth(track, { captureBase: true });
+    hubStudentsApplyTimelineTrackWidth(track, visibilityOnly ? undefined : { captureBase: true });
 
-    hubStudentsUpdateTimelineAxisProgress(100, 'Timeline ready.');
-    await hubStudentsTimelineForcePaint();
+    if (!visibilityOnly) {
+      hubStudentsUpdateTimelineAxisProgress(100, 'Timeline ready.');
+      await hubStudentsTimelineForcePaint();
+    }
     if (typeof global.requestAnimationFrame === 'function') {
       await new Promise(function (resolve) {
         global.requestAnimationFrame(function () {
@@ -2060,9 +2341,33 @@
     hubStudentsTimelineLoadUi(false);
   }
 
-  async function hubStudentsFetchTimeline(studentId) {
+  async function hubStudentsFetchTimelineLoadOptions(studentId) {
     const id = String(studentId || '').trim();
-    const response = await fetch('' + API_BASE + '/students/' + encodeURIComponent(id) + '/timeline', {
+    const response = await fetch('' + API_BASE + '/students/' + encodeURIComponent(id) + '/timeline/load-options', {
+      headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+      credentials: 'same-origin'
+    });
+    const payload = await response.json().catch(function () {
+      return { status: 'error', message: 'Unable to load timeline options.' };
+    });
+    if (!response.ok || payload.status !== 'success') {
+      throw new Error(payload.message || 'Unable to load timeline options.');
+    }
+    return payload.loadOptions || null;
+  }
+
+  async function hubStudentsFetchTimeline(studentId, queryOpts) {
+    const id = String(studentId || '').trim();
+    const q = queryOpts && typeof queryOpts === 'object' ? queryOpts : {};
+    const params = new URLSearchParams();
+    if (q.startDate) params.set('startDate', String(q.startDate));
+    if (q.endDate) params.set('endDate', String(q.endDate));
+    if (Array.isArray(q.sources) && q.sources.length) {
+      params.set('sources', q.sources.join(','));
+    }
+    const qs = params.toString();
+    const url = '' + API_BASE + '/students/' + encodeURIComponent(id) + '/timeline' + (qs ? '?' + qs : '');
+    const response = await fetch(url, {
       headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
       credentials: 'same-origin'
     });
@@ -2073,6 +2378,224 @@
       throw new Error(payload.message || 'Unable to load timeline.');
     }
     return payload.timeline || null;
+  }
+
+  function hubStudentsTimelineAddMonths(isoDate, monthDelta) {
+    const text = String(isoDate || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) return '';
+    const parts = text.split('-').map(Number);
+    const dt = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+    dt.setUTCMonth(dt.getUTCMonth() + monthDelta);
+    const y = dt.getUTCFullYear();
+    const m = String(dt.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(dt.getUTCDate()).padStart(2, '0');
+    return y + '-' + m + '-' + d;
+  }
+
+  function hubStudentsTimelineClampIsoDate(value, min, max) {
+    const date = String(value || '').trim();
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return '';
+    let out = date;
+    if (min && out < min) out = min;
+    if (max && out > max) out = max;
+    return out;
+  }
+
+  function hubStudentsSetTimelineLoadDateFields(startDate, endDate) {
+    const startEl = document.getElementById('hubStudentsTimelineLoadStart');
+    const endEl = document.getElementById('hubStudentsTimelineLoadEnd');
+    const min = String(hubStudentsTimelineLoadFullRange.minDate || '').trim();
+    const max = String(hubStudentsTimelineLoadFullRange.maxDate || '').trim();
+    const start = hubStudentsTimelineClampIsoDate(startDate, min, max);
+    const end = hubStudentsTimelineClampIsoDate(endDate, min, max);
+    if (startEl) {
+      startEl.min = min;
+      startEl.max = max;
+      startEl.value = start;
+    }
+    if (endEl) {
+      endEl.min = min;
+      endEl.max = max;
+      endEl.value = end;
+    }
+  }
+
+  function hubStudentsRenderTimelineSourceCheckboxes(catalog, countsBySource, checkedKeys) {
+    const list = document.getElementById('hubStudentsTimelineSourceList');
+    if (!list) return;
+    const checked = new Set(Array.isArray(checkedKeys) ? checkedKeys : HUB_TIMELINE_SOURCE_KEYS);
+    const rows = Array.isArray(catalog) ? catalog : HUB_TIMELINE_SOURCE_KEYS.map(function (key) {
+      return { key: key, label: key };
+    });
+    const counts = countsBySource && typeof countsBySource === 'object' ? countsBySource : {};
+    list.innerHTML = rows.map(function (row) {
+      const key = String(row.key || '').trim();
+      const label = escapeHtml(String(row.label || key));
+      const count = Number(counts[key]) || 0;
+      const on = checked.has(key);
+      const typeClass = hubStudentsTimelineSourceTypeClass(key);
+      const inputId = 'hubStudentsTimelineSource_' + key;
+      return [
+        '<label class="hub-students-timeline-source-row ' + typeClass + '" for="' + escapeHtml(inputId) + '">',
+        '<input class="form-check-input js-hub-timeline-source flex-shrink-0" type="checkbox"',
+        ' id="' + escapeHtml(inputId) + '"',
+        ' value="' + escapeHtml(key) + '"',
+        on ? ' checked' : '',
+        '>',
+        '<span class="hub-students-timeline-source-swatch" aria-hidden="true"></span>',
+        '<span class="hub-students-timeline-source-label">' + label + '</span>',
+        '<span class="hub-students-timeline-source-count badge rounded-pill">' + String(count) + '</span>',
+        '</label>'
+      ].join('');
+    }).join('');
+  }
+
+  function hubStudentsReadTimelineLoadSources() {
+    return Array.from(document.querySelectorAll('#hubStudentsTimelineSourceList .js-hub-timeline-source:checked'))
+      .map(function (el) { return String(el.value || '').trim(); })
+      .filter(Boolean);
+  }
+
+  function hubStudentsApplyTimelineLoadRangeToken(token) {
+    const min = String(hubStudentsTimelineLoadFullRange.minDate || '').trim();
+    const max = String(hubStudentsTimelineLoadFullRange.maxDate || '').trim();
+    if (!min || !max) return;
+    const key = String(token || '').trim().toLowerCase();
+    if (key === 'full') {
+      hubStudentsSetTimelineLoadDateFields(min, max);
+      return;
+    }
+    const monthsMap = { 'last-3-months': -3, 'last-6-months': -6, 'last-12-months': -12 };
+    const monthDelta = monthsMap[key];
+    if (monthDelta == null) return;
+    let start = hubStudentsTimelineAddMonths(max, monthDelta);
+    if (start < min) start = min;
+    hubStudentsSetTimelineLoadDateFields(start, max);
+    const shortcuts = document.getElementById('hubStudentsTimelineLoadShortcuts');
+    if (shortcuts) {
+      shortcuts.querySelectorAll('[data-hub-timeline-range]').forEach(function (btn) {
+        btn.classList.toggle('active', btn.getAttribute('data-hub-timeline-range') === key);
+      });
+    }
+  }
+
+  async function hubStudentsOpenTimelineLoadModal(restoreLastPrefs) {
+    const profile = hubStudentsRequireSelectedProfile();
+    if (!profile) return;
+    const modalEl = document.getElementById('hubStudentsTimelineLoadModal');
+    const busy = document.getElementById('hubStudentsTimelineLoadBusy');
+    const form = document.getElementById('hubStudentsTimelineLoadForm');
+    const errorEl = document.getElementById('hubStudentsTimelineLoadError');
+    const confirmBtn = document.getElementById('hubStudentsTimelineLoadConfirm');
+    const spanHint = document.getElementById('hubStudentsTimelineLoadSpanHint');
+    if (!modalEl) return;
+    if (busy) busy.classList.remove('d-none');
+    if (form) form.classList.add('d-none');
+    if (errorEl) {
+      errorEl.textContent = '';
+      errorEl.classList.add('d-none');
+    }
+    if (confirmBtn) confirmBtn.disabled = true;
+    hubStudentsShowModal(modalEl);
+    try {
+      const loadOptions = await hubStudentsFetchTimelineLoadOptions(profile.id);
+      hubStudentsTimelineLoadFullRange = loadOptions && loadOptions.fullRange
+        ? loadOptions.fullRange
+        : { minDate: '', maxDate: '' };
+      const min = String(hubStudentsTimelineLoadFullRange.minDate || '').trim();
+      const max = String(hubStudentsTimelineLoadFullRange.maxDate || '').trim();
+      if (spanHint) {
+        spanHint.textContent = min && max
+          ? 'Available span: ' + min + ' – ' + max
+          : 'No dated events were found for this student.';
+      }
+      const prefs = restoreLastPrefs === true ? hubStudentsTimelineLastLoadPrefs : { startDate: '', endDate: '', sources: [] };
+      const startPref = String(prefs.startDate || min).trim();
+      const endPref = String(prefs.endDate || max).trim();
+      const sourcesPref = Array.isArray(prefs.sources) && prefs.sources.length
+        ? prefs.sources
+        : HUB_TIMELINE_SOURCE_KEYS.slice();
+      hubStudentsRenderTimelineSourceCheckboxes(loadOptions && loadOptions.sources, loadOptions && loadOptions.countsBySource, sourcesPref);
+      hubStudentsSetTimelineLoadDateFields(startPref, endPref);
+      if (busy) busy.classList.add('d-none');
+      if (form) form.classList.remove('d-none');
+      if (confirmBtn) confirmBtn.disabled = !(min && max);
+    } catch (error) {
+      if (busy) busy.classList.add('d-none');
+      if (errorEl) {
+        errorEl.textContent = String(error && error.message ? error.message : 'Unable to load timeline options.');
+        errorEl.classList.remove('d-none');
+      }
+    }
+  }
+
+  function hubStudentsReadTimelineLoadDateFields() {
+    const startEl = document.getElementById('hubStudentsTimelineLoadStart');
+    const endEl = document.getElementById('hubStudentsTimelineLoadEnd');
+    return {
+      startDate: startEl ? String(startEl.value || '').trim() : '',
+      endDate: endEl ? String(endEl.value || '').trim() : ''
+    };
+  }
+
+  async function hubStudentsConfirmTimelineLoad() {
+    const profile = hubStudentsRequireSelectedProfile();
+    if (!profile) return;
+    const errorEl = document.getElementById('hubStudentsTimelineLoadError');
+    const range = hubStudentsReadTimelineLoadDateFields();
+    const sources = hubStudentsReadTimelineLoadSources();
+    const min = String(hubStudentsTimelineLoadFullRange.minDate || '').trim();
+    const max = String(hubStudentsTimelineLoadFullRange.maxDate || '').trim();
+    if (!min || !max) {
+      if (errorEl) {
+        errorEl.textContent = 'This student has no dated timeline events to show.';
+        errorEl.classList.remove('d-none');
+      }
+      return;
+    }
+    if (!range.startDate || !range.endDate) {
+      if (errorEl) {
+        errorEl.textContent = 'Choose both start and end dates.';
+        errorEl.classList.remove('d-none');
+      }
+      return;
+    }
+    if (range.startDate > range.endDate) {
+      if (errorEl) {
+        errorEl.textContent = 'Start date must be on or before end date.';
+        errorEl.classList.remove('d-none');
+      }
+      return;
+    }
+    if (range.startDate < min || range.endDate > max) {
+      if (errorEl) {
+        errorEl.textContent = 'Dates must stay within the available span (' + min + ' – ' + max + ').';
+        errorEl.classList.remove('d-none');
+      }
+      return;
+    }
+    if (!sources.length) {
+      if (errorEl) {
+        errorEl.textContent = 'Select at least one event type to load.';
+        errorEl.classList.remove('d-none');
+      }
+      return;
+    }
+    hubStudentsTimelineLastLoadPrefs = {
+      startDate: range.startDate,
+      endDate: range.endDate,
+      sources: sources.slice()
+    };
+    const loadModal = document.getElementById('hubStudentsTimelineLoadModal');
+    if (loadModal && global.bootstrap && global.bootstrap.Modal) {
+      const inst = global.bootstrap.Modal.getInstance(loadModal);
+      if (inst) inst.hide();
+    }
+    await hubStudentsOpenTimelineModal({
+      startDate: range.startDate,
+      endDate: range.endDate,
+      sources: sources
+    });
   }
 
   function hubStudentsHandleTimelineEventAction(action) {
@@ -2104,7 +2627,7 @@
       return;
     }
 
-    if (kind === 'enrollment_edit_embed' || kind === 'embed_url') {
+    if (kind === 'enrollment_edit_embed' || kind === 'enrollment_on_hold_embed' || kind === 'embed_url') {
       const url = String(bag.url || '').trim();
       const title = String(bag.title || 'Details').trim();
       if (!url) {
@@ -2159,14 +2682,40 @@
     }
   }
 
-  async function hubStudentsOpenTimelineModal() {
+  async function hubStudentsFetchTimelineWithProgress(studentId, queryOpts) {
+    const fetchNotes = [
+      'Loading enrollments, CLB, reports, and related events…',
+      'Loading referrals, activities, and cases…',
+      'Waiting for server response…'
+    ];
+    let creepPct = 28;
+    let noteIdx = 0;
+    hubStudentsUpdateTimelineAxisProgress(creepPct, fetchNotes[noteIdx]);
+    await hubStudentsTimelineForcePaint();
+    const creepTimer = setInterval(function () {
+      if (creepPct >= 38) return;
+      creepPct += 1;
+      noteIdx = (noteIdx + 1) % fetchNotes.length;
+      hubStudentsUpdateTimelineAxisProgress(creepPct, fetchNotes[noteIdx]);
+    }, 400);
+    try {
+      return await hubStudentsFetchTimeline(studentId, queryOpts);
+    } finally {
+      clearInterval(creepTimer);
+    }
+  }
+
+  async function hubStudentsOpenTimelineModal(queryOpts) {
     const profile = hubStudentsRequireSelectedProfile();
     if (!profile) return;
     const modalEl = document.getElementById('hubStudentsTimelineModal');
     const empty = document.getElementById('hubStudentsTimelineEmpty');
     const wrap = document.getElementById('hubStudentsTimelineWrap');
     if (!modalEl) return;
-    if (empty) empty.classList.add('d-none');
+    if (empty) {
+      empty.classList.add('d-none');
+      empty.textContent = 'No dated events were found for this student.';
+    }
     if (wrap) {
       wrap.classList.remove('d-none');
       const minLabel = document.getElementById('hubStudentsTimelineMinLabel');
@@ -2183,7 +2732,7 @@
       await hubStudentsTimelineForcePaint();
       hubStudentsUpdateTimelineAxisProgress(14, 'Opening timeline for the selected student…');
       await hubStudentsTimelineForcePaint();
-      const timeline = await hubStudentsFetchTimelineWithProgress(profile.id);
+      const timeline = await hubStudentsFetchTimelineWithProgress(profile.id, queryOpts);
       hubStudentsUpdateTimelineAxisProgress(40, 'Events received — building timeline…');
       await hubStudentsTimelineForcePaint();
       await hubStudentsRenderTimeline(timeline);
@@ -2194,6 +2743,35 @@
         empty.classList.remove('d-none');
       }
       if (wrap) wrap.classList.add('d-none');
+    }
+  }
+
+  let hubStudentsTimelineHelpPanelBound = false;
+
+  function hubStudentsSetTimelineHelpOpen(open) {
+    const helpBtn = document.getElementById('hubStudentsTimelineHelpBtn');
+    const panel = document.getElementById('hubStudentsTimelineHelpPanel');
+    if (!helpBtn || !panel) return;
+    const show = open === true;
+    panel.classList.toggle('d-none', !show);
+    helpBtn.setAttribute('aria-expanded', show ? 'true' : 'false');
+  }
+
+  function hubStudentsBindTimelineHelpPanel() {
+    if (hubStudentsTimelineHelpPanelBound) return;
+    const helpBtn = document.getElementById('hubStudentsTimelineHelpBtn');
+    const closeBtn = document.getElementById('hubStudentsTimelineHelpClose');
+    const panel = document.getElementById('hubStudentsTimelineHelpPanel');
+    if (!helpBtn || !panel) return;
+    hubStudentsTimelineHelpPanelBound = true;
+    helpBtn.addEventListener('click', function () {
+      const open = panel.classList.contains('d-none');
+      hubStudentsSetTimelineHelpOpen(open);
+    });
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function () {
+        hubStudentsSetTimelineHelpOpen(false);
+      });
     }
   }
 
@@ -2378,7 +2956,67 @@
         hubStudentsResetTimelineZoom();
       });
     }
+    hubStudentsBindTimelineHelpPanel();
+    const changeFiltersBtn = document.getElementById('hubStudentsTimelineChangeFilters');
+    if (changeFiltersBtn) {
+      changeFiltersBtn.addEventListener('click', function () {
+        void hubStudentsOpenTimelineLoadModal(true);
+      });
+    }
+    const legend = document.getElementById('hubStudentsTimelineLegend');
+    if (legend) {
+      legend.addEventListener('click', function (event) {
+        const btn = event.target && event.target.closest('[data-timeline-source]');
+        if (!btn) return;
+        const key = String(btn.getAttribute('data-timeline-source') || '').trim();
+        if (!key) return;
+        if (hubStudentsTimelineHiddenSources.has(key)) {
+          hubStudentsTimelineHiddenSources.delete(key);
+        } else {
+          hubStudentsTimelineHiddenSources.add(key);
+        }
+        hubStudentsSyncTimelineLegendUi();
+        if (hubStudentsTimelineRawPayload) {
+          void hubStudentsRenderTimeline(hubStudentsTimelineRawPayload, { visibilityOnly: true });
+        }
+      });
+    }
     window.addEventListener('scroll', hubStudentsHideTimelineTip, true);
+  }
+
+  function bindHubStudentsTimelineLoadModal() {
+    if (hubStudentsTimelineLoadModalBound) return;
+    hubStudentsTimelineLoadModalBound = true;
+    const shortcuts = document.getElementById('hubStudentsTimelineLoadShortcuts');
+    if (shortcuts) {
+      shortcuts.addEventListener('click', function (event) {
+        const btn = event.target && event.target.closest('[data-hub-timeline-range]');
+        if (!btn) return;
+        hubStudentsApplyTimelineLoadRangeToken(btn.getAttribute('data-hub-timeline-range') || '');
+      });
+    }
+    const confirmBtn = document.getElementById('hubStudentsTimelineLoadConfirm');
+    if (confirmBtn) {
+      confirmBtn.addEventListener('click', function () {
+        void hubStudentsConfirmTimelineLoad();
+      });
+    }
+    const allBtn = document.getElementById('hubStudentsTimelineSourcesAll');
+    const noneBtn = document.getElementById('hubStudentsTimelineSourcesNone');
+    if (allBtn) {
+      allBtn.addEventListener('click', function () {
+        document.querySelectorAll('#hubStudentsTimelineSourceList .js-hub-timeline-source').forEach(function (el) {
+          el.checked = true;
+        });
+      });
+    }
+    if (noneBtn) {
+      noneBtn.addEventListener('click', function () {
+        document.querySelectorAll('#hubStudentsTimelineSourceList .js-hub-timeline-source').forEach(function (el) {
+          el.checked = false;
+        });
+      });
+    }
   }
 
   let hubStudentsEmbedModalBound = false;
@@ -2419,6 +3057,7 @@
 
   function bindHubStudentsQuickActions() {
     bindHubStudentsEmbedModals();
+    bindHubStudentsTimelineLoadModal();
     bindHubStudentsTimelineModal();
     hubStudentsGetQuickActionButtons().forEach(function (btn) {
       btn.addEventListener('click', function () {
@@ -2707,6 +3346,7 @@
       renderHubStudentsReferralsCard(null);
       renderHubStudentsProgramRegsCard(null);
       renderHubStudentsEnrollmentsCard(null);
+      renderHubStudentsOnHoldsCard(null);
       hubStudentsUpdateQuickActionsState(false);
       return;
     }
@@ -2718,6 +3358,7 @@
     setHubStudentsPersonalCardLoading();
     setHubStudentsProgramRegsCardLoading();
     setHubStudentsEnrollmentsCardLoading();
+    setHubStudentsOnHoldsCardLoading();
     try {
       const response = await fetch('' + API_BASE + '/students/' + encodeURIComponent(id) + '/profile', {
         headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
@@ -2738,6 +3379,7 @@
       renderHubStudentsReferralsCard(hubStudentsActiveProfile);
       renderHubStudentsProgramRegsCard(hubStudentsActiveProfile);
       renderHubStudentsEnrollmentsCard(hubStudentsActiveProfile);
+      renderHubStudentsOnHoldsCard(hubStudentsActiveProfile);
       hubStudentsUpdateQuickActionsState(Boolean(hubStudentsActiveProfile && hubStudentsActiveProfile.id));
     } catch (error) {
       if (error && error.name === 'AbortError') return;
@@ -2750,6 +3392,7 @@
       renderHubStudentsReferralsCard(null);
       renderHubStudentsProgramRegsCard(null);
       renderHubStudentsEnrollmentsCard(null);
+      renderHubStudentsOnHoldsCard(null);
       hubStudentsUpdateQuickActionsState(false);
     }
   }
@@ -3059,7 +3702,7 @@
   let hubStudentsCardHeightResizeBound = false;
 
   function hubStudentsResetPairedSideCardHeights() {
-    ['hubStudentsProgramRegsCard', 'hubStudentsEnrollmentsCard'].forEach(function (id) {
+    ['hubStudentsProgramRegsCard', 'hubStudentsEnrollmentsCard', 'hubStudentsOnHoldsCard'].forEach(function (id) {
       const el = document.getElementById(id);
       if (!el) return;
       el.style.minHeight = '';
@@ -3080,6 +3723,12 @@
     if (enrollmentsCard && claimsClbPair && !enrollmentsCard.classList.contains('d-none')) {
       const pairHeight = claimsClbPair.offsetHeight;
       if (pairHeight > 0) enrollmentsCard.style.minHeight = pairHeight + 'px';
+    }
+    const onHoldsCard = document.getElementById('hubStudentsOnHoldsCard');
+    const referralsCard = document.querySelector('[data-hub-students-card="referrals"]');
+    if (onHoldsCard && referralsCard && !onHoldsCard.classList.contains('d-none')) {
+      const referralsHeight = referralsCard.offsetHeight;
+      if (referralsHeight > 0) onHoldsCard.style.minHeight = referralsHeight + 'px';
     }
   }
 
@@ -3303,6 +3952,18 @@
         }
         return;
       }
+      const onHoldBtn = event.target.closest('[data-hub-students-open-on-hold]');
+      if (onHoldBtn) {
+        event.preventDefault();
+        const url = String(onHoldBtn.getAttribute('data-hub-on-hold-url') || '').trim();
+        const title = String(onHoldBtn.getAttribute('data-hub-on-hold-title') || 'On hold').trim();
+        if (!url) {
+          void hubStudentsShowSimpleMsg('Unavailable', 'warning', 'This on-hold period does not have a linked page.');
+          return;
+        }
+        hubStudentsOpenEmbedModal(title, url);
+        return;
+      }
       const manageBtn = event.target.closest('[data-hub-students-manage]');
       const addBtn = event.target.closest('[data-hub-students-add]');
       const target = manageBtn || addBtn;
@@ -3437,6 +4098,10 @@
       '<div class="hub-students-side-card-header"><i class="bi bi-collection me-2"></i>Enrollments</div>',
       '<div class="hub-students-side-card-body" id="hubStudentsEnrollmentsBody"></div>',
       '</section>',
+      '<section class="hub-students-side-card hub-students-onholds-card d-none" id="hubStudentsOnHoldsCard">',
+      '<div class="hub-students-side-card-header"><i class="bi bi-pause-circle me-2"></i>On hold</div>',
+      '<div class="hub-students-side-card-body" id="hubStudentsOnHoldsBody"></div>',
+      '</section>',
       '</div>',
       '</div>',
       '<div class="hub-students-main-panel" id="hubStudentsMainPanel">',
@@ -3463,6 +4128,7 @@
     renderHubStudentsReferralsCard(null);
     renderHubStudentsProgramRegsCard(null);
     renderHubStudentsEnrollmentsCard(null);
+    renderHubStudentsOnHoldsCard(null);
     renderHubStudentsEmptyHero();
     setHubStudentsWorkspaceSelectionState(Boolean(hubStudentsSelectedId));
     void loadHubStudentsPopulationSummary();

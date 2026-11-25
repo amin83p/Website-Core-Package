@@ -57,6 +57,9 @@ test('student management view and client expose workspace', () => {
   assert.match(directoryService, /referralLinks/);
   assert.match(directoryService, /buildClassEnrollmentRows/);
   assert.match(studentManagementScript, /hubStudentsEnrollmentsCard/);
+  assert.match(studentManagementScript, /hubStudentsOnHoldsCard/);
+  assert.match(studentManagementScript, /hubStudentsCollectAppliedOnHolds/);
+  assert.match(studentManagementScript, /data-hub-students-open-on-hold/);
   assert.match(studentManagementScript, /hubStudentsEmptyHero/);
   assert.match(studentManagementScript, /SchoolStudentManagementEnrollmentClose/);
   assert.match(studentManagementScript, /\/school\/student-management\/api/);
@@ -84,7 +87,13 @@ test('student management view and client expose workspace', () => {
   assert.match(studentManagementScript, /hubStudentsTimelinePanState/);
   assert.match(studentManagementScript, /track-scroll--zoomed/);
   assert.match(studentManagementScript, /ctrlKey/);
+  assert.match(managementModals, /hubStudentsTimelineHelpBtn/);
+  assert.match(managementModals, /hubStudentsTimelineHelpPanel/);
+  assert.match(managementModals, /hubStudentsTimelineHelpClose/);
+  assert.match(managementModals, /hub-students-timeline-legend-bar/);
   assert.match(managementModals, /Ctrl\+wheel/);
+  assert.match(studentManagementScript, /hubStudentsBindTimelineHelpPanel/);
+  assert.match(studentManagementScript, /hubStudentsSetTimelineHelpOpen/);
   assert.doesNotMatch(studentManagementScript, /hub-students-timeline-dot-date/);
   assert.doesNotMatch(studentManagementScript, /hub-students-timeline-vline/);
   assert.doesNotMatch(studentManagementScript, /hub-students-timeline-joint-h/);
@@ -99,7 +108,23 @@ test('student management view and client expose workspace', () => {
   assert.match(managementStyles, /hub-students-timeline-track-scroll--zoomed/);
   assert.match(managementModals, /hubStudentsTimelineRangeSync/);
   assert.match(managementModals, /id="hubStudentsTimelineModal"/);
+  assert.match(managementModals, /id="hubStudentsTimelineLoadModal"/);
+  assert.match(managementModals, /hub-students-timeline-load-dialog/);
+  assert.match(managementStyles, /hub-students-timeline-source-row/);
+  assert.match(managementStyles, /hub-students-timeline-type--enrollment/);
+  assert.match(managementStyles, /hub-students-onhold-list/);
+  assert.match(managementModals, /id="hubStudentsTimelineSourceList"/);
+  assert.match(managementModals, /id="hubStudentsTimelineLegend"/);
+  assert.match(managementModals, /data-timeline-source="clb"/);
+  assert.match(managementModals, /hubStudentsTimelineChangeFilters/);
+  assert.match(managementStyles, /hub-students-timeline-filters-btn/);
   assert.match(managementModals, /id="hubStudentsTimelineLoadStatus"/);
+  assert.match(studentManagementScript, /hubStudentsOpenTimelineLoadModal/);
+  assert.match(studentManagementScript, /timeline\/load-options/);
+  assert.match(studentManagementScript, /sources\.join/);
+  assert.match(studentManagementScript, /hubStudentsFilterTimelineEventsByVisibility/);
+  assert.match(studentManagementScript, /hub-students-timeline-source-row/);
+  assert.match(studentManagementScript, /hubStudentsTimelineSourceTypeClass/);
   assert.match(studentManagementScript, /hubStudentsUpdateTimelineAxisProgress/);
   assert.match(managementModals, /studentReferralLinksModal/);
   assert.match(managementModals, /referralQuickCreateModal/);
@@ -109,6 +134,18 @@ test('student management view and client expose workspace', () => {
   assert.match(studentManagementScript, /HUB_STUDENTS_EMBED_QUERY/);
   assert.match(studentManagementScript, /smEmbed/);
   assert.match(studentManagementScript, /hubStudentsWithEmbedParams/);
+  assert.match(studentManagementScript, /hubStudentsRenderTimelineSpan/);
+  assert.match(studentManagementScript, /hub-students-timeline-span/);
+  assert.match(studentManagementScript, /enrollment_on_hold_embed/);
+  assert.match(managementStyles, /hub-students-timeline-type--on-hold/);
+  assert.match(studentFileTimelineService, /class_enrollment_on_hold/);
+  assert.match(directoryService, /enrollmentHoldPeriods/);
+  const academicOverviewService = fs.readFileSync(
+    path.join(ROOT, 'MVC', 'services', 'school', 'studentAcademicOverviewService.js'),
+    'utf8'
+  );
+  assert.match(academicOverviewService, /buildEnrollmentOnHoldDeepLinkUrl/);
+  assert.match(academicOverviewService, /enrollmentHoldPeriods/);
   assert.match(studentManagementScript, /hubStudentsBuildSessionCasesUrl/);
   assert.match(studentManagementScript, /hubStudentsEmbedFrame/);
   assert.match(studentManagementView, /schoolDateRangeShortcuts\.js/);
@@ -150,8 +187,10 @@ test('student management routes and controller are registered', () => {
   assert.match(managementRoutes, /\/api\/students\/search/);
   assert.match(managementRoutes, /\/api\/students\/summary/);
   assert.match(managementRoutes, /\/api\/students\/:studentId\/profile/);
+  assert.match(managementRoutes, /\/api\/students\/:studentId\/timeline\/load-options/);
   assert.match(managementRoutes, /\/api\/students\/:studentId\/timeline/);
   assert.match(managementRoutes, /\/api\/students\/:studentId\/report-instances/);
+  assert.match(managementController, /exports\.getHubStudentTimelineLoadOptions/);
   assert.match(managementController, /exports\.getHubStudentTimeline/);
   assert.match(managementController, /exports\.getHubStudentReportInstances/);
   assert.match(managementController, /listStudentReportInstancesForForm/);

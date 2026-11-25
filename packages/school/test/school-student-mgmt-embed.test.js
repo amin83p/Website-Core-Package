@@ -66,3 +66,17 @@ test('program and term registration details merge embedRenderLocals', () => {
   assert.match(programCtrl, /programRegistrationDetails/);
   assert.match(termCtrl, /termRegistrationDetails/);
 });
+
+test('rolling enrollment page merges embedRenderLocals and trims in embed CSS', () => {
+  const rollingCtrl = fs.readFileSync(
+    path.join(__dirname, '..', 'MVC', 'controllers', 'school', 'classRollingEnrollmentController.js'),
+    'utf8'
+  );
+  assert.match(rollingCtrl, /embedRenderLocals\(req/);
+  assert.match(rollingCtrl, /rollingEnrollment/);
+  const pkgCss = fs.readFileSync(
+    path.join(__dirname, '..', 'public', 'styles', 'schoolStudentMgmtEmbed.css'),
+    'utf8'
+  );
+  assert.match(pkgCss, /html\.school-sm-embed-iframe \.rolling-enrollment-page \.sections-page/);
+});

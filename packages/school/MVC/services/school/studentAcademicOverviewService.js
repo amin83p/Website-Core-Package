@@ -6,6 +6,7 @@ const programRegistrationViewService = require('./programRegistrationViewService
 const termRegistrationViewService = require('./termRegistrationViewService');
 const programWithdrawalService = require('./withdrawal/programWithdrawalService');
 const classSessionCapacityService = require('./classSessionCapacityService');
+const classEnrollmentPeriodModel = require('../../models/school/classEnrollmentPeriodModel');
 
 const ACTIVE_REGISTRATION_STATUSES = new Set(['registered', 'draft', 'error', 'planned', 'to_be_confirmed', 'waiting_list', 'active']);
 
@@ -164,6 +165,31 @@ function buildClassEnrollmentNavigationUrl({
   return `/school/classes/${encodeURIComponent(normalizedClassId)}/rolling-enrollment${query ? `?${query}` : ''}`;
 }
 
+function buildEnrollmentOnHoldDeepLinkUrl({
+  editUrl = '',
+  periodId = '',
+  holdId = ''
+} = {}) {
+  const base = String(editUrl || '').trim();
+  const pid = toPublicId(periodId);
+  if (!base || !pid) return base;
+  if (base.indexOf('/rolling-enrollment') < 0) return base;
+  try {
+    const parsed = new URL(base, 'http://localhost');
+    parsed.searchParams.set('openOnHold', '1');
+    parsed.searchParams.set('periodId', pid);
+    const hid = toPublicId(holdId);
+    if (hid) parsed.searchParams.set('holdId', hid);
+    return parsed.pathname + parsed.search;
+  } catch (_) {
+    const join = base.indexOf('?') >= 0 ? '&' : '?';
+    let out = `${base}${join}openOnHold=1&periodId=${encodeURIComponent(pid)}`;
+    const hid = toPublicId(holdId);
+    if (hid) out += `&holdId=${encodeURIComponent(hid)}`;
+    return out;
+  }
+}
+
 async function buildClassEnrollmentRows({
   reqUser,
   activeOrgId,
@@ -218,7 +244,8 @@ async function buildClassEnrollmentRows({
           classId,
           studentId,
           classData: classRow
-        })
+        }),
+        enrollmentHoldPeriods: classEnrollmentPeriodModel.sanitizeEnrollmentHoldPeriods(period?.enrollmentHoldPeriods)
       };
     });
 
@@ -295,6 +322,7 @@ module.exports = {
   buildClassEnrollmentRows,
   buildEnrollmentDetailApiUrl,
   buildClassEnrollmentNavigationUrl,
+  buildEnrollmentOnHoldDeepLinkUrl,
   resolveClassTeacherName,
   resolveRegistrationSource,
   registrationSortRank,

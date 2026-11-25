@@ -371,7 +371,8 @@ async function buildPersonalProfile(studentId, req) {
       startDate: normalizeText(row.startDate),
       endDate: normalizeText(row.endDate),
       status: normalizeText(row.status),
-      editUrl: normalizeText(row.editUrl)
+      editUrl: normalizeText(row.editUrl),
+      enrollmentHoldPeriods: Array.isArray(row.enrollmentHoldPeriods) ? row.enrollmentHoldPeriods : []
     }));
   } catch (_) {
     programRegistrations = [];

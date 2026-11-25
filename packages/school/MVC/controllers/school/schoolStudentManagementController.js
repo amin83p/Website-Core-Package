@@ -78,9 +78,30 @@ exports.getHubStudentPopulationSummary = async (req, res) => {
   }
 };
 
+exports.getHubStudentTimelineLoadOptions = async (req, res) => {
+  try {
+    const loadOptions = await studentFileTimelineService.buildStudentFileTimelineLoadOptions(
+      req.params.studentId,
+      req
+    );
+    res.json({ status: 'success', loadOptions });
+  } catch (error) {
+    const statusCode = error.statusCode || 400;
+    res.status(statusCode).json({
+      status: 'error',
+      message: error.message || 'Unable to load timeline options.'
+    });
+  }
+};
+
 exports.getHubStudentTimeline = async (req, res) => {
   try {
-    const timeline = await studentFileTimelineService.buildStudentFileTimeline(req.params.studentId, req);
+    const queryOpts = studentFileTimelineService.parseTimelineLoadQuery(req.query || {});
+    const timeline = await studentFileTimelineService.buildStudentFileTimeline(
+      req.params.studentId,
+      req,
+      queryOpts
+    );
     res.json({ status: 'success', timeline });
   } catch (error) {
     const statusCode = error.statusCode || 400;

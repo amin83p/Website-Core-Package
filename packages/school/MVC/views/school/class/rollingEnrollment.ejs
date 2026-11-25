@@ -11154,6 +11154,7 @@
     periodRows = Array.isArray(result.items) ? result.items : [];
     renderRows();
     syncRollingEnrollmentSearchInputsFromUrl();
+    maybeOpenOnHoldFromQueryParams();
   }
 
   function syncRollingEnrollmentSearchInputsFromUrl() {
@@ -13679,6 +13680,34 @@
     }
   }
 
+  let onHoldDeepLinkHandled = false;
+
+  function maybeOpenOnHoldFromQueryParams() {
+    if (onHoldDeepLinkHandled) return;
+    try {
+      const params = new URLSearchParams(window.location.search || '');
+      if (String(params.get('openOnHold') || '') !== '1') return;
+      const periodId = String(params.get('periodId') || '').trim();
+      if (!periodId) return;
+      const holdId = String(params.get('holdId') || '').trim();
+      const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === periodId);
+      if (!row) return;
+      onHoldDeepLinkHandled = true;
+      if (canManageEnrollmentOffice) {
+        openEnrollmentOnHoldModal(periodId);
+        if (holdId && typeof requestAnimationFrame === 'function') {
+          requestAnimationFrame(function () {
+            startEditOnHoldPeriod(holdId);
+          });
+        } else if (holdId) {
+          startEditOnHoldPeriod(holdId);
+        }
+      } else {
+        void openEnrollmentDetailModal(periodId);
+      }
+    } catch (_) { /* ignore */ }
+  }
+
   function openEnrollmentOnHoldModal(periodId) {
     if (!canManageEnrollmentOffice) return;
     const row = (Array.isArray(periodRows) ? periodRows : []).find((item) => String(item?.id || '') === String(periodId || ''));
@@ -14736,5 +14765,6 @@
   applyTargetSessionCountUi();
   syncSessionCapacityControlsForClass();
   renderRows();
+  maybeOpenOnHoldFromQueryParams();
 })();
 </script>
