@@ -248,6 +248,21 @@ router.post('/semi-monthly/api/export',
   trackActionState(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ, { keepActive: true }),
   semiMonthlyCtrl.exportSelections);
 
+router.post('/semi-monthly/api/low-mark-review/start',
+  requireAccess(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ),
+  trackActionState(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ, { keepActive: true }),
+  semiMonthlyCtrl.startLowMarkReviewJob);
+
+router.get('/semi-monthly/api/low-mark-review-jobs/:jobId',
+  requireAccess(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ),
+  trackActionState(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ, { keepActive: true }),
+  semiMonthlyCtrl.getLowMarkReviewJob);
+
+router.post('/semi-monthly/api/low-mark-review-jobs/:jobId/cancel',
+  requireAccess(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ),
+  trackActionState(SEMI_MONTHLY_REPORT_SECTION, OPERATIONS.READ, { keepActive: true }),
+  semiMonthlyCtrl.cancelLowMarkReviewJob);
+
 // Template Designer
 router.get('/templates',
   requireAccess(REPORT_TEMPLATE_SECTION, OPERATIONS.READ_ALL),

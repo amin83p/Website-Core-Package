@@ -6,6 +6,8 @@ const schoolSemiMonthlyReportService = require('../../services/school/schoolSemi
 const schoolSemiMonthlyReportByFunderService = require('../../services/school/schoolSemiMonthlyReportByFunderService');
 const schoolSemiMonthlyReportReviewService = require('../../services/school/schoolSemiMonthlyReportReviewService');
 const schoolSemiMonthlyReportExportService = require('../../services/school/schoolSemiMonthlyReportExportService');
+const schoolSemiMonthlyLowMarkReviewService = require('../../services/school/schoolSemiMonthlyLowMarkReviewService');
+const schoolDataService = require('../../services/school/schoolDataService');
 const studentAttendanceReportService = require('../../services/school/studentAttendanceReportService');
 const reportViewService = require('../../services/school/reportViewService');
 const reportFunderDocxService = require('../../services/school/reportFunderDocxService');
@@ -51,6 +53,17 @@ async function showSemiMonthlyReportPage(req, res) {
       : [];
     const funderPickerOptions = reportFunderDocxService.buildFunderPickerOptions(activeFunders);
     const canOpenRollingEnrollment = await schoolRollingEnrollmentAccessService.canAccessRollingEnrollment(req.user);
+    const reportTemplateOptions = [];
+    for (const templateId of policy.reportTemplateIds || []) {
+      const token = String(templateId || '').trim();
+      if (!token) continue;
+      // eslint-disable-next-line no-await-in-loop
+      const template = await schoolDataService.getDataById('reportTemplates', token, req.user);
+      reportTemplateOptions.push({
+        id: token,
+        label: semiMonthlyReportPolicyService.formatTemplateLabel(template, token)
+      });
+    }
     res.render('school/report/semiMonthlyReportViewer', {
       title: 'School Semi-Monthly Report',
       includeModal: true,
@@ -66,7 +79,8 @@ async function showSemiMonthlyReportPage(req, res) {
       canExportReport,
       canShowEnrollmentClaims,
       funderPickerOptions,
-      canOpenRollingEnrollment
+      canOpenRollingEnrollment,
+      reportTemplateOptions
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
@@ -278,6 +292,99 @@ async function lockReviewAssignmentRow(req, res) {
   }
 }
 
+async function startLowMarkReviewJob(req, res) {
+  try {
+    const sarExportJobService = require('../../services/school/sarExportJobService');
+    const body = req.body && typeof req.body === 'object' ? req.body : {};
+    const input = schoolSemiMonthlyLowMarkReviewService.parseReviewInput(body);
+    const job = sarExportJobService.createJob({
+      userId: req.user?.id || req.user?.userId,
+      activeOrgId: req.user?.activeOrgId,
+      jobType: 'low_mark_review',
+      totalItems: 0
+    });
+    const fauxReq = { user: req.user };
+    sarExportJobService.startJob(job.id, async (runningJob) => {
+      const reviewPayload = await schoolSemiMonthlyLowMarkReviewService.buildLowMarkReviewPayload(
+        fauxReq,
+        input,
+        {
+          jobId: runningJob.id,
+          onProgress: ({ processedItems, totalItems, phase }) => {
+            sarExportJobService.updateJobProgress(runningJob.id, {
+              processedItems,
+              totalItems,
+              phase
+            });
+          }
+        }
+      );
+      return reviewPayload;
+    });
+    return res.status(202).json({
+      status: 'accepted',
+      async: true,
+      job: sarExportJobService.toPublicJob(job),
+      pollUrl: `/school/reports/semi-monthly/api/low-mark-review-jobs/${job.id}`
+    });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 400).json({
+      status: 'error',
+      message: error.message || 'Could not start low mark review scan.'
+    });
+  }
+}
+
+async function getLowMarkReviewJob(req, res) {
+  try {
+    const sarExportJobService = require('../../services/school/sarExportJobService');
+    const jobId = String(req.params?.jobId || '').trim();
+    const job = sarExportJobService.getJobForUser(jobId, req.user);
+    if (job.jobType !== 'low_mark_review') {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Low mark review job was not found or has expired.'
+      });
+    }
+    const reviewPayload = job.status === 'complete'
+      ? sarExportJobService.getJobResultPayload(job)
+      : null;
+    return res.json({
+      status: 'success',
+      job: sarExportJobService.toPublicJob(job),
+      reviewPayload
+    });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 400).json({
+      status: 'error',
+      message: error.message || 'Could not load low mark review job status.'
+    });
+  }
+}
+
+async function cancelLowMarkReviewJob(req, res) {
+  try {
+    const sarExportJobService = require('../../services/school/sarExportJobService');
+    const jobId = String(req.params?.jobId || '').trim();
+    const job = sarExportJobService.requestJobCancel(jobId, req.user);
+    if (job.jobType !== 'low_mark_review') {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Low mark review job was not found or has expired.'
+      });
+    }
+    return res.json({
+      status: 'success',
+      job: sarExportJobService.toPublicJob(job)
+    });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 400).json({
+      status: 'error',
+      message: error.message || 'Could not cancel low mark review scan.'
+    });
+  }
+}
+
 async function unlockReviewAssignmentRow(req, res) {
   try {
     const payload = await schoolSemiMonthlyReportReviewService.unlockReviewAssignmentRow({
@@ -305,5 +412,8 @@ module.exports = {
   exportSelections,
   getReviewAssignments,
   lockReviewAssignmentRow,
-  unlockReviewAssignmentRow
+  unlockReviewAssignmentRow,
+  startLowMarkReviewJob,
+  getLowMarkReviewJob,
+  cancelLowMarkReviewJob
 };

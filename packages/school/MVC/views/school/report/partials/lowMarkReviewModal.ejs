@@ -1,0 +1,300 @@
+<link rel="stylesheet" href="/styles/attendance-hover-tip.css">
+<style>
+  .lmr-review-table th.lmr-sticky-student,
+  .lmr-review-table td.lmr-sticky-student {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    min-width: 200px;
+    max-width: 260px;
+    background-color: #fff;
+    border-right: 2px solid #dee2e6;
+    box-shadow: 2px 0 2px -1px rgba(0, 0, 0, 0.06);
+  }
+  .lmr-review-table thead th.lmr-sticky-student {
+    background-color: #f8f9fa;
+    z-index: 3;
+  }
+  .lmr-review-table.table-striped > tbody > tr:nth-of-type(odd) > td:not(.lmr-sticky-student) {
+    background-color: rgba(0, 0, 0, 0.02);
+  }
+  .lmr-review-table.table-striped > tbody > tr:nth-of-type(even) > td:not(.lmr-sticky-student) {
+    background-color: #fff;
+  }
+  .lmr-review-table.table-striped > tbody > tr:nth-of-type(odd) > td.lmr-sticky-student {
+    background-color: #f8f9fa;
+    z-index: 2;
+  }
+  .lmr-review-table.table-striped > tbody > tr:nth-of-type(even) > td.lmr-sticky-student {
+    background-color: #fff;
+    z-index: 2;
+  }
+  .lmr-metric-icon {
+    font-size: 1.05rem;
+    line-height: 1;
+    vertical-align: middle;
+  }
+  .lmr-metric-icon--pass {
+    color: #2e7d32;
+  }
+  .lmr-metric-icon--fail {
+    color: #c62828;
+  }
+  .lmr-review-table th {
+    position: sticky;
+    top: 0;
+    background-color: #f8f9fa;
+    z-index: 1;
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
+  .lmr-cell-chip {
+    display: flex;
+    justify-content: center;
+    margin: 0.2rem 0;
+    padding: 0;
+    cursor: default;
+  }
+  .lmr-metric-legend {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.65rem 1.35rem;
+    padding: 0.4rem 0.55rem;
+    margin-bottom: 0.35rem;
+    border-bottom: 1px solid #dee2e6;
+    background-color: #f8f9fa;
+    border-radius: 0.35rem 0.35rem 0 0;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #495057;
+  }
+  .lmr-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    white-space: nowrap;
+  }
+  .lmr-legend-icon {
+    font-size: 1.05rem;
+    color: #495057;
+    line-height: 1;
+  }
+  .lmr-cell-value {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.2rem;
+    width: 6.5rem;
+    flex-shrink: 0;
+  }
+  .lmr-mark-badge {
+    display: inline-block;
+    font-size: 1.12rem;
+    font-weight: 700;
+    line-height: 1.15;
+    padding: 0.2rem 0.35rem;
+    border-radius: 0.45rem;
+    text-decoration: none;
+    color: #1a1a1a;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    letter-spacing: 0.01em;
+    width: 3.25rem;
+    min-width: 3.25rem;
+    max-width: 3.25rem;
+    text-align: center;
+    box-sizing: border-box;
+  }
+  .lmr-mark-badge:hover {
+    text-decoration: none;
+    filter: brightness(0.97);
+  }
+  .lmr-mark-ok { background-color: #c8e6c9; }
+  .lmr-mark-gap-slight { background-color: #fff59d; }
+  .lmr-mark-gap-moderate { background-color: #ffcc80; }
+  .lmr-mark-gap-serious { background-color: #ffab91; }
+  .lmr-mark-gap-severe { background-color: #ef9a9a; }
+  .lmr-open-report {
+    font-size: 0.85rem;
+    text-decoration: none;
+    opacity: 0.75;
+  }
+  .lmr-open-report:hover {
+    opacity: 1;
+  }
+  .sch-event-tip.lmr-cell-tip {
+    width: max-content;
+    max-width: min(520px, 92vw);
+    min-width: min(280px, 92vw);
+  }
+  .sch-event-tip.lmr-cell-tip .lmr-tip-line {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  .sch-event-tip.lmr-cell-tip .sch-tip-line:first-child {
+    font-size: 1rem;
+  }
+  .lmr-warnings-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.25rem 0.55rem;
+    border-radius: 999px;
+    border: 1px solid #ffc107;
+    background: #fff8e1;
+    color: #664d03;
+    cursor: help;
+    font-weight: 600;
+  }
+  .lmr-warnings-chip .bi {
+    font-size: 1rem;
+    color: #e65100;
+  }
+  .lmr-warnings-chip:focus {
+    outline: 2px solid #ffc107;
+    outline-offset: 1px;
+  }
+  #lowMarkReviewModal .lmr-modal-dialog {
+    width: calc(100% - 1.5rem);
+    max-width: min(1320px, 96vw);
+    height: calc(100vh - 1.5rem);
+    max-height: calc(100vh - 1.5rem);
+    margin: 0.75rem auto;
+  }
+  #lowMarkReviewModal .lmr-modal-dialog .modal-content {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  #lowMarkReviewModal .lmr-modal-dialog .modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #lowMarkReviewModal #lmrTableWrap.student-report-wrapper {
+    max-height: none;
+    flex: 1 1 auto;
+    min-height: 12rem;
+    overflow: auto;
+  }
+</style>
+<div class="modal fade" id="lowMarkReviewModal" tabindex="-1" aria-labelledby="lowMarkReviewModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable lmr-modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header py-3">
+        <div>
+          <h5 class="modal-title fw-bold" id="lowMarkReviewModalLabel"><i class="bi bi-graph-down-arrow me-2 text-primary"></i>Low Average Mark Review</h5>
+          <div class="small text-muted mt-1">Find students below your minimum on selected report fields in semi-monthly report instances.</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body pt-2">
+        <div class="row g-3 align-items-end mb-2">
+          <div class="col-md-3">
+            <label class="form-label" for="lmrStartDate">Start date</label>
+            <input type="date" id="lmrStartDate" class="form-control form-control-sm">
+          </div>
+          <div class="col-md-3">
+            <label class="form-label" for="lmrEndDate">End date</label>
+            <input type="date" id="lmrEndDate" class="form-control form-control-sm">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label" for="lmrThreshold">Min. mark %</label>
+            <input type="number" min="1" max="100" step="1" id="lmrThreshold" class="form-control form-control-sm" value="60">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label" for="lmrTemplateId">Report template</label>
+            <select id="lmrTemplateId" class="form-select form-select-sm">
+              <option value="">All configured templates</option>
+              <% (Array.isArray(reportTemplateOptions) ? reportTemplateOptions : []).forEach((opt) => { %>
+                <option value="<%= String(opt.id || '').replace(/"/g, '&quot;') %>"><%= opt.label || opt.id %></option>
+              <% }); %>
+            </select>
+          </div>
+        </div>
+        <details class="mb-3 border rounded p-2 bg-light-subtle">
+          <summary class="fw-semibold small user-select-none">Scope filters (optional)</summary>
+          <div class="row g-3 mt-1">
+            <div class="col-md-6">
+              <label class="form-label small" for="lmrFunderIds">Funders</label>
+              <select id="lmrFunderIds" class="form-select form-select-sm" multiple size="4">
+                <% (Array.isArray(funderPickerOptions) ? funderPickerOptions : []).forEach((opt) => { %>
+                  <option value="<%= String(opt.id || '').replace(/"/g, '&quot;') %>"><%= opt.label || opt.id %></option>
+                <% }); %>
+              </select>
+              <p class="small text-muted mb-0">Hold Ctrl/Cmd to select multiple. Leave empty for all students in the org.</p>
+            </div>
+            <div class="col-md-6">
+              <div class="form-check mb-2">
+                <input class="form-check-input" type="checkbox" id="lmrOnlyBelowThreshold" checked>
+                <label class="form-check-label small" for="lmrOnlyBelowThreshold" title="When checked, each cell lists only marks below the minimum.">Below limit only</label>
+              </div>
+            </div>
+            <div class="col-12">
+              <span class="form-label small d-block">Metrics to review</span>
+              <p class="small text-muted mb-2">A student appears if they are below the minimum on any selected metric. Skills apply only where the template defines that numeric field.</p>
+              <div class="d-flex flex-wrap gap-3">
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input lmr-metric-key" type="checkbox" name="lmrMetricKeys" id="lmrMetric_attendance" value="attendance">
+                  <label class="form-check-label small" for="lmrMetric_attendance">Attendance</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input lmr-metric-key" type="checkbox" name="lmrMetricKeys" id="lmrMetric_punctuality" value="punctuality">
+                  <label class="form-check-label small" for="lmrMetric_punctuality">Punctuality</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input lmr-metric-key" type="checkbox" name="lmrMetricKeys" id="lmrMetric_speaking" value="speaking">
+                  <label class="form-check-label small" for="lmrMetric_speaking">Speaking</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input lmr-metric-key" type="checkbox" name="lmrMetricKeys" id="lmrMetric_listening" value="listening">
+                  <label class="form-check-label small" for="lmrMetric_listening">Listening</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input lmr-metric-key" type="checkbox" name="lmrMetricKeys" id="lmrMetric_reading" value="reading">
+                  <label class="form-check-label small" for="lmrMetric_reading">Reading</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input lmr-metric-key" type="checkbox" name="lmrMetricKeys" id="lmrMetric_writing" value="writing">
+                  <label class="form-check-label small" for="lmrMetric_writing">Writing</label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <input class="form-check-input lmr-metric-key" type="checkbox" name="lmrMetricKeys" id="lmrMetric_average_class_mark" value="average_class_mark" checked>
+                  <label class="form-check-label small" for="lmrMetric_average_class_mark">Average Class Mark</label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </details>
+        <div id="lmrProgressWrap" class="d-none mb-3">
+          <div class="d-flex justify-content-between align-items-center small text-muted mb-1">
+            <span id="lmrProgressPhase">Scanning…</span>
+            <span id="lmrProgressEta"></span>
+          </div>
+          <div class="progress" style="height: 0.65rem;">
+            <div class="progress-bar progress-bar-striped progress-bar-animated" id="lmrProgressBar" role="progressbar" style="width: 0%;" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+          </div>
+        </div>
+        <div id="lmrWarnings" class="d-none mb-2" role="status"></div>
+        <div id="lmrEmpty" class="d-none alert alert-light border text-muted small mb-0">No students were below the threshold for the selected scope and date range.</div>
+        <div id="lmrTableWrap" class="d-none table-responsive student-report-wrapper">
+          <div id="lmrMetricLegend" class="lmr-metric-legend d-none" role="note" aria-label="Metric icons legend"></div>
+          <table class="table table-sm table-bordered table-striped lmr-review-table mb-0" id="lmrResultsTable">
+            <thead><tr id="lmrResultsHead"></tr></thead>
+            <tbody id="lmrResultsBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer py-2">
+        <button type="button" class="btn btn-outline-danger btn-sm d-none" id="btn_lmrCancelScan">Cancel scan</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-filled btn-primary btn-sm" id="btn_lmrRunScan"><i class="bi bi-search me-1"></i>Run scan</button>
+      </div>
+    </div>
+  </div>
+</div>

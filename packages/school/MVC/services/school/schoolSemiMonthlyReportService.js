@@ -355,6 +355,7 @@ async function buildSemiMonthlyReportPayload(req, options = {}) {
 module.exports = {
   normalizeDateOnly,
   filterReportInstancesForClass,
+  filterInstancesForSemiMonthlyWindow,
   buildTemplateIdSet,
   sessionDateInRange,
   instanceMatchesStudent,

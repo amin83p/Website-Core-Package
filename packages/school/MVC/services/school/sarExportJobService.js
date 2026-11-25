@@ -28,6 +28,15 @@ function pruneExpiredJobs() {
   });
 }
 
+const PAYLOAD_JOB_TYPES = new Set(['report', 'low_mark_review']);
+
+function normalizeJobType(value = '') {
+  const token = cleanId(value).toLowerCase();
+  if (token === 'report') return 'report';
+  if (token === 'low_mark_review') return 'low_mark_review';
+  return 'export';
+}
+
 function createJob({
   userId = '',
   activeOrgId = '',
@@ -41,7 +50,7 @@ function createJob({
     id,
     userId: cleanId(userId),
     activeOrgId: cleanId(activeOrgId),
-    jobType: cleanId(jobType) === 'report' ? 'report' : 'export',
+    jobType: normalizeJobType(jobType),
     status: 'pending',
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -50,6 +59,7 @@ function createJob({
     processedItems: 0,
     phase: '',
     error: '',
+    cancelRequested: false,
     filePath: '',
     contentType: '',
     fileName: '',
@@ -120,8 +130,39 @@ function toPublicJob(job) {
     estimatedSecondsRemaining: computeEstimatedSecondsRemaining(job),
     error: job.error || '',
     ready: job.status === 'complete',
+    cancelled: job.status === 'cancelled',
     fileName: job.fileName || ''
   };
+}
+
+function isJobCancelRequested(jobId = '') {
+  const job = jobs.get(cleanId(jobId));
+  return Boolean(job?.cancelRequested);
+}
+
+function requestJobCancel(jobId, reqUser) {
+  const job = getJobForUser(jobId, reqUser);
+  if (job.status === 'complete' || job.status === 'failed' || job.status === 'cancelled') {
+    return job;
+  }
+  job.cancelRequested = true;
+  job.updatedAt = Date.now();
+  return job;
+}
+
+function assertJobNotCancelled(jobId = '') {
+  if (!isJobCancelRequested(jobId)) return;
+  const error = new Error('Scan cancelled.');
+  error.code = 'JOB_CANCELLED';
+  throw error;
+}
+
+class JobCancelledError extends Error {
+  constructor(message = 'Scan cancelled.') {
+    super(message);
+    this.name = 'JobCancelledError';
+    this.code = 'JOB_CANCELLED';
+  }
 }
 
 function updateJobProgress(jobId, patch = {}) {
@@ -160,13 +201,19 @@ function startJob(jobId, runner = async () => null) {
 
   setImmediate(async () => {
     try {
+      if (job.cancelRequested) {
+        throw new JobCancelledError();
+      }
       const result = await runner(job);
-      if (job.jobType === 'report') {
+      if (PAYLOAD_JOB_TYPES.has(job.jobType)) {
         const payload = result && typeof result === 'object' && result.reportPayload
           ? result.reportPayload
           : result;
         if (!payload || typeof payload !== 'object') {
-          throw new Error('Report load completed but no data was produced.');
+          throw new Error('Job completed but no data was produced.');
+        }
+        if (job.cancelRequested) {
+          throw new JobCancelledError();
         }
         completeJobWithPayload(job.id, payload);
         return;
@@ -194,8 +241,14 @@ function startJob(jobId, runner = async () => null) {
       }
       job.updatedAt = Date.now();
     } catch (error) {
-      job.status = 'failed';
-      job.error = String(error?.message || 'Export failed.');
+      if (job.cancelRequested || error?.code === 'JOB_CANCELLED' || error?.name === 'JobCancelledError') {
+        job.status = 'cancelled';
+        job.error = String(error?.message || 'Scan cancelled.');
+        job.resultPayload = null;
+      } else {
+        job.status = 'failed';
+        job.error = String(error?.message || 'Export failed.');
+      }
       job.updatedAt = Date.now();
     }
   });
@@ -211,7 +264,7 @@ function readJobFile(job) {
 }
 
 function getJobResultPayload(job) {
-  if (!job || job.status !== 'complete' || job.jobType !== 'report') {
+  if (!job || job.status !== 'complete' || !PAYLOAD_JOB_TYPES.has(job.jobType)) {
     return null;
   }
   return job.resultPayload && typeof job.resultPayload === 'object' ? job.resultPayload : null;
@@ -226,5 +279,10 @@ module.exports = {
   readJobFile,
   getJobResultPayload,
   completeJobWithPayload,
-  computeEstimatedSecondsRemaining
+  computeEstimatedSecondsRemaining,
+  requestJobCancel,
+  isJobCancelRequested,
+  assertJobNotCancelled,
+  JobCancelledError,
+  normalizeJobType
 };
