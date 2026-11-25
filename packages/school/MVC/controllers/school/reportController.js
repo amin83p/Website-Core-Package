@@ -2299,7 +2299,10 @@ async function buildInstanceEditorRenderContext(req) {
   } else {
     await attachReportAiServicesContext(renderContext, req, template, mergedDataForValidation || mergedData);
   }
-  return renderContext;
+  return {
+    ...renderContext,
+    ...schoolStudentMgmtEmbedService.embedRenderLocals(req, renderContext)
+  };
 }
 
 async function reportAiAssistPrepare(req, res) {

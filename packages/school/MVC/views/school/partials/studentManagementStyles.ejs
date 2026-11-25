@@ -128,6 +128,10 @@
     gap: 0.35rem;
   }
 
+  #hubStudentsTimelineModal.hub-students-timeline-modal {
+    z-index: 1055;
+  }
+
   #hubStudentsTimelineModal.hub-students-timeline-modal .modal-content {
     min-height: 100%;
     display: flex;
@@ -459,13 +463,61 @@
     background: #f8fafc;
   }
 
+  #hubStudentsReportsModal {
+    z-index: 1065;
+  }
+
+  #hubStudentsReportsModal .hub-students-reports-dialog {
+    width: min(96vw, 1200px);
+    max-width: 96vw;
+    margin: 1.75rem auto;
+  }
+
+  #hubStudentsReportsModal .hub-students-reports-list .table {
+    font-size: 0.8125rem;
+    margin-bottom: 0;
+  }
+
+  #hubStudentsReportsModal .hub-students-reports-list .hub-students-reports-table th,
+  #hubStudentsReportsModal .hub-students-reports-list .hub-students-reports-table td {
+    white-space: nowrap;
+    vertical-align: middle;
+  }
+
+  #hubStudentsReportsModal .hub-students-reports-list .hub-students-reports-table td.hub-students-reports-template {
+    max-width: 14rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #hubStudentsReportsModal .hub-students-reports-list .hub-students-reports-table td.hub-students-reports-class {
+    max-width: 11rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #hubStudentsReportsModal .hub-students-reports-list .hub-students-reports-table td.hub-students-reports-teacher {
+    max-width: 9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #hubStudentsReportsModal .hub-students-reports-list .hub-students-reports-col-action {
+    width: 1%;
+    white-space: nowrap;
+  }
+
   #hubStudentsEmbedModal.hub-students-embed-modal {
     z-index: 1065;
   }
 
+  body.hub-students-embed-dim .modal-backdrop.show {
+    opacity: 0.58;
+  }
+
   #hubStudentsEmbedModal .hub-students-embed-dialog {
-    width: 90vw;
-    max-width: 90vw;
+    width: min(100vw - 0.75rem, calc(var(--sections-page-max-width, min(1400px, calc(100vw - 32px))) * 1.1));
+    max-width: min(100vw - 0.75rem, calc(var(--sections-page-max-width, min(1400px, calc(100vw - 32px))) * 1.1));
     height: 90vh;
     max-height: 90vh;
     margin: 5vh auto;

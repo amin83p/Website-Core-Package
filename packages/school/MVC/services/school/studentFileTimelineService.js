@@ -328,7 +328,11 @@ async function buildStudentFileTimeline(studentId, req) {
         const instanceId = normalizeText(row?.id);
         const sessionDate = normalizeText(row?.sessionDate);
         if (!isValidTimelineDate(sessionDate)) return;
-        const embedUrl = normalizeText(row?.openV2Url || row?.openUrl);
+        const templateTitle = normalizeText(row?.templateTitle || row?.templateId || 'Report');
+        const v2Path = instanceId
+          ? `/school/reports/instances/edit-v2/${encodeURIComponent(instanceId)}`
+          : '';
+        const embedUrl = normalizeText(row?.openV2Url || v2Path);
         pushEvent(events, {
           id: makeEventId(['report_instance', instanceId]),
           date: sessionDate,
@@ -341,8 +345,9 @@ async function buildStudentFileTimeline(studentId, req) {
             row?.teacherName ? `Teacher: ${normalizeText(row.teacherName)}` : ''
           ].filter(Boolean),
           action: {
-            kind: 'embed_url',
-            title: 'Report',
+            kind: 'report_instance_v2',
+            title: templateTitle,
+            instanceId,
             url: embedUrl ? withSmEmbed(embedUrl) : ''
           }
         });

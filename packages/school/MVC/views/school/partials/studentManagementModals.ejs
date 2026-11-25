@@ -146,6 +146,32 @@
   </div>
 </div>
 
+<div class="modal fade hub-students-reports-modal" id="hubStudentsReportsModal" tabindex="-1" aria-labelledby="hubStudentsReportsModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-scrollable hub-students-reports-dialog">
+    <div class="modal-content border-0 shadow">
+      <div class="modal-header py-2">
+        <h5 class="modal-title fw-bold" id="hubStudentsReportsModalLabel">Report instances</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body py-3">
+        <div id="hubStudentsReportsLoading" class="hub-students-reports-loading text-center py-4" role="status" aria-live="polite">
+          <span class="spinner-border text-primary" aria-hidden="true"></span>
+          <div class="small text-muted fw-semibold mt-2">Loading report instances…</div>
+        </div>
+        <div id="hubStudentsReportsError" class="alert alert-danger d-none mb-0" role="alert"></div>
+        <div id="hubStudentsReportsAccessNote" class="alert alert-light border small d-none mb-3" role="status"></div>
+        <div id="hubStudentsReportsList" class="hub-students-reports-list d-none"></div>
+      </div>
+      <div class="modal-footer py-2 d-flex flex-wrap justify-content-between gap-2">
+        <a href="#" id="hubStudentsReportsFullListLink" class="btn btn-outline-primary btn-sm d-none" target="_blank" rel="noopener noreferrer">
+          <i class="bi bi-collection me-1"></i>All reports (person filter)
+        </a>
+        <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade hub-students-embed-modal" id="hubStudentsEmbedModal" tabindex="-1" aria-labelledby="hubStudentsEmbedModalLabel" aria-hidden="true" data-bs-backdrop="static">
   <div class="modal-dialog modal-dialog-scrollable hub-students-embed-dialog">
     <div class="modal-content border-0 shadow">

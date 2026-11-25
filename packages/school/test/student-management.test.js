@@ -18,6 +18,14 @@ const managementController = fs.readFileSync(
   path.join(ROOT, 'MVC', 'controllers', 'school', 'schoolStudentManagementController.js'),
   'utf8'
 );
+const studentFileTimelineService = fs.readFileSync(
+  path.join(ROOT, 'MVC', 'services', 'school', 'studentFileTimelineService.js'),
+  'utf8'
+);
+const reportController = fs.readFileSync(
+  path.join(ROOT, 'MVC', 'controllers', 'school', 'reportController.js'),
+  'utf8'
+);
 const mainRoute = fs.readFileSync(path.join(ROOT, 'MVC', 'routes', 'schoolMainRoute.js'), 'utf8');
 const reportHubRoutes = fs.readFileSync(path.join(ROOT, 'MVC', 'routes', 'schoolReportHubRoutes.js'), 'utf8');
 const reportHubService = fs.readFileSync(path.join(ROOT, 'MVC', 'services', 'school', 'schoolReportHubService.js'), 'utf8');
@@ -62,6 +70,10 @@ test('student management view and client expose workspace', () => {
   assert.match(studentManagementScript, /data-hub-students-open="referral-links"/);
   assert.match(studentManagementScript, /data-hub-students-open="timeline"/);
   assert.match(studentManagementScript, /hubStudentsHandleTimelineEventAction/);
+  assert.doesNotMatch(
+    studentManagementScript,
+    /function hubStudentsHandleTimelineEventAction[\s\S]*?hubStudentsHideTimelineModal/
+  );
   assert.match(studentManagementScript, /hubStudentsTimelineTrack/);
   assert.match(studentManagementScript, /hub-students-timeline-elbow-corner/);
   assert.match(studentManagementScript, /hub-students-timeline-event-date/);
@@ -102,6 +114,23 @@ test('student management view and client expose workspace', () => {
   assert.match(studentManagementView, /schoolDateRangeShortcuts\.js/);
   assert.match(managementModals, /id="hubStudentsDateRangeModal"/);
   assert.match(managementModals, /id="hubStudentsEmbedModal"/);
+  assert.match(managementStyles, /#hubStudentsReportsModal[\s\S]*z-index:\s*1065/);
+  assert.match(managementStyles, /#hubStudentsTimelineModal\.hub-students-timeline-modal[\s\S]*z-index:\s*1055/);
+  assert.match(managementStyles, /hub-students-embed-dim/);
+  assert.match(managementStyles, /--sections-page-max-width[\s\S]*\* 1\.1/);
+  assert.match(studentManagementScript, /hub-students-embed-dim/);
+  assert.match(managementModals, /id="hubStudentsReportsModal"/);
+  assert.match(managementModals, /hub-students-reports-dialog/);
+  assert.match(studentManagementScript, /Review<\/a>/);
+  assert.match(managementStyles, /hub-students-reports-dialog/);
+  assert.match(managementModals, /id="hubStudentsReportsList"/);
+  assert.match(studentManagementScript, /hubStudentsOpenReportsModal/);
+  assert.match(studentManagementScript, /hubStudentsBuildReportInstanceV2EmbedUrl/);
+  assert.match(studentManagementScript, /report_instance_v2/);
+  assert.match(studentManagementScript, /edit-v2/);
+  assert.match(studentManagementScript, /report-instances/);
+  assert.match(studentFileTimelineService, /kind: 'report_instance_v2'/);
+  assert.match(reportController, /embedRenderLocals\(req, renderContext\)/);
   assert.match(managementModals, /id="hubStudentsEmbedFrame"/);
   assert.match(managementModals, /data-hub-students-range-token="year"/);
   assert.match(managementModals, /data-hub-students-range-token="last-6-months"/);
@@ -122,7 +151,10 @@ test('student management routes and controller are registered', () => {
   assert.match(managementRoutes, /\/api\/students\/summary/);
   assert.match(managementRoutes, /\/api\/students\/:studentId\/profile/);
   assert.match(managementRoutes, /\/api\/students\/:studentId\/timeline/);
+  assert.match(managementRoutes, /\/api\/students\/:studentId\/report-instances/);
   assert.match(managementController, /exports\.getHubStudentTimeline/);
+  assert.match(managementController, /exports\.getHubStudentReportInstances/);
+  assert.match(managementController, /listStudentReportInstancesForForm/);
   assert.match(managementController, /exports\.showStudentManagementPage/);
   assert.match(managementController, /school\/studentManagement/);
   assert.doesNotMatch(reportHubRoutes, /\/api\/students\/search/);

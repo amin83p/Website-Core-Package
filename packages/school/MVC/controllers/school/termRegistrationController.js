@@ -17,6 +17,7 @@ const {
   canCreateOrgScopedItem
 } = requireCoreModule('MVC/utils/orgContextUtils');
 const { resolveOrgTodayFromRequest, resolveOrgTodayFromContext } = requireCoreModule('MVC/utils/timezoneUtils');
+const schoolStudentMgmtEmbedService = require('../../services/school/schoolStudentMgmtEmbedService');
 
 function parseJsonSafe(v, fallback) {
   if (v === undefined || v === null || v === '') return fallback;
@@ -1875,7 +1876,8 @@ exports.showRegistrationDetails = async (req, res) => {
       canManageRegistrations,
       includeModal: true,
       user: req.user,
-      actionStateId: req.actionStateId
+      actionStateId: req.actionStateId,
+      ...schoolStudentMgmtEmbedService.embedRenderLocals(req, {})
     });
   } catch (error) {
     res.status(500).render('error', { title: 'Error', error, message: error.message, user: req.user });

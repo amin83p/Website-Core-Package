@@ -1,5 +1,6 @@
 const reportHubStudentDirectoryService = require('../../services/school/reportHubStudentDirectoryService');
 const studentFileTimelineService = require('../../services/school/studentFileTimelineService');
+const studentReportInstancesService = require('../../services/school/studentReportInstancesService');
 const { requireCoreModule } = require('../../services/school/schoolCoreContracts');
 const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
 const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
@@ -86,6 +87,31 @@ exports.getHubStudentTimeline = async (req, res) => {
     res.status(statusCode).json({
       status: 'error',
       message: error.message || 'Unable to load student timeline.'
+    });
+  }
+};
+
+exports.getHubStudentReportInstances = async (req, res) => {
+  try {
+    const profile = await reportHubStudentDirectoryService.buildPersonalProfile(req.params.studentId, req);
+    const personId = String(profile?.personId || '').trim();
+    const payload = await studentReportInstancesService.listStudentReportInstancesForForm({
+      reqUser: req.user,
+      personId
+    });
+    res.json({
+      status: 'success',
+      studentId: profile?.id || req.params.studentId,
+      personId,
+      rows: payload.rows || [],
+      accessNote: payload.accessNote || '',
+      fullListUrl: payload.fullListUrl || studentReportInstancesService.buildPersonReportsFullListUrl(personId)
+    });
+  } catch (error) {
+    const statusCode = error.statusCode || 400;
+    res.status(statusCode).json({
+      status: 'error',
+      message: error.message || 'Unable to load report instances.'
     });
   }
 };

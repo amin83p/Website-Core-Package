@@ -1,13 +1,39 @@
 /* Uses global app-page-width-full (side control "Full width"); only minor embed tweaks below. */
 html.school-sm-embed-iframe.app-page-width-full {
   --app-side-controls-gutter: 0px;
+  --sections-page-max-width: 100%;
 }
 
 html.school-sm-embed-iframe.app-page-width-full main.container {
-  max-width: 100%;
-  width: 100%;
-  padding-left: var(--spacing-md, 1rem);
-  padding-right: var(--spacing-md, 1rem);
+  max-width: 100% !important;
+  width: 100% !important;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+  padding-left: 0 !important;
+  padding-right: 0 !important;
+  padding-top: 0.25rem;
+}
+
+html.school-sm-embed-iframe .sections-page,
+html.school-sm-embed-iframe .sections-page.school-sm-embed-section {
+  max-width: 100% !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box;
+}
+
+html.school-sm-embed-iframe #main-header,
+html.school-sm-embed-iframe .header-side-controls {
+  display: none !important;
+}
+
+html.school-sm-embed-iframe footer.site-footer-collapsible {
+  display: none !important;
+}
+
+html.school-sm-embed-iframe body > .container.mt-3 {
+  display: none !important;
 }
 
 html.school-sm-embed-iframe .table-scroll-wrapper,
@@ -18,4 +44,17 @@ html.school-sm-embed-iframe .schedule-shell {
 
 html.school-sm-embed-iframe .report-by-funder-modal-dialog {
   max-width: min(100%, 96vw);
+}
+
+/* Report Instance V2: show form body only inside student-hub iframe */
+html.school-sm-embed-iframe .report-instance-page > .row.g-2.align-items-start.mb-4 {
+  display: none !important;
+}
+
+html.school-sm-embed-iframe .report-instance-page > .card.border-0.shadow-sm.mb-4:has(#btnCloseReportInstance) {
+  display: none !important;
+}
+
+html.school-sm-embed-iframe .report-instance-page > .card.border-0.shadow-sm.mb-4:has(#reportInstanceDetailsToggle) {
+  display: none !important;
 }

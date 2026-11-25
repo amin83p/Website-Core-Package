@@ -37,3 +37,32 @@ test('embed assets and layout guard exist', () => {
   assert.match(layout, /schoolSmEmbed/);
   assert.match(layout, /school-sm-embed-iframe/);
 });
+
+test('embed CSS hides global chrome and trims report instance V2', () => {
+  const pkgCss = fs.readFileSync(
+    path.join(__dirname, '..', 'public', 'styles', 'schoolStudentMgmtEmbed.css'),
+    'utf8'
+  );
+  const servedCss = fs.readFileSync(path.join(repoRoot, 'public', 'styles', 'schoolStudentMgmtEmbed.css'), 'utf8');
+  assert.equal(pkgCss, servedCss);
+  assert.match(pkgCss, /html\.school-sm-embed-iframe #main-header/);
+  assert.match(pkgCss, /html\.school-sm-embed-iframe \.header-side-controls/);
+  assert.match(pkgCss, /html\.school-sm-embed-iframe footer\.site-footer-collapsible/);
+  assert.match(pkgCss, /html\.school-sm-embed-iframe \.sections-page/);
+  assert.match(pkgCss, /html\.school-sm-embed-iframe \.report-instance-page/);
+});
+
+test('program and term registration details merge embedRenderLocals', () => {
+  const programCtrl = fs.readFileSync(
+    path.join(__dirname, '..', 'MVC', 'controllers', 'school', 'programRegistrationController.js'),
+    'utf8'
+  );
+  const termCtrl = fs.readFileSync(
+    path.join(__dirname, '..', 'MVC', 'controllers', 'school', 'termRegistrationController.js'),
+    'utf8'
+  );
+  assert.match(programCtrl, /embedRenderLocals\(req/);
+  assert.match(termCtrl, /embedRenderLocals\(req/);
+  assert.match(programCtrl, /programRegistrationDetails/);
+  assert.match(termCtrl, /termRegistrationDetails/);
+});

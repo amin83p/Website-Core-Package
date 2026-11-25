@@ -740,6 +740,169 @@
     return '/school/reports/person-reports?' + params.toString();
   }
 
+  function hubStudentsBuildReportInstanceV2EmbedUrl(instanceId) {
+    const id = String(instanceId || '').trim();
+    if (!id) return '';
+    const params = hubStudentsWithEmbedParams();
+    const qs = params.toString();
+    const base = '/school/reports/instances/edit-v2/' + encodeURIComponent(id);
+    return qs ? base + '?' + qs : base;
+  }
+
+  function hubStudentsReportStatusBadgeClass(status) {
+    const token = String(status || '').trim().toLowerCase();
+    if (token === 'submitted') return 'bg-success';
+    if (token === 'locked') return 'bg-dark';
+    return 'bg-warning text-dark';
+  }
+
+  function hubStudentsSortReportInstanceRows(rows) {
+    return (Array.isArray(rows) ? rows : []).slice().sort(function (left, right) {
+      const leftDate = String(left?.sessionDate || '').trim();
+      const rightDate = String(right?.sessionDate || '').trim();
+      if (leftDate !== rightDate) return rightDate.localeCompare(leftDate);
+      const leftTitle = String(left?.templateTitle || left?.templateId || '').trim().toLowerCase();
+      const rightTitle = String(right?.templateTitle || right?.templateId || '').trim().toLowerCase();
+      return leftTitle.localeCompare(rightTitle);
+    });
+  }
+
+  function hubStudentsRenderReportInstancesList(rows) {
+    const sorted = hubStudentsSortReportInstanceRows(rows);
+    if (!sorted.length) {
+      return '<p class="text-center text-muted py-4 mb-0">No report instances found for this student.</p>';
+    }
+    const body = sorted.map(function (row) {
+      const status = String(row?.status || '').trim().toLowerCase();
+      const badgeClass = hubStudentsReportStatusBadgeClass(status);
+      const openV2Url = String(row?.openV2Url || '').trim();
+      const openBtn = openV2Url
+        ? '<a href="' + escapeHtml(openV2Url) + '" class="btn btn-primary btn-sm" target="_blank" rel="noopener noreferrer">'
+          + '<i class="bi bi-box-arrow-up-right me-1"></i>Review</a>'
+        : '<span class="text-muted small">—</span>';
+      const classTitle = escapeHtml(row?.classTitle || row?.classId || '-');
+      const templateTitle = escapeHtml(row?.templateTitle || row?.templateId || '-');
+      const templateVersion = Number(row?.templateVersion || 1) || 1;
+      const instanceId = String(row?.id || '').trim();
+      const instanceTitle = instanceId ? ' title="' + escapeHtml(instanceId) + '"' : '';
+      return [
+        '<tr>',
+        '<td class="ps-3 hub-students-reports-template"' + instanceTitle + '>',
+        '<span class="fw-semibold text-dark">' + templateTitle + '</span>',
+        ' <span class="text-muted small">v' + templateVersion + '</span>',
+        '</td>',
+        '<td class="hub-students-reports-class"><span class="fw-semibold">' + classTitle + '</span></td>',
+        '<td>' + escapeHtml(row?.sessionDate || '-') + '</td>',
+        '<td class="hub-students-reports-teacher">' + escapeHtml(row?.teacherName || '-') + '</td>',
+        '<td><span class="badge ' + badgeClass + '">' + escapeHtml(status || '-') + '</span></td>',
+        '<td class="text-end pe-3 hub-students-reports-col-action">' + openBtn + '</td>',
+        '</tr>'
+      ].join('');
+    }).join('');
+    return [
+      '<div class="table-responsive">',
+      '<table class="table table-sm table-hover align-middle mb-0 hub-students-reports-table">',
+      '<thead class="table-light"><tr>',
+      '<th class="ps-3">Template</th><th>Class</th><th>Session date</th><th>Teacher</th><th>Status</th>',
+      '<th class="pe-3 text-end">Actions</th>',
+      '</tr></thead><tbody>',
+      body,
+      '</tbody></table></div>'
+    ].join('');
+  }
+
+  async function hubStudentsFetchReportInstances(studentId) {
+    const sid = String(studentId || '').trim();
+    if (!sid) throw new Error('Student id is required.');
+    const response = await fetch('/school/student-management/api/students/' + encodeURIComponent(sid) + '/report-instances', {
+      credentials: 'same-origin',
+      headers: { Accept: 'application/json' }
+    });
+    const payload = await response.json().catch(function () { return null; });
+    if (!response.ok || !payload || payload.status !== 'success') {
+      throw new Error(String(payload?.message || 'Unable to load report instances.'));
+    }
+    return payload;
+  }
+
+  function hubStudentsSetReportsModalState(patch) {
+    const loading = document.getElementById('hubStudentsReportsLoading');
+    const errorEl = document.getElementById('hubStudentsReportsError');
+    const accessEl = document.getElementById('hubStudentsReportsAccessNote');
+    const listEl = document.getElementById('hubStudentsReportsList');
+    const fullLink = document.getElementById('hubStudentsReportsFullListLink');
+    if (loading) loading.classList.toggle('d-none', patch?.loading !== true);
+    if (errorEl) {
+      const message = String(patch?.error || '').trim();
+      errorEl.textContent = message;
+      errorEl.classList.toggle('d-none', !message);
+    }
+    if (accessEl) {
+      const note = String(patch?.accessNote || '').trim();
+      accessEl.textContent = note;
+      accessEl.classList.toggle('d-none', !note);
+    }
+    if (listEl) {
+      if (patch?.listHtml !== undefined) listEl.innerHTML = patch.listHtml;
+      listEl.classList.toggle('d-none', patch?.showList !== true);
+    }
+    if (fullLink) {
+      const href = String(patch?.fullListUrl || '').trim();
+      if (href) {
+        fullLink.href = href;
+        fullLink.classList.remove('d-none');
+      } else {
+        fullLink.href = '#';
+        fullLink.classList.add('d-none');
+      }
+    }
+  }
+
+  async function hubStudentsOpenReportsModal() {
+    const profile = hubStudentsRequireSelectedProfile();
+    if (!profile) return;
+    const personId = String(profile.personId || '').trim();
+    if (!personId) {
+      void hubStudentsShowSimpleMsg('Unavailable', 'warning', 'This student does not have a linked person profile.');
+      return;
+    }
+    const modalEl = document.getElementById('hubStudentsReportsModal');
+    const titleEl = document.getElementById('hubStudentsReportsModalLabel');
+    if (!modalEl) return;
+    const studentLabel = String(profile.name || profile.id || '').trim() || 'Student';
+    if (titleEl) titleEl.textContent = 'Report instances — ' + studentLabel;
+    hubStudentsSetReportsModalState({
+      loading: true,
+      error: '',
+      accessNote: '',
+      showList: false,
+      listHtml: '',
+      fullListUrl: hubStudentsBuildPersonReportsUrl(personId)
+    });
+    hubStudentsShowModal(modalEl);
+    try {
+      const payload = await hubStudentsFetchReportInstances(profile.id);
+      const fullListUrl = String(payload?.fullListUrl || hubStudentsBuildPersonReportsUrl(personId)).trim();
+      hubStudentsSetReportsModalState({
+        loading: false,
+        error: '',
+        accessNote: String(payload?.accessNote || '').trim(),
+        showList: true,
+        listHtml: hubStudentsRenderReportInstancesList(payload?.rows),
+        fullListUrl
+      });
+    } catch (error) {
+      hubStudentsSetReportsModalState({
+        loading: false,
+        error: error?.message || 'Unable to load report instances.',
+        accessNote: '',
+        showList: false,
+        listHtml: '',
+        fullListUrl: hubStudentsBuildPersonReportsUrl(personId)
+      });
+    }
+  }
+
   function hubStudentsBuildSessionCasesUrl(personId, startDate, endDate) {
     const params = hubStudentsWithEmbedParams();
     const pid = String(personId || '').trim();
@@ -870,12 +1033,7 @@
       return;
     }
     if (key === 'person-reports') {
-      const personId = String(profile.personId || '').trim();
-      if (!personId) {
-        void hubStudentsShowSimpleMsg('Unavailable', 'warning', 'This student does not have a linked person profile.');
-        return;
-      }
-      hubStudentsOpenEmbedModal('Reports', hubStudentsBuildPersonReportsUrl(personId));
+      void hubStudentsOpenReportsModal();
       return;
     }
     if (key === 'session-cases') {
@@ -1928,9 +2086,21 @@
     if (kind === 'enrollment_close') {
       const row = bag.enrollmentRow;
       if (row && global.SchoolStudentManagementEnrollmentClose) {
-        hubStudentsHideTimelineModal();
         global.SchoolStudentManagementEnrollmentClose.openForEnrollment(row);
       }
+      return;
+    }
+
+    if (kind === 'report_instance_v2') {
+      const instanceId = String(bag.instanceId || '').trim();
+      let url = String(bag.url || '').trim();
+      if (!url && instanceId) url = hubStudentsBuildReportInstanceV2EmbedUrl(instanceId);
+      const title = String(bag.title || 'Report Instance (V2)').trim();
+      if (!url) {
+        void hubStudentsShowSimpleMsg('Unavailable', 'warning', 'This report does not have an editor link.');
+        return;
+      }
+      hubStudentsOpenEmbedModal(title, url);
       return;
     }
 
@@ -1941,7 +2111,6 @@
         void hubStudentsShowSimpleMsg('Unavailable', 'warning', 'This item does not have a linked page.');
         return;
       }
-      hubStudentsHideTimelineModal();
       hubStudentsOpenEmbedModal(title, url);
       return;
     }
@@ -1949,7 +2118,6 @@
     if (kind === 'manager_clb') {
       const label = String(profile.name || profile.id).trim();
       if (global.RollingStudentClbManager) {
-        hubStudentsHideTimelineModal();
         global.RollingStudentClbManager.open({
           studentId: profile.id,
           studentLabel: label,
@@ -1964,7 +2132,6 @@
     if (kind === 'manager_referrals') {
       const label = String(profile.name || profile.id).trim();
       if (global.StudentReferralLinksManager) {
-        hubStudentsHideTimelineModal();
         global.StudentReferralLinksManager.open({
           studentId: profile.id,
           studentLabel: label,
@@ -1977,17 +2144,13 @@
     }
 
     if (kind === 'person_reports') {
-      const personId = String(profile.personId || '').trim();
-      if (!personId) return;
-      hubStudentsHideTimelineModal();
-      hubStudentsOpenEmbedModal('Reports', hubStudentsBuildPersonReportsUrl(personId));
+      void hubStudentsOpenReportsModal();
       return;
     }
 
     if (kind === 'session_cases_day') {
       const personId = String(bag.personId || profile.personId || '').trim();
       const day = String(bag.date || '').trim();
-      hubStudentsHideTimelineModal();
       hubStudentsOpenEmbedModal(
         'Student cases',
         hubStudentsBuildSessionCasesUrl(personId, day, day)
@@ -2225,7 +2388,11 @@
     hubStudentsEmbedModalBound = true;
     const embedModal = document.getElementById('hubStudentsEmbedModal');
     if (embedModal) {
+      embedModal.addEventListener('shown.bs.modal', function () {
+        document.body.classList.add('hub-students-embed-dim');
+      });
       embedModal.addEventListener('hidden.bs.modal', function () {
+        document.body.classList.remove('hub-students-embed-dim');
         const frame = document.getElementById('hubStudentsEmbedFrame');
         if (frame) {
           frame.onload = null;
