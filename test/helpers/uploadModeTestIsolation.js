@@ -20,6 +20,7 @@ const DEFAULT_APP_UPLOAD_STUBS = {
 
 let backendOverride = null;
 let extraAppStubs = {};
+let savedUploadMode;
 
 function stubUploadStorageBackend(mode) {
   backendOverride = mode == null ? null : String(mode).trim().toLowerCase();
@@ -54,12 +55,14 @@ function wrapGetValueForUploadTests(originalGetValue = ORIGINAL_GET_VALUE) {
 
 /**
  * Stub app.uploadStorageBackend (and related upload app keys) to stable local defaults
- * so tests are not affected by data/systemSettings.json when UPLOAD_MODE is unset.
+ * so tests are not affected by data/systemSettings.json or CI UPLOAD_MODE env values.
  */
 function installUploadModeTestIsolation(test, options = {}) {
   const originalGetValue = options.originalGetValue || ORIGINAL_GET_VALUE;
 
   test.beforeEach(() => {
+    savedUploadMode = process.env.UPLOAD_MODE;
+    delete process.env.UPLOAD_MODE;
     backendOverride = null;
     extraAppStubs = {};
     wrapGetValueForUploadTests(originalGetValue);
@@ -70,6 +73,8 @@ function installUploadModeTestIsolation(test, options = {}) {
     if (options.originalGetValue) {
       settingService.getValue = options.originalGetValue;
     }
+    if (savedUploadMode === undefined) delete process.env.UPLOAD_MODE;
+    else process.env.UPLOAD_MODE = savedUploadMode;
   });
 }
 
