@@ -89,8 +89,8 @@ test('canSubmitEntryViaSave Family A and Family B admin', () => {
     status: 'approved',
     audit: { createDateTime: '2026-03-01T00:00:00.000Z' }
   };
-  assert.equal(wordOfDayAccessService.canSubmitEntryViaSave(approved, familyABypassUpdate, 'U1', '2026'), true);
-  assert.equal(wordOfDayAccessService.canSubmitEntryViaSave(approved, familyBAdminUpdate, 'U1', '2026'), true);
+  assert.equal(wordOfDayAccessService.canSubmitEntryViaSave(approved, familyABypassUpdate, 'U1', '2026'), false);
+  assert.equal(wordOfDayAccessService.canSubmitEntryViaSave(approved, familyBAdminUpdate, 'U1', '2026'), false);
   assert.equal(wordOfDayAccessService.canSubmitEntryViaSave(approved, orgUpdateAccess, 'U1', '2026'), false);
 });
 
@@ -99,7 +99,9 @@ test('canSubmitEntryViaSave owner and org tiers', () => {
   const submittedMine = { id: '12', authorUserId: 'U1', status: 'submitted', audit: { createDateTime: '2026-01-01T00:00:00.000Z' } };
   assert.equal(wordOfDayAccessService.canSubmitEntryViaSave(savedMine, ownerAccess, 'U1', '2026'), true);
   assert.equal(wordOfDayAccessService.canSubmitEntryViaSave(submittedMine, ownerAccess, 'U1', '2026'), false);
-  assert.equal(wordOfDayAccessService.canSubmitEntryViaSave(submittedMine, orgUpdateAccess, 'U1', '2026'), true);
+  assert.equal(wordOfDayAccessService.canSubmitEntryViaSave(submittedMine, orgUpdateAccess, 'U1', '2026'), false);
+  const reopenedMine = { id: '13', authorUserId: 'U1', status: 'reopened', audit: { createDateTime: '2026-01-01T00:00:00.000Z' } };
+  assert.equal(wordOfDayAccessService.canSubmitEntryViaSave(reopenedMine, ownerAccess, 'U1', '2026'), true);
 });
 
 test('canClearWorkflowNote mirrors canChangeAuthorOnEdit (Family A and admin update scope)', () => {

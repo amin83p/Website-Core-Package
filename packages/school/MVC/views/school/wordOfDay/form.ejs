@@ -2,7 +2,6 @@
 const wodFormAccess = typeof wordOfDayAccess !== 'undefined' ? wordOfDayAccess : {};
 const editCaps = typeof entryCapabilities !== 'undefined' ? entryCapabilities : {};
 const canEdit = isEdit ? Boolean(editCaps.canEdit) : Boolean(wodFormAccess.canCreateWords);
-const canSubmit = isEdit ? Boolean(editCaps.canSubmit) : Boolean(wodFormAccess.canCreateWords);
 const examples = isEdit && Array.isArray(entry.examples) ? entry.examples : [];
 const selectedTypes = isEdit
   ? (Array.isArray(entry.wordTypes) && entry.wordTypes.length ? entry.wordTypes : (entry.wordType ? [entry.wordType] : ['noun']))
@@ -25,6 +24,28 @@ const activeUserLabel = String(user?.name || user?.username || user?.email || ac
 const wodReviewerNote = isEdit ? String(entry?.workflow?.reviewerNote || '').trim() : '';
 const wodEntryStatusLabel = isEdit ? String(entry?.status || '').replace(/_/g, ' ') : '';
 const canClearWodWorkflowNote = Boolean(isEdit && wodFormAccess.canClearWorkflowNote);
+const wodEntryStatusLower = isEdit ? String(entry.status || 'saved').toLowerCase() : '';
+const wodIsPreSubmitStatus = !isEdit || wodEntryStatusLower === 'saved' || wodEntryStatusLower === 'reopened';
+const showSaveAndSubmit = wodIsPreSubmitStatus && (isEdit ? Boolean(editCaps.canSubmit) : Boolean(wodFormAccess.canCreateWords));
+const wodSaveButtonLabel = wodIsPreSubmitStatus ? 'Save draft' : 'Save';
+const wodCurrentYearBucket = (authorStats && authorStats.byYear && wodContributionYear && authorStats.byYear[wodContributionYear])
+  ? authorStats.byYear[wodContributionYear]
+  : {};
+const wodRemainingContributions = (wodContributionLimit > 0 && !wodQuotaExempt)
+  ? Math.max(0, wodContributionLimit - wodCurrentYearCount)
+  : null;
+const wodContributionUsagePct = (wodContributionLimit > 0 && !wodQuotaExempt)
+  ? Math.min(100, Math.round((wodCurrentYearCount / wodContributionLimit) * 100))
+  : 0;
+const wodContributionProgressClass = wodQuotaBlocked
+  ? 'bg-danger'
+  : (wodContributionUsagePct >= 85 ? 'bg-warning' : 'bg-primary');
+const wodStatusStatTone = Object.freeze({
+  saved: 'secondary',
+  submitted: 'warning',
+  approved: 'success',
+  rejected: 'danger'
+});
 %>
 
 <style>
@@ -53,6 +74,79 @@ const canClearWodWorkflowNote = Boolean(isEdit && wodFormAccess.canClearWorkflow
     font-weight: 700;
     white-space: nowrap;
   }
+  .word-of-day-form-page .wod-contribution-card {
+    border-left: 4px solid var(--bs-primary);
+  }
+  .word-of-day-form-page .wod-contribution-kicker {
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+  }
+  .word-of-day-form-page .wod-contribution-stat {
+    align-items: center;
+    border-radius: 0.5rem;
+    border-width: 1px;
+    border-style: solid;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    justify-content: center;
+    min-height: 4.75rem;
+    padding: 0.85rem 0.75rem;
+    text-align: center;
+  }
+  .word-of-day-form-page .wod-contribution-stat .wod-stat-value {
+    display: block;
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1.1;
+  }
+  .word-of-day-form-page .wod-contribution-stat .wod-stat-label {
+    color: var(--bs-secondary-color);
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    margin-top: 0.2rem;
+    text-transform: uppercase;
+  }
+  .word-of-day-form-page .wod-contribution-metrics {
+    display: grid;
+    gap: 0.75rem;
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .word-of-day-form-page .wod-contribution-quota-panel {
+    border-radius: 0.5rem;
+    height: 100%;
+    min-height: 100%;
+  }
+  .word-of-day-form-page .wod-contribution-breakdown-wrap {
+    display: grid;
+    grid-template-rows: auto minmax(5.5rem, 1fr);
+    min-height: 100%;
+  }
+  .word-of-day-form-page .wod-contribution-status-grid {
+    display: grid;
+    gap: 0.5rem;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-rows: minmax(5.5rem, 1fr);
+    height: 100%;
+    min-height: 0;
+  }
+  @media (min-width: 576px) {
+    .word-of-day-form-page .wod-contribution-status-grid {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+  @media (min-width: 992px) {
+    .word-of-day-form-page .wod-contribution-metrics {
+      align-items: stretch;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    }
+    .word-of-day-form-page .wod-contribution-stat .wod-stat-value {
+      font-size: clamp(1.5rem, 3vw, 2rem);
+    }
+  }
 </style>
 
 <span id="actionStateIdRef" data-id="<%= actionStateId || '' %>" hidden></span>
@@ -71,6 +165,77 @@ const canClearWodWorkflowNote = Boolean(isEdit && wodFormAccess.canClearWorkflow
     </a>
   </div>
 
+  <section class="wod-contribution-hero mb-4" aria-labelledby="wodContributionHeading">
+    <div class="card border-0 shadow-sm wod-contribution-card">
+      <div class="card-body p-3 p-md-4">
+        <div class="d-flex flex-wrap align-items-start justify-content-between gap-2 mb-3">
+          <div>
+            <p class="wod-contribution-kicker text-muted mb-1">Your contribution status</p>
+            <h2 id="wodContributionHeading" class="h5 fw-bold mb-0">
+              <i class="bi bi-calendar3-event me-2 text-primary" aria-hidden="true"></i>
+              <%= wodContributionYear || 'Current year' %>
+            </h2>
+          </div>
+          <% if (wodQuotaBlocked) { %>
+            <span class="badge rounded-pill bg-danger-subtle text-danger border border-danger px-3 py-2">Yearly limit reached</span>
+          <% } else if (wodQuotaExempt) { %>
+            <span class="badge rounded-pill bg-info-subtle text-info border border-info px-3 py-2">Quota exempt</span>
+          <% } %>
+        </div>
+
+        <div class="wod-contribution-metrics">
+          <div class="wod-contribution-quota-panel p-3 border bg-white">
+              <% if (wodQuotaExempt) { %>
+                <p class="text-muted small mb-1">Organization limit</p>
+                <p class="h3 fw-bold text-primary mb-1">No cap</p>
+                <p class="text-muted small mb-2">Your account is exempt from the yearly contribution limit.</p>
+                <p class="small mb-0"><strong><%= wodCurrentYearCount %></strong> word<%= wodCurrentYearCount === 1 ? '' : 's' %> created in <%= wodContributionYear %>.</p>
+              <% } else if (wodContributionLimit > 0) { %>
+                <p class="text-muted small mb-1">Used this year</p>
+                <div class="d-flex align-items-baseline gap-2 flex-wrap mb-2">
+                  <span class="display-6 fw-bold <%= wodQuotaBlocked ? 'text-danger' : 'text-primary' %>"><%= wodCurrentYearCount %></span>
+                  <span class="fs-4 text-muted">/ <%= wodContributionLimit %></span>
+                </div>
+                <div class="progress mb-2" role="progressbar" aria-valuenow="<%= wodContributionUsagePct %>" aria-valuemin="0" aria-valuemax="100" aria-label="Contribution quota used">
+                  <div class="progress-bar <%= wodContributionProgressClass %>" style="width: <%= wodContributionUsagePct %>%"></div>
+                </div>
+                <% if (wodQuotaBlocked) { %>
+                  <p class="small text-danger mb-0 fw-semibold">You cannot create another word until <%= Number(wodContributionYear) + 1 %> or an administrator raises the limit.</p>
+                <% } else { %>
+                  <p class="small text-muted mb-0"><strong class="text-body"><%= wodRemainingContributions %></strong> contribution<%= wodRemainingContributions === 1 ? '' : 's' %> remaining this year.</p>
+                <% } %>
+                <p class="small text-muted mb-0 mt-2">Counts every entry you created in <%= wodContributionYear %> (all statuses).</p>
+              <% } else { %>
+                <p class="text-muted small mb-1">Used this year</p>
+                <p class="display-6 fw-bold text-primary mb-1"><%= wodCurrentYearCount %></p>
+                <p class="text-muted small mb-0">No yearly limit is configured. Unlimited contributions.</p>
+              <% } %>
+          </div>
+          <div class="wod-contribution-breakdown-wrap">
+            <input type="hidden" id="wodQuotaBlockedFlag" value="<%= wodQuotaBlocked ? '1' : '0' %>">
+            <p class="text-muted small fw-semibold mb-2">Breakdown for <%= wodContributionYear %></p>
+            <div class="wod-contribution-status-grid">
+              <% [
+                ['Saved', 'saved', wodCurrentYearBucket.saved || 0],
+                ['Submitted', 'submitted', wodCurrentYearBucket.submitted || 0],
+                ['Approved', 'approved', wodCurrentYearBucket.approved || 0],
+                ['Rejected', 'rejected', wodCurrentYearBucket.rejected || 0]
+              ].forEach(([label, statusKey, count]) => {
+                const tone = wodStatusStatTone[statusKey] || 'secondary';
+                const darkText = statusKey === 'submitted' ? ' text-dark' : '';
+              %>
+                <div class="wod-contribution-stat bg-<%= tone %>-subtle border-<%= tone %>-subtle<%= darkText %>">
+                  <span class="wod-stat-value text-<%= tone %><%= darkText %>"><%= count %></span>
+                  <span class="wod-stat-label<%= darkText %>"><%= label %></span>
+                </div>
+              <% }) %>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <div class="form-container wide" style="max-width: 1400px;">
     <div class="card border-0 shadow-sm mb-4">
       <button class="card-header bg-white border-bottom w-100 text-start d-flex align-items-center justify-content-between gap-2 py-3 px-4 wod-year-stats-toggle"
@@ -78,16 +243,13 @@ const canClearWodWorkflowNote = Boolean(isEdit && wodFormAccess.canClearWorkflow
         id="wodAuthorStatsToggle"
         data-bs-toggle="collapse"
         data-bs-target="#wodAuthorStatsCollapse"
-        aria-expanded="true"
+        aria-expanded="false"
         aria-controls="wodAuthorStatsCollapse">
-        <span class="fw-bold m-0 text-primary"><i class="bi bi-bar-chart me-2"></i>Your words by year</span>
+        <span class="fw-bold m-0 text-primary"><i class="bi bi-bar-chart me-2"></i>Contribution history by year</span>
         <i class="bi bi-chevron-down wod-year-stats-chevron text-muted" aria-hidden="true"></i>
       </button>
-      <div id="wodAuthorStatsCollapse" class="collapse show">
+      <div id="wodAuthorStatsCollapse" class="collapse">
         <div class="card-body p-4">
-          <% if (!isEdit && wodQuotaBlocked) { %>
-            <div class="alert alert-warning small mb-3">You cannot create another word until the next calendar year or an administrator raises the limit.</div>
-          <% } %>
           <% if (!wodStatsTableYears.length) { %>
             <p class="text-muted mb-0 small">No entries yet.</p>
           <% } else { %>
@@ -298,12 +460,12 @@ const canClearWodWorkflowNote = Boolean(isEdit && wodFormAccess.canClearWorkflow
         </div>
       </div>
 
-      <% if (canEdit || canSubmit) { %>
+      <% if (canEdit || showSaveAndSubmit) { %>
         <div class="d-flex flex-wrap gap-2">
           <% if (canEdit) { %>
-            <button type="button" class="btn btn-outline-secondary" data-wod-save="saved"<%= (!isEdit && wodQuotaBlocked) ? ' disabled' : '' %>>Save draft</button>
+            <button type="button" class="btn btn-outline-secondary" data-wod-save="saved"<%= (!isEdit && wodQuotaBlocked) ? ' disabled' : '' %>><%= wodSaveButtonLabel %></button>
           <% } %>
-          <% if (canSubmit) { %>
+          <% if (showSaveAndSubmit) { %>
             <button type="button" class="btn btn-filled btn-primary" data-wod-save="submit"<%= (!isEdit && wodQuotaBlocked) ? ' disabled' : '' %>>Save &amp; submit</button>
           <% } %>
         </div>
@@ -311,25 +473,6 @@ const canClearWodWorkflowNote = Boolean(isEdit && wodFormAccess.canClearWorkflow
     </form>
   </div>
 
-  <div class="modal fade" id="wodDuplicateModal" tabindex="-1" aria-labelledby="wodDuplicateModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
-      <div class="modal-content">
-        <div class="modal-header border-0 pb-0">
-          <h2 class="modal-title h5" id="wodDuplicateModalLabel">Word already saved</h2>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body">
-          <p class="text-muted small mb-3">This word is already in your organization. The entry below was not changed.</p>
-          <dl class="row small mb-0" id="wodDuplicateDetails"></dl>
-          <ul class="small mb-0 ps-3 d-none" id="wodDuplicateExamples"></ul>
-        </div>
-        <div class="modal-footer border-0 pt-0">
-          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
-          <a href="#" class="btn btn-primary" id="wodDuplicateOpenLink" target="_self">Open saved entry</a>
-        </div>
-      </div>
-    </div>
-  </div>
 </div>
 
 <%- include('partials/modal_GenericPicker') %>

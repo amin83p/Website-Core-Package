@@ -41,8 +41,10 @@ router.get('/api/notify/roles', ...newsAccess(OPERATIONS.UPDATE, { requireToken:
 router.post('/api/notify/recipients', ...newsAccess(OPERATIONS.UPDATE), controller.postNotifyRecipients);
 
 router.post('/api/upload',
-  ...newsAccess(OPERATIONS.UPDATE),
+  requireAuth,
+  requireAccess(SECTIONS.NEWS, OPERATIONS.UPDATE),
   upload('news').array('files', 10),
+  trackActionState(SECTIONS.NEWS, OPERATIONS.UPDATE, { requireToken: false }),
   controller.uploadMedia);
 
 router.get('/manage/new', ...newsAccess(OPERATIONS.CREATE, { keepActive: true }), controller.showForm);

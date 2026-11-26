@@ -397,6 +397,7 @@ async function createEntry(req, res) {
 
 async function checkDuplicateWord(req, res) {
   try {
+    const access = await getAccess(req);
     const orgId = wordOfDayService.getActiveOrgId(req.user);
     const word = String(req.body?.word ?? req.query?.word ?? '').trim();
     const excludeId = String(req.body?.excludeId ?? req.query?.excludeId ?? '').trim();
@@ -404,9 +405,14 @@ async function checkDuplicateWord(req, res) {
       return res.json({ status: 'success', duplicate: null });
     }
     const duplicate = await wordOfDayService.findDuplicateWord(orgId, word, excludeId);
+    const actorId = wordOfDayService.getActorId(req.user);
     return res.json({
       status: 'success',
-      duplicate: wordOfDayService.formatDuplicateSummary(duplicate)
+      duplicate: wordOfDayService.formatDuplicateSummary(duplicate, {
+        access,
+        actorId,
+        currentYear: wordOfDayService.currentCalendarYear()
+      })
     });
   } catch (error) {
     return sendError(req, res, error, statusCode(error, 400));

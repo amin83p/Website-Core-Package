@@ -199,11 +199,42 @@ function formatTypeLabels(row) {
   return wordOfDayModel.primaryWordTypeLabel(types);
 }
 
-function formatDuplicateSummary(row) {
+function duplicateAccessFlags(row, context = {}) {
+  const { access, actorId, currentYear } = context;
+  if (!row || !access) {
+    return { canViewDetails: true, canOpen: Boolean(row?.id) };
+  }
+  if (access.adminFlags?.readAll) {
+    return { canViewDetails: true, canOpen: Boolean(row.id) };
+  }
+  const status = String(row?.status || '').toLowerCase();
+  const view = status === 'archived' ? 'archived' : 'active';
+  const visible = wordOfDayAccessService.rowVisibleInList(row, access, actorId, currentYear, view);
+  return { canViewDetails: visible, canOpen: visible && Boolean(row.id) };
+}
+
+function formatDuplicateSummary(row, context = {}) {
   if (!row) return null;
+  const status = String(row.status || '').toLowerCase();
+  const { canViewDetails, canOpen } = duplicateAccessFlags(row, context);
+
+  if (!canViewDetails) {
+    const isAvailableInOrg = status === 'approved' || status === 'on_hold';
+    return {
+      word: row.word,
+      limited: true,
+      canOpen: false,
+      notice: isAvailableInOrg
+        ? 'This word is already available in your organization. Please choose a different word.'
+        : 'This word is already saved in your organization. Please choose a different word.'
+    };
+  }
+
   return {
     id: row.id,
     word: row.word,
+    limited: false,
+    canOpen,
     wordTypes: Array.isArray(row.wordTypes) ? row.wordTypes : [],
     typeLabels: formatTypeLabels(row),
     difficulty: row.difficulty,
@@ -215,7 +246,9 @@ function formatDuplicateSummary(row) {
     authorName: row.authorName || row.authorUserId || '',
     createdBy: row.audit?.createdBy || row.authorUserId || '',
     createDateTime: row.audit?.createDateTime || '',
-    detailUrl: row.id ? `/school/word-of-day?openEntry=${encodeURIComponent(row.id)}` : ''
+    detailUrl: canOpen && row.id
+      ? `/school/word-of-day?openEntry=${encodeURIComponent(row.id)}`
+      : ''
   };
 }
 
@@ -230,13 +263,19 @@ async function findDuplicateWord(orgId, word, excludeId = '') {
   }) || null;
 }
 
-function assertNoDuplicateWord(orgId, word, excludeId = '') {
+function assertNoDuplicateWord(orgId, word, excludeId = '', context = {}) {
   return findDuplicateWord(orgId, word, excludeId).then((duplicate) => {
     if (!duplicate) return null;
-    const error = new Error('This word is already saved in your organization.');
+    const limited = duplicateAccessFlags(duplicate, context);
+    const message = limited.canViewDetails
+      ? 'This word is already saved in your organization.'
+      : (String(duplicate.status || '').toLowerCase() === 'approved' || String(duplicate.status || '').toLowerCase() === 'on_hold'
+        ? 'This word is already available in your organization.'
+        : 'This word is already saved in your organization.');
+    const error = new Error(message);
     error.code = 'WORD_OF_DAY_DUPLICATE';
     error.statusCode = 409;
-    error.duplicate = formatDuplicateSummary(duplicate);
+    error.duplicate = formatDuplicateSummary(duplicate, context);
     throw error;
   });
 }
@@ -288,7 +327,11 @@ async function createEntry(reqUser, body, { saveAs = 'saved', access = null } = 
     error.statusCode = 400;
     throw error;
   }
-  await assertNoDuplicateWord(orgId, body?.word);
+  await assertNoDuplicateWord(orgId, body?.word, '', {
+    access,
+    actorId: getActorId(reqUser),
+    currentYear: currentCalendarYear()
+  });
   await assertContributionQuota(reqUser, body, access);
   const authorName = await getActorName(reqUser);
   const status = saveAs === 'submitted' ? 'submitted' : 'saved';
@@ -326,7 +369,11 @@ async function updateEntry(reqUser, id, body, { saveAs, access = null } = {}) {
   assertUpdateAllowed(existing, access, reqUser);
 
   if (body?.word !== undefined) {
-    await assertNoDuplicateWord(getActiveOrgId(reqUser), body.word, existing.id);
+    await assertNoDuplicateWord(getActiveOrgId(reqUser), body.word, existing.id, {
+      access,
+      actorId: getActorId(reqUser),
+      currentYear: currentCalendarYear()
+    });
   }
 
   if (!body || typeof body !== 'object' || !Object.keys(body).length) {
@@ -648,5 +695,6 @@ module.exports = {
   buildEntryCapabilities,
   validateUploadedFile,
   getActiveOrgId,
+  getActorId,
   currentCalendarYear
 };

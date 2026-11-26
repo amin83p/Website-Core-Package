@@ -18,10 +18,10 @@ const UPDATE_STATUSES_BY_TIER = Object.freeze({
 
 const SUBMIT_VIA_SAVE_STATUSES_BY_TIER = Object.freeze({
   owner: new Set(['saved', 'reopened']),
-  department: new Set(['saved', 'reopened', 'submitted']),
-  division: new Set(['saved', 'reopened', 'submitted']),
-  organization: new Set(['saved', 'reopened', 'submitted']),
-  admin: null
+  department: new Set(['saved', 'reopened']),
+  division: new Set(['saved', 'reopened']),
+  organization: new Set(['saved', 'reopened']),
+  admin: new Set(['saved', 'reopened'])
 });
 
 const DELETE_STATUSES_BY_TIER = Object.freeze({
@@ -199,9 +199,10 @@ function canSubmitEntryViaSave(row, access, actorId, currentYear) {
   if (!canUpdateEntry(row, access, actorId, currentYear)) return false;
   const status = String(row?.status || '').toLowerCase();
   if (status === 'archived') return false;
+  const submitAllowedStatuses = SUBMIT_VIA_SAVE_STATUSES_BY_TIER.admin;
+  if (!submitAllowedStatuses.has(status)) return false;
   if (access?.adminFlags?.update) return true;
   const tier = effectiveTier(access, 'update');
-  if (tier === 'admin') return true;
   if (tier === 'owner' && !isOwnerRow(row, actorId)) return false;
   if ((tier === 'department' || tier === 'division') && entryYear(row) !== String(currentYear)) return false;
   return statusAllowedForTier(status, tier, SUBMIT_VIA_SAVE_STATUSES_BY_TIER);

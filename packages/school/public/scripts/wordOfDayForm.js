@@ -6,7 +6,6 @@
   let audio = {};
   let csrf = '';
   let entryId = '';
-  let duplicateModal = null;
   let saving = false;
 
   function qs(id) {
@@ -30,19 +29,33 @@
       .trim();
   }
 
+  function messageIcon(icon) {
+    const ui = global.SchoolMessageUi;
+    return ui?.normalizeIcon ? ui.normalizeIcon(icon || 'error') : String(icon || 'error');
+  }
+
+  function messageOkButtonClass(icon) {
+    const normalized = messageIcon(icon);
+    if (normalized === 'error') return 'btn-danger';
+    if (normalized === 'warning') return 'btn-warning';
+    if (normalized === 'success') return 'btn-success';
+    return 'btn-primary';
+  }
+
   async function showAlert(title, message, icon) {
     const body = plainMessage(message || title || 'Something went wrong.');
+    const normalizedIcon = messageIcon(icon || 'error');
     const ui = global.SchoolMessageUi;
-    if (ui?.showAlert && typeof global.showMessageModal === 'function' && document.getElementById('messageModal')) {
-      await ui.showAlert(title, icon || 'error', body);
+    if (ui?.showAlert) {
+      await ui.showAlert(title, normalizedIcon, body);
       return;
     }
     if (typeof global.showMessageModal === 'function' && document.getElementById('messageModal')) {
       await global.showMessageModal({
         title: String(title || 'Message'),
         message: body,
-        icon: icon || 'error',
-        buttons: [{ text: 'OK', class: icon === 'success' ? 'btn-success' : 'btn-primary' }]
+        icon: normalizedIcon,
+        buttons: [{ text: 'OK', class: messageOkButtonClass(normalizedIcon) }]
       });
       return;
     }
@@ -186,58 +199,66 @@
     return data.media || {};
   }
 
-  function ensureDuplicateModal() {
-    const el = qs('wodDuplicateModal');
-    if (!el || !global.bootstrap?.Modal) return null;
-    if (!duplicateModal) duplicateModal = new global.bootstrap.Modal(el);
-    return duplicateModal;
+  function buildDuplicateDetailsHtml(duplicate) {
+    const rows = [
+      ['Word', duplicate.word],
+      ['Type', duplicate.typeLabels || (duplicate.wordTypes || []).join(', ')],
+      ['Difficulty', duplicate.difficultyLabel || duplicate.difficulty],
+      ['Pronunciation', duplicate.pronunciation || '—'],
+      ['Meaning', duplicate.meaning || '—'],
+      ['Status', duplicate.status || '—'],
+      ['Saved by', duplicate.authorName || duplicate.createdBy || '—'],
+      ['Saved on', duplicate.createDateTime || '—']
+    ];
+    let html = '<div class="text-start">';
+    html += '<p class="text-muted small mb-3">This word is already in your organization. The entry below was not changed.</p>';
+    html += `<dl class="row small mb-0">${rows.map(([dt, dd]) => (
+      `<dt class="col-sm-3">${escapeHtml(dt)}</dt><dd class="col-sm-9">${escapeHtml(dd)}</dd>`
+    )).join('')}</dl>`;
+    const examplesDup = Array.isArray(duplicate.examples) ? duplicate.examples : [];
+    if (examplesDup.length) {
+      html += `<ul class="small mb-0 ps-3 mt-2">${examplesDup.map((row) => `<li>${escapeHtml(row)}</li>`).join('')}</ul>`;
+    }
+    html += '</div>';
+    return html;
   }
 
-  function showDuplicateModal(duplicate) {
+  async function showDuplicateModal(duplicate) {
     if (!duplicate) return;
-    const dl = qs('wodDuplicateDetails');
-    const exList = qs('wodDuplicateExamples');
-    const link = qs('wodDuplicateOpenLink');
-    if (dl) {
-      const rows = [
-        ['Word', duplicate.word],
-        ['Type', duplicate.typeLabels || (duplicate.wordTypes || []).join(', ')],
-        ['Difficulty', duplicate.difficultyLabel || duplicate.difficulty],
-        ['Pronunciation', duplicate.pronunciation || '—'],
-        ['Meaning', duplicate.meaning || '—'],
-        ['Status', duplicate.status || '—'],
-        ['Saved by', duplicate.authorName || duplicate.createdBy || '—'],
-        ['Saved on', duplicate.createDateTime || '—']
-      ];
-      dl.innerHTML = rows.map(([dt, dd]) => (
-        `<dt class="col-sm-3">${escapeHtml(dt)}</dt><dd class="col-sm-9">${escapeHtml(dd)}</dd>`
-      )).join('');
-    }
-    const examplesDup = Array.isArray(duplicate.examples) ? duplicate.examples : [];
-    if (exList) {
-      if (examplesDup.length) {
-        exList.classList.remove('d-none');
-        exList.innerHTML = examplesDup.map((row) => `<li>${escapeHtml(row)}</li>`).join('');
-      } else {
-        exList.classList.add('d-none');
-        exList.innerHTML = '';
-      }
-    }
-    if (link && duplicate.detailUrl) {
-      link.href = duplicate.detailUrl;
-      link.classList.remove('d-none');
-    } else if (link) {
-      link.classList.add('d-none');
-    }
-    const modal = ensureDuplicateModal();
-    if (modal) modal.show();
-    else {
-      void showAlert(
-        'Word already saved',
-        `This word is already saved by ${duplicate.authorName || 'another user'}.`,
+    const limited = duplicate.limited === true || duplicate.canOpen === false;
+    if (limited) {
+      await showAlert(
+        'Word already in use',
+        duplicate.notice || 'This word is already in your organization. Please choose a different word.',
         'warning'
       );
+      return;
     }
+
+    const openLabel = 'Open saved entry';
+    if (typeof global.showMessageModal === 'function' && document.getElementById('messageModal')) {
+      const buttons = [{ text: 'Close', class: 'btn-secondary' }];
+      if (duplicate.detailUrl) {
+        buttons.push({ text: openLabel, class: 'btn-primary' });
+      }
+      const result = await global.showMessageModal({
+        title: 'Word already saved',
+        icon: 'warning',
+        size: 'lg',
+        message: buildDuplicateDetailsHtml(duplicate),
+        buttons
+      });
+      if (result === openLabel && duplicate.detailUrl) {
+        global.location.href = duplicate.detailUrl;
+      }
+      return;
+    }
+
+    await showAlert(
+      'Word already saved',
+      `This word is already saved by ${duplicate.authorName || 'another user'}.`,
+      'warning'
+    );
   }
 
   async function checkDuplicateWord(word) {
@@ -281,7 +302,7 @@
       const preCheck = await checkDuplicateWord(word);
       if (preCheck?.duplicate) {
         saving = false;
-        showDuplicateModal(preCheck.duplicate);
+        await showDuplicateModal(preCheck.duplicate);
         return;
       }
     } catch (_) { /* server will enforce */ }
@@ -304,7 +325,7 @@
       }
 
       if (res.status === 409 && data?.duplicate) {
-        showDuplicateModal(data.duplicate);
+        await showDuplicateModal(data.duplicate);
         saving = false;
         return;
       }
