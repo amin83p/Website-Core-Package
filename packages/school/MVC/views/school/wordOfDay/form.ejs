@@ -28,6 +28,11 @@ const wodEntryStatusLower = isEdit ? String(entry.status || 'saved').toLowerCase
 const wodIsPreSubmitStatus = !isEdit || wodEntryStatusLower === 'saved' || wodEntryStatusLower === 'reopened';
 const showSaveAndSubmit = wodIsPreSubmitStatus && (isEdit ? Boolean(editCaps.canSubmit) : Boolean(wodFormAccess.canCreateWords));
 const wodSaveButtonLabel = wodIsPreSubmitStatus ? 'Save draft' : 'Save';
+const wodAiAssistAccess = typeof wordOfDayAiAssistAccess !== 'undefined' && wordOfDayAiAssistAccess ? wordOfDayAiAssistAccess : {};
+const canShowWodAiAutofill = Boolean(canEdit && wodAiAssistAccess.hasAssignedLimit);
+const canUseWodAiAutofill = Boolean(canShowWodAiAutofill && wodAiAssistAccess.allowed);
+const wodAiQuotaBlocked = canShowWodAiAutofill && !canUseWodAiAutofill;
+const wodAiAutofillHint = wodAiAssistAccess.message || 'You have reached your allocated School AI limit. Contact your administrator for more credit.';
 const wodCurrentYearBucket = (authorStats && authorStats.byYear && wodContributionYear && authorStats.byYear[wodContributionYear])
   ? authorStats.byYear[wodContributionYear]
   : {};
@@ -358,7 +363,19 @@ const wodStatusStatTone = Object.freeze({
         <% } %>
         <div class="mb-3">
           <label class="form-label fw-bold" for="wodWord">Word <span class="text-danger">*</span></label>
-          <input type="text" class="form-control size-md" id="wodWord" name="word" required maxlength="200" value="<%= isEdit ? (entry.word || '') : '' %>" <%= canEdit ? '' : 'readonly' %>>
+          <div class="input-group">
+            <input type="text" class="form-control size-md" id="wodWord" name="word" required maxlength="200" value="<%= isEdit ? (entry.word || '') : '' %>" <%= canEdit ? '' : 'readonly' %>>
+            <% if (canShowWodAiAutofill) { %>
+              <button type="button" class="btn btn-outline-primary" id="btnWodAiAutofill" title="Generate pronunciation, meaning, examples, and more with AI">
+                <i class="bi bi-stars me-1"></i>Generate with AI
+              </button>
+            <% } %>
+          </div>
+          <% if (canUseWodAiAutofill) { %>
+            <div class="form-text">AI fill uses your org’s assigned model under AI Assist → Service assignments and counts against your usage limit.</div>
+          <% } else if (canEdit && !canShowWodAiAutofill && wodAiAssistAccess.message) { %>
+            <div class="form-text text-muted"><%= wodAiAssistAccess.message %></div>
+          <% } %>
         </div>
 
         <div class="mb-3">
@@ -481,7 +498,11 @@ const wodStatusStatTone = Object.freeze({
 <script>
   if (window.WordOfDayForm) {
     window.WordOfDayForm.init({
-      csrfToken: document.querySelector('#wordOfDayForm input[name="_csrf"]')?.value || ''
+      csrfToken: document.querySelector('#wordOfDayForm input[name="_csrf"]')?.value || '',
+      aiAutofill: {
+        allowed: <%= canUseWodAiAutofill ? 'true' : 'false' %>,
+        blockedMessage: <%- JSON.stringify(wodAiQuotaBlocked ? wodAiAutofillHint : '') %>
+      }
     });
   }
 </script>

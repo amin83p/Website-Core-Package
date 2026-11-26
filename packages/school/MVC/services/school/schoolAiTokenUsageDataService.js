@@ -154,6 +154,39 @@ const schoolAiTokenUsageDataService = {
     return schoolDataService.updateData(ENTITY, rowId, next, requestingUser, { accessContext });
   },
 
+  async sumUsageForUser(filters = {}, requestingUser, accessContext = {}) {
+    const orgId = cleanString(filters.orgId, { max: 120, allowEmpty: false })
+      || getActiveOrgIdOrThrow(requestingUser);
+    const userId = cleanString(filters.userId, { max: 120, allowEmpty: false });
+    const sinceIso = cleanString(filters.sinceIso, { max: 80, allowEmpty: true }) || '';
+    const serviceKey = cleanString(filters.serviceKey, { max: 120, allowEmpty: true }) || '';
+    const sinceMs = sinceIso ? Date.parse(sinceIso) : 0;
+    let rows = await schoolDataService.fetchAllData(
+      ENTITY,
+      { orgId__eq: orgId, userId__eq: userId },
+      requestingUser || { id: userId, activeOrgId: orgId },
+      accessContext
+    );
+    rows = (Array.isArray(rows) ? rows : []).filter((row) => {
+      if (!idsEqual(row?.orgId, orgId) || !idsEqual(row?.userId, userId)) return false;
+      if (sinceMs && Number.isFinite(sinceMs)) {
+        const createdMs = Date.parse(String(row?.createdAt || ''));
+        if (Number.isFinite(createdMs) && createdMs < sinceMs) return false;
+      }
+      if (serviceKey && String(row?.serviceKey || '') !== String(serviceKey)) return false;
+      return true;
+    });
+    let totalTokens = 0;
+    rows.forEach((row) => {
+      const tokenCount = Number(row?.totalTokenCount);
+      if (Number.isFinite(tokenCount) && tokenCount > 0) totalTokens += tokenCount;
+    });
+    return {
+      totalTokens,
+      requestCount: rows.length
+    };
+  },
+
   async listReportAiAssistHistory(filters = {}, requestingUser, accessContext = {}) {
     const orgId = getActiveOrgIdOrThrow(requestingUser);
     const context = cleanString(filters.reportContext, { max: 20, allowEmpty: true }).toLowerCase();

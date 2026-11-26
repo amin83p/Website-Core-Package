@@ -18,6 +18,7 @@ Registered keys live in `packages/school/MVC/config/schoolAiServiceRegistry.js`.
 
 - `school.report_review` — Report Review Service (`planned`)
 - `school.bimpr_goals_checker` — Bi-MPR Goals Checker (`implemented`; default preset JSON below)
+- `school.word_of_day_autofill` — Word of the Day Autofill (`implemented`; vocabulary form AI fill)
 
 ## Report template bindings
 
@@ -46,6 +47,7 @@ When no org row exists in `schoolAiServiceDefinitions`, the app loads defaults f
 | Service key | Preset file |
 |-------------|-------------|
 | `school.bimpr_goals_checker` | `packages/school/MVC/config/schoolAiServiceDefinitionPresets/school.bimpr_goals_checker.json` |
+| `school.word_of_day_autofill` | `packages/school/MVC/config/schoolAiServiceDefinitionPresets/school.word_of_day_autofill.json` |
 
 To configure the live service in the UI (no hardcoded JS):
 
@@ -61,7 +63,13 @@ To push a preset into Mongo after editing the JSON file:
 
 `node packages/school/scripts/maintenance/sync-bimpr-ai-service-definition.js`
 
+Word of the Day autofill (Mongo only — does not update `data/school/schoolAiServiceDefinitions.json`):
+
+`node packages/school/scripts/maintenance/sync-word-of-day-ai-service-definition.js`
+
 The **`school.bimpr_goals_checker`** preset uses JSON with goals `goal_1`–`goal_4` and optional `notes`. Orgs with an older **markdown** saved definition should re-save using JSON mode and the schema from the preset file.
+
+The **`school.word_of_day_autofill`** preset returns `pronunciation`, a multi-sentence practical `meaning`, three everyday `examples` (full sentences, not one-liners), `difficulty` (`easy` \| `medium` \| `hard`), and `wordTypes` aligned with the Word of the Day form. Teachers invoke it from **Word of the Day → New/Edit → Generate with AI** (`POST /school/word-of-day/api/ai-autofill`) only when they have an **active usage limit** row for **Word of the Day Autofill** or **All services** with remaining quota (**AI Assist → Usage Limits**). Assign **Gemini 2.5 Flash** (or Pro) under **Service assignments**. After editing the preset JSON, re-run the WoD sync script so Mongo matches disk (or paste prompts in **Service definitions → Edit**).
 
 ```http
 POST /school/reports/ai-assist/prepare

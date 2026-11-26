@@ -271,6 +271,120 @@
     return data;
   }
 
+  function applyAiAutofillFields(fields = {}) {
+    const form = qs('wordOfDayForm');
+    const pronunciation = qs('wodPronunciation');
+    const meaning = qs('wodMeaning');
+    if (pronunciation) pronunciation.value = String(fields.pronunciation || '');
+    if (meaning) meaning.value = String(fields.meaning || '');
+
+    const difficulty = String(fields.difficulty || 'medium').trim();
+    form?.querySelectorAll('input[name="difficulty"]').forEach((radio) => {
+      radio.checked = radio.value === difficulty;
+    });
+
+    const typeSet = new Set(Array.isArray(fields.wordTypes) ? fields.wordTypes : []);
+    form?.querySelectorAll('[data-wod-word-type]').forEach((el) => {
+      el.checked = typeSet.has(el.value);
+    });
+    if (form) syncWordTypesInput(form);
+
+    examples = Array.isArray(fields.examples)
+      ? fields.examples.map((row) => String(row || '').trim()).filter(Boolean).slice(0, 3)
+      : [];
+    const draft = qs('wodExampleDraft');
+    if (draft) draft.value = '';
+    syncExamplesInput();
+  }
+
+  let aiAutofillRunning = false;
+  let aiAutofillAllowed = true;
+  let aiAutofillBlockedMessage = '';
+
+  function beginAiAutofillLoading(word) {
+    if (typeof global.showLoading !== 'function') return null;
+    return global.showLoading({
+      title: 'Word of the Day',
+      operation: 'AI Assist',
+      note: `Generating pronunciation, meaning, and examples for “${String(word || '').trim()}”…`
+    });
+  }
+
+  function endAiAutofillLoading(token) {
+    if (token && typeof global.hideLoading === 'function') {
+      global.hideLoading(token);
+    }
+  }
+
+  async function runAiAutofill() {
+    if (!aiAutofillAllowed) {
+      await showAlert(
+        'AI credit limit',
+        aiAutofillBlockedMessage || 'You have reached your allocated School AI limit. Contact your administrator for more credit.',
+        'warning'
+      );
+      return;
+    }
+    const btn = qs('btnWodAiAutofill');
+    const wordInput = qs('wodWord');
+    const word = String(wordInput?.value || '').trim();
+    if (!word) {
+      await showAlert('Word required', 'Enter a vocabulary word before generating with AI.', 'warning');
+      wordInput?.focus();
+      return;
+    }
+    if (aiAutofillRunning) return;
+    aiAutofillRunning = true;
+    const priorLabel = btn?.innerHTML;
+    let loadingToken = null;
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>Generating…';
+    }
+    try {
+      loadingToken = beginAiAutofillLoading(word);
+      const res = await fetch('/school/word-of-day/api/ai-autofill', {
+        method: 'POST',
+        headers: apiHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ word })
+      });
+      const data = await readResponsePayload(res);
+      const nextToken = String(
+        res.headers.get('x-action-state-id') || res.headers.get('X-Action-State-Id') || ''
+      ).trim();
+      if (nextToken) {
+        const hidden = document.querySelector('#wordOfDayForm [name="actionStateId"]');
+        const ref = document.getElementById('actionStateIdRef');
+        if (hidden) hidden.value = nextToken;
+        if (ref) ref.dataset.id = nextToken;
+      }
+      if (!res.ok || data?.status !== 'success') {
+        await showAlert(
+          'AI autofill failed',
+          data.message || data.error || 'Could not generate content. Assign a model in AI Assist → Service assignments.',
+          'error'
+        );
+        return;
+      }
+      applyAiAutofillFields(data.fields || {});
+    } catch (err) {
+      await showAlert('AI autofill failed', err.message || 'Could not generate content.', 'error');
+    } finally {
+      endAiAutofillLoading(loadingToken);
+      aiAutofillRunning = false;
+      if (btn) {
+        btn.disabled = false;
+        if (priorLabel) btn.innerHTML = priorLabel;
+      }
+    }
+  }
+
+  function bindAiAutofill() {
+    qs('btnWodAiAutofill')?.addEventListener('click', () => {
+      void runAiAutofill();
+    });
+  }
+
   async function runSave(form, saveAction) {
     if (saving) return;
     saving = true;
@@ -442,6 +556,9 @@
 
   function init(options = {}) {
     csrf = String(options.csrfToken || '').trim();
+    const aiOpts = options.aiAutofill && typeof options.aiAutofill === 'object' ? options.aiAutofill : {};
+    aiAutofillAllowed = aiOpts.allowed !== false;
+    aiAutofillBlockedMessage = String(aiOpts.blockedMessage || '').trim();
     const form = qs('wordOfDayForm');
     if (!form) return;
     entryId = String(form.getAttribute('data-entry-id') || '').trim();
@@ -475,6 +592,7 @@
 
     bindSaveButtons(form);
     bindAuthorPicker();
+    bindAiAutofill();
     syncWordTypesInput(form);
   }
 

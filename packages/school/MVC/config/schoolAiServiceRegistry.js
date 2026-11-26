@@ -14,6 +14,13 @@ const SCHOOL_AI_SERVICES = Object.freeze([
     description: 'Revises up to four Bi-MPR future-goal statements against MPR length, tense, and wording rules.',
     status: 'implemented',
     category: 'reports'
+  }),
+  Object.freeze({
+    serviceKey: 'school.word_of_day_autofill',
+    label: 'Word of the Day Autofill',
+    description: 'Generate pronunciation, definition, three examples, difficulty, and word types from a vocabulary word.',
+    status: 'implemented',
+    category: 'word_of_day'
   })
 ]);
 

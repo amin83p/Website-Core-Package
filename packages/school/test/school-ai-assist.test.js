@@ -228,6 +228,9 @@ function testAiAssistPagesUseMessageModalPartial() {
   assert.doesNotMatch(providerForm, /include\('partials\/modal'\)/, 'Provider form should rely on layout message modal');
   assert.match(providerList, /aiAssistGuardedDeleteScript/);
   assert.match(usageLimitList, /aiAssistGuardedDeleteScript/);
+  const guardedDelete = fs.readFileSync(path.join(viewsDir, 'partials/aiAssistGuardedDeleteScript.ejs'), 'utf8');
+  assert.match(guardedDelete, /guardedDeleteBasePath/);
+  assert.doesNotMatch(guardedDelete, /const deleteBasePath = typeof deleteBasePath/);
   assert.match(runnerPartial, /SchoolAiAssistMessaging/);
   assert.doesNotMatch(runnerPartial, /window\.alert/);
 }

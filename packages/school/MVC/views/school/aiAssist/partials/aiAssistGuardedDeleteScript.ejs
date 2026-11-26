@@ -1,16 +1,18 @@
 <%
-  const deleteBasePath = typeof deleteBasePath !== 'undefined' ? String(deleteBasePath || '').replace(/\/+$/, '') : '';
-  const deleteEntityLabel = typeof deleteEntityLabel !== 'undefined' ? String(deleteEntityLabel) : 'this item';
-  const deleteConfirmTitle = typeof deleteConfirmTitle !== 'undefined' ? String(deleteConfirmTitle) : 'Confirm deletion';
+  const guardedDeleteBasePath = typeof deleteBasePath !== 'undefined'
+    ? String(deleteBasePath || '').replace(/\/+$/, '')
+  : '';
+  const guardedDeleteEntityLabel = typeof deleteEntityLabel !== 'undefined' ? String(deleteEntityLabel) : 'this item';
+  const guardedDeleteConfirmTitle = typeof deleteConfirmTitle !== 'undefined' ? String(deleteConfirmTitle) : 'Confirm deletion';
   const asid = (typeof actionStateId !== 'undefined' && actionStateId) ? String(actionStateId) : '';
 %>
 <%- include('school/aiAssist/partials/aiAssistMessageHelpers') %>
 <script>
 document.addEventListener('DOMContentLoaded', () => {
   const actionStateId = <%- JSON.stringify(asid) %>;
-  const basePath = <%- JSON.stringify(deleteBasePath) %>;
-  const entityLabel = <%- JSON.stringify(deleteEntityLabel) %>;
-  const confirmTitle = <%- JSON.stringify(deleteConfirmTitle) %>;
+  const basePath = <%- JSON.stringify(guardedDeleteBasePath) %>;
+  const entityLabel = <%- JSON.stringify(guardedDeleteEntityLabel) %>;
+  const confirmTitle = <%- JSON.stringify(guardedDeleteConfirmTitle) %>;
 
   function showMessage(options) {
     if (window.SchoolAiAssistMessaging && typeof window.SchoolAiAssistMessaging.show === 'function') {

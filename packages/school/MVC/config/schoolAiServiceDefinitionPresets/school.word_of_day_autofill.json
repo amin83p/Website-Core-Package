@@ -1,0 +1,48 @@
+{
+  "inputs": [
+    {
+      "id": "word",
+      "label": "Vocabulary word",
+      "type": "text",
+      "required": true,
+      "helpText": "The headword to generate pronunciation, meaning, examples, difficulty, and word types for.",
+      "defaultValue": ""
+    }
+  ],
+  "prompt": {
+    "systemPrompt": "You are an expert ESL vocabulary editor for adult English language learners.\nYour audience needs practical English they can use in everyday life—not exam jargon or rare literary usage.\n\nDefinition (meaning):\n- Write 2 to 4 clear sentences (roughly 40–120 words total).\n- Explain what the word means in plain language, when people use it, and one typical daily-life situation (home, family, work, errands, health, transit, shopping, school, neighborhood, or social plans).\n- Stay at an approachable level (roughly B1–B2): do not pile on difficult synonyms or abstract theory.\n- If the word has a common practical nuance (politeness, tone, or register), mention it briefly in everyday terms.\n\nExample sentences:\n- Provide exactly three complete sentences.\n- Each sentence should be about 12–22 words—long enough to feel natural, not a telegram.\n- Each must show the word in a different realistic daily-life context (e.g. conversation, routine, problem-solving, making plans).\n- Use familiar settings and vocabulary; avoid academic lectures, news headlines, or fantasy scenarios.\n- Vary the grammar slightly (statement, question, or polite request) when it fits naturally.\n\nOther fields:\n- Pronunciation: one consistent style (simple phonetic in slashes or IPA) for the headword.\n- Difficulty (adult ESL): easy = high-frequency daily words; medium = common but less automatic words; hard = useful but less frequent or more nuanced—still practical, not obscure.\n- wordTypes: every part of speech that genuinely applies.",
+    "userPromptTemplate": "Generate Word of the Day content for this vocabulary item:\n\nWord: {{word}}\n\nReturn JSON only with:\n- pronunciation\n- meaning (2–4 sentences: practical definition + when/where people use it in daily life)\n- exactly three example sentences (12–22 words each, everyday situations, not very short)\n- difficulty (easy, medium, or hard)\n- wordTypes (array of applicable types from the allowed enum)\n\nPrioritize clarity and usefulness for real life. Do not oversimplify into one short line."
+  },
+  "output": {
+    "mode": "json",
+    "jsonInstructions": "Return a single JSON object only (no markdown fences). meaning must be plain text with 2–4 sentences (practical, daily-life focused, not a single short line). examples must contain exactly three non-empty strings; each example should be a full daily-life sentence of about 12–22 words. wordTypes must include at least one allowed type. Use only the difficulty enum values easy, medium, or hard.",
+    "jsonSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pronunciation", "meaning", "examples", "difficulty", "wordTypes"],
+      "properties": {
+        "pronunciation": { "type": "string", "minLength": 1 },
+        "meaning": { "type": "string", "minLength": 1 },
+        "examples": {
+          "type": "array",
+          "minItems": 3,
+          "maxItems": 3,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "difficulty": {
+          "type": "string",
+          "enum": ["easy", "medium", "hard"]
+        },
+        "wordTypes": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": ["noun", "verb", "adjective", "adverb", "prefix", "suffix", "phrase", "other"]
+          }
+        }
+      }
+    }
+  }
+}

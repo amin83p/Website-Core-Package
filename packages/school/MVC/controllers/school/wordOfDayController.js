@@ -16,6 +16,8 @@ const { applyGenericFilter } = requireCoreModule('MVC/utils/queryEngine');
 const settingService = requireCoreModule('MVC/services/settingService');
 const { getTodayDateKeyInTimezone, resolveOrganizationTimezoneFromRow } = requireCoreModule('MVC/utils/timezoneUtils');
 const schoolDataService = require('../../services/school/schoolDataService');
+const wordOfDayAiAutofillService = require('../../services/school/wordOfDayAiAutofillService');
+const schoolAiUsageLimitService = require('../../services/school/schoolAiUsageLimitService');
 
 function wantsJson(req) {
   return isAjax(req) || String(req.headers.accept || '').includes('application/json');
@@ -338,18 +340,35 @@ async function getEntryPublicFeedback(req, res) {
   }
 }
 
+async function resolveWordOfDayAiAssistAccess(req) {
+  const accessContext = schoolDataService.buildRouteAccessContext(req);
+  const orgId = wordOfDayService.getActiveOrgId(req.user);
+  const userId = wordOfDayService.getActorId(req.user);
+  const gate = await schoolAiUsageLimitService.evaluateServiceAccess({
+    orgId,
+    userId,
+    serviceKey: wordOfDayAiAutofillService.SERVICE_KEY,
+    requestingUser: req.user,
+    accessContext,
+    noLimitMessage: `Word of the Day AI autofill requires an active usage limit for your account (user ID ${userId || 'unknown'}) under AI Assist → Usage Limits, with Applies to set to Word of the Day Autofill or All services.`
+  });
+  return gate;
+}
+
 async function showNewForm(req, res) {
   try {
     const access = await getAccess(req);
     if (!access.canCreateWords) {
       return sendError(req, res, { message: 'You do not have permission to create words.', statusCode: 403 }, 403);
     }
+    const wordOfDayAiAssistAccess = await resolveWordOfDayAiAssistAccess(req);
     return res.render('school/wordOfDay/form', await baseViewModel(req, res, {
       title: 'New Word of the Day',
       mode: 'create',
       entry: null,
       entryId: '',
-      formAction: '/school/word-of-day/new'
+      formAction: '/school/word-of-day/new',
+      wordOfDayAiAssistAccess
     }));
   } catch (error) {
     return sendError(req, res, error);
@@ -362,13 +381,15 @@ async function showEditForm(req, res) {
     const entry = await wordOfDayService.getEntry(req.user, req.params.id, access);
     if (!entry) return sendError(req, res, { message: 'Entry not found.', statusCode: 404 }, 404);
     const entryCapabilities = wordOfDayService.buildEntryCapabilities(entry, access, req.user);
+    const wordOfDayAiAssistAccess = await resolveWordOfDayAiAssistAccess(req);
     return res.render('school/wordOfDay/form', await baseViewModel(req, res, {
       title: 'Edit Word of the Day',
       mode: 'edit',
       entry,
       entryId: entry.id,
       entryCapabilities,
-      formAction: `/school/word-of-day/edit/${encodeURIComponent(req.params.id)}`
+      formAction: `/school/word-of-day/edit/${encodeURIComponent(req.params.id)}`,
+      wordOfDayAiAssistAccess
     }));
   } catch (error) {
     return sendError(req, res, error);
@@ -391,6 +412,45 @@ async function createEntry(req, res) {
         duplicate: error.duplicate
       });
     }
+    return sendError(req, res, error, statusCode(error, 400));
+  }
+}
+
+async function assertAutofillAccess(req) {
+  const access = await getAccess(req);
+  if (access.canCreateWords || access.canUpdateWords || access.adminFlags?.create || access.adminFlags?.update) {
+    return access;
+  }
+  const error = new Error('You do not have permission to use Word of the Day AI autofill.');
+  error.statusCode = 403;
+  throw error;
+}
+
+async function postAiAutofill(req, res) {
+  try {
+    await assertAutofillAccess(req);
+    const usageGate = await resolveWordOfDayAiAssistAccess(req);
+    if (!usageGate.allowed) {
+      const error = new Error(usageGate.message || 'AI autofill is not available for your account.');
+      error.statusCode = usageGate.statusCode || 403;
+      error.code = usageGate.code;
+      throw error;
+    }
+    const word = String(req.body?.word ?? req.query?.word ?? '').trim();
+    const accessContext = schoolDataService.buildRouteAccessContext(req);
+    const result = await wordOfDayAiAutofillService.autofill({
+      word,
+      requestingUser: req.user,
+      accessContext
+    });
+    return res.json({
+      status: 'success',
+      fields: result.fields,
+      traceId: result.traceId,
+      usageRecordId: result.usageRecordId,
+      modelId: result.modelId
+    });
+  } catch (error) {
     return sendError(req, res, error, statusCode(error, 400));
   }
 }
@@ -633,6 +693,7 @@ module.exports = {
   showNewForm,
   showEditForm,
   checkDuplicateWord,
+  postAiAutofill,
   createEntry,
   updateEntry,
   submitEntry,

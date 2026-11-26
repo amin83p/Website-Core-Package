@@ -72,12 +72,12 @@
             <div class="col-md-4">
               <label class="form-label fw-bold" for="limitMaxTokens">Max tokens</label>
               <input id="limitMaxTokens" class="form-control size-md" name="maxTotalTokens" type="number" min="0"
-                value="<%= record.maxTotalTokens != null ? record.maxTotalTokens : 0 %>" placeholder="0 = unlimited">
+                value="<%= record.maxTotalTokens != null ? record.maxTotalTokens : 0 %>" placeholder="0 = no token cap">
             </div>
             <div class="col-md-4">
               <label class="form-label fw-bold" for="limitMaxRequests">Max requests</label>
               <input id="limitMaxRequests" class="form-control size-md" name="maxRequestCount" type="number" min="0"
-                value="<%= record.maxRequestCount != null ? record.maxRequestCount : 0 %>" placeholder="0 = unlimited">
+                value="<%= record.maxRequestCount != null ? record.maxRequestCount : 0 %>" placeholder="0 = no request cap">
             </div>
             <div class="col-md-4 d-flex align-items-end">
               <div class="form-check form-switch">
@@ -85,6 +85,9 @@
                   <%= record.isActive === false ? '' : 'checked' %>>
                 <label class="form-check-label fw-semibold" for="limitActive">Active</label>
               </div>
+            </div>
+            <div class="col-12">
+              <p class="form-text mb-0">Set at least one cap above zero (tokens and/or requests). If both are zero, the user cannot run AI services covered by this limit.</p>
             </div>
             <div class="col-12">
               <label class="form-label fw-bold" for="limitNotes">Notes</label>

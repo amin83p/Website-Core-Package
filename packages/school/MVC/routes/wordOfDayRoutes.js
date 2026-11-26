@@ -149,4 +149,8 @@ router.post('/api/check-duplicate',
   trackActionState(SECTION, OPERATIONS.CREATE, { requireToken: false, keepActive: true }),
   ctrl.checkDuplicateWord);
 
+router.post('/api/ai-autofill',
+  trackActionState(SECTION, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
+  ctrl.postAiAutofill);
+
 module.exports = router;

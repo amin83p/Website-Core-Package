@@ -339,6 +339,7 @@ module.exports = {
   EDITABLE_STATUSES,
   sanitizeWordOfDayInput,
   sanitizeWordTypes,
+  normalizeDifficulty,
   primaryWordTypeLabel,
   normalizeWordKey,
   sanitizeExamples,

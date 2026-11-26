@@ -1,9 +1,12 @@
 'use strict';
 
 const schoolDataService = require('./schoolDataService');
+const schoolRepositories = require('../../repositories/school');
 const schoolIdentityLookupService = require('./schoolIdentityLookupService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { applyGenericFilter } = requireCoreModule('MVC/utils/queryEngine');
+const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const { SCOPE_MODES } = require('./schoolDataScopeBuilder');
 const {
   getActiveOrgIdOrThrow,
   idsEqual,
@@ -93,14 +96,31 @@ const schoolAiUserUsageLimitDataService = {
   },
 
   async listActiveLimitsForUser(orgId, userId, requestingUser, accessContext = {}) {
-    const rows = await schoolDataService.fetchAllData(
-      ENTITY,
-      { orgId__eq: orgId, userId__eq: userId },
-      requestingUser,
-      accessContext
-    );
+    const orgToken = toPublicId(orgId);
+    const userToken = toPublicId(userId);
+    if (!orgToken || !userToken) return [];
+
+    // Org-wide fetch + in-memory user match so teachers can read their own limit row
+    // without School AI admin data scope (USER scope would return zero rows).
+    const orgScope = {
+      denyAll: false,
+      canViewAll: false,
+      activeOrgId: orgToken,
+      allowSystemFallback: false,
+      scopeName: 'ORGANIZATION',
+      scopeMode: SCOPE_MODES.ORG_WIDE,
+      userId: userToken,
+      personId: toPublicId(requestingUser?.personId) || null,
+      ownerScoped: false
+    };
+    const rows = await schoolRepositories.schoolAiUserUsageLimits.list({
+      query: { orgId__eq: orgToken, page: 1, limit: 200 },
+      scope: orgScope
+    });
     return (Array.isArray(rows) ? rows : []).filter((row) => (
-      idsEqual(row?.orgId, orgId) && idsEqual(row?.userId, userId) && row?.isActive !== false
+      idsEqual(row?.orgId, orgToken)
+      && idsEqual(row?.userId, userToken)
+      && row?.isActive !== false
     ));
   }
 };
