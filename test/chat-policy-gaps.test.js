@@ -29,6 +29,10 @@ test('conversation management view/delete buttons follow review and delete flags
   const templatePath = path.join(ROOT_DIR, 'MVC/views/admin/chatList.ejs');
   const template = fs.readFileSync(templatePath, 'utf8');
 
+  const templateSource = fs.readFileSync(templatePath, 'utf8');
+  assert.match(templateSource, /optionalToolbarSecondRow: chatOrphanAuditSecondRow/);
+  assert.match(templateSource, /Audit orphan attachments/);
+
   const listOnly = await ejs.render(template, {
     title: 'Conversation Management',
     newUrl: '',
@@ -53,13 +57,22 @@ test('conversation management view/delete buttons follow review and delete flags
     }
   }, { filename: templatePath, async: true });
 
-  assert.doesNotMatch(listOnly, /onclick="adminViewChat\(/);
-  assert.doesNotMatch(listOnly, /onclick="adminDeleteChat\(/);
-  assert.match(listOnly, /No actions/);
-  assert.match(historyAndDelete, /onclick="adminViewChat\(/);
-  assert.match(historyAndDelete, /onclick="adminDeleteChat\(/);
+  assert.doesNotMatch(listOnly, /btn-row-actions-toggle/);
+  assert.match(listOnly, /—/);
+  assert.match(historyAndDelete, /js-admin-view-chat/);
+  assert.match(historyAndDelete, /js-admin-delete-chat/);
+  assert.match(historyAndDelete, /btn-row-actions-toggle/);
+  assert.match(historyAndDelete, /admin-chat-participants-link/);
+  assert.match(historyAndDelete, /id="first-table"/);
+  assert.match(historyAndDelete, /data-floating-row-actions="true"/);
+  assert.match(historyAndDelete, /adminSanitizeMessageHtml/);
   assert.match(historyAndDelete, /getAdminAttachmentUrl/);
   assert.match(historyAndDelete, /removeConversationRowFromTable/);
+  assert.match(historyAndDelete, /adminRunOrphanAudit/);
+  assert.match(historyAndDelete, /adminOrphanAuditProgressWrap/);
+  assert.match(historyAndDelete, /adminBuildFileManagerHref/);
+  assert.match(historyAndDelete, /Review in File Manager/);
+  assert.doesNotMatch(listOnly, /adminOrphanAuditBtn/);
   assert.doesNotMatch(historyAndDelete, /window\.location\.reload\(\)/);
 });
 

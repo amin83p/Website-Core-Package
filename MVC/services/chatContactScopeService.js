@@ -13,6 +13,10 @@ const {
 } = require('./person/packageRoleAssignmentService');
 const { idsEqual, toIdArray, toPublicId } = require('../utils/idAdapter');
 const chatAvatarColorService = require('./chatAvatarColorService');
+const {
+  isChatSystemParticipant,
+  projectChatSystemParticipant
+} = require('./chatSystemParticipantService');
 
 const PERSON_QUERY_OPTIONS = Object.freeze({
   enrichment: { includeSchoolRoles: false }
@@ -544,21 +548,30 @@ async function buildConversationContactStates(requestingUser, conversations = []
     const participantRows = targetIds.map((userId) => {
       const user = userById.get(userId) || null;
       const person = personById.get(toPublicId(user?.personId)) || null;
-      const decision = evaluateTargetContact(context, user, person, options);
-      const baseDisplay = user
-        ? projectContact(user, person, decision.targetRoleScope || summarizeRootPerson(person, context.registry))
-        : {
-          id: userId,
-          name: 'Unknown User',
-          avatar: null,
-          email: '',
-          org: 'General',
-          roles: [],
-          roleLabels: [],
-          packages: [],
-          packageDomains: [],
-          plainMember: false
-        };
+      const decision = isChatSystemParticipant(userId)
+        ? {
+          allowed: false,
+          reason: READ_ONLY_REASON,
+          matchingDomains: [],
+          targetRoleScope: null
+        }
+        : evaluateTargetContact(context, user, person, options);
+      const baseDisplay = isChatSystemParticipant(userId)
+        ? projectChatSystemParticipant(userId)
+        : (user
+          ? projectContact(user, person, decision.targetRoleScope || summarizeRootPerson(person, context.registry))
+          : {
+            id: userId,
+            name: 'Unknown User',
+            avatar: null,
+            email: '',
+            org: 'General',
+            roles: [],
+            roleLabels: [],
+            packages: [],
+            packageDomains: [],
+            plainMember: false
+          });
       return {
         userId,
         user,

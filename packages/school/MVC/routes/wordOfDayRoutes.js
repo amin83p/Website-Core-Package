@@ -68,6 +68,21 @@ router.post('/api/review-search',
   trackActionState(SECTION, OPERATIONS.RESOLVE, { requireToken: false, keepActive: true }),
   ctrl.postReviewSearch);
 
+router.get('/api/display-schedule',
+  requireAccess(SECTION, OPERATIONS.CONFIGURE),
+  trackActionState(SECTION, OPERATIONS.CONFIGURE, { requireToken: false, keepActive: true }),
+  ctrl.getDisplaySchedule);
+
+router.put('/api/display-schedule',
+  requireAccess(SECTION, OPERATIONS.CONFIGURE),
+  trackActionState(SECTION, OPERATIONS.CONFIGURE, { requireToken: false, keepActive: true }),
+  ctrl.putDisplaySchedule);
+
+router.get('/api/display-schedule/picker',
+  requireAccess(SECTION, OPERATIONS.CONFIGURE),
+  trackActionState(SECTION, OPERATIONS.CONFIGURE, { requireToken: false, keepActive: true }),
+  ctrl.getDisplaySchedulePicker);
+
 router.get('/api/:id/detail',
   requireAccess(SECTION, OPERATIONS.READ),
   trackActionState(SECTION, OPERATIONS.READ, { requireToken: false, keepActive: true }),

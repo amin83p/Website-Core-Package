@@ -119,11 +119,16 @@ async function showDebugHub(req, res) {
         }
     ].sort((a, b) => (Number(a.priority || 0) - Number(b.priority || 0)));
 
+    const wordOfDayDashboardWidgetService = require('../services/wordOfDayDashboardWidgetService');
+    const wordOfDayPayload = await wordOfDayDashboardWidgetService.resolveWordOfDayDashboardPayload(req);
+
     res.render('admin/debugHub', {
         title: 'Developer Tools',
         dashboardSections,
         user: req.user,
-        activePage: 'tools'
+        activePage: 'tools',
+        wordOfDayPayload,
+        wordOfDayUiConstants: wordOfDayDashboardWidgetService.getWordOfDayUiConstants()
     });
 }
 

@@ -355,11 +355,8 @@ async function sumUploadDirectoryBytes(scopeKey, relativeDir = '') {
 }
 
 async function getChatAttachmentBytes(convId) {
-  const context = { conversationId: convId };
-  const folders = [...new Set([
-    uploadFolderSettingsService.resolveUploadFolder('core.chat', context),
-    uploadFolderSettingsService.resolveDefaultUploadFolder('core.chat', context)
-  ].filter(Boolean))];
+  const chatConversationAttachmentService = require('./chatConversationAttachmentService');
+  const folders = chatConversationAttachmentService.getConversationUploadDirs(convId);
   let total = 0;
   for (const relativePath of folders) {
     total += await sumUploadDirectoryBytes('GLOBAL', relativePath);
@@ -373,23 +370,27 @@ async function getChatAttachmentBytes(convId) {
       /* legacy path missing */
     }
   }
+  try {
+    const onDisk = await chatConversationAttachmentService.listConversationAttachmentFiles(convId);
+    const listedTotal = (Array.isArray(onDisk) ? onDisk : []).reduce(
+      (sum, row) => sum + Number(row?.size || 0),
+      0
+    );
+    if (listedTotal > total) total = listedTotal;
+  } catch (_) {
+    /* ignore */
+  }
   return total;
 }
 
 async function getConversationStorageBytes(convId) {
   const id = String(convId || '').trim();
   if (!id) return 0;
-  let totalBytes = 0;
-  const msgFile = path.join(__dirname, '../../data/messages/', `${id}.json`);
-  if (fs.existsSync(msgFile)) {
-    try {
-      totalBytes += fs.statSync(msgFile).size;
-    } catch (_) {
-      /* ignore */
-    }
-  }
-  totalBytes += await getChatAttachmentBytes(id);
-  return totalBytes;
+  const [messageBytes, attachmentBytes] = await Promise.all([
+    chatRepository.getMessageStorageBytes(id),
+    getChatAttachmentBytes(id)
+  ]);
+  return Number(messageBytes || 0) + Number(attachmentBytes || 0);
 }
 
 async function getUserStorageBytes(userId) {

@@ -36,13 +36,31 @@
   let pageWatermarkHtml = '';
   bannerIconHtml = buildSectionIconHtml(ds, (titleIcon || pageBgIconClass));
   pageWatermarkHtml = buildSectionIconHtml(ds, pageBgIconClass);
+  const hasWodHero = Boolean(
+    typeof wordOfDayPayload !== 'undefined'
+    && wordOfDayPayload
+    && wordOfDayPayload.entry
+  );
+  const dashboardBannerClass = hasWodHero
+    ? `${key}-dashboard-banner ${key}-dashboard-banner--in-hero mb-0`
+    : `${key}-dashboard-banner mb-4`;
 %>
 
 <div class="sections-page <%= key %>-dashboard-page">
   <div class="<%= key %>-page-watermark" aria-hidden="true">
     <%- pageWatermarkHtml %>
   </div>
-  <div class="<%= key %>-dashboard-banner mb-4">
+  <% if (hasWodHero) { %>
+  <div class="<%= key %>-dashboard-hero-row mb-3">
+    <div class="<%= key %>-dashboard-hero-wod">
+      <%- include('../../../../packages/school/MVC/views/school/wordOfDay/partials/widget', {
+        wordOfDayPayload: wordOfDayPayload,
+        wordOfDayUiConstants: typeof wordOfDayUiConstants !== 'undefined' ? wordOfDayUiConstants : null,
+        wordOfDayOpenInNewTab: typeof wordOfDayOpenInNewTab !== 'undefined' ? wordOfDayOpenInNewTab : true
+      }) %>
+    </div>
+  <% } %>
+  <div class="<%= dashboardBannerClass %>">
     <div class="d-flex align-items-start justify-content-between gap-3 gap-md-4 w-100 <%= key %>-banner-row">
       <div class="d-flex align-items-start gap-3 gap-md-4 min-w-0 <%= key %>-banner-title-cluster">
         <div class="<%= key %>-banner-icon-wrap flex-shrink-0 align-self-start"><%- bannerIconHtml %></div>
@@ -100,6 +118,9 @@
       <% } %>
     </div>
   </div>
+  <% if (hasWodHero) { %>
+  </div>
+  <% } %>
 
   <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3 <%= key %>-tools-row">
     <div class="d-flex align-items-center flex-wrap gap-2 <%= key %>-module-meta">
@@ -112,15 +133,18 @@
         <button
           type="button"
           id="<%= key %>ModuleCustomizeToggle"
-          class="btn btn-outline-secondary btn-sm <%= key %>-module-customize-toggle"
+          class="btn btn-light border shadow-sm <%= key %>-module-toolbar-icon-btn <%= key %>-module-customize-toggle"
           aria-pressed="false"
+          aria-label="Customize module order and visibility"
+          data-bs-toggle="tooltip"
+          data-bs-placement="top"
           title="Customize module order and visibility">
-          <i class="bi bi-sliders me-1" aria-hidden="true"></i>Customize
+          <i class="bi bi-sliders" aria-hidden="true"></i>
         </button>
         <button
           type="button"
           id="<%= key %>ModuleOrderReset"
-          class="btn btn-link btn-sm p-0 text-muted <%= key %>-module-order-reset"
+          class="btn btn-light border shadow-sm <%= key %>-module-toolbar-icon-btn <%= key %>-module-order-reset"
           aria-label="Reset module layout"
           data-bs-toggle="tooltip"
           data-bs-placement="top"
@@ -314,6 +338,65 @@
     box-shadow: var(--ud-home-hero-shadow);
     color: var(--ud-home-ink);
     padding: 1.25rem 1.5rem;
+  }
+  .<%= key %>-dashboard-hero-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.65rem;
+    align-items: stretch;
+  }
+  .<%= key %>-dashboard-hero-wod {
+    flex: 0 0 min(100%, 22rem);
+    max-width: 22rem;
+    min-width: 0;
+    display: flex;
+  }
+  .<%= key %>-dashboard-hero-wod .word-of-day-widget--dashboard.wod-school-dash-card {
+    margin-bottom: 0;
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    min-height: 100%;
+    box-sizing: border-box;
+  }
+  .<%= key %>-dashboard-hero-wod .wod-widget-card-link {
+    display: flex;
+    flex-direction: column;
+    flex: 1 1 auto;
+    height: 100%;
+    min-height: 100%;
+  }
+  .<%= key %>-dashboard-hero-wod .wod-widget-inner {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .<%= key %>-dashboard-banner--in-hero {
+    flex: 1 1 16rem;
+    min-width: min(100%, 18rem);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    height: auto;
+    align-self: stretch;
+  }
+  .<%= key %>-dashboard-banner--in-hero .<%= key %>-banner-row {
+    flex: 1 1 auto;
+    align-items: center;
+  }
+  @media (max-width: 991.98px) {
+    .<%= key %>-dashboard-hero-row {
+      gap: 0.5rem;
+    }
+    .<%= key %>-dashboard-hero-wod {
+      flex: 1 1 100%;
+      max-width: 100%;
+    }
+    .<%= key %>-dashboard-banner--in-hero {
+      flex: 1 1 100%;
+      min-width: 100%;
+    }
   }
   .<%= key %>-banner-icon-wrap {
     width: 96px;
@@ -850,11 +933,10 @@
       font-size: 0.68rem;
       gap: 0.28rem;
     }
-    .<%= key %>-module-customize-toggle {
-      font-size: 0.68rem;
-      padding: 0.18rem 0.4rem;
-    }
-    .<%= key %>-module-order-reset {
+    .<%= key %>-module-toolbar-icon-btn {
+      width: 30px;
+      min-width: 30px;
+      height: 30px;
       font-size: 0.82rem;
     }
     .<%= key %>-module-count-wrap {
@@ -880,7 +962,8 @@
   .<%= key %>-module-meta {
     min-height: 38px;
   }
-  .<%= key %>-search-launcher {
+  .<%= key %>-search-launcher,
+  .<%= key %>-module-toolbar-icon-btn {
     height: 36px;
     min-width: 0;
     width: auto;
@@ -894,8 +977,16 @@
     background:
       linear-gradient(120deg, rgba(255, 255, 255, 0.96), rgba(255, 255, 255, 0.84));
   }
+  .<%= key %>-module-toolbar-icon-btn {
+    width: 36px;
+    min-width: 36px;
+    padding: 0;
+    line-height: 1;
+  }
   .<%= key %>-search-launcher:hover,
-  .<%= key %>-search-launcher:focus-visible {
+  .<%= key %>-search-launcher:focus-visible,
+  .<%= key %>-module-toolbar-icon-btn:hover,
+  .<%= key %>-module-toolbar-icon-btn:focus-visible {
     color: #0f172a;
     border-color: rgba(13, 110, 253, 0.42);
     box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
@@ -1074,18 +1165,11 @@
     left: 0.55rem;
     transform: translateY(-50%);
   }
-  .<%= key %>-module-order-reset {
-    line-height: 1;
-    text-decoration: none;
-  }
-  .<%= key %>-module-order-reset:hover,
-  .<%= key %>-module-order-reset:focus-visible {
-    color: #0f172a !important;
-  }
   .<%= key %>-module-customize-toggle[aria-pressed="true"] {
     color: #fff;
-    background-color: var(--bs-primary);
+    background: var(--bs-primary);
     border-color: var(--bs-primary);
+    box-shadow: 0 8px 22px rgba(13, 110, 253, 0.28);
   }
   .<%= key %>-module-visibility-btn {
     position: absolute;
@@ -2150,6 +2234,9 @@
     }
 
     if (moduleCustomizeToggleEl) {
+      if (window.bootstrap && window.bootstrap.Tooltip) {
+        new window.bootstrap.Tooltip(moduleCustomizeToggleEl);
+      }
       moduleCustomizeToggleEl.addEventListener('click', function () {
         customizeMode = !customizeMode;
         updateCustomizeToggleUi();

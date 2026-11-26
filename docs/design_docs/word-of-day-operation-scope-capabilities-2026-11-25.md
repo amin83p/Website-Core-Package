@@ -107,6 +107,8 @@ Display analytics (`display.displayCount`, `displayDates`) are recorded when a w
 
 Display-history warning when moving to `reopened`/`submitted` or deleting displayed words.
 
+- **Rejection chat:** When an entry becomes `rejected`, the server sends an in-app **System** chat message to the entry author (direct conversation: author + `system`; sender `system`, not the reviewer). The message includes the word, optional reviewer note from the reject action, and a link to `/school/word-of-day?openEntry={id}`. Chat delivery failures do not fail the reject API.
+
 ### DELETE
 
 | Operation | Scope | Allowed when |
@@ -122,7 +124,7 @@ Display-history warning when moving to `reopened`/`submitted` or deleting displa
 | Operation | Scope | What user can do and see |
 | --- | --- | --- |
 | CONFIGURE | USER / OWNER / DEPARTMENT / DIVISION | No Access. |
-| CONFIGURE | ORGANIZATION / ADMIN | School settings Word of Day display policy. |
+| CONFIGURE | ORGANIZATION / ADMIN | School settings Word of Day display policy (where words appear, show/hide contributor and difficulty on public displays, yearly contribution limit per user). Per-day word assignments via **Configure Display** modal on the Word of Day list only (`GET/PUT /school/word-of-day/api/display-schedule`). Unscheduled days use the automatic daily picker. |
 
 ---
 

@@ -148,7 +148,9 @@
       <td class="ps-3"><button type="button" class="btn btn-link p-0 fw-bold text-decoration-none wod-review-open" data-entry-id="${escapeHtml(id)}">${escapeHtml(entry.word || '—')}</button>
         <div class="small text-muted">${escapeHtml(entry.meaning || '').slice(0, 80)}</div></td>
       <td class="small">${escapeHtml(entry.authorName || entry.authorUserId || '—')}</td>
-      <td><span class="badge ${statusBadgeClass(status)}">${escapeHtml(status.replace(/_/g, ' '))}</span></td>
+      <td>${global.WordOfDayEntryDetailUi?.renderStatusBadgeHtml
+        ? global.WordOfDayEntryDetailUi.renderStatusBadgeHtml(entry)
+        : `<span class="badge ${statusBadgeClass(status)}">${escapeHtml(status.replace(/_/g, ' '))}</span>`}</td>
       <td class="small text-muted">${escapeHtml(formatDay(entry.audit?.createDateTime))}</td>
       <td class="small text-muted">${escapeHtml(formatDay(entry.audit?.lastUpdateDateTime))}</td>
       <td class="text-end pe-3"><div class="wod-review-row-actions" role="group">${renderWorkflowActions(caps, { compact: true })}</div></td>`;
@@ -220,9 +222,19 @@
     if (!wf?.postWorkflowAction) return;
     const hasDisplay = Number(entry?.display?.displayCount || 0) > 0 || entry?.capabilities?.hasDisplayHistory;
     if (!await wf.confirmRiskyAction(action, hasDisplay)) return;
+    const noteModal = global.WordOfDayRejectionReasonModal;
+    let note = '';
+    if (noteModal?.isPromptableWorkflowAction?.(action)) {
+      if (!noteModal.promptWorkflowNote) {
+        if (wf.showAlert) await wf.showAlert('Unavailable', 'Workflow note dialog is not available.', 'warning');
+        return;
+      }
+      const prompted = await noteModal.promptWorkflowNote({ action, word: entry?.word, entryId });
+      if (prompted === null) return;
+      note = prompted;
+    }
     const loadingToken = beginWorkflowLoading(action);
     try {
-      const note = global.WordOfDayEntryDetailUi?.readWorkflowNote?.('wodListEntryWorkflowNote') || '';
       const result = await wf.postWorkflowAction(entryId, action, { note });
       if (!result.ok) {
         if (result.message && wf.showAlert) await wf.showAlert('Action failed', result.message, 'error');
@@ -337,6 +349,17 @@
       if (openBtn) {
         ev.preventDefault();
         openDetail(openBtn.getAttribute('data-entry-id'));
+        return;
+      }
+      const noteChip = ev.target.closest('.wod-workflow-status-chip, .wod-rejection-status-chip');
+      if (noteChip) {
+        ev.preventDefault();
+        const row = noteChip.closest('tr[data-entry-id]');
+        const entryId = row?.getAttribute('data-entry-id') || noteChip.getAttribute('data-entry-id');
+        const entry = state.entries.get(String(entryId || ''));
+        if (entry && global.WordOfDayRejectionReasonModal?.showFromEntry) {
+          global.WordOfDayRejectionReasonModal.showFromEntry(entry);
+        }
         return;
       }
       const actionBtn = ev.target.closest('.wod-review-action');

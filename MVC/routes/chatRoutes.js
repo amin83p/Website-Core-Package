@@ -34,5 +34,8 @@ router.post('/broadcast/:convId',
             chatController.broadcastMessage);
 
 router.get('/list', requireChatAccessAny([OPERATIONS.READ, OPERATIONS.READ_ALL], OPERATIONS.READ), chatController.listAllChats);
+router.get('/admin/attachment-audit', requireChatAccessAny(OPERATIONS.READ_ALL, OPERATIONS.READ), chatController.auditOrphanAttachments);
+router.post('/admin/attachment-audit', requireChatAccessAny(OPERATIONS.READ_ALL, OPERATIONS.READ), chatController.auditOrphanAttachments);
+router.post('/admin/attachment-cleanup', requireChatAccessAny(OPERATIONS.DELETE_ALL, OPERATIONS.DELETE), chatController.cleanupOrphanAttachments);
 
 module.exports = router;

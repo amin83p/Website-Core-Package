@@ -6,7 +6,10 @@ const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const DEFAULT_POLICY = Object.freeze({
   schoolDashboardEnabled: true,
   publicHomeEnabled: false,
-  publicSourceOrgId: ''
+  publicSourceOrgId: '',
+  showAuthorOnDisplay: true,
+  showDifficultyOnDisplay: true,
+  yearlyContributionLimitPerUser: 0
 });
 
 function cleanBool(value, fallback = false) {
@@ -22,11 +25,24 @@ function cleanOrgId(value) {
   return toPublicId(String(value || '').trim());
 }
 
+function cleanNonNegativeInt(value, fallback = 0) {
+  if (value === undefined || value === null || value === '') return fallback;
+  const n = Number.parseInt(String(value).trim(), 10);
+  if (!Number.isFinite(n) || n < 0) return fallback;
+  return n;
+}
+
 function normalizePolicyFromStored(raw = {}) {
   return {
     schoolDashboardEnabled: cleanBool(raw.schoolDashboardEnabled, DEFAULT_POLICY.schoolDashboardEnabled),
     publicHomeEnabled: cleanBool(raw.publicHomeEnabled, DEFAULT_POLICY.publicHomeEnabled),
-    publicSourceOrgId: cleanOrgId(raw.publicSourceOrgId)
+    publicSourceOrgId: cleanOrgId(raw.publicSourceOrgId),
+    showAuthorOnDisplay: cleanBool(raw.showAuthorOnDisplay, DEFAULT_POLICY.showAuthorOnDisplay),
+    showDifficultyOnDisplay: cleanBool(raw.showDifficultyOnDisplay, DEFAULT_POLICY.showDifficultyOnDisplay),
+    yearlyContributionLimitPerUser: cleanNonNegativeInt(
+      raw.yearlyContributionLimitPerUser,
+      DEFAULT_POLICY.yearlyContributionLimitPerUser
+    )
   };
 }
 

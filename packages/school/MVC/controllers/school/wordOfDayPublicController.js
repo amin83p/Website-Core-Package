@@ -75,10 +75,12 @@ async function loadDailyDetail(req, dateKey) {
     error.statusCode = 404;
     throw error;
   }
+  const orgPolicy = await wordOfDayPolicyModel.getPolicyForOrg(orgId);
   const detail = await wordOfDayDisplayService.resolveDailyPublicDetail({
     orgId,
     dateKey,
-    recordAnalytics: true
+    recordAnalytics: true,
+    policy: orgPolicy
   });
   return detail;
 }

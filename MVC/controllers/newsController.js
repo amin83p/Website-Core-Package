@@ -892,10 +892,15 @@ async function showCenter(req, res) {
             }
         ].sort((a, b) => (Number(a.priority || 0) - Number(b.priority || 0)));
 
+        const wordOfDayDashboardWidgetService = require('../services/wordOfDayDashboardWidgetService');
+        const wordOfDayPayload = await wordOfDayDashboardWidgetService.resolveWordOfDayDashboardPayload(req);
+
         res.render('news/center', {
             title: 'News Command Center',
             dashboardSections,
-            user: req.user
+            user: req.user,
+            wordOfDayPayload,
+            wordOfDayUiConstants: wordOfDayDashboardWidgetService.getWordOfDayUiConstants()
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });

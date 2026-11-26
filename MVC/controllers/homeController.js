@@ -128,7 +128,8 @@ async function getHome(req, res) {
       wordOfDayPublic = await wordOfDayDisplayService.resolveDailyDisplay({
         orgId: policy.publicSourceOrgId,
         dateKey,
-        recordAnalytics: true
+        recordAnalytics: true,
+        policy
       });
     }
   } catch (_err) {

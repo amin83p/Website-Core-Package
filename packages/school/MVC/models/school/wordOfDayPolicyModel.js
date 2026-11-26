@@ -27,7 +27,10 @@ function pickStoredPolicyFields(row) {
   return {
     schoolDashboardEnabled: row.schoolDashboardEnabled,
     publicHomeEnabled: row.publicHomeEnabled,
-    publicSourceOrgId: row.publicSourceOrgId
+    publicSourceOrgId: row.publicSourceOrgId,
+    showAuthorOnDisplay: row.showAuthorOnDisplay,
+    showDifficultyOnDisplay: row.showDifficultyOnDisplay,
+    yearlyContributionLimitPerUser: row.yearlyContributionLimitPerUser
   };
 }
 

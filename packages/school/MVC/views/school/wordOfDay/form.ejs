@@ -9,11 +9,23 @@ const selectedTypes = isEdit
   : ['noun'];
 const selectedDifficulty = isEdit ? (entry.difficulty || 'medium') : 'medium';
 const years = authorStats && authorStats.byYear ? Object.keys(authorStats.byYear).sort().reverse() : [];
+const wodContributionLimit = typeof wordOfDayContributionLimit !== 'undefined' ? Number(wordOfDayContributionLimit) : 0;
+const wodContributionYear = typeof wordOfDayContributionYear !== 'undefined' ? String(wordOfDayContributionYear) : '';
+const wodCurrentYearCount = typeof wordOfDayCurrentYearContributionCount !== 'undefined' ? Number(wordOfDayCurrentYearContributionCount) : 0;
+const wodQuotaExempt = typeof wordOfDayContributionQuotaExempt !== 'undefined' && wordOfDayContributionQuotaExempt;
+const wodQuotaBlocked = !isEdit && wodContributionLimit > 0 && !wodQuotaExempt && wodCurrentYearCount >= wodContributionLimit;
+const wodStatsYearSet = new Set(years);
+if (wodContributionYear) wodStatsYearSet.add(wodContributionYear);
+const wodStatsTableYears = Array.from(wodStatsYearSet).sort().reverse();
 const canPickAuthor = (!isEdit && wodFormAccess.canCreateAsOtherUser) || (isEdit && wodFormAccess.canChangeAuthorOnEdit);
 const authorUserIdValue = isEdit ? (entry.authorUserId || entry.audit?.createdBy || '') : '';
 const authorNameValue = isEdit ? (entry.authorName || '') : '';
 const activeUserId = String(user?.id || user?.userId || '').trim();
-const activeUserLabel = String(user?.name || user?.username || user?.email || activeUserId).trim(); %>
+const activeUserLabel = String(user?.name || user?.username || user?.email || activeUserId).trim();
+const wodReviewerNote = isEdit ? String(entry?.workflow?.reviewerNote || '').trim() : '';
+const wodEntryStatusLabel = isEdit ? String(entry?.status || '').replace(/_/g, ' ') : '';
+const canClearWodWorkflowNote = Boolean(isEdit && wodFormAccess.canClearWorkflowNote);
+%>
 
 <style>
   .word-of-day-form-page .wod-type-toggle .btn { min-width: 5.5rem; }
@@ -22,12 +34,24 @@ const activeUserLabel = String(user?.name || user?.username || user?.email || ac
   .word-of-day-form-page .wod-difficulty .btn-check:checked + .btn-outline-danger { background-color: var(--bs-danger); color: #fff; border-color: var(--bs-danger); }
   .word-of-day-form-page #wodExamplesList .list-group-item { align-items: center; }
   .word-of-day-form-page #wodExamplesList .wod-example-text { flex: 1 1 auto; }
-  .word-of-day-form-page .wod-year-tile {
-    border: 1px solid rgba(20, 45, 75, 0.1);
-    border-radius: var(--border-radius, 0.5rem);
-    padding: 0.75rem 1rem;
-    height: 100%;
-    background: rgba(255, 255, 255, 0.85);
+  .word-of-day-form-page .wod-year-stats-toggle {
+    cursor: pointer;
+    user-select: none;
+  }
+  .word-of-day-form-page .wod-year-stats-toggle .wod-year-stats-chevron {
+    transition: transform 0.2s ease;
+  }
+  .word-of-day-form-page .wod-year-stats-toggle[aria-expanded="false"] .wod-year-stats-chevron {
+    transform: rotate(-90deg);
+  }
+  .word-of-day-form-page #wodAuthorStatsTable th,
+  .word-of-day-form-page #wodAuthorStatsTable td {
+    font-size: 0.85rem;
+    vertical-align: middle;
+  }
+  .word-of-day-form-page #wodAuthorStatsTable .wod-year-col {
+    font-weight: 700;
+    white-space: nowrap;
   }
 </style>
 
@@ -49,29 +73,84 @@ const activeUserLabel = String(user?.name || user?.username || user?.email || ac
 
   <div class="form-container wide" style="max-width: 1400px;">
     <div class="card border-0 shadow-sm mb-4">
-      <div class="card-header bg-white border-bottom">
-        <h6 class="fw-bold m-0 text-primary"><i class="bi bi-bar-chart me-2"></i>Your words by year</h6>
-      </div>
-      <div class="card-body p-4">
-        <% if (!years.length) { %>
-          <p class="text-muted mb-0 small">No entries yet.</p>
-        <% } else { %>
-          <div class="row g-3">
-            <% years.forEach((year) => {
-              const bucket = authorStats.byYear[year] || {};
-            %>
-              <div class="col-sm-6 col-md-4 col-lg-3">
-                <div class="wod-year-tile">
-                  <div class="fw-bold"><%= year %></div>
-                  <div class="small text-muted mt-1">
-                    Saved: <%= bucket.saved || 0 %> · Submitted: <%= bucket.submitted || 0 %><br>
-                    Approved: <%= bucket.approved || 0 %> · Rejected: <%= bucket.rejected || 0 %>
-                  </div>
-                </div>
-              </div>
-            <% }) %>
-          </div>
-        <% } %>
+      <button class="card-header bg-white border-bottom w-100 text-start d-flex align-items-center justify-content-between gap-2 py-3 px-4 wod-year-stats-toggle"
+        type="button"
+        id="wodAuthorStatsToggle"
+        data-bs-toggle="collapse"
+        data-bs-target="#wodAuthorStatsCollapse"
+        aria-expanded="true"
+        aria-controls="wodAuthorStatsCollapse">
+        <span class="fw-bold m-0 text-primary"><i class="bi bi-bar-chart me-2"></i>Your words by year</span>
+        <i class="bi bi-chevron-down wod-year-stats-chevron text-muted" aria-hidden="true"></i>
+      </button>
+      <div id="wodAuthorStatsCollapse" class="collapse show">
+        <div class="card-body p-4">
+          <% if (!isEdit && wodQuotaBlocked) { %>
+            <div class="alert alert-warning small mb-3">You cannot create another word until the next calendar year or an administrator raises the limit.</div>
+          <% } %>
+          <% if (!wodStatsTableYears.length) { %>
+            <p class="text-muted mb-0 small">No entries yet.</p>
+          <% } else { %>
+            <div class="table-responsive border rounded">
+              <table class="table table-sm table-hover align-middle mb-0" id="wodAuthorStatsTable">
+                <thead class="table-light">
+                  <tr>
+                    <th class="ps-3 wod-year-col">Year</th>
+                    <th class="text-center">Saved</th>
+                    <th class="text-center">Submitted</th>
+                    <th class="text-center">Approved</th>
+                    <th class="text-center">Rejected</th>
+                    <th class="text-center">Reopened</th>
+                    <th class="text-center">On hold</th>
+                    <th class="text-center">Archived</th>
+                    <th class="text-center">Total</th>
+                    <th class="text-end pe-3">Contributions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% wodStatsTableYears.forEach((year) => {
+                    const bucket = (authorStats && authorStats.byYear && authorStats.byYear[year]) ? authorStats.byYear[year] : {};
+                    const total = Number(bucket.total) || 0;
+                    const isCurrentYear = wodContributionYear && String(year) === String(wodContributionYear);
+                    const rowClass = isCurrentYear ? 'table-primary' : '';
+                  %>
+                    <tr class="<%= rowClass %>">
+                      <td class="ps-3 wod-year-col">
+                        <%= year %>
+                        <% if (isCurrentYear) { %><span class="badge bg-primary ms-1">Current</span><% } %>
+                      </td>
+                      <td class="text-center"><%= bucket.saved || 0 %></td>
+                      <td class="text-center"><%= bucket.submitted || 0 %></td>
+                      <td class="text-center"><%= bucket.approved || 0 %></td>
+                      <td class="text-center"><%= bucket.rejected || 0 %></td>
+                      <td class="text-center"><%= bucket.reopened || 0 %></td>
+                      <td class="text-center"><%= bucket.on_hold || 0 %></td>
+                      <td class="text-center"><%= bucket.archived || 0 %></td>
+                      <td class="text-center fw-semibold"><%= total %></td>
+                      <td class="text-end pe-3">
+                        <% if (wodQuotaExempt) { %>
+                          <span class="text-muted">Exempt</span>
+                        <% } else if (wodContributionLimit > 0) { %>
+                          <span class="<%= (isCurrentYear && wodQuotaBlocked) ? 'text-danger fw-semibold' : '' %>">
+                            <strong><%= isCurrentYear ? wodCurrentYearCount : total %></strong>
+                            <span class="text-muted">/</span>
+                            <%= wodContributionLimit %>
+                          </span>
+                        <% } else { %>
+                          <span class="text-muted">Unlimited</span>
+                          <span class="d-block small text-muted">(<%= total %> used)</span>
+                        <% } %>
+                      </td>
+                    </tr>
+                  <% }) %>
+                </tbody>
+              </table>
+            </div>
+            <p class="small text-muted mb-0 mt-2">
+              Contributions count every entry you created that calendar year (all statuses). The limit is the organization setting in School settings → Word of Day.
+            </p>
+          <% } %>
+        </div>
       </div>
     </div>
 
@@ -172,6 +251,27 @@ const activeUserLabel = String(user?.name || user?.username || user?.email || ac
         </div>
       </div>
 
+      <% if (isEdit && wodReviewerNote) { %>
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-bottom d-flex flex-wrap align-items-center justify-content-between gap-2">
+          <h6 class="fw-bold m-0 text-primary"><i class="bi bi-chat-left-text me-2"></i>Workflow note</h6>
+          <% if (wodEntryStatusLabel) { %>
+            <span class="badge bg-light text-dark border text-capitalize"><%= wodEntryStatusLabel %></span>
+          <% } %>
+        </div>
+        <div class="card-body p-4">
+          <p class="text-muted small mb-2">Note from the latest status change on this entry.</p>
+          <div class="border rounded bg-light p-3 mb-0" style="white-space: pre-wrap;"><%= wodReviewerNote %></div>
+          <% if (canClearWodWorkflowNote && canEdit) { %>
+            <div class="form-check mt-3 mb-0">
+              <input class="form-check-input" type="checkbox" value="1" id="wodClearWorkflowNote" name="clearWorkflowNote">
+              <label class="form-check-label" for="wodClearWorkflowNote">Remove this note when you save</label>
+            </div>
+          <% } %>
+        </div>
+      </div>
+      <% } %>
+
       <div class="card border-0 shadow-sm mb-4">
         <div class="card-header bg-white border-bottom">
           <h6 class="fw-bold m-0 text-primary"><i class="bi bi-images me-2"></i>Media</h6>
@@ -201,10 +301,10 @@ const activeUserLabel = String(user?.name || user?.username || user?.email || ac
       <% if (canEdit || canSubmit) { %>
         <div class="d-flex flex-wrap gap-2">
           <% if (canEdit) { %>
-            <button type="button" class="btn btn-outline-secondary" data-wod-save="saved">Save draft</button>
+            <button type="button" class="btn btn-outline-secondary" data-wod-save="saved"<%= (!isEdit && wodQuotaBlocked) ? ' disabled' : '' %>>Save draft</button>
           <% } %>
           <% if (canSubmit) { %>
-            <button type="button" class="btn btn-filled btn-primary" data-wod-save="submit">Save &amp; submit</button>
+            <button type="button" class="btn btn-filled btn-primary" data-wod-save="submit"<%= (!isEdit && wodQuotaBlocked) ? ' disabled' : '' %>>Save &amp; submit</button>
           <% } %>
         </div>
       <% } %>

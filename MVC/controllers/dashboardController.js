@@ -19,6 +19,7 @@ const {
 const sectionNavigationPreferencesService = require('../services/sectionNavigationPreferencesService');
 const dashboardPinnedModuleService = require('../services/dashboardPinnedModuleService');
 const sectionsOperationsCatalogCacheService = require('../services/cache/sectionsOperationsCatalogCacheService');
+const wordOfDayDashboardWidgetService = require('../services/wordOfDayDashboardWidgetService');
 const {
   buildDashboardAllSectionsCacheKey,
   readDashboardAllSectionsCache,
@@ -772,29 +773,8 @@ async function renderSubDashboardForParent(req, res, parentSection, allSections,
   const displayName = resolveSectionDisplayTitle(parentSection, formatDashboardLabel);
   const title = `${displayName} - Subsections`;
 
-  let wordOfDayPayload = null;
-  if (String(parentSection?.name || '').trim().toUpperCase() === 'SCHOOL' && req.user) {
-    try {
-      const wordOfDayPolicyModel = require('../../packages/school/MVC/models/school/wordOfDayPolicyModel');
-      const wordOfDayDisplayService = require('../../packages/school/MVC/services/school/wordOfDayDisplayService');
-      const wordOfDayService = require('../../packages/school/MVC/services/school/wordOfDayService');
-      const wordOfDayController = require('../../packages/school/MVC/controllers/school/wordOfDayController');
-      const orgId = wordOfDayService.getActiveOrgId(req.user);
-      const policy = await wordOfDayPolicyModel.getPolicyForOrg(orgId);
-      if (policy.schoolDashboardEnabled !== false && orgId) {
-        const dateKey = await wordOfDayController.resolveOrgDateKey(req.user);
-        wordOfDayPayload = await wordOfDayDisplayService.resolveDailyDisplay({
-          orgId,
-          dateKey,
-          recordAnalytics: true
-        });
-      }
-    } catch (_err) {
-      wordOfDayPayload = null;
-    }
-  }
-
-  const wordOfDayUiConstants = require('../../packages/school/MVC/services/school/wordOfDayUiConstants');
+  const wordOfDayPayload = await wordOfDayDashboardWidgetService.resolveWordOfDayDashboardPayload(req);
+  const wordOfDayUiConstants = wordOfDayDashboardWidgetService.getWordOfDayUiConstants();
 
   return res.render('dashboard/sectionSubDashboard', {
     title,

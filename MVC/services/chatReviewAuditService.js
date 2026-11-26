@@ -105,9 +105,37 @@ async function auditAttachmentReview(user, ipAddress, conversationId, attachment
   });
 }
 
+async function auditAttachmentOrphanAudit(user, ipAddress, scopeId, meta = {}) {
+  return recordReviewEvent({
+    user,
+    ipAddress,
+    operationId: OPERATIONS.READ_ALL,
+    action: 'attachment_orphan_audit',
+    scopeId,
+    globalRead: meta.globalRead === true,
+    outcome: meta.outcome || 'success',
+    details: meta.details || {}
+  });
+}
+
+async function auditAttachmentOrphanCleanup(user, ipAddress, scopeId, meta = {}) {
+  return recordReviewEvent({
+    user,
+    ipAddress,
+    operationId: OPERATIONS.DELETE_ALL,
+    action: 'attachment_orphan_cleanup',
+    scopeId,
+    globalRead: meta.globalRead === true,
+    outcome: meta.outcome || 'success',
+    details: meta.details || {}
+  });
+}
+
 module.exports = {
   recordReviewEvent,
   auditConversationListReview,
   auditConversationHistoryReview,
-  auditAttachmentReview
+  auditAttachmentReview,
+  auditAttachmentOrphanAudit,
+  auditAttachmentOrphanCleanup
 };

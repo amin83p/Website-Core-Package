@@ -4,6 +4,7 @@ const wordOfDayService = require('../../services/school/wordOfDayService');
 const wordOfDayAccessService = require('../../services/school/wordOfDayAccessService');
 const wordOfDayModel = require('../../models/school/wordOfDayModel');
 const wordOfDayDisplayService = require('../../services/school/wordOfDayDisplayService');
+const wordOfDayDisplayScheduleService = require('../../services/school/wordOfDayDisplayScheduleService');
 const wordOfDayPageVisitService = require('../../services/school/wordOfDayPageVisitService');
 const uploadLimitsPolicyService = require('../../services/school/uploadLimitsPolicyService');
 const wordOfDayPolicyModel = require('../../models/school/wordOfDayPolicyModel');
@@ -92,6 +93,9 @@ function buildFormPayload(body = {}) {
   Object.entries(payload).forEach(([key, value]) => {
     if (value !== undefined) out[key] = value;
   });
+  if (['1', 'true', true, 'on'].includes(body.clearWorkflowNote)) {
+    out.clearWorkflowNote = true;
+  }
   return out;
 }
 
@@ -106,9 +110,28 @@ async function getAccess(req) {
   return req._wordOfDayAccess || wordOfDayAccessService.buildWordOfDayAccess(req.user, req.ip);
 }
 
+async function assertConfigureDisplay(req) {
+  const access = await getAccess(req);
+  if (!access.canConfigureDisplay) {
+    const error = new Error('You do not have permission to configure Word of Day display.');
+    error.statusCode = 403;
+    throw error;
+  }
+  return access;
+}
+
 async function baseViewModel(req, res, extra = {}) {
   const access = await getAccess(req);
   const stats = await wordOfDayService.summarizeAuthorStats(req.user, access);
+  const orgId = wordOfDayService.getActiveOrgId(req.user);
+  const wordOfDayPolicy = orgId ? await wordOfDayPolicyModel.getPolicyForOrg(orgId) : null;
+  const contributionYear = wordOfDayService.currentCalendarYear();
+  const contributionLimit = Number(wordOfDayPolicy?.yearlyContributionLimitPerUser || 0);
+  const authorUserId = String(req.user?.id || req.user?.userId || '').trim();
+  const currentYearContributionCount = (orgId && authorUserId)
+    ? await wordOfDayService.countAuthorContributionsForYear(orgId, authorUserId, contributionYear)
+    : 0;
+  const contributionQuotaExempt = wordOfDayService.isContributionQuotaExempt(access);
   return {
     user: req.user,
     schoolSectionDashboardHref: res.locals.schoolSectionDashboardHref || '/dashboard/section-nav/SCHOOL',
@@ -122,6 +145,10 @@ async function baseViewModel(req, res, extra = {}) {
     difficultyLevels: wordOfDayModel.DIFFICULTY_LEVELS,
     difficultyLabels: wordOfDayModel.DIFFICULTY_LABELS,
     authorStats: stats,
+    wordOfDayContributionLimit: contributionLimit,
+    wordOfDayContributionYear: contributionYear,
+    wordOfDayCurrentYearContributionCount: currentYearContributionCount,
+    wordOfDayContributionQuotaExempt: contributionQuotaExempt,
     ...extra
   };
 }
@@ -511,7 +538,8 @@ async function getDailyWidgetPayload(req, res) {
     const result = await wordOfDayDisplayService.resolveDailyDisplay({
       orgId,
       dateKey,
-      recordAnalytics: req.query?.preview !== '1'
+      recordAnalytics: req.query?.preview !== '1',
+      policy
     });
     return res.json({ status: 'success', enabled: true, ...result });
   } catch (error) {
@@ -524,12 +552,69 @@ async function getPublicDailyPayload(orgId, dateKey) {
   if (!policy.publicHomeEnabled) return { enabled: false, entry: null, dateKey };
   const sourceOrg = String(policy.publicSourceOrgId || orgId || '').trim();
   if (!sourceOrg) return { enabled: false, entry: null, dateKey };
+  const orgPolicy = await wordOfDayPolicyModel.getPolicyForOrg(sourceOrg);
   const result = await wordOfDayDisplayService.resolveDailyDisplay({
     orgId: sourceOrg,
     dateKey,
-    recordAnalytics: true
+    recordAnalytics: true,
+    policy: orgPolicy
   });
   return { enabled: true, ...result };
+}
+
+async function getDisplaySchedule(req, res) {
+  try {
+    await assertConfigureDisplay(req);
+    const orgId = wordOfDayService.getActiveOrgId(req.user);
+    const from = String(req.query?.from || '').trim();
+    const to = String(req.query?.to || '').trim();
+    const payload = await wordOfDayDisplayScheduleService.listScheduleRange({ orgId, from, to });
+    return res.json({ status: 'success', ...payload });
+  } catch (error) {
+    return sendError(req, res, error, statusCode(error, 400));
+  }
+}
+
+async function putDisplaySchedule(req, res) {
+  try {
+    await assertConfigureDisplay(req);
+    const orgId = wordOfDayService.getActiveOrgId(req.user);
+    const dateKey = String(req.body?.dateKey || '').trim();
+    const entryIdRaw = req.body?.entryId;
+  const entryId = entryIdRaw === null || entryIdRaw === '' || entryIdRaw === undefined
+      ? ''
+      : String(entryIdRaw).trim();
+    if (!entryId) {
+      await wordOfDayDisplayScheduleService.clearScheduledDate({
+        orgId,
+        dateKey,
+        auditUserId: req.user?.id
+      });
+      return res.json({ status: 'success', message: 'Schedule cleared for date.', dateKey });
+    }
+    await wordOfDayDisplayScheduleService.assignScheduledDate({
+      orgId,
+      dateKey,
+      entryId,
+      auditUserId: req.user?.id
+    });
+    return res.json({ status: 'success', message: 'Word scheduled for date.', dateKey, entryId });
+  } catch (error) {
+    return sendError(req, res, error, statusCode(error, 400));
+  }
+}
+
+async function getDisplaySchedulePicker(req, res) {
+  try {
+    await assertConfigureDisplay(req);
+    const orgId = wordOfDayService.getActiveOrgId(req.user);
+    const q = String(req.query?.q || '').trim();
+    const limit = Number(req.query?.limit) || 20;
+    const items = await wordOfDayDisplayScheduleService.searchApprovedForPicker({ orgId, q, limit });
+    return res.json({ status: 'success', items });
+  } catch (error) {
+    return sendError(req, res, error, statusCode(error, 400));
+  }
 }
 
 module.exports = {
@@ -554,5 +639,8 @@ module.exports = {
   uploadMedia,
   getDailyWidgetPayload,
   getPublicDailyPayload,
+  getDisplaySchedule,
+  putDisplaySchedule,
+  getDisplaySchedulePicker,
   resolveOrgDateKey
 };

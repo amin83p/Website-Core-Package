@@ -90,9 +90,27 @@
     : '';
   const wordOfDaySchoolDashboardEnabled = (typeof wordOfDayPolicy !== 'undefined' && wordOfDayPolicy?.schoolDashboardEnabled !== false);
   const wordOfDayPublicHomeEnabled = (typeof wordOfDayPolicy !== 'undefined' && wordOfDayPolicy?.publicHomeEnabled === true);
+  const wordOfDayAllowedOrgs = (typeof wordOfDayUserAllowedOrganizations !== 'undefined' && Array.isArray(wordOfDayUserAllowedOrganizations))
+    ? wordOfDayUserAllowedOrganizations
+    : [];
+  const wordOfDaySingleOrgPicker = (typeof wordOfDayPublicSourceOrgSinglePicker !== 'undefined' && wordOfDayPublicSourceOrgSinglePicker === true)
+    || wordOfDayAllowedOrgs.length === 1;
   const wordOfDayPublicSourceOrgId = (typeof wordOfDayPolicy !== 'undefined' && wordOfDayPolicy?.publicSourceOrgId)
     ? String(wordOfDayPolicy.publicSourceOrgId)
-    : (typeof activeOrgId !== 'undefined' ? String(activeOrgId || '') : '');
+    : (wordOfDaySingleOrgPicker && wordOfDayAllowedOrgs[0] ? String(wordOfDayAllowedOrgs[0].id) : (typeof activeOrgId !== 'undefined' ? String(activeOrgId || '') : ''));
+  const wordOfDayPublicSourceOrgName = (typeof wordOfDayPublicSourceOrgLabel !== 'undefined' && String(wordOfDayPublicSourceOrgLabel || '').trim())
+    ? String(wordOfDayPublicSourceOrgLabel).trim()
+    : (wordOfDaySingleOrgPicker && wordOfDayAllowedOrgs[0]?.name ? String(wordOfDayAllowedOrgs[0].name).trim() : (typeof activeOrgName !== 'undefined' ? String(activeOrgName || '').trim() : ''));
+  const wordOfDayPublicSourceOrgSummary = wordOfDayPublicSourceOrgId
+    ? (wordOfDayPublicSourceOrgName
+      ? `${wordOfDayPublicSourceOrgName} (${wordOfDayPublicSourceOrgId})`
+      : wordOfDayPublicSourceOrgId)
+    : 'Not selected';
+  const wordOfDayShowAuthorOnDisplay = (typeof wordOfDayPolicy !== 'undefined' && wordOfDayPolicy?.showAuthorOnDisplay !== false);
+  const wordOfDayShowDifficultyOnDisplay = (typeof wordOfDayPolicy !== 'undefined' && wordOfDayPolicy?.showDifficultyOnDisplay !== false);
+  const wordOfDayYearlyContributionLimit = (typeof wordOfDayPolicy !== 'undefined' && wordOfDayPolicy?.yearlyContributionLimitPerUser != null)
+    ? Number(wordOfDayPolicy.yearlyContributionLimitPerUser)
+    : 0;
   const timesheetImportActivityOptionsList = Array.isArray(timesheetImportActivityOptions) ? timesheetImportActivityOptions : [];
   const statutoryHolidayPublicActivityOptionsList = (typeof statutoryHolidayPublicActivityOptions !== 'undefined' && Array.isArray(statutoryHolidayPublicActivityOptions))
     ? statutoryHolidayPublicActivityOptions
@@ -1313,9 +1331,30 @@
               <label class="form-check-label fw-semibold" for="wordOfDayPublicHomeEnabled">Show on public home page</label>
             </div>
             <div class="mb-3">
-              <label class="form-label fw-semibold" for="wordOfDayPublicSourceOrgId">Public home source organization ID</label>
-              <input class="form-control font-monospace" id="wordOfDayPublicSourceOrgId" value="<%= wordOfDayPublicSourceOrgId %>" placeholder="Required when public home is enabled" <%= canConfigureWordOfDayFlag ? '' : 'readonly' %>>
-              <p class="small text-muted mb-0 mt-1">Approved words are chosen from this organization when the public home widget is enabled.</p>
+              <label class="form-label fw-semibold" for="wordOfDayPublicSourceOrgLabel">Public home source organization</label>
+              <input type="hidden" id="wordOfDayPublicSourceOrgId" name="publicSourceOrgId" value="<%= wordOfDayPublicSourceOrgId %>">
+              <div class="input-group">
+                <input type="text" class="form-control bg-white" id="wordOfDayPublicSourceOrgLabel" value="<%= wordOfDayPublicSourceOrgSummary %>" placeholder="Select organization" readonly aria-describedby="wordOfDayPublicSourceOrgHelp">
+                <% if (canConfigureWordOfDayFlag && !wordOfDaySingleOrgPicker) { %>
+                  <button type="button" class="btn btn-outline-primary" id="btnPickWordOfDayPublicSourceOrg" title="Pick organization"><i class="bi bi-building"></i></button>
+                <% } %>
+              </div>
+              <p class="small text-muted mb-0 mt-1" id="wordOfDayPublicSourceOrgHelp">Approved words are chosen from this organization when the public home widget is enabled.<% if (wordOfDaySingleOrgPicker) { %> Your account is limited to one organization, so this value is fixed.<% } %></p>
+            </div>
+            <hr class="my-4">
+            <h6 class="fw-bold text-primary mb-3"><i class="bi bi-eye me-2"></i>Public display options</h6>
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" id="wordOfDayShowAuthorOnDisplay" <%= wordOfDayShowAuthorOnDisplay ? 'checked' : '' %> <%= canConfigureWordOfDayFlag ? '' : 'disabled' %>>
+              <label class="form-check-label fw-semibold" for="wordOfDayShowAuthorOnDisplay">Show contributor on Word of the Day page and widgets</label>
+            </div>
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" id="wordOfDayShowDifficultyOnDisplay" <%= wordOfDayShowDifficultyOnDisplay ? 'checked' : '' %> <%= canConfigureWordOfDayFlag ? '' : 'disabled' %>>
+              <label class="form-check-label fw-semibold" for="wordOfDayShowDifficultyOnDisplay">Show difficulty on Word of the Day page and widgets</label>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold" for="wordOfDayYearlyContributionLimit">Yearly contribution limit per user</label>
+              <input type="number" class="form-control" id="wordOfDayYearlyContributionLimit" min="0" step="1" value="<%= wordOfDayYearlyContributionLimit %>" <%= canConfigureWordOfDayFlag ? '' : 'readonly' %>>
+              <p class="small text-muted mb-0 mt-1">Maximum entries each user may create per calendar year (all statuses). Use <strong>0</strong> for unlimited. Section admins are exempt. To assign specific words to calendar days, use <strong>Configure Display</strong> on the Word of Day list.</p>
             </div>
             <% if (canConfigureWordOfDayFlag) { %>
               <button class="btn btn-primary" type="submit" id="btnSaveWordOfDaySettings"><i class="bi bi-save me-1"></i>Save Word of Day settings</button>
@@ -3807,16 +3846,63 @@
     enrollmentFinishAlertPolicy = result.policy && typeof result.policy === 'object' ? result.policy : enrollmentFinishAlertPolicy;
   });
 
+  function formatWordOfDayPublicSourceOrgSummary(orgId, orgName) {
+    const id = String(orgId || '').trim();
+    const name = String(orgName || '').trim();
+    if (!id) return 'Not selected';
+    return name ? `${name} (${id})` : id;
+  }
+
+  function setWordOfDayPublicSourceOrgSelection(orgId, orgName) {
+    const idInput = document.getElementById('wordOfDayPublicSourceOrgId');
+    const labelInput = document.getElementById('wordOfDayPublicSourceOrgLabel');
+    if (idInput) idInput.value = String(orgId || '').trim();
+    if (labelInput) labelInput.value = formatWordOfDayPublicSourceOrgSummary(orgId, orgName);
+  }
+
+  document.getElementById('btnPickWordOfDayPublicSourceOrg')?.addEventListener('click', () => {
+    if (!window.GenericPicker || !window.GenericPickerPresets?.organization) return;
+    const context = window.GenericPickerContexts?.activeOrganizationScope
+      ? window.GenericPickerContexts.activeOrganizationScope({ label: 'Active Organization' })
+      : undefined;
+    window.GenericPicker.open(window.GenericPickerPresets.organization({
+      title: 'Select public home source organization',
+      icon: 'bi-building',
+      placeholder: 'Search organizations...',
+      context,
+      onSelect: (item) => {
+        const orgId = String(item?.id || item?.orgId || '').trim();
+        const orgName = String(item?.name || item?.identity?.displayName || item?.title || '').trim();
+        setWordOfDayPublicSourceOrgSelection(orgId, orgName);
+      }
+    }));
+  });
+
   document.getElementById('wordOfDaySettingsForm')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     if (!canUpdate) return;
     const button = event.submitter || document.getElementById('btnSaveWordOfDaySettings');
-    await postSettings('/school/settings/word-of-day', {
+    const result = await postSettings('/school/settings/word-of-day', {
       actionStateId: event.currentTarget.elements.actionStateId?.value || '',
       schoolDashboardEnabled: document.getElementById('wordOfDaySchoolDashboardEnabled')?.checked === true,
       publicHomeEnabled: document.getElementById('wordOfDayPublicHomeEnabled')?.checked === true,
-      publicSourceOrgId: document.getElementById('wordOfDayPublicSourceOrgId')?.value || ''
+      publicSourceOrgId: document.getElementById('wordOfDayPublicSourceOrgId')?.value || '',
+      showAuthorOnDisplay: document.getElementById('wordOfDayShowAuthorOnDisplay')?.checked === true,
+      showDifficultyOnDisplay: document.getElementById('wordOfDayShowDifficultyOnDisplay')?.checked === true,
+      yearlyContributionLimitPerUser: Number(document.getElementById('wordOfDayYearlyContributionLimit')?.value || 0)
     }, button, 'wordOfDaySettingsError');
+    if (!result) return;
+    if (result.policy?.publicSourceOrgId) {
+      setWordOfDayPublicSourceOrgSelection(
+        result.policy.publicSourceOrgId,
+        result.publicSourceOrgLabel || ''
+      );
+    }
+    await showSettingsMessage({
+      title: 'Settings Saved',
+      message: result.message || 'Word of Day display settings were updated.',
+      icon: 'success'
+    });
   });
 
   document.getElementById('timesheetParametersSettingsForm')?.addEventListener('submit', async event => {

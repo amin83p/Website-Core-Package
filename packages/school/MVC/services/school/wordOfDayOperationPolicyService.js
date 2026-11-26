@@ -40,6 +40,7 @@ const EMPTY_ACCESS_FLAGS = Object.freeze({
   canConfigureDisplay: false,
   canCreateAsOtherUser: false,
   canChangeAuthorOnEdit: false,
+  canClearWorkflowNote: false,
   isWordOfDayAdminViewer: false,
   readScopeId: null,
   readAllScopeId: null,
@@ -211,6 +212,7 @@ function deriveAccessFlags(evaluations = {}, adminFlags = {}) {
     adminFlags.update
     || (updateAllowed && normalizeScopeMode(update.scopeId) === 'admin')
   );
+  const canClearWorkflowNote = canChangeAuthorOnEdit;
   const isWordOfDayAdminViewer = Boolean(
     adminFlags.readAll || adminFlags.update || adminFlags.resolve || adminFlags.read || adminFlags.configure
   );
@@ -225,6 +227,7 @@ function deriveAccessFlags(evaluations = {}, adminFlags = {}) {
     canConfigureDisplay,
     canCreateAsOtherUser,
     canChangeAuthorOnEdit,
+    canClearWorkflowNote,
     isWordOfDayAdminViewer,
     readScopeId: read.scopeId || null,
     readAllScopeId: readAll.scopeId || null,

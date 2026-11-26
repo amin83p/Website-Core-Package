@@ -113,6 +113,11 @@ async function softDeleteMessages(convId, messageIds = [], options = {}) {
         try { messages = JSON.parse(await fs.readFile(msgPath, 'utf8')); } catch {}
         const found = messages.filter((message) => targetIds.has(String(message?.id || '')));
         if (found.length !== targetIds.size) throw new Error('One or more messages were not found.');
+        const deletedMessages = found.map((message) => ({
+            id: message?.id,
+            fileUrl: message?.fileUrl || null,
+            type: message?.type || 'text'
+        }));
 
         const now = new Date().toISOString();
         const scopeMode = chatMessageVisibilityService.normalizeScopeMode(options?.scopeMode);
@@ -159,7 +164,8 @@ async function softDeleteMessages(convId, messageIds = [], options = {}) {
             messageIds: [...targetIds],
             deletedAt: now,
             deletionMode: twoSided ? 'two-sided' : 'one-sided',
-            scopeMode
+            scopeMode,
+            deletedMessages
         };
     });
 }

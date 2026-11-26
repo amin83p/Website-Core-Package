@@ -1,0 +1,78 @@
+<% const wodCanConfigure = typeof wordOfDayAccess !== 'undefined' && wordOfDayAccess.canConfigureDisplay; %>
+<% if (wodCanConfigure) { %>
+<style>
+  #wordOfDayDisplayScheduleModal .schedule-date-range-menu {
+    position: fixed;
+    z-index: 2060;
+    min-width: 12rem;
+    max-height: 18rem;
+    overflow: auto;
+    background: var(--bs-body-bg, #fff);
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.375rem;
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,.15);
+    padding: 0.35rem 0;
+  }
+  #wordOfDayDisplayScheduleModal .wod-schedule-invalid td {
+    background: rgba(255, 193, 7, 0.12);
+  }
+  #wordOfDayDisplayScheduleModal .wod-schedule-modal-dialog {
+    width: calc(100% - 1.5rem);
+    max-width: min(1200px, 96vw);
+  }
+</style>
+<%- include('../../schedule/partials/personScheduleDateRangeShortcuts', {
+  dateRangeMenuId: 'wodDisplayScheduleDateRangeMenu',
+  includeMatrixAllDates: true
+}) %>
+<div class="modal fade" id="wordOfDayDisplayScheduleModal" tabindex="-1" aria-labelledby="wordOfDayDisplayScheduleModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable wod-schedule-modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold" id="wordOfDayDisplayScheduleModalLabel"><i class="bi bi-calendar-week me-2"></i>Configure display schedule</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted">Assign an <strong>approved</strong> word to each day, or leave a day on <strong>Automatic</strong> to use the rotation algorithm. Display toggles and yearly limits are in <a href="/school/settings#word-of-day">School settings → Word of Day</a>.</p>
+        <div class="card border-0 bg-light mb-3">
+          <div class="card-body py-3">
+            <div class="row g-3 align-items-end">
+              <div class="col-md-3">
+                <label class="form-label fw-semibold small" for="wodScheduleDateFrom">Date from</label>
+                <div class="d-flex gap-1">
+                  <input type="date" class="form-control form-control-sm" id="wodScheduleDateFrom" autocomplete="off">
+                  <button type="button" class="btn btn-outline-secondary btn-sm" id="wodScheduleDateShortcutsBtn" title="Quick date ranges" aria-expanded="false" aria-controls="wodDisplayScheduleDateRangeMenu"><i class="bi bi-calendar-range"></i></button>
+                </div>
+              </div>
+              <div class="col-md-3">
+                <label class="form-label fw-semibold small" for="wodScheduleDateTo">Date to</label>
+                <input type="date" class="form-control form-control-sm" id="wodScheduleDateTo" autocomplete="off">
+              </div>
+              <div class="col-md-6 d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-primary btn-sm" id="wodScheduleLoadBtn"><i class="bi bi-arrow-repeat me-1"></i>Load range</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="wodScheduleStatus" class="small text-muted mb-2 d-none"></div>
+        <div class="table-responsive border rounded">
+          <table class="table table-sm table-hover align-middle mb-0" id="wodScheduleTable">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3">Date</th>
+                <th>Assignment</th>
+                <th>Word</th>
+                <th>Author</th>
+                <th class="text-end pe-3" style="min-width:14rem;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="wodScheduleTableBody">
+              <tr><td colspan="5" class="text-center text-muted py-4">Choose a date range and click Load range.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<% } %>

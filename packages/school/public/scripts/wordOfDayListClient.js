@@ -7,6 +7,7 @@
 
   let entryModal;
   let activeEntryId = '';
+  let activeEntry = null;
 
   async function showAlert(title, message, icon) {
     if (msg()?.showAlert) {
@@ -91,8 +92,7 @@
       actions.dataset.hasDisplay = caps.hasDisplayHistory ? '1' : '0';
       actions.dataset.canEdit = caps.canEdit ? '1' : '0';
     }
-    const note = qs('wodListEntryWorkflowNote');
-    if (note) note.value = '';
+    activeEntry = entry;
   }
 
   function bindEntryModalStacking() {
@@ -183,7 +183,21 @@
     if (!workflow?.postWorkflowAction) return;
     const ok = await workflow.confirmRiskyAction(action, hasDisplayHistory);
     if (!ok) return;
-    const note = ui()?.readWorkflowNote('wodListEntryWorkflowNote') || '';
+    const noteModal = global.WordOfDayRejectionReasonModal;
+    let note = '';
+    if (noteModal?.isPromptableWorkflowAction?.(action)) {
+      if (!noteModal.promptWorkflowNote) {
+        await showAlert('Unavailable', 'Workflow note dialog is not available.', 'warning');
+        return;
+      }
+      const prompted = await noteModal.promptWorkflowNote({
+        action,
+        word: activeEntry?.word,
+        entryId
+      });
+      if (prompted === null) return;
+      note = prompted;
+    }
     const loadingNote = ui()?.workflowLoadingMessage?.(action) || 'Updating status…';
     const loadingToken = typeof global.showLoading === 'function'
       ? global.showLoading({ title: 'Word of the Day', note: loadingNote, operation: 'Update' })
@@ -220,8 +234,7 @@
     if (!workflow?.confirmRiskyAction) return;
     const ok = await workflow.confirmRiskyAction('delete', false);
     if (!ok) return;
-    const note = ui()?.readWorkflowNote('wodListEntryWorkflowNote') || '';
-    const result = await workflow.postWorkflowAction(entryId, 'delete', { note });
+    const result = await workflow.postWorkflowAction(entryId, 'delete', { note: '' });
     if (!result.ok) {
       await showAlert('Delete failed', result.message || 'Unable to delete this entry.', 'error');
       return;
@@ -230,7 +243,25 @@
     removeListRow(entryId);
   }
 
+  function openWorkflowNoteFromEntry(ev) {
+    const chip = ev.target.closest('.wod-workflow-status-chip, .wod-rejection-status-chip, .wod-entry-workflow-note-callout');
+    if (!chip) return false;
+    ev.preventDefault();
+    if (activeEntry && global.WordOfDayRejectionReasonModal?.showFromEntry) {
+      global.WordOfDayRejectionReasonModal.showFromEntry(activeEntry);
+    }
+    return true;
+  }
+
+  function bindRejectionStatusClicks() {
+    qs('wodListEntryHeaderStatus')?.addEventListener('click', openWorkflowNoteFromEntry);
+    qs('wodListEntryBody')?.addEventListener('click', (ev) => {
+      openWorkflowNoteFromEntry(ev);
+    });
+  }
+
   function bindEntryModalActions() {
+    bindRejectionStatusClicks();
     qs('wodListEntryActions')?.addEventListener('click', (ev) => {
       const btn = ev.target.closest('[data-wod-action]');
       if (!btn) return;

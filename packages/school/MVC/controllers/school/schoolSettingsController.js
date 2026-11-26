@@ -79,6 +79,33 @@ function resolveActiveOrgName(user, activeOrgId) {
   ).trim();
 }
 
+function listUserAllowedOrganizations(user) {
+  const allowedOrgs = Array.isArray(user?.allowedOrgs) ? user.allowedOrgs : [];
+  return allowedOrgs
+    .map((row) => ({
+      id: String(row?.orgId || row?.id || '').trim(),
+      name: String(
+        row?.name
+        || row?.orgName
+        || row?.organizationName
+        || row?.identity?.displayName
+        || ''
+      ).trim()
+    }))
+    .filter((row) => row.id);
+}
+
+function resolveOrganizationLabel(user, orgId) {
+  const id = String(orgId || '').trim();
+  if (!id) return '';
+  const match = listUserAllowedOrganizations(user).find((row) => row.id === id);
+  if (match?.name) return match.name;
+  if (String(user?.activeOrgId || '').trim() === id) {
+    return resolveActiveOrgName(user, id);
+  }
+  return '';
+}
+
 function defaultAttendanceItems() {
   return [{
     scheduledMinutes: attendanceMatrixPolicyModel.DEFAULT_POLICY.scheduledMinutes,
@@ -493,6 +520,12 @@ async function loadSettingsPageData(req) {
     }))
     .filter((row) => row.id);
   const statutoryHolidaySchemes = statutoryHolidaySchemeService.resolveSchemes(timesheetParametersPolicy);
+  const wordOfDayUserAllowedOrganizations = listUserAllowedOrganizations(req.user);
+  const wordOfDayPublicSourceOrgSinglePicker = wordOfDayUserAllowedOrganizations.length === 1;
+  const wordOfDayPublicSourceOrgId = String(
+    wordOfDayPolicy?.publicSourceOrgId || activeOrgId || ''
+  ).trim();
+  const wordOfDayPublicSourceOrgLabel = resolveOrganizationLabel(req.user, wordOfDayPublicSourceOrgId);
 
   return {
     activeOrgId,
@@ -524,6 +557,9 @@ async function loadSettingsPageData(req) {
     timesheetDisplayAllowedFieldsByKind: timesheetDisplayPolicyService.ALLOWED_FIELDS_BY_KIND,
     enrollmentFinishAlertPolicy,
     wordOfDayPolicy,
+    wordOfDayUserAllowedOrganizations,
+    wordOfDayPublicSourceOrgSinglePicker,
+    wordOfDayPublicSourceOrgLabel,
     timesheetImportActivityOptions,
     statutoryHolidayPublicActivityOptions,
     statutoryHolidayMappingYearOptions,
@@ -1003,17 +1039,22 @@ async function saveWordOfDayPolicy(req, res) {
     const normalized = wordOfDayPolicyService.validatePolicyInput({
       schoolDashboardEnabled: req.body?.schoolDashboardEnabled,
       publicHomeEnabled: req.body?.publicHomeEnabled,
-      publicSourceOrgId: req.body?.publicSourceOrgId || activeOrgId
+      publicSourceOrgId: req.body?.publicSourceOrgId || activeOrgId,
+      showAuthorOnDisplay: req.body?.showAuthorOnDisplay,
+      showDifficultyOnDisplay: req.body?.showDifficultyOnDisplay,
+      yearlyContributionLimitPerUser: req.body?.yearlyContributionLimitPerUser
     });
     const policy = await wordOfDayPolicyModel.savePolicyForOrg(
       activeOrgId,
       normalized,
       req.user?.id
     );
+    const sourceOrgLabel = resolveOrganizationLabel(req.user, policy.publicSourceOrgId);
     return res.json({
       status: 'success',
       message: 'Word of Day display settings were updated.',
-      policy
+      policy,
+      publicSourceOrgLabel: sourceOrgLabel || policy.publicSourceOrgId || ''
     });
   } catch (error) {
     return res.status(Number(error?.statusCode) || 500).json({

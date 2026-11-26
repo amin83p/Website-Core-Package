@@ -1,0 +1,46 @@
+<style>
+  .wod-workflow-status-chip,
+  .wod-rejection-status-chip {
+    cursor: pointer;
+    text-transform: capitalize;
+  }
+  .wod-workflow-status-chip:hover,
+  .wod-workflow-status-chip:focus-visible,
+  .wod-rejection-status-chip:hover,
+  .wod-rejection-status-chip:focus-visible {
+    filter: brightness(1.08);
+    outline: 2px solid rgba(255, 255, 255, 0.85);
+    outline-offset: 1px;
+  }
+</style>
+<div class="modal fade" id="wordOfDayRejectionReasonModal" tabindex="-1" aria-labelledby="wordOfDayRejectionReasonModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title h5 mb-0" id="wordOfDayRejectionReasonModalLabel">Workflow note</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-2 d-none" id="wodRejectionReasonWordLine"></p>
+        <div id="wodRejectionReasonViewBlock" class="d-none">
+          <dl class="mb-0 small">
+            <dt class="text-muted fw-semibold" id="wodRejectionReasonViewNoteLabel">Note</dt>
+            <dd id="wodRejectionReasonViewText" class="mb-3 text-body"></dd>
+            <dt class="text-muted fw-semibold" id="wodRejectionReasonViewByLabel">Updated by</dt>
+            <dd id="wodRejectionReasonViewBy" class="mb-0 text-body"></dd>
+          </dl>
+        </div>
+        <div id="wodRejectionReasonPromptBlock" class="d-none">
+          <label class="form-label fw-semibold" id="wodRejectionReasonPromptLabel" for="wodRejectionReasonInput">Note</label>
+          <div class="text-muted small mb-2" id="wodRejectionReasonPromptHint"></div>
+          <textarea id="wodRejectionReasonInput" class="form-control" rows="4" maxlength="2000" placeholder="Add a note…"></textarea>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal" id="wodRejectionReasonCancelBtn">Cancel</button>
+        <button type="button" class="btn btn-danger d-none" id="wodRejectionReasonConfirmBtn">Continue</button>
+        <button type="button" class="btn btn-primary d-none" data-bs-dismiss="modal" id="wodRejectionReasonCloseBtn">Close</button>
+      </div>
+    </div>
+  </div>
+</div>

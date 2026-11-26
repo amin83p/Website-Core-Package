@@ -6,11 +6,18 @@ const dataService = require('../services/dataService');
 const chatAccessService = require('../services/chatAccessService');
 const chatOperationPolicyService = require('../services/chatOperationPolicyService');
 const chatContactScopeService = require('../services/chatContactScopeService');
+const {
+  isChatSystemParticipant,
+  CHAT_SYSTEM_DISPLAY_NAME,
+  projectChatSystemParticipant
+} = require('../services/chatSystemParticipantService');
 const chatBroadcastService = require('../services/chatBroadcastService');
 const chatAttachmentAccessService = require('../services/chatAttachmentAccessService');
 const chatPendingAttachmentService = require('../services/chatPendingAttachmentService');
 const chatReviewAuditService = require('../services/chatReviewAuditService');
 const chatPolicyService = require('../services/chatPolicyService');
+const chatConversationAttachmentService = require('../services/chatConversationAttachmentService');
+const chatAttachmentOrphanAuditService = require('../services/chatAttachmentOrphanAuditService');
 const socketService = require('../services/socketService');
 const coreFilesService = require('../services/coreFilesService');
 const fs = require('fs');
@@ -248,11 +255,15 @@ async function enrichConversations(conversations, currentUserId, requestingUser,
             participants: []
         };
         const otherParticipant = c.participants.find(p => !idsEqual(p.userId, currentUserId));
-        const participantState = state.participants.find((row) => idsEqual(row.userId, otherParticipant?.userId))
+        const otherUserId = otherParticipant?.userId;
+        const participantState = state.participants.find((row) => idsEqual(row.userId, otherUserId))
             || state.participants[0]
             || null;
         const userDetails = participantState?.user || null;
-        const participantDisplay = participantState?.display || {};
+        const systemDisplay = isChatSystemParticipant(otherUserId)
+          ? projectChatSystemParticipant(otherUserId)
+          : null;
+        const participantDisplay = systemDisplay || participantState?.display || {};
         const canMessage = Boolean(updateAccess?.allowed && state.canMessage);
         const scopeReason = canMessage
             ? ''
@@ -266,7 +277,8 @@ async function enrichConversations(conversations, currentUserId, requestingUser,
         return {
             ...c,
             display: {
-                name: participantDisplay.name || 'Unknown User',
+                name: participantDisplay.name
+                  || (isChatSystemParticipant(otherUserId) ? CHAT_SYSTEM_DISPLAY_NAME : 'Unknown User'),
                 avatar: participantDisplay.avatar || null,
                 initials: participantDisplay.initials || '',
                 avatarColor: participantDisplay.avatarColor || null,
@@ -317,12 +329,18 @@ exports.listAllChats = async (req, res) => {
         const userMap = new Map(allUsers.map(u => [String(u.id), u]));
 
         const enriched = await Promise.all(allConvs.map(async (c) => {
-            const participantNames = c.participants.map(p => {
+            const participantRows = Array.isArray(c.participants) ? c.participants : [];
+            const participantNames = participantRows.map(p => {
                 const u = userMap.get(String(p.userId));
                 return u ? (u.name || u.username) : 'Unknown';
             }).join(', ');
 
-            let totalBytes = await chatPolicyService.getConversationStorageBytes(c.id);
+            let totalBytes = 0;
+            try {
+                totalBytes = await chatPolicyService.getConversationStorageBytes(c.id);
+            } catch (sizeErr) {
+                console.warn(`[Chat] Storage size skipped for ${c.id}:`, sizeErr?.message || sizeErr);
+            }
 
             return {
                 id: c.id,
@@ -337,10 +355,19 @@ exports.listAllChats = async (req, res) => {
 
         res.render('admin/chatList', {
             title: 'Conversation Management',
-            tableName: 'System Conversations',
+            tableName: 'System_Conversations',
             data: enriched,
             chatAccess: await chatAccessService.buildChatAccess(req.user, req.ip),
-            newUrl: '', newLabel: '', includeModal: true, print: true, user: req.user, pagination: null, filters: {}
+            newUrl: '',
+            newLabel: null,
+            includeModal: true,
+            includeModal_Table: true,
+            print: true,
+            btn_export: true,
+            searchableFields: ['id', 'participants', 'lastMsg'],
+            user: req.user,
+            pagination: null,
+            filters: {}
         });
 
         await chatReviewAuditService.auditConversationListReview(
@@ -351,7 +378,11 @@ exports.listAllChats = async (req, res) => {
         );
 
     } catch (err) {
-        res.status(500).render('error', { title: 'Error', message: err.message });
+        res.status(500).render('error', {
+            title: 'Error',
+            message: err.message,
+            user: req.user
+        });
     }
 };
 
@@ -462,41 +493,7 @@ exports.deleteChat = async (req, res) => {
             });
         }
 
-        // ✅ USE RESOLVER to find the folder to delete
-        const root = coreFilesService.getRootPath('GLOBAL');
-        let filesDeleted = false;
-
-        try {
-            const configuredFolder = uploadFolderSettingsService.resolveUploadFolder('core.chat', {
-                conversationId: convId
-            });
-            const defaultFolder = uploadFolderSettingsService.resolveDefaultUploadFolder('core.chat', {
-                conversationId: convId
-            });
-            for (const relativePath of [...new Set([configuredFolder, defaultFolder])]) {
-                // eslint-disable-next-line no-await-in-loop
-                const removedUploadFolder = await uploadStorage.deleteRelativePath({
-                    scopeKey: 'GLOBAL',
-                    relativePath
-                });
-                if (removedUploadFolder) {
-                    filesDeleted = true;
-                    console.log(`[Chat] Deleted attachments for: ${convId}`);
-                }
-            }
-            if (!filesDeleted && uploadStoragePolicy.allowLocalUploadFallback()) {
-                // resolveSafePath ensures we don't accidentally delete outside our scope
-                const chatDir = coreFilesService.resolveSafePath(root, `chat/${convId}`);
-                if (fs.existsSync(chatDir)) {
-                    await fsPromises.rm(chatDir, { recursive: true, force: true });
-                    filesDeleted = true;
-                    console.log(`[Chat] Deleted legacy attachments for: ${convId}`);
-                }
-            }
-        } catch (e) {
-            // It's okay if the folder doesn't exist or is empty
-            console.warn(`[Chat] File cleanup note for ${convId}:`, e.message);
-        }
+        const filesDeleted = await chatConversationAttachmentService.deleteConversationAttachments(convId);
 
         await socketService.emitConversationDeleted({
             conversation,
@@ -535,6 +532,22 @@ exports.deleteMessages = async (req, res) => {
             deletedByUserId: req.user?.id,
             scopeMode: access.scopeMode || 'global'
         });
+        if ((result.deletionMode || 'two-sided') === 'two-sided') {
+            const namesToDelete = [];
+            const deletedMessages = Array.isArray(result.deletedMessages) ? result.deletedMessages : [];
+            for (const message of deletedMessages) {
+                if (!chatConversationAttachmentService.isAttachmentMessage(message)) continue;
+                const fileName = chatConversationAttachmentService.basenameFromFileUrl(message.fileUrl);
+                if (!fileName) continue;
+                // eslint-disable-next-line no-await-in-loop
+                const stillReferenced = await chatRepository.hasActiveAttachment(convId, fileName);
+                if (!stillReferenced) namesToDelete.push(fileName);
+            }
+            if (namesToDelete.length) {
+                await chatConversationAttachmentService.deleteAttachmentFiles(convId, namesToDelete);
+            }
+        }
+
         await socketService.emitMessagesDeleted({
             convId,
             messageIds: result.messageIds,
@@ -601,7 +614,7 @@ exports.getHistory = async (req, res) => {
         const [messagePage, writeAccess] = await Promise.all([
             chatRepository.getMessages(convId, {
                 ...paginationOptions,
-                viewerUserId: req.user?.id
+                viewerUserId: readAccess.globalRead === true ? null : req.user?.id
             }),
             chatAccessService.canAccessConversation({
                 user: req.user,
@@ -728,5 +741,74 @@ exports.broadcastMessage = async (req, res) => {
             await uploadMiddleware.deleteUploadedFiles(req).catch(() => {});
         }
         res.status(err.statusCode || 500).json({ status: 'error', message: err.message });
+    }
+};
+
+exports.auditOrphanAttachments = async (req, res) => {
+    try {
+        const [listAccess, readAllAccess] = await Promise.all([
+            chatAccessService.canManageConversationReviewList(req.user, req.ip),
+            chatAccessService.canReadAllConversations(req.user, req.ip)
+        ]);
+        if (!listAccess.allowed || !readAllAccess.allowed) {
+            return res.status(403).json({
+                status: 'error',
+                message: 'Orphan attachment audit requires conversation management and READ_ALL chat access.'
+            });
+        }
+
+        const report = await chatAttachmentOrphanAuditService.auditOrphanAttachments();
+        await chatReviewAuditService.auditAttachmentOrphanAudit(req.user, req.ip, listAccess.scopeId, {
+            globalRead: readAllAccess.globalRead === true,
+            outcome: 'success',
+            details: {
+                totals: report.totals,
+                dryRun: req.query?.dryRun === 'true' || req.body?.dryRun === true
+            }
+        });
+        return res.json({ status: 'success', data: report });
+    } catch (err) {
+        return res.status(err.statusCode || 500).json({ status: 'error', message: err.message });
+    }
+};
+
+exports.cleanupOrphanAttachments = async (req, res) => {
+    try {
+        const chatAccess = await chatAccessService.buildChatAccess(req.user, req.ip);
+        if (!chatAccess.canDeleteAll) {
+            return res.status(403).json({
+                status: 'error',
+                message: 'Orphan attachment cleanup requires DELETE_ALL chat access.'
+            });
+        }
+
+        const body = req.body || {};
+        if (body.confirm !== true) {
+            return res.status(400).json({
+                status: 'error',
+                message: 'Cleanup requires confirm: true.'
+            });
+        }
+
+        const result = await chatAttachmentOrphanAuditService.cleanupOrphanAttachments(null, {
+            confirm: true,
+            dryRun: body.dryRun === true,
+            orphanFolderIds: body.orphanFolderIds,
+            orphanFiles: body.orphanFiles
+        });
+
+        await chatReviewAuditService.auditAttachmentOrphanCleanup(req.user, req.ip, chatAccess.deleteScopeId, {
+            globalRead: true,
+            outcome: 'success',
+            details: {
+                deletedFolders: result.deletedFolders,
+                deletedFileCount: result.deletedFiles?.length || 0,
+                skippedCount: result.skipped?.length || 0
+            }
+        });
+
+        return res.json({ status: 'success', data: result });
+    } catch (err) {
+        return res.status(err.statusCode || 500).json({ status: 'error', message: err.message });
     }
 };

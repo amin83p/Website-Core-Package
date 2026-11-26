@@ -346,6 +346,32 @@
     `;
   }
 
+  function workflowNoteStatusTitle(status) {
+    const s = String(status || '').toLowerCase();
+    if (s === 'rejected') return 'Rejection note';
+    if (s === 'reopened') return 'Reopen note';
+    if (s === 'on_hold') return 'On hold note';
+    if (s === 'archived') return 'Archive note';
+    if (s === 'approved') return 'Approval note';
+    if (s === 'submitted') return 'Submission note';
+    return 'Workflow note';
+  }
+
+  function renderWorkflowNoteCallout(entry) {
+    const note = String(entry?.workflow?.reviewerNote || '').trim();
+    if (!note) return '';
+    const status = String(entry?.status || '').toLowerCase();
+    const title = workflowNoteStatusTitle(status);
+    const statusClass = status ? `status-${status.replace(/[^a-z0-9_-]/g, '')}` : '';
+    const word = String(entry?.word || '').trim();
+    const aria = word ? `${title} for ${word}. Open details.` : `${title}. Open details.`;
+    return `<button type="button" class="wod-entry-workflow-note-callout ${escapeHtml(statusClass)} wod-workflow-status-chip" data-wod-workflow-note-view aria-label="${escapeHtml(aria)}">
+      <div class="wod-entry-workflow-note-title"><i class="bi bi-chat-left-text me-1" aria-hidden="true"></i>${escapeHtml(title)}</div>
+      <p class="wod-entry-workflow-note-text">${escapeHtml(note.length > 280 ? `${note.slice(0, 280)}…` : note)}</p>
+      <p class="wod-entry-workflow-note-hint mb-0">Click for full note and details</p>
+    </button>`;
+  }
+
   function renderEntryMetaPanel(entry) {
     const author = entry.authorName || entry.authorUserId || '—';
     return `<div id="wodEntryMetaPanel" class="wod-entry-meta-panel collapse">
@@ -402,6 +428,7 @@
 
     return `
       ${displayWarning}
+      ${renderWorkflowNoteCallout(entry)}
       <div class="wod-entry-chip-row d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
         <div class="d-flex flex-wrap align-items-center gap-2">
           <span class="badge bg-light text-dark border px-3 py-2 fs-6">${escapeHtml(typeText)}</span>
@@ -427,14 +454,29 @@
     return `<span class="wod-entry-header-phonetics font-monospace" lang="en">${escapeHtml(pronunciation)}</span>`;
   }
 
+  function renderStatusBadgeHtml(entry, options = {}) {
+    const status = String(entry?.status || '').toLowerCase();
+    const label = status.replace(/_/g, ' ');
+    if (!label) return '';
+    const clickableNote = options.clickableNote !== false;
+    const noteStatuses = global.WordOfDayRejectionReasonModal?.NOTE_VIEW_STATUSES;
+    const hasNoteStatus = noteStatuses
+      ? noteStatuses.has(status)
+      : ['rejected', 'reopened', 'on_hold', 'archived'].includes(status);
+    if (hasNoteStatus && clickableNote) {
+      const word = String(entry?.word || '').trim();
+      const id = String(entry?.id || '').trim();
+      const title = `View ${label} note`;
+      const aria = word ? `${title} for ${word}` : title;
+      return `<button type="button" class="badge ${statusBadgeClass(status)} border-0 wod-workflow-status-chip wod-rejection-status-chip" data-wod-workflow-note-view data-entry-id="${escapeHtml(id)}" title="${escapeHtml(title)}" aria-label="${escapeHtml(aria)}">${escapeHtml(label)}</button>`;
+    }
+    return `<span class="badge ${statusBadgeClass(status)}">${escapeHtml(label)}</span>`;
+  }
+
   function renderHeaderStatusHtml(entry) {
     if (!entry) return '';
-    const status = String(entry.status || '').toLowerCase();
-    const label = status.replace(/_/g, ' ');
     const displayCount = Number(entry.display?.displayCount || 0);
-    const statusBadge = label
-      ? `<span class="badge ${statusBadgeClass(status)}">${escapeHtml(label)}</span>`
-      : '';
+    const statusBadge = renderStatusBadgeHtml(entry) || '';
     const displayChip = renderDisplayChip(displayCount);
     return `<div class="wod-entry-header-status-chips d-flex flex-wrap align-items-center justify-content-end gap-2">${statusBadge}${displayChip}</div>`;
   }
@@ -451,6 +493,8 @@
     renderActionButtons,
     renderEditLink,
     renderHeaderStatusHtml,
+    renderStatusBadgeHtml,
+    renderWorkflowNoteCallout,
     renderHeaderSubtitleHtml,
     renderDisplayChip,
     renderEntryDetailHtml,

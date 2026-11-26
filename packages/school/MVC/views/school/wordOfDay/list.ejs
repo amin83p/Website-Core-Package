@@ -11,7 +11,7 @@ if (wodAccess.canResolveWords) {
   manageBtns.push('<button type="button" class="btn btn-outline-primary btn-md mb-2" id="btnWordOfDayReview"><i class="bi bi-clipboard-check me-1"></i> Review Words</button>');
 }
 if (wodAccess.canConfigureDisplay) {
-  manageBtns.push('<a href="/school/settings#word-of-day" class="btn btn-outline-success btn-md mb-2"><i class="bi bi-sliders me-1"></i> Configure Display</a>');
+  manageBtns.push('<button type="button" class="btn btn-outline-success btn-md mb-2" id="btnWordOfDayConfigureDisplay"><i class="bi bi-sliders me-1"></i> Configure Display</button>');
 }
 %>
 <% if (wodAccess.canOpenList && !wodAccess.canViewEntries) { %>
@@ -114,9 +114,11 @@ if (wodAccess.canConfigureDisplay) {
 
 <%- include('partials/tablePages-end') %>
 <%- include('school/wordOfDay/partials/entryModal') %>
+<%- include('school/wordOfDay/partials/rejectionReasonModal') %>
 <%- include('school/wordOfDay/partials/publicFeedbackModal') %>
 <%- include('partials/modal_ImageViewer') %>
 <%- include('school/wordOfDay/partials/reviewModal') %>
+<%- include('school/wordOfDay/partials/displayScheduleModal') %>
 <script type="application/json" id="wodListReviewBootstrap"><%- JSON.stringify({
   openReview: Boolean(typeof openReviewModal !== 'undefined' && openReviewModal),
   openEntryId: typeof openEntryId !== 'undefined' ? String(openEntryId || '') : '',
@@ -124,7 +126,11 @@ if (wodAccess.canConfigureDisplay) {
 }) %></script>
 <script src="/scripts/schoolModalStack.js"></script>
 <script src="/scripts/wordOfDayWorkflowClient.js"></script>
+<script src="/scripts/wordOfDayRejectionReasonModal.js"></script>
 <script src="/scripts/wordOfDayEntryDetailUi.js"></script>
 <script src="/scripts/wordOfDayListClient.js"></script>
 <script src="/scripts/schoolDateRangeShortcuts.js"></script>
 <script src="/scripts/wordOfDayReviewModal.js"></script>
+<% if (wodAccess.canConfigureDisplay) { %>
+<script src="/scripts/wordOfDayDisplayScheduleModal.js"></script>
+<% } %>

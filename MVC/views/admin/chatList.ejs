@@ -1,24 +1,30 @@
-<%- include('../partials/tablePages-start', {
-  title,
-  newUrl, 
-  newLabel: null, 
-  user,
-  tableName: 'System Conversations',
-  print,
-  btn_export: true
-}) %>
-
 <% const adminChatAccess = (typeof chatAccess !== 'undefined' && chatAccess) ? chatAccess : {}; %>
 <% const canReviewHistory = !!adminChatAccess.canReviewConversationHistory; %>
 <% const canDeleteAllChats = !!adminChatAccess.canDeleteAll; %>
+<%
+  const chatOrphanAuditSecondRow = canDeleteAllChats
+    ? [`<div class="w-100 d-flex justify-content-end flex-wrap"><button type="button" class="btn btn-outline-primary btn-md mb-2" id="adminOrphanAuditBtn" onclick="adminOpenOrphanAuditModal()"><i class="bi bi-folder-x me-1"></i> Audit orphan attachments</button></div>`]
+    : [];
+%>
+
+<%- include('../partials/tablePages-start', {
+  title,
+  newUrl,
+  newLabel: null,
+  user,
+  tableName: 'System Conversations',
+  print,
+  btn_export: true,
+  optionalToolbarSecondRow: chatOrphanAuditSecondRow
+}) %>
 
 <%- include('../partials/tablePages-search', {
     placeholder: 'Search conversations...',
     fields: []
   }) %>
 
-<div class="table-scroll-wrapper">
-  <table class="table-responsive size-md" id="chat-table">
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
     <thead>
       <tr>
         <th class="draggable">ID<span class="sort-icon"></span></th>
@@ -28,7 +34,7 @@
         <th class="draggable">Last Message<span class="sort-icon"></span></th>
         <th class="draggable">Total Size<span class="sort-icon"></span></th>
         <th class="draggable">Msgs<span class="sort-icon"></span></th>
-        <th>Actions</th>
+        <th class="text-end pe-4">Action</th>
       </tr>
     </thead>
 
@@ -40,8 +46,20 @@
           </td>
           
           <td>
-            <i class="bi bi-people-fill text-secondary me-1"></i>
-            <span class="fw-bold text-dark"><%= conv.participants %></span>
+            <% if (canReviewHistory) { %>
+              <button
+                type="button"
+                class="btn btn-link p-0 border-0 text-start admin-chat-participants-link"
+                data-conv-id="<%= conv.id %>"
+                data-participants="<%= encodeURIComponent(conv.participants || '') %>"
+                title="Review conversation">
+                <i class="bi bi-people-fill text-secondary me-1"></i>
+                <span class="fw-bold text-dark text-decoration-underline"><%= conv.participants %></span>
+              </button>
+            <% } else { %>
+              <i class="bi bi-people-fill text-secondary me-1"></i>
+              <span class="fw-bold text-dark"><%= conv.participants %></span>
+            <% } %>
           </td>
 
           <td>
@@ -68,20 +86,38 @@
             <span class="badge bg-secondary rounded-pill"><%= conv.msgCount %></span>
           </td>
 
-          <td class="table-actions">
-            <% if (canReviewHistory) { %>
-            <button class="btn btn-sm btn-filled btn-edit" onclick="adminViewChat('<%= conv.id %>', '<%= conv.participants %>')">
-                View
-            </button>
-            <% } %>
-            
-            <% if (canDeleteAllChats) { %>
-            <button class="btn btn-sm btn-filled btn-delete delete-btn" onclick="adminDeleteChat('<%= conv.id %>')">
-                Delete
-            </button>
-            <% } %>
-            <% if (!canReviewHistory && !canDeleteAllChats) { %>
-              <span class="text-muted small">No actions</span>
+          <td class="table-actions text-end pe-4">
+            <% if (canReviewHistory || canDeleteAllChats) { %>
+              <div class="row-actions-wrap">
+                <button
+                  type="button"
+                  class="btn btn-secondary btn-sm btn-row-actions-toggle"
+                  data-row-actions-id="<%= conv.id %>"
+                  title="Row actions">
+                  <i class="bi bi-three-dots-vertical"></i>
+                </button>
+                <div class="row-actions-menu d-none" data-row-actions-id="<%= conv.id %>">
+                  <% if (canReviewHistory) { %>
+                    <button
+                      type="button"
+                      class="btn btn-outline-primary btn-sm js-admin-view-chat"
+                      data-conv-id="<%= conv.id %>"
+                      data-participants="<%= encodeURIComponent(conv.participants || '') %>">
+                      <i class="bi bi-eye me-2"></i>View history
+                    </button>
+                  <% } %>
+                  <% if (canDeleteAllChats) { %>
+                    <button
+                      type="button"
+                      class="btn btn-outline-danger btn-sm js-admin-delete-chat delete-btn"
+                      data-conv-id="<%= conv.id %>">
+                      <i class="bi bi-trash me-2"></i>Delete
+                    </button>
+                  <% } %>
+                </div>
+              </div>
+            <% } else { %>
+              <span class="text-muted small">—</span>
             <% } %>
           </td>
         </tr>
@@ -97,6 +133,57 @@
 </div>
 
 <%- include('../partials/tablePages-end') %>
+
+<div class="modal fade" id="adminOrphanAuditModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-xl">
+    <div class="modal-content border-0 shadow-lg">
+      <div class="modal-header border-0">
+        <div>
+          <h5 class="modal-title fw-bold mb-1">Orphan attachment audit</h5>
+          <div class="small text-muted" id="adminOrphanAuditSummary">Run an audit to find upload folders and files not referenced by conversations.</div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-0">
+        <div class="p-3 border-bottom bg-light d-flex flex-wrap gap-2 align-items-center">
+          <button type="button" class="btn btn-filled btn-primary btn-md" id="adminOrphanAuditRunBtn" onclick="adminRunOrphanAudit()"><i class="bi bi-search me-1"></i> Run audit</button>
+          <button type="button" class="btn btn-outline-secondary btn-md" onclick="adminOrphanAuditSelectAll(true)">Select all</button>
+          <button type="button" class="btn btn-outline-secondary btn-md" onclick="adminOrphanAuditSelectAll(false)">Clear selection</button>
+          <button type="button" class="btn btn-filled btn-danger btn-md ms-auto" id="adminOrphanAuditDeleteBtn" onclick="adminDeleteSelectedOrphans()" disabled>Delete selected</button>
+        </div>
+        <div id="adminOrphanAuditProgressWrap" class="px-3 py-2 border-bottom bg-white d-none" aria-live="polite">
+          <div class="d-flex align-items-center gap-3">
+            <div class="progress flex-grow-1" style="height: 0.55rem;">
+              <div id="adminOrphanAuditProgressBar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" style="width: 35%;" aria-valuenow="35" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            <span class="small text-muted text-nowrap" id="adminOrphanAuditProgressLabel">Preparing audit…</span>
+          </div>
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0" id="adminOrphanAuditTable">
+            <thead class="table-light">
+              <tr>
+                <th style="width:2.5rem;"></th>
+                <th>Kind</th>
+                <th>Conversation</th>
+                <th>Path / file</th>
+                <th>Size</th>
+                <th>Reason</th>
+                <th>Review</th>
+              </tr>
+            </thead>
+            <tbody id="adminOrphanAuditTableBody">
+              <tr><td colspan="7" class="text-center text-muted py-4">No audit results yet. Click <strong>Run audit</strong> to scan upload storage.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="modal-footer border-0 bg-light">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <div class="modal fade" id="adminChatViewModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg admin-chat-view-dialog">
@@ -211,6 +298,13 @@
         color: #495057;
     }
     .admin-chat-msg-text { white-space: pre-wrap; }
+    .admin-chat-msg-html { white-space: normal; }
+    .admin-chat-msg-html a { word-break: break-word; }
+    .admin-chat-msg-html.msg-system-content {
+        background: rgba(255, 255, 255, 0.45);
+        border-radius: 8px;
+        padding: 0.35rem 0.45rem;
+    }
     .admin-chat-bubble img {
         max-width: min(280px, 100%);
         height: auto;
@@ -266,6 +360,262 @@
 
 <script>
 const adminCanReviewHistory = <%= canReviewHistory ? 'true' : 'false' %>;
+const adminCanDeleteAll = <%= canDeleteAllChats ? 'true' : 'false' %>;
+let adminOrphanAuditRows = [];
+let adminOrphanAuditProgressTimer = null;
+
+function adminGetCsrfHeaders() {
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+  const headers = { 'Content-Type': 'application/json', Accept: 'application/json' };
+  if (csrfToken) {
+    headers['x-csrf-token'] = csrfToken;
+    headers['csrf-token'] = csrfToken;
+  }
+  return headers;
+}
+
+function adminFormatBytes(bytes) {
+    const value = Number(bytes) || 0;
+    if (!value) return '0 B';
+    const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1);
+    const scaled = value / Math.pow(1024, i);
+    return `${scaled.toFixed(i === 0 ? 0 : 2)} ${units[i]}`;
+}
+
+function adminNormalizeUploadRelativePath(value) {
+    return String(value || '').replace(/\\/g, '/').replace(/^\/+/, '').replace(/\/+$/, '').trim();
+}
+
+function adminBuildFileManagerHref(row) {
+    const kind = String(row?.kind || '').toLowerCase();
+    const fileName = adminNormalizeUploadRelativePath(row?.fileName);
+    const rawPath = adminNormalizeUploadRelativePath(row?.path || row?.relativePath || '');
+    let relative = rawPath;
+    if (kind === 'folder') {
+        relative = rawPath || adminNormalizeUploadRelativePath(`chat/${row?.conversationId || ''}`);
+    } else if (fileName) {
+        if (rawPath && (rawPath === fileName || rawPath.endsWith(`/${fileName}`))) {
+            relative = rawPath;
+        } else if (rawPath) {
+            relative = `${rawPath.replace(/\/+$/, '')}/${fileName}`;
+        } else if (row?.conversationId) {
+            relative = `chat/${row.conversationId}/${fileName}`;
+        }
+    }
+    if (!relative) return '/files';
+    const scopePath = /^global\//i.test(relative) ? relative : `GLOBAL/${relative}`;
+    return `/files?path=${encodeURIComponent(scopePath)}`;
+}
+
+function adminSetOrphanAuditProgress(active, label, percent) {
+    const wrap = document.getElementById('adminOrphanAuditProgressWrap');
+    const bar = document.getElementById('adminOrphanAuditProgressBar');
+    const lbl = document.getElementById('adminOrphanAuditProgressLabel');
+    if (wrap) wrap.classList.toggle('d-none', !active);
+    if (lbl && label) lbl.textContent = label;
+    if (bar) {
+        const pct = Math.max(5, Math.min(100, Number(percent) || 0));
+        bar.style.width = `${pct}%`;
+        bar.setAttribute('aria-valuenow', String(Math.round(pct)));
+        bar.classList.toggle('progress-bar-animated', active && pct < 100);
+        bar.classList.toggle('progress-bar-striped', active);
+    }
+}
+
+function adminStartOrphanAuditProgress() {
+    let pct = 10;
+    adminSetOrphanAuditProgress(true, 'Scanning upload folders…', pct);
+    adminOrphanAuditProgressTimer = window.setInterval(() => {
+        pct = Math.min(pct + Math.random() * 8 + 4, 92);
+        const label = pct < 55 ? 'Scanning upload folders…' : 'Matching message references…';
+        adminSetOrphanAuditProgress(true, label, pct);
+    }, 350);
+}
+
+function adminStopOrphanAuditProgress(success) {
+    if (adminOrphanAuditProgressTimer) {
+        window.clearInterval(adminOrphanAuditProgressTimer);
+        adminOrphanAuditProgressTimer = null;
+    }
+    if (success) {
+        adminSetOrphanAuditProgress(true, 'Audit complete.', 100);
+        window.setTimeout(() => adminSetOrphanAuditProgress(false), 600);
+        return;
+    }
+    adminSetOrphanAuditProgress(false);
+}
+
+function adminOpenOrphanAuditModal() {
+    if (!adminCanDeleteAll) return;
+    const modalEl = document.getElementById('adminOrphanAuditModal');
+    bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    adminSetOrphanAuditProgress(false);
+}
+
+function adminOrphanRowKey(row) {
+    if (row.kind === 'folder') return `folder:${row.conversationId}`;
+    return `file:${row.conversationId}:${row.fileName}`;
+}
+
+function adminRenderOrphanAuditTable() {
+    const tbody = document.getElementById('adminOrphanAuditTableBody');
+    const deleteBtn = document.getElementById('adminOrphanAuditDeleteBtn');
+    if (!tbody) return;
+    if (!adminOrphanAuditRows.length) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center text-muted py-4">No orphan attachments found.</td></tr>';
+        if (deleteBtn) deleteBtn.disabled = true;
+        return;
+    }
+    tbody.innerHTML = adminOrphanAuditRows.map((row) => {
+        const key = adminOrphanRowKey(row);
+        const label = row.kind === 'folder'
+            ? adminEscapeHtml(row.path || row.conversationId)
+            : adminEscapeHtml(row.fileName || '');
+        const reviewHref = adminEscapeHtml(adminBuildFileManagerHref(row));
+        const reviewLabel = row.kind === 'folder' ? 'Open folder' : 'Open file';
+        return `<tr data-orphan-key="${adminEscapeHtml(key)}">
+          <td><input type="checkbox" class="form-check-input admin-orphan-select" data-orphan-key="${adminEscapeHtml(key)}" checked></td>
+          <td>${adminEscapeHtml(row.kind)}</td>
+          <td class="font-monospace small">${adminEscapeHtml(row.conversationId || '')}</td>
+          <td class="small">${label}</td>
+          <td>${adminEscapeHtml(adminFormatBytes(row.sizeBytes))}</td>
+          <td class="small text-muted">${adminEscapeHtml(row.reason || '')}</td>
+          <td class="text-nowrap">
+            <a href="${reviewHref}" class="btn btn-outline-primary btn-sm" target="_blank" rel="noopener noreferrer" title="Review in File Manager">
+              <i class="bi bi-folder2-open me-1"></i>${reviewLabel}
+            </a>
+          </td>
+        </tr>`;
+    }).join('');
+    if (deleteBtn) deleteBtn.disabled = false;
+    tbody.querySelectorAll('.admin-orphan-select').forEach((input) => {
+        input.addEventListener('change', adminUpdateOrphanDeleteButtonState);
+    });
+    adminUpdateOrphanDeleteButtonState();
+}
+
+function adminUpdateOrphanDeleteButtonState() {
+    const deleteBtn = document.getElementById('adminOrphanAuditDeleteBtn');
+    const selected = document.querySelectorAll('#adminOrphanAuditTableBody .admin-orphan-select:checked');
+    if (deleteBtn) deleteBtn.disabled = selected.length === 0;
+}
+
+function adminOrphanAuditSelectAll(checked) {
+    document.querySelectorAll('#adminOrphanAuditTableBody .admin-orphan-select').forEach((input) => {
+        input.checked = !!checked;
+    });
+    adminUpdateOrphanDeleteButtonState();
+}
+
+async function adminRunOrphanAudit() {
+    const runBtn = document.getElementById('adminOrphanAuditRunBtn');
+    const summary = document.getElementById('adminOrphanAuditSummary');
+    const deleteBtn = document.getElementById('adminOrphanAuditDeleteBtn');
+    if (runBtn) runBtn.disabled = true;
+    if (deleteBtn) deleteBtn.disabled = true;
+    if (summary) summary.textContent = 'Running audit…';
+    adminStartOrphanAuditProgress();
+    let success = false;
+    try {
+        const resp = await fetch('/chat/admin/attachment-audit', { headers: { Accept: 'application/json' } });
+        const res = await resp.json();
+        if (res.status !== 'success') {
+            if (summary) summary.textContent = res.message || 'Audit failed.';
+            return;
+        }
+        const report = res.data || {};
+        const folders = Array.isArray(report.orphanConversationFolders) ? report.orphanConversationFolders : [];
+        const files = Array.isArray(report.orphanFiles) ? report.orphanFiles : [];
+        adminOrphanAuditRows = [...folders, ...files];
+        adminRenderOrphanAuditTable();
+        const totals = report.totals || {};
+        if (summary) {
+            summary.textContent = `${totals.orphanFolderCount || 0} orphan folder(s), ${totals.orphanFileCount || 0} orphan file(s), ${adminFormatBytes(totals.orphanTotalBytes)} total.`;
+        }
+        success = true;
+    } catch (err) {
+        console.error(err);
+        if (summary) summary.textContent = 'Error connecting to server.';
+    } finally {
+        adminStopOrphanAuditProgress(success);
+        if (runBtn) runBtn.disabled = false;
+    }
+}
+
+async function adminDeleteSelectedOrphans() {
+    const selectedKeys = new Set(
+        [...document.querySelectorAll('#adminOrphanAuditTableBody .admin-orphan-select:checked')]
+            .map((input) => input.getAttribute('data-orphan-key'))
+            .filter(Boolean)
+    );
+    if (!selectedKeys.size) return;
+
+    const selectedRows = adminOrphanAuditRows.filter((row) => selectedKeys.has(adminOrphanRowKey(row)));
+    const totalBytes = selectedRows.reduce((sum, row) => sum + (Number(row.sizeBytes) || 0), 0);
+    const confirmMessage = `Delete ${selectedRows.length} selected orphan item(s) (${adminFormatBytes(totalBytes)})? This cannot be undone.`;
+
+    let isConfirmed = false;
+    if (typeof window.showMessageModal === 'function') {
+        const result = await window.showMessageModal({
+            title: 'Delete orphan attachments',
+            icon: 'warning',
+            message: confirmMessage,
+            buttons: [
+                { text: 'Cancel', class: 'btn-secondary' },
+                { text: 'Delete', class: 'btn-danger' }
+            ]
+        });
+        if (result === 'Delete') isConfirmed = true;
+    } else {
+        isConfirmed = window.confirm(confirmMessage);
+    }
+    if (!isConfirmed) return;
+
+    const orphanFolderIds = selectedRows.filter((row) => row.kind === 'folder').map((row) => row.conversationId);
+    const orphanFiles = selectedRows.filter((row) => row.kind === 'file').map((row) => ({
+        convId: row.conversationId,
+        fileName: row.fileName
+    }));
+
+    try {
+        const resp = await fetch('/chat/admin/attachment-cleanup', {
+            method: 'POST',
+            headers: adminGetCsrfHeaders(),
+            body: JSON.stringify({
+                confirm: true,
+                orphanFolderIds,
+                orphanFiles
+            })
+        });
+        const res = await resp.json();
+        if (res.status !== 'success') {
+            const errMsg = res.message || 'Cleanup failed.';
+            if (typeof window.showMessageModal === 'function') {
+                await window.showMessageModal({ title: 'Error', icon: 'error', message: errMsg });
+            } else {
+                alert(errMsg);
+            }
+            return;
+        }
+        if (typeof window.showMessageModal === 'function') {
+            await window.showMessageModal({
+                title: 'Cleanup complete',
+                icon: 'success',
+                message: 'Selected orphan attachments were removed.',
+                buttons: [{ text: 'OK', class: 'btn-success' }]
+            });
+        }
+        await adminRunOrphanAudit();
+    } catch (err) {
+        console.error(err);
+        if (typeof window.showMessageModal === 'function') {
+            await window.showMessageModal({ title: 'Connection Error', icon: 'error', message: 'Error connecting to server.' });
+        } else {
+            alert('Error connecting to server.');
+        }
+    }
+}
 
 function adminEscapeHtml(value) {
     return String(value == null ? '' : value)
@@ -303,12 +653,47 @@ function formatAdminDayLabel(value) {
     return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function normalizeAdminMessageText(value) {
+    return String(value == null ? '' : value)
+        .replace(/\r\n/g, '\n')
+        .replace(/\r/g, '\n');
+}
+
+function isAdminLegacySystemHtmlMessage(content) {
+    const raw = String(content || '');
+    return /<(?:b|strong)>System Message:<\/(?:b|strong)>/i.test(raw)
+        && /<a\s+href=/i.test(raw);
+}
+
+function normalizeAdminLegacySystemHtml(content) {
+    return String(content || '')
+        .replace(/^[\s\S]*?(?=<(?:b|strong)>System Message)/i, '<i class="bi bi-pin-map-fill text-primary"></i> ')
+        .replace(/âž[\s\S]*?(?=Open Specific Note)/i, '<i class="bi bi-box-arrow-up-right"></i> ');
+}
+
+function adminSanitizeMessageHtml(html, options = {}) {
+    const raw = String(html || '');
+  const trusted = options.trusted === true;
+    if (window.DOMPurify && typeof window.DOMPurify.sanitize === 'function') {
+        return window.DOMPurify.sanitize(raw, { ADD_ATTR: ['target', 'rel', 'class', 'style'] });
+    }
+    return trusted ? raw : adminEscapeHtml(raw);
+}
+
+function adminMessageShouldRenderHtml(msg) {
+    const type = String(msg?.type || 'text').toLowerCase();
+    if (type === 'system') return true;
+    const content = String(msg?.content || '');
+    if (type === 'text' && isAdminLegacySystemHtmlMessage(content)) return true;
+    return /<[a-z][\s\S]*?>/i.test(content);
+}
+
 function buildAdminMessageContentHtml(msg, convId) {
     if (msg.deletedAt) {
         return '<div class="admin-chat-msg-text">Message deleted</div>';
     }
     if (msg.type === 'system') {
-        return `<div class="admin-chat-msg-text">${adminEscapeHtml(msg.content || 'System message')}</div>`;
+        return `<div class="admin-chat-msg-text admin-chat-msg-html msg-system-content">${adminSanitizeMessageHtml(msg.content || 'System message', { trusted: true })}</div>`;
     }
     if (msg.type === 'image') {
         const safeUrl = getAdminAttachmentUrl(convId, msg.fileUrl);
@@ -324,7 +709,45 @@ function buildAdminMessageContentHtml(msg, convId) {
         }
         return `<a href="${adminEscapeHtml(safeUrl)}" target="_blank" rel="noopener" class="admin-chat-file-link"><i class="bi bi-file-earmark-arrow-down fs-5 text-primary"></i><span><strong>Download attachment</strong><br><span class="small text-muted">Open secured file</span></span></a>`;
     }
-    return `<div class="admin-chat-msg-text">${adminEscapeHtml(msg.content || '')}</div>`;
+    const content = normalizeAdminMessageText(msg.content || '');
+    if (msg.type === 'text' && isAdminLegacySystemHtmlMessage(content)) {
+        return `<div class="admin-chat-msg-text admin-chat-msg-html msg-system-content">${adminSanitizeMessageHtml(normalizeAdminLegacySystemHtml(content), { trusted: true })}</div>`;
+    }
+    if (adminMessageShouldRenderHtml(msg)) {
+        return `<div class="admin-chat-msg-text admin-chat-msg-html">${adminSanitizeMessageHtml(content)}</div>`;
+    }
+    return `<div class="admin-chat-msg-text">${adminEscapeHtml(content)}</div>`;
+}
+
+function adminDecodeParticipantsAttr(value) {
+    try {
+        return decodeURIComponent(String(value || ''));
+    } catch (_) {
+        return String(value || '');
+    }
+}
+
+async function adminFetchAllMessages(convId) {
+    const collected = [];
+    let before = null;
+    let guard = 0;
+    while (guard++ < 50) {
+        const query = new URLSearchParams({ limit: '100' });
+        if (before) query.set('before', before);
+        // eslint-disable-next-line no-await-in-loop
+        const resp = await fetch(`/chat/messages/${encodeURIComponent(convId)}?${query.toString()}`);
+        // eslint-disable-next-line no-await-in-loop
+        const res = await resp.json();
+        if (res.status !== 'success') {
+            return { ok: false, message: res.message || 'Unknown error', messages: collected };
+        }
+        const page = Array.isArray(res.data) ? res.data : [];
+        collected.unshift(...page);
+        const pagination = res.pagination || {};
+        if (!pagination.hasMore || !pagination.oldestId) break;
+        before = pagination.oldestId;
+    }
+    return { ok: true, messages: collected };
 }
 
 function renderAdminChatTranscript(container, messages, convId) {
@@ -393,7 +816,7 @@ function renderAdminChatTranscript(container, messages, convId) {
 }
 
 function removeConversationRowFromTable(convId) {
-    const table = document.getElementById('chat-table');
+    const table = document.getElementById('first-table');
     const tbody = table?.querySelector('tbody');
     if (!tbody) return;
     tbody.querySelector(`tr[data-conversation-id="${CSS.escape(String(convId))}"]`)?.remove();
@@ -419,15 +842,12 @@ async function adminViewChat(convId, participants) {
     bsModal.show();
 
     try {
-        const resp = await fetch(`/chat/messages/${encodeURIComponent(convId)}`);
-        const res = await resp.json();
-
-        if (res.status !== 'success') {
-            container.innerHTML = `<div class="p-4"><div class="alert alert-danger mb-0">Failed to load messages: ${adminEscapeHtml(res.message || 'Unknown error')}</div></div>`;
+        const history = await adminFetchAllMessages(convId);
+        if (!history?.ok) {
+            container.innerHTML = `<div class="p-4"><div class="alert alert-danger mb-0">Failed to load messages: ${adminEscapeHtml(history?.message || 'Unknown error')}</div></div>`;
             return;
         }
-
-        const messages = Array.isArray(res.data) ? res.data : [];
+        const messages = Array.isArray(history.messages) ? history.messages : [];
         metaEl.textContent = `${messages.length} message${messages.length === 1 ? '' : 's'}`;
 
         if (!messages.length) {
@@ -441,6 +861,29 @@ async function adminViewChat(convId, participants) {
         container.innerHTML = '<div class="p-4"><div class="alert alert-danger mb-0">Error connecting to server.</div></div>';
     }
 }
+
+document.addEventListener('click', (event) => {
+    const participantLink = event.target.closest('.admin-chat-participants-link');
+    if (participantLink) {
+        if (!adminCanReviewHistory) return;
+        const convId = participantLink.getAttribute('data-conv-id');
+        const participants = adminDecodeParticipantsAttr(participantLink.getAttribute('data-participants'));
+        if (convId) adminViewChat(convId, participants);
+        return;
+    }
+    const viewBtn = event.target.closest('.js-admin-view-chat');
+    if (viewBtn) {
+        const convId = viewBtn.getAttribute('data-conv-id');
+        const participants = adminDecodeParticipantsAttr(viewBtn.getAttribute('data-participants'));
+        if (convId) adminViewChat(convId, participants);
+        return;
+    }
+    const deleteBtn = event.target.closest('.js-admin-delete-chat');
+    if (deleteBtn) {
+        const convId = deleteBtn.getAttribute('data-conv-id');
+        if (convId) adminDeleteChat(convId);
+    }
+});
 
 async function adminDeleteChat(convId) {
     let isConfirmed = false;

@@ -399,6 +399,12 @@ In multi-select mode the only operation is Delete. The server validates every se
 - `DELETE_ALL` remains global and still includes broadcast authority until a dedicated broadcast operation is added.
 - Soft-deleted attachment references are removed from the message, and the guarded attachment route rejects direct URLs that no longer have an active message reference.
 
+### Attachment storage operations (admin)
+
+- Deleting a conversation removes its configured `core.chat` upload folder(s) and legacy `chat/{conversationId}` storage when local fallback is enabled.
+- Two-sided message delete clears `fileUrl` in the database and deletes on-disk files when no other active message still references the same basename.
+- Conversation Management (`/chat/list`) exposes an **Audit orphan attachments** action for users with `DELETE_ALL`; audit requires conversation list review plus `READ_ALL`, and cleanup records review audit events.
+
 ## Implementation References
 
 - `MVC/services/chatAccessService.js`: operation evaluation and conversation/file/delete authorization.

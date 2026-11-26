@@ -48,6 +48,8 @@ test('list view wires review modal and button', () => {
   assert.match(list, /btnWordOfDayReview/);
   assert.match(list, /wordOfDayReviewModal/);
   assert.match(list, /wordOfDayReviewModal\.js/);
+  assert.match(list, /wordOfDayRejectionReasonModal/);
+  assert.match(list, /rejectionReasonModal/);
   assert.match(list, /partials\/entryModal/);
   assert.match(list, /btn-row-actions-toggle/);
   assert.match(list, /partials\/pagination|pagination,/);

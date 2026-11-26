@@ -2,7 +2,9 @@
 
 const schoolRepositories = require('../../repositories/school');
 const wordOfDayModel = require('../../models/school/wordOfDayModel');
+const wordOfDayPolicyModel = require('../../models/school/wordOfDayPolicyModel');
 const wordOfDayAccessService = require('./wordOfDayAccessService');
+const wordOfDayRejectionChatService = require('./wordOfDayRejectionChatService');
 const wordOfDayReviewFilter = require('./wordOfDayReviewFilter');
 const personDisplayNameService = require('./personDisplayNameService');
 const schoolFileService = require('./schoolFileService');
@@ -239,6 +241,45 @@ function assertNoDuplicateWord(orgId, word, excludeId = '') {
   });
 }
 
+function isContributionQuotaExempt(access) {
+  return Boolean(access?.adminFlags?.create);
+}
+
+async function countAuthorContributionsForYear(orgId, authorUserId, year) {
+  const targetAuthor = toPublicId(authorUserId);
+  const targetYear = String(year || '').trim();
+  if (!targetAuthor || !targetYear) return 0;
+  const rows = await listWordOfDayRepositoryRows({ orgId: String(orgId || '').trim() });
+  const list = Array.isArray(rows) ? rows : (rows?.items || []);
+  return list.filter((row) => {
+    const aid = toPublicId(row?.authorUserId || row?.audit?.createdBy || '');
+    if (!idsEqual(aid, targetAuthor)) return false;
+    return yearFromAudit(row) === targetYear;
+  }).length;
+}
+
+async function assertContributionQuota(reqUser, body, access) {
+  if (isContributionQuotaExempt(access)) return;
+  const orgId = getActiveOrgId(reqUser);
+  if (!orgId) return;
+  const policy = await wordOfDayPolicyModel.getPolicyForOrg(orgId);
+  const limit = Number(policy?.yearlyContributionLimitPerUser || 0);
+  if (!limit) return;
+  const authorName = await getActorName(reqUser);
+  const authorPayload = buildAuthorPayload(reqUser, authorName, body, access);
+  const year = currentCalendarYear();
+  const count = await countAuthorContributionsForYear(orgId, authorPayload.authorUserId, year);
+  if (count >= limit) {
+    const error = new Error(`You have reached the yearly contribution limit (${limit} entries in ${year}).`);
+    error.code = 'WORD_OF_DAY_QUOTA_EXCEEDED';
+    error.statusCode = 403;
+    error.limit = limit;
+    error.count = count;
+    error.year = year;
+    throw error;
+  }
+}
+
 async function createEntry(reqUser, body, { saveAs = 'saved', access = null } = {}) {
   assertCreateAllowed(access);
   const orgId = getActiveOrgId(reqUser);
@@ -248,6 +289,7 @@ async function createEntry(reqUser, body, { saveAs = 'saved', access = null } = 
     throw error;
   }
   await assertNoDuplicateWord(orgId, body?.word);
+  await assertContributionQuota(reqUser, body, access);
   const authorName = await getActorName(reqUser);
   const status = saveAs === 'submitted' ? 'submitted' : 'saved';
   const now = new Date().toISOString();
@@ -323,6 +365,14 @@ async function updateEntry(reqUser, id, body, { saveAs, access = null } = {}) {
 
   const now = new Date().toISOString();
   const workflow = { ...(existing.workflow || {}) };
+  if (body?.clearWorkflowNote === true) {
+    if (!access?.canClearWorkflowNote) {
+      const error = new Error('You do not have permission to remove the workflow note.');
+      error.statusCode = 403;
+      throw error;
+    }
+    workflow.reviewerNote = '';
+  }
   if (saveAs === 'submitted') {
     Object.assign(workflow, {
       submittedAt: now,
@@ -389,11 +439,21 @@ async function transitionEntry(reqUser, id, targetStatus, access, options = {}) 
       submittedByName: reviewerName
     });
   }
-  return schoolRepositories.wordOfDay.update(id, {
+  const updated = await schoolRepositories.wordOfDay.update(id, {
     status: to,
     workflow,
     audit: { updatedBy: actorId }
   }, { orgId });
+  if (to === 'rejected') {
+    try {
+      await wordOfDayRejectionChatService.notifyAuthorWordRejected(updated, {
+        note: workflow.reviewerNote
+      });
+    } catch (chatErr) {
+      console.error('Word of Day rejection chat notification failed:', chatErr?.message || chatErr);
+    }
+  }
+  return updated;
 }
 
 async function submitEntry(reqUser, id, access, options = {}) {
@@ -522,7 +582,9 @@ function buildEntryCapabilities(entry, access, reqUser) {
     canHold: wordOfDayAccessService.canResolveTransition(entry, 'on_hold', access, actorId, year),
     canArchive: wordOfDayAccessService.canResolveTransition(entry, 'archived', access, actorId, year),
     canDelete: wordOfDayAccessService.canDeleteEntry(entry, access, actorId, year),
-    hasDisplayHistory: wordOfDayAccessService.hasDisplayHistory(entry)
+    hasDisplayHistory: wordOfDayAccessService.hasDisplayHistory(entry),
+    canClearWorkflowNote: Boolean(access?.canClearWorkflowNote),
+    hasWorkflowNote: Boolean(String(entry?.workflow?.reviewerNote || '').trim())
   };
 }
 
@@ -581,7 +643,10 @@ module.exports = {
   archiveEntry,
   deleteEntry,
   summarizeAuthorStats,
+  countAuthorContributionsForYear,
+  isContributionQuotaExempt,
   buildEntryCapabilities,
   validateUploadedFile,
-  getActiveOrgId
+  getActiveOrgId,
+  currentCalendarYear
 };

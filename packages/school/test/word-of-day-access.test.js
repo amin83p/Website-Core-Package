@@ -102,6 +102,24 @@ test('canSubmitEntryViaSave owner and org tiers', () => {
   assert.equal(wordOfDayAccessService.canSubmitEntryViaSave(submittedMine, orgUpdateAccess, 'U1', '2026'), true);
 });
 
+test('canClearWorkflowNote mirrors canChangeAuthorOnEdit (Family A and admin update scope)', () => {
+  const adminUpdate = wordOfDayOperationPolicyService.deriveAccessFlags({
+    update: { allowed: true, scopeId: 'SCP_ADMIN' }
+  }, {});
+  assert.equal(adminUpdate.canClearWorkflowNote, true);
+  assert.equal(adminUpdate.canClearWorkflowNote, adminUpdate.canChangeAuthorOnEdit);
+
+  const bypass = wordOfDayOperationPolicyService.deriveAccessFlags({
+    update: { allowed: true, scopeId: 'SCP_OWNER' }
+  }, { update: true });
+  assert.equal(bypass.canClearWorkflowNote, true);
+
+  const ownerUpdate = wordOfDayOperationPolicyService.deriveAccessFlags({
+    update: { allowed: true, scopeId: 'SCP_OWNER' }
+  }, {});
+  assert.equal(ownerUpdate.canClearWorkflowNote, false);
+});
+
 test('canChangeAuthorOnEdit for Family A bypass and Family B admin update', () => {
   const adminUpdate = wordOfDayOperationPolicyService.deriveAccessFlags({
     update: { allowed: true, scopeId: 'SCP_ADMIN' }

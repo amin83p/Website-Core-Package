@@ -3,6 +3,9 @@
 const crypto = require('crypto');
 const schoolRepositories = require('../../repositories/school');
 const wordOfDayModel = require('../../models/school/wordOfDayModel');
+const wordOfDayPolicyService = require('./wordOfDayPolicyService');
+const wordOfDayDisplayScheduleService = require('./wordOfDayDisplayScheduleService');
+const wordOfDayPolicyModel = require('../../models/school/wordOfDayPolicyModel');
 const { enrichEntryMedia } = require('./wordOfDayService');
 const { SCOPE_MODES } = require('./schoolDataScopeBuilder');
 const { requireCoreModule } = require('./schoolCoreModuleResolver');
@@ -49,14 +52,29 @@ function authorFirstName(authorName = '') {
   return token || '';
 }
 
-function redactForDisplay(row) {
+function applyDisplayPolicy(entry, policy = null) {
+  if (!entry || typeof entry !== 'object') return entry;
+  const resolved = wordOfDayPolicyService.resolvePolicy(policy || {});
+  const next = { ...entry };
+  if (!resolved.showAuthorOnDisplay) {
+    next.authorName = '';
+    next.authorFirstName = '';
+  }
+  if (!resolved.showDifficultyOnDisplay) {
+    next.difficulty = '';
+    next.difficultyLabel = '';
+  }
+  return next;
+}
+
+function redactForDisplay(row, policy = null) {
   if (!row) return null;
   const wordTypes = Array.isArray(row.wordTypes) && row.wordTypes.length
     ? row.wordTypes
     : (row.wordType ? [row.wordType] : []);
   const typeLabels = wordTypes.map((key) => wordOfDayModel.WORD_TYPE_LABELS[key] || key).filter(Boolean);
   const authorName = String(row.authorName || '').trim();
-  return {
+  const base = {
     id: row.id,
     word: row.word,
     wordTypes,
@@ -70,11 +88,12 @@ function redactForDisplay(row) {
     authorFirstName: authorFirstName(authorName),
     status: row.status
   };
+  return applyDisplayPolicy(base, policy);
 }
 
-function redactForPublicDetail(row) {
+function redactForPublicDetail(row, policy = null) {
   if (!row || String(row.status || '').toLowerCase() !== 'approved') return null;
-  const base = redactForDisplay(row);
+  const base = redactForDisplay(row, policy);
   if (!base) return null;
   const enriched = enrichEntryMedia(row);
   const examples = Array.isArray(enriched.examples)
@@ -121,34 +140,48 @@ async function recordDisplayForDate(row, orgId, dateKey) {
   return schoolRepositories.wordOfDay.update(row.id, { display: nextDisplay }, { orgId: String(orgId || '').trim() });
 }
 
-async function resolveDailyDisplay({ orgId, dateKey, recordAnalytics = true }) {
-  const targetOrgId = String(orgId || '').trim();
-  const targetDate = String(dateKey || '').trim();
-  if (!targetOrgId || !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
-    return { orgId: targetOrgId, dateKey: targetDate, entry: null };
-  }
-  const approved = await listApprovedForOrg(targetOrgId);
-  let picked = pickDailyEntry(approved, targetOrgId, targetDate);
-  if (!picked) return { orgId: targetOrgId, dateKey: targetDate, entry: null };
-  if (recordAnalytics) {
-    picked = await recordDisplayForDate(picked, targetOrgId, targetDate);
-  }
-  return { orgId: targetOrgId, dateKey: targetDate, entry: redactForDisplay(picked) };
+async function pickEntryForDate(orgId, dateKey) {
+  const scheduled = await wordOfDayDisplayScheduleService.resolveScheduledEntryId(orgId, dateKey);
+  if (scheduled) return scheduled;
+  const approved = await listApprovedForOrg(orgId);
+  return pickDailyEntry(approved, orgId, dateKey);
 }
 
-async function resolveDailyPublicDetail({ orgId, dateKey, recordAnalytics = true }) {
+async function resolvePolicyForOrg(orgId, policy) {
+  if (policy && typeof policy === 'object') {
+    return wordOfDayPolicyService.resolvePolicy(policy);
+  }
+  return wordOfDayPolicyModel.getPolicyForOrg(orgId);
+}
+
+async function resolveDailyDisplay({ orgId, dateKey, recordAnalytics = true, policy = null }) {
   const targetOrgId = String(orgId || '').trim();
   const targetDate = String(dateKey || '').trim();
   if (!targetOrgId || !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
     return { orgId: targetOrgId, dateKey: targetDate, entry: null };
   }
-  const approved = await listApprovedForOrg(targetOrgId);
-  let picked = pickDailyEntry(approved, targetOrgId, targetDate);
+  const displayPolicy = await resolvePolicyForOrg(targetOrgId, policy);
+  let picked = await pickEntryForDate(targetOrgId, targetDate);
   if (!picked) return { orgId: targetOrgId, dateKey: targetDate, entry: null };
   if (recordAnalytics) {
     picked = await recordDisplayForDate(picked, targetOrgId, targetDate);
   }
-  return { orgId: targetOrgId, dateKey: targetDate, entry: redactForPublicDetail(picked) };
+  return { orgId: targetOrgId, dateKey: targetDate, entry: redactForDisplay(picked, displayPolicy) };
+}
+
+async function resolveDailyPublicDetail({ orgId, dateKey, recordAnalytics = true, policy = null }) {
+  const targetOrgId = String(orgId || '').trim();
+  const targetDate = String(dateKey || '').trim();
+  if (!targetOrgId || !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+    return { orgId: targetOrgId, dateKey: targetDate, entry: null };
+  }
+  const displayPolicy = await resolvePolicyForOrg(targetOrgId, policy);
+  let picked = await pickEntryForDate(targetOrgId, targetDate);
+  if (!picked) return { orgId: targetOrgId, dateKey: targetDate, entry: null };
+  if (recordAnalytics) {
+    picked = await recordDisplayForDate(picked, targetOrgId, targetDate);
+  }
+  return { orgId: targetOrgId, dateKey: targetDate, entry: redactForPublicDetail(picked, displayPolicy) };
 }
 
 async function getApprovedEntryRowById(id) {
@@ -166,6 +199,8 @@ async function getEntryById(id) {
 module.exports = {
   hashSeed,
   pickDailyEntry,
+  pickEntryForDate,
+  applyDisplayPolicy,
   redactForDisplay,
   redactForPublicDetail,
   resolveDailyDisplay,

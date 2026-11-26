@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const chatModel = require('../models/chatModel');
 const { toPublicId, idsEqual } = require('../utils/idAdapter');
 const { assertQueryableCrudRepository } = require('./contracts/crudRepositoryContract');
@@ -401,6 +403,11 @@ const chatRepository = {
         const messages = Array.isArray(row?.messages) ? row.messages : [];
         const found = messages.filter((message) => ids.some((id) => idsEqual(message?.id, id)));
         if (found.length !== ids.length) throw new Error('One or more messages were not found.');
+        const deletedMessages = found.map((message) => ({
+          id: message?.id,
+          fileUrl: message?.fileUrl || null,
+          type: message?.type || 'text'
+        }));
         const now = new Date().toISOString();
         const scopeMode = chatMessageVisibilityService.normalizeScopeMode(deleteOptions?.scopeMode);
         const deleterId = toPublicId(deleteOptions?.deletedByUserId);
@@ -450,7 +457,8 @@ const chatRepository = {
           messageIds: ids,
           deletedAt: now,
           deletionMode: twoSided ? 'two-sided' : 'one-sided',
-          scopeMode
+          scopeMode,
+          deletedMessages
         };
       }
     }, 'core.chat.softDeleteMessages');
@@ -604,6 +612,41 @@ const chatRepository = {
         )).length;
       }
     }, 'core.chat.countSentMessagesByUser');
+  },
+
+  async getMessageStorageBytes(convId, options = {}) {
+    const id = String(convId || '').trim();
+    if (!id) return 0;
+    return runByRepositoryBackend(options, {
+      json: async () => {
+        const msgPath = path.join(__dirname, '../../data/messages/', `${id}.json`);
+        try {
+          if (fs.existsSync(msgPath)) {
+            return fs.statSync(msgPath).size;
+          }
+        } catch (_) {
+          /* missing */
+        }
+        return 0;
+      },
+      mongo: async () => {
+        const collection = getMongoCollection('chatConversations');
+        const matchFilter = resolveMongoIdFilter(id);
+        try {
+          const rows = await collection.aggregate([
+            { $match: matchFilter },
+            { $project: { messageBytes: { $bsonSize: { $ifNull: ['$messages', []] } } } }
+          ]).toArray();
+          const sized = Number(rows[0]?.messageBytes);
+          if (Number.isFinite(sized) && sized >= 0) return sized;
+        } catch (_) {
+          /* fall back below */
+        }
+        const row = await collection.findOne(matchFilter, { projection: { messages: 1 } });
+        const messages = Array.isArray(row?.messages) ? row.messages : [];
+        return Buffer.byteLength(JSON.stringify(messages), 'utf8');
+      }
+    }, 'core.chat.getMessageStorageBytes');
   }
 };
 
