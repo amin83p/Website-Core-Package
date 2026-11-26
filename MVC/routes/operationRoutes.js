@@ -21,9 +21,18 @@ router.post('/import',
     operationsImport.startImport
 );
 
-router.get('/import/stream/:jobId', operationsImport.streamImportStatus);
-router.post('/import/abort/:jobId', operationsImport.abortImport);
-router.get('/import/report/:jobId', operationsImport.downloadImportReport);
+router.get('/import/stream/:jobId',
+  requireAuth,
+  requireAccess(SECTIONS.OPERATIONS, OPERATIONS.IMPORT),
+  operationsImport.streamImportStatus);
+router.post('/import/abort/:jobId',
+  requireAuth,
+  requireAccess(SECTIONS.OPERATIONS, OPERATIONS.IMPORT),
+  operationsImport.abortImport);
+router.get('/import/report/:jobId',
+  requireAuth,
+  requireAccess(SECTIONS.OPERATIONS, OPERATIONS.IMPORT),
+  operationsImport.downloadImportReport);
 
 // Export
 router.post('/export', 

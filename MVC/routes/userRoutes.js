@@ -93,9 +93,18 @@ router.post('/import',
     usersImportCtrl.startImport
 );
 
-router.get('/import/stream/:jobId', usersImportCtrl.streamImportStatus);
-router.post('/import/abort/:jobId', usersImportCtrl.abortImport);
-router.get('/import/report/:jobId', usersImportCtrl.downloadImportReport);
+router.get('/import/stream/:jobId',
+  requireAuth,
+  requireAccess(SECTIONS.USERS, OPERATIONS.IMPORT),
+  usersImportCtrl.streamImportStatus);
+router.post('/import/abort/:jobId',
+  requireAuth,
+  requireAccess(SECTIONS.USERS, OPERATIONS.IMPORT),
+  usersImportCtrl.abortImport);
+router.get('/import/report/:jobId',
+  requireAuth,
+  requireAccess(SECTIONS.USERS, OPERATIONS.IMPORT),
+  usersImportCtrl.downloadImportReport);
 
 // Export
 router.post('/export', 

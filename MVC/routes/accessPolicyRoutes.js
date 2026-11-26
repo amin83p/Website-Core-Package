@@ -20,8 +20,16 @@ router.get('/check-user/:userId', requireAuth,
     ctrl.checkUserPolicy);
 
 // 2. Access Checker Tool (Diagnostic Page)
-router.get('/checker', requireAuth, ctrl.showAccessChecker);
-router.post('/checker/test', requireAuth, ctrl.performAccessCheck);
+router.get('/checker',
+  requireAuth,
+  requireAccess(SECTIONS.DEBUG_ACCESS_SIMULATOR, OPERATIONS.READ),
+  trackActionState(SECTIONS.DEBUG_ACCESS_SIMULATOR, OPERATIONS.READ),
+  ctrl.showAccessChecker);
+router.post('/checker/test',
+  requireAuth,
+  requireAccess(SECTIONS.DEBUG_ACCESS_SIMULATOR, OPERATIONS.READ),
+  trackActionState(SECTIONS.DEBUG_ACCESS_SIMULATOR, OPERATIONS.READ),
+  ctrl.performAccessCheck);
 
 // 3. Protected CRUD
 router.get('/', requireAuth, 
@@ -59,9 +67,18 @@ router.post('/import', requireAuth,
     requireAccess(SECTIONS.ACCESS_POLICIES, OPERATIONS.IMPORT), 
     trackActionState(SECTIONS.ACCESS_POLICIES, OPERATIONS.IMPORT), 
     adminApproval, upload('imports').single('importFile'), importCtrl.startImport);
-router.get('/import/stream/:jobId', requireAuth, importCtrl.streamImportStatus);
-router.post('/import/abort/:jobId', requireAuth, importCtrl.abortImport);
-router.get('/import/report/:jobId', requireAuth, importCtrl.downloadImportReport);
+router.get('/import/stream/:jobId',
+  requireAuth,
+  requireAccess(SECTIONS.ACCESS_POLICIES, OPERATIONS.IMPORT),
+  importCtrl.streamImportStatus);
+router.post('/import/abort/:jobId',
+  requireAuth,
+  requireAccess(SECTIONS.ACCESS_POLICIES, OPERATIONS.IMPORT),
+  importCtrl.abortImport);
+router.get('/import/report/:jobId',
+  requireAuth,
+  requireAccess(SECTIONS.ACCESS_POLICIES, OPERATIONS.IMPORT),
+  importCtrl.downloadImportReport);
 
 router.post('/export', requireAuth, 
     requireAccess(SECTIONS.ACCESS_POLICIES, OPERATIONS.EXPORT), 

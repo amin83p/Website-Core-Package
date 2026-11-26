@@ -165,7 +165,7 @@ async function editOperation(req, res) {
 
 async function deleteOperation(req, res) {
   try {
-    const result = await dataService.deleteData('operations',req.params.id);
+    const result = await dataService.deleteData('operations', req.params.id, req.user);
     invalidateOperationsCatalog();
     if (req.headers['x-ajax-request']) {
       return res.json({ status: 'success', result, message: 'Operation deleted successfully.' });

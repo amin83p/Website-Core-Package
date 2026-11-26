@@ -11,7 +11,11 @@ const { trackActionState } = require('../middleware/actionStateMiddleware');
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 
 // 1. AJAX Check
-router.get('/check-org/:orgId', requireAuth, ctrl.checkOrgPolicy);
+router.get('/check-org/:orgId',
+  requireAuth,
+  requireAccess(SECTIONS.ORGANIZATION_POLICIES, OPERATIONS.READ),
+  trackActionState(SECTIONS.ORGANIZATION_POLICIES, OPERATIONS.READ),
+  ctrl.checkOrgPolicy);
 
 // 2. CRUD
 router.get('/', 

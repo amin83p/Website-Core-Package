@@ -19,9 +19,18 @@ router.post('/import', requireAuth,
     adminApproval, 
     upload('imports').single('importFile'), 
     scopesImport.startImport);
-router.get('/import/stream/:jobId', scopesImport.streamImportStatus);
-router.post('/import/abort/:jobId', scopesImport.abortImport);
-router.get('/import/report/:jobId', scopesImport.downloadImportReport);
+router.get('/import/stream/:jobId',
+  requireAuth,
+  requireAccess(SECTIONS.SCOPES, OPERATIONS.IMPORT),
+  scopesImport.streamImportStatus);
+router.post('/import/abort/:jobId',
+  requireAuth,
+  requireAccess(SECTIONS.SCOPES, OPERATIONS.IMPORT),
+  scopesImport.abortImport);
+router.get('/import/report/:jobId',
+  requireAuth,
+  requireAccess(SECTIONS.SCOPES, OPERATIONS.IMPORT),
+  scopesImport.downloadImportReport);
 
 // Export
 router.post('/export', requireAuth, 

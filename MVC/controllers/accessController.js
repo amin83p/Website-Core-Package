@@ -273,8 +273,8 @@ async function deleteAccess(req, res) {
     try {
         const existing = await dataService.getDataById('accesses', req.params.id, req.user);
         if (!existing) throw new Error('Access Definition not found');
-    
-        const results = await dataService.deleteData('accesses', req.params.id);
+
+        const results = await dataService.deleteData('accesses', req.params.id, req.user);
         await invalidateAuthContextForAccessProfileId(req.params.id);
         if (req.headers['x-ajax-request']) {
           return res.json({ status: 'success', results, message: 'Access Definition Deleted successfully.' });

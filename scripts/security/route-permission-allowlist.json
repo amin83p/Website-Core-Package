@@ -1,0 +1,39 @@
+{
+  "files": [
+    "MVC/routes/authRoutes.js",
+    "MVC/routes/homeRoutes.js",
+    "MVC/routes/addressRoutes.js",
+    "MVC/routes/sessionRoutes.js",
+    "MVC/routes/dashboardRoutes.js",
+    "MVC/routes/profileRoutes.js",
+    "MVC/routes/chatRoutes.js",
+    "MVC/routes/packageEvolutionRoutes.js",
+    "MVC/routes/securityRoutes.js",
+    "MVC/routes/docsRoutes.js",
+    "MVC/routes/styleRoutes.js",
+    "MVC/routes/restrictedRoutes.js",
+    "MVC/routes/internal/fileGatewayRoutes.js",
+    "MVC/routes/actionStateRoutes.js",
+    "packages/school/MVC/routes/enrollmentClaimRoutes.js",
+    "MVC/routes/activityQuota/activityQuotaMainRoute.js",
+    "MVC/routes/emailManagementRoutes.js",
+    "packages/school/MVC/routes/schoolRoutes.js",
+    "packages/ielts/MVC/routes/ieltsRoutes.js",
+    "packages/ielts/MVC/routes/ieltsMainRoute.js",
+    "packages/benchpath/MVC/routes/benchpath/benchpathRoutes.js",
+    "packages/benchpath/MVC/routes/benchpath/benchpathMainRoute.js"
+  ],
+  "routes": [
+    { "file": "MVC/routes/newsRoutes.js", "method": "GET", "routePath": "/" },
+    { "file": "MVC/routes/newsRoutes.js", "method": "GET", "routePath": "/article/:idOrSlug" },
+    { "file": "MVC/routes/newsRoutes.js", "method": "GET", "routePath": "/manage/article/:idOrSlug" },
+    { "file": "MVC/routes/personRoutes.js", "method": "GET", "routePath": "/register" },
+    { "file": "MVC/routes/personRoutes.js", "method": "POST", "routePath": "/register" },
+    { "file": "MVC/routes/personRoutes.js", "method": "GET", "routePath": "/join" },
+    { "file": "MVC/routes/personRoutes.js", "method": "POST", "routePath": "/join" },
+    { "file": "MVC/routes/sectionRoutes.js", "method": "GET", "routePath": "/quick-menu" },
+    { "file": "MVC/routes/sectionRoutes.js", "method": "GET", "routePath": "/start-menu" },
+    { "file": "MVC/routes/systemSettingsRoutes.js", "method": "GET", "routePath": "/" }
+  ],
+  "routePatterns": []
+}

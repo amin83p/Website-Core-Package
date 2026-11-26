@@ -1,0 +1,16 @@
+{
+  "allowedUnresolved": [
+    "LOG_ARCHIVE_EXTRACTOR",
+    "LOG_ARCHIVE_ANALYZER",
+    "DASHBOARD",
+    "ACTIVE_USERS",
+    "SUBSCRIPTION_GROUPS",
+    "DEBUG_ACCESS_SIMULATOR",
+    "DEBUG_ACCESS_AUDITOR",
+    "DEBUG_INTEGRITY_AUDITOR",
+    "DEBUG_USER_PERSON_CHECKER",
+    "DEBUG_USER_SESSION_INSPECTOR",
+    "DEBUG_HEIC_CONVERTER"
+  ],
+  "note": "Tokens not present in data/sections.json static snapshot but used at runtime or via dashboard/meta sections."
+}

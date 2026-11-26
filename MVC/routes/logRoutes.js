@@ -36,8 +36,8 @@ router.get('/delete-all',
 //router.post('/export', requireAuth, adminApproval, ctrl.exportActivityLog);
 router.post('/export', 
             requireAuth, 
-            requireAccess(SECTIONS.SECTIONS, OPERATIONS.EXPORT), 
-            trackActionState(SECTIONS.SECTIONS, OPERATIONS.EXPORT), 
+            requireAccess(SECTIONS.LOGS, OPERATIONS.EXPORT), 
+            trackActionState(SECTIONS.LOGS, OPERATIONS.EXPORT), 
             adminApproval, 
             generalExportCtrl.performExport);
 

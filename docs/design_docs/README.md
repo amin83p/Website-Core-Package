@@ -4,6 +4,8 @@ Canonical design references for **access profiles**, architecture, and cross-cut
 
 **Machine-readable index:** [access-definition-catalog.json](access-definition-catalog.json) (validated by `npm run design-docs:validate-catalog`).
 
+**Route permission conventions:** [../security/route-permissions.md](../security/route-permissions.md) (`npm run security:audit:routes`, `npm run test:security:access`).
+
 **In-app browsing:** Documentation Center (`/docs`) → folder `design_docs` → this README.
 
 ---

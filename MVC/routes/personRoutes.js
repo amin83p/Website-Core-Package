@@ -105,9 +105,18 @@ router.post('/import',
     personsImportCtrl.startImport
 );
 
-router.get('/import/stream/:jobId', requireAuth, personsImportCtrl.streamImportStatus);
-router.post('/import/abort/:jobId', requireAuth, personsImportCtrl.abortImport);
-router.get('/import/report/:jobId', requireAuth, personsImportCtrl.downloadImportReport);
+router.get('/import/stream/:jobId',
+  requireAuth,
+  requireAccess(SECTIONS.PERSONS, OPERATIONS.IMPORT),
+  personsImportCtrl.streamImportStatus);
+router.post('/import/abort/:jobId',
+  requireAuth,
+  requireAccess(SECTIONS.PERSONS, OPERATIONS.IMPORT),
+  personsImportCtrl.abortImport);
+router.get('/import/report/:jobId',
+  requireAuth,
+  requireAccess(SECTIONS.PERSONS, OPERATIONS.IMPORT),
+  personsImportCtrl.downloadImportReport);
 
 // Export
 // ✅ CLEAN: Removed { requireToken: false } 

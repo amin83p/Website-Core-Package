@@ -3,19 +3,47 @@ const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/contractController');
 const { requireAuth } = require('../middleware/authMiddleware');
-// Assuming you have access middleware, add it here if needed
-// const { requireAccess } = require('../middleware/accessMiddleware');
+const { requireAccess } = require('../middleware/accessMiddleware');
+const { trackActionState } = require('../middleware/actionStateMiddleware');
+const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 
-router.get('/', requireAuth, ctrl.listContracts);
+router.get('/',
+  requireAuth,
+  requireAccess(SECTIONS.CONTRACTS, OPERATIONS.READ_ALL),
+  trackActionState(SECTIONS.CONTRACTS, OPERATIONS.READ_ALL),
+  ctrl.listContracts);
 
-router.get('/new', requireAuth, ctrl.showAddForm);
-router.post('/new', requireAuth, ctrl.addContract);
+router.get('/new',
+  requireAuth,
+  requireAccess(SECTIONS.CONTRACTS, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.CONTRACTS, OPERATIONS.CREATE, { keepActive: true }),
+  ctrl.showAddForm);
+router.post('/new',
+  requireAuth,
+  requireAccess(SECTIONS.CONTRACTS, OPERATIONS.CREATE),
+  trackActionState(SECTIONS.CONTRACTS, OPERATIONS.CREATE),
+  ctrl.addContract);
 
-router.get('/edit/:id', requireAuth, ctrl.showEditForm);
-router.post('/edit/:id', requireAuth, ctrl.editContract);
+router.get('/edit/:id',
+  requireAuth,
+  requireAccess(SECTIONS.CONTRACTS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.CONTRACTS, OPERATIONS.UPDATE, { keepActive: true }),
+  ctrl.showEditForm);
+router.post('/edit/:id',
+  requireAuth,
+  requireAccess(SECTIONS.CONTRACTS, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.CONTRACTS, OPERATIONS.UPDATE),
+  ctrl.editContract);
 
-// Support both for compatibility
-router.get('/delete/:id', requireAuth, ctrl.deleteContract);
-router.delete('/delete/:id', requireAuth, ctrl.deleteContract);
+router.get('/delete/:id',
+  requireAuth,
+  requireAccess(SECTIONS.CONTRACTS, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.CONTRACTS, OPERATIONS.DELETE),
+  ctrl.deleteContract);
+router.delete('/delete/:id',
+  requireAuth,
+  requireAccess(SECTIONS.CONTRACTS, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.CONTRACTS, OPERATIONS.DELETE),
+  ctrl.deleteContract);
 
 module.exports = router;

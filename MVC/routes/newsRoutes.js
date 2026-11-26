@@ -2,60 +2,63 @@
 const express = require('express');
 const router = express.Router();
 const controller = require('../controllers/newsController');
-// ✅ IMPORT UPLOAD FACTORY
-const upload = require('../middleware/upload'); 
+const upload = require('../middleware/upload');
 const { requireAuth } = require('../middleware/authMiddleware');
+const { requireAccess } = require('../middleware/accessMiddleware');
+const { trackActionState } = require('../middleware/actionStateMiddleware');
+const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
+
 /* ============================================================
    PUBLIC / FEED ROUTES
 ============================================================ */
 
-// Main News Feed (Public + Context Aware)
-router.get('/', 
-    // We do NOT strictly require auth here because we want public news to be visible
-    // The controller handles filtering based on whether req.user exists.
-    (req, res, next) => {
-        // Optional: Middleware to soft-auth if token exists in cookie but header missing
-        // (Assuming app.js handles softAuth globally)
-        next();
-    },
-    controller.feed
-);
+router.get('/',
+  (req, res, next) => {
+    next();
+  },
+  controller.feed);
 
-// View Single Article (ID or Slug)
-router.get(['/article/:idOrSlug','/manage/article/:idOrSlug'] , controller.viewArticle);
+router.get(['/article/:idOrSlug', '/manage/article/:idOrSlug'], controller.viewArticle);
+
 /* ============================================================
    ADMIN / MANAGEMENT ROUTES
 ============================================================ */
 
-router.get('/center', requireAuth, controller.showCenter);
-router.get('/manage', requireAuth, controller.listAdmin);
+function newsAccess(op, options) {
+  return [
+    requireAuth,
+    requireAccess(SECTIONS.NEWS, op),
+    trackActionState(SECTIONS.NEWS, op, options || {})
+  ];
+}
 
-// ✅ NEW: API Route for Media Manager Uploads
-// This enforces the 'news' folder configuration
-router.get('/api/unread', requireAuth, controller.getUnreadArticlesApi);
-router.get('/api/media/library', requireAuth, controller.listNewsMediaLibrary);
-router.get('/api/notify/roles', requireAuth, controller.getNotifyRoles);
-router.post('/api/notify/recipients', requireAuth, controller.postNotifyRecipients);
+router.get('/center', ...newsAccess(OPERATIONS.READ_ALL), controller.showCenter);
+router.get('/manage', ...newsAccess(OPERATIONS.READ_ALL), controller.listAdmin);
 
-router.post('/api/upload', 
-    requireAuth, 
-    upload('news').array('files', 10), // Use the factory: upload('news')
-    controller.uploadMedia
-);
+router.get('/api/unread', ...newsAccess(OPERATIONS.READ_ALL, { requireToken: false }), controller.getUnreadArticlesApi);
+router.get('/api/media/library', ...newsAccess(OPERATIONS.READ_ALL, { requireToken: false }), controller.listNewsMediaLibrary);
+router.get('/api/notify/roles', ...newsAccess(OPERATIONS.UPDATE, { requireToken: false }), controller.getNotifyRoles);
+router.post('/api/notify/recipients', ...newsAccess(OPERATIONS.UPDATE), controller.postNotifyRecipients);
 
-// Create New
-router.get('/manage/new', requireAuth, controller.showForm);
-router.post('/manage/new', requireAuth, upload('news').array('attachments', 10), controller.saveNews);
-router.post('/manage/preview', requireAuth, controller.previewDraft);
+router.post('/api/upload',
+  ...newsAccess(OPERATIONS.UPDATE),
+  upload('news').array('files', 10),
+  controller.uploadMedia);
 
-// Edit Existing
-router.get('/manage/edit/:id', requireAuth, controller.showForm);
-router.post('/manage/edit/:id', requireAuth, upload('news').array('attachments', 10), controller.saveNews);
+router.get('/manage/new', ...newsAccess(OPERATIONS.CREATE, { keepActive: true }), controller.showForm);
+router.post('/manage/new',
+  ...newsAccess(OPERATIONS.CREATE),
+  upload('news').array('attachments', 10),
+  controller.saveNews);
+router.post('/manage/preview', ...newsAccess(OPERATIONS.CREATE), controller.previewDraft);
 
-// Delete
-router.get('/manage/delete/:id', requireAuth, controller.deleteNews);
+router.get('/manage/edit/:id', ...newsAccess(OPERATIONS.UPDATE, { keepActive: true }), controller.showForm);
+router.post('/manage/edit/:id',
+  ...newsAccess(OPERATIONS.UPDATE),
+  upload('news').array('attachments', 10),
+  controller.saveNews);
 
-// Stats
-router.get('/manage/stats/:id', requireAuth, controller.showStats);
+router.get('/manage/delete/:id', ...newsAccess(OPERATIONS.DELETE), controller.deleteNews);
+router.get('/manage/stats/:id', ...newsAccess(OPERATIONS.READ_ALL), controller.showStats);
 
 module.exports = router;
