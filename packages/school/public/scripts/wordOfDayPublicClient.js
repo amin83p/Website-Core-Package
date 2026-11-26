@@ -196,6 +196,111 @@
     }
   }
 
+  function scoreNaturalEnglishVoice(voice) {
+    const name = String(voice?.name || '');
+    const lang = String(voice?.lang || '').toLowerCase().replace('_', '-');
+    if (!/^en(-|$)/.test(lang)) return Number.NEGATIVE_INFINITY;
+
+    let score = 0;
+    if (lang === 'en-us') score += 40;
+    else if (lang.startsWith('en-')) score += 12;
+
+    if (/\(natural\)|\bneural\b/i.test(name)) score += 120;
+    if (/\bonline\b/i.test(name)) score += 20;
+    if (/google/i.test(name) && /english/i.test(name)) score += 88;
+
+    const lower = name.toLowerCase();
+    if (/microsoft\s+(aria|jenny|emma|brian|ava|andrew|guy|michelle|christopher)\b/.test(lower)) {
+      score += 82;
+    }
+    if (/\bmicrosoft\s+(david|zira|mark)\b/.test(lower) && !/\(natural\)/i.test(name)) {
+      score -= 90;
+    }
+    if (voice.localService && !/\(natural\)|\bneural\b|google/i.test(name)) {
+      score -= 40;
+    }
+
+    return score;
+  }
+
+  function pickEnglishVoice(synth) {
+    if (!synth || typeof synth.getVoices !== 'function') return null;
+    const voices = synth.getVoices();
+    if (!Array.isArray(voices) || !voices.length) return null;
+
+    const enCandidates = voices.filter((v) => /^en(-|_)/i.test(String(v.lang || '')));
+    const pool = enCandidates.length ? enCandidates : voices;
+
+    let picked = pool[0];
+    let pickedScore = scoreNaturalEnglishVoice(picked);
+    pool.forEach((v) => {
+      const score = scoreNaturalEnglishVoice(v);
+      if (score > pickedScore) {
+        pickedScore = score;
+        picked = v;
+      }
+    });
+
+    return picked || null;
+  }
+
+  function initSpeechControls() {
+    const synth = global.speechSynthesis;
+    if (!synth || typeof global.SpeechSynthesisUtterance === 'undefined') {
+      document.querySelectorAll('[data-wod-speak]').forEach((btn) => {
+        btn.classList.add('d-none');
+      });
+      return;
+    }
+
+    let preferredVoice = pickEnglishVoice(synth);
+    const refreshVoice = () => {
+      preferredVoice = pickEnglishVoice(synth) || preferredVoice;
+    };
+    synth.addEventListener('voiceschanged', refreshVoice);
+    refreshVoice();
+
+    const clearSpeakingUi = () => {
+      document.querySelectorAll('[data-wod-speak].is-speaking').forEach((node) => {
+        node.classList.remove('is-speaking');
+      });
+    };
+
+    document.querySelectorAll('[data-wod-speak]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const text = String(btn.getAttribute('data-speak-text') || '').trim();
+        if (!text) return;
+
+        if (btn.classList.contains('is-speaking')) {
+          synth.cancel();
+          clearSpeakingUi();
+          return;
+        }
+
+        synth.cancel();
+        clearSpeakingUi();
+
+        if (!preferredVoice || /Microsoft (David|Zira|Mark)\b/.test(String(preferredVoice.name || ''))) {
+          preferredVoice = pickEnglishVoice(synth) || preferredVoice;
+        }
+
+        const utter = new global.SpeechSynthesisUtterance(text);
+        if (preferredVoice) {
+          utter.voice = preferredVoice;
+          utter.lang = String(preferredVoice.lang || 'en-US');
+        } else {
+          utter.lang = 'en-US';
+        }
+
+        utter.onend = clearSpeakingUi;
+        utter.onerror = clearSpeakingUi;
+
+        btn.classList.add('is-speaking');
+        synth.speak(utter);
+      });
+    });
+  }
+
   function initQualifiedVisitTracking(panel) {
     if (!panel) return;
     const entryId = String(panel.getAttribute('data-entry-id') || '').trim();
@@ -233,6 +338,7 @@
   function init() {
     document.querySelectorAll('[data-wod-audio-player]').forEach((node) => initAudioPlayer(node));
     bindPhotoOpen();
+    initSpeechControls();
     const panel = document.getElementById('wodReactionPanel');
     bindReactions(panel);
     initQualifiedVisitTracking(panel);

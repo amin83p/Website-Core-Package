@@ -153,8 +153,8 @@ async function baseViewModel(req, res, extra = {}) {
   };
 }
 
-async function resolveOrgDateKey(reqUser) {
-  const orgId = wordOfDayService.getActiveOrgId(reqUser);
+async function resolveOrgDateKey(reqUser, orgIdOverride = '') {
+  const orgId = String(orgIdOverride || '').trim() || wordOfDayService.getActiveOrgId(reqUser);
   let timezone = '';
   try {
     const org = orgId ? await schoolDataService.getDataById('organizations', orgId, reqUser) : null;

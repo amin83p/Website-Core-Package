@@ -10,26 +10,106 @@ const wordOfDayService = require('../../services/school/wordOfDayService');
 const wordOfDayModel = require('../../models/school/wordOfDayModel');
 const wordOfDayUiConstants = require('../../services/school/wordOfDayUiConstants');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+const wordOfDayController = require('./wordOfDayController');
+
+const WORD_OF_DAY_PUBLIC_PAGE_CSS = 'wordOfDayPublicPage.css';
+const FUTURE_DATE_MESSAGE = 'Future words are not published yet. You can browse today and previous days.';
+
+function shiftDateKey(dateKey, deltaDays) {
+  const key = String(dateKey || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return '';
+  const d = new Date(`${key}T12:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + deltaDays);
+  return d.toISOString().slice(0, 10);
+}
+
+function formatDateLabel(dateKey) {
+  const key = String(dateKey || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return '';
+  const d = new Date(`${key}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return key;
+  return d.toLocaleDateString(undefined, {
+    weekday: 'long',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric'
+  });
+}
+
+function defaultTodayKeyUtc() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+async function resolvePublicTodayKey(req) {
+  const orgId = await resolvePublicOrgId(req);
+  if (orgId) {
+    return wordOfDayController.resolveOrgDateKey(req.user || {}, orgId);
+  }
+  return defaultTodayKeyUtc();
+}
+
+function buildDateNavigation(dateKey, orgQuerySuffix = '', todayKey = '') {
+  const suffix = String(orgQuerySuffix || '');
+  const key = String(dateKey || '').trim();
+  const today = String(todayKey || '').trim() || defaultTodayKeyUtc();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) {
+    return {
+      formattedDateLabel: '',
+      prevDateHref: `/word-of-the-day/${today}${suffix}`,
+      nextDateHref: '',
+      todayHref: `/word-of-the-day/${today}${suffix}`,
+      isViewingToday: false,
+      canGoNext: false,
+      showTodayNav: true
+    };
+  }
+  const mk = (dk) => `/word-of-the-day/${encodeURIComponent(dk)}${suffix}`;
+  const isViewingToday = key === today;
+  const canGoNext = key < today;
+  return {
+    formattedDateLabel: formatDateLabel(key),
+    prevDateHref: mk(shiftDateKey(key, -1)),
+    nextDateHref: canGoNext ? mk(shiftDateKey(key, 1)) : '',
+    todayHref: mk(today),
+    isViewingToday,
+    canGoNext,
+    showTodayNav: !isViewingToday
+  };
+}
+
+function baseHtmlRenderLocals(req, extra = {}) {
+  return {
+    htmlClass: 'pte-public-root home-public-root',
+    bodyClass: 'pte-public-body home-public-body public-zoom-centered-body',
+    mainClass: 'container pte-public-main home-public-main',
+    user: req.user || null,
+    wordTypeLabels: wordOfDayModel.WORD_TYPE_LABELS,
+    difficultyLabels: wordOfDayModel.DIFFICULTY_LABELS,
+    wordOfDayUiConstants,
+    pageCss: WORD_OF_DAY_PUBLIC_PAGE_CSS,
+    pageScript: 'wordOfDayPublicClient.js',
+    ...extra
+  };
+}
 
 function sendError(req, res, error, fallback = 500) {
   const status = Number(error?.statusCode || error?.status || fallback) || fallback;
   const message = String(error?.message || 'Request failed.');
   if (req.accepts('html') && !req.xhr && req.method === 'GET') {
-    return res.status(status).render('wordOfTheDay', {
+    const dateKey = resolveDateKeyParam(req);
+    const orgSuffix = String(req.query?.org || '').trim()
+      ? `?org=${encodeURIComponent(toPublicId(String(req.query.org).trim()))}`
+      : '';
+    const dateNav = buildDateNavigation(dateKey, orgSuffix);
+    return res.status(status).render('wordOfTheDay', baseHtmlRenderLocals(req, {
       title: `Word of the Day - ${appBrandingService.getBrand().appName}`,
-      htmlClass: 'pte-public-root home-public-root',
-      bodyClass: 'pte-public-body home-public-body public-zoom-centered-body',
-      mainClass: 'container pte-public-main home-public-main',
-      user: req.user || null,
       pageError: message,
-      wordOfDayDetail: null,
+      wordOfDayDetail: dateKey ? { dateKey, orgId: '', entry: null } : null,
       reactionSummary: { likes: 0, dislikes: 0, myVote: null },
-      wordTypeLabels: wordOfDayModel.WORD_TYPE_LABELS,
-      difficultyLabels: wordOfDayModel.DIFFICULTY_LABELS,
-      wordOfDayUiConstants,
       includeModal: false,
-      pageScript: 'wordOfDayPublicClient.js'
-    });
+      ...dateNav,
+      orgQuerySuffix: orgSuffix
+    }));
   }
   return res.status(status).json({ status: 'error', message });
 }
@@ -94,7 +174,7 @@ function buildOrgQuery(orgId, globalPolicy) {
 
 async function showToday(req, res) {
   try {
-    const dateKey = new Date().toISOString().slice(0, 10);
+    const dateKey = await resolvePublicTodayKey(req);
     const query = new URLSearchParams(req.query || {}).toString();
     const suffix = query ? `?${query}` : '';
     return res.redirect(301, `/word-of-the-day/${dateKey}${suffix}`);
@@ -108,30 +188,43 @@ async function showByDate(req, res) {
     const dateKey = resolveDateKeyParam(req);
     if (!dateKey) return sendError(req, res, { message: 'Invalid date.', statusCode: 400 }, 400);
 
-    const detail = await loadDailyDetail(req, dateKey);
+    const todayKey = await resolvePublicTodayKey(req);
+    const orgId = await resolvePublicOrgId(req);
     const globalPolicy = await wordOfDayPolicyModel.getGlobalPublicPolicy();
+    const orgQuerySuffix = buildOrgQuery(orgId, globalPolicy);
+    const dateNav = buildDateNavigation(dateKey, orgQuerySuffix, todayKey);
+
+    if (dateKey > todayKey) {
+      return res.status(200).render('wordOfTheDay', baseHtmlRenderLocals(req, {
+        title: `Word of the Day - ${appBrandingService.getBrand().appName}`,
+        wordOfDayDetail: { orgId, dateKey, entry: null },
+        reactionSummary: { likes: 0, dislikes: 0, myVote: null },
+        orgQuerySuffix,
+        includeModal: false,
+        pageError: FUTURE_DATE_MESSAGE,
+        ...dateNav
+      }));
+    }
+
+    const detail = await loadDailyDetail(req, dateKey);
     const reactionSummary = detail?.entry?.id
       ? await wordOfDayReactionService.getSummaryForEntry(detail.entry.id, { user: req.user, ip: req.ip })
       : { likes: 0, dislikes: 0, myVote: null };
 
-  return res.render('wordOfTheDay', {
+    const detailOrgQuerySuffix = buildOrgQuery(detail.orgId, globalPolicy);
+    const detailDateNav = buildDateNavigation(dateKey, detailOrgQuerySuffix, todayKey);
+
+    return res.render('wordOfTheDay', baseHtmlRenderLocals(req, {
       title: detail?.entry?.word
         ? `${detail.entry.word} — Word of the Day`
         : `Word of the Day - ${appBrandingService.getBrand().appName}`,
-      htmlClass: 'pte-public-root home-public-root',
-      bodyClass: 'pte-public-body home-public-body public-zoom-centered-body',
-      mainClass: 'container pte-public-main home-public-main',
-      user: req.user || null,
       wordOfDayDetail: detail,
       reactionSummary,
-      orgQuerySuffix: buildOrgQuery(detail.orgId, globalPolicy),
-      wordTypeLabels: wordOfDayModel.WORD_TYPE_LABELS,
-      difficultyLabels: wordOfDayModel.DIFFICULTY_LABELS,
-      wordOfDayUiConstants,
+      orgQuerySuffix: detailOrgQuerySuffix,
       includeModal: Boolean(detail?.entry?.photo?.url),
-      pageScript: 'wordOfDayPublicClient.js',
-      pageError: null
-    });
+      pageError: null,
+      ...detailDateNav
+    }));
   } catch (error) {
     return sendError(req, res, error, error.statusCode || 500);
   }
@@ -196,5 +289,10 @@ module.exports = {
   getReactionSummary,
   postReaction,
   postPageVisit,
-  resolvePublicOrgId
+  resolvePublicOrgId,
+  buildDateNavigation,
+  shiftDateKey,
+  formatDateLabel,
+  resolvePublicTodayKey,
+  FUTURE_DATE_MESSAGE
 };

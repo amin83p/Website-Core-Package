@@ -13,15 +13,17 @@
     const homeFinalCta = homePageContent.finalCta || {};
     const homeSlides = (typeof homeShowcaseItems !== 'undefined' && Array.isArray(homeShowcaseItems)) ? homeShowcaseItems : [];
   %>
-  <% if (typeof wordOfDayPublic !== 'undefined' && wordOfDayPublic && wordOfDayPublic.entry) { %>
-    <%- include('../../packages/school/MVC/views/school/wordOfDay/partials/widget', {
-      wordOfDayPayload: wordOfDayPublic,
-      wordOfDayWidgetVariant: 'banner',
-      wordOfDayUiConstants: typeof wordOfDayUiConstants !== 'undefined' ? wordOfDayUiConstants : null,
-      wordOfDayPublicSourceOrgId: typeof wordOfDayPublicSourceOrgId !== 'undefined' ? wordOfDayPublicSourceOrgId : ''
-    }) %>
-  <% } %>
-  <section class="pte-hero-intro home-hero reveal" aria-labelledby="homeLandingTitle">
+  <section class="pte-hero-intro home-hero reveal<%= (typeof wordOfDayPublic !== 'undefined' && wordOfDayPublic && wordOfDayPublic.entry) ? ' home-hero--with-wod' : '' %>" aria-labelledby="homeLandingTitle">
+    <% if (typeof wordOfDayPublic !== 'undefined' && wordOfDayPublic && wordOfDayPublic.entry) { %>
+      <div class="home-wod-lead">
+        <%- include('../../packages/school/MVC/views/school/wordOfDay/partials/widget', {
+          wordOfDayPayload: wordOfDayPublic,
+          wordOfDayWidgetVariant: 'banner',
+          wordOfDayUiConstants: typeof wordOfDayUiConstants !== 'undefined' ? wordOfDayUiConstants : null,
+          wordOfDayPublicSourceOrgId: typeof wordOfDayPublicSourceOrgId !== 'undefined' ? wordOfDayPublicSourceOrgId : ''
+        }) %>
+      </div>
+    <% } %>
     <div class="pte-hero-orbit" aria-hidden="true">
       <span></span>
       <span></span>
@@ -257,20 +259,16 @@
 
 html.home-public-root,
 html.home-public-root body.home-public-body {
-  background:
-    radial-gradient(circle at 7% 7%, rgba(10, 102, 194, 0.15), transparent 28%),
-    radial-gradient(circle at 93% 4%, rgba(37, 136, 114, 0.14), transparent 26%),
-    radial-gradient(circle at 8% 48%, rgba(180, 91, 43, 0.08), transparent 25%),
-    radial-gradient(circle at 91% 76%, rgba(10, 102, 194, 0.1), transparent 28%),
-    linear-gradient(135deg, #f8fbff 0%, #eef7f4 50%, #ffffff 100%);
+  background-color: #f6fafc;
   min-height: 100%;
 }
 
 body.home-public-body {
-  background-attachment: fixed;
+  background-attachment: scroll;
 }
 
 main.home-public-main {
+  background: transparent;
   margin-bottom: 0 !important;
   margin-top: 0 !important;
   padding-bottom: clamp(2.2rem, 5vw, 4.5rem);
@@ -331,6 +329,21 @@ main.home-public-main {
   margin-bottom: clamp(1.5rem, 3vw, 2.2rem);
   padding: clamp(1.5rem, 3.5vw, 3rem) 0 clamp(1.3rem, 3vw, 2.4rem);
   position: relative;
+}
+
+.home-pro .home-hero--with-wod {
+  padding-top: clamp(1rem, 2.2vw, 1.75rem);
+}
+
+.home-pro .home-wod-lead {
+  margin-bottom: clamp(1.1rem, 2.4vw, 1.65rem);
+  position: relative;
+  z-index: 2;
+}
+
+.home-pro .home-wod-lead .wod-home-pte-banner {
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
 .home-pro .home-kicker {

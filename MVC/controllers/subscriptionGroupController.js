@@ -5,7 +5,6 @@ const { idsEqual } = require('../utils/idAdapter');
 
 const settingService = require('../services/settingService'); // ✅ Use Dynamic Service
 const { getDashboardSection } = require('./dashboardController');
-const wordOfDayDashboardWidgetService = require('../services/wordOfDayDashboardWidgetService');
 const paginate = require('../utils/paginationHelper');
 const {isAjax, buildDataServiceQuery, inferSearchableFields} = require('../utils/generalTools');
 
@@ -90,14 +89,11 @@ exports.dashboard = async (req, res) => {
   ].sort((a, b) => (Number(a.priority || 0) - Number(b.priority || 0)));
 
   const dashboardSection = await getDashboardSection('/subscriptionGroup/dashboard', req.user);
-  const wordOfDayPayload = await wordOfDayDashboardWidgetService.resolveWordOfDayDashboardPayload(req);
   res.render('newsletter/dashboard', {
     title: 'Newsletter Dashboard',
     dashboardSections,
     dashboardSection,
-    user: req.user,
-    wordOfDayPayload,
-    wordOfDayUiConstants: wordOfDayDashboardWidgetService.getWordOfDayUiConstants()
+    user: req.user
   });
 };
 

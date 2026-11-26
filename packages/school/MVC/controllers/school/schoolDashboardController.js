@@ -491,12 +491,15 @@ async function showDashboard(req, res) {
           .map(({ __idx, ...s }) => s);
 
         const dashboardSection = await getDashboardSection('/school', req.user);
+        const schoolDashboardHeroFeedService = require('../../services/school/schoolDashboardHeroFeedService');
+        const dashboardHeroFeeds = await schoolDashboardHeroFeedService.buildDashboardHeroFeeds(req);
         res.render('school/dashboard', {
             title: 'School Management Dashboard',
             dashboardSections: sortedDashboardSections,
             dashboardSection,
             includeModal: true,
-            user: req.user
+            user: req.user,
+            dashboardHeroFeeds
         });
     } catch (error) {
         res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });

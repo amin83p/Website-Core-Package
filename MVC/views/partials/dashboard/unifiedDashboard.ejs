@@ -36,12 +36,12 @@
   let pageWatermarkHtml = '';
   bannerIconHtml = buildSectionIconHtml(ds, (titleIcon || pageBgIconClass));
   pageWatermarkHtml = buildSectionIconHtml(ds, pageBgIconClass);
-  const hasWodHero = Boolean(
-    typeof wordOfDayPayload !== 'undefined'
-    && wordOfDayPayload
-    && wordOfDayPayload.entry
-  );
-  const dashboardBannerClass = hasWodHero
+  const heroFeedsInput = typeof dashboardHeroFeeds !== 'undefined' ? dashboardHeroFeeds : [];
+  const dashboardHeroFeedItems = Array.isArray(heroFeedsInput)
+    ? heroFeedsInput.filter((item) => item && item.show !== false && String(item.partial || '').trim())
+    : [];
+  const hasDashboardHeroFeeds = dashboardHeroFeedItems.length > 0;
+  const dashboardBannerClass = hasDashboardHeroFeeds
     ? `${key}-dashboard-banner ${key}-dashboard-banner--in-hero mb-0`
     : `${key}-dashboard-banner mb-4`;
 %>
@@ -50,15 +50,16 @@
   <div class="<%= key %>-page-watermark" aria-hidden="true">
     <%- pageWatermarkHtml %>
   </div>
-  <% if (hasWodHero) { %>
+  <% if (hasDashboardHeroFeeds) { %>
   <div class="<%= key %>-dashboard-hero-row mb-3">
-    <div class="<%= key %>-dashboard-hero-wod">
-      <%- include('../../../../packages/school/MVC/views/school/wordOfDay/partials/widget', {
-        wordOfDayPayload: wordOfDayPayload,
-        wordOfDayUiConstants: typeof wordOfDayUiConstants !== 'undefined' ? wordOfDayUiConstants : null,
-        wordOfDayOpenInNewTab: typeof wordOfDayOpenInNewTab !== 'undefined' ? wordOfDayOpenInNewTab : true
-      }) %>
+    <% dashboardHeroFeedItems.forEach(function (feed) {
+      const feedId = String(feed.id || 'item').replace(/[^a-z0-9_-]/gi, '');
+      const feedLocals = (feed.locals && typeof feed.locals === 'object') ? feed.locals : {};
+    %>
+    <div class="<%= key %>-dashboard-hero-feed <%= key %>-dashboard-hero-feed--<%= feedId %>">
+      <%- include(feed.partial, feedLocals) %>
     </div>
+    <% }); %>
   <% } %>
   <div class="<%= dashboardBannerClass %>">
     <div class="d-flex align-items-start justify-content-between gap-3 gap-md-4 w-100 <%= key %>-banner-row">
@@ -118,7 +119,7 @@
       <% } %>
     </div>
   </div>
-  <% if (hasWodHero) { %>
+  <% if (hasDashboardHeroFeeds) { %>
   </div>
   <% } %>
 
@@ -345,12 +346,14 @@
     gap: 0.65rem;
     align-items: stretch;
   }
+  .<%= key %>-dashboard-hero-feed,
   .<%= key %>-dashboard-hero-wod {
     flex: 0 0 min(100%, 22rem);
     max-width: 22rem;
     min-width: 0;
     display: flex;
   }
+  .<%= key %>-dashboard-hero-feed .word-of-day-widget--dashboard.wod-school-dash-card,
   .<%= key %>-dashboard-hero-wod .word-of-day-widget--dashboard.wod-school-dash-card {
     margin-bottom: 0;
     width: 100%;
@@ -359,6 +362,7 @@
     min-height: 100%;
     box-sizing: border-box;
   }
+  .<%= key %>-dashboard-hero-feed .wod-widget-card-link,
   .<%= key %>-dashboard-hero-wod .wod-widget-card-link {
     display: flex;
     flex-direction: column;
@@ -366,6 +370,7 @@
     height: 100%;
     min-height: 100%;
   }
+  .<%= key %>-dashboard-hero-feed .wod-widget-inner,
   .<%= key %>-dashboard-hero-wod .wod-widget-inner {
     flex: 1 1 auto;
     display: flex;
@@ -389,6 +394,7 @@
     .<%= key %>-dashboard-hero-row {
       gap: 0.5rem;
     }
+    .<%= key %>-dashboard-hero-feed,
     .<%= key %>-dashboard-hero-wod {
       flex: 1 1 100%;
       max-width: 100%;

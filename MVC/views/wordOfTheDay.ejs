@@ -16,254 +16,71 @@
     const examples = entry && Array.isArray(entry.examples) ? entry.examples : [];
     const photoUrl = entry && entry.photo && entry.photo.url ? String(entry.photo.url) : '';
     const audioUrl = entry && entry.audio && entry.audio.url ? String(entry.audio.url) : '';
+    const wodFormattedDateLabel = (typeof formattedDateLabel !== 'undefined' && formattedDateLabel) ? String(formattedDateLabel) : '';
+    const wodPrevDateHref = (typeof prevDateHref !== 'undefined' && prevDateHref) ? String(prevDateHref) : '';
+    const wodNextDateHref = (typeof nextDateHref !== 'undefined' && nextDateHref) ? String(nextDateHref) : '';
+    const wodTodayHref = (typeof todayHref !== 'undefined' && todayHref) ? String(todayHref) : '';
+    const wodIsViewingToday = typeof isViewingToday !== 'undefined' && isViewingToday === true;
+    const wodCanGoNext = typeof canGoNext !== 'undefined' && canGoNext === true;
+    const wodShowTodayNav = typeof showTodayNav === 'undefined' ? true : Boolean(showTodayNav);
+    const showDateNav = Boolean(wodPrevDateHref && wodTodayHref);
   %>
 
-  <style>
-    .wod-public-page { padding-bottom: 2.5rem; }
-    .wod-public-hero {
-      border-radius: 1.25rem;
-      overflow: hidden;
-      background: linear-gradient(125deg, #1e3a8a 0%, #4338ca 50%, #6366f1 100%);
-      color: #fff;
-      box-shadow: 0 1.25rem 2.5rem rgba(30, 64, 175, 0.2);
-      margin-bottom: 1.75rem;
-    }
-    .wod-public-hero-inner { padding: 1.5rem 1.75rem; position: relative; }
-    .wod-public-hero-inner::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background: radial-gradient(circle at 90% 10%, rgba(255,255,255,0.16), transparent 45%);
-      pointer-events: none;
-    }
-    .wod-public-kicker {
-      font-size: 0.72rem;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      opacity: 0.9;
-      margin: 0 0 0.35rem;
-      position: relative;
-      z-index: 1;
-    }
-    .wod-public-headline {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: baseline;
-      gap: 0.75rem 1.5rem;
-      margin: 0 0 0.75rem;
-      position: relative;
-      z-index: 1;
-    }
-    .wod-public-word {
-      font-size: clamp(2rem, 5vw, 3rem);
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      margin: 0;
-      line-height: 1.05;
-    }
-    .wod-public-phonetics {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 1.05rem;
-      opacity: 0.92;
-      margin: 0;
-    }
-    .wod-public-chips {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 0.45rem;
-      position: relative;
-      z-index: 1;
-    }
-    .wod-public-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      padding: 0.28rem 0.65rem;
-      border-radius: 2rem;
-      font-size: 0.78rem;
-      font-weight: 600;
-      background: rgba(255,255,255,0.14);
-      border: 1px solid rgba(255,255,255,0.28);
-    }
-    .wod-hero-audio {
-      margin-top: 0.85rem;
-      max-width: min(100%, 17.5rem);
-      position: relative;
-      z-index: 1;
-    }
-    .wod-stylish-audio-player--compact {
-      background: rgba(255, 255, 255, 0.12);
-      border: 1px solid rgba(255, 255, 255, 0.28);
-      border-radius: 12px;
-      padding: 0.4rem 0.5rem 0.45rem;
-    }
-    .wod-stylish-audio-player--compact .wod-audio-player-inner {
-      display: flex;
-      gap: 0.5rem;
-      align-items: center;
-    }
-    .wod-stylish-audio-player--compact .wod-audio-play-toggle {
-      width: 1.9rem;
-      height: 1.9rem;
-      border-radius: 50%;
-      border: 1px solid rgba(255, 255, 255, 0.35);
-      background: rgba(255, 255, 255, 0.2);
-      color: #fff;
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 0.95rem;
-      flex-shrink: 0;
-    }
-    .wod-stylish-audio-player--compact .wod-audio-player-main {
-      flex: 1;
-      min-width: 0;
-    }
-    .wod-stylish-audio-player--compact .wod-audio-seek {
-      height: 0.3rem;
-      margin: 0.1rem 0 0.15rem;
-    }
-    .wod-stylish-audio-player--compact .wod-audio-times {
-      display: flex;
-      justify-content: space-between;
-      font-size: 0.66rem;
-      color: rgba(255, 255, 255, 0.88);
-      line-height: 1.2;
-    }
-    .wod-public-hero-layout {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 1.15rem 1.5rem;
-      position: relative;
-      z-index: 1;
-    }
-    .wod-public-hero-main {
-      flex: 1 1 16rem;
-      min-width: 0;
-    }
-    .wod-public-hero-meta-card {
-      flex: 0 1 13.5rem;
-      min-width: min(100%, 11.5rem);
-      background: rgba(255, 255, 255, 0.96);
-      color: #334155;
-      border-radius: 14px;
-      padding: 0.85rem 1rem;
-      border: 1px solid rgba(255, 255, 255, 0.55);
-      box-shadow: 0 10px 28px rgba(15, 23, 42, 0.18);
-      margin-left: auto;
-    }
-    .wod-public-hero-meta-card .wod-meta-eyebrow {
-      font-size: 0.65rem;
-      font-weight: 700;
-      letter-spacing: 0.09em;
-      text-transform: uppercase;
-      color: #64748b;
-      margin: 0 0 0.55rem;
-    }
-    .wod-public-hero-meta-card .wod-meta-line {
-      font-size: 0.88rem;
-      line-height: 1.45;
-      margin: 0 0 0.4rem;
-      color: #475569;
-    }
-    .wod-public-hero-meta-card .wod-meta-line:last-child {
-      margin-bottom: 0;
-    }
-    .wod-public-hero-meta-card .wod-meta-line strong {
-      color: #0f172a;
-      font-weight: 700;
-    }
-    .wod-public-hero-meta-card .wod-meta-date {
-      display: inline-flex;
-      align-items: center;
-      gap: 0.35rem;
-      font-weight: 600;
-      color: #1e3a8a;
-    }
-    @media (max-width: 640px) {
-      .wod-public-hero-meta-card {
-        flex: 1 1 100%;
-        margin-left: 0;
-      }
-    }
-    .wod-public-card {
-      background: #fff;
-      border-radius: 1rem;
-      border: 1px solid rgba(15, 23, 42, 0.08);
-      box-shadow: 0 0.75rem 1.75rem rgba(15, 23, 42, 0.06);
-      padding: 1.35rem 1.5rem;
-      margin-bottom: 1.25rem;
-    }
-    .wod-public-card h2 {
-      font-size: 1.05rem;
-      font-weight: 700;
-      margin: 0 0 0.65rem;
-      color: #334155;
-    }
-    .wod-public-meaning { font-size: 1.05rem; line-height: 1.65; color: #0f172a; margin: 0; white-space: pre-wrap; }
-    .wod-public-examples { margin: 0; padding-left: 1.2rem; }
-    .wod-public-examples li { margin-bottom: 0.45rem; line-height: 1.55; }
-    .wod-public-photo-btn {
-      border: none;
-      padding: 0;
-      background: transparent;
-      display: block;
-      width: 100%;
-      border-radius: 0.75rem;
-      overflow: hidden;
-      position: relative;
-    }
-    .wod-public-photo-btn img {
-      width: 100%;
-      max-height: 340px;
-      object-fit: contain;
-      background: #f8fafc;
-    }
-    .wod-public-reactions {
-      display: flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0.75rem;
-    }
-    .wod-public-reactions .btn-vote { min-width: 7.5rem; }
-    .wod-public-reactions .btn-vote.is-active-like { background: #22c55e; border-color: #22c55e; color: #fff; }
-    .wod-public-reactions .btn-vote.is-active-dislike { background: #ef4444; border-color: #ef4444; color: #fff; }
-    .wod-dislike-feedback {
-      margin-top: 1rem;
-      padding: 1rem 1.1rem;
-      border-radius: 0.75rem;
-      border: 1px solid rgba(239, 68, 68, 0.25);
-      background: #fef2f2;
-    }
-    .wod-dislike-feedback.is-hidden { display: none; }
-    .wod-dislike-feedback textarea { resize: vertical; min-height: 4.5rem; }
-    .wod-dislike-feedback-actions { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
-    .wod-public-back { margin-top: 1.5rem; }
-  </style>
+  <div class="wod-public-topbar reveal">
+    <a href="/" class="wod-public-back-link"><i class="bi bi-arrow-left" aria-hidden="true"></i>Back to home</a>
+  </div>
+
+  <% if (showDateNav) { %>
+    <nav class="wod-public-date-nav reveal" aria-label="Browse other days">
+      <a href="<%= wodPrevDateHref %>" rel="prev"><i class="bi bi-chevron-left" aria-hidden="true"></i>Previous day</a>
+      <div class="wod-date-nav-group">
+        <% if (wodShowTodayNav) { %>
+          <a href="<%= wodTodayHref %>" class="wod-date-nav-today<%= wodIsViewingToday ? ' is-current' : '' %>">Today</a>
+        <% } %>
+        <% if (wodCanGoNext && wodNextDateHref) { %>
+          <a href="<%= wodNextDateHref %>" rel="next">Next day<i class="bi bi-chevron-right" aria-hidden="true"></i></a>
+        <% } %>
+      </div>
+    </nav>
+  <% } %>
 
   <% if (pageErr && !entry) { %>
-    <section class="wod-public-card reveal" aria-live="polite">
-      <h1 class="h3 mb-2">Word of the Day</h1>
+    <section class="wod-public-empty-card reveal" aria-live="polite">
+      <p class="wod-public-kicker">Word of the Day</p>
+      <% if (wodFormattedDateLabel) { %><p class="wod-public-date-label mb-2"><%= wodFormattedDateLabel %></p><% } %>
+      <h1 class="h4 mb-2">Unavailable</h1>
       <p class="text-muted mb-0"><%= pageErr %></p>
-      <div class="wod-public-back">
-        <a href="/" class="btn btn-outline-primary"><i class="bi bi-house me-1"></i>Back to home</a>
-      </div>
     </section>
   <% } else if (entry) { %>
-    <header class="wod-public-hero reveal" aria-labelledby="wodPublicTitle">
-      <div class="wod-public-hero-inner">
-        <div class="wod-public-hero-layout">
+    <div class="wod-public-shell reveal">
+      <header class="wod-public-hero-band" aria-labelledby="wodPublicTitle">
+        <p class="wod-public-kicker">Word of the Day</p>
+        <% if (wodFormattedDateLabel) { %>
+          <p class="wod-public-date-label"><%= wodFormattedDateLabel %></p>
+        <% } %>
+      </header>
+
+      <div class="wod-public-layout<%= photoUrl ? ' wod-public-layout--with-photo' : '' %>">
+        <div class="wod-public-layout-visual">
+          <% if (photoUrl) { %>
+            <figure class="wod-public-hero-figure">
+              <button type="button" class="wod-public-photo-btn" data-wod-photo-open data-url="<%= photoUrl %>" data-filename="<%= entry.photo.fileName || entry.word %>" data-mime="<%= entry.photo.mimeType || 'image/jpeg' %>" aria-label="Open illustration full size">
+                <img src="<%= photoUrl %>" alt="<%= entry.word %> illustration">
+              </button>
+            </figure>
+          <% } %>
+
           <div class="wod-public-hero-main">
-            <p class="wod-public-kicker">Word of the Day</p>
-            <div class="wod-public-headline">
+            <div class="wod-public-word-row">
               <h1 id="wodPublicTitle" class="wod-public-word"><%= entry.word %></h1>
-              <% if (entry.pronunciation) { %>
-                <p class="wod-public-phonetics" lang="en"><%= entry.pronunciation %></p>
-              <% } %>
+              <button type="button" class="wod-speak-btn" data-wod-speak data-speak-text="<%= entry.word %>" aria-label="Read word aloud">
+                <i class="bi bi-volume-up-fill wod-speak-icon-idle" aria-hidden="true"></i>
+                <i class="bi bi-stop-fill wod-speak-icon-active d-none" aria-hidden="true"></i>
+              </button>
             </div>
+            <% if (entry.pronunciation) { %>
+              <p class="wod-public-phonetics" lang="en"><%= entry.pronunciation %></p>
+            <% } %>
             <div class="wod-public-chips" aria-label="Type and difficulty">
               <% wordTypes.forEach((key) => { %>
                 <span class="wod-public-chip"><i class="bi <%= uiConstants.wordTypeIcon(key) %>" aria-hidden="true"></i><%= typeLabels[key] || key %></span>
@@ -272,8 +89,11 @@
                 <span class="wod-public-chip"><i class="bi <%= uiConstants.difficultyIcon(entry.difficulty) %>" aria-hidden="true"></i><%= diffLabels[entry.difficulty] || entry.difficulty %></span>
               <% } %>
             </div>
+            <% if (entry.authorName) { %>
+              <p class="wod-public-meta-lines">Contributed by <strong><%= entry.authorName %></strong></p>
+            <% } %>
             <% if (audioUrl) { %>
-              <div class="wod-hero-audio wod-stylish-audio-player wod-stylish-audio-player--compact" data-wod-audio-player>
+              <div class="wod-hero-audio wod-stylish-audio-player wod-stylish-audio-player--editorial" data-wod-audio-player>
                 <audio class="wod-audio-element" preload="metadata" playsinline>
                   <source src="<%= audioUrl %>" type="<%= entry.audio.mimeType || 'audio/mpeg' %>">
                 </audio>
@@ -293,85 +113,82 @@
               </div>
             <% } %>
           </div>
-          <aside class="wod-public-hero-meta-card" aria-label="Word details">
-            <p class="wod-meta-eyebrow mb-0">Details</p>
-            <% if (entry.authorName) { %>
-              <p class="wod-meta-line">Contributed by <strong><%= entry.authorName %></strong></p>
-            <% } %>
-            <p class="wod-meta-line wod-meta-date mb-0">
-              <i class="bi bi-calendar3" aria-hidden="true"></i>
-              Word for <strong><%= dateKey %></strong>
-            </p>
-          </aside>
         </div>
+
+        <article class="wod-public-article wod-public-layout-reading">
+          <% if (entry.meaning) { %>
+            <section class="wod-public-section" aria-labelledby="wodMeaningHeading">
+              <div class="wod-public-section-heading-row">
+                <h2 id="wodMeaningHeading" class="wod-public-section-label">Meaning</h2>
+                <button type="button" class="wod-speak-btn" data-wod-speak data-speak-text="<%= entry.meaning %>" aria-label="Read meaning aloud">
+                  <i class="bi bi-volume-up-fill wod-speak-icon-idle" aria-hidden="true"></i>
+                  <i class="bi bi-stop-fill wod-speak-icon-active d-none" aria-hidden="true"></i>
+                </button>
+              </div>
+              <p class="wod-public-meaning"><%= entry.meaning %></p>
+            </section>
+          <% } %>
+
+          <% if (examples.length) { %>
+            <section class="wod-public-section" aria-labelledby="wodExamplesHeading">
+              <h2 id="wodExamplesHeading" class="wod-public-section-label">In context</h2>
+              <ol class="wod-public-examples">
+                <% examples.forEach((ex) => { %>
+                  <li class="wod-public-example-row">
+                    <span class="wod-public-example-text"><%= ex %></span>
+                    <button type="button" class="wod-speak-btn" data-wod-speak data-speak-text="<%= ex %>" aria-label="Read example aloud">
+                      <i class="bi bi-volume-up-fill wod-speak-icon-idle" aria-hidden="true"></i>
+                      <i class="bi bi-stop-fill wod-speak-icon-active d-none" aria-hidden="true"></i>
+                    </button>
+                  </li>
+                <% }) %>
+              </ol>
+            </section>
+          <% } %>
+
+          <% if (entry.videoUrl) { %>
+            <section class="wod-public-section" aria-label="Video">
+              <h2 class="wod-public-section-label">Video</h2>
+              <a href="<%= entry.videoUrl %>" class="btn btn-outline-primary wod-public-video-link" target="_blank" rel="noopener noreferrer"><i class="bi bi-play-btn me-1"></i>Watch video</a>
+            </section>
+          <% } %>
+
+          <section class="wod-public-section" id="wodReactionPanel" data-wod-reaction-panel
+            data-entry-id="<%= entry.id %>"
+            data-org-id="<%= orgId %>"
+            data-date-key="<%= dateKey %>"
+            data-my-vote="<%= summary.myVote || '' %>">
+            <h2 class="wod-public-section-label">Your feedback</h2>
+            <p class="wod-public-reactions-intro">Your ideas help us improve our word choices.<% if (!user) { %> You can vote without signing in.<% } %></p>
+            <div class="wod-public-reactions">
+              <button type="button" class="btn btn-outline-success btn-vote<%= summary.myVote === 'like' ? ' is-active-like' : '' %>" data-wod-vote="like">
+                <i class="bi bi-hand-thumbs-up me-1"></i>Like
+              </button>
+              <button type="button" class="btn btn-outline-danger btn-vote<%= summary.myVote === 'dislike' ? ' is-active-dislike' : '' %>" data-wod-vote="dislike">
+                <i class="bi bi-hand-thumbs-down me-1"></i>Dislike
+              </button>
+            </div>
+            <div id="wodDislikeFeedback" class="wod-dislike-feedback is-hidden" role="region" aria-labelledby="wodDislikeFeedbackTitle" hidden>
+              <p id="wodDislikeFeedbackTitle" class="mb-2 fw-semibold">Would you share why this word didn’t work for you?</p>
+              <p class="text-muted small mb-2">Your ideas help us improve our word choices. Your comment is saved without your name. We keep it for staff review only; it is not shown on this page.</p>
+              <label class="visually-hidden" for="wodDislikeComment">Optional reason</label>
+              <textarea id="wodDislikeComment" class="form-control" rows="3" maxlength="2000" placeholder="Optional — tell us what would have worked better"></textarea>
+              <div class="wod-dislike-feedback-actions">
+                <button type="button" class="btn btn-danger btn-sm" data-wod-dislike-submit>Submit dislike</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-wod-dislike-skip">Skip</button>
+                <button type="button" class="btn btn-link btn-sm text-decoration-none" data-wod-dislike-cancel>Cancel</button>
+              </div>
+            </div>
+          </section>
+        </article>
       </div>
-    </header>
-
-    <% if (entry.meaning) { %>
-      <section class="wod-public-card reveal" aria-labelledby="wodMeaningHeading">
-        <h2 id="wodMeaningHeading">Meaning</h2>
-        <p class="wod-public-meaning"><%= entry.meaning %></p>
-      </section>
-    <% } %>
-
-    <% if (examples.length) { %>
-      <section class="wod-public-card reveal" aria-labelledby="wodExamplesHeading">
-        <h2 id="wodExamplesHeading">Examples</h2>
-        <ol class="wod-public-examples">
-          <% examples.forEach((ex) => { %><li><%= ex %></li><% }) %>
-        </ol>
-      </section>
-    <% } %>
-
-    <% if (photoUrl || entry.videoUrl) { %>
-      <section class="wod-public-card reveal" aria-label="Media">
-        <h2>Media</h2>
-        <% if (photoUrl) { %>
-          <button type="button" class="wod-public-photo-btn" data-wod-photo-open data-url="<%= photoUrl %>" data-filename="<%= entry.photo.fileName || entry.word %>" data-mime="<%= entry.photo.mimeType || 'image/jpeg' %>" aria-label="Open illustration full size">
-            <img src="<%= photoUrl %>" alt="<%= entry.word %> illustration">
-          </button>
-        <% } %>
-        <% if (entry.videoUrl) { %>
-          <a href="<%= entry.videoUrl %>" class="btn btn-outline-primary mt-3" target="_blank" rel="noopener noreferrer"><i class="bi bi-play-btn me-1"></i>Watch video</a>
-        <% } %>
-      </section>
-    <% } %>
-
-    <section class="wod-public-card reveal" id="wodReactionPanel" data-wod-reaction-panel
-      data-entry-id="<%= entry.id %>"
-      data-org-id="<%= orgId %>"
-      data-date-key="<%= dateKey %>"
-      data-my-vote="<%= summary.myVote || '' %>">
-      <h2>Did you like this word?</h2>
-      <p class="text-muted small mb-3">Your ideas help us improve our word choices.<% if (!user) { %> You can vote without signing in.<% } %></p>
-      <div class="wod-public-reactions">
-        <button type="button" class="btn btn-outline-success btn-vote<%= summary.myVote === 'like' ? ' is-active-like' : '' %>" data-wod-vote="like">
-          <i class="bi bi-hand-thumbs-up me-1"></i>Like
-        </button>
-        <button type="button" class="btn btn-outline-danger btn-vote<%= summary.myVote === 'dislike' ? ' is-active-dislike' : '' %>" data-wod-vote="dislike">
-          <i class="bi bi-hand-thumbs-down me-1"></i>Dislike
-        </button>
-      </div>
-      <div id="wodDislikeFeedback" class="wod-dislike-feedback is-hidden" role="region" aria-labelledby="wodDislikeFeedbackTitle" hidden>
-        <p id="wodDislikeFeedbackTitle" class="mb-2 fw-semibold">Would you share why this word didn’t work for you?</p>
-        <p class="text-muted small mb-2">Your ideas help us improve our word choices. Your comment is saved without your name. We keep it for staff review only; it is not shown on this page.</p>
-        <label class="visually-hidden" for="wodDislikeComment">Optional reason</label>
-        <textarea id="wodDislikeComment" class="form-control" rows="3" maxlength="2000" placeholder="Optional — tell us what would have worked better"></textarea>
-        <div class="wod-dislike-feedback-actions">
-          <button type="button" class="btn btn-danger btn-sm" data-wod-dislike-submit>Submit dislike</button>
-          <button type="button" class="btn btn-outline-secondary btn-sm" data-wod-dislike-skip>Skip</button>
-          <button type="button" class="btn btn-link btn-sm text-decoration-none" data-wod-dislike-cancel>Cancel</button>
-        </div>
-      </div>
-    </section>
-
-    <div class="wod-public-back">
-      <a href="/" class="btn btn-link text-decoration-none"><i class="bi bi-arrow-left me-1"></i>Back to home</a>
     </div>
   <% } else { %>
-    <section class="wod-public-card reveal">
-      <h1 class="h3">Word of the Day</h1>
-      <p class="text-muted mb-0">No approved word is scheduled for today yet.</p>
+    <section class="wod-public-empty-card reveal">
+      <p class="wod-public-kicker">Word of the Day</p>
+      <% if (wodFormattedDateLabel) { %><p class="wod-public-date-label mb-2"><%= wodFormattedDateLabel %></p><% } %>
+      <h1 class="h4">No word yet</h1>
+      <p class="text-muted mb-0">No approved word is scheduled for this day yet.</p>
     </section>
   <% } %>
 </section>

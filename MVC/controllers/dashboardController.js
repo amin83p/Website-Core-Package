@@ -19,7 +19,7 @@ const {
 const sectionNavigationPreferencesService = require('../services/sectionNavigationPreferencesService');
 const dashboardPinnedModuleService = require('../services/dashboardPinnedModuleService');
 const sectionsOperationsCatalogCacheService = require('../services/cache/sectionsOperationsCatalogCacheService');
-const wordOfDayDashboardWidgetService = require('../services/wordOfDayDashboardWidgetService');
+const dashboardHeroFeedService = require('../services/dashboardHeroFeedService');
 const {
   buildDashboardAllSectionsCacheKey,
   readDashboardAllSectionsCache,
@@ -773,8 +773,7 @@ async function renderSubDashboardForParent(req, res, parentSection, allSections,
   const displayName = resolveSectionDisplayTitle(parentSection, formatDashboardLabel);
   const title = `${displayName} - Subsections`;
 
-  const wordOfDayPayload = await wordOfDayDashboardWidgetService.resolveWordOfDayDashboardPayload(req);
-  const wordOfDayUiConstants = wordOfDayDashboardWidgetService.getWordOfDayUiConstants();
+  const dashboardHeroFeeds = await dashboardHeroFeedService.resolveDashboardHeroFeedsForSection(req, parentSection);
 
   return res.render('dashboard/sectionSubDashboard', {
     title,
@@ -787,8 +786,7 @@ async function renderSubDashboardForParent(req, res, parentSection, allSections,
     dashboardSection: parentWithIcon,
     dashboardBackHref: '/dashboard',
     dashboardBackLabel: 'Back to Dashboard',
-    wordOfDayPayload,
-    wordOfDayUiConstants
+    dashboardHeroFeeds
   });
 }
 
