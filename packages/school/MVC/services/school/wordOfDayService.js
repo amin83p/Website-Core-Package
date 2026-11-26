@@ -3,7 +3,10 @@
 const schoolRepositories = require('../../repositories/school');
 const wordOfDayModel = require('../../models/school/wordOfDayModel');
 const wordOfDayAccessService = require('./wordOfDayAccessService');
+const wordOfDayReviewFilter = require('./wordOfDayReviewFilter');
 const personDisplayNameService = require('./personDisplayNameService');
+const schoolFileService = require('./schoolFileService');
+const { SCOPE_MODES } = require('./schoolDataScopeBuilder');
 const { requireCoreModule } = require('./schoolCoreModuleResolver');
 const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 
@@ -11,6 +14,63 @@ const MEDIA_LIMIT_BYTES = Object.freeze({
   photo: 2 * 1024 * 1024,
   audio: 3 * 1024 * 1024
 });
+
+const MEDIA_KINDS = Object.freeze(['photo', 'audio']);
+
+function enrichMediaRef(raw) {
+  if (!raw || typeof raw !== 'object') return {};
+  const normalized = schoolFileService.normalizeExistingAttachment(raw);
+  if (!normalized?.url) return {};
+  return {
+    url: normalized.url,
+    fileName: cleanString(raw.fileName || normalized.originalName || normalized.name, 260),
+    mimeType: cleanString(raw.mimeType || normalized.mimeType, 120),
+    sizeBytes: Number.isFinite(Number(raw.sizeBytes))
+      ? Math.max(0, Math.floor(Number(raw.sizeBytes)))
+      : (Number.isFinite(Number(normalized.size)) ? Math.max(0, Math.floor(Number(normalized.size))) : 0)
+  };
+}
+
+function enrichEntryMedia(row) {
+  if (!row || typeof row !== 'object') return row;
+  return {
+    ...row,
+    photo: enrichMediaRef(row.photo),
+    audio: enrichMediaRef(row.audio)
+  };
+}
+
+function mediaRefStorageKey(ref) {
+  if (!ref || typeof ref !== 'object') return '';
+  const normalized = schoolFileService.normalizeAttachmentDownloadRef(ref);
+  if (normalized) return normalized;
+  return cleanString(ref.url || ref.storagePath || ref.path, 2000);
+}
+
+function shouldDeleteSupersededMedia(existingRef, nextRef) {
+  const prevKey = mediaRefStorageKey(existingRef);
+  if (!prevKey) return false;
+  const nextKey = mediaRefStorageKey(nextRef);
+  return prevKey !== nextKey;
+}
+
+async function deleteEntryMediaFiles(entry) {
+  if (!entry || typeof entry !== 'object') return;
+  await Promise.all(MEDIA_KINDS.map(async (kind) => {
+    const ref = entry[kind];
+    if (mediaRefStorageKey(ref)) {
+      await schoolFileService.deleteAttachmentFile(ref).catch(() => {});
+    }
+  }));
+}
+
+async function deleteSupersededMediaKinds(existing, body, patch) {
+  await Promise.all(MEDIA_KINDS.map(async (kind) => {
+    if (body?.[kind] === undefined) return;
+    if (!shouldDeleteSupersededMedia(existing?.[kind], patch?.[kind])) return;
+    await schoolFileService.deleteAttachmentFile(existing?.[kind]).catch(() => {});
+  }));
+}
 
 function cleanString(value, max = 5000) {
   if (value === undefined || value === null) return '';
@@ -24,6 +84,32 @@ function getActiveOrgId(user) {
 
 function getActorId(user) {
   return toPublicId(user?.id || user?._id || user?.userId || user?.username || '');
+}
+
+/** Org-wide repository scope; row visibility is enforced in wordOfDayAccessService. */
+function buildWordOfDayRepositoryListScope(orgId) {
+  const activeOrgId = toPublicId(orgId);
+  if (!activeOrgId) {
+    return {
+      denyAll: true,
+      canViewAll: false,
+      activeOrgId: null,
+      scopeMode: SCOPE_MODES.USER
+    };
+  }
+  return {
+    denyAll: false,
+    canViewAll: false,
+    activeOrgId,
+    scopeMode: SCOPE_MODES.ORG_WIDE
+  };
+}
+
+async function listWordOfDayRepositoryRows({ orgId, query = {} } = {}) {
+  return schoolRepositories.wordOfDay.list({
+    query,
+    scope: buildWordOfDayRepositoryListScope(orgId)
+  });
 }
 
 async function getActorName(user) {
@@ -60,28 +146,41 @@ function assertUpdateAllowed(row, access, reqUser) {
 async function listEntries(reqUser, query = {}, access = null) {
   const orgId = getActiveOrgId(reqUser);
   if (!access || !access.canViewEntries) return [];
-  const rows = await schoolRepositories.wordOfDay.list({ orgId, ...query });
+  const statusFilter = String(query?.status || '').trim().toLowerCase();
+  const repositoryQuery = statusFilter ? { status__eq: statusFilter } : {};
+  const rows = await listWordOfDayRepositoryRows({ orgId, query: repositoryQuery });
   const list = Array.isArray(rows) ? rows : (rows?.items || []);
-  const view = String(query?.view || '').toLowerCase() === 'archived' ? 'archived' : 'active';
+  const viewRaw = String(query?.view || '').toLowerCase();
+  const view = viewRaw === 'archived' ? 'archived' : (viewRaw === 'review' ? 'review' : 'active');
   const actorId = getActorId(reqUser);
   const year = currentCalendarYear();
-  return list.filter((row) => wordOfDayAccessService.rowVisibleInList(row, access, actorId, year, view));
+  const visibilityView = view === 'archived' ? 'archived' : 'active';
+  return list.filter((row) => {
+    if (!wordOfDayAccessService.rowVisibleInList(row, access, actorId, year, visibilityView)) return false;
+    if (view === 'review') return String(row?.status || '').toLowerCase() === 'submitted';
+    if (statusFilter && String(row?.status || '').toLowerCase() !== statusFilter) return false;
+    return true;
+  }).map((row) => enrichEntryMedia(row));
 }
 
 async function getEntry(reqUser, id, access = null) {
   const orgId = getActiveOrgId(reqUser);
   const row = await schoolRepositories.wordOfDay.getById(id, { orgId });
   if (!row) return null;
-  if (!access) return row;
-  wordOfDayAccessService.assertRowVisible(row, access, getActorId(reqUser), currentCalendarYear());
-  return row;
+  if (access) {
+    wordOfDayAccessService.assertRowVisible(row, access, getActorId(reqUser), currentCalendarYear());
+  }
+  return enrichEntryMedia(row);
 }
 
 function buildAuthorPayload(reqUser, authorName, body = {}, access = {}) {
   let authorUserId = getActorId(reqUser);
   let authorDisplay = authorName || authorUserId;
   const requestedAuthor = toPublicId(body?.authorUserId || body?.createdBy);
-  if (requestedAuthor && access?.canCreateAsOtherUser && !idsEqual(requestedAuthor, authorUserId)) {
+  const canAssignOtherAuthor = Boolean(
+    access?.canCreateAsOtherUser || access?.canChangeAuthorOnEdit
+  );
+  if (requestedAuthor && canAssignOtherAuthor && !idsEqual(requestedAuthor, authorUserId)) {
     authorUserId = requestedAuthor;
     authorDisplay = cleanString(body?.authorName, 160) || requestedAuthor;
   }
@@ -114,14 +213,14 @@ function formatDuplicateSummary(row) {
     authorName: row.authorName || row.authorUserId || '',
     createdBy: row.audit?.createdBy || row.authorUserId || '',
     createDateTime: row.audit?.createDateTime || '',
-    detailUrl: row.id ? `/school/word-of-day/detail/${encodeURIComponent(row.id)}` : ''
+    detailUrl: row.id ? `/school/word-of-day?openEntry=${encodeURIComponent(row.id)}` : ''
   };
 }
 
 async function findDuplicateWord(orgId, word, excludeId = '') {
   const key = wordOfDayModel.normalizeWordKey(word);
   if (!key || !orgId) return null;
-  const rows = await schoolRepositories.wordOfDay.list({ orgId: String(orgId).trim() });
+  const rows = await listWordOfDayRepositoryRows({ orgId: String(orgId).trim() });
   const list = Array.isArray(rows) ? rows : (rows?.items || []);
   return list.find((row) => {
     if (excludeId && idsEqual(row?.id, excludeId)) return false;
@@ -171,7 +270,8 @@ async function createEntry(reqUser, body, { saveAs = 'saved', access = null } = 
       updatedBy: getActorId(reqUser)
     }
   }, { isUpdate: false });
-  return schoolRepositories.wordOfDay.create(payload, { orgId });
+  const created = await schoolRepositories.wordOfDay.create(payload, { orgId });
+  return enrichEntryMedia(created);
 }
 
 async function updateEntry(reqUser, id, body, { saveAs, access = null } = {}) {
@@ -187,18 +287,38 @@ async function updateEntry(reqUser, id, body, { saveAs, access = null } = {}) {
     await assertNoDuplicateWord(getActiveOrgId(reqUser), body.word, existing.id);
   }
 
+  if (!body || typeof body !== 'object' || !Object.keys(body).length) {
+    const error = new Error('No form fields were received. Save was not applied.');
+    error.statusCode = 400;
+    throw error;
+  }
   const patch = wordOfDayModel.sanitizeWordOfDayInput({ ...existing, ...body }, { isUpdate: true });
+  if (access?.canChangeAuthorOnEdit && (body?.authorUserId !== undefined || body?.authorName !== undefined)) {
+    const authorName = await getActorName(reqUser);
+    const authorPayload = buildAuthorPayload(reqUser, authorName, body, access);
+    Object.assign(patch, authorPayload);
+    const existingAudit = existing.audit && typeof existing.audit === 'object' ? existing.audit : {};
+    const nextAuthorId = toPublicId(authorPayload.authorUserId);
+    if (nextAuthorId && !idsEqual(nextAuthorId, existingAudit.createdBy)) {
+      patch.audit = {
+        ...existingAudit,
+        ...(patch.audit && typeof patch.audit === 'object' ? patch.audit : {}),
+        createdBy: nextAuthorId
+      };
+    }
+  }
+  const actorId = getActorId(reqUser);
+  const year = currentCalendarYear();
   let nextStatus = existing.status;
   if (saveAs === 'submitted') {
-    const from = String(existing.status || '').toLowerCase();
-    if (!['saved', 'reopened'].includes(from)) {
-      const error = new Error('Only saved or reopened entries can be submitted.');
+    if (!wordOfDayAccessService.canSubmitEntryViaSave(existing, access, actorId, year)) {
+      const error = new Error('You cannot submit this entry from its current status.');
       error.statusCode = 409;
       throw error;
     }
     nextStatus = 'submitted';
   } else if (saveAs === 'saved') {
-    nextStatus = String(existing.status || 'saved').toLowerCase() === 'submitted' ? 'submitted' : 'saved';
+    nextStatus = String(existing.status || 'saved').toLowerCase();
   }
 
   const now = new Date().toISOString();
@@ -210,13 +330,20 @@ async function updateEntry(reqUser, id, body, { saveAs, access = null } = {}) {
       submittedByName: await getActorName(reqUser)
     });
   }
+  const existingAudit = existing.audit && typeof existing.audit === 'object' ? existing.audit : {};
+  const patchAudit = patch.audit && typeof patch.audit === 'object' ? patch.audit : {};
   const updated = await schoolRepositories.wordOfDay.update(id, {
     ...patch,
     status: nextStatus,
     workflow,
-    audit: { updatedBy: getActorId(reqUser) }
+    audit: {
+      ...existingAudit,
+      ...patchAudit,
+      updatedBy: getActorId(reqUser)
+    }
   }, { orgId: getActiveOrgId(reqUser) });
-  return updated;
+  await deleteSupersededMediaKinds(existing, body, patch);
+  return enrichEntryMedia(updated);
 }
 
 async function transitionEntry(reqUser, id, targetStatus, access, options = {}) {
@@ -315,7 +442,10 @@ async function deleteEntry(reqUser, id, access = null, options = {}) {
     forDelete: true,
     confirmDisplayRisk: options.confirmDisplayRisk === true
   });
-  return schoolRepositories.wordOfDay.remove(id, { orgId: getActiveOrgId(reqUser) });
+  const orgId = getActiveOrgId(reqUser);
+  await schoolRepositories.wordOfDay.remove(id, { orgId });
+  await deleteEntryMediaFiles(existing);
+  return true;
 }
 
 function yearFromAudit(row) {
@@ -341,13 +471,51 @@ async function summarizeAuthorStats(reqUser, access = null) {
   return { authorUserId: authorId, byYear };
 }
 
+async function searchForReview(reqUser, filters = {}, access = null) {
+  if (!access?.canResolveWords && !access?.adminFlags?.resolve) {
+    const error = new Error('You do not have permission to review words.');
+    error.statusCode = 403;
+    throw error;
+  }
+  if (!access?.canViewEntries && !access?.adminFlags?.readAll) {
+    return [];
+  }
+  const orgId = getActiveOrgId(reqUser);
+  const rows = await listWordOfDayRepositoryRows({ orgId });
+  const list = Array.isArray(rows) ? rows : (rows?.items || []);
+  const actorId = getActorId(reqUser);
+  const year = currentCalendarYear();
+
+  const visible = list.filter((row) => {
+    const status = String(row?.status || '').toLowerCase();
+    const visibilityView = status === 'archived' ? 'archived' : 'active';
+    return wordOfDayAccessService.rowVisibleInList(row, access, actorId, year, visibilityView);
+  });
+
+  const filtered = wordOfDayReviewFilter.applyReviewFilters(visible, filters);
+
+  const sorted = [...filtered].sort((a, b) => {
+    const aMs = Date.parse(String(a?.audit?.lastUpdateDateTime || a?.audit?.createDateTime || '')) || 0;
+    const bMs = Date.parse(String(b?.audit?.lastUpdateDateTime || b?.audit?.createDateTime || '')) || 0;
+    return bMs - aMs;
+  });
+
+  return sorted.map((row) => {
+    const enriched = enrichEntryMedia(row);
+    return {
+      ...enriched,
+      capabilities: buildEntryCapabilities(enriched, access, reqUser)
+    };
+  });
+}
+
 function buildEntryCapabilities(entry, access, reqUser) {
   const actorId = getActorId(reqUser);
   const year = currentCalendarYear();
   const status = String(entry?.status || '').toLowerCase();
   return {
     canEdit: wordOfDayAccessService.canUpdateEntry(entry, access, actorId, year),
-    canSubmit: ['saved', 'reopened'].includes(status) && wordOfDayAccessService.canUpdateEntry(entry, access, actorId, year),
+    canSubmit: wordOfDayAccessService.canSubmitEntryViaSave(entry, access, actorId, year),
     canApprove: wordOfDayAccessService.canResolveTransition(entry, 'approved', access, actorId, year),
     canReject: wordOfDayAccessService.canResolveTransition(entry, 'rejected', access, actorId, year),
     canReopen: wordOfDayAccessService.canResolveTransition(entry, 'reopened', access, actorId, year),
@@ -358,16 +526,20 @@ function buildEntryCapabilities(entry, access, reqUser) {
   };
 }
 
-function validateUploadedFile(file, kind) {
+function validateUploadedFile(file, kind, maxBytes) {
   if (!file) {
     const error = new Error('No file was uploaded.');
     error.statusCode = 400;
     throw error;
   }
-  const limit = MEDIA_LIMIT_BYTES[kind];
+  const fallback = MEDIA_LIMIT_BYTES[kind];
+  const limit = Number.isFinite(Number(maxBytes)) && Number(maxBytes) > 0
+    ? Number(maxBytes)
+    : fallback;
   const size = Number(file.size || 0);
   if (limit && size > limit) {
-    const error = new Error(`${kind === 'photo' ? 'Photo' : 'Audio'} must be ${kind === 'photo' ? '2' : '3'} MB or smaller.`);
+    const limitMb = Math.max(1, Math.round(limit / (1024 * 1024)));
+    const error = new Error(`${kind === 'photo' ? 'Photo' : 'Audio'} must be ${limitMb} MB or smaller.`);
     error.statusCode = 400;
     throw error;
   }
@@ -386,12 +558,18 @@ function validateUploadedFile(file, kind) {
 
 module.exports = {
   MEDIA_LIMIT_BYTES,
+  MEDIA_KINDS,
+  enrichMediaRef,
+  enrichEntryMedia,
+  mediaRefStorageKey,
+  shouldDeleteSupersededMedia,
   canManageAll,
   formatTypeLabels,
   formatDuplicateSummary,
   findDuplicateWord,
   assertNoDuplicateWord,
   listEntries,
+  searchForReview,
   getEntry,
   createEntry,
   updateEntry,

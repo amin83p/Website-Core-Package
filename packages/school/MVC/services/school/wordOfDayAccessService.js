@@ -16,6 +16,14 @@ const UPDATE_STATUSES_BY_TIER = Object.freeze({
   admin: null
 });
 
+const SUBMIT_VIA_SAVE_STATUSES_BY_TIER = Object.freeze({
+  owner: new Set(['saved', 'reopened']),
+  department: new Set(['saved', 'reopened', 'submitted']),
+  division: new Set(['saved', 'reopened', 'submitted']),
+  organization: new Set(['saved', 'reopened', 'submitted']),
+  admin: null
+});
+
 const DELETE_STATUSES_BY_TIER = Object.freeze({
   owner: new Set(['saved', 'reopened']),
   department: new Set(['saved', 'reopened']),
@@ -187,6 +195,18 @@ function canUpdateEntry(row, access, actorId, currentYear) {
   return statusAllowedForTier(status, tier, UPDATE_STATUSES_BY_TIER);
 }
 
+function canSubmitEntryViaSave(row, access, actorId, currentYear) {
+  if (!canUpdateEntry(row, access, actorId, currentYear)) return false;
+  const status = String(row?.status || '').toLowerCase();
+  if (status === 'archived') return false;
+  if (access?.adminFlags?.update) return true;
+  const tier = effectiveTier(access, 'update');
+  if (tier === 'admin') return true;
+  if (tier === 'owner' && !isOwnerRow(row, actorId)) return false;
+  if ((tier === 'department' || tier === 'division') && entryYear(row) !== String(currentYear)) return false;
+  return statusAllowedForTier(status, tier, SUBMIT_VIA_SAVE_STATUSES_BY_TIER);
+}
+
 function canDeleteEntry(row, access, actorId, currentYear) {
   if (!access?.canDeleteWords && !access?.adminFlags?.delete) return false;
   if (!rowVisibleInList(row, access, actorId, currentYear, 'active') && String(row?.status || '').toLowerCase() !== 'archived') return false;
@@ -251,6 +271,7 @@ module.exports = {
   rowVisibleInList,
   assertRowVisible,
   canUpdateEntry,
+  canSubmitEntryViaSave,
   canDeleteEntry,
   canResolveTransition,
   hasDisplayHistory,

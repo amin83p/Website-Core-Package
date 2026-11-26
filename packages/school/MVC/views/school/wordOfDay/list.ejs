@@ -1,71 +1,102 @@
 <% const wodAccess = typeof wordOfDayAccess !== 'undefined' ? wordOfDayAccess : {};
-const listViewMode = typeof listView !== 'undefined' ? listView : 'active'; %>
+const listViewMode = typeof listView !== 'undefined' ? listView : 'active';
+const listRows = (typeof data !== 'undefined' && Array.isArray(data)) ? data : (entries || []);
+const manageBtns = [];
+if (listViewMode === 'archived') {
+  manageBtns.push('<a href="/school/word-of-day" class="btn btn-outline-primary btn-md mb-2"><i class="bi bi-journal-text me-1"></i> Active words</a>');
+} else {
+  manageBtns.push('<a href="/school/word-of-day?view=archived" class="btn btn-outline-warning btn-md mb-2"><i class="bi bi-archive me-1"></i> Archived words</a>');
+}
+if (wodAccess.canResolveWords) {
+  manageBtns.push('<button type="button" class="btn btn-outline-primary btn-md mb-2" id="btnWordOfDayReview"><i class="bi bi-clipboard-check me-1"></i> Review Words</button>');
+}
+if (wodAccess.canConfigureDisplay) {
+  manageBtns.push('<a href="/school/settings#word-of-day" class="btn btn-outline-success btn-md mb-2"><i class="bi bi-sliders me-1"></i> Configure Display</a>');
+}
+%>
 <% if (wodAccess.canOpenList && !wodAccess.canViewEntries) { %>
-  <div class="alert alert-info mb-3">You can open Word of Day, but your profile does not grant list visibility (READ_ALL).</div>
+  <div class="alert alert-info mb-3">You can open Word of the Day, but your profile does not grant list visibility (READ_ALL).</div>
 <% } %>
-<div class="d-flex flex-wrap gap-2 mb-2">
-  <a href="/school/word-of-day" class="btn btn-sm <%= listViewMode === 'active' ? 'btn-primary' : 'btn-outline-primary' %>">Active words</a>
-  <a href="/school/word-of-day?view=archived" class="btn btn-sm <%= listViewMode === 'archived' ? 'btn-primary' : 'btn-outline-secondary' %>">Archived</a>
-</div>
 <%- include('partials/tablePages-start', {
   title,
-  newUrl: 'school/word-of-day',
-  newLabel: 'New word',
-  newHref: wodAccess.canCreateWords ? '/school/word-of-day/new' : '',
+  newUrl: typeof newUrl !== 'undefined' ? newUrl : 'school/word-of-day',
+  newLabel: typeof newLabel !== 'undefined' ? newLabel : null,
+  newHref: (wodAccess.canCreateWords && listViewMode !== 'archived') ? '/school/word-of-day/new' : '',
   user,
-  tableName: 'school_word_of_day',
+  tableName: 'School_Word_Of_The_Day',
   btn_export: false,
-  print: false,
+  print: typeof print !== 'undefined' ? print : false,
+  actionStateId: typeof actionStateId !== 'undefined' ? actionStateId : '',
   headerManageBtns: [
     '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>'
-  ]
+  ],
+  manageBtns
 }) %>
 
 <%- include('partials/tablePages-search', {
-  placeholder: 'Search words...',
-  fields: [
+  placeholder: 'Search words…',
+  fields: listViewMode !== 'review' ? [
     { name: 'status', label: 'Status', type: 'select', options: (statuses || []).map((s) => ({ value: s, label: s.replace(/_/g, ' ') })) }
-  ]
+  ] : []
 }) %>
 
 <div class="table-scroll-wrapper" data-floating-row-actions="true">
   <table class="table-responsive size-md" id="first-table">
     <thead>
       <tr>
-        <th class="ps-4">Word</th>
-        <th>Type</th>
-        <th>Difficulty</th>
-        <th>Status</th>
-        <th>Displays</th>
+        <th class="draggable ps-4" data-column="word">Word</th>
+        <th class="draggable" data-column="wordType">Type</th>
+        <th class="draggable" data-column="difficulty">Difficulty</th>
+        <th class="draggable" data-column="status">Status</th>
+        <th class="draggable" data-column="displayCount">Displays</th>
         <th class="text-end pe-4">Actions</th>
       </tr>
     </thead>
     <tbody>
-      <% if (!entries || entries.length === 0) { %>
+      <% if (!listRows || listRows.length === 0) { %>
         <tr><td colspan="6" class="text-center py-4 text-muted">No entries found.</td></tr>
       <% } %>
-      <% (entries || []).forEach((row) => { %>
+      <% listRows.forEach((row) => { %>
         <% const status = String(row.status || '').toLowerCase();
+        const caps = row.capabilities || {};
         let badge = 'bg-secondary';
         if (status === 'approved') badge = 'bg-success';
         if (status === 'submitted') badge = 'bg-warning text-dark';
-        if (status === 'rejected') badge = 'bg-danger'; %>
-        <tr>
+        if (status === 'rejected') badge = 'bg-danger';
+        if (status === 'on_hold') badge = 'bg-info text-dark';
+        if (status === 'archived') badge = 'bg-dark';
+        if (status === 'reopened') badge = 'bg-primary';
+        const wodTypes = Array.isArray(row.wordTypes) && row.wordTypes.length
+          ? row.wordTypes
+          : (row.wordType ? [row.wordType] : []);
+        const wodTypeText = wodTypes.map((key) => (wordTypeLabels || {})[key] || key).join(', ') || '—';
+        const displayCount = Number(row.display && row.display.displayCount ? row.display.displayCount : 0);
+        %>
+        <tr data-entry-id="<%= row.id %>">
           <td class="ps-4">
-            <div class="fw-bold"><a href="/school/word-of-day/detail/<%= row.id %>"><%= row.word %></a></div>
+            <button type="button" class="btn btn-link p-0 fw-bold text-decoration-none text-start" data-wod-list-open data-entry-id="<%= row.id %>"><%= row.word %></button>
             <div class="small text-muted"><%= row.authorName || row.authorUserId || '—' %></div>
           </td>
-          <td><%
-            const wodTypes = Array.isArray(row.wordTypes) && row.wordTypes.length
-              ? row.wordTypes
-              : (row.wordType ? [row.wordType] : []);
-            const wodTypeText = wodTypes.map((key) => (wordTypeLabels || {})[key] || key).join(', ') || '—';
-          %><%= wodTypeText %></td>
-          <td><%= (difficultyLabels || {})[row.difficulty] || row.difficulty %></td>
-          <td><span class="badge <%= badge %>"><%= status.toUpperCase() %></span></td>
-          <td><%= Number(row.display && row.display.displayCount ? row.display.displayCount : 0) %></td>
-          <td class="text-end pe-4">
-            <a href="/school/word-of-day/detail/<%= row.id %>" class="btn btn-outline-secondary btn-sm">Open</a>
+          <td data-sort-value="<%= wodTypeText %>"><%= wodTypeText %></td>
+          <td data-sort-value="<%= row.difficulty || '' %>"><%= (difficultyLabels || {})[row.difficulty] || row.difficulty %></td>
+          <td data-sort-value="<%= status %>"><span class="badge <%= badge %>" data-wod-list-status><%= status.toUpperCase() %></span></td>
+          <td data-sort-value="<%= displayCount %>" data-wod-list-displays><%= displayCount %></td>
+          <td class="table-actions text-end pe-4">
+            <div class="row-actions-wrap">
+              <button type="button" class="btn btn-secondary btn-sm btn-row-actions-toggle" data-row-actions-id="<%= row.id %>" title="Word actions" aria-label="Word actions">
+                <i class="bi bi-three-dots-vertical"></i>
+              </button>
+              <div class="row-actions-menu d-none" data-row-actions-id="<%= row.id %>">
+                <button type="button" class="btn btn-outline-primary btn-sm" data-wod-list-open data-entry-id="<%= row.id %>"><i class="bi bi-box-arrow-up-right me-2"></i>Open</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" data-wod-list-feedback data-entry-id="<%= row.id %>" data-word-label="<%= row.word %>"><i class="bi bi-chat-heart me-2"></i>Public feedback</button>
+                <% if (caps.canEdit) { %>
+                  <a href="/school/word-of-day/edit/<%= row.id %>" class="btn btn-outline-primary btn-sm" data-wod-list-edit><i class="bi bi-pencil-square me-2"></i>Edit</a>
+                <% } %>
+                <% if (caps.canDelete) { %>
+                  <button type="button" class="btn btn-outline-danger btn-sm" data-wod-list-delete data-entry-id="<%= row.id %>" data-word-label="<%= row.word %>"><i class="bi bi-trash me-2"></i>Delete</button>
+                <% } %>
+              </div>
+            </div>
           </td>
         </tr>
       <% }) %>
@@ -73,4 +104,27 @@ const listViewMode = typeof listView !== 'undefined' ? listView : 'active'; %>
   </table>
 </div>
 
+<% if (typeof pagination !== 'undefined' && pagination) { %>
+  <%- include('partials/pagination', {
+    pagination,
+    filters,
+    baseUrlPath: typeof newUrl !== 'undefined' ? newUrl : 'school/word-of-day'
+  }) %>
+<% } %>
+
 <%- include('partials/tablePages-end') %>
+<%- include('school/wordOfDay/partials/entryModal') %>
+<%- include('school/wordOfDay/partials/publicFeedbackModal') %>
+<%- include('partials/modal_ImageViewer') %>
+<%- include('school/wordOfDay/partials/reviewModal') %>
+<script type="application/json" id="wodListReviewBootstrap"><%- JSON.stringify({
+  openReview: Boolean(typeof openReviewModal !== 'undefined' && openReviewModal),
+  openEntryId: typeof openEntryId !== 'undefined' ? String(openEntryId || '') : '',
+  canResolve: Boolean(wodAccess.canResolveWords)
+}) %></script>
+<script src="/scripts/schoolModalStack.js"></script>
+<script src="/scripts/wordOfDayWorkflowClient.js"></script>
+<script src="/scripts/wordOfDayEntryDetailUi.js"></script>
+<script src="/scripts/wordOfDayListClient.js"></script>
+<script src="/scripts/schoolDateRangeShortcuts.js"></script>
+<script src="/scripts/wordOfDayReviewModal.js"></script>

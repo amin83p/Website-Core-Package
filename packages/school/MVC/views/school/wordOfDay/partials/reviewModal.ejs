@@ -1,0 +1,171 @@
+<% const wodStatuses = (typeof statuses !== 'undefined' && Array.isArray(statuses)) ? statuses : [];
+const wodCanResolve = typeof wordOfDayAccess !== 'undefined' && wordOfDayAccess.canResolveWords;
+%>
+<% if (wodCanResolve) { %>
+<style>
+  #wordOfDayReviewModal .schedule-date-range-menu {
+    position: fixed;
+    z-index: 2060;
+    min-width: 12rem;
+    max-height: 18rem;
+    overflow: auto;
+    background: var(--bs-body-bg, #fff);
+    border: 1px solid var(--bs-border-color, #dee2e6);
+    border-radius: 0.375rem;
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,.15);
+    padding: 0.35rem 0;
+  }
+  #wordOfDayReviewModal .schedule-date-range-option {
+    display: block;
+    width: 100%;
+    text-align: left;
+    border: 0;
+    background: transparent;
+    padding: 0.35rem 0.75rem;
+    font-size: 0.875rem;
+  }
+  #wordOfDayReviewModal .schedule-date-range-option:hover {
+    background: var(--bs-light, #f8f9fa);
+  }
+  #wordOfDayReviewModal .wod-review-author-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem 0.75rem;
+    width: 100%;
+  }
+  #wordOfDayReviewModal .wod-review-author-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  #wordOfDayReviewModal .wod-status-action-btn,
+  #wordOfDayEntryModal .wod-status-action-btn {
+    font-weight: 600;
+    border-radius: 2rem;
+    padding-inline: 0.9rem;
+    letter-spacing: 0.01em;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+    transition: transform 0.12s ease, box-shadow 0.12s ease;
+  }
+  #wordOfDayReviewModal .wod-status-action-btn:hover,
+  #wordOfDayEntryModal .wod-status-action-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(15, 23, 42, 0.12);
+  }
+  #wordOfDayReviewModal .wod-review-row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.25rem;
+    justify-content: flex-end;
+  }
+  #wordOfDayReviewModal .wod-review-row-actions .wod-status-action-btn {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 0.1rem 0.4rem;
+    border-radius: 1.25rem;
+    letter-spacing: 0;
+    box-shadow: none;
+  }
+  #wordOfDayReviewModal .wod-review-row-actions .wod-status-action-btn .bi {
+    font-size: 0.78rem;
+    margin-right: 0.2rem !important;
+  }
+  #wordOfDayReviewModal .wod-review-row-actions .wod-status-action-btn:hover {
+    transform: none;
+    box-shadow: none;
+  }
+  #wordOfDayReviewModal .wod-review-modal-dialog {
+    width: calc(100% - 1.5rem);
+    max-width: min(1320px, 96vw);
+  }
+</style>
+<%- include('../../schedule/partials/personScheduleDateRangeShortcuts', {
+  dateRangeMenuId: 'wodReviewDateRangeMenu',
+  includeMatrixAllDates: true
+}) %>
+<div class="modal fade" id="wordOfDayReviewModal" tabindex="-1" aria-labelledby="wordOfDayReviewModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable wod-review-modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title fw-bold" id="wordOfDayReviewModalLabel"><i class="bi bi-clipboard-check me-2"></i>Review Words</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div class="card border-0 bg-light mb-3">
+          <div class="card-body py-3">
+            <div class="row g-3 align-items-end">
+              <div class="col-md-3 col-lg-3">
+                <label class="form-label fw-semibold small" for="wodReviewDateFrom">Date from</label>
+                <div class="d-flex gap-1">
+                  <input type="date" class="form-control form-control-sm" id="wodReviewDateFrom" autocomplete="off">
+                  <button type="button" class="btn btn-outline-secondary btn-sm" id="wodReviewDateShortcutsBtn" title="Quick date ranges" aria-expanded="false" aria-controls="wodReviewDateRangeMenu"><i class="bi bi-calendar-range"></i></button>
+                </div>
+              </div>
+              <div class="col-md-3 col-lg-3">
+                <label class="form-label fw-semibold small" for="wodReviewDateTo">Date to</label>
+                <input type="date" class="form-control form-control-sm" id="wodReviewDateTo" autocomplete="off">
+              </div>
+              <div class="col-md-6 col-lg-6">
+                <label class="form-label fw-semibold small" for="wodReviewText">Search text</label>
+                <input type="text" class="form-control form-control-sm" id="wodReviewText" placeholder="Word or meaning…" autocomplete="off">
+              </div>
+              <div class="col-12">
+                <label class="form-label fw-semibold small mb-1">Authors</label>
+                <div class="wod-review-author-row">
+                  <button type="button" class="btn btn-outline-primary btn-sm flex-shrink-0" id="wodReviewPickUsersBtn"><i class="bi bi-people me-1"></i>Pick users</button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm flex-shrink-0 d-none" id="wodReviewClearUsersBtn">Clear</button>
+                  <div id="wodReviewUserChips" class="wod-review-author-summary" aria-live="polite">
+                    <span class="small text-muted mb-0">All users</span>
+                  </div>
+                </div>
+                <input type="hidden" id="wodReviewAuthorUserIds" value="">
+              </div>
+              <div class="col-12">
+                <fieldset class="mb-0">
+                  <legend class="form-label fw-semibold small mb-1">Statuses</legend>
+                  <div class="d-flex flex-wrap gap-3" id="wodReviewStatusFilters">
+                    <% wodStatuses.forEach((st) => { %>
+                      <% const checked = st === 'submitted' ? 'checked' : ''; %>
+                      <div class="form-check form-check-inline mb-0">
+                        <input class="form-check-input wod-review-status-cb" type="checkbox" value="<%= st %>" id="wodReviewStatus-<%= st %>" <%= checked %>>
+                        <label class="form-check-label small" for="wodReviewStatus-<%= st %>"><%= st.replace(/_/g, ' ') %></label>
+                      </div>
+                    <% }); %>
+                  </div>
+                </fieldset>
+              </div>
+              <div class="col-12 d-flex flex-wrap gap-2">
+                <button type="button" class="btn btn-primary btn-sm" id="wodReviewSearchBtn"><i class="bi bi-search me-1"></i>Search</button>
+                <button type="button" class="btn btn-outline-secondary btn-sm" id="wodReviewResetBtn">Reset filters</button>
+              </div>
+            </div>
+            <p class="small text-muted mb-0 mt-2">Date range matches if <strong>created</strong> or <strong>last modified</strong> falls within the range.</p>
+          </div>
+        </div>
+        <div id="wodReviewResultsStatus" class="small text-muted mb-2 d-none"></div>
+        <div class="table-responsive border rounded">
+          <table class="table table-sm table-hover align-middle mb-0" id="wodReviewResultsTable">
+            <thead class="table-light">
+              <tr>
+                <th class="ps-3">Word</th>
+                <th>Author</th>
+                <th>Status</th>
+                <th>Created</th>
+                <th>Modified</th>
+                <th class="text-end pe-3" style="min-width:11rem;">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="wodReviewResultsBody">
+              <tr class="wod-review-placeholder"><td colspan="6" class="text-center text-muted py-4">Set filters and click Search.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<% } %>

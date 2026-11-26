@@ -116,11 +116,14 @@ async function getHome(req, res) {
   }
 
   let wordOfDayPublic = null;
+  let wordOfDayPublicSourceOrgId = '';
+  const wordOfDayUiConstants = require('../../packages/school/MVC/services/school/wordOfDayUiConstants');
   try {
     const wordOfDayPolicyModel = require('../../packages/school/MVC/models/school/wordOfDayPolicyModel');
     const wordOfDayDisplayService = require('../../packages/school/MVC/services/school/wordOfDayDisplayService');
     const policy = await wordOfDayPolicyModel.getGlobalPublicPolicy();
     if (policy.publicHomeEnabled && policy.publicSourceOrgId) {
+      wordOfDayPublicSourceOrgId = policy.publicSourceOrgId;
       const dateKey = new Date().toISOString().slice(0, 10);
       wordOfDayPublic = await wordOfDayDisplayService.resolveDailyDisplay({
         orgId: policy.publicSourceOrgId,
@@ -144,7 +147,9 @@ async function getHome(req, res) {
     heroSlides,
     homeShowcaseItems,
     buyMeACoffeeQr,
-    wordOfDayPublic
+    wordOfDayPublic,
+    wordOfDayPublicSourceOrgId,
+    wordOfDayUiConstants
   });
 }
 

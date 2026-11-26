@@ -39,6 +39,7 @@ const EMPTY_ACCESS_FLAGS = Object.freeze({
   canDeleteWords: false,
   canConfigureDisplay: false,
   canCreateAsOtherUser: false,
+  canChangeAuthorOnEdit: false,
   isWordOfDayAdminViewer: false,
   readScopeId: null,
   readAllScopeId: null,
@@ -206,6 +207,10 @@ function deriveAccessFlags(evaluations = {}, adminFlags = {}) {
     adminFlags.create
     || (createAllowed && ['admin', 'organization'].includes(normalizeScopeMode(create.scopeId)))
   );
+  const canChangeAuthorOnEdit = Boolean(
+    adminFlags.update
+    || (updateAllowed && normalizeScopeMode(update.scopeId) === 'admin')
+  );
   const isWordOfDayAdminViewer = Boolean(
     adminFlags.readAll || adminFlags.update || adminFlags.resolve || adminFlags.read || adminFlags.configure
   );
@@ -219,6 +224,7 @@ function deriveAccessFlags(evaluations = {}, adminFlags = {}) {
     canDeleteWords,
     canConfigureDisplay,
     canCreateAsOtherUser,
+    canChangeAuthorOnEdit,
     isWordOfDayAdminViewer,
     readScopeId: read.scopeId || null,
     readAllScopeId: readAll.scopeId || null,

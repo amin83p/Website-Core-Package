@@ -1,54 +1,173 @@
+<style>
+  #imageViewerModal .image-viewer-modal-content {
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 20px;
+    overflow: hidden;
+    height: min(88vh, 920px);
+    display: flex;
+    flex-direction: column;
+    background: #0f172a;
+    box-shadow: 0 28px 80px rgba(15, 23, 42, 0.45);
+  }
+  #imageViewerModal .image-viewer-modal-header {
+    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.98), rgba(15, 23, 42, 0.95));
+    padding: 0.85rem 1.1rem;
+    z-index: 10;
+  }
+  #imageViewerModal .image-viewer-modal-title {
+    color: #f1f5f9;
+    font-weight: 700;
+    font-size: 0.95rem;
+  }
+  #imageViewerModal .image-viewer-title-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 12px;
+    background: rgba(10, 102, 194, 0.22);
+    border: 1px solid rgba(96, 165, 250, 0.35);
+    color: #93c5fd;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  #imageViewerModal .image-viewer-download-btn {
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 0.82rem;
+    padding: 0.35rem 0.85rem;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    color: #e2e8f0;
+  }
+  #imageViewerModal .image-viewer-download-btn:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: #fff;
+    border-color: rgba(148, 163, 184, 0.5);
+  }
+  #imageViewerModal .btn-close {
+    filter: invert(1) grayscale(1);
+    opacity: 0.85;
+  }
+  #imageViewerModal .image-viewer-modal-body {
+    background:
+      radial-gradient(circle at 50% 40%, rgba(51, 65, 85, 0.55), transparent 62%),
+      linear-gradient(160deg, #0b1224 0%, #111827 45%, #0f172a 100%);
+    position: relative;
+    overflow: hidden;
+  }
+  #imageViewerModal .image-viewer-modal-body::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(circle at center, transparent 55%, rgba(0, 0, 0, 0.35) 100%);
+  }
+  #imageViewerModal #imgViewerTarget {
+    max-width: 94%;
+    max-height: 94%;
+    transition: transform 0.2s ease-out;
+    cursor: grab;
+    border-radius: 8px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.35);
+  }
+  #imageViewerModal .image-viewer-nav-btn {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    color: #f8fafc;
+    backdrop-filter: blur(6px);
+  }
+  #imageViewerModal .image-viewer-nav-btn:hover {
+    background: rgba(255, 255, 255, 0.18);
+    color: #fff;
+  }
+  #imageViewerModal #imgViewerCounter {
+    background: rgba(15, 23, 42, 0.72);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    color: #cbd5e1;
+    backdrop-filter: blur(8px);
+  }
+  #imageViewerModal .image-viewer-toolbar {
+    background: rgba(15, 23, 42, 0.78);
+    border: 1px solid rgba(148, 163, 184, 0.32);
+    backdrop-filter: blur(10px);
+    border-radius: 999px;
+    padding: 0.45rem 0.55rem;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+  }
+  #imageViewerModal .image-viewer-toolbar .btn {
+    width: 2.15rem;
+    height: 2.15rem;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    color: #e2e8f0;
+  }
+  #imageViewerModal .image-viewer-toolbar .btn:hover {
+    background: rgba(255, 255, 255, 0.16);
+    color: #fff;
+  }
+  #imageViewerModal .image-viewer-toolbar .vr {
+    opacity: 0.35;
+  }
+</style>
+
 <div class="modal fade" id="imageViewerModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered modal-xl">
-    <div class="modal-content border-0 shadow-lg" style="border-radius: 16px; overflow: hidden; height: 85vh; display: flex; flex-direction: column;">
-      <div class="modal-header border-bottom-0 pb-2 bg-white align-items-center z-index-10">
-        <h5 class="modal-title fw-bold text-dark d-flex align-items-center gap-2 text-truncate">
-          <div class="rounded-circle bg-primary-subtle text-primary d-flex align-items-center justify-content-center" style="width: 32px; height: 32px;">
-            <i class="bi bi-file-image"></i>
-          </div>
-          <span id="imgViewerTitle" class="fs-6">Image Preview</span>
+    <div class="modal-content border-0 image-viewer-modal-content">
+      <div class="modal-header image-viewer-modal-header align-items-center">
+        <h5 class="modal-title image-viewer-modal-title d-flex align-items-center gap-2 text-truncate mb-0">
+          <span class="image-viewer-title-icon" aria-hidden="true"><i class="bi bi-image"></i></span>
+          <span id="imgViewerTitle">Image preview</span>
         </h5>
 
         <div class="ms-auto d-flex align-items-center gap-2">
-          <a href="#" id="imgViewerDownload" class="btn btn-sm btn-light border text-dark fw-bold rounded-pill px-3" download>
-            <i class="bi bi-download me-1"></i> Download
+          <a href="#" id="imgViewerDownload" class="btn btn-sm image-viewer-download-btn" download>
+            <i class="bi bi-download me-1"></i>Download
           </a>
           <button type="button" class="btn-close ms-1" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
       </div>
 
-      <div class="modal-body p-0 bg-secondary-subtle position-relative overflow-hidden d-flex align-items-center justify-content-center flex-grow-1 user-select-none" id="imgContainer">
-        <img id="imgViewerTarget" src="" alt="Preview"
-             style="max-width: 95%; max-height: 95%; transition: transform 0.2s ease-out; cursor: grab;">
+      <div class="modal-body p-0 image-viewer-modal-body d-flex align-items-center justify-content-center flex-grow-1 user-select-none" id="imgContainer">
+        <img id="imgViewerTarget" src="" alt="Preview">
 
         <button type="button"
                 id="imgViewerPrevBtn"
                 data-no-wait="true"
-                class="btn btn-light border position-absolute top-50 start-0 translate-middle-y ms-3 d-none"
+                class="btn image-viewer-nav-btn position-absolute top-50 start-0 translate-middle-y ms-3 d-none"
                 onclick="ImageViewer.prev()"
                 title="Previous image">
-          <i class="bi bi-chevron-left fs-4"></i>
+          <i class="bi bi-chevron-left fs-5"></i>
         </button>
 
         <button type="button"
                 id="imgViewerNextBtn"
                 data-no-wait="true"
-                class="btn btn-light border position-absolute top-50 end-0 translate-middle-y me-3 d-none"
+                class="btn image-viewer-nav-btn position-absolute top-50 end-0 translate-middle-y me-3 d-none"
                 onclick="ImageViewer.next()"
                 title="Next image">
-          <i class="bi bi-chevron-right fs-4"></i>
+          <i class="bi bi-chevron-right fs-5"></i>
         </button>
 
         <div id="imgViewerCounter"
-             class="position-absolute top-0 start-50 translate-middle-x mt-2 px-3 py-1 bg-white border rounded-pill shadow-sm small text-muted d-none"></div>
+             class="position-absolute top-0 start-50 translate-middle-x mt-2 px-3 py-1 border rounded-pill shadow-sm small d-none"></div>
 
-        <div class="position-absolute bottom-0 start-50 translate-middle-x mb-4 p-2 bg-white rounded-pill shadow-sm border d-flex gap-2 z-index-20">
-          <button type="button" data-no-wait="true" class="btn btn-light rounded-circle btn-sm" onclick="ImageViewer.zoom(-0.2)" title="Zoom Out"><i class="bi bi-dash-lg"></i></button>
-          <button type="button" data-no-wait="true" class="btn btn-light rounded-circle btn-sm" onclick="ImageViewer.reset()" title="Reset"><i class="bi bi-arrows-fullscreen"></i></button>
-          <button type="button" data-no-wait="true" class="btn btn-light rounded-circle btn-sm" onclick="ImageViewer.zoom(0.2)" title="Zoom In"><i class="bi bi-plus-lg"></i></button>
-          <div class="vr mx-1"></div>
-          <button type="button" data-no-wait="true" class="btn btn-light rounded-circle btn-sm" onclick="ImageViewer.rotate(-90)" title="Rotate Left"><i class="bi bi-arrow-counterclockwise"></i></button>
-          <button type="button" data-no-wait="true" class="btn btn-light rounded-circle btn-sm" onclick="ImageViewer.rotate(90)" title="Rotate Right"><i class="bi bi-arrow-clockwise"></i></button>
+        <div class="position-absolute bottom-0 start-50 translate-middle-x mb-4 image-viewer-toolbar d-flex gap-2 z-index-20">
+          <button type="button" data-no-wait="true" class="btn btn-sm" onclick="ImageViewer.zoom(-0.2)" title="Zoom Out" aria-label="Zoom out"><i class="bi bi-dash-lg"></i></button>
+          <button type="button" data-no-wait="true" class="btn btn-sm" onclick="ImageViewer.reset()" title="Reset" aria-label="Reset zoom"><i class="bi bi-arrows-fullscreen"></i></button>
+          <button type="button" data-no-wait="true" class="btn btn-sm" onclick="ImageViewer.zoom(0.2)" title="Zoom In" aria-label="Zoom in"><i class="bi bi-plus-lg"></i></button>
+          <div class="vr mx-1 align-self-center"></div>
+          <button type="button" data-no-wait="true" class="btn btn-sm" onclick="ImageViewer.rotate(-90)" title="Rotate Left" aria-label="Rotate left"><i class="bi bi-arrow-counterclockwise"></i></button>
+          <button type="button" data-no-wait="true" class="btn btn-sm" onclick="ImageViewer.rotate(90)" title="Rotate Right" aria-label="Rotate right"><i class="bi bi-arrow-clockwise"></i></button>
         </div>
       </div>
     </div>

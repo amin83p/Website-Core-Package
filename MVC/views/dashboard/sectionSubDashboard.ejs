@@ -1,5 +1,9 @@
 <% if (typeof wordOfDayPayload !== 'undefined' && wordOfDayPayload && wordOfDayPayload.entry) { %>
-  <%- include('../../../packages/school/MVC/views/school/wordOfDay/partials/widget', { wordOfDayPayload: wordOfDayPayload }) %>
+  <%- include('../../../packages/school/MVC/views/school/wordOfDay/partials/widget', {
+    wordOfDayPayload: wordOfDayPayload,
+    wordOfDayUiConstants: typeof wordOfDayUiConstants !== 'undefined' ? wordOfDayUiConstants : null,
+    wordOfDayOpenInNewTab: true
+  }) %>
 <% } %>
 <%- include('../partials/dashboard/unifiedDashboard', {
   dashboardKey,

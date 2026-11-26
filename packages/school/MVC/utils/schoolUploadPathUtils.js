@@ -98,6 +98,13 @@ function buildBookPdfCategory(context = {}) {
   });
 }
 
+function buildWordOfDayCategory(context = {}) {
+  return resolveUploadFolder('school.wordOfDay', {
+    entryId: sanitizeFolderToken(context.entryId, 'entry_unsaved'),
+    kind: sanitizeFolderToken(context.kind || 'media', 'media')
+  });
+}
+
 module.exports = {
   sanitizeFolderToken,
   joinUploadParts,
@@ -109,5 +116,6 @@ module.exports = {
   buildClassWorkspaceCategory,
   buildSubjectWorkspaceCategory,
   buildBookCoverCategory,
-  buildBookPdfCategory
+  buildBookPdfCategory,
+  buildWordOfDayCategory
 };

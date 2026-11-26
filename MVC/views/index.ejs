@@ -14,7 +14,12 @@
     const homeSlides = (typeof homeShowcaseItems !== 'undefined' && Array.isArray(homeShowcaseItems)) ? homeShowcaseItems : [];
   %>
   <% if (typeof wordOfDayPublic !== 'undefined' && wordOfDayPublic && wordOfDayPublic.entry) { %>
-    <%- include('../../packages/school/MVC/views/school/wordOfDay/partials/widget', { wordOfDayPayload: wordOfDayPublic }) %>
+    <%- include('../../packages/school/MVC/views/school/wordOfDay/partials/widget', {
+      wordOfDayPayload: wordOfDayPublic,
+      wordOfDayWidgetVariant: 'banner',
+      wordOfDayUiConstants: typeof wordOfDayUiConstants !== 'undefined' ? wordOfDayUiConstants : null,
+      wordOfDayPublicSourceOrgId: typeof wordOfDayPublicSourceOrgId !== 'undefined' ? wordOfDayPublicSourceOrgId : ''
+    }) %>
   <% } %>
   <section class="pte-hero-intro home-hero reveal" aria-labelledby="homeLandingTitle">
     <div class="pte-hero-orbit" aria-hidden="true">

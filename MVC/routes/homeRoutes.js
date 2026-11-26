@@ -1,10 +1,17 @@
 const express = require('express');
 const router  = express.Router();
 const homeCtrl = require('../controllers/homeController');
+const wordOfDayPublicController = require('../../packages/school/MVC/controllers/school/wordOfDayPublicController');
 const publicPageContentSettingsDataService = require('../services/publicPageContentSettingsDataService');
 
 
 router.get('/', homeCtrl.getHome);
+
+router.get('/word-of-the-day', wordOfDayPublicController.showToday);
+router.get('/word-of-the-day/api/:entryId/summary', wordOfDayPublicController.getReactionSummary);
+router.post('/word-of-the-day/api/reaction', wordOfDayPublicController.postReaction);
+router.post('/word-of-the-day/api/page-visit', wordOfDayPublicController.postPageVisit);
+router.get('/word-of-the-day/:dateKey', wordOfDayPublicController.showByDate);
 
 router.get(['/about', 'aboutus', 'about-us'], async (req, res, next)=>{
     try {

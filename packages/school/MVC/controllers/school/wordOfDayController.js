@@ -4,10 +4,15 @@ const wordOfDayService = require('../../services/school/wordOfDayService');
 const wordOfDayAccessService = require('../../services/school/wordOfDayAccessService');
 const wordOfDayModel = require('../../models/school/wordOfDayModel');
 const wordOfDayDisplayService = require('../../services/school/wordOfDayDisplayService');
+const wordOfDayPageVisitService = require('../../services/school/wordOfDayPageVisitService');
+const uploadLimitsPolicyService = require('../../services/school/uploadLimitsPolicyService');
 const wordOfDayPolicyModel = require('../../models/school/wordOfDayPolicyModel');
 const schoolFileService = require('../../services/school/schoolFileService');
 const { requireCoreModule } = require('../../services/school/schoolCoreModuleResolver');
-const { isAjax } = requireCoreModule('MVC/utils/generalTools');
+const paginate = requireCoreModule('MVC/utils/paginationHelper');
+const { isAjax, buildDataServiceQuery } = requireCoreModule('MVC/utils/generalTools');
+const { applyGenericFilter } = requireCoreModule('MVC/utils/queryEngine');
+const settingService = requireCoreModule('MVC/services/settingService');
 const { getTodayDateKeyInTimezone, resolveOrganizationTimezoneFromRow } = requireCoreModule('MVC/utils/timezoneUtils');
 const schoolDataService = require('../../services/school/schoolDataService');
 
@@ -33,6 +38,7 @@ function sendError(req, res, error, fallback = 500) {
 }
 
 function parseExamples(raw) {
+  if (raw === undefined || raw === null) return undefined;
   if (Array.isArray(raw)) return wordOfDayModel.sanitizeExamples(raw);
   const text = String(raw || '').trim();
   if (!text) return [];
@@ -44,12 +50,13 @@ function parseExamples(raw) {
 }
 
 function parseMediaRef(raw) {
-  if (!raw) return {};
+  if (raw === undefined || raw === null || raw === '') return undefined;
   if (typeof raw === 'object') return raw;
   try {
-    return JSON.parse(String(raw || '{}'));
+    const parsed = JSON.parse(String(raw || ''));
+    return parsed && typeof parsed === 'object' ? parsed : undefined;
   } catch (_) {
-    return {};
+    return undefined;
   }
 }
 
@@ -64,11 +71,11 @@ function parseWordTypes(body = {}) {
   if (body.wordType) {
     return wordOfDayModel.sanitizeWordTypes([], body.wordType);
   }
-  return wordOfDayModel.sanitizeWordTypes([]);
+  return undefined;
 }
 
 function buildFormPayload(body = {}) {
-  return {
+  const payload = {
     word: body.word,
     wordTypes: parseWordTypes(body),
     pronunciation: body.pronunciation,
@@ -81,6 +88,11 @@ function buildFormPayload(body = {}) {
     authorUserId: body.authorUserId,
     authorName: body.authorName
   };
+  const out = {};
+  Object.entries(payload).forEach(([key, value]) => {
+    if (value !== undefined) out[key] = value;
+  });
+  return out;
 }
 
 function resolveAccessOptions(body = {}) {
@@ -100,7 +112,8 @@ async function baseViewModel(req, res, extra = {}) {
   return {
     user: req.user,
     schoolSectionDashboardHref: res.locals.schoolSectionDashboardHref || '/dashboard/section-nav/SCHOOL',
-    actionStateId: res.locals.actionStateId || '',
+    actionStateId: req.actionStateId || res.locals.actionStateId || '',
+    includeModal: true,
     wordOfDayAccess: access,
     canManageAll: wordOfDayService.canManageAll(access),
     statuses: wordOfDayModel.WORD_OF_DAY_STATUSES,
@@ -124,20 +137,177 @@ async function resolveOrgDateKey(reqUser) {
   return getTodayDateKeyInTimezone(timezone);
 }
 
+function resolveListViewMode(query = {}) {
+  const view = String(query?.view || '').toLowerCase();
+  if (view === 'archived') return 'archived';
+  if (view === 'review') return 'review';
+  return 'active';
+}
+
+function listTitleForView(listView) {
+  if (listView === 'archived') return 'Word of the Day — Archived';
+  if (listView === 'review') return 'Word of the Day — Review queue';
+  return 'Word of the Day';
+}
+
 async function showList(req, res) {
   try {
     const access = await getAccess(req);
-    const rows = await wordOfDayService.listEntries(req.user, {
+    const listView = resolveListViewMode(req.query || {});
+    const query = await buildDataServiceQuery(req.query, {
+      allowedExactKeys: ['view', 'status', 'openReview', 'openEntry']
+    });
+    const searchDefaultKeyword = settingService.getValue('app', 'searchDefaultKeyword') || 'aaa';
+    if (query.q === searchDefaultKeyword) query.q = '';
+
+    let rows = await wordOfDayService.listEntries(req.user, {
       status: String(req.query?.status || '').trim() || undefined,
-      view: String(req.query?.view || '').trim() || 'active'
+      view: listView
     }, access);
+    const searchableFields = ['word', 'meaning', 'pronunciation', 'status', 'authorName', 'difficulty'];
+    rows = applyGenericFilter(rows, query, { defaultSearchFields: searchableFields });
+    rows = rows.sort((a, b) => String(a?.word || '').localeCompare(String(b?.word || ''), undefined, { sensitivity: 'base' }));
+    const { data, pagination } = paginate(rows, query.page, query.limit);
+
+    const entries = data.map((row) => ({
+      ...row,
+      capabilities: wordOfDayService.buildEntryCapabilities(row, access, req.user)
+    }));
+
+    const openReview = ['1', 'true', true].includes(req.query?.openReview);
+    const openEntryId = String(req.query?.openEntry || '').trim();
+    const newLabel = access.canCreateWords && listView !== 'archived' ? 'New word' : null;
+
+    if (isAjax(req)) {
+      return res.json({ status: 'success', results: entries, pagination });
+    }
+
     return res.render('school/wordOfDay/list', await baseViewModel(req, res, {
-      title: 'Word of Day',
-      entries: rows,
-      listView: String(req.query?.view || '').toLowerCase() === 'archived' ? 'archived' : 'active'
+      title: listTitleForView(listView),
+      data: entries,
+      entries,
+      listView,
+      openReview,
+      openReviewModal: openReview,
+      openEntryId,
+      newUrl: 'school/word-of-day',
+      newLabel,
+      searchableFields,
+      includeModal_Table: true,
+      print: false,
+      btn_export: false,
+      pagination,
+      filters: req.query,
+      actionStateId: req.actionStateId || res.locals.actionStateId || ''
     }));
   } catch (error) {
     return sendError(req, res, error);
+  }
+}
+
+async function showReviewList(req, res) {
+  try {
+    const access = await getAccess(req);
+    if (!access.canResolveWords) {
+      return sendError(req, res, {
+        message: 'You do not have permission to review words.',
+        statusCode: 403
+      }, 403);
+    }
+    return res.redirect('/school/word-of-day?openReview=1');
+  } catch (error) {
+    return sendError(req, res, error);
+  }
+}
+
+function parseReviewSearchPayload(body = {}) {
+  const authorUserIds = Array.isArray(body.authorUserIds)
+    ? body.authorUserIds
+    : (body.authorUserIds ? [body.authorUserIds] : []);
+  const statuses = Array.isArray(body.statuses)
+    ? body.statuses
+    : (body.statuses ? String(body.statuses).split(',') : []);
+  return {
+    dateFrom: String(body.dateFrom || '').trim(),
+    dateTo: String(body.dateTo || '').trim(),
+    authorUserIds: authorUserIds.map((id) => String(id || '').trim()).filter(Boolean),
+    statuses: statuses.map((s) => String(s || '').trim()).filter(Boolean),
+    text: String(body.text || '').trim()
+  };
+}
+
+async function postReviewSearch(req, res) {
+  try {
+    const access = await getAccess(req);
+    const entries = await wordOfDayService.searchForReview(
+      req.user,
+      parseReviewSearchPayload(req.body),
+      access
+    );
+    return res.json({
+      status: 'success',
+      entries
+    });
+  } catch (error) {
+    return sendError(req, res, error, statusCode(error, 400));
+  }
+}
+
+async function getReviewDetail(req, res) {
+  try {
+    const access = await getAccess(req);
+    if (!access.canResolveWords) {
+      return sendError(req, res, { message: 'Not authorized.', statusCode: 403 }, 403);
+    }
+    const entry = await wordOfDayService.getEntry(req.user, req.params.id, access);
+    if (!entry) return sendError(req, res, { message: 'Entry not found.', statusCode: 404 }, 404);
+    const base = await baseViewModel(req, res, {});
+    return res.json({
+      status: 'success',
+      entry,
+      capabilities: wordOfDayService.buildEntryCapabilities(entry, access, req.user),
+      wordTypeLabels: base.wordTypeLabels,
+      difficultyLabels: base.difficultyLabels
+    });
+  } catch (error) {
+    return sendError(req, res, error, statusCode(error, 400));
+  }
+}
+
+async function getEntryDetail(req, res) {
+  try {
+    const access = await getAccess(req);
+    const entry = await wordOfDayService.getEntry(req.user, req.params.id, access);
+    if (!entry) return sendError(req, res, { message: 'Entry not found.', statusCode: 404 }, 404);
+    const base = await baseViewModel(req, res, {});
+    return res.json({
+      status: 'success',
+      entry,
+      capabilities: wordOfDayService.buildEntryCapabilities(entry, access, req.user),
+      wordTypeLabels: base.wordTypeLabels,
+      difficultyLabels: base.difficultyLabels
+    });
+  } catch (error) {
+    return sendError(req, res, error, statusCode(error, 400));
+  }
+}
+
+async function getEntryPublicFeedback(req, res) {
+  try {
+    const access = await getAccess(req);
+    const entry = await wordOfDayService.getEntry(req.user, req.params.id, access);
+    if (!entry) return sendError(req, res, { message: 'Entry not found.', statusCode: 404 }, 404);
+    const report = await wordOfDayPageVisitService.getStaffEngagementReport(entry.id);
+    return res.json({
+      status: 'success',
+      entryId: entry.id,
+      word: entry.word,
+      publicFeedback: report.publicFeedback,
+      reactionVoters: report.reactionVoters,
+      pageVisits: report.pageVisits
+    });
+  } catch (error) {
+    return sendError(req, res, error, statusCode(error, 400));
   }
 }
 
@@ -148,7 +318,7 @@ async function showNewForm(req, res) {
       return sendError(req, res, { message: 'You do not have permission to create words.', statusCode: 403 }, 403);
     }
     return res.render('school/wordOfDay/form', await baseViewModel(req, res, {
-      title: 'New Word of Day',
+      title: 'New Word of the Day',
       mode: 'create',
       entry: null,
       entryId: '',
@@ -166,28 +336,12 @@ async function showEditForm(req, res) {
     if (!entry) return sendError(req, res, { message: 'Entry not found.', statusCode: 404 }, 404);
     const entryCapabilities = wordOfDayService.buildEntryCapabilities(entry, access, req.user);
     return res.render('school/wordOfDay/form', await baseViewModel(req, res, {
-      title: 'Edit Word of Day',
+      title: 'Edit Word of the Day',
       mode: 'edit',
       entry,
       entryId: entry.id,
       entryCapabilities,
       formAction: `/school/word-of-day/edit/${encodeURIComponent(req.params.id)}`
-    }));
-  } catch (error) {
-    return sendError(req, res, error);
-  }
-}
-
-async function showDetail(req, res) {
-  try {
-    const access = await getAccess(req);
-    const entry = await wordOfDayService.getEntry(req.user, req.params.id, access);
-    if (!entry) return sendError(req, res, { message: 'Entry not found.', statusCode: 404 }, 404);
-    const entryCapabilities = wordOfDayService.buildEntryCapabilities(entry, access, req.user);
-    return res.render('school/wordOfDay/detail', await baseViewModel(req, res, {
-      title: 'Word of Day Detail',
-      entry,
-      entryCapabilities
     }));
   } catch (error) {
     return sendError(req, res, error);
@@ -200,7 +354,7 @@ async function createEntry(req, res) {
     const saveAs = req.body?.saveAction === 'submit' ? 'submitted' : 'saved';
     const created = await wordOfDayService.createEntry(req.user, buildFormPayload(req.body), { saveAs, access });
     if (wantsJson(req)) return res.json({ status: 'success', entry: created });
-    return res.redirect(`/school/word-of-day/detail/${encodeURIComponent(created.id)}`);
+    return res.redirect('/school/word-of-day');
   } catch (error) {
     if (error?.code === 'WORD_OF_DAY_DUPLICATE' && wantsJson(req)) {
       return res.status(409).json({
@@ -238,7 +392,7 @@ async function updateEntry(req, res) {
     const saveAs = req.body?.saveAction === 'submit' ? 'submitted' : (req.body?.saveAction === 'saved' ? 'saved' : undefined);
     const updated = await wordOfDayService.updateEntry(req.user, req.params.id, buildFormPayload(req.body), { saveAs, access });
     if (wantsJson(req)) return res.json({ status: 'success', entry: updated });
-    return res.redirect(`/school/word-of-day/detail/${encodeURIComponent(updated.id)}`);
+    return res.redirect('/school/word-of-day');
   } catch (error) {
     if (error?.code === 'WORD_OF_DAY_DUPLICATE' && wantsJson(req)) {
       return res.status(409).json({
@@ -326,7 +480,10 @@ async function deleteEntry(req, res) {
 async function uploadMedia(req, res) {
   try {
     const kind = String(req.body?.kind || req.query?.kind || 'photo').toLowerCase() === 'audio' ? 'audio' : 'photo';
-    wordOfDayService.validateUploadedFile(req.file, kind);
+    const orgId = wordOfDayService.getActiveOrgId(req.user);
+    const sectionKey = kind === 'audio' ? 'wordOfDayAudio' : 'wordOfDayPhoto';
+    const maxMb = await uploadLimitsPolicyService.resolveMaxFileSizeMb(orgId, sectionKey);
+    wordOfDayService.validateUploadedFile(req.file, kind, maxMb * 1024 * 1024);
     const normalized = schoolFileService.normalizeUploadedFile(req.file, {
       kind: `word_of_day_${kind}`,
       uploadedBy: req.user?.id
@@ -377,9 +534,13 @@ async function getPublicDailyPayload(orgId, dateKey) {
 
 module.exports = {
   showList,
+  showReviewList,
+  postReviewSearch,
+  getReviewDetail,
+  getEntryDetail,
+  getEntryPublicFeedback,
   showNewForm,
   showEditForm,
-  showDetail,
   checkDuplicateWord,
   createEntry,
   updateEntry,

@@ -3,8 +3,10 @@
 const crypto = require('crypto');
 const schoolRepositories = require('../../repositories/school');
 const wordOfDayModel = require('../../models/school/wordOfDayModel');
+const { enrichEntryMedia } = require('./wordOfDayService');
+const { SCOPE_MODES } = require('./schoolDataScopeBuilder');
 const { requireCoreModule } = require('./schoolCoreModuleResolver');
-const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
 function hashSeed(value) {
   return crypto.createHash('sha256').update(String(value || '')).digest('hex');
@@ -42,35 +44,64 @@ function pickDailyEntry(approvedRows, orgId, dateKey) {
   return idx >= 0 ? pool[idx] : pool[0];
 }
 
+function authorFirstName(authorName = '') {
+  const token = String(authorName || '').trim().split(/\s+/).filter(Boolean)[0];
+  return token || '';
+}
+
 function redactForDisplay(row) {
   if (!row) return null;
   const wordTypes = Array.isArray(row.wordTypes) && row.wordTypes.length
     ? row.wordTypes
     : (row.wordType ? [row.wordType] : []);
+  const typeLabels = wordTypes.map((key) => wordOfDayModel.WORD_TYPE_LABELS[key] || key).filter(Boolean);
+  const authorName = String(row.authorName || '').trim();
   return {
     id: row.id,
     word: row.word,
     wordTypes,
     wordType: wordTypes[0] || row.wordType || '',
     wordTypeLabel: wordOfDayModel.primaryWordTypeLabel(wordTypes),
+    wordTypeLabels: typeLabels,
     pronunciation: row.pronunciation,
     difficulty: row.difficulty,
     difficultyLabel: wordOfDayModel.DIFFICULTY_LABELS[row.difficulty] || row.difficulty,
-    meaning: row.meaning,
-    examples: Array.isArray(row.examples) ? row.examples : [],
-    photo: row.photo || {},
-    audio: row.audio || {},
-    videoUrl: row.videoUrl || '',
-    displayCount: Number(row?.display?.displayCount || 0),
-    authorName: row.authorName || '',
+    authorName,
+    authorFirstName: authorFirstName(authorName),
     status: row.status
   };
 }
 
+function redactForPublicDetail(row) {
+  if (!row || String(row.status || '').toLowerCase() !== 'approved') return null;
+  const base = redactForDisplay(row);
+  if (!base) return null;
+  const enriched = enrichEntryMedia(row);
+  const examples = Array.isArray(enriched.examples)
+    ? enriched.examples.map((ex) => String(ex || '').trim()).filter(Boolean)
+    : [];
+  return {
+    ...base,
+    meaning: String(row.meaning || '').trim(),
+    examples,
+    photo: enriched.photo && enriched.photo.url ? enriched.photo : {},
+    audio: enriched.audio && enriched.audio.url ? enriched.audio : {},
+    videoUrl: String(row.videoUrl || '').trim()
+  };
+}
+
 async function listApprovedForOrg(orgId) {
+  const activeOrgId = toPublicId(String(orgId || '').trim());
   const rows = await schoolRepositories.wordOfDay.list({
-    orgId: String(orgId || '').trim(),
-    status: 'approved'
+    query: { status__eq: 'approved' },
+    scope: activeOrgId
+      ? {
+        denyAll: false,
+        canViewAll: false,
+        activeOrgId,
+        scopeMode: SCOPE_MODES.ORG_WIDE
+      }
+      : { denyAll: true }
   });
   const list = Array.isArray(rows) ? rows : (rows?.items || []);
   return list.filter((row) => String(row?.status || '').toLowerCase() === 'approved');
@@ -94,20 +125,41 @@ async function resolveDailyDisplay({ orgId, dateKey, recordAnalytics = true }) {
   const targetOrgId = String(orgId || '').trim();
   const targetDate = String(dateKey || '').trim();
   if (!targetOrgId || !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
-    return { dateKey: targetDate, entry: null };
+    return { orgId: targetOrgId, dateKey: targetDate, entry: null };
   }
   const approved = await listApprovedForOrg(targetOrgId);
   let picked = pickDailyEntry(approved, targetOrgId, targetDate);
-  if (!picked) return { dateKey: targetDate, entry: null };
+  if (!picked) return { orgId: targetOrgId, dateKey: targetDate, entry: null };
   if (recordAnalytics) {
     picked = await recordDisplayForDate(picked, targetOrgId, targetDate);
   }
-  return { dateKey: targetDate, entry: redactForDisplay(picked) };
+  return { orgId: targetOrgId, dateKey: targetDate, entry: redactForDisplay(picked) };
+}
+
+async function resolveDailyPublicDetail({ orgId, dateKey, recordAnalytics = true }) {
+  const targetOrgId = String(orgId || '').trim();
+  const targetDate = String(dateKey || '').trim();
+  if (!targetOrgId || !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
+    return { orgId: targetOrgId, dateKey: targetDate, entry: null };
+  }
+  const approved = await listApprovedForOrg(targetOrgId);
+  let picked = pickDailyEntry(approved, targetOrgId, targetDate);
+  if (!picked) return { orgId: targetOrgId, dateKey: targetDate, entry: null };
+  if (recordAnalytics) {
+    picked = await recordDisplayForDate(picked, targetOrgId, targetDate);
+  }
+  return { orgId: targetOrgId, dateKey: targetDate, entry: redactForPublicDetail(picked) };
+}
+
+async function getApprovedEntryRowById(id) {
+  const row = await schoolRepositories.wordOfDay.getById(id, {});
+  if (!row || String(row.status || '').toLowerCase() !== 'approved') return null;
+  return row;
 }
 
 async function getEntryById(id) {
-  const row = await schoolRepositories.wordOfDay.getById(id, {});
-  if (!row || String(row.status || '').toLowerCase() !== 'approved') return null;
+  const row = await getApprovedEntryRowById(id);
+  if (!row) return null;
   return redactForDisplay(row);
 }
 
@@ -115,7 +167,10 @@ module.exports = {
   hashSeed,
   pickDailyEntry,
   redactForDisplay,
+  redactForPublicDetail,
   resolveDailyDisplay,
+  resolveDailyPublicDetail,
   getEntryById,
+  getApprovedEntryRowById,
   listApprovedForOrg
 };

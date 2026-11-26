@@ -57,3 +57,64 @@ test('configure scope allows organization tier', () => {
   assert.equal(wordOfDayOperationPolicyService.canConfigureAtScope('SCP_ORG'), true);
   assert.equal(wordOfDayOperationPolicyService.canConfigureAtScope('SCP_OWNER'), false);
 });
+
+const orgUpdateAccess = {
+  canViewEntries: true,
+  canUpdateWords: true,
+  readAllScopeId: 'SCP_ORG',
+  updateScopeId: 'SCP_ORG',
+  adminFlags: {}
+};
+
+const familyBAdminUpdate = {
+  canViewEntries: true,
+  canUpdateWords: true,
+  readAllScopeId: 'SCP_ORG',
+  updateScopeId: 'SCP_ADMIN',
+  adminFlags: {}
+};
+
+const familyABypassUpdate = {
+  canViewEntries: true,
+  canUpdateWords: true,
+  readAllScopeId: 'SCP_ORG',
+  updateScopeId: 'SCP_OWNER',
+  adminFlags: { update: true }
+};
+
+test('canSubmitEntryViaSave Family A and Family B admin', () => {
+  const approved = {
+    id: '10',
+    authorUserId: 'U2',
+    status: 'approved',
+    audit: { createDateTime: '2026-03-01T00:00:00.000Z' }
+  };
+  assert.equal(wordOfDayAccessService.canSubmitEntryViaSave(approved, familyABypassUpdate, 'U1', '2026'), true);
+  assert.equal(wordOfDayAccessService.canSubmitEntryViaSave(approved, familyBAdminUpdate, 'U1', '2026'), true);
+  assert.equal(wordOfDayAccessService.canSubmitEntryViaSave(approved, orgUpdateAccess, 'U1', '2026'), false);
+});
+
+test('canSubmitEntryViaSave owner and org tiers', () => {
+  const savedMine = { id: '11', authorUserId: 'U1', status: 'saved', audit: { createDateTime: '2026-01-01T00:00:00.000Z' } };
+  const submittedMine = { id: '12', authorUserId: 'U1', status: 'submitted', audit: { createDateTime: '2026-01-01T00:00:00.000Z' } };
+  assert.equal(wordOfDayAccessService.canSubmitEntryViaSave(savedMine, ownerAccess, 'U1', '2026'), true);
+  assert.equal(wordOfDayAccessService.canSubmitEntryViaSave(submittedMine, ownerAccess, 'U1', '2026'), false);
+  assert.equal(wordOfDayAccessService.canSubmitEntryViaSave(submittedMine, orgUpdateAccess, 'U1', '2026'), true);
+});
+
+test('canChangeAuthorOnEdit for Family A bypass and Family B admin update', () => {
+  const adminUpdate = wordOfDayOperationPolicyService.deriveAccessFlags({
+    update: { allowed: true, scopeId: 'SCP_ADMIN' }
+  }, {});
+  assert.equal(adminUpdate.canChangeAuthorOnEdit, true);
+
+  const bypass = wordOfDayOperationPolicyService.deriveAccessFlags({
+    update: { allowed: true, scopeId: 'SCP_OWNER' }
+  }, { update: true });
+  assert.equal(bypass.canChangeAuthorOnEdit, true);
+
+  const ownerUpdate = wordOfDayOperationPolicyService.deriveAccessFlags({
+    update: { allowed: true, scopeId: 'SCP_OWNER' }
+  }, {});
+  assert.equal(ownerUpdate.canChangeAuthorOnEdit, false);
+});

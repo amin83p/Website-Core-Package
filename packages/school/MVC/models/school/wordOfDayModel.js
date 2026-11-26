@@ -307,8 +307,10 @@ async function updateWordOfDayEntry(id, input) {
     examples: input?.examples !== undefined ? sanitized.examples : existing.examples,
     workflow: input?.workflow !== undefined ? sanitized.workflow : existing.workflow,
     display: input?.display !== undefined ? sanitized.display : existing.display,
+    publicFeedback: input?.publicFeedback !== undefined ? input.publicFeedback : existing.publicFeedback,
     audit: {
       ...(existing.audit || {}),
+      ...(sanitized.audit && typeof sanitized.audit === 'object' ? sanitized.audit : {}),
       lastUpdateDateTime: new Date().toISOString(),
       updatedBy: cleanId(input?.audit?.updatedBy || input?.updatedBy, { allowEmpty: true }) || existing.audit?.updatedBy || ''
     }

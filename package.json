@@ -80,6 +80,8 @@
     "school:activities-section:seed": "node scripts/seed-school-activities-section.js --db app",
     "school:student-management-section:seed": "node scripts/seed-school-student-management-section.js --db app",
     "school:word-of-day-section:seed": "node scripts/seed-school-word-of-day-section.js --db app",
+    "school:word-of-day:seed-samples": "node scripts/school/seed/seedWordOfDaySamples.js",
+    "school:word-of-day:seed-samples:apply": "node scripts/school/seed/seedWordOfDaySamples.js --apply",
     "school:overall-reports:seed": "node scripts/seed-school-overall-report-sections.js --db app",
     "school:settings:seed": "node scripts/seed-school-settings-section.js --db app",
     "school:teaching-outline-levels:seed": "node scripts/seed-school-teaching-outline-levels.js --db app --org 900000",

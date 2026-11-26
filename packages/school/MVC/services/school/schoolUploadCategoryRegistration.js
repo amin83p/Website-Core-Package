@@ -72,6 +72,16 @@ function registerSchoolUploadCategoryResolvers() {
       bookId: req.params?.id || req.body?.bookId || req.body?.id
     })
   ));
+
+  uploadCategoryResolverService.registerUploadCategoryResolver('school.wordofday', ({ req = {} } = {}) => {
+    const kind = String(req.body?.kind || req.query?.kind || 'media').toLowerCase();
+    const safeKind = kind === 'audio' ? 'audio' : (kind === 'photo' ? 'photo' : 'media');
+    const entryId = req.params?.id
+      || req.body?.entryId
+      || req.query?.entryId
+      || 'entry_unsaved';
+    return schoolUploadPathUtils.buildWordOfDayCategory({ entryId, kind: safeKind });
+  });
 }
 
 module.exports = {

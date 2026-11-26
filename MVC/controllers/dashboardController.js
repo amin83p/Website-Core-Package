@@ -794,6 +794,8 @@ async function renderSubDashboardForParent(req, res, parentSection, allSections,
     }
   }
 
+  const wordOfDayUiConstants = require('../../packages/school/MVC/services/school/wordOfDayUiConstants');
+
   return res.render('dashboard/sectionSubDashboard', {
     title,
     user: req.user || null,
@@ -805,7 +807,8 @@ async function renderSubDashboardForParent(req, res, parentSection, allSections,
     dashboardSection: parentWithIcon,
     dashboardBackHref: '/dashboard',
     dashboardBackLabel: 'Back to Dashboard',
-    wordOfDayPayload
+    wordOfDayPayload,
+    wordOfDayUiConstants
   });
 }
 

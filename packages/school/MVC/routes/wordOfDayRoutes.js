@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/school/wordOfDayController');
-const { requireCoreModule } = require('../services/school/schoolCoreContracts');
 const {
   requireAuth,
   requireAccess,
@@ -9,9 +8,10 @@ const {
   SECTIONS,
   OPERATIONS
 } = require('./schoolRouteDependencies');
-const { SCHOOL_UPLOAD_FOLDERS } = require('../../config/accessConstants');
-
-const upload = requireCoreModule('MVC/middleware/upload');
+const {
+  uploadWordOfDayMedia,
+  requireWordOfDayMediaUploadAccess
+} = require('../middleware/wordOfDayUploadMiddleware');
 const { attachWordOfDayAccess } = require('./wordOfDayRouteGuards');
 const SECTION = SECTIONS.SCHOOL_WORD_OF_DAY;
 
@@ -30,6 +30,11 @@ router.get('/',
   requireAccess(SECTION, OPERATIONS.READ),
   trackActionState(SECTION, OPERATIONS.READ),
   ctrl.showList);
+
+router.get('/review',
+  requireAccess(SECTION, OPERATIONS.RESOLVE),
+  trackActionState(SECTION, OPERATIONS.RESOLVE),
+  ctrl.showReviewList);
 
 router.get('/new',
   requireAccess(SECTION, OPERATIONS.CREATE),
@@ -53,8 +58,30 @@ router.post('/edit/:id',
 
 router.get('/detail/:id',
   requireAccess(SECTION, OPERATIONS.READ),
-  trackActionState(SECTION, OPERATIONS.READ),
-  ctrl.showDetail);
+  (req, res) => {
+    const id = encodeURIComponent(String(req.params.id || '').trim());
+    return res.redirect(302, `/school/word-of-day?openEntry=${id}`);
+  });
+
+router.post('/api/review-search',
+  requireAccess(SECTION, OPERATIONS.RESOLVE),
+  trackActionState(SECTION, OPERATIONS.RESOLVE, { requireToken: false, keepActive: true }),
+  ctrl.postReviewSearch);
+
+router.get('/api/:id/detail',
+  requireAccess(SECTION, OPERATIONS.READ),
+  trackActionState(SECTION, OPERATIONS.READ, { requireToken: false, keepActive: true }),
+  ctrl.getEntryDetail);
+
+router.get('/api/:id/public-feedback',
+  requireAccess(SECTION, OPERATIONS.READ),
+  trackActionState(SECTION, OPERATIONS.READ, { requireToken: false, keepActive: true }),
+  ctrl.getEntryPublicFeedback);
+
+router.get('/api/:id/review-detail',
+  requireAccess(SECTION, OPERATIONS.RESOLVE),
+  trackActionState(SECTION, OPERATIONS.RESOLVE, { requireToken: false, keepActive: true }),
+  ctrl.getReviewDetail);
 
 router.post('/api/:id/submit',
   requireAccess(SECTION, OPERATIONS.UPDATE),
@@ -92,8 +119,8 @@ router.post('/api/:id/delete',
   ctrl.deleteEntry);
 
 router.post('/api/media/upload',
-  requireAccess(SECTION, OPERATIONS.UPDATE),
-  upload(SCHOOL_UPLOAD_FOLDERS.WORD_OF_DAY, true).single('file'),
+  requireWordOfDayMediaUploadAccess,
+  uploadWordOfDayMedia,
   trackActionState(SECTION, OPERATIONS.UPDATE, { requireToken: false, keepActive: true }),
   ctrl.uploadMedia);
 

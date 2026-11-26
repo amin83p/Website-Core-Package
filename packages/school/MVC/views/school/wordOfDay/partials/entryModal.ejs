@@ -1,0 +1,365 @@
+<style>
+  #wordOfDayEntryModal .modal-content {
+    border: 0;
+    border-radius: 1rem;
+    overflow: hidden;
+    box-shadow: 0 1.25rem 3rem rgba(15, 23, 42, 0.18);
+  }
+  #wordOfDayEntryModal .wod-entry-modal-header {
+    background: linear-gradient(135deg, #f8fafc 0%, #eef2ff 100%);
+    border-bottom: 1px solid rgba(15, 23, 42, 0.08);
+    padding: 1.25rem 1.5rem;
+    gap: 1rem;
+  }
+  #wordOfDayEntryModal .wod-entry-header-title-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.75rem 1.25rem;
+    width: 100%;
+    padding-right: 2.5rem;
+  }
+  #wordOfDayEntryModal .wod-entry-header-status {
+    flex-shrink: 0;
+    align-self: center;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.35rem;
+    text-align: right;
+  }
+  #wordOfDayEntryModal .wod-entry-header-status-chips {
+    justify-content: flex-end;
+  }
+  #wordOfDayEntryModal .wod-entry-header-status:empty {
+    display: none;
+  }
+  #wordOfDayEntryModal .wod-entry-header-status .badge {
+    font-size: 0.95rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 0.5rem 1rem;
+    border-radius: 2rem;
+    text-transform: capitalize;
+  }
+  #wordOfDayEntryModal .wod-entry-modal-title {
+    font-size: 1.75rem;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+  }
+  #wordOfDayEntryModal .wod-entry-modal-subtitle {
+    font-size: 1.05rem;
+    color: var(--bs-secondary-color);
+    margin-top: 0.4rem;
+    line-height: 1.35;
+  }
+  #wordOfDayEntryModal .wod-entry-header-phonetics {
+    display: inline-block;
+    font-size: 1.05rem;
+    color: #475569;
+    padding: 0.15rem 0;
+  }
+  #wordOfDayEntryModal .wod-entry-chip-row {
+    margin-top: 0.15rem;
+  }
+  #wordOfDayEntryModal .wod-entry-display-chip {
+    font-size: 0.85rem;
+    font-weight: 500;
+    padding: 0.45rem 0.75rem;
+    border-color: rgba(15, 23, 42, 0.12) !important;
+    background: #fff !important;
+  }
+  #wordOfDayEntryModal .wod-entry-details-toggle {
+    border-radius: 2rem;
+    font-weight: 600;
+    padding-inline: 0.85rem;
+  }
+  #wordOfDayEntryModal .wod-entry-meta-panel {
+    margin-bottom: 0.75rem;
+  }
+  #wordOfDayEntryModal .wod-entry-meta-panel .wod-entry-meta-grid {
+    background: var(--bs-light, #f8f9fa);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.65rem;
+    padding: 0.75rem 1rem;
+  }
+  #wordOfDayEntryModal .wod-entry-modal-body {
+    padding: 1.5rem 1.75rem 1.75rem;
+    font-size: 1.05rem;
+    line-height: 1.55;
+  }
+  #wordOfDayEntryModal .wod-entry-status-badge {
+    font-size: 0.9rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 0.45rem 0.85rem;
+    border-radius: 2rem;
+  }
+  #wordOfDayEntryModal .wod-entry-meaning-card {
+    background: var(--bs-light, #f8f9fa);
+    border: 1px solid var(--bs-border-color);
+    border-radius: 0.75rem;
+    padding: 1.15rem 1.35rem;
+    margin: 0.5rem 0 1.25rem;
+  }
+  #wordOfDayEntryModal .wod-entry-meaning-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--bs-secondary-color);
+    margin-bottom: 0.5rem;
+  }
+  #wordOfDayEntryModal .wod-entry-meaning-text {
+    font-size: 1.2rem;
+    font-weight: 500;
+    color: var(--bs-body-color);
+    margin: 0;
+  }
+  #wordOfDayEntryModal .wod-entry-meta-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+    gap: 1rem 1.25rem;
+    margin-top: 0.5rem;
+  }
+  #wordOfDayEntryModal .wod-entry-meta-item dt {
+    font-size: 0.8rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--bs-secondary-color);
+    margin-bottom: 0.25rem;
+  }
+  #wordOfDayEntryModal .wod-entry-meta-item dd {
+    font-size: 1.05rem;
+    font-weight: 600;
+    margin: 0;
+  }
+  #wordOfDayEntryModal .wod-entry-examples-title {
+    font-size: 1rem;
+    font-weight: 700;
+    margin: 1.5rem 0 0.75rem;
+  }
+  #wordOfDayEntryModal .wod-entry-examples-list {
+    font-size: 1.05rem;
+    padding-left: 1.35rem;
+    margin: 0;
+  }
+  #wordOfDayEntryModal .wod-entry-examples-list li {
+    margin-bottom: 0.65rem;
+  }
+  #wordOfDayEntryModal .wod-entry-media-modal {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+  #wordOfDayEntryModal .wod-entry-media-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1rem;
+    align-items: stretch;
+  }
+  @media (min-width: 768px) {
+    #wordOfDayEntryModal .wod-entry-media-grid {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    }
+  }
+  #wordOfDayEntryModal .wod-entry-photo-frame {
+    height: 200px;
+    min-height: 200px;
+    max-height: 200px;
+    border-radius: 0.85rem;
+    border: 1px dashed rgba(15, 23, 42, 0.14);
+    background: linear-gradient(145deg, #f8fafc 0%, #eef2ff 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    position: relative;
+  }
+  #wordOfDayEntryModal .wod-entry-photo-open {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+    position: relative;
+    cursor: zoom-in;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  #wordOfDayEntryModal .wod-entry-photo-open .wod-entry-media-img {
+    max-width: 100%;
+    max-height: 100%;
+    width: auto;
+    height: auto;
+    object-fit: contain;
+    display: block;
+    border-radius: 0.5rem;
+  }
+  #wordOfDayEntryModal .wod-entry-photo-zoom-hint {
+    position: absolute;
+    right: 0.5rem;
+    bottom: 0.5rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.55rem;
+    border-radius: 2rem;
+    background: rgba(15, 23, 42, 0.72);
+    color: #fff;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    pointer-events: none;
+  }
+  #wordOfDayEntryModal .wod-entry-photo-open:hover .wod-entry-photo-zoom-hint,
+  #wordOfDayEntryModal .wod-entry-photo-open:focus-visible .wod-entry-photo-zoom-hint {
+    opacity: 1;
+  }
+  #wordOfDayEntryModal .wod-entry-photo-empty {
+    text-align: center;
+    color: var(--bs-secondary-color);
+    padding: 1rem;
+  }
+  #wordOfDayEntryModal .wod-stylish-audio-player {
+    height: 200px;
+    border-radius: 0.85rem;
+    background: linear-gradient(135deg, #312e81 0%, #4f46e5 48%, #6366f1 100%);
+    box-shadow: 0 0.75rem 1.75rem rgba(79, 70, 229, 0.22);
+    padding: 1rem 1.1rem;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  #wordOfDayEntryModal .wod-audio-element {
+    display: none;
+  }
+  #wordOfDayEntryModal .wod-audio-player-inner {
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+  }
+  #wordOfDayEntryModal .wod-audio-play-toggle {
+    width: 3.1rem;
+    height: 3.1rem;
+    border-radius: 50%;
+    border: 0;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: #fff;
+    color: #4f46e5;
+    font-size: 1.35rem;
+    box-shadow: 0 0.35rem 1rem rgba(15, 23, 42, 0.18);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  #wordOfDayEntryModal .wod-audio-play-toggle:hover {
+    transform: scale(1.04);
+  }
+  #wordOfDayEntryModal .wod-stylish-audio-player.is-playing .wod-audio-play-toggle {
+    background: #e0e7ff;
+  }
+  #wordOfDayEntryModal .wod-audio-player-main {
+    flex: 1;
+    min-width: 0;
+  }
+  #wordOfDayEntryModal .wod-audio-player-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.9;
+    margin-bottom: 0.15rem;
+  }
+  #wordOfDayEntryModal .wod-audio-player-title {
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 0.65rem;
+    opacity: 0.98;
+  }
+  #wordOfDayEntryModal .wod-audio-seek {
+    height: 0.35rem;
+    margin: 0 0 0.35rem;
+    accent-color: #fff;
+    cursor: pointer;
+  }
+  #wordOfDayEntryModal .wod-audio-times {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.8rem;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.88;
+  }
+  #wordOfDayEntryModal .wod-entry-audio-slot-empty {
+    display: none;
+  }
+  @media (min-width: 768px) {
+    #wordOfDayEntryModal .wod-entry-audio-slot-empty {
+      display: block;
+      height: 200px;
+    }
+  }
+  #wordOfDayEntryModal .wod-entry-modal-footer {
+    background: #f8fafc;
+    border-top: 1px solid rgba(15, 23, 42, 0.08);
+    padding: 1.25rem 1.5rem 1.5rem;
+  }
+  #wordOfDayEntryModal .wod-entry-note-label {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin-bottom: 0.35rem;
+  }
+  #wordOfDayEntryModal #wodListEntryWorkflowNote {
+    font-size: 1rem;
+    min-height: 4.5rem;
+    border-radius: 0.5rem;
+  }
+  #wordOfDayEntryModal .wod-status-action-btn {
+    font-weight: 600;
+    border-radius: 2rem;
+    padding-inline: 0.95rem;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.08);
+  }
+  #wordOfDayEntryModal #wodListEntryActions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.45rem;
+    justify-content: flex-end;
+  }
+  #wordOfDayEntryModal .wod-entry-display-alert {
+    font-size: 0.95rem;
+    border-radius: 0.5rem;
+    padding: 0.75rem 1rem;
+  }
+</style>
+<div class="modal fade" id="wordOfDayEntryModal" tabindex="-1" aria-labelledby="wordOfDayEntryModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header wod-entry-modal-header align-items-start flex-wrap position-relative">
+        <div class="wod-entry-header-title-row flex-grow-1">
+          <div class="flex-grow-1 min-w-0">
+            <div class="modal-title wod-entry-modal-title fw-bold mb-0 text-break" id="wordOfDayEntryModalLabel">Word of the Day</div>
+            <div class="wod-entry-modal-subtitle" id="wodListEntrySubtitle"></div>
+          </div>
+          <div class="wod-entry-header-status" id="wodListEntryHeaderStatus" aria-live="polite"></div>
+        </div>
+        <button type="button" class="btn-close position-absolute top-0 end-0 mt-3 me-3" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body wod-entry-modal-body" id="wodListEntryBody">
+        <div class="text-center text-muted py-5 fs-5"><span class="spinner-border me-2"></span>Loading…</div>
+      </div>
+      <div class="modal-footer wod-entry-modal-footer flex-column align-items-stretch gap-3">
+        <div>
+          <label class="wod-entry-note-label text-body mb-1" for="wodListEntryWorkflowNote">Optional note</label>
+          <div class="text-muted small mb-2">For reject, reopen, on hold, or archive actions.</div>
+          <textarea id="wodListEntryWorkflowNote" class="form-control" rows="3" maxlength="2000" placeholder="Add a note for reviewers or authors…"></textarea>
+        </div>
+        <div class="d-flex flex-wrap gap-2 justify-content-end w-100" id="wodListEntryActions"></div>
+      </div>
+    </div>
+  </div>
+</div>

@@ -22,6 +22,70 @@
     }
   }
 
+  function plainMessage(value) {
+    return String(value || '')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  async function showAlert(title, message, icon) {
+    const body = plainMessage(message || title || 'Something went wrong.');
+    const ui = global.SchoolMessageUi;
+    if (ui?.showAlert && typeof global.showMessageModal === 'function' && document.getElementById('messageModal')) {
+      await ui.showAlert(title, icon || 'error', body);
+      return;
+    }
+    if (typeof global.showMessageModal === 'function' && document.getElementById('messageModal')) {
+      await global.showMessageModal({
+        title: String(title || 'Message'),
+        message: body,
+        icon: icon || 'error',
+        buttons: [{ text: 'OK', class: icon === 'success' ? 'btn-success' : 'btn-primary' }]
+      });
+      return;
+    }
+    global.alert(body);
+  }
+
+  function apiHeaders(extra = {}) {
+    const headers = {
+      Accept: 'application/json',
+      'X-Ajax-Request': 'true',
+      ...(csrf ? { 'CSRF-Token': csrf } : {}),
+      ...extra
+    };
+    const actionStateId = String(
+      document.querySelector('#wordOfDayForm [name="actionStateId"]')?.value
+      || document.getElementById('actionStateIdRef')?.dataset?.id
+      || ''
+    ).trim();
+    if (actionStateId) headers['X-Action-State-Id'] = actionStateId;
+    return headers;
+  }
+
+  function buildSaveRequestBody(form, saveAction) {
+    const fd = new FormData(form);
+    const params = new URLSearchParams();
+    fd.forEach((value, key) => {
+      if (value instanceof File) return;
+      params.append(key, String(value));
+    });
+    params.set('saveAction', saveAction);
+    return params.toString();
+  }
+
+  async function readResponsePayload(res) {
+    const text = await res.text();
+    if (!text) return {};
+    try {
+      return JSON.parse(text);
+    } catch (_) {
+      return { message: plainMessage(text) || `Request failed (${res.status}).` };
+    }
+  }
+
   function escapeHtml(value) {
     return String(value || '')
       .replace(/&/g, '&amp;')
@@ -83,16 +147,41 @@
     }
   }
 
+  function resolveEntryIdForUpload() {
+    const form = qs('wordOfDayForm');
+    const id = String(form?.getAttribute('data-entry-id') || form?.dataset?.entryId || '').trim();
+    return id || 'entry_unsaved';
+  }
+
+  function clearMedia(kind) {
+    if (kind === 'photo') {
+      photo = {};
+      const input = qs('wodPhotoInput');
+      const fileInput = qs('wodPhotoFile');
+      if (input) input.value = '{}';
+      if (fileInput) fileInput.value = '';
+      setMediaPreview('photo', photo);
+    } else if (kind === 'audio') {
+      audio = {};
+      const input = qs('wodAudioInput');
+      const fileInput = qs('wodAudioFile');
+      if (input) input.value = '{}';
+      if (fileInput) fileInput.value = '';
+      setMediaPreview('audio', audio);
+    }
+  }
+
   async function uploadFile(file, kind) {
     const fd = new FormData();
     fd.append('file', file);
     fd.append('kind', kind);
+    fd.append('entryId', resolveEntryIdForUpload());
     const res = await fetch('/school/word-of-day/api/media/upload', {
       method: 'POST',
-      headers: csrf ? { 'CSRF-Token': csrf } : {},
+      headers: apiHeaders(),
       body: fd
     });
-    const data = await res.json().catch(() => ({}));
+    const data = await readResponsePayload(res);
     if (!res.ok) throw new Error(data.message || 'Upload failed.');
     return data.media || {};
   }
@@ -142,20 +231,22 @@
     }
     const modal = ensureDuplicateModal();
     if (modal) modal.show();
-    else window.alert(`This word is already saved by ${duplicate.authorName || 'another user'}.`);
+    else {
+      void showAlert(
+        'Word already saved',
+        `This word is already saved by ${duplicate.authorName || 'another user'}.`,
+        'warning'
+      );
+    }
   }
 
   async function checkDuplicateWord(word) {
     const res = await fetch('/school/word-of-day/api/check-duplicate', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        ...(csrf ? { 'CSRF-Token': csrf } : {})
-      },
+      headers: apiHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ word, excludeId: entryId })
     });
-    const data = await res.json().catch(() => ({}));
+    const data = await readResponsePayload(res);
     return data;
   }
 
@@ -181,7 +272,7 @@
       }
     } catch (err) {
       saving = false;
-      window.alert(err.message || 'Upload failed.');
+      await showAlert('Upload failed', err.message || 'Upload failed.', 'error');
       return;
     }
 
@@ -195,16 +286,22 @@
       }
     } catch (_) { /* server will enforce */ }
 
-    const fd = new FormData(form);
-    fd.set('saveAction', saveAction);
-
     try {
       const res = await fetch(form.action, {
         method: 'POST',
-        headers: { Accept: 'application/json', ...(csrf ? { 'CSRF-Token': csrf } : {}) },
-        body: fd
+        headers: apiHeaders({ 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' }),
+        body: buildSaveRequestBody(form, saveAction)
       });
-      const data = await res.json().catch(() => ({}));
+      const data = await readResponsePayload(res);
+      const nextToken = String(
+        res.headers.get('x-action-state-id') || res.headers.get('X-Action-State-Id') || ''
+      ).trim();
+      if (nextToken) {
+        const hidden = document.querySelector('#wordOfDayForm [name="actionStateId"]');
+        const ref = document.getElementById('actionStateIdRef');
+        if (hidden) hidden.value = nextToken;
+        if (ref) ref.dataset.id = nextToken;
+      }
 
       if (res.status === 409 && data?.duplicate) {
         showDuplicateModal(data.duplicate);
@@ -212,21 +309,102 @@
         return;
       }
       if (!res.ok) {
-        window.alert(data.message || 'Save failed.');
+        await showAlert('Save failed', data.message || 'Save failed.', 'error');
         saving = false;
         return;
       }
-      const id = data?.entry?.id;
-      if (id) {
-        global.location.href = `/school/word-of-day/detail/${encodeURIComponent(id)}`;
-        return;
-      }
+      const wordLabel = String(qs('wodWord')?.value || data?.entry?.word || 'Word').trim() || 'Word';
+      const submitted = saveAction === 'submit';
+      const successTitle = submitted ? 'Submitted' : 'Saved';
+      const successMessage = submitted
+        ? `"${wordLabel}" was saved and submitted for review.`
+        : `"${wordLabel}" was saved successfully.`;
+      await showAlert(successTitle, successMessage, 'success');
       global.location.href = '/school/word-of-day';
+      return;
     } catch (err) {
-      window.alert(err.message || 'Save failed.');
+      await showAlert('Save failed', err.message || 'Save failed.', 'error');
     } finally {
       saving = false;
     }
+  }
+
+  function setAuthorChip(userId, displayName) {
+    const idInput = qs('wodAuthorUserId');
+    const nameInput = qs('wodAuthorName');
+    const labelEl = qs('wodAuthorChipLabel');
+    const idEl = qs('wodAuthorChipId');
+    const clearBtn = qs('wodClearAuthorBtn');
+    const uid = String(userId || '').trim();
+    const name = String(displayName || '').trim();
+    if (idInput) idInput.value = uid;
+    if (nameInput) nameInput.value = name || uid;
+    if (labelEl) labelEl.textContent = name || uid || 'You (default)';
+    if (idEl) {
+      if (uid) {
+        idEl.textContent = `(${uid})`;
+        idEl.classList.remove('d-none');
+      } else {
+        idEl.textContent = '';
+        idEl.classList.add('d-none');
+      }
+    }
+    clearBtn?.classList.toggle('d-none', !uid);
+  }
+
+  function readActiveAuthorMeta() {
+    const meta = parseJsonInput(qs('wodActiveAuthorMeta'), null);
+    if (!meta || typeof meta !== 'object') return { userId: '', displayName: '' };
+    const userId = String(meta.userId || meta.id || '').trim();
+    const displayName = String(meta.displayName || meta.name || '').trim();
+    return { userId, displayName };
+  }
+
+  function bindAuthorPicker() {
+    const pickBtn = qs('wodPickAuthorBtn');
+    const assignSelfBtn = qs('wodAssignSelfAuthorBtn');
+    if (!pickBtn && !assignSelfBtn) return;
+
+    assignSelfBtn?.addEventListener('click', () => {
+      const active = readActiveAuthorMeta();
+      if (!active.userId) {
+        void showAlert('Unavailable', 'Active user ID is not available.', 'warning');
+        return;
+      }
+      setAuthorChip(active.userId, active.displayName || active.userId);
+    });
+
+    if (!pickBtn) return;
+
+    pickBtn.addEventListener('click', () => {
+      if (!global.GenericPicker || !global.GenericPickerPresets?.user) {
+        void showAlert('Unavailable', 'User picker is not available on this page.', 'warning');
+        return;
+      }
+      const context = global.GenericPickerContexts?.activeOrganizationScope
+        ? global.GenericPickerContexts.activeOrganizationScope({ label: 'Active organization' })
+        : null;
+      global.GenericPicker.open(global.GenericPickerPresets.user({
+        title: 'Select author',
+        icon: 'bi-person-check',
+        multiselect: false,
+        apiEndpoint: '/users',
+        searchFields: 'id,username,email,name',
+        placeholder: 'Search users…',
+        context,
+        onSelect: (item) => {
+          const user = Array.isArray(item) ? item[0] : item;
+          if (!user) return;
+          const uid = String(user.id || user.userId || '').trim();
+          const label = String(user.name || user.username || user.email || uid).trim();
+          setAuthorChip(uid, label);
+        }
+      }));
+    });
+
+    qs('wodClearAuthorBtn')?.addEventListener('click', () => {
+      setAuthorChip('', '');
+    });
   }
 
   function bindSaveButtons(form) {
@@ -252,6 +430,9 @@
     audio = parseJsonInput(qs('wodAudioInput'), {});
     setMediaPreview('photo', photo);
     setMediaPreview('audio', audio);
+
+    qs('wodClearPhotoBtn')?.addEventListener('click', () => clearMedia('photo'));
+    qs('wodClearAudioBtn')?.addEventListener('click', () => clearMedia('audio'));
     renderExamples();
 
     qs('btnAddWodExample')?.addEventListener('click', () => {
@@ -272,6 +453,7 @@
     });
 
     bindSaveButtons(form);
+    bindAuthorPicker();
     syncWordTypesInput(form);
   }
 

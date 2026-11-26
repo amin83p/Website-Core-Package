@@ -84,31 +84,33 @@ function upload(fixedCategory = 'misc', isDynamic = false, forceGlobal = false, 
     }
   });
 
+  const defaultFileFilter = (req, file, cb) => {
+    const isSuperAdmin = adminAuthorityService.isSuperAdmin(req.user);
+
+    if (isSuperAdmin) {
+      return cb(null, true);
+    }
+
+    const ext = path.extname(file.originalname).toLowerCase();
+    const mimeType = file.mimetype;
+
+    if (ext === '.pdf') {
+      return cb(null, true);
+    }
+
+    if (ALLOWED_EXTENSIONS.has(ext) && ALLOWED_MIME_TYPES.has(mimeType)) {
+      return cb(null, true);
+    }
+
+    return cb(new Error(`File type not allowed. Allowed types: Images, Documents, Archives. Attempted to upload: ${ext} (${mimeType})`));
+  };
+
+  const fileFilter = typeof options.fileFilter === 'function' ? options.fileFilter : defaultFileFilter;
+
   const uploader = multer({
     storage,
     limits: { fileSize: maxFileMb * 1024 * 1024 },
-    fileFilter: (req, file, cb) => {
-      // Check if user is a super admin
-      const isSuperAdmin = adminAuthorityService.isSuperAdmin(req.user);
-      
-      if (isSuperAdmin) {
-        // Super admins can upload anything
-        return cb(null, true);
-      }
-
-      const ext = path.extname(file.originalname).toLowerCase();
-      const mimeType = file.mimetype;
-
-      if (ext === '.pdf') {
-        return cb(null, true);
-      }
-
-      if (ALLOWED_EXTENSIONS.has(ext) && ALLOWED_MIME_TYPES.has(mimeType)) {
-        return cb(null, true);
-      }
-
-      return cb(new Error(`File type not allowed. Allowed types: Images, Documents, Archives. Attempted to upload: ${ext} (${mimeType})`));
-    }
+    fileFilter
   });
 
   const originalUploadMethods = {

@@ -2,12 +2,18 @@
 const wodFormAccess = typeof wordOfDayAccess !== 'undefined' ? wordOfDayAccess : {};
 const editCaps = typeof entryCapabilities !== 'undefined' ? entryCapabilities : {};
 const canEdit = isEdit ? Boolean(editCaps.canEdit) : Boolean(wodFormAccess.canCreateWords);
+const canSubmit = isEdit ? Boolean(editCaps.canSubmit) : Boolean(wodFormAccess.canCreateWords);
 const examples = isEdit && Array.isArray(entry.examples) ? entry.examples : [];
 const selectedTypes = isEdit
   ? (Array.isArray(entry.wordTypes) && entry.wordTypes.length ? entry.wordTypes : (entry.wordType ? [entry.wordType] : ['noun']))
   : ['noun'];
 const selectedDifficulty = isEdit ? (entry.difficulty || 'medium') : 'medium';
-const years = authorStats && authorStats.byYear ? Object.keys(authorStats.byYear).sort().reverse() : []; %>
+const years = authorStats && authorStats.byYear ? Object.keys(authorStats.byYear).sort().reverse() : [];
+const canPickAuthor = (!isEdit && wodFormAccess.canCreateAsOtherUser) || (isEdit && wodFormAccess.canChangeAuthorOnEdit);
+const authorUserIdValue = isEdit ? (entry.authorUserId || entry.audit?.createdBy || '') : '';
+const authorNameValue = isEdit ? (entry.authorName || '') : '';
+const activeUserId = String(user?.id || user?.userId || '').trim();
+const activeUserLabel = String(user?.name || user?.username || user?.email || activeUserId).trim(); %>
 
 <style>
   .word-of-day-form-page .wod-type-toggle .btn { min-width: 5.5rem; }
@@ -25,6 +31,7 @@ const years = authorStats && authorStats.byYear ? Object.keys(authorStats.byYear
   }
 </style>
 
+<span id="actionStateIdRef" data-id="<%= actionStateId || '' %>" hidden></span>
 <div class="sections-page word-of-day-form-page">
   <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
     <div class="d-flex align-items-center gap-2 flex-wrap">
@@ -82,38 +89,52 @@ const years = authorStats && authorStats.byYear ? Object.keys(authorStats.byYear
           <h6 class="fw-bold m-0 text-primary"><i class="bi bi-pencil-square me-2"></i>Word details</h6>
         </div>
         <div class="card-body p-4">
-        <% if (!isEdit && wodFormAccess.canCreateAsOtherUser) { %>
-          <div class="row g-3 mb-3">
-            <div class="col-md-6">
-              <label class="form-label fw-bold" for="wodAuthorUserId">Creator user ID</label>
-              <input type="text" class="form-control size-md font-monospace" id="wodAuthorUserId" name="authorUserId" placeholder="Optional — defaults to you">
+        <% if (canPickAuthor) { %>
+          <input type="hidden" id="wodAuthorUserId" name="authorUserId" value="<%= authorUserIdValue %>">
+          <input type="hidden" id="wodAuthorName" name="authorName" value="<%= authorNameValue %>">
+          <input type="hidden" id="wodActiveAuthorMeta" value='<%- JSON.stringify({ userId: activeUserId, displayName: activeUserLabel }) %>'>
+          <div class="mb-3">
+            <span class="form-label fw-bold d-block">Author</span>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+              <button type="button" class="btn btn-outline-primary btn-sm" id="wodPickAuthorBtn" <%= canEdit ? '' : 'disabled' %>>
+                <i class="bi bi-person-check me-1"></i>Pick user
+              </button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="wodAssignSelfAuthorBtn" <%= (canEdit && activeUserId) ? '' : 'disabled' %>>
+                <i class="bi bi-person-badge me-1"></i>Use me as author
+              </button>
+              <button type="button" class="btn btn-outline-secondary btn-sm<%= authorUserIdValue ? '' : ' d-none' %>" id="wodClearAuthorBtn" <%= canEdit ? '' : 'disabled' %>>Clear</button>
+              <span class="small">
+                <span id="wodAuthorChipLabel"><%= authorNameValue || authorUserIdValue || (isEdit ? (entry.authorName || entry.authorUserId || '—') : 'You (default)') %></span>
+                <span id="wodAuthorChipId" class="text-muted font-monospace<%= authorUserIdValue ? '' : ' d-none' %>"><%= authorUserIdValue ? '(' + authorUserIdValue + ')' : '' %></span>
+              </span>
             </div>
-            <div class="col-md-6">
-              <label class="form-label fw-bold" for="wodAuthorName">Creator display name</label>
-              <input type="text" class="form-control size-md" id="wodAuthorName" name="authorName" placeholder="Optional label">
-            </div>
+          </div>
+        <% } else if (isEdit) { %>
+          <div class="mb-3">
+            <label class="form-label fw-bold">Author</label>
+            <div class="text-muted"><%= entry.authorName || entry.authorUserId || '—' %></div>
           </div>
         <% } %>
         <div class="mb-3">
           <label class="form-label fw-bold" for="wodWord">Word <span class="text-danger">*</span></label>
-            <input type="text" class="form-control size-md" id="wodWord" name="word" required maxlength="200" value="<%= isEdit ? (entry.word || '') : '' %>" <%= canEdit ? '' : 'readonly' %>>
-          </div>
+          <input type="text" class="form-control size-md" id="wodWord" name="word" required maxlength="200" value="<%= isEdit ? (entry.word || '') : '' %>" <%= canEdit ? '' : 'readonly' %>>
+        </div>
 
-          <div class="mb-3">
-            <span class="form-label fw-bold d-block">Word type <span class="text-muted fw-normal">(select all that apply)</span></span>
-            <div class="d-flex flex-wrap gap-2 wod-type-toggle">
-              <% (wordTypes || []).forEach((key) => {
-                const label = (wordTypeLabels || {})[key] || key;
-                const checked = selectedTypes.includes(key);
-              %>
-                <input type="checkbox" class="btn-check" id="wodType_<%= key %>" value="<%= key %>" data-wod-word-type autocomplete="off" <%= checked ? 'checked' : '' %> <%= canEdit ? '' : 'disabled' %>>
-                <label class="btn btn-sm btn-outline-primary" for="wodType_<%= key %>"><%= label %></label>
-              <% }) %>
-            </div>
+        <div class="mb-3">
+          <span class="form-label fw-bold d-block">Word type <span class="text-muted fw-normal">(select all that apply)</span></span>
+          <div class="d-flex flex-wrap gap-2 wod-type-toggle">
+            <% (wordTypes || []).forEach((key) => {
+              const label = (wordTypeLabels || {})[key] || key;
+              const checked = selectedTypes.includes(key);
+            %>
+              <input type="checkbox" class="btn-check" id="wodType_<%= key %>" value="<%= key %>" data-wod-word-type autocomplete="off" <%= checked ? 'checked' : '' %> <%= canEdit ? '' : 'disabled' %>>
+              <label class="btn btn-sm btn-outline-primary" for="wodType_<%= key %>"><%= label %></label>
+            <% }) %>
           </div>
+        </div>
 
-          <div class="mb-3">
-            <span class="form-label fw-bold d-block">Difficulty</span>
+        <div class="mb-3">
+          <span class="form-label fw-bold d-block">Difficulty</span>
             <div class="d-flex flex-wrap gap-2 wod-difficulty" role="radiogroup" aria-label="Difficulty">
               <% const diffStyles = { easy: 'btn-outline-success', medium: 'btn-outline-warning', hard: 'btn-outline-danger' };
               (difficultyLevels || []).forEach((key) => {
@@ -161,20 +182,30 @@ const years = authorStats && authorStats.byYear ? Object.keys(authorStats.byYear
               <label class="form-label fw-bold" for="wodPhotoFile">Photo (max 2 MB)</label>
               <input type="file" class="form-control size-md" id="wodPhotoFile" accept="image/*" <%= canEdit ? '' : 'disabled' %>>
               <div id="wodPhotoPreview" class="small mt-2"></div>
+              <% if (canEdit) { %>
+                <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="wodClearPhotoBtn">Remove photo</button>
+              <% } %>
             </div>
             <div class="col-md-6">
               <label class="form-label fw-bold" for="wodAudioFile">Audio (max 3 MB)</label>
               <input type="file" class="form-control size-md" id="wodAudioFile" accept="audio/*" <%= canEdit ? '' : 'disabled' %>>
               <div id="wodAudioPreview" class="small mt-2"></div>
+              <% if (canEdit) { %>
+                <button type="button" class="btn btn-sm btn-outline-secondary mt-2" id="wodClearAudioBtn">Remove audio</button>
+              <% } %>
             </div>
           </div>
         </div>
       </div>
 
-      <% if (canEdit) { %>
+      <% if (canEdit || canSubmit) { %>
         <div class="d-flex flex-wrap gap-2">
-          <button type="button" class="btn btn-outline-secondary" data-wod-save="saved">Save draft</button>
-          <button type="button" class="btn btn-filled btn-primary" data-wod-save="submit">Save &amp; submit</button>
+          <% if (canEdit) { %>
+            <button type="button" class="btn btn-outline-secondary" data-wod-save="saved">Save draft</button>
+          <% } %>
+          <% if (canSubmit) { %>
+            <button type="button" class="btn btn-filled btn-primary" data-wod-save="submit">Save &amp; submit</button>
+          <% } %>
         </div>
       <% } %>
     </form>
@@ -201,6 +232,8 @@ const years = authorStats && authorStats.byYear ? Object.keys(authorStats.byYear
   </div>
 </div>
 
+<%- include('partials/modal_GenericPicker') %>
+<script src="/scripts/schoolMessageUi.js"></script>
 <script src="/scripts/wordOfDayForm.js"></script>
 <script>
   if (window.WordOfDayForm) {

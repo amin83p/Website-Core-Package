@@ -1,6 +1,6 @@
 const SECTION_ID = '445588';
 const SECTION_NAME = 'SCHOOL_WORD_OF_DAY';
-const SECTION_LABEL = 'Word of Day';
+const SECTION_LABEL = 'Word of the Day';
 const PARENT_SECTION_ID = '122740';
 const PARENT_SECTION_NAME = 'SCHOOL';
 const SYMBOL_ID = 'SYM_SCHOOL_WORD_OF_DAY_001';

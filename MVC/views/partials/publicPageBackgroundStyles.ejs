@@ -1,0 +1,74 @@
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap');
+
+html.pte-public-root,
+html.pte-public-root body.pte-public-body,
+html.home-public-root,
+html.home-public-root body.home-public-body {
+  background:
+    radial-gradient(circle at 8% 5%, rgba(29, 95, 184, 0.16), transparent 28%),
+    radial-gradient(circle at 92% 4%, rgba(8, 127, 140, 0.16), transparent 26%),
+    radial-gradient(circle at 9% 44%, rgba(29, 95, 184, 0.08), transparent 24%),
+    radial-gradient(circle at 91% 72%, rgba(8, 127, 140, 0.1), transparent 28%),
+    linear-gradient(135deg, #f8fbff 0%, #eef8f5 52%, #ffffff 100%);
+  min-height: 100%;
+}
+
+body.pte-public-body.home-public-body {
+  background-attachment: fixed;
+  color: #17223b;
+}
+
+main.pte-public-main.home-public-main {
+  margin-bottom: 0 !important;
+  margin-top: 0 !important;
+  padding-bottom: clamp(2rem, 5vw, 4.5rem);
+  padding-top: 0;
+  position: relative;
+}
+
+.home-pro {
+  --home-primary: #0a66c2;
+  --home-primary-dark: #094d92;
+  --home-ink: #17223b;
+  --home-muted: #5c687d;
+  --home-border: #dbe3ee;
+  --home-surface: #ffffff;
+  --home-soft: #f4f8fc;
+  font-family: 'Manrope', 'Segoe UI', sans-serif;
+  isolation: isolate;
+  padding-top: clamp(1rem, 2.5vw, 1.75rem);
+  position: relative;
+}
+
+.home-pro::before {
+  background:
+    radial-gradient(circle at 8% 5%, rgba(29, 95, 184, 0.16), transparent 28%),
+    radial-gradient(circle at 92% 4%, rgba(8, 127, 140, 0.16), transparent 26%),
+    radial-gradient(circle at 9% 44%, rgba(29, 95, 184, 0.08), transparent 24%),
+    radial-gradient(circle at 91% 72%, rgba(8, 127, 140, 0.1), transparent 28%),
+    linear-gradient(135deg, #f8fbff 0%, #eef8f5 52%, #ffffff 100%);
+  bottom: calc(-1 * clamp(2rem, 5vw, 4.5rem));
+  content: "";
+  left: 50%;
+  pointer-events: none;
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  width: 100vw;
+  z-index: -1;
+}
+
+.home-pro .reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: wodPublicFadeUp 0.55s ease forwards;
+}
+
+@keyframes wodPublicFadeUp {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+</style>

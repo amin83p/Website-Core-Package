@@ -10957,7 +10957,7 @@
     },
     {
       "id": "school-dashboard-word-of-day",
-      "label": "Word of Day",
+      "label": "Word of the Day",
       "href": "/school/word-of-day",
       "icon": "bi bi-book-half",
       "description": "Create and approve vocabulary entries shown as the daily word on the school dashboard.",
