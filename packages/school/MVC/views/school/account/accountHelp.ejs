@@ -140,7 +140,7 @@
                 <td>
                   <code>none</code>, <code>students</code>, <code>student_all</code>, <code>student_domestic</code>,
                   <code>student_international</code>, <code>student_corporate</code>, <code>student_scholarship</code>,
-                  <code>student_government_funded</code>, <code>student_linc_alberta</code>, <code>student_wcb_alberta</code>,
+                  <code>student_government_funded</code>, <code>student_self_funded</code>, <code>student_linc_alberta</code>, <code>student_wcb_alberta</code>,
                   <code>student_other</code>, <code>teachers</code>, <code>staff</code>, <code>parents</code>,
                   <code>vendors</code>, <code>organizations</code>, <code>other</code>
                 </td>
@@ -279,7 +279,7 @@
         <h5 class="fw-bold mb-3">5. Student Integration Rules</h5>
         <p class="mb-2">Student admission logic currently follows this behavior:</p>
         <ul>
-          <li>If student is <span class="fw-bold">self-funded</span>: system looks for active <code>Head Account For = student_all</code> (or legacy <code>students</code>), then routes to category control accounts such as <code>Student_International</code>, <code>Student_LINC_Alberta</code>, <code>Student_WCB_Alberta</code> based on Default Fee Category.</li>
+          <li>If student is <span class="fw-bold">self-funded</span>: system looks for active <code>Head Account For = student_all</code> (or legacy <code>students</code>), then routes to category control accounts such as <code>Student_Self_Funded</code>, <code>Student_International</code>, <code>Student_LINC_Alberta</code>, <code>Student_WCB_Alberta</code> based on Default Fee Category.</li>
           <li>If student is <span class="fw-bold">funded</span>: system auto-creates a child student account under selected funder account.</li>
           <li>If self-funded and no student head account exists: admission is blocked and returns an error.</li>
         </ul>

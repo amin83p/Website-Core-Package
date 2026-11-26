@@ -161,7 +161,11 @@
             <div class="news-mini-list">
               <% relatedItems.forEach((news) => { %>
                 <a href="/news/article/<%= news.hrefToken %>" class="news-mini-card">
-                  <span class="news-mini-icon"><i class="bi bi-arrow-up-right"></i></span>
+                  <% if (news.image) { %>
+                    <img src="<%= news.image %>" alt="<%= news.title %>">
+                  <% } else { %>
+                    <span class="news-mini-icon"><i class="bi bi-newspaper"></i></span>
+                  <% } %>
                   <span>
                     <strong><%= news.title %></strong>
                     <small><%= news.category %><% if (news.views > 10) { %> - Hot<% } %></small>

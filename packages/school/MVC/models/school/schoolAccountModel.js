@@ -28,6 +28,7 @@ const ACCOUNT_HEAD_CATEGORIES = Object.freeze([
   'student_government_funded',
   'student_linc_alberta',
   'student_wcb_alberta',
+  'student_self_funded',
   'student_other',
   'teachers',
   'staff',

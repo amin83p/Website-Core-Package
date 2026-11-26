@@ -14,6 +14,11 @@ const {
 } = requireCoreModule('MVC/utils/orgContextUtils');
 
 const postingPolicyService = require('../../services/school/postingPolicyService');
+const {
+  getFeeCategories,
+  ALL_FEE_CATEGORIES_KEY,
+  ALL_FEE_CATEGORIES_LABEL
+} = require('../../models/school/feeCategoryCatalog');
 const { respondSchoolDeleteError } = require('../../utils/schoolDeleteErrorResponse');
 
 function parseJsonSafe(v, fallback) {
@@ -131,6 +136,9 @@ async function renderDepartmentFormView(req, res, viewName, titleOverride) {
                 const definitionOrgId = toPublicId(definition.orgId);
                 return idsEqual(definitionOrgId, definitionScopeOrgId) || definitionOrgId === 'SYSTEM';
             }),
+            feeCategories: getFeeCategories({ includeAll: false }),
+            allFeeCategoryKey: ALL_FEE_CATEGORIES_KEY,
+            allFeeCategoryLabel: ALL_FEE_CATEGORIES_LABEL,
             includeModal: true,
             user: req.user,
             actionStateId: req.actionStateId

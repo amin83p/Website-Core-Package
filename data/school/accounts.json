@@ -254,6 +254,25 @@
     "type": "asset"
   },
   {
+    "id": "ACC_1229",
+    "allowPost": false,
+    "audit": {
+      "createDateTime": "2026-11-26T00:00:00.000Z"
+    },
+    "code": "1229",
+    "description": "Self funded student receivable control account.",
+    "headCategory": "student_self_funded",
+    "isControl": true,
+    "level": 4,
+    "name": "Student_Self_Funded",
+    "normalBalance": "debit",
+    "orgId": "900000",
+    "parentId": "ACC_1220",
+    "partyRole": "none",
+    "status": "active",
+    "type": "asset"
+  },
+  {
     "id": "ACC_1230",
     "allowPost": false,
     "audit": {

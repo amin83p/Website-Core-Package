@@ -77,15 +77,10 @@
                 <div class="col-md-3 mb-3">
                   <label class="form-label fw-bold">Fee Category</label>
                   <select id="postingPolicyCategory" class="form-select size-md">
-                    <option value="__ALL__">All Categories</option>
-                    <option value="Domestic">Domestic</option>
-                    <option value="International">International</option>
-                    <option value="Corporate">Corporate</option>
-                    <option value="Scholarship">Scholarship</option>
-                    <option value="Government Funded">Government Funded</option>
-                    <option value="LINC Alberta">LINC Alberta</option>
-                    <option value="WCB Alberta">WCB Alberta</option>
-                    <option value="Others">Others</option>
+                    <option value="<%= typeof allFeeCategoryKey !== 'undefined' ? allFeeCategoryKey : '__ALL__' %>"><%= typeof allFeeCategoryLabel !== 'undefined' ? allFeeCategoryLabel : 'All Categories' %></option>
+                    <% (feeCategories || []).forEach(function (cat) { %>
+                      <option value="<%= cat %>"><%= cat %></option>
+                    <% }); %>
                   </select>
                 </div>
                 <div class="col-md-6 mb-3">

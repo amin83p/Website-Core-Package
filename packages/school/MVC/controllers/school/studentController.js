@@ -45,7 +45,10 @@ const { SECTIONS, OPERATIONS } = require('../../../config/accessConstants');
 const studentModel = require('../../models/school/studentModel');
 const studentReferralLinkService = require('../../services/school/studentReferralLinkService');
 const { ACADEMIC_STATUSES } = studentModel;
-const { FEE_CATEGORIES } = require('../../models/school/feeCategoryCatalog');
+const {
+  FEE_CATEGORIES,
+  getStudentFeeCategoryControlAccountCode
+} = require('../../models/school/feeCategoryCatalog');
 const { normalizeProgramRegistrationSelections } = require('../../utils/programRegistrationSelectionUtils');
 
 function routeAccess(req) {
@@ -213,34 +216,10 @@ function findActiveOrgHeadAccount(accounts, orgId, headCategory, aliases = []) {
     }) || null;
 }
 
-function normalizeFeeCategoryKey(value) {
-    return String(value || '')
-        .trim()
-        .toLowerCase()
-        .replace(/\(.*?\)/g, '')
-        .replace(/[^a-z0-9]+/g, '_')
-        .replace(/_+/g, '_')
-        .replace(/^_+|_+$/g, '');
-}
-
 function resolveStudentCategoryParentAccount(orgAccounts, studentsHeadAccount, feeCategory) {
     if (!studentsHeadAccount) return null;
 
-    const key = normalizeFeeCategoryKey(feeCategory);
-    const codeMap = {
-        domestic: '1221',
-        international: '1222',
-        corporate: '1223',
-        scholarship: '1224',
-        government_funded: '1225',
-        others: '1226',
-        other: '1226',
-        linc: '1227',
-        linc_alberta: '1227',
-        wcb: '1228',
-        wcb_alberta: '1228'
-    };
-    const targetCode = codeMap[key];
+    const targetCode = getStudentFeeCategoryControlAccountCode(feeCategory);
     if (!targetCode) return null;
 
     return (orgAccounts || []).find((a) => {

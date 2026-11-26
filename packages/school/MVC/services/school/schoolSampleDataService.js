@@ -4,7 +4,10 @@ const dataService = require('../../services/school/schoolDataService');
 const { requireCoreModule } = require('./schoolCoreContracts');
 const { resolveCoreRoot } = require('./schoolCoreModuleResolver');
 const dataServiceGlobal = requireCoreModule('MVC/services/dataService');
-const { FEE_CATEGORIES } = require('../../models/school/feeCategoryCatalog');
+const {
+  FEE_CATEGORIES,
+  getStudentFeeCategoryControlAccountCode
+} = require('../../models/school/feeCategoryCatalog');
 const withdrawalRepository = require('../../repositories/school/withdrawalRepository');
 const schoolRepositories = require('../../repositories/school');
 const attendanceMatrixPolicyModel = require('../../models/school/attendanceMatrixPolicyModel');
@@ -215,24 +218,7 @@ function findHeadAccount(accounts, orgId, headCategory, aliases = []) {
 
 function resolveStudentCategoryParent(accounts, studentsHeadAccount, feeCategory) {
   if (!studentsHeadAccount) return null;
-  const normalized = String(feeCategory || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '');
-  const codeMap = {
-    domestic: '1221',
-    international: '1222',
-    corporate: '1223',
-    scholarship: '1224',
-    government_funded: '1225',
-    others: '1226',
-    other: '1226',
-    linc_alberta: '1227',
-    wcb_alberta: '1228'
-  };
-  const expectedCode = codeMap[normalized];
+  const expectedCode = getStudentFeeCategoryControlAccountCode(feeCategory);
   if (!expectedCode) return null;
   return (accounts || []).find((a) =>
     idsEqual(a?.parentId, studentsHeadAccount.id) &&
