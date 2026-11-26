@@ -1,0 +1,37 @@
+<% const w = (typeof wordOfDayPayload !== 'undefined' && wordOfDayPayload) ? wordOfDayPayload : null;
+const entry = w && w.entry ? w.entry : null; %>
+<% if (entry) { %>
+  <section class="card border-0 shadow-sm mb-4 word-of-day-widget" aria-label="Word of the day">
+    <div class="card-body">
+      <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-2">
+        <h3 class="h5 mb-0"><i class="bi bi-book-half me-2 text-primary" aria-hidden="true"></i>Word of the Day</h3>
+        <% if (w.dateKey) { %><span class="badge bg-light text-dark border"><%= w.dateKey %></span><% } %>
+      </div>
+      <div class="d-flex flex-wrap align-items-baseline gap-2 mb-2">
+        <span class="display-6 fw-bold text-primary mb-0"><%= entry.word %></span>
+        <% if (entry.wordTypeLabel) { %><span class="badge bg-secondary"><%= entry.wordTypeLabel %></span><% } %>
+        <% if (entry.difficultyLabel) { %><span class="badge bg-outline-secondary border text-muted"><%= entry.difficultyLabel %></span><% } %>
+      </div>
+      <% if (entry.pronunciation) { %><div class="small text-muted font-monospace mb-2"><%= entry.pronunciation %></div><% } %>
+      <% if (entry.meaning) { %><p class="mb-2"><%= entry.meaning %></p><% } %>
+      <% if (entry.examples && entry.examples.length) { %>
+        <ul class="small mb-2 ps-3">
+          <% entry.examples.forEach((ex) => { %><li><%= ex %></li><% }) %>
+        </ul>
+      <% } %>
+      <div class="d-flex flex-wrap gap-3 align-items-center">
+        <% if (entry.photo && entry.photo.url) { %>
+          <img src="<%= entry.photo.url %>" alt="" class="rounded border" style="max-width:120px;max-height:120px;object-fit:cover;">
+        <% } %>
+        <% if (entry.audio && entry.audio.url) { %>
+          <audio controls preload="none" class="w-100" style="max-width:280px;"><source src="<%= entry.audio.url %>" type="<%= entry.audio.mimeType || 'audio/mpeg' %>"></audio>
+        <% } %>
+        <% if (entry.videoUrl) { %>
+          <a href="<%= entry.videoUrl %>" class="btn btn-sm btn-outline-primary" target="_blank" rel="noopener noreferrer">Watch video</a>
+        <% } %>
+      </div>
+      <div class="small text-muted mt-2">Displayed <%= Number(entry.displayCount || 0) %> time(s)<% if (entry.authorName) { %> · by <%= entry.authorName %><% } %></div>
+      <a href="/school/word-of-day" class="small">Manage Word of Day</a>
+    </div>
+  </section>
+<% } %>

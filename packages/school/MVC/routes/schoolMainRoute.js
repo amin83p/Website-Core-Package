@@ -49,6 +49,7 @@ router.use('/funders', require('./funderRoutes'));
 router.use('/teachers', require('./teacherRoutes'));
 router.use('/staff', require('./staffRoutes'));
 router.use('/referrals', require('./referralRoutes'));
+router.use('/word-of-day', require('./wordOfDayRoutes'));
 router.use('/programs', require('./programRoutes'));
 router.use('/transactionTemplates', require('./transactionTemplateRoutes'));
 router.use('/transactionDefinitions', require('./transactionDefinitionRoutes'));

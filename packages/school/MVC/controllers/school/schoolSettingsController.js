@@ -49,6 +49,9 @@ const schedulingTimePolicyModel = require('../../models/school/schedulingTimePol
 const { listUploadLimitSections } = require('../../config/uploadLimitsSectionCatalog');
 const { userCanUpdateSchoolSettings } = require('../../services/school/schoolSettingsAccessService');
 const studentDuplicateProfileService = require('../../services/school/studentDuplicateProfileService');
+const wordOfDayPolicyModel = require('../../models/school/wordOfDayPolicyModel');
+const wordOfDayPolicyService = require('../../services/school/wordOfDayPolicyService');
+const wordOfDayAccessService = require('../../services/school/wordOfDayAccessService');
 
 const CONDUCT_LEVEL_CODES = Object.freeze(
   (conductRatingScalePolicyModel.DEFAULT_POLICY?.levels || []).map((row) => String(row.code))
@@ -406,9 +409,11 @@ async function loadSettingsPageData(req) {
     timesheetImportPolicy,
     timesheetDisplayPolicy,
     enrollmentFinishAlertPolicy,
+    wordOfDayPolicy,
     uploadLimitsPolicy,
     schedulingTimePolicy,
-    canUpdate
+    canUpdate,
+    canConfigureWordOfDay
   ] = await Promise.all([
     conductRatingScalePolicyModel.getPolicyForOrg(activeOrgId),
     attendanceMatrixPolicyModel.getPolicyForOrg(activeOrgId),
@@ -422,9 +427,11 @@ async function loadSettingsPageData(req) {
     timesheetImportPolicyModel.getPolicyForOrg(activeOrgId),
     timesheetDisplayPolicyModel.getPolicyForOrg(activeOrgId),
     enrollmentFinishAlertPolicyModel.getPolicyForOrg(activeOrgId),
+    wordOfDayPolicyModel.getPolicyForOrg(activeOrgId),
     uploadLimitsPolicyModel.getPolicyForOrg(activeOrgId),
     schedulingTimePolicyModel.getPolicyForOrg(activeOrgId),
-    userCanUpdateSchoolSettings(req.user, req.ip)
+    userCanUpdateSchoolSettings(req.user, req.ip),
+    wordOfDayAccessService.userCanConfigureWordOfDay(req.user, req.ip)
   ]);
   const studentAttendanceReportLabels = await resolveStudentAttendanceReportLabels(
     studentAttendanceReportPolicy,
@@ -492,6 +499,7 @@ async function loadSettingsPageData(req) {
     activeOrgName: resolveActiveOrgName(req.user, activeOrgId),
     groups: listSchoolSettingsGroups(),
     canUpdate,
+    canConfigureWordOfDay,
     conductPolicy,
     attendancePolicy,
     attendanceThresholdsEnabled: attendanceConfig.thresholdsEnabled,
@@ -515,6 +523,7 @@ async function loadSettingsPageData(req) {
     timesheetDisplayRowKinds: timesheetDisplayPolicyService.ROW_KINDS,
     timesheetDisplayAllowedFieldsByKind: timesheetDisplayPolicyService.ALLOWED_FIELDS_BY_KIND,
     enrollmentFinishAlertPolicy,
+    wordOfDayPolicy,
     timesheetImportActivityOptions,
     statutoryHolidayPublicActivityOptions,
     statutoryHolidayMappingYearOptions,
@@ -981,6 +990,39 @@ async function saveEnrollmentFinishAlertPolicy(req, res) {
   }
 }
 
+async function saveWordOfDayPolicy(req, res) {
+  try {
+    const canConfigure = await wordOfDayAccessService.userCanConfigureWordOfDay(req.user, req.ip);
+    if (!canConfigure) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'You do not have permission to configure Word of Day display settings.'
+      });
+    }
+    const activeOrgId = activeOrgIdOrThrow(req.user);
+    const normalized = wordOfDayPolicyService.validatePolicyInput({
+      schoolDashboardEnabled: req.body?.schoolDashboardEnabled,
+      publicHomeEnabled: req.body?.publicHomeEnabled,
+      publicSourceOrgId: req.body?.publicSourceOrgId || activeOrgId
+    });
+    const policy = await wordOfDayPolicyModel.savePolicyForOrg(
+      activeOrgId,
+      normalized,
+      req.user?.id
+    );
+    return res.json({
+      status: 'success',
+      message: 'Word of Day display settings were updated.',
+      policy
+    });
+  } catch (error) {
+    return res.status(Number(error?.statusCode) || 500).json({
+      status: 'error',
+      message: error?.message || 'Failed to save Word of Day settings.'
+    });
+  }
+}
+
 async function saveTimesheetParametersPolicy(req, res) {
   try {
     const activeOrgId = activeOrgIdOrThrow(req.user);
@@ -1173,6 +1215,7 @@ module.exports = {
   saveSemiMonthlyReportSettings,
   saveTimesheetParametersPolicy,
   saveEnrollmentFinishAlertPolicy,
+  saveWordOfDayPolicy,
   previewStatutoryHolidayDayMapping,
   mapStatutoryHolidayDays,
   saveTimesheetImportPolicy,

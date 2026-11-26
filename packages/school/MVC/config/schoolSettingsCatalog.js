@@ -65,6 +65,13 @@ const SCHOOL_SETTINGS_GROUPS = Object.freeze([
     order: 41
   }),
   Object.freeze({
+    key: 'word-of-day',
+    title: 'Word of Day',
+    description: 'Show the daily approved word on the school dashboard and optional public home page.',
+    icon: 'bi-book-half',
+    order: 41.5
+  }),
+  Object.freeze({
     key: 'timesheet-parameters',
     title: 'Timesheet Parameters',
     description: 'Configure how class sessions with no student enrollment appear on timesheets.',

@@ -115,6 +115,23 @@ async function getHome(req, res) {
     }
   }
 
+  let wordOfDayPublic = null;
+  try {
+    const wordOfDayPolicyModel = require('../../packages/school/MVC/models/school/wordOfDayPolicyModel');
+    const wordOfDayDisplayService = require('../../packages/school/MVC/services/school/wordOfDayDisplayService');
+    const policy = await wordOfDayPolicyModel.getGlobalPublicPolicy();
+    if (policy.publicHomeEnabled && policy.publicSourceOrgId) {
+      const dateKey = new Date().toISOString().slice(0, 10);
+      wordOfDayPublic = await wordOfDayDisplayService.resolveDailyDisplay({
+        orgId: policy.publicSourceOrgId,
+        dateKey,
+        recordAnalytics: true
+      });
+    }
+  } catch (_err) {
+    wordOfDayPublic = null;
+  }
+
   res.render('index', {
     title: `Home - ${appBrandingService.getBrand().appName}`,
     includeModal: true,
@@ -126,7 +143,8 @@ async function getHome(req, res) {
     homeContent,
     heroSlides,
     homeShowcaseItems,
-    buyMeACoffeeQr
+    buyMeACoffeeQr,
+    wordOfDayPublic
   });
 }
 

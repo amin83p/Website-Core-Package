@@ -1,0 +1,116 @@
+<% const status = String(entry?.status || '').toLowerCase();
+const caps = entryCapabilities || {};
+let badge = 'bg-secondary';
+if (status === 'approved') badge = 'bg-success';
+if (status === 'submitted') badge = 'bg-warning text-dark';
+if (status === 'rejected') badge = 'bg-danger';
+if (status === 'on_hold') badge = 'bg-info text-dark';
+if (status === 'archived') badge = 'bg-dark';
+if (status === 'reopened') badge = 'bg-primary';
+%>
+<div class="sections-page">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+    <h1 class="page-heading size-md m-0"><%= entry.word || 'Word of Day' %></h1>
+    <div class="d-flex gap-2">
+      <% if (caps.canEdit) { %>
+        <a href="/school/word-of-day/edit/<%= entry.id %>" class="btn btn-outline-primary btn-sm">Edit</a>
+      <% } %>
+      <a href="/school/word-of-day" class="btn btn-outline-secondary btn-sm">Back</a>
+    </div>
+  </div>
+
+  <div class="card border-0 shadow-sm mb-3">
+    <div class="card-body">
+      <div class="mb-2"><span class="badge <%= badge %>"><%= status.replace(/_/g, ' ').toUpperCase() %></span></div>
+      <% if (caps.hasDisplayHistory) { %>
+        <div class="alert alert-warning py-2 small">This word has been displayed <%= Number(entry.display?.displayCount || 0) %> time(s). Some status changes require confirmation.</div>
+      <% } %>
+      <dl class="row mb-0 small">
+        <dt class="col-sm-3">Type</dt><dd class="col-sm-9"><%
+          const wodTypes = Array.isArray(entry.wordTypes) && entry.wordTypes.length
+            ? entry.wordTypes
+            : (entry.wordType ? [entry.wordType] : []);
+        %><%= wodTypes.map((key) => (wordTypeLabels || {})[key] || key).join(', ') || '—' %></dd>
+        <dt class="col-sm-3">Difficulty</dt><dd class="col-sm-9"><%= (difficultyLabels || {})[entry.difficulty] || entry.difficulty %></dd>
+        <dt class="col-sm-3">Pronunciation</dt><dd class="col-sm-9 font-monospace"><%= entry.pronunciation || '—' %></dd>
+        <dt class="col-sm-3">Meaning</dt><dd class="col-sm-9"><%= entry.meaning || '—' %></dd>
+        <dt class="col-sm-3">Author</dt><dd class="col-sm-9"><%= entry.authorName || entry.authorUserId || '—' %></dd>
+        <dt class="col-sm-3">Created</dt><dd class="col-sm-9"><%= entry.audit?.createDateTime || '—' %></dd>
+        <dt class="col-sm-3">Displayed</dt><dd class="col-sm-9"><%= Number(entry.display?.displayCount || 0) %> time(s)</dd>
+      </dl>
+      <% if (entry.examples && entry.examples.length) { %>
+        <h2 class="h6 mt-3">Examples</h2>
+        <ol class="small mb-0 ps-3"><% entry.examples.forEach((ex) => { %><li class="mb-1"><%= ex %></li><% }) %></ol>
+      <% } %>
+      <% if (entry.photo?.url) { %><img src="<%= entry.photo.url %>" alt="" class="rounded border mt-2" style="max-height:160px;"><% } %>
+      <% if (entry.audio?.url) { %><audio controls class="mt-2 d-block" src="<%= entry.audio.url %>"></audio><% } %>
+      <% if (entry.videoUrl) { %><a href="<%= entry.videoUrl %>" class="btn btn-sm btn-outline-primary mt-2" target="_blank" rel="noopener noreferrer">Video</a><% } %>
+    </div>
+  </div>
+
+  <div class="d-flex flex-wrap gap-2" id="wodDetailActions" data-entry-id="<%= entry.id %>" data-has-display="<%= caps.hasDisplayHistory ? '1' : '0' %>">
+    <% if (caps.canSubmit) { %>
+      <button type="button" class="btn btn-primary btn-sm" data-wod-action="submit">Submit for review</button>
+    <% } %>
+    <% if (caps.canApprove) { %>
+      <button type="button" class="btn btn-success btn-sm" data-wod-action="approve">Approve</button>
+    <% } %>
+    <% if (caps.canReject) { %>
+      <button type="button" class="btn btn-danger btn-sm" data-wod-action="reject">Reject</button>
+    <% } %>
+    <% if (caps.canReopen) { %>
+      <button type="button" class="btn btn-outline-secondary btn-sm" data-wod-action="reopen">Reopen</button>
+    <% } %>
+    <% if (caps.canHold) { %>
+      <button type="button" class="btn btn-outline-info btn-sm" data-wod-action="hold">On hold</button>
+    <% } %>
+    <% if (caps.canArchive) { %>
+      <button type="button" class="btn btn-outline-dark btn-sm" data-wod-action="archive">Archive</button>
+    <% } %>
+    <% if (caps.canDelete) { %>
+      <button type="button" class="btn btn-outline-danger btn-sm" data-wod-action="delete">Delete</button>
+    <% } %>
+  </div>
+</div>
+
+<script>
+(function () {
+  const root = document.getElementById('wodDetailActions');
+  if (!root) return;
+  const id = root.getAttribute('data-entry-id');
+  const hasDisplay = root.getAttribute('data-has-display') === '1';
+  const csrf = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+  const riskyActions = new Set(['reopen', 'archive', 'delete']);
+  async function post(action, extra = {}) {
+    const note = ['reject', 'reopen', 'hold', 'archive'].includes(action)
+      ? window.prompt('Optional note:', '') || ''
+      : '';
+    const body = { note, ...extra };
+    const res = await fetch(`/school/word-of-day/api/${encodeURIComponent(id)}/${action}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'CSRF-Token': csrf },
+      body: JSON.stringify(body)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.status === 409 && data.code === 'WORD_OF_DAY_DISPLAY_WARNING') {
+      if (window.confirm(`${data.message || 'This word was displayed.'} Continue anyway?`)) {
+        return post(action, { confirmDisplayRisk: true, note });
+      }
+      return;
+    }
+    if (!res.ok) {
+      window.alert(data.message || 'Action failed.');
+      return;
+    }
+    window.location.reload();
+  }
+  root.addEventListener('click', (ev) => {
+    const btn = ev.target.closest('[data-wod-action]');
+    if (!btn) return;
+    const action = btn.getAttribute('data-wod-action');
+    if (action === 'delete' && !window.confirm('Delete this entry?')) return;
+    if (hasDisplay && riskyActions.has(action) && !window.confirm('This word has display history. Continue?')) return;
+    post(action);
+  });
+})();
+</script>

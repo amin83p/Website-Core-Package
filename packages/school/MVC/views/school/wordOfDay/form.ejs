@@ -1,0 +1,211 @@
+<% const isEdit = mode === 'edit' && entry;
+const wodFormAccess = typeof wordOfDayAccess !== 'undefined' ? wordOfDayAccess : {};
+const editCaps = typeof entryCapabilities !== 'undefined' ? entryCapabilities : {};
+const canEdit = isEdit ? Boolean(editCaps.canEdit) : Boolean(wodFormAccess.canCreateWords);
+const examples = isEdit && Array.isArray(entry.examples) ? entry.examples : [];
+const selectedTypes = isEdit
+  ? (Array.isArray(entry.wordTypes) && entry.wordTypes.length ? entry.wordTypes : (entry.wordType ? [entry.wordType] : ['noun']))
+  : ['noun'];
+const selectedDifficulty = isEdit ? (entry.difficulty || 'medium') : 'medium';
+const years = authorStats && authorStats.byYear ? Object.keys(authorStats.byYear).sort().reverse() : []; %>
+
+<style>
+  .word-of-day-form-page .wod-type-toggle .btn { min-width: 5.5rem; }
+  .word-of-day-form-page .wod-difficulty .btn-check:checked + .btn-outline-success { background-color: var(--bs-success); color: #fff; border-color: var(--bs-success); }
+  .word-of-day-form-page .wod-difficulty .btn-check:checked + .btn-outline-warning { background-color: var(--bs-warning); color: #000; border-color: var(--bs-warning); }
+  .word-of-day-form-page .wod-difficulty .btn-check:checked + .btn-outline-danger { background-color: var(--bs-danger); color: #fff; border-color: var(--bs-danger); }
+  .word-of-day-form-page #wodExamplesList .list-group-item { align-items: center; }
+  .word-of-day-form-page #wodExamplesList .wod-example-text { flex: 1 1 auto; }
+  .word-of-day-form-page .wod-year-tile {
+    border: 1px solid rgba(20, 45, 75, 0.1);
+    border-radius: var(--border-radius, 0.5rem);
+    padding: 0.75rem 1rem;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.85);
+  }
+</style>
+
+<div class="sections-page word-of-day-form-page">
+  <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <h1 class="page-heading size-md m-0">
+        <i class="bi bi-journal-richtext me-2"></i><%= title %>
+      </h1>
+      <% if (isEdit && entry?.id) { %>
+        <span class="badge bg-primary border font-monospace">ID: <%= entry.id %></span>
+      <% } %>
+    </div>
+    <a href="/school/word-of-day" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i> Back to List
+    </a>
+  </div>
+
+  <div class="form-container wide" style="max-width: 1400px;">
+    <div class="card border-0 shadow-sm mb-4">
+      <div class="card-header bg-white border-bottom">
+        <h6 class="fw-bold m-0 text-primary"><i class="bi bi-bar-chart me-2"></i>Your words by year</h6>
+      </div>
+      <div class="card-body p-4">
+        <% if (!years.length) { %>
+          <p class="text-muted mb-0 small">No entries yet.</p>
+        <% } else { %>
+          <div class="row g-3">
+            <% years.forEach((year) => {
+              const bucket = authorStats.byYear[year] || {};
+            %>
+              <div class="col-sm-6 col-md-4 col-lg-3">
+                <div class="wod-year-tile">
+                  <div class="fw-bold"><%= year %></div>
+                  <div class="small text-muted mt-1">
+                    Saved: <%= bucket.saved || 0 %> · Submitted: <%= bucket.submitted || 0 %><br>
+                    Approved: <%= bucket.approved || 0 %> · Rejected: <%= bucket.rejected || 0 %>
+                  </div>
+                </div>
+              </div>
+            <% }) %>
+          </div>
+        <% } %>
+      </div>
+    </div>
+
+    <form id="wordOfDayForm" method="post" action="<%= formAction %>" data-entry-id="<%= typeof entryId !== 'undefined' ? entryId : '' %>">
+      <input type="hidden" name="_csrf" value="<%= typeof csrfToken !== 'undefined' ? csrfToken : '' %>">
+      <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+      <input type="hidden" name="wordTypes" id="wodWordTypesInput" value='<%- JSON.stringify(selectedTypes) %>'>
+      <input type="hidden" name="photo" id="wodPhotoInput" value='<%- JSON.stringify(isEdit ? (entry.photo || {}) : {}) %>'>
+      <input type="hidden" name="audio" id="wodAudioInput" value='<%- JSON.stringify(isEdit ? (entry.audio || {}) : {}) %>'>
+      <input type="hidden" name="examples" id="wodExamplesInput" value='<%- JSON.stringify(examples) %>'>
+      <input type="hidden" name="saveAction" id="wodSaveAction" value="saved">
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-bottom">
+          <h6 class="fw-bold m-0 text-primary"><i class="bi bi-pencil-square me-2"></i>Word details</h6>
+        </div>
+        <div class="card-body p-4">
+        <% if (!isEdit && wodFormAccess.canCreateAsOtherUser) { %>
+          <div class="row g-3 mb-3">
+            <div class="col-md-6">
+              <label class="form-label fw-bold" for="wodAuthorUserId">Creator user ID</label>
+              <input type="text" class="form-control size-md font-monospace" id="wodAuthorUserId" name="authorUserId" placeholder="Optional — defaults to you">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold" for="wodAuthorName">Creator display name</label>
+              <input type="text" class="form-control size-md" id="wodAuthorName" name="authorName" placeholder="Optional label">
+            </div>
+          </div>
+        <% } %>
+        <div class="mb-3">
+          <label class="form-label fw-bold" for="wodWord">Word <span class="text-danger">*</span></label>
+            <input type="text" class="form-control size-md" id="wodWord" name="word" required maxlength="200" value="<%= isEdit ? (entry.word || '') : '' %>" <%= canEdit ? '' : 'readonly' %>>
+          </div>
+
+          <div class="mb-3">
+            <span class="form-label fw-bold d-block">Word type <span class="text-muted fw-normal">(select all that apply)</span></span>
+            <div class="d-flex flex-wrap gap-2 wod-type-toggle">
+              <% (wordTypes || []).forEach((key) => {
+                const label = (wordTypeLabels || {})[key] || key;
+                const checked = selectedTypes.includes(key);
+              %>
+                <input type="checkbox" class="btn-check" id="wodType_<%= key %>" value="<%= key %>" data-wod-word-type autocomplete="off" <%= checked ? 'checked' : '' %> <%= canEdit ? '' : 'disabled' %>>
+                <label class="btn btn-sm btn-outline-primary" for="wodType_<%= key %>"><%= label %></label>
+              <% }) %>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <span class="form-label fw-bold d-block">Difficulty</span>
+            <div class="d-flex flex-wrap gap-2 wod-difficulty" role="radiogroup" aria-label="Difficulty">
+              <% const diffStyles = { easy: 'btn-outline-success', medium: 'btn-outline-warning', hard: 'btn-outline-danger' };
+              (difficultyLevels || []).forEach((key) => {
+                const label = (difficultyLabels || {})[key] || key;
+              %>
+                <input type="radio" class="btn-check" name="difficulty" id="wodDiff_<%= key %>" value="<%= key %>" autocomplete="off" <%= selectedDifficulty === key ? 'checked' : '' %> <%= canEdit ? '' : 'disabled' %>>
+                <label class="btn btn-sm <%= diffStyles[key] || 'btn-outline-secondary' %>" for="wodDiff_<%= key %>"><%= label %></label>
+              <% }) %>
+            </div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label fw-bold" for="wodPronunciation">Pronunciation</label>
+            <input type="text" class="form-control size-md font-monospace" id="wodPronunciation" name="pronunciation" maxlength="500" value="<%= isEdit ? (entry.pronunciation || '') : '' %>" <%= canEdit ? '' : 'readonly' %>>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold" for="wodMeaning">Meaning</label>
+            <textarea class="form-control size-md" id="wodMeaning" name="meaning" rows="4" <%= canEdit ? '' : 'readonly' %>><%= isEdit ? (entry.meaning || '') : '' %></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold" for="wodExampleDraft">Examples</label>
+            <div class="form-text mb-2">Add one sentence per example. Anything left in the box below is included when you save.</div>
+            <div class="input-group mb-2">
+              <textarea class="form-control size-md" id="wodExampleDraft" rows="2" placeholder="Type an example sentence" <%= canEdit ? '' : 'readonly' %>></textarea>
+              <% if (canEdit) { %>
+                <button type="button" class="btn btn-outline-primary" id="btnAddWodExample">Add to list</button>
+              <% } %>
+            </div>
+            <ol class="list-group list-group-numbered border rounded mb-0" id="wodExamplesList" aria-label="Example sentences"></ol>
+          </div>
+          <div class="mb-0">
+            <label class="form-label fw-bold" for="wodVideoUrl">Video URL</label>
+            <input type="url" class="form-control size-md" id="wodVideoUrl" name="videoUrl" placeholder="https://..." value="<%= isEdit ? (entry.videoUrl || '') : '' %>" <%= canEdit ? '' : 'readonly' %>>
+          </div>
+        </div>
+      </div>
+
+      <div class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white border-bottom">
+          <h6 class="fw-bold m-0 text-primary"><i class="bi bi-images me-2"></i>Media</h6>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label fw-bold" for="wodPhotoFile">Photo (max 2 MB)</label>
+              <input type="file" class="form-control size-md" id="wodPhotoFile" accept="image/*" <%= canEdit ? '' : 'disabled' %>>
+              <div id="wodPhotoPreview" class="small mt-2"></div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label fw-bold" for="wodAudioFile">Audio (max 3 MB)</label>
+              <input type="file" class="form-control size-md" id="wodAudioFile" accept="audio/*" <%= canEdit ? '' : 'disabled' %>>
+              <div id="wodAudioPreview" class="small mt-2"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <% if (canEdit) { %>
+        <div class="d-flex flex-wrap gap-2">
+          <button type="button" class="btn btn-outline-secondary" data-wod-save="saved">Save draft</button>
+          <button type="button" class="btn btn-filled btn-primary" data-wod-save="submit">Save &amp; submit</button>
+        </div>
+      <% } %>
+    </form>
+  </div>
+
+  <div class="modal fade" id="wodDuplicateModal" tabindex="-1" aria-labelledby="wodDuplicateModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
+      <div class="modal-content">
+        <div class="modal-header border-0 pb-0">
+          <h2 class="modal-title h5" id="wodDuplicateModalLabel">Word already saved</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small mb-3">This word is already in your organization. The entry below was not changed.</p>
+          <dl class="row small mb-0" id="wodDuplicateDetails"></dl>
+          <ul class="small mb-0 ps-3 d-none" id="wodDuplicateExamples"></ul>
+        </div>
+        <div class="modal-footer border-0 pt-0">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Close</button>
+          <a href="#" class="btn btn-primary" id="wodDuplicateOpenLink" target="_self">Open saved entry</a>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="/scripts/wordOfDayForm.js"></script>
+<script>
+  if (window.WordOfDayForm) {
+    window.WordOfDayForm.init({
+      csrfToken: document.querySelector('#wordOfDayForm input[name="_csrf"]')?.value || ''
+    });
+  }
+</script>

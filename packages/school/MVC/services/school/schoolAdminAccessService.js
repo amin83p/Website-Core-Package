@@ -85,6 +85,10 @@ function isLeaveRequestsAdminViewer(user) {
   return isAdminForRequest(user, SECTIONS.SCHOOL_LEAVE_REQUESTS, OPERATIONS.READ_ALL);
 }
 
+function isWordOfDayAdminViewer(user) {
+  return isAdminForRequest(user, SECTIONS.SCHOOL_WORD_OF_DAY, OPERATIONS.READ_ALL);
+}
+
 function isTimesheetsAdminViewer(user, operationId = OPERATIONS.READ_ALL) {
   return isAdminForRequest(user, SECTIONS.SCHOOL_TIMESHEETS, operationId);
 }
@@ -339,6 +343,7 @@ module.exports = {
   isSessionsAdminViewer,
   canSelectAdminSessionStatuses,
   isLeaveRequestsAdminViewer,
+  isWordOfDayAdminViewer,
   isTimesheetsAdminViewer,
   isTimesheetsAdminViewerAsync,
   isTimesheetManagementAdminViewer,

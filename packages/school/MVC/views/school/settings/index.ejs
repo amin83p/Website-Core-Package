@@ -1,5 +1,6 @@
 <%
   const canUpdateFlag = typeof canUpdate !== 'undefined' && canUpdate === true;
+  const canConfigureWordOfDayFlag = typeof canConfigureWordOfDay !== 'undefined' && canConfigureWordOfDay === true;
   const conductLevelsJson = JSON.stringify(conductPolicy?.levels || []).replace(/</g, '\\u003c');
   const attendanceItemsJson = JSON.stringify(attendanceItems || []).replace(/</g, '\\u003c');
   const autosavePolicyJson = JSON.stringify(typeof autosavePolicy !== 'undefined' ? autosavePolicy : { defaultMinutes: 5, sections: {} }).replace(/</g, '\\u003c');
@@ -87,6 +88,11 @@
   const enrollmentFinishAlertMessageValue = (typeof enrollmentFinishAlertPolicy !== 'undefined' && enrollmentFinishAlertPolicy?.alertMessage)
     ? String(enrollmentFinishAlertPolicy.alertMessage)
     : '';
+  const wordOfDaySchoolDashboardEnabled = (typeof wordOfDayPolicy !== 'undefined' && wordOfDayPolicy?.schoolDashboardEnabled !== false);
+  const wordOfDayPublicHomeEnabled = (typeof wordOfDayPolicy !== 'undefined' && wordOfDayPolicy?.publicHomeEnabled === true);
+  const wordOfDayPublicSourceOrgId = (typeof wordOfDayPolicy !== 'undefined' && wordOfDayPolicy?.publicSourceOrgId)
+    ? String(wordOfDayPolicy.publicSourceOrgId)
+    : (typeof activeOrgId !== 'undefined' ? String(activeOrgId || '') : '');
   const timesheetImportActivityOptionsList = Array.isArray(timesheetImportActivityOptions) ? timesheetImportActivityOptions : [];
   const statutoryHolidayPublicActivityOptionsList = (typeof statutoryHolidayPublicActivityOptions !== 'undefined' && Array.isArray(statutoryHolidayPublicActivityOptions))
     ? statutoryHolidayPublicActivityOptions
@@ -1279,6 +1285,42 @@
                   <i class="bi bi-save me-1"></i>Save Student Attendance Report Settings
                 </button>
               </div>
+            <% } %>
+          </form>
+        </div>
+      </section>
+
+      <section class="school-settings-panel card border-0 shadow-sm" id="word-of-day" role="tabpanel" aria-labelledby="settings-tab-word-of-day" tabindex="0" hidden>
+        <header class="school-settings-panel-header card-header px-4 py-3">
+          <div class="d-flex align-items-center gap-3">
+            <span class="school-settings-nav-icon"><i class="bi bi-book-half" aria-hidden="true"></i></span>
+            <div>
+              <h2 class="h5 fw-bold mb-1">Word of Day</h2>
+              <p class="small text-muted mb-0">Control where the daily approved word appears for your organization.</p>
+            </div>
+          </div>
+        </header>
+        <div class="card-body p-4">
+          <div class="alert alert-danger d-none js-settings-error" id="wordOfDaySettingsError" role="alert"></div>
+          <form id="wordOfDaySettingsForm" novalidate>
+            <input type="hidden" name="actionStateId" value="<%= actionStateId || '' %>">
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" id="wordOfDaySchoolDashboardEnabled" <%= wordOfDaySchoolDashboardEnabled ? 'checked' : '' %> <%= canConfigureWordOfDayFlag ? '' : 'disabled' %>>
+              <label class="form-check-label fw-semibold" for="wordOfDaySchoolDashboardEnabled">Show on School dashboard</label>
+            </div>
+            <div class="form-check form-switch mb-3">
+              <input class="form-check-input" type="checkbox" id="wordOfDayPublicHomeEnabled" <%= wordOfDayPublicHomeEnabled ? 'checked' : '' %> <%= canConfigureWordOfDayFlag ? '' : 'disabled' %>>
+              <label class="form-check-label fw-semibold" for="wordOfDayPublicHomeEnabled">Show on public home page</label>
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-semibold" for="wordOfDayPublicSourceOrgId">Public home source organization ID</label>
+              <input class="form-control font-monospace" id="wordOfDayPublicSourceOrgId" value="<%= wordOfDayPublicSourceOrgId %>" placeholder="Required when public home is enabled" <%= canConfigureWordOfDayFlag ? '' : 'readonly' %>>
+              <p class="small text-muted mb-0 mt-1">Approved words are chosen from this organization when the public home widget is enabled.</p>
+            </div>
+            <% if (canConfigureWordOfDayFlag) { %>
+              <button class="btn btn-primary" type="submit" id="btnSaveWordOfDaySettings"><i class="bi bi-save me-1"></i>Save Word of Day settings</button>
+            <% } else { %>
+              <p class="small text-muted mb-0">Word of Day display settings require CONFIGURE access on section 445588.</p>
             <% } %>
           </form>
         </div>
@@ -3763,6 +3805,18 @@
     }, button, 'enrollmentFinishAlertSettingsError');
     if (!result) return;
     enrollmentFinishAlertPolicy = result.policy && typeof result.policy === 'object' ? result.policy : enrollmentFinishAlertPolicy;
+  });
+
+  document.getElementById('wordOfDaySettingsForm')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    if (!canUpdate) return;
+    const button = event.submitter || document.getElementById('btnSaveWordOfDaySettings');
+    await postSettings('/school/settings/word-of-day', {
+      actionStateId: event.currentTarget.elements.actionStateId?.value || '',
+      schoolDashboardEnabled: document.getElementById('wordOfDaySchoolDashboardEnabled')?.checked === true,
+      publicHomeEnabled: document.getElementById('wordOfDayPublicHomeEnabled')?.checked === true,
+      publicSourceOrgId: document.getElementById('wordOfDayPublicSourceOrgId')?.value || ''
+    }, button, 'wordOfDaySettingsError');
   });
 
   document.getElementById('timesheetParametersSettingsForm')?.addEventListener('submit', async event => {

@@ -152,6 +152,9 @@
           "id": "445587"
         },
         {
+          "id": "445588"
+        },
+        {
           "id": "446106"
         },
         {
@@ -4753,6 +4756,68 @@
       "subsections": [],
       "related": [],
       "adoptExisting": true
+    },
+    {
+      "id": "445588",
+      "name": "SCHOOL_WORD_OF_DAY",
+      "category": "SCHOOL",
+      "description": "Submit vocabulary entries for approval and display one approved word per day on the school dashboard.",
+      "active": true,
+      "trackState": true,
+      "minimumAccessRequirement": 7,
+      "dashboardDisplay": true,
+      "mainDashboardDisplay": false,
+      "navigatorSection": false,
+      "homeURL": "/school/word-of-day",
+      "inactiveMessage": "",
+      "message": "",
+      "operations": [
+        {
+          "id": "OP1001",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1002",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1003",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1004",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1005",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1006",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        },
+        {
+          "id": "OP1014",
+          "sessionAttempts": 10,
+          "sessionTime": 30,
+          "active": true
+        }
+      ],
+      "subsections": [],
+      "related": [],
+      "adoptExisting": true
     }
   ],
   "symbols": [
@@ -5657,6 +5722,18 @@
       "tags": [
         "SCHOOL_STUDENT_MANAGEMENT",
         "445587"
+      ],
+      "orgId": "SYSTEM",
+      "adoptExisting": true
+    },
+    {
+      "id": "SYM_SCHOOL_WORD_OF_DAY_001",
+      "name": "SCHOOL_WORD_OF_DAY",
+      "type": "class",
+      "value": "bi bi-book-half",
+      "tags": [
+        "SCHOOL_WORD_OF_DAY",
+        "445588"
       ],
       "orgId": "SYSTEM",
       "adoptExisting": true
@@ -10469,6 +10546,18 @@
       "applyDefault": true
     },
     {
+      "key": "school.wordOfDay",
+      "packageName": "SCHOOL",
+      "group": "School Uploads",
+      "label": "Word of Day Media",
+      "defaultTemplate": "school/word-of-day/{entryId}/{kind}",
+      "placeholders": [
+        "entryId",
+        "kind"
+      ],
+      "applyDefault": true
+    },
+    {
       "key": "school.bookPdf",
       "packageName": "SCHOOL",
       "group": "School Uploads",
@@ -10867,6 +10956,17 @@
       "active": true
     },
     {
+      "id": "school-dashboard-word-of-day",
+      "label": "Word of Day",
+      "href": "/school/word-of-day",
+      "icon": "bi bi-book-half",
+      "description": "Create and approve vocabulary entries shown as the daily word on the school dashboard.",
+      "visibility": "authenticated",
+      "target": "_self",
+      "category": "School",
+      "active": true
+    },
+    {
       "id": "school-dashboard-prior-subject-credits",
       "label": "Prior Subject Credits",
       "href": "/school/programs/prior-subject-credits",
@@ -11082,6 +11182,11 @@
       "collectionName": "schoolLeaveRequests"
     },
     {
+      "entityType": "wordOfDay",
+      "label": "Word of Day",
+      "collectionName": "schoolWordOfDay"
+    },
+    {
       "entityType": "tasks",
       "label": "Tasks",
       "collectionName": "schoolTasks"
@@ -11166,6 +11271,18 @@
         "mongo"
       ],
       "idempotencyKey": "school:section:school-referrals"
+    },
+    {
+      "id": "school-word-of-day-section",
+      "version": "0.1.4",
+      "description": "Ensure SCHOOL_WORD_OF_DAY section, symbol, School dashboard link, and SCHOOL_STAFF access are present in MongoDB.",
+      "run": "seeders/school-word-of-day-section-run.js",
+      "revert": "seeders/school-word-of-day-section-revert.js",
+      "mode": "upsert",
+      "backendModes": [
+        "mongo"
+      ],
+      "idempotencyKey": "school:section:school-word-of-day"
     }
   ],
   "migrations": [],

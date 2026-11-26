@@ -68,6 +68,7 @@ const studentTermRegistrationModel = require('../../models/school/studentTermReg
 const classEnrollmentPeriodModel = require('../../models/school/classEnrollmentPeriodModel');
 const { normalizeTransactionSummary } = require('../../models/school/registrationTransactionSummary');
 const leaveRequestModel = require('../../models/school/leaveRequestModel');
+const wordOfDayModel = require('../../models/school/wordOfDayModel');
 const taskModel = require('../../models/school/taskModel');
 const taskRoutingRuleModel = require('../../models/school/taskRoutingRuleModel');
 const notificationRuleModel = require('../../models/school/notificationRuleModel');
@@ -1855,6 +1856,29 @@ const schoolRepositories = {
     ],
     dateFields: ['requestDate', 'startDate', 'endDate', 'completionDate', 'audit.createDateTime', 'audit.lastUpdateDateTime']
   }),
+  wordOfDay: createSchoolRepository({
+    entityName: 'wordOfDay',
+    collectionName: 'schoolWordOfDay',
+    getAll: wordOfDayModel.getAllWordOfDayEntries,
+    getById: wordOfDayModel.getWordOfDayById,
+    create: wordOfDayModel.addWordOfDayEntry,
+    update: wordOfDayModel.updateWordOfDayEntry,
+    remove: wordOfDayModel.deleteWordOfDayEntry,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueWordOfDayId),
+    defaultSearchFields: [
+      'id',
+      'orgId',
+      'word',
+      'wordType',
+      'difficulty',
+      'status',
+      'authorUserId',
+      'authorName',
+      'meaning',
+      'pronunciation'
+    ],
+    dateFields: ['audit.createDateTime', 'audit.lastUpdateDateTime', 'workflow.submittedAt', 'workflow.approvedAt', 'display.lastDisplayedAt']
+  }),
   attendanceChangeLogs: createSchoolRepository({
     entityName: 'attendanceChangeLogs',
     collectionName: 'schoolAttendanceChangeLogs',
@@ -3222,6 +3246,7 @@ assertQueryableCrudRepository('schoolRepositories.studentProgramRegistrations', 
 assertQueryableCrudRepository('schoolRepositories.studentTermRegistrations', schoolRepositories.studentTermRegistrations);
 assertQueryableCrudRepository('schoolRepositories.classEnrollmentPeriods', schoolRepositories.classEnrollmentPeriods);
 assertQueryableCrudRepository('schoolRepositories.leaveRequests', schoolRepositories.leaveRequests);
+assertQueryableCrudRepository('schoolRepositories.wordOfDay', schoolRepositories.wordOfDay);
 assertQueryableCrudRepository('schoolRepositories.attendanceChangeLogs', schoolRepositories.attendanceChangeLogs);
 assertQueryableCrudRepository('schoolRepositories.sessionStudentCases', schoolRepositories.sessionStudentCases);
 assertQueryableCrudRepository('schoolRepositories.tasks', schoolRepositories.tasks);

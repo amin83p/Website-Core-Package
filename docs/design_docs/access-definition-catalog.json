@@ -58,6 +58,16 @@
       "docx": "chat-operation-scope-capabilities-2026-09-03.docx",
       "status": "implemented",
       "seedScript": "scripts/seed-chat-section.js"
+    },
+    {
+      "sectionKeys": ["SCHOOL_WORD_OF_DAY"],
+      "title": "Word of Day",
+      "markdown": "word-of-day-operation-scope-capabilities-2026-11-25.md",
+      "docx": "Word of the Day-2026-11-25.docx",
+      "status": "implemented",
+      "seedScript": "scripts/seed-school-word-of-day-section.js",
+      "verifyScript": "scripts/school/verify-word-of-day-access-profiles.js",
+      "mongoNote": "Section 445588; package seeder packages/school/scripts/maintenance/seedSchoolWordOfDaySection.js"
     }
   ],
   "crossCutting": [

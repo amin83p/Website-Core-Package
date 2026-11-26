@@ -1,0 +1,76 @@
+<% const wodAccess = typeof wordOfDayAccess !== 'undefined' ? wordOfDayAccess : {};
+const listViewMode = typeof listView !== 'undefined' ? listView : 'active'; %>
+<% if (wodAccess.canOpenList && !wodAccess.canViewEntries) { %>
+  <div class="alert alert-info mb-3">You can open Word of Day, but your profile does not grant list visibility (READ_ALL).</div>
+<% } %>
+<div class="d-flex flex-wrap gap-2 mb-2">
+  <a href="/school/word-of-day" class="btn btn-sm <%= listViewMode === 'active' ? 'btn-primary' : 'btn-outline-primary' %>">Active words</a>
+  <a href="/school/word-of-day?view=archived" class="btn btn-sm <%= listViewMode === 'archived' ? 'btn-primary' : 'btn-outline-secondary' %>">Archived</a>
+</div>
+<%- include('partials/tablePages-start', {
+  title,
+  newUrl: 'school/word-of-day',
+  newLabel: 'New word',
+  newHref: wodAccess.canCreateWords ? '/school/word-of-day/new' : '',
+  user,
+  tableName: 'school_word_of_day',
+  btn_export: false,
+  print: false,
+  headerManageBtns: [
+    '<a href="' + schoolSectionDashboardHref + '" class="school-navigator-dashboard btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> School Dashboard</a>'
+  ]
+}) %>
+
+<%- include('partials/tablePages-search', {
+  placeholder: 'Search words...',
+  fields: [
+    { name: 'status', label: 'Status', type: 'select', options: (statuses || []).map((s) => ({ value: s, label: s.replace(/_/g, ' ') })) }
+  ]
+}) %>
+
+<div class="table-scroll-wrapper" data-floating-row-actions="true">
+  <table class="table-responsive size-md" id="first-table">
+    <thead>
+      <tr>
+        <th class="ps-4">Word</th>
+        <th>Type</th>
+        <th>Difficulty</th>
+        <th>Status</th>
+        <th>Displays</th>
+        <th class="text-end pe-4">Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      <% if (!entries || entries.length === 0) { %>
+        <tr><td colspan="6" class="text-center py-4 text-muted">No entries found.</td></tr>
+      <% } %>
+      <% (entries || []).forEach((row) => { %>
+        <% const status = String(row.status || '').toLowerCase();
+        let badge = 'bg-secondary';
+        if (status === 'approved') badge = 'bg-success';
+        if (status === 'submitted') badge = 'bg-warning text-dark';
+        if (status === 'rejected') badge = 'bg-danger'; %>
+        <tr>
+          <td class="ps-4">
+            <div class="fw-bold"><a href="/school/word-of-day/detail/<%= row.id %>"><%= row.word %></a></div>
+            <div class="small text-muted"><%= row.authorName || row.authorUserId || '—' %></div>
+          </td>
+          <td><%
+            const wodTypes = Array.isArray(row.wordTypes) && row.wordTypes.length
+              ? row.wordTypes
+              : (row.wordType ? [row.wordType] : []);
+            const wodTypeText = wodTypes.map((key) => (wordTypeLabels || {})[key] || key).join(', ') || '—';
+          %><%= wodTypeText %></td>
+          <td><%= (difficultyLabels || {})[row.difficulty] || row.difficulty %></td>
+          <td><span class="badge <%= badge %>"><%= status.toUpperCase() %></span></td>
+          <td><%= Number(row.display && row.display.displayCount ? row.display.displayCount : 0) %></td>
+          <td class="text-end pe-4">
+            <a href="/school/word-of-day/detail/<%= row.id %>" class="btn btn-outline-secondary btn-sm">Open</a>
+          </td>
+        </tr>
+      <% }) %>
+    </tbody>
+  </table>
+</div>
+
+<%- include('partials/tablePages-end') %>

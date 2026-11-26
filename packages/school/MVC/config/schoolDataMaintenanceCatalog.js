@@ -139,6 +139,7 @@ const SCHOOL_DATA_MAINTENANCE_CATALOG = Object.freeze([
   { entityType: 'timesheetParametersPolicy', label: 'Timesheet Parameters Policies', group: 'operations', collectionName: 'schoolTimesheetParametersPolicy', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'orgPolicy', policyModel: 'timesheetParameters' },
   { entityType: 'timesheetDisplayPolicy', label: 'Timesheet Display/Print Policies', group: 'operations', collectionName: 'schoolTimesheetDisplayPolicy', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'orgPolicy', policyModel: 'timesheetDisplay' },
   { entityType: 'leaveRequests', label: 'Leave Requests', group: 'operations', collectionName: 'schoolLeaveRequests', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
+  { entityType: 'wordOfDay', label: 'Word of Day', group: 'operations', collectionName: 'schoolWordOfDay', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
   { entityType: 'tasks', label: 'Tasks', group: 'operations', collectionName: 'schoolTasks', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
   { entityType: 'taskRoutingRules', label: 'Task Routing Rules', group: 'operations', collectionName: 'schoolTaskRoutingRules', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
   { entityType: 'sessionStudentCases', label: 'Session Student Cases', group: 'operations', collectionName: 'schoolSessionStudentCases', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },

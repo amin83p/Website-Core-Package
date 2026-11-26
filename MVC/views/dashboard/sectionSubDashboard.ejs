@@ -1,3 +1,6 @@
+<% if (typeof wordOfDayPayload !== 'undefined' && wordOfDayPayload && wordOfDayPayload.entry) { %>
+  <%- include('../../../packages/school/MVC/views/school/wordOfDay/partials/widget', { wordOfDayPayload: wordOfDayPayload }) %>
+<% } %>
 <%- include('../partials/dashboard/unifiedDashboard', {
   dashboardKey,
   dashboardTitle,

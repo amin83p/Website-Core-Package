@@ -772,6 +772,28 @@ async function renderSubDashboardForParent(req, res, parentSection, allSections,
   const displayName = resolveSectionDisplayTitle(parentSection, formatDashboardLabel);
   const title = `${displayName} - Subsections`;
 
+  let wordOfDayPayload = null;
+  if (String(parentSection?.name || '').trim().toUpperCase() === 'SCHOOL' && req.user) {
+    try {
+      const wordOfDayPolicyModel = require('../../packages/school/MVC/models/school/wordOfDayPolicyModel');
+      const wordOfDayDisplayService = require('../../packages/school/MVC/services/school/wordOfDayDisplayService');
+      const wordOfDayService = require('../../packages/school/MVC/services/school/wordOfDayService');
+      const wordOfDayController = require('../../packages/school/MVC/controllers/school/wordOfDayController');
+      const orgId = wordOfDayService.getActiveOrgId(req.user);
+      const policy = await wordOfDayPolicyModel.getPolicyForOrg(orgId);
+      if (policy.schoolDashboardEnabled !== false && orgId) {
+        const dateKey = await wordOfDayController.resolveOrgDateKey(req.user);
+        wordOfDayPayload = await wordOfDayDisplayService.resolveDailyDisplay({
+          orgId,
+          dateKey,
+          recordAnalytics: true
+        });
+      }
+    } catch (_err) {
+      wordOfDayPayload = null;
+    }
+  }
+
   return res.render('dashboard/sectionSubDashboard', {
     title,
     user: req.user || null,
@@ -782,7 +804,8 @@ async function renderSubDashboardForParent(req, res, parentSection, allSections,
     dashboardSections,
     dashboardSection: parentWithIcon,
     dashboardBackHref: '/dashboard',
-    dashboardBackLabel: 'Back to Dashboard'
+    dashboardBackLabel: 'Back to Dashboard',
+    wordOfDayPayload
   });
 }
 

@@ -13,6 +13,9 @@
     const homeFinalCta = homePageContent.finalCta || {};
     const homeSlides = (typeof homeShowcaseItems !== 'undefined' && Array.isArray(homeShowcaseItems)) ? homeShowcaseItems : [];
   %>
+  <% if (typeof wordOfDayPublic !== 'undefined' && wordOfDayPublic && wordOfDayPublic.entry) { %>
+    <%- include('../../packages/school/MVC/views/school/wordOfDay/partials/widget', { wordOfDayPayload: wordOfDayPublic }) %>
+  <% } %>
   <section class="pte-hero-intro home-hero reveal" aria-labelledby="homeLandingTitle">
     <div class="pte-hero-orbit" aria-hidden="true">
       <span></span>

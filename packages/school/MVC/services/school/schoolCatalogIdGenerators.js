@@ -99,6 +99,10 @@ function candidateLeaveRequestId() {
   return `LR-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 }
 
+function candidateWordOfDayId() {
+  return `WOD-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+}
+
 function candidateTaskId() {
   return `STA-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
 }
@@ -171,6 +175,7 @@ module.exports = {
   candidateStudentProgramPriorSubjectId,
   candidateClassEnrollmentPeriodId,
   candidateLeaveRequestId,
+  candidateWordOfDayId,
   candidateTaskId,
   candidateTaskRoutingRuleId,
   candidateSessionStudentCaseId,
@@ -202,6 +207,7 @@ module.exports = {
   allocateUniqueStudentProgramPriorSubjectId: wrapAllocator(candidateStudentProgramPriorSubjectId),
   allocateUniqueClassEnrollmentPeriodId: wrapAllocator(candidateClassEnrollmentPeriodId),
   allocateUniqueLeaveRequestId: wrapAllocator(candidateLeaveRequestId),
+  allocateUniqueWordOfDayId: wrapAllocator(candidateWordOfDayId),
   allocateUniqueTaskId: wrapAllocator(candidateTaskId),
   allocateUniqueTaskRoutingRuleId: wrapAllocator(candidateTaskRoutingRuleId),
   allocateUniqueSessionStudentCaseId: wrapAllocator(candidateSessionStudentCaseId),
