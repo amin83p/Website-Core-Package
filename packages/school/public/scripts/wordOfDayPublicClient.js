@@ -335,6 +335,303 @@
     global.setTimeout(sendVisit, minMs);
   }
 
+  const SOCIAL_EXPORT_MIN = 600;
+  const SOCIAL_EXPORT_MAX = 1920;
+  const SOCIAL_EXPORT_MAX_AREA = 3686400;
+
+  function clampSocialExportDim(value) {
+    const n = Math.round(Number(value) || 0);
+    return Math.min(SOCIAL_EXPORT_MAX, Math.max(SOCIAL_EXPORT_MIN, n));
+  }
+
+  function validateSocialExportSize(width, height) {
+    const w = clampSocialExportDim(width);
+    const h = clampSocialExportDim(height);
+    if (w * h > SOCIAL_EXPORT_MAX_AREA) {
+      throw new Error('Image area is too large. Use smaller width or height.');
+    }
+    return { width: w, height: h };
+  }
+
+  function readSocialExportPayload() {
+    const el = document.getElementById('wodSocialExportPayload');
+    if (!el) return null;
+    try {
+      return JSON.parse(el.textContent || '{}');
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function hydrateSocialExportPhoto(card) {
+    const img = card?.querySelector('.wod-social-export-photo');
+    if (!img || img.dataset.exportPhotoReady === '1') return;
+    const src = String(img.getAttribute('src') || img.src || '').trim();
+    if (!src) return;
+    img.removeAttribute('crossorigin');
+    if (src.startsWith('blob:')) {
+      throw new Error('Export image URL is invalid. Refresh the page and try again.');
+    }
+    if (img.complete && img.naturalWidth > 0) {
+      img.dataset.exportPhotoReady = '1';
+      return;
+    }
+    await new Promise((resolve, reject) => {
+      const done = () => {
+        img.dataset.exportPhotoReady = '1';
+        resolve();
+      };
+      img.addEventListener('load', done, { once: true });
+      img.addEventListener('error', () => reject(new Error('Could not load illustration for export.')), { once: true });
+    });
+  }
+
+  function waitForSocialExportImages(card) {
+    const imgs = Array.from(card.querySelectorAll('img'));
+    return Promise.all(imgs.map((img) => {
+      if (img.complete && img.naturalWidth) return Promise.resolve();
+      return new Promise((resolve) => {
+        img.addEventListener('load', () => resolve(), { once: true });
+        img.addEventListener('error', () => resolve(), { once: true });
+      });
+    }));
+  }
+
+  function socialExportLayoutKind(width, height) {
+    const safeW = Math.max(1, Number(width) || 1);
+    const safeH = Math.max(1, Number(height) || 1);
+    const aspect = safeW / safeH;
+    if (aspect > 1.15) return 'landscape';
+    if (aspect < 0.82) return 'story';
+    return 'square';
+  }
+
+  function computeSocialExportWordSize(wordText, width, height, layout) {
+    const minDim = Math.min(width, height);
+    const text = String(wordText || '').trim();
+    const len = text.length || 1;
+    let ratio = 0.088;
+    if (layout === 'story') ratio = 0.096;
+    if (layout === 'landscape') ratio = 0.14 * (height / minDim);
+    if (len > 24) ratio *= 0.55;
+    else if (len > 18) ratio *= 0.68;
+    else if (len > 14) ratio *= 0.8;
+    else if (len > 10) ratio *= 0.9;
+    else if (len <= 7) ratio *= 1.06;
+    const size = Math.round(minDim * ratio);
+    return Math.max(28, Math.min(size, Math.round(minDim * 0.15)));
+  }
+
+  function applySocialExportLayout(card, width, height) {
+    if (!card) return;
+    const w = clampSocialExportDim(width);
+    const h = clampSocialExportDim(height);
+    const minDim = Math.min(w, h);
+    const layout = socialExportLayoutKind(w, h);
+    const wordEl = card.querySelector('[data-wod-export-word]') || card.querySelector('.wod-social-export-word');
+    const wordText = wordEl?.textContent || '';
+    const pad = Math.round(minDim * 0.052);
+    const gap = Math.round(minDim * 0.016);
+    const blockGap = layout === 'story' ? Math.round(h * 0.022) : gap;
+
+    card.dataset.wodExportLayout = layout;
+    card.style.width = `${w}px`;
+    card.style.height = `${h}px`;
+    card.style.setProperty('--wod-ex-pad', `${pad}px`);
+    card.style.setProperty('--wod-ex-gap', `${gap}px`);
+    card.style.setProperty('--wod-ex-block-gap', `${blockGap}px`);
+    card.style.setProperty('--wod-ex-radius', `${Math.round(minDim * 0.024)}px`);
+    card.style.setProperty('--wod-ex-photo-radius', `${Math.round(minDim * 0.018)}px`);
+    card.style.setProperty('--wod-ex-kicker', `${Math.round(minDim * 0.028)}px`);
+    card.style.setProperty('--wod-ex-date', `${Math.round(minDim * 0.024)}px`);
+    card.style.setProperty('--wod-ex-word', `${computeSocialExportWordSize(wordText, w, h, layout)}px`);
+    card.style.setProperty('--wod-ex-pron', `${Math.round(minDim * 0.026)}px`);
+    card.style.setProperty('--wod-ex-meaning', `${Math.round(minDim * (layout === 'landscape' ? 0.032 : 0.028))}px`);
+    card.style.setProperty('--wod-ex-example', `${Math.round(minDim * 0.024)}px`);
+    card.style.setProperty('--wod-ex-chip', `${Math.round(minDim * 0.022)}px`);
+    card.style.setProperty('--wod-ex-brand', `${Math.round(minDim * 0.022)}px`);
+  /** Photo height as share of canvas — scales with story vs square vs landscape. */
+    const photoMax = layout === 'story'
+      ? Math.round(h * 0.34)
+      : layout === 'landscape'
+        ? Math.round(h * 0.78)
+        : Math.round(h * 0.3);
+    card.style.setProperty('--wod-ex-photo-max', `${photoMax}px`);
+    card.style.setProperty('--wod-ex-brand-margin', layout === 'story' ? `${Math.round(gap * 0.5)}px 0 0 0` : '0');
+  }
+
+  function initSocialImageExport() {
+    const root = document.querySelector('[data-wod-social-export]');
+    const openBtn = document.querySelector('[data-wod-social-export-open]');
+    const card = document.getElementById('wodSocialExportCard');
+    const stage = document.getElementById('wodSocialExportStage');
+    if (!root || !openBtn || !card || !stage) return;
+
+    const modalEl = document.getElementById('wodSocialExportModal');
+    const bsModal = global.bootstrap?.Modal ? global.bootstrap.Modal.getOrCreateInstance(modalEl) : null;
+    const widthInput = root.querySelector('[data-wod-social-width]');
+    const heightInput = root.querySelector('[data-wod-social-height]');
+    const aspectLock = root.querySelector('[data-wod-social-aspect-lock]');
+    const previewWrap = root.querySelector('[data-wod-social-preview-wrap]');
+    const previewScaler = root.querySelector('[data-wod-social-preview-scaler]');
+    const downloadBtn = root.querySelector('[data-wod-social-download]');
+    const errorEl = root.querySelector('[data-wod-social-export-error]');
+    const payload = readSocialExportPayload() || {};
+    const stageHome = stage.parentNode;
+    let stageMountedInPreview = false;
+
+    let aspectRatio = 1;
+
+    function showExportError(msg) {
+      if (!errorEl) return;
+      if (msg) {
+        errorEl.textContent = msg;
+        errorEl.classList.remove('d-none');
+      } else {
+        errorEl.textContent = '';
+        errorEl.classList.add('d-none');
+      }
+    }
+
+    function unmountStageFromPreview() {
+      if (!stageMountedInPreview || !stageHome) return;
+      stage.classList.remove('wod-social-export-stage--preview');
+      stage.style.transform = '';
+      stageHome.appendChild(stage);
+      stageMountedInPreview = false;
+    }
+
+    function updatePreview(width, height) {
+      if (!previewWrap || !previewScaler) return;
+      applySocialExportLayout(card, width, height);
+      if (!stageMountedInPreview) {
+        stageMountedInPreview = true;
+        stage.classList.add('wod-social-export-stage--preview');
+        previewScaler.appendChild(stage);
+      }
+      const wrapW = previewWrap.clientWidth || 1;
+      const scale = Math.min(1, (wrapW - 16) / width);
+      stage.style.width = `${width}px`;
+      stage.style.height = `${height}px`;
+      stage.style.transform = `scale(${scale})`;
+      stage.style.transformOrigin = 'top center';
+    }
+
+    function applyCardSize(width, height) {
+      updatePreview(width, height);
+    }
+
+    function readSize() {
+      return validateSocialExportSize(widthInput?.value, heightInput?.value);
+    }
+
+    function setPreset(w, h) {
+      if (widthInput) widthInput.value = String(w);
+      if (heightInput) heightInput.value = String(h);
+      aspectRatio = w / h;
+      try {
+        const size = readSize();
+        applyCardSize(size.width, size.height);
+        showExportError('');
+      } catch (error) {
+        showExportError(error.message);
+      }
+    }
+
+    modalEl?.addEventListener('hidden.bs.modal', () => {
+      unmountStageFromPreview();
+    });
+
+    openBtn.addEventListener('click', async () => {
+      showExportError('');
+      try {
+        await hydrateSocialExportPhoto(card);
+        await waitForSocialExportImages(card);
+      } catch (error) {
+        showExportError(error?.message || 'Could not load illustration.');
+        return;
+      }
+      setPreset(1080, 1080);
+      if (bsModal) bsModal.show();
+      else if (modalEl) {
+        modalEl.classList.add('show');
+        modalEl.style.display = 'block';
+      }
+    });
+
+    root.querySelectorAll('[data-wod-social-preset]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const token = String(btn.getAttribute('data-wod-social-preset') || '');
+        const parts = token.split('x').map((x) => Number(x));
+        if (parts.length === 2 && parts[0] && parts[1]) setPreset(parts[0], parts[1]);
+      });
+    });
+
+    const onDimChange = (changed) => {
+      try {
+        let w = Number(widthInput?.value);
+        let h = Number(heightInput?.value);
+        if (aspectLock?.checked && aspectRatio > 0) {
+          if (changed === 'width') {
+            h = Math.round(w / aspectRatio);
+            if (heightInput) heightInput.value = String(h);
+          } else {
+            w = Math.round(h * aspectRatio);
+            if (widthInput) widthInput.value = String(w);
+          }
+        }
+        const size = readSize();
+        aspectRatio = size.width / size.height;
+        applyCardSize(size.width, size.height);
+        showExportError('');
+      } catch (error) {
+        showExportError(error.message);
+      }
+    };
+
+    widthInput?.addEventListener('input', () => onDimChange('width'));
+    heightInput?.addEventListener('input', () => onDimChange('height'));
+    aspectLock?.addEventListener('change', () => {
+      try {
+        const size = readSize();
+        aspectRatio = size.width / size.height;
+      } catch (_) { /* ignore */ }
+    });
+
+    downloadBtn?.addEventListener('click', async () => {
+      showExportError('');
+      if (!global.htmlToImage?.toPng) {
+        showExportError('Image library did not load. Refresh and try again.');
+        return;
+      }
+      try {
+        const size = readSize();
+        unmountStageFromPreview();
+        applySocialExportLayout(card, size.width, size.height);
+        downloadBtn.disabled = true;
+        await hydrateSocialExportPhoto(card);
+        await waitForSocialExportImages(card);
+        const dataUrl = await global.htmlToImage.toPng(card, {
+          width: size.width,
+          height: size.height,
+          pixelRatio: 1,
+          cacheBust: false,
+          skipFonts: true,
+          backgroundColor: '#ffffff'
+        });
+        const link = document.createElement('a');
+        const dateKey = String(payload.dateKey || 'today').replace(/[^\d-]/g, '') || 'today';
+        link.download = `word-of-the-day-${dateKey}-${size.width}x${size.height}.png`;
+        link.href = dataUrl;
+        link.click();
+      } catch (error) {
+        showExportError(error?.message || 'Could not create image.');
+      } finally {
+        downloadBtn.disabled = false;
+      }
+    });
+  }
+
   function init() {
     document.querySelectorAll('[data-wod-audio-player]').forEach((node) => initAudioPlayer(node));
     bindPhotoOpen();
@@ -342,6 +639,7 @@
     const panel = document.getElementById('wodReactionPanel');
     bindReactions(panel);
     initQualifiedVisitTracking(panel);
+    initSocialImageExport();
   }
 
   if (document.readyState === 'loading') {

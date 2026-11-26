@@ -462,6 +462,94 @@ test('applyMoveEnrollment requires matching previewHash', async () => {
   }
 });
 
+test('validateMovePreviewForApply accepts hash for open source period', async () => {
+  const mocks = buildMocks();
+  enrollmentMoveService.__setDependenciesForTest(mocks);
+  try {
+    const payload = buildPayload();
+    const normalized = enrollmentMoveService.normalizeMovePayload(payload, sourcePeriod);
+    const hash = enrollmentMoveService.buildPreviewHash(normalized);
+    const validated = await enrollmentMoveService.validateMovePreviewForApply({
+      sourcePeriodId: sourcePeriod.id,
+      payload,
+      previewHash: hash,
+      reqUser: { id: 'USR_1' },
+      orgId: 'ORG_001'
+    });
+    assert.equal(validated.previewHash, hash);
+    assert.deepEqual(validated.normalizedPayload.close.effectiveDate, normalized.close.effectiveDate);
+  } finally {
+    enrollmentMoveService.__resetDependenciesForTest();
+  }
+});
+
+test('applyMoveEnrollment honors trustPreviewHash without a prior preview call', async () => {
+  const mocks = buildMocks();
+  enrollmentMoveService.__setDependenciesForTest(mocks);
+  try {
+    const payload = buildPayload({
+      target: { ...buildPayload().target, sessionCapacityType: 'group' }
+    });
+    const normalized = enrollmentMoveService.normalizeMovePayload(payload, sourcePeriod);
+    const hash = enrollmentMoveService.buildPreviewHash(normalized);
+    const result = await enrollmentMoveService.applyMoveEnrollment({
+      sourcePeriodId: sourcePeriod.id,
+      payload,
+      previewHash: hash,
+      reqUser: { id: 'USR_1' },
+      orgId: 'ORG_001',
+      options: { trustPreviewHash: true }
+    });
+    assert.equal(result.targetPeriod.classId, 'CLS_TARGET');
+    assert.equal(mocks.periodStore.get(sourcePeriod.id).status, 'completed');
+  } finally {
+    enrollmentMoveService.__resetDependenciesForTest();
+  }
+});
+
+test('applyMoveEnrollmentGroupLegacy creates target before closing source', async () => {
+  const mocks = buildMocks();
+  const order = [];
+  mocks.registrationStatusLifecycleService.applyTransition = async () => {
+    order.push('close');
+    return { registration: { ...sourcePeriod, status: 'completed' } };
+  };
+  mocks.rollingEnrollmentEngineService.execute = async () => {
+    order.push('enroll');
+    return {
+      results: [{
+        ok: true,
+        studentId: 'STU_001',
+        period: { id: 'PER_TARGET_1', classId: 'CLS_TARGET', status: 'active' }
+      }],
+      summary: { succeeded: 1, failed: 0, total: 1 }
+    };
+  };
+  enrollmentMoveService.__setDependenciesForTest(mocks);
+  try {
+    const preview = await enrollmentMoveService.previewMoveEnrollment({
+      sourcePeriodId: sourcePeriod.id,
+      payload: buildPayload({
+        target: { ...buildPayload().target, sessionCapacityType: 'group' }
+      }),
+      reqUser: { id: 'USR_1' },
+      orgId: 'ORG_001'
+    });
+    await enrollmentMoveService.applyMoveEnrollment({
+      sourcePeriodId: sourcePeriod.id,
+      payload: buildPayload({
+        target: { ...buildPayload().target, sessionCapacityType: 'group' }
+      }),
+      previewHash: preview.previewHash,
+      reqUser: { id: 'USR_1' },
+      orgId: 'ORG_001'
+    });
+    assert.deepEqual(order, ['enroll', 'close']);
+  } finally {
+    enrollmentMoveService.__resetDependenciesForTest();
+  }
+});
+
 test('applyMoveEnrollment closes source and creates target period', async () => {
   const mocks = buildMocks();
   enrollmentMoveService.__setDependenciesForTest(mocks);

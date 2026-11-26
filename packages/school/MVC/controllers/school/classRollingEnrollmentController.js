@@ -5660,11 +5660,13 @@ async function listEnrollmentMoveTargetClasses(req, res) {
   }
 }
 
-function buildMoveEnrollmentServiceOptions(req, { targetClassData, sourcePeriod } = {}) {
-  const sourceClassId = toPublicId(sourcePeriod?.classId || '');
+function buildMoveEnrollmentServiceOptions(req, { targetClassData, sourceClassData, sourcePeriod } = {}) {
+  const sourceClassId = toPublicId(sourcePeriod?.classId || sourceClassData?.id || '');
   return {
     accessContext: buildRouteAccessContext(req),
     orgToday: resolveOrgTodayFromRequest(req),
+    sourceClass: sourceClassData || null,
+    targetClass: targetClassData || null,
     assertPrerequisites: targetClassData
       ? async (student, programId, termId, startDate) => {
         await assertRollingEnrollmentPrerequisitesOrThrow(req, targetClassData, student, programId, termId, startDate);
@@ -5705,7 +5707,11 @@ async function previewEnrollmentMove(req, res) {
       payload: req.body || {},
       reqUser: req.user,
       orgId: getActiveOrgIdOrThrow(req.user),
-      options: buildMoveEnrollmentServiceOptions(req, { targetClassData, sourcePeriod: source })
+      options: buildMoveEnrollmentServiceOptions(req, {
+        targetClassData,
+        sourceClassData: classData,
+        sourcePeriod: source
+      })
     });
     return res.status(preview.canApply ? 200 : 409).json({
       status: preview.canApply ? 'success' : 'blocked',
@@ -5765,17 +5771,52 @@ async function previewClassMoveBatch(req, res) {
       options: {
         ...buildMoveEnrollmentServiceOptions(req, {
           targetClassData,
+          sourceClassData: classData,
           sourcePeriod: { classId: classData.id }
         }),
         sourceClassTitle: String(classData?.title || classData?.name || '').trim()
       }
     });
+    const previewMessage = preview.canApplyAny
+      ? (preview.blockedCount > 0
+        ? `Preview ready for ${preview.applyableCount} student(s). ${preview.blockedCount} blocked — they cannot be included in apply.`
+        : 'Class move preview is ready for all selected students.')
+      : 'No selected students can be moved. Review preview results and adjust selections.';
     return res.json({
       status: preview.canApplyAny ? 'success' : 'blocked',
-      message: preview.canApplyAny
-        ? 'Class move preview is ready.'
-        : 'Some selected students cannot be moved. Review preview results.',
+      message: previewMessage,
       preview
+    });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+}
+
+async function sealClassMovePreviewBatch(req, res) {
+  try {
+    const classId = toPublicId(req.params?.classId || '');
+    if (!classId) throw new Error('classId is required.');
+    const { classData } = await getClassByIdWithOrgCheck(classId, req.user, buildRouteAccessContext(req));
+    assertRollingWorkflowEnabledForClass(req, classData);
+    assertEnrollmentOfficeAccess(req);
+    const targetClassId = toPublicId(req.body?.targetClassId || '');
+    const closeUserReason = String(req.body?.closeReason || req.body?.closeUserReason || '').trim();
+    const sealed = enrollmentClassMoveService.sealClassMovePreview({
+      sourceClassId: classData.id,
+      targetClassId,
+      closeUserReason,
+      rows: Array.isArray(req.body?.rows) ? req.body.rows : [],
+      items: Array.isArray(req.body?.items) ? req.body.items : []
+    });
+    const previewMessage = sealed.canApplyAny
+      ? (sealed.blockedCount > 0
+        ? `Preview ready for ${sealed.applyableCount} student(s). ${sealed.blockedCount} blocked — they cannot be included in apply.`
+        : 'Class move preview is ready for all selected students.')
+      : 'No selected students can be moved. Review preview results and adjust selections.';
+    return res.json({
+      status: sealed.canApplyAny ? 'success' : 'blocked',
+      message: previewMessage,
+      preview: sealed
     });
   } catch (error) {
     return res.status(400).json({ status: 'error', message: error.message });
@@ -5796,24 +5837,36 @@ async function applyClassMoveBatch(req, res) {
     if (targetClassData) {
       assertRollingWorkflowEnabledForClass(req, targetClassData);
     }
+    const closeUserReason = String(req.body?.closeReason || req.body?.closeUserReason || '').trim();
     const result = await enrollmentClassMoveService.applyClassMoveBatch({
       batchPreviewHash: String(req.body?.batchPreviewHash || '').trim(),
+      applyBatchHash: String(req.body?.applyBatchHash || req.body?.batchPreviewHash || '').trim(),
+      sourceClassId: classData.id,
+      targetClassId,
+      closeUserReason,
       rows: Array.isArray(req.body?.rows) ? req.body.rows : [],
       reqUser: req.user,
       orgId: getActiveOrgIdOrThrow(req.user),
       engineHooks: targetClassData ? buildRollingEnrollmentEngineHooks(req, targetClassData) : {},
       options: buildMoveEnrollmentServiceOptions(req, {
         targetClassData,
+        sourceClassData: classData,
         sourcePeriod: { classId: classData.id }
       })
     });
     return res.json({
       status: 'success',
-      message: `Class move finished. Applied: ${result.applied}, failed: ${result.failed}, skipped: ${result.skipped}.`,
+      message: `Class move finished. Applied: ${result.applied} student(s).`,
       result
     });
   } catch (error) {
-    return res.status(400).json({ status: 'error', message: error.message });
+    const status = Number(error?.statusCode) || 400;
+    return res.status(status).json({
+      status: error?.rollbackSummary ? 'rolled_back' : 'error',
+      message: error.message,
+      result: error.results || null,
+      rollbackSummary: error.rollbackSummary || null
+    });
   }
 }
 
@@ -5837,7 +5890,11 @@ async function applyEnrollmentMove(req, res) {
       reqUser: req.user,
       orgId: getActiveOrgIdOrThrow(req.user),
       engineHooks: targetClassData ? buildRollingEnrollmentEngineHooks(req, targetClassData) : {},
-      options: buildMoveEnrollmentServiceOptions(req, { targetClassData, sourcePeriod: source })
+      options: buildMoveEnrollmentServiceOptions(req, {
+        targetClassData,
+        sourceClassData: classData,
+        sourcePeriod: source
+      })
     });
     return res.json({
       status: 'success',
@@ -5854,7 +5911,8 @@ async function applyEnrollmentMove(req, res) {
       status: 'error',
       message: error.message,
       preview: error.preview || null,
-      partial: error.partial || null
+      partial: error.partial || null,
+      rollbackSummary: error.partial?.rollbackSummary || null
     });
   }
 }
@@ -5951,6 +6009,7 @@ module.exports = {
   listEnrollmentMoveTargetClasses,
   listClassMoveCandidates,
   previewClassMoveBatch,
+  sealClassMovePreviewBatch,
   applyClassMoveBatch,
   previewEnrollmentMove,
   applyEnrollmentMove,

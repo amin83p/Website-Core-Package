@@ -2704,7 +2704,7 @@
             <table class="table table-sm align-middle mb-0">
               <thead class="table-light">
                 <tr>
-                  <th style="width:2.5rem;"></th>
+                  <th style="width:5.5rem;">Status</th>
                   <th>Student</th>
                   <th>Result</th>
                 </tr>
@@ -10665,9 +10665,13 @@
       });
       if (wrapped.stop) return null;
     }
-    if (!response.ok || (!allowErrorResult && String(result.status || '').toLowerCase() === 'error')) {
+    const resultStatus = String(result.status || '').toLowerCase();
+    if (!response.ok || (!allowErrorResult && (resultStatus === 'error' || resultStatus === 'rolled_back'))) {
       const err = new Error(result?.message || 'Request failed.');
       if (result?.code) err.code = String(result.code);
+      if (result?.status) err.status = result.status;
+      if (result?.partial) err.partial = result.partial;
+      if (result?.rollbackSummary) err.rollbackSummary = result.rollbackSummary;
       throw err;
     }
     return result;
@@ -12050,7 +12054,12 @@
       await showMsg('Move Applied', 'success', result.message || 'Enrollment moved successfully.');
       resetMovePreviewState();
     } catch (error) {
-      await showMsg('Move Failed', 'error', error.message || 'Unable to apply enrollment move.');
+      const rollbackNote = error?.rollbackSummary
+        ? ' Automatic rollback was attempted where possible.'
+        : (error?.partial
+          ? ' Review the enrollment record — the source period may already be closed.'
+          : '');
+      await showMsg('Move Failed', 'error', (error.message || 'Unable to apply enrollment move.') + rollbackNote);
       resetMovePreviewState();
     } finally {
       hideBusy();
@@ -12071,6 +12080,7 @@
     rowEdits: {},
     previewItems: [],
     batchPreviewHash: '',
+    applyBatchHash: '',
     targetClassId: '',
     targetClassTitle: ''
   };
@@ -12134,6 +12144,7 @@
     classMoveWizardState.rowEdits = {};
     classMoveWizardState.previewItems = [];
     classMoveWizardState.batchPreviewHash = '';
+    classMoveWizardState.applyBatchHash = '';
     classMoveWizardState.targetClassId = '';
     classMoveWizardState.targetClassTitle = '';
     if (qs('classMove_closeDate')) qs('classMove_closeDate').value = orgTodayFallback();
@@ -12311,15 +12322,19 @@
       const msg = blocked
         ? (item.blockers || []).map((row) => formatMoveEnrollmentBlockerHtml(row)).join('<br>')
         : (item.summaryLines || []).map((line) => htmlEscape(line)).join('<br>');
+      const statusBadge = blocked
+        ? '<span class="badge text-bg-warning">Blocked</span>'
+        : '<span class="badge text-bg-success">Ready</span>';
       return `<tr class="${blocked ? 'table-warning' : ''}">
-        <td><input type="checkbox" class="form-check-input class-move-preview-check" data-period-id="${htmlEscape(periodId)}" ${blocked ? '' : 'checked'} ${blocked ? 'disabled' : ''}></td>
+        <td class="text-center">${blocked ? '—' : statusBadge}</td>
         <td class="fw-semibold">${htmlEscape(item.studentLabel || item.studentId || '')}</td>
         <td class="small">${msg || (blocked ? 'Blocked' : 'Ready')}</td>
       </tr>`;
     }).join('');
     const applyBtn = qs('btn_classMoveApply');
+    const applyable = items.filter((row) => row.canApply === true);
     if (applyBtn) {
-      applyBtn.disabled = !items.some((row) => row.canApply === true);
+      applyBtn.disabled = !applyable.length || !String(classMoveWizardState.applyBatchHash || '').trim();
     }
   }
 
@@ -12365,6 +12380,7 @@
     if (input.classList.contains('class-move-claim-select')) {
       classMoveWizardState.rowEdits[periodId].claimNumberId = readClaimNumberSelectValue(input);
       classMoveWizardState.batchPreviewHash = '';
+      classMoveWizardState.applyBatchHash = '';
       classMoveWizardState.previewItems = [];
       return;
     }
@@ -12390,6 +12406,7 @@
     if (periodId && classMoveWizardState.rowEdits[periodId]) {
       classMoveWizardState.rowEdits[periodId].claimNumberId = readClaimNumberSelectValue(selectEl);
       classMoveWizardState.batchPreviewHash = '';
+      classMoveWizardState.applyBatchHash = '';
       classMoveWizardState.previewItems = [];
     }
   }
@@ -12436,6 +12453,25 @@
     }));
   }
 
+  function showClassMoveBusy({ studentLabel, index, total }) {
+    const i = Math.max(0, Number(index) || 0);
+    const n = Math.max(1, Number(total) || 1);
+    const label = String(studentLabel || 'student').trim() || 'student';
+    const progress = Math.min(100, Math.round(((i + 1) / n) * 100));
+    const note = `Previewing ${label} (${i + 1}/${n})...`;
+    if (i === 0) {
+      showBusy(note);
+    }
+    if (typeof window.updateLoading === 'function') {
+      window.updateLoading({ note, progress });
+    } else if (i > 0) {
+      showBusy(note);
+    }
+    if (typeof window.setLoadingProgress === 'function') {
+      window.setLoadingProgress(progress);
+    }
+  }
+
   async function previewClassMoveBatchAction() {
     const closeReason = String(qs('classMove_closeReason')?.value || '').trim();
     const targetClassId = String(classMoveWizardState.targetClassId || qs('classMove_targetClassId')?.value || '').trim();
@@ -12453,67 +12489,128 @@
       studentLabel: candidate.studentLabel,
       payload: buildClassMovePayloadForRow(candidate, edit)
     }));
+    classMoveWizardState.batchPreviewHash = '';
+    classMoveWizardState.applyBatchHash = '';
+    classMoveWizardState.previewItems = [];
     try {
-      showBusy('Previewing class move...');
-      const result = await requestJson(`/school/classes/api/${encodeURIComponent(classId)}/class-move/preview`, 'POST', {
-        targetClassId,
-        closeReason,
-        rows
-      });
-      const preview = result?.preview || {};
+      const previewItems = [];
+      for (let i = 0; i < rows.length; i += 1) {
+        showClassMoveBusy({
+          studentLabel: rows[i].studentLabel,
+          index: i,
+          total: rows.length
+        });
+        const result = await requestJson(
+          `/school/classes/api/${encodeURIComponent(classId)}/class-move/preview`,
+          'POST',
+          {
+            targetClassId,
+            closeReason,
+            rows: [rows[i]]
+          }
+        );
+        const item = result?.preview?.items?.[0];
+        if (!item) {
+          throw new Error(`Preview did not return a result for ${rows[i].studentLabel || rows[i].periodId}.`);
+        }
+        previewItems.push(item);
+      }
+      if (typeof window.updateLoading === 'function') {
+        window.updateLoading({ note: 'Finalizing preview...', progress: 100 });
+      } else {
+        showBusy('Finalizing preview...');
+      }
+      const sealResult = await requestJson(
+        `/school/classes/api/${encodeURIComponent(classId)}/class-move/preview-seal`,
+        'POST',
+        {
+          targetClassId,
+          closeReason,
+          rows: rows.map((row, idx) => ({
+            periodId: row.periodId,
+            payload: previewItems[idx]?.payload || row.payload
+          })),
+          items: previewItems
+        }
+      );
+      const preview = sealResult?.preview || {};
       classMoveWizardState.batchPreviewHash = String(preview.batchPreviewHash || '').trim();
-      classMoveWizardState.previewItems = Array.isArray(preview.items) ? preview.items : [];
+      classMoveWizardState.applyBatchHash = String(preview.applyBatchHash || '').trim();
+      classMoveWizardState.previewItems = previewItems;
       if (qs('classMove_previewHint')) {
-        qs('classMove_previewHint').textContent = preview.canApplyAny
-          ? 'Review results below. Blocked students are unchecked automatically.'
-          : 'No students can be moved with the current settings. Adjust selections or fix blockers.';
+        if (sealResult?.message) {
+          qs('classMove_previewHint').textContent = String(sealResult.message);
+        } else if (preview.canApplyAny) {
+          qs('classMove_previewHint').textContent = 'Blocked students cannot be included. Apply moves all students marked Ready.';
+        } else {
+          qs('classMove_previewHint').textContent = 'No students can be moved with the current settings. Adjust selections or fix blockers.';
+        }
       }
       renderClassMovePreviewTable();
+    } catch (error) {
+      classMoveWizardState.batchPreviewHash = '';
+      classMoveWizardState.applyBatchHash = '';
+      classMoveWizardState.previewItems = [];
+      const message = error?.message || 'Class move preview failed.';
+      await showMsg('Preview Failed', 'danger', message);
+      throw error;
     } finally {
       hideBusy();
     }
   }
 
   async function applyClassMoveBatchAction() {
-    if (!classMoveWizardState.batchPreviewHash) {
+    if (!classMoveWizardState.applyBatchHash) {
       await showMsg('Preview Required', 'warning', 'Preview before applying.');
       return;
     }
     const targetClassId = String(classMoveWizardState.targetClassId || '').trim();
-    const previewMap = new Map((classMoveWizardState.previewItems || []).map((row) => [String(row.periodId || '').trim(), row]));
-    const rows = [];
-    document.querySelectorAll('.class-move-preview-check:checked:not(:disabled)').forEach((input) => {
-      const periodId = String(input.getAttribute('data-period-id') || '').trim();
-      const previewRow = previewMap.get(periodId);
-      if (!previewRow?.canApply || !previewRow.previewHash || !previewRow.payload) return;
-      rows.push({
-        periodId,
-        previewHash: previewRow.previewHash,
-        payload: previewRow.payload
-      });
-    });
+    const closeReason = String(qs('classMove_closeReason')?.value || '').trim();
+    const applyableItems = (classMoveWizardState.previewItems || []).filter((row) => row.canApply === true);
+    const rows = applyableItems
+      .filter((row) => row.previewHash && row.payload)
+      .map((row) => ({
+        periodId: row.periodId,
+        previewHash: row.previewHash,
+        payload: row.payload
+      }));
     if (!rows.length) {
-      await showMsg('Nothing to Apply', 'warning', 'Select at least one student that passed preview.');
+      await showMsg('Nothing to Apply', 'warning', 'No students passed preview.');
       return;
     }
-    const confirmed = await showConfirm(`Apply move for ${rows.length} student(s)?`, 'Move Class', {
-      confirmText: 'Apply',
-      confirmClass: 'btn-primary'
-    });
+    const confirmed = await showConfirm(
+      `Apply move for all ${rows.length} student(s) that passed preview?`,
+      'Move Class',
+      {
+        confirmText: 'Apply',
+        confirmClass: 'btn-primary'
+      }
+    );
     if (!confirmed) return;
     try {
       showBusy('Applying class moves...');
       const result = await requestJson(`/school/classes/api/${encodeURIComponent(classId)}/class-move/apply`, 'POST', {
+        applyBatchHash: classMoveWizardState.applyBatchHash,
         batchPreviewHash: classMoveWizardState.batchPreviewHash,
         targetClassId,
+        closeReason,
         rows
       });
       classMoveWizardModal?.hide();
       await loadRows();
-      const summary = result?.result || {};
-      await showMsg('Class Move Finished', summary.failed > 0 ? 'warning' : 'success', result?.message || 'Class move completed.');
+      await showMsg('Class Move Finished', 'success', result?.message || 'Class move completed.');
     } catch (error) {
-      await showMsg('Class Move Failed', 'error', error.message || 'Unable to apply class move.');
+      if (error?.status === 'rolled_back' || error?.rollbackSummary) {
+        await loadRows();
+        await showMsg(
+          'Class Move Rolled Back',
+          'warning',
+          (error.message || 'Move failed partway through.') +
+            ' Earlier moves in this batch were reversed where possible.'
+        );
+      } else {
+        await showMsg('Class Move Failed', 'error', error.message || 'Unable to apply class move.');
+      }
     } finally {
       hideBusy();
     }
@@ -12536,6 +12633,7 @@
         classMoveWizardState.rowEdits = {};
         classMoveWizardState.previewItems = [];
         classMoveWizardState.batchPreviewHash = '';
+        classMoveWizardState.applyBatchHash = '';
       }
       try {
         showBusy('Loading eligible students...');
@@ -12561,9 +12659,13 @@
       }
       classMoveWizardState.previewItems = [];
       classMoveWizardState.batchPreviewHash = '';
+      classMoveWizardState.applyBatchHash = '';
     }
     classMoveWizardState.step = Math.min(4, step + 1);
     renderClassMoveWizardStep();
+    if (classMoveWizardState.step === 4 && !classMoveWizardState.applyBatchHash) {
+      previewClassMoveBatchAction().catch((error) => console.error(error));
+    }
   }
 
   function classMoveWizardBack() {

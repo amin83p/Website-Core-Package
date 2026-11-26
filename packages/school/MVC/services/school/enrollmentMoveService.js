@@ -11,6 +11,7 @@ const rollingEnrollmentEngineService = require('./rollingEnrollmentEngineService
 const rollingEnrollmentFunderService = require('./rollingEnrollmentFunderService');
 const classEnrollmentSessionApplicabilityService = require('./classEnrollmentSessionApplicabilityService');
 const enrollmentMoveOneOnOneService = require('./enrollmentMoveOneOnOneService');
+const enrollmentMoveCompensationService = require('./enrollmentMoveCompensationService');
 const scheduleMoveSessionsService = require('./scheduleMoveSessionsService');
 const { addDaysToDateKey } = require('./sessionAttendanceEditAccessService');
 const { requireCoreModule } = require('./schoolCoreContracts');
@@ -186,6 +187,8 @@ async function listMoveTargetClasses({
 async function getSourcePeriodOrThrow(periodId, options = {}) {
   const id = toPublicId(periodId);
   if (!id) throw new Error('sourcePeriodId is required.');
+  const prefetched = options.prefetchedPeriods?.get(id);
+  if (prefetched) return prefetched;
   const period = await dependencies.repositories.classEnrollmentPeriods.getById(id, options);
   if (!period) throw new Error('Source enrollment period not found.');
   return period;
@@ -382,7 +385,11 @@ async function previewTargetEnrollment(normalized, sourcePeriod, sourceClass, ta
   let scheduleConflicts = null;
   if (typeof options.detectScheduleConflicts === 'function') {
     try {
-      const student = await dependencies.schoolDataService.getDataById('students', target.studentId, reqUser);
+      const studentToken = toPublicId(target.studentId);
+      const student = options.studentLookup?.get(studentToken)
+        || (studentToken
+          ? await dependencies.schoolDataService.getDataById('students', studentToken, reqUser)
+          : null);
       if (!student) {
         blockers.push({ code: 'STUDENT_NOT_FOUND', message: 'Student not found for schedule conflict review.' });
       } else {
@@ -442,10 +449,13 @@ async function previewMoveEnrollment({
   options = {}
 } = {}) {
   const sourcePeriod = await getSourcePeriodOrThrow(sourcePeriodId, options);
-  const sourceClass = await dependencies.repositories.classes.getById(sourcePeriod.classId, options);
+  const sourceClass = options.sourceClass
+    || await dependencies.repositories.classes.getById(sourcePeriod.classId, options);
   const normalized = normalizeMovePayload(payload, sourcePeriod);
   const targetClass = normalized.target.classId
-    ? await dependencies.repositories.classes.getById(normalized.target.classId, options)
+    ? (options.targetClass && idsEqual(options.targetClass?.id, normalized.target.classId)
+      ? options.targetClass
+      : await dependencies.repositories.classes.getById(normalized.target.classId, options))
     : null;
 
   const blockers = assertMovePayloadBasics(normalized, sourcePeriod, sourceClass, targetClass);
@@ -506,6 +516,30 @@ async function previewMoveEnrollment({
   };
 }
 
+async function validateMovePreviewForApply({
+  sourcePeriodId,
+  payload = {},
+  previewHash = '',
+  reqUser,
+  orgId,
+  options = {}
+} = {}) {
+  void reqUser;
+  void orgId;
+  const sourcePeriod = await getSourcePeriodOrThrow(sourcePeriodId, options);
+  const status = String(sourcePeriod?.status || '').trim().toLowerCase();
+  if (!OPEN_STATUSES.has(status)) {
+    throw new Error('Source enrollment is no longer open. Preview again before applying.');
+  }
+  const normalized = normalizeMovePayload(payload, sourcePeriod);
+  const hash = buildPreviewHash(normalized);
+  const expected = String(previewHash || '').trim();
+  if (!expected || hash !== expected) {
+    throw new Error('Preview is stale. Preview again before applying.');
+  }
+  return { ok: true, normalizedPayload: normalized, previewHash: hash };
+}
+
 async function applySourceClose(normalized, sourcePeriod, orgId, reqUser, options = {}) {
   const close = normalized.close;
   const result = await dependencies.registrationStatusLifecycleService.applyTransition({
@@ -528,25 +562,47 @@ async function applyMoveEnrollment({
   engineHooks = {},
   options = {}
 } = {}) {
-  const preview = await previewMoveEnrollment({
-    sourcePeriodId,
-    payload,
-    reqUser,
-    orgId,
-    options
-  });
-  if (!preview.canApply) {
-    const message = preview.blockers[0]?.message || 'Move enrollment preview is blocked.';
-    const error = new Error(message);
-    error.preview = preview;
-    throw error;
-  }
-  if (!previewHash || previewHash !== preview.previewHash) {
-    throw new Error('Preview is stale. Preview the move again before applying.');
+  let preview;
+  let normalized;
+  if (options.trustPreviewHash === true) {
+    const validated = await validateMovePreviewForApply({
+      sourcePeriodId,
+      payload,
+      previewHash,
+      reqUser,
+      orgId,
+      options
+    });
+    normalized = validated.normalizedPayload;
+    preview = {
+      canApply: true,
+      blockers: [],
+      warnings: [],
+      previewHash: validated.previewHash,
+      normalizedPayload: normalized,
+      summaryLines: []
+    };
+  } else {
+    preview = await previewMoveEnrollment({
+      sourcePeriodId,
+      payload,
+      reqUser,
+      orgId,
+      options
+    });
+    if (!preview.canApply) {
+      const message = preview.blockers[0]?.message || 'Move enrollment preview is blocked.';
+      const error = new Error(message);
+      error.preview = preview;
+      throw error;
+    }
+    if (!previewHash || previewHash !== preview.previewHash) {
+      throw new Error('Preview is stale. Preview the move again before applying.');
+    }
+    normalized = preview.normalizedPayload;
   }
 
   const sourcePeriod = await getSourcePeriodOrThrow(sourcePeriodId, options);
-  const normalized = preview.normalizedPayload;
   const sourceClass = await dependencies.repositories.classes.getById(sourcePeriod.classId, options);
   const targetClass = await dependencies.repositories.classes.getById(normalized.target.classId, options);
   if (!targetClass) throw new Error('Target class not found.');
@@ -574,8 +630,10 @@ async function applyMoveEnrollment({
       options
     });
     const targetPeriod = legacy.firstResult.period || null;
+    const draftRequired = preview.targetEnrollmentPreview?.draftRequired
+      || normalizeClassBillingMode(targetClass?.billingMode) === 'chargeable';
     const requiresDraftReview = Boolean(
-      preview.targetEnrollmentPreview?.draftRequired
+      draftRequired
       && targetPeriod
       && ['draft', 'to_be_confirmed', 'waiting_list'].includes(String(targetPeriod.status || '').trim().toLowerCase())
     );
@@ -657,29 +715,48 @@ async function applyMoveEnrollment({
       });
     }
     const message = firstResult?.error || 'Target enrollment failed.';
-    const error = new Error(integratedMove
-      ? message
-      : `${message} Source enrollment was already closed; review the student record and create the target enrollment manually if needed.`);
+    const error = new Error(message);
     error.partial = { closedSource, engineResult, sessionTransferResult };
     throw error;
   }
 
+  const targetPeriodBeforeClose = firstResult.period || null;
   closedSource = await applySourceClose(normalized, sourcePeriod, orgId, reqUser, options);
 
-  if (integratedMove && sessionTransferPlan?.sourceSessionIds?.length) {
-    const sourceSessions = await dependencies.schoolDataService.getClassSessions(sourceClass.id, reqUser);
-    await dependencies.scheduleMoveSessionsService.removeSourceSessionsAfterTransfer({
-      sourceClassId: sourceClass.id,
-      sourceSessions,
-      sourceSessionIdsToRemove: sessionTransferPlan.sourceSessionIds,
-      reqUser,
-      accessContext
-    });
+  try {
+    if (integratedMove && sessionTransferPlan?.sourceSessionIds?.length) {
+      const sourceSessions = await dependencies.schoolDataService.getClassSessions(sourceClass.id, reqUser);
+      await dependencies.scheduleMoveSessionsService.removeSourceSessionsAfterTransfer({
+        sourceClassId: sourceClass.id,
+        sourceSessions,
+        sourceSessionIdsToRemove: sessionTransferPlan.sourceSessionIds,
+        reqUser,
+        accessContext
+      });
+    }
+  } catch (cleanupError) {
+    const rollback = await enrollmentMoveCompensationService.rollbackCompensationRecord(
+      enrollmentMoveCompensationService.buildCompensationRecordFromOutcome({
+        closedSource,
+        targetPeriod: targetPeriodBeforeClose,
+        sessionTransferResult
+      }, {
+        sourcePeriodId: sourcePeriod.id,
+        targetClassId: targetClass.id,
+        sourceClassId: sourceClass.id
+      }),
+      { reqUser, orgId, accessContext }
+    );
+    const error = new Error(cleanupError.message || 'Move cleanup failed after closing the source enrollment.');
+    error.partial = { closedSource, rollbackSummary: rollback };
+    throw error;
   }
 
-  const targetPeriod = firstResult.period || null;
+  const targetPeriod = targetPeriodBeforeClose;
+  const draftRequiredIntegrated = preview.targetEnrollmentPreview?.draftRequired
+    || normalizeClassBillingMode(targetClass?.billingMode) === 'chargeable';
   const requiresDraftReview = Boolean(
-    preview.targetEnrollmentPreview?.draftRequired
+    draftRequiredIntegrated
     && targetPeriod
     && ['draft', 'to_be_confirmed', 'waiting_list'].includes(String(targetPeriod.status || '').trim().toLowerCase())
   );
@@ -703,7 +780,6 @@ async function applyMoveEnrollmentGroupLegacy({
   engineHooks,
   options
 } = {}) {
-  const closedSource = await applySourceClose(normalized, sourcePeriod, orgId, reqUser, options);
   const engineResult = await dependencies.rollingEnrollmentEngineService.execute({
     classData: targetClass,
     reqUser,
@@ -712,11 +788,12 @@ async function applyMoveEnrollmentGroupLegacy({
   });
   const firstResult = (Array.isArray(engineResult.results) ? engineResult.results : [])[0];
   if (!firstResult?.ok) {
-    const message = firstResult?.error || 'Target enrollment failed after closing the source period.';
-    const error = new Error(`${message} Source enrollment was already closed; review the student record and create the target enrollment manually if needed.`);
-    error.partial = { closedSource, engineResult };
+    const message = firstResult?.error || 'Target enrollment failed.';
+    const error = new Error(message);
+    error.partial = { engineResult };
     throw error;
   }
+  const closedSource = await applySourceClose(normalized, sourcePeriod, orgId, reqUser, options);
   return { closedSource, engineResult, firstResult };
 }
 
@@ -748,6 +825,7 @@ module.exports = {
   buildPreviewHash,
   listMoveTargetClasses,
   previewMoveEnrollment,
+  validateMovePreviewForApply,
   applyMoveEnrollment,
   __setDependenciesForTest,
   __resetDependenciesForTest

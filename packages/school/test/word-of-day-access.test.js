@@ -122,6 +122,25 @@ test('canClearWorkflowNote mirrors canChangeAuthorOnEdit (Family A and admin upd
   assert.equal(ownerUpdate.canClearWorkflowNote, false);
 });
 
+test('canExportWordOfDaySocialImage allows Family A bypass and Family B admin update only', () => {
+  const familyA = wordOfDayOperationPolicyService.deriveAccessFlags({
+    update: { allowed: true, scopeId: 'SCP_OWNER' }
+  }, { update: true });
+  const familyB = wordOfDayOperationPolicyService.deriveAccessFlags({
+    update: { allowed: true, scopeId: 'SCP_ADMIN' }
+  }, {});
+  const ownerUpdate = wordOfDayOperationPolicyService.deriveAccessFlags({
+    update: { allowed: true, scopeId: 'SCP_OWNER' }
+  }, {});
+  const orgUpdate = wordOfDayOperationPolicyService.deriveAccessFlags({
+    update: { allowed: true, scopeId: 'SCP_ORG' }
+  }, {});
+  assert.equal(wordOfDayAccessService.canExportWordOfDaySocialImage(familyA), true);
+  assert.equal(wordOfDayAccessService.canExportWordOfDaySocialImage(familyB), true);
+  assert.equal(wordOfDayAccessService.canExportWordOfDaySocialImage(ownerUpdate), false);
+  assert.equal(wordOfDayAccessService.canExportWordOfDaySocialImage(orgUpdate), false);
+});
+
 test('canChangeAuthorOnEdit for Family A bypass and Family B admin update', () => {
   const adminUpdate = wordOfDayOperationPolicyService.deriveAccessFlags({
     update: { allowed: true, scopeId: 'SCP_ADMIN' }

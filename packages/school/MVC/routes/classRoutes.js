@@ -586,6 +586,14 @@ router.post('/api/:classId/class-move/preview',
   }),
   rollingCtrl.previewClassMoveBatch);
 
+router.post('/api/:classId/class-move/preview-seal',
+  requireAccess(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE),
+  trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, {
+    ...rollingEnrollmentMutationActionState,
+    requireToken: false
+  }),
+  rollingCtrl.sealClassMovePreviewBatch);
+
 router.post('/api/:classId/class-move/apply',
   requireAccess(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE),
   trackActionState(SECTIONS.SCHOOL_ROLLING_ENROLLMENT, OPERATIONS.UPDATE, rollingEnrollmentMutationActionState),

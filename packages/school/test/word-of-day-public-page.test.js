@@ -7,7 +7,9 @@ const path = require('path');
 const {
   buildDateNavigation,
   shiftDateKey,
-  FUTURE_DATE_MESSAGE
+  FUTURE_DATE_MESSAGE,
+  isTodayDateAlias,
+  WORD_OF_DAY_TODAY_PATH
 } = require('../MVC/controllers/school/wordOfDayPublicController');
 const {
   resolveWordOfDayDashboardOrgId,
@@ -32,12 +34,18 @@ test('shiftDateKey moves by calendar day in UTC', () => {
   assert.equal(shiftDateKey('2026-11-26', 1), '2026-11-27');
 });
 
+test('isTodayDateAlias recognizes stable today path token', () => {
+  assert.equal(isTodayDateAlias('today'), true);
+  assert.equal(isTodayDateAlias('Today'), true);
+  assert.equal(isTodayDateAlias('2026-11-26'), false);
+});
+
 test('buildDateNavigation preserves org query suffix when past today', () => {
   const todayKey = '2026-11-28';
   const nav = buildDateNavigation('2026-11-26', '?org=900000', todayKey);
   assert.equal(nav.prevDateHref, '/word-of-the-day/2026-11-25?org=900000');
   assert.equal(nav.nextDateHref, '/word-of-the-day/2026-11-27?org=900000');
-  assert.equal(nav.todayHref, '/word-of-the-day/2026-11-28?org=900000');
+  assert.equal(nav.todayHref, `${WORD_OF_DAY_TODAY_PATH}?org=900000`);
   assert.equal(nav.canGoNext, true);
   assert.equal(nav.showTodayNav, true);
   assert.equal(typeof nav.formattedDateLabel, 'string');
@@ -80,4 +88,9 @@ test('public page assets and reaction hooks exist', () => {
   );
   assert.match(clientJs, /initSpeechControls/);
   assert.match(clientJs, /speechSynthesis/);
+  assert.match(clientJs, /initSocialImageExport/);
+  assert.match(clientJs, /htmlToImage/);
+  assert.match(view, /data-wod-social-export/);
+  assert.match(view, /wodSocialExportCard/);
+  assert.match(view, /data-wod-social-export-open/);
 });

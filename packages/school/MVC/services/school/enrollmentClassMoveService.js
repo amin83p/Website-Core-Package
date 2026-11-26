@@ -3,15 +3,20 @@
 const crypto = require('crypto');
 const schoolDataService = require('./schoolDataService');
 const enrollmentMoveService = require('./enrollmentMoveService');
+const enrollmentMoveCompensationService = require('./enrollmentMoveCompensationService');
 const rollingEnrollmentFunderService = require('./rollingEnrollmentFunderService');
 const schoolPersonAccessService = require('./schoolPersonAccessService');
 const { addDaysToDateKey } = require('./sessionAttendanceEditAccessService');
 const { requireCoreModule } = require('./schoolCoreContracts');
-const { toPublicId, idsEqual } = requireCoreModule('MVC/utils/idAdapter');
+const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
+
+const PREVIEW_CONCURRENCY = 7;
+const STUDENT_LOOKUP_CONCURRENCY = 8;
 
 let dependencies = {
   schoolDataService,
   enrollmentMoveService,
+  enrollmentMoveCompensationService,
   schoolPersonAccessService
 };
 
@@ -123,6 +128,54 @@ function buildBatchPreviewHash({ sourceClassId, targetClassId, closeUserReason, 
   return crypto.createHash('sha256').update(JSON.stringify(normalized)).digest('hex');
 }
 
+async function mapWithConcurrency(values, concurrency, mapper) {
+  const list = Array.isArray(values) ? values : [];
+  const limit = Math.max(1, Number(concurrency) || 1);
+  const results = new Array(list.length);
+  let nextIndex = 0;
+
+  async function worker() {
+    while (nextIndex < list.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await mapper(list[index], index);
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(limit, list.length) }, () => worker()));
+  return results;
+}
+
+async function buildStudentLookupForStudentIds(studentIds = [], reqUser) {
+  const ids = [...new Set(
+    (Array.isArray(studentIds) ? studentIds : [])
+      .map((id) => toPublicId(id))
+      .filter(Boolean)
+  )];
+  if (!ids.length) return new Map();
+  const records = await mapWithConcurrency(
+    ids,
+    STUDENT_LOOKUP_CONCURRENCY,
+    (id) => dependencies.schoolDataService.getDataById('students', id, reqUser).catch(() => null)
+  );
+  const lookup = new Map();
+  (Array.isArray(records) ? records : []).forEach((student) => {
+    if (!student) return;
+    const id = toPublicId(student?.id);
+    if (id) lookup.set(id, student);
+  });
+  return lookup;
+}
+
+async function buildStudentLookupForPeriods(periods = [], reqUser) {
+  const studentIds = new Set();
+  (Array.isArray(periods) ? periods : []).forEach((period) => {
+    const token = toPublicId(period?.studentId);
+    if (token) studentIds.add(token);
+  });
+  return buildStudentLookupForStudentIds([...studentIds], reqUser);
+}
+
 function buildEnrollmentStudentLabelLookup(students = [], personById = new Map()) {
   const byStudentId = new Map();
   const byPersonId = new Map();
@@ -151,11 +204,12 @@ function resolvePeriodStudentLabel(studentId, lookup = {}) {
   return token;
 }
 
-async function buildEnrollmentStudentLabelLookupForUser(reqUser) {
-  const students = await dependencies.schoolDataService.fetchAllData('students', {}, reqUser).catch(() => []);
+async function buildEnrollmentStudentLabelLookupForStudentIds(studentIds = [], reqUser) {
+  const lookup = await buildStudentLookupForStudentIds(studentIds, reqUser);
+  const students = [...lookup.values()];
   const personById = await dependencies.schoolPersonAccessService.buildPersonByIdMap({
     reqUser,
-    personIds: (Array.isArray(students) ? students : []).map((student) => student?.personId)
+    personIds: students.map((student) => student?.personId).filter(Boolean)
   });
   return buildEnrollmentStudentLabelLookup(students, personById);
 }
@@ -177,7 +231,10 @@ async function listEligibleMoveCandidates({
     .filter((row) => isOpenMovePeriod(row))
     .filter((row) => periodCoversCloseDate(row, closeDate));
 
-  const labelLookup = await buildEnrollmentStudentLabelLookupForUser(reqUser);
+  const labelLookup = await buildEnrollmentStudentLabelLookupForStudentIds(
+    eligible.map((period) => period?.studentId),
+    reqUser
+  );
   const title = String(sourceClassTitle || '').trim();
 
   return eligible.map((period) => {
@@ -203,6 +260,66 @@ async function listEligibleMoveCandidates({
   }).sort((a, b) => String(a.studentLabel).localeCompare(String(b.studentLabel)));
 }
 
+async function previewSingleClassMoveRow({
+  row,
+  normalizedTargetClassId,
+  closeUserReason,
+  targetClassTitle,
+  periodById,
+  previewOptions,
+  reqUser,
+  orgId
+}) {
+  const periodId = toPublicId(row?.periodId);
+  if (!periodId) return null;
+  const sourcePeriod = periodById.get(periodId);
+  if (!sourcePeriod) {
+    return {
+      periodId,
+      studentId: '',
+      studentLabel: '',
+      canApply: false,
+      blockers: [{ code: 'PERIOD_NOT_FOUND', message: 'Enrollment period not found.' }],
+      warnings: [],
+      previewHash: '',
+      summaryLines: [],
+      payload: null
+    };
+  }
+  const defaults = buildDefaultMovePayloadFromPeriod({
+    period: sourcePeriod,
+    sourceClassTitle: previewOptions.sourceClassTitle || '',
+    closeEffectiveDate: row?.payload?.close?.effectiveDate || row?.closeEffectiveDate,
+    closeUserReason,
+    targetClassId: normalizedTargetClassId,
+    targetClassTitle
+  });
+  const payload = mergeMovePayload(defaults, row?.payload || {});
+  payload.close.reason = buildMoveCloseReason(targetClassTitle, closeUserReason || payload.close.reason);
+  payload.target.classId = normalizedTargetClassId;
+
+  const preview = await dependencies.enrollmentMoveService.previewMoveEnrollment({
+    sourcePeriodId: periodId,
+    payload,
+    reqUser,
+    orgId,
+    options: previewOptions
+  });
+  const studentId = toPublicId(sourcePeriod?.studentId);
+  return {
+    periodId,
+    studentId,
+    studentLabel: String(row?.studentLabel || studentId || '').trim(),
+    canApply: preview.canApply === true,
+    blockers: preview.blockers || [],
+    warnings: preview.warnings || [],
+    previewHash: String(preview.previewHash || '').trim(),
+    summaryLines: preview.summaryLines || [],
+    payload: preview.normalizedPayload || payload,
+    targetEnrollmentPreview: preview.targetEnrollmentPreview || null
+  };
+}
+
 async function previewClassMoveBatch({
   sourceClassId,
   targetClassId,
@@ -213,108 +330,207 @@ async function previewClassMoveBatch({
   orgId,
   options = {}
 } = {}) {
+  const normalizedSourceClassId = toPublicId(sourceClassId);
   const normalizedTargetClassId = toPublicId(targetClassId);
   if (!normalizedTargetClassId) throw new Error('targetClassId is required.');
+  const inputRows = Array.isArray(rows) ? rows : [];
   const batchPreviewHash = buildBatchPreviewHash({
-    sourceClassId,
+    sourceClassId: normalizedSourceClassId,
     targetClassId: normalizedTargetClassId,
     closeUserReason,
-    rows
+    rows: inputRows
   });
 
-  const items = [];
-  const inputRows = Array.isArray(rows) ? rows : [];
-  for (const row of inputRows) {
-    const periodId = toPublicId(row?.periodId);
-    if (!periodId) continue;
-    const sourcePeriod = await dependencies.schoolDataService.getDataById('classEnrollmentPeriods', periodId, reqUser);
-    if (!sourcePeriod) {
-      items.push({
-        periodId,
-        studentId: '',
-        studentLabel: '',
-        canApply: false,
-        blockers: [{ code: 'PERIOD_NOT_FOUND', message: 'Enrollment period not found.' }],
-        warnings: [],
-        previewHash: '',
-        summaryLines: [],
-        payload: null
-      });
-      continue;
-    }
-    const defaults = buildDefaultMovePayloadFromPeriod({
-      period: sourcePeriod,
-      sourceClassTitle: options.sourceClassTitle || '',
-      closeEffectiveDate: row?.payload?.close?.effectiveDate || row?.closeEffectiveDate,
-      closeUserReason,
-      targetClassId: normalizedTargetClassId,
-      targetClassTitle
-    });
-    const payload = mergeMovePayload(defaults, row?.payload || {});
-    payload.close.reason = buildMoveCloseReason(targetClassTitle, closeUserReason || payload.close.reason);
-    payload.target.classId = normalizedTargetClassId;
+  const classPeriods = normalizedSourceClassId
+    ? await dependencies.schoolDataService.getClassEnrollmentPeriodsByClassId(normalizedSourceClassId, reqUser)
+    : [];
+  const periodById = new Map();
+  (Array.isArray(classPeriods) ? classPeriods : []).forEach((period) => {
+    const id = toPublicId(period?.id);
+    if (id) periodById.set(id, period);
+  });
 
-    const preview = await dependencies.enrollmentMoveService.previewMoveEnrollment({
+  const studentLookup = await buildStudentLookupForPeriods(
+    inputRows.map((row) => periodById.get(toPublicId(row?.periodId))).filter(Boolean),
+    reqUser
+  );
+
+  const previewOptions = {
+    ...options,
+    prefetchedPeriods: periodById,
+    studentLookup
+  };
+
+  const items = (await mapWithConcurrency(
+    inputRows,
+    PREVIEW_CONCURRENCY,
+    (row) => previewSingleClassMoveRow({
+      row,
+      normalizedTargetClassId,
+      closeUserReason,
+      targetClassTitle,
+      periodById,
+      previewOptions,
+      reqUser,
+      orgId
+    })
+  )).filter(Boolean);
+
+  const applyableCount = items.filter((row) => row.canApply === true).length;
+  const blockedCount = items.length - applyableCount;
+  const applyRows = items
+    .filter((row) => row.canApply === true)
+    .map((row) => ({ periodId: row.periodId, payload: row.payload }));
+  const applyBatchHash = buildBatchPreviewHash({
+    sourceClassId: normalizedSourceClassId,
+    targetClassId: normalizedTargetClassId,
+    closeUserReason,
+    rows: applyRows
+  });
+
+  return {
+    batchPreviewHash,
+    applyBatchHash,
+    items,
+    canApplyAny: applyableCount > 0,
+    canApplyAllSelected: items.length > 0 && blockedCount === 0,
+    applyableCount,
+    blockedCount
+  };
+}
+
+function sealClassMovePreview({
+  sourceClassId,
+  targetClassId,
+  closeUserReason = '',
+  rows = [],
+  items = []
+} = {}) {
+  const normalizedSourceClassId = toPublicId(sourceClassId);
+  const normalizedTargetClassId = toPublicId(targetClassId);
+  const inputRows = (Array.isArray(rows) && rows.length)
+    ? rows
+    : (Array.isArray(items) ? items : []).map((item) => ({
+        periodId: item?.periodId,
+        payload: item?.payload
+      }));
+  const batchPreviewHash = buildBatchPreviewHash({
+    sourceClassId: normalizedSourceClassId,
+    targetClassId: normalizedTargetClassId,
+    closeUserReason,
+    rows: inputRows
+  });
+  const applySource = (Array.isArray(items) && items.length)
+    ? items
+    : inputRows.map((row) => ({ ...row, canApply: true }));
+  const applyRows = applySource
+    .filter((row) => row.canApply !== false)
+    .map((row) => ({ periodId: row.periodId, payload: row.payload }));
+  const applyBatchHash = buildBatchPreviewHash({
+    sourceClassId: normalizedSourceClassId,
+    targetClassId: normalizedTargetClassId,
+    closeUserReason,
+    rows: applyRows
+  });
+  const applyableCount = applySource.filter((row) => row.canApply === true).length;
+  const blockedCount = applySource.length - applyableCount;
+  return {
+    batchPreviewHash,
+    applyBatchHash,
+    applyableCount,
+    blockedCount,
+    canApplyAny: applyableCount > 0,
+    canApplyAllSelected: applySource.length > 0 && blockedCount === 0
+  };
+}
+
+async function assertApplyRowsStillValid({ rows, reqUser, orgId, options } = {}) {
+  for (const row of rows) {
+    const periodId = toPublicId(row?.periodId);
+    const previewHash = String(row?.previewHash || '').trim();
+    const payload = row?.payload;
+    if (!periodId || !previewHash || !payload) {
+      throw new Error('Each apply row must include periodId, previewHash, and payload.');
+    }
+    await dependencies.enrollmentMoveService.validateMovePreviewForApply({
       sourcePeriodId: periodId,
       payload,
+      previewHash,
       reqUser,
       orgId,
       options
     });
-    const studentId = toPublicId(sourcePeriod?.studentId);
-    items.push({
-      periodId,
-      studentId,
-      studentLabel: String(row?.studentLabel || studentId || '').trim(),
-      canApply: preview.canApply === true,
-      blockers: preview.blockers || [],
-      warnings: preview.warnings || [],
-      previewHash: String(preview.previewHash || '').trim(),
-      summaryLines: preview.summaryLines || [],
-      payload: preview.normalizedPayload || payload,
-      targetEnrollmentPreview: preview.targetEnrollmentPreview || null
-    });
   }
-
-  return {
-    batchPreviewHash,
-    items,
-    canApplyAny: items.some((row) => row.canApply)
-  };
 }
 
 async function applyClassMoveBatch({
   batchPreviewHash = '',
+  applyBatchHash = '',
+  sourceClassId = '',
+  targetClassId = '',
+  closeUserReason = '',
   rows = [],
   reqUser,
   orgId,
   engineHooks = {},
   options = {}
 } = {}) {
-  const expectedHash = String(batchPreviewHash || '').trim();
-  if (!expectedHash) throw new Error('batchPreviewHash is required.');
+  const expectedHash = String(applyBatchHash || batchPreviewHash || '').trim();
+  if (!expectedHash) throw new Error('applyBatchHash (or batchPreviewHash) is required.');
 
-  const results = [];
   const inputRows = Array.isArray(rows) ? rows : [];
-  let applied = 0;
-  let skipped = 0;
-  let failed = 0;
+  if (!inputRows.length) throw new Error('At least one enrollment move row is required.');
 
-  for (const row of inputRows) {
-    const periodId = toPublicId(row?.periodId);
-    const previewHash = String(row?.previewHash || '').trim();
-    const payload = row?.payload;
-    if (!periodId || !previewHash || !payload) {
-      skipped += 1;
-      results.push({
-        periodId,
-        ok: false,
-        skipped: true,
-        error: 'Missing periodId, previewHash, or payload.'
-      });
-      continue;
-    }
-    try {
+  const recomputedHash = buildBatchPreviewHash({
+    sourceClassId,
+    targetClassId,
+    closeUserReason,
+    rows: inputRows.map((row) => ({
+      periodId: row?.periodId,
+      payload: row?.payload
+    }))
+  });
+  if (recomputedHash !== expectedHash) {
+    throw new Error('Preview is stale. Preview again before applying.');
+  }
+
+  const periodById = new Map();
+  const normalizedSourceClassId = toPublicId(sourceClassId);
+  if (normalizedSourceClassId) {
+    const classPeriods = await dependencies.schoolDataService.getClassEnrollmentPeriodsByClassId(
+      normalizedSourceClassId,
+      reqUser
+    );
+    (Array.isArray(classPeriods) ? classPeriods : []).forEach((period) => {
+      const id = toPublicId(period?.id);
+      if (id) periodById.set(id, period);
+    });
+  }
+
+  const applyOptions = {
+    ...options,
+    prefetchedPeriods: periodById,
+    studentLookup: await buildStudentLookupForPeriods(
+      inputRows.map((row) => periodById.get(toPublicId(row?.periodId))).filter(Boolean),
+      reqUser
+    )
+  };
+
+  await assertApplyRowsStillValid({
+    rows: inputRows,
+    reqUser,
+    orgId,
+    options: applyOptions
+  });
+
+  const compensationRecords = [];
+  const results = [];
+
+  try {
+    for (const row of inputRows) {
+      const periodId = toPublicId(row?.periodId);
+      const previewHash = String(row?.previewHash || '').trim();
+      const payload = row?.payload;
       const outcome = await dependencies.enrollmentMoveService.applyMoveEnrollment({
         sourcePeriodId: periodId,
         payload,
@@ -322,9 +538,15 @@ async function applyClassMoveBatch({
         reqUser,
         orgId,
         engineHooks,
-        options
+        options: { ...applyOptions, trustPreviewHash: true }
       });
-      applied += 1;
+      compensationRecords.push(
+        dependencies.enrollmentMoveCompensationService.buildCompensationRecordFromOutcome(outcome, {
+          sourcePeriodId: periodId,
+          targetClassId: toPublicId(payload?.target?.classId || targetClassId),
+          sourceClassId: normalizedSourceClassId
+        })
+      );
       results.push({
         periodId,
         ok: true,
@@ -335,23 +557,29 @@ async function applyClassMoveBatch({
           ? 'Moved; review draft charges for the new enrollment.'
           : 'Moved successfully.'
       });
-    } catch (error) {
-      failed += 1;
-      results.push({
-        periodId,
-        ok: false,
-        error: error?.message || 'Move failed.',
-        partial: error?.partial || null,
-        preview: error?.preview || null
-      });
     }
+  } catch (error) {
+    const rollback = await dependencies.enrollmentMoveCompensationService.rollbackCompensationRecordsLifo(
+      compensationRecords,
+      { reqUser, orgId, accessContext: options.accessContext }
+    );
+    const rolled = new Error(
+      error.message || 'Class move failed partway through. Earlier moves in this batch were rolled back where possible.'
+    );
+    rolled.statusCode = 409;
+    rolled.results = results;
+    rolled.rollbackSummary = rollback;
+    rolled.failedPeriodId = toPublicId(error?.preview?.normalizedPayload?.target?.studentId || '');
+    throw rolled;
   }
 
   return {
     batchPreviewHash: expectedHash,
-    applied,
-    skipped,
-    failed,
+    applyBatchHash: expectedHash,
+    status: 'success',
+    applied: results.length,
+    skipped: 0,
+    failed: 0,
     results
   };
 }
@@ -364,6 +592,7 @@ function __resetDependenciesForTest() {
   dependencies = {
     schoolDataService,
     enrollmentMoveService,
+    enrollmentMoveCompensationService,
     schoolPersonAccessService
   };
 }
@@ -374,6 +603,7 @@ module.exports = {
   buildBatchPreviewHash,
   listEligibleMoveCandidates,
   previewClassMoveBatch,
+  sealClassMovePreview,
   applyClassMoveBatch,
   __setDependenciesForTest,
   __resetDependenciesForTest

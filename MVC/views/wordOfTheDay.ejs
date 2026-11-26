@@ -24,10 +24,21 @@
     const wodCanGoNext = typeof canGoNext !== 'undefined' && canGoNext === true;
     const wodShowTodayNav = typeof showTodayNav === 'undefined' ? true : Boolean(showTodayNav);
     const showDateNav = Boolean(wodPrevDateHref && wodTodayHref);
+    const canExportWodSocial = typeof canExportWordOfDaySocialImage !== 'undefined' && canExportWordOfDaySocialImage === true;
+    const wodBrandName = typeof wordOfDayBrandName !== 'undefined' ? String(wordOfDayBrandName || '').trim() : '';
+    const socialExportExamples = examples.slice(0, 2);
+    const wodSocialExportPhotoSrc = (typeof wordOfDaySocialExportPhotoSrc !== 'undefined' && wordOfDaySocialExportPhotoSrc)
+      ? String(wordOfDaySocialExportPhotoSrc)
+      : '';
   %>
 
-  <div class="wod-public-topbar reveal">
+  <div class="wod-public-topbar reveal wod-public-topbar--split">
     <a href="/" class="wod-public-back-link"><i class="bi bi-arrow-left" aria-hidden="true"></i>Back to home</a>
+    <% if (canExportWodSocial && entry && wodIsViewingToday) { %>
+      <button type="button" class="btn btn-outline-primary btn-sm wod-social-export-open" data-wod-social-export-open>
+        <i class="bi bi-image me-1" aria-hidden="true"></i>Create social image
+      </button>
+    <% } %>
   </div>
 
   <% if (showDateNav) { %>
@@ -192,6 +203,131 @@
     </section>
   <% } %>
 </section>
+
+<% if (canExportWodSocial && entry && wodIsViewingToday) { %>
+  <div id="wodSocialExportStage" class="wod-social-export-stage" aria-hidden="true">
+    <div id="wodSocialExportCard" class="wod-social-export-card" data-wod-social-export-card>
+      <style>
+        #wodSocialExportCard,#wodSocialExportCard *{box-sizing:border-box}
+        #wodSocialExportCard{background:linear-gradient(160deg,#f8fafc 0%,#eef4fb 48%,#e8f1fa 100%);border:1px solid rgba(10,102,194,.15);border-radius:var(--wod-ex-radius,24px);color:#0f172a;display:flex;flex-direction:column;font-family:Georgia,'Times New Roman',serif;height:100%;overflow:hidden;padding:var(--wod-ex-pad,52px)}
+        #wodSocialExportCard .wod-social-export-card__inner{display:flex;flex:1;flex-direction:column;gap:var(--wod-ex-block-gap,18px);height:100%;min-height:0;overflow:hidden}
+        #wodSocialExportCard .wod-social-export-block{display:flex;flex-direction:column;flex-shrink:0;gap:var(--wod-ex-gap,14px);min-width:0}
+        #wodSocialExportCard .wod-social-export-block--head{gap:calc(var(--wod-ex-gap,14px) * .55)}
+        #wodSocialExportCard .wod-social-export-kicker{color:#0a66c2;font-size:var(--wod-ex-kicker,30px);font-weight:600;letter-spacing:.06em;line-height:1.15;margin:0;text-transform:uppercase}
+        #wodSocialExportCard .wod-social-export-date{color:#64748b;font-family:system-ui,sans-serif;font-size:var(--wod-ex-date,24px);line-height:1.2;margin:0}
+        #wodSocialExportCard .wod-social-export-photo-wrap{border-radius:var(--wod-ex-photo-radius,18px);flex-shrink:0;max-height:var(--wod-ex-photo-max,320px);overflow:hidden}
+        #wodSocialExportCard .wod-social-export-photo{display:block;height:auto;max-height:var(--wod-ex-photo-max,320px);object-fit:cover;width:100%}
+        #wodSocialExportCard .wod-social-export-word{font-size:var(--wod-ex-word,88px);font-weight:500;line-height:1.08;margin:0;word-break:break-word}
+        #wodSocialExportCard .wod-social-export-pronunciation{color:#475569;font-family:system-ui,sans-serif;font-size:var(--wod-ex-pron,28px);font-style:italic;line-height:1.25;margin:0}
+        #wodSocialExportCard .wod-social-export-chips{display:flex;flex-wrap:wrap;font-family:system-ui,sans-serif;gap:calc(var(--wod-ex-gap,14px) * .65)}
+        #wodSocialExportCard .wod-social-export-chip{background:rgba(10,102,194,.1);border-radius:999px;color:#0a66c2;font-size:var(--wod-ex-chip,22px);font-weight:600;line-height:1.2;padding:.3em .85em}
+        #wodSocialExportCard .wod-social-export-meaning{font-family:system-ui,sans-serif;font-size:var(--wod-ex-meaning,30px);line-height:1.4;margin:0}
+        #wodSocialExportCard .wod-social-export-examples{font-family:system-ui,sans-serif;font-size:var(--wod-ex-example,26px);line-height:1.45;margin:0;padding-left:1.25em}
+        #wodSocialExportCard .wod-social-export-examples li{margin:.15em 0}
+        #wodSocialExportCard .wod-social-export-brand{color:#64748b;font-family:system-ui,sans-serif;font-size:var(--wod-ex-brand,22px);font-weight:600;line-height:1.2;margin:var(--wod-ex-brand-margin,0);text-align:right}
+        #wodSocialExportCard[data-wod-export-layout="story"] .wod-social-export-card__inner{justify-content:space-between}
+        #wodSocialExportCard[data-wod-export-layout="landscape"] .wod-social-export-card__inner{column-gap:var(--wod-ex-gap,14px);display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.12fr);grid-template-rows:auto minmax(0,1fr) auto}
+        #wodSocialExportCard[data-wod-export-layout="landscape"] .wod-social-export-block--head{grid-column:1/-1}
+        #wodSocialExportCard[data-wod-export-layout="landscape"] .wod-social-export-block--visual{align-self:stretch;grid-column:1;grid-row:2}
+        #wodSocialExportCard[data-wod-export-layout="landscape"] .wod-social-export-block--main{align-self:center;grid-column:2;grid-row:2}
+        #wodSocialExportCard[data-wod-export-layout="landscape"] .wod-social-export-block--foot{grid-column:1/-1}
+        #wodSocialExportCard[data-wod-export-layout="landscape"] .wod-social-export-photo-wrap,#wodSocialExportCard[data-wod-export-layout="landscape"] .wod-social-export-photo{height:100%;max-height:100%;object-fit:cover}
+      </style>
+      <div class="wod-social-export-card__inner">
+        <div class="wod-social-export-block wod-social-export-block--head">
+          <p class="wod-social-export-kicker">Word of the Day</p>
+          <% if (wodFormattedDateLabel) { %><p class="wod-social-export-date"><%= wodFormattedDateLabel %></p><% } %>
+        </div>
+        <% if (photoUrl && wodSocialExportPhotoSrc) { %>
+          <div class="wod-social-export-block wod-social-export-block--visual">
+            <div class="wod-social-export-photo-wrap">
+              <img class="wod-social-export-photo" src="<%= wodSocialExportPhotoSrc %>" alt="" />
+            </div>
+          </div>
+        <% } %>
+        <div class="wod-social-export-block wod-social-export-block--main">
+          <h2 class="wod-social-export-word" data-wod-export-word><%= entry.word %></h2>
+          <% if (entry.pronunciation) { %><p class="wod-social-export-pronunciation"><%= entry.pronunciation %></p><% } %>
+          <% if (wordTypes.length || entry.difficulty) { %>
+            <div class="wod-social-export-chips">
+              <% wordTypes.forEach((key) => { %>
+                <span class="wod-social-export-chip"><%= typeLabels[key] || key %></span>
+              <% }) %>
+              <% if (entry.difficulty) { %>
+                <span class="wod-social-export-chip"><%= diffLabels[entry.difficulty] || entry.difficulty %></span>
+              <% } %>
+            </div>
+          <% } %>
+          <% if (entry.meaning) { %>
+            <p class="wod-social-export-meaning"><%= entry.meaning %></p>
+          <% } %>
+        </div>
+        <div class="wod-social-export-block wod-social-export-block--foot">
+          <% if (socialExportExamples.length) { %>
+            <ol class="wod-social-export-examples">
+              <% socialExportExamples.forEach((ex) => { %>
+                <li><%= ex %></li>
+              <% }) %>
+            </ol>
+          <% } %>
+          <% if (wodBrandName) { %>
+            <p class="wod-social-export-brand"><%= wodBrandName %></p>
+          <% } %>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="wodSocialExportModal" tabindex="-1" aria-labelledby="wodSocialExportModalLabel" aria-hidden="true" data-wod-social-export>
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title h5" id="wodSocialExportModalLabel">Create social image</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small">Choose a preset or set custom width and height (600–1920 px) for Facebook or Instagram.</p>
+          <div class="d-flex flex-wrap gap-2 mb-3" role="group" aria-label="Size presets">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-wod-social-preset="1080x1080">Square post · 1080×1080</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-wod-social-preset="1080x1920">Story · 1080×1920</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-wod-social-preset="1200x630">Facebook link · 1200×630</button>
+          </div>
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label small fw-semibold" for="wodSocialExportWidth">Width (px)</label>
+              <input type="number" class="form-control form-control-sm" id="wodSocialExportWidth" data-wod-social-width min="600" max="1920" step="1" value="1080" />
+            </div>
+            <div class="col-6">
+              <label class="form-label small fw-semibold" for="wodSocialExportHeight">Height (px)</label>
+              <input type="number" class="form-control form-control-sm" id="wodSocialExportHeight" data-wod-social-height min="600" max="1920" step="1" value="1080" />
+            </div>
+          </div>
+          <div class="form-check mb-3">
+            <input class="form-check-input" type="checkbox" id="wodSocialExportAspectLock" data-wod-social-aspect-lock checked />
+            <label class="form-check-label small" for="wodSocialExportAspectLock">Keep aspect ratio when resizing</label>
+          </div>
+          <div class="wod-social-export-preview-wrap" data-wod-social-preview-wrap>
+            <div class="wod-social-export-preview-scaler" data-wod-social-preview-scaler></div>
+          </div>
+          <p class="small text-danger d-none mb-0" data-wod-social-export-error role="alert"></p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-primary" data-wod-social-download>
+            <i class="bi bi-download me-1" aria-hidden="true"></i>Download PNG
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="application/json" id="wodSocialExportPayload"><%- JSON.stringify({
+    dateKey,
+    word: entry.word,
+    brandName: wodBrandName
+  }) %></script>
+  <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/vendor/html-to-image.js') : '/scripts/vendor/html-to-image.js' %>"></script>
+<% } %>
 
 <% if (entry && photoUrl) { %>
   <%- include('./partials/modal_ImageViewer') %>

@@ -145,6 +145,7 @@
     "express-session": "^1.18.2",
     "heic-convert": "^2.1.0",
     "helmet": "^8.3.0",
+    "html-to-image": "^1.11.13",
     "json2csv": "^6.0.0-alpha.2",
     "jsonwebtoken": "^9.0.2",
     "mongodb": "^6.21.0",

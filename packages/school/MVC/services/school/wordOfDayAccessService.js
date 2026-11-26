@@ -264,6 +264,11 @@ async function getWordOfDayAccessForRequest(req) {
   return access;
 }
 
+/** Family A UPDATE bypass or Family B UPDATE at ADMIN scope (same gate as author reassignment). */
+function canExportWordOfDaySocialImage(access) {
+  return Boolean(access?.canUpdateWords && access?.canChangeAuthorOnEdit);
+}
+
 module.exports = {
   evaluateWordOfDayOperation,
   buildWordOfDayAccess,
@@ -277,6 +282,7 @@ module.exports = {
   canResolveTransition,
   hasDisplayHistory,
   assertDisplayRiskAcknowledged,
+  canExportWordOfDaySocialImage,
   entryYear,
   isOwnerRow,
   UPDATE_STATUSES_BY_TIER,

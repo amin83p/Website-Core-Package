@@ -5,6 +5,7 @@ const path = require('node:path');
 
 const enrollmentClassMoveService = require('../MVC/services/school/enrollmentClassMoveService');
 const enrollmentMoveService = require('../MVC/services/school/enrollmentMoveService');
+const enrollmentMoveCompensationService = require('../MVC/services/school/enrollmentMoveCompensationService');
 
 const viewSource = fs.readFileSync(
   path.join(__dirname, '../MVC/views/school/class/rollingEnrollment.ejs'),
@@ -57,12 +58,17 @@ const mockPeriods = [
 ];
 
 test('listEligibleMoveCandidates filters open periods covering close date', async () => {
+  const getDataByIdCalls = [];
   enrollmentClassMoveService.__setDependenciesForTest({
     schoolDataService: {
       getClassEnrollmentPeriodsByClassId: async () => mockPeriods,
-      fetchAllData: async () => [
-        { id: 'STU_1', personId: 'PERSON_1', studentNumber: '100' }
-      ]
+      getDataById: async (type, id) => {
+        getDataByIdCalls.push({ type, id });
+        if (type === 'students' && id === 'STU_1') {
+          return { id: 'STU_1', personId: 'PERSON_1', studentNumber: '100' };
+        }
+        return null;
+      }
     },
     schoolPersonAccessService: {
       buildPersonByIdMap: async () => new Map([
@@ -88,6 +94,7 @@ test('listEligibleMoveCandidates filters open periods covering close date', asyn
     assert.equal(rows[0].defaultPayload.close.targetStatus, 'completed');
     assert.equal(rows[0].defaultPayload.close.effectiveDate, '2026-03-15');
     assert.equal(rows[0].defaultPayload.target.startDate, '2026-03-16');
+    assert.deepEqual(getDataByIdCalls, [{ type: 'students', id: 'STU_1' }]);
   } finally {
     enrollmentClassMoveService.__resetDependenciesForTest();
   }
@@ -97,10 +104,8 @@ test('previewClassMoveBatch returns mixed canApply and stable batchPreviewHash',
   const previewCalls = [];
   enrollmentClassMoveService.__setDependenciesForTest({
     schoolDataService: {
-      getDataById: async (collection, id) => {
-        if (collection !== 'classEnrollmentPeriods') return null;
-        return mockPeriods.find((row) => row.id === id) || null;
-      }
+      getClassEnrollmentPeriodsByClassId: async () => mockPeriods,
+      getDataById: async () => null
     },
     enrollmentMoveService: {
       previewMoveEnrollment: async (args) => {
@@ -155,6 +160,11 @@ test('previewClassMoveBatch returns mixed canApply and stable batchPreviewHash',
     assert.equal(preview1.items[0].canApply, true);
     assert.equal(preview1.items[1].canApply, false);
     assert.equal(preview1.canApplyAny, true);
+    assert.equal(preview1.canApplyAllSelected, false);
+    assert.equal(preview1.applyableCount, 1);
+    assert.equal(preview1.blockedCount, 1);
+    assert.ok(preview1.applyBatchHash);
+    assert.notEqual(preview1.applyBatchHash, preview1.batchPreviewHash);
     assert.equal(previewCalls.length, 4);
     assert.equal(previewCalls[0].payload.close.targetStatus, 'completed');
     assert.ok(String(previewCalls[0].payload.close.reason || '').includes('Teacher leaving'));
@@ -181,6 +191,7 @@ test('buildBatchPreviewHash changes when row payload changes', () => {
 test('static: routes and rolling enrollment view expose class-move bulk move UI', () => {
   assert.match(routesSource, /class-move\/candidates/);
   assert.match(routesSource, /class-move\/preview/);
+  assert.match(routesSource, /class-move\/preview-seal/);
   assert.match(routesSource, /class-move\/apply/);
   assert.match(viewSource, /classMoveWizardModal/);
   assert.match(viewSource, /btn_openClassMoveWizard/);
@@ -193,6 +204,109 @@ test('static: routes and rolling enrollment view expose class-move bulk move UI'
   assert.match(viewSource, /data-field="targetStartDate"/);
   assert.match(viewSource, /validateMoveStartAfterClose/);
   assert.match(viewSource, /move_startDateGapHelp/);
+  assert.match(viewSource, /applyBatchHash/);
+  assert.match(viewSource, /showClassMoveBusy/);
+  assert.match(viewSource, /updateLoading[\s\S]*progress/);
+  assert.match(viewSource, /class-move\/preview-seal/);
+  assert.match(viewSource, /rows: \[rows\[i\]\]/);
+  assert.match(viewSource, /Class Move Rolled Back/);
+  assert.match(viewSource, /rollbackSummary/);
+});
+
+test('sealClassMovePreview returns batch and apply hashes without preview execution', () => {
+  const rows = [
+    { periodId: 'PER_ACTIVE', payload: { close: { effectiveDate: '2026-03-15' } } },
+    { periodId: 'PER_FUTURE', payload: { close: { effectiveDate: '2026-03-15' } } }
+  ];
+  const items = [
+    { periodId: 'PER_ACTIVE', canApply: true, payload: rows[0].payload },
+    { periodId: 'PER_FUTURE', canApply: false, payload: rows[1].payload }
+  ];
+  const sealed = enrollmentClassMoveService.sealClassMovePreview({
+    sourceClassId: 'CLS_SRC',
+    targetClassId: 'CLS_TGT',
+    closeUserReason: 'Reason',
+    rows,
+    items
+  });
+  assert.ok(sealed.batchPreviewHash);
+  assert.ok(sealed.applyBatchHash);
+  assert.notEqual(sealed.batchPreviewHash, sealed.applyBatchHash);
+  assert.equal(sealed.applyableCount, 1);
+  assert.equal(sealed.blockedCount, 1);
+  assert.equal(sealed.canApplyAny, true);
+  assert.equal(sealed.canApplyAllSelected, false);
+});
+
+test('applyClassMoveBatch rolls back earlier success when a later row fails', async () => {
+  let applyCount = 0;
+  const rollbackCalls = [];
+  const previewCalls = [];
+  enrollmentClassMoveService.__setDependenciesForTest({
+    schoolDataService: {
+      getClassEnrollmentPeriodsByClassId: async () => mockPeriods,
+      getDataById: async () => null
+    },
+    enrollmentMoveService: {
+      previewMoveEnrollment: async (args) => {
+        previewCalls.push(args);
+        return { canApply: true, previewHash: 'hash-ok' };
+      },
+      validateMovePreviewForApply: async () => ({
+        ok: true,
+        normalizedPayload: { target: { classId: 'CLS_TGT', studentId: 'STU_1' } },
+        previewHash: 'hash-ok'
+      }),
+      applyMoveEnrollment: async (args) => {
+        assert.equal(args.options?.trustPreviewHash, true);
+        applyCount += 1;
+        if (applyCount === 2) {
+          throw new Error('Simulated failure');
+        }
+        return {
+          closedSource: { id: 'PER_ACTIVE', classId: 'CLS_SRC' },
+          targetPeriod: { id: 'PER_TGT_NEW', classId: 'CLS_TGT', status: 'draft' },
+          sessionTransferResult: null
+        };
+      }
+    },
+    enrollmentMoveCompensationService: {
+      buildCompensationRecordFromOutcome: enrollmentMoveCompensationService.buildCompensationRecordFromOutcome,
+      rollbackCompensationRecordsLifo: async (records) => {
+        rollbackCalls.push(records.length);
+        return { allOk: true, results: [] };
+      }
+    }
+  });
+  try {
+    const rows = [
+      { periodId: 'PER_ACTIVE', previewHash: 'hash-ok', payload: { target: { classId: 'CLS_TGT' } } },
+      { periodId: 'PER_ACTIVE', previewHash: 'hash-ok', payload: { target: { classId: 'CLS_TGT' } } }
+    ];
+    const applyHash = enrollmentClassMoveService.buildBatchPreviewHash({
+      sourceClassId: 'CLS_SRC',
+      targetClassId: 'CLS_TGT',
+      closeUserReason: 'Reason',
+      rows
+    });
+    await assert.rejects(
+      () => enrollmentClassMoveService.applyClassMoveBatch({
+        applyBatchHash: applyHash,
+        sourceClassId: 'CLS_SRC',
+        targetClassId: 'CLS_TGT',
+        closeUserReason: 'Reason',
+        rows,
+        reqUser: {},
+        orgId: 'ORG_1'
+      }),
+      /Simulated failure|rolled back/i
+    );
+    assert.equal(rollbackCalls.length, 1);
+    assert.equal(rollbackCalls[0], 1);
+    assert.equal(previewCalls.length, 0);
+  } finally {
+    enrollmentClassMoveService.__resetDependenciesForTest();
+  }
 });
 
 test('OPEN_STATUSES used for candidate filtering matches enrollment move service', () => {

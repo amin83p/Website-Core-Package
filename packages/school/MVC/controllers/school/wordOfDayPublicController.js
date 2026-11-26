@@ -11,9 +11,16 @@ const wordOfDayModel = require('../../models/school/wordOfDayModel');
 const wordOfDayUiConstants = require('../../services/school/wordOfDayUiConstants');
 const { toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 const wordOfDayController = require('./wordOfDayController');
+const wordOfDayAccessService = require('../../services/school/wordOfDayAccessService');
+const uploadStorageService = requireCoreModule('MVC/services/uploadStorageService');
 
 const WORD_OF_DAY_PUBLIC_PAGE_CSS = 'wordOfDayPublicPage.css';
 const FUTURE_DATE_MESSAGE = 'Future words are not published yet. You can browse today and previous days.';
+const WORD_OF_DAY_TODAY_PATH = '/word-of-the-day/today';
+
+function isTodayDateAlias(value) {
+  return String(value || '').trim().toLowerCase() === 'today';
+}
 
 function shiftDateKey(dateKey, deltaDays) {
   const key = String(dateKey || '').trim();
@@ -55,9 +62,9 @@ function buildDateNavigation(dateKey, orgQuerySuffix = '', todayKey = '') {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) {
     return {
       formattedDateLabel: '',
-      prevDateHref: `/word-of-the-day/${today}${suffix}`,
+      prevDateHref: `${WORD_OF_DAY_TODAY_PATH}${suffix}`,
       nextDateHref: '',
-      todayHref: `/word-of-the-day/${today}${suffix}`,
+      todayHref: `${WORD_OF_DAY_TODAY_PATH}${suffix}`,
       isViewingToday: false,
       canGoNext: false,
       showTodayNav: true
@@ -70,7 +77,7 @@ function buildDateNavigation(dateKey, orgQuerySuffix = '', todayKey = '') {
     formattedDateLabel: formatDateLabel(key),
     prevDateHref: mk(shiftDateKey(key, -1)),
     nextDateHref: canGoNext ? mk(shiftDateKey(key, 1)) : '',
-    todayHref: mk(today),
+    todayHref: `${WORD_OF_DAY_TODAY_PATH}${suffix}`,
     isViewingToday,
     canGoNext,
     showTodayNav: !isViewingToday
@@ -96,7 +103,10 @@ function sendError(req, res, error, fallback = 500) {
   const status = Number(error?.statusCode || error?.status || fallback) || fallback;
   const message = String(error?.message || 'Request failed.');
   if (req.accepts('html') && !req.xhr && req.method === 'GET') {
-    const dateKey = resolveDateKeyParam(req);
+    let dateKey = resolveDateKeyParam(req);
+    if (!dateKey && isTodayDateAlias(req.params?.dateKey)) {
+      dateKey = defaultTodayKeyUtc();
+    }
     const orgSuffix = String(req.query?.org || '').trim()
       ? `?org=${encodeURIComponent(toPublicId(String(req.query.org).trim()))}`
       : '';
@@ -142,10 +152,31 @@ async function resolvePublicOrgId(req) {
 
 function resolveDateKeyParam(req, fallback = '') {
   const fromParam = String(req.params?.dateKey || '').trim();
-  if (fromParam && /^\d{4}-\d{2}-\d{2}$/.test(fromParam)) return fromParam;
+  if (fromParam && !isTodayDateAlias(fromParam) && /^\d{4}-\d{2}-\d{2}$/.test(fromParam)) return fromParam;
   const fromQuery = String(req.query?.date || '').trim();
-  if (fromQuery && /^\d{4}-\d{2}-\d{2}$/.test(fromQuery)) return fromQuery;
+  if (fromQuery && !isTodayDateAlias(fromQuery) && /^\d{4}-\d{2}-\d{2}$/.test(fromQuery)) return fromQuery;
   return String(fallback || '').trim();
+}
+
+async function resolveRequestedDateKey(req) {
+  const fromParam = String(req.params?.dateKey || '').trim();
+  if (isTodayDateAlias(fromParam)) {
+    return resolvePublicTodayKey(req);
+  }
+  const fromQuery = String(req.query?.date || '').trim();
+  if (isTodayDateAlias(fromQuery)) {
+    return resolvePublicTodayKey(req);
+  }
+  const resolved = resolveDateKeyParam(req);
+  return resolved;
+}
+
+async function resolveCanExportWordOfDaySocialImage(req, { entry, dateKey, todayKey }) {
+  if (!req.user || !entry || String(dateKey || '') !== String(todayKey || '')) {
+    return false;
+  }
+  const access = await wordOfDayAccessService.buildWordOfDayAccess(req.user, req.ip);
+  return wordOfDayAccessService.canExportWordOfDaySocialImage(access);
 }
 
 async function loadDailyDetail(req, dateKey) {
@@ -174,10 +205,9 @@ function buildOrgQuery(orgId, globalPolicy) {
 
 async function showToday(req, res) {
   try {
-    const dateKey = await resolvePublicTodayKey(req);
     const query = new URLSearchParams(req.query || {}).toString();
     const suffix = query ? `?${query}` : '';
-    return res.redirect(301, `/word-of-the-day/${dateKey}${suffix}`);
+    return res.redirect(301, `${WORD_OF_DAY_TODAY_PATH}${suffix}`);
   } catch (error) {
     return sendError(req, res, error);
   }
@@ -185,7 +215,7 @@ async function showToday(req, res) {
 
 async function showByDate(req, res) {
   try {
-    const dateKey = resolveDateKeyParam(req);
+    const dateKey = await resolveRequestedDateKey(req);
     if (!dateKey) return sendError(req, res, { message: 'Invalid date.', statusCode: 400 }, 400);
 
     const todayKey = await resolvePublicTodayKey(req);
@@ -213,6 +243,11 @@ async function showByDate(req, res) {
 
     const detailOrgQuerySuffix = buildOrgQuery(detail.orgId, globalPolicy);
     const detailDateNav = buildDateNavigation(dateKey, detailOrgQuerySuffix, todayKey);
+    const canExportWordOfDaySocialImage = await resolveCanExportWordOfDaySocialImage(req, {
+      entry: detail?.entry,
+      dateKey,
+      todayKey
+    });
 
     return res.render('wordOfTheDay', baseHtmlRenderLocals(req, {
       title: detail?.entry?.word
@@ -223,6 +258,11 @@ async function showByDate(req, res) {
       orgQuerySuffix: detailOrgQuerySuffix,
       includeModal: Boolean(detail?.entry?.photo?.url),
       pageError: null,
+      canExportWordOfDaySocialImage,
+      wordOfDayBrandName: appBrandingService.getBrand().appName || '',
+      wordOfDaySocialExportPhotoSrc: (canExportWordOfDaySocialImage && detail?.entry?.photo?.url)
+        ? buildSocialExportImageProxyPath(detail.entry.photo.url)
+        : '',
       ...detailDateNav
     }));
   } catch (error) {
@@ -263,6 +303,44 @@ async function postReaction(req, res) {
   }
 }
 
+function uploadsRefFromPublicUrl(url = '') {
+  const token = String(url || '').trim();
+  if (!token) return '';
+  if (/^\/uploads\//i.test(token)) return token.split(/[?#]/)[0];
+  const match = token.match(/(\/uploads\/[^\s?#]+)/i);
+  return match ? match[1] : '';
+}
+
+function buildSocialExportImageProxyPath(uploadRef = '') {
+  const ref = uploadsRefFromPublicUrl(uploadRef);
+  if (!ref) return '';
+  return `/word-of-the-day/api/social-export-image?ref=${encodeURIComponent(ref)}`;
+}
+
+async function getSocialExportImage(req, res) {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ status: 'error', message: 'Sign in required.' });
+    }
+    const access = await wordOfDayAccessService.buildWordOfDayAccess(req.user, req.ip);
+    if (!wordOfDayAccessService.canExportWordOfDaySocialImage(access)) {
+      return res.status(403).json({ status: 'error', message: 'Not allowed.' });
+    }
+    const ref = uploadsRefFromPublicUrl(req.query?.ref || req.query?.url || '');
+    if (!ref || !/^\/uploads\//i.test(ref)) {
+      return res.status(400).json({ status: 'error', message: 'Invalid image reference.' });
+    }
+    const normalized = uploadStorageService.normalizeReference(ref);
+    const payload = await uploadStorageService.readBuffer(normalized);
+    const mimeType = String(payload?.mimeType || '').trim() || 'image/jpeg';
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Cache-Control', 'private, max-age=120');
+    return res.send(payload.buffer);
+  } catch (error) {
+    return res.status(404).json({ status: 'error', message: 'Image not found.' });
+  }
+}
+
 async function postPageVisit(req, res) {
   try {
     const body = req.body && typeof req.body === 'object' ? req.body : {};
@@ -289,10 +367,15 @@ module.exports = {
   getReactionSummary,
   postReaction,
   postPageVisit,
+  getSocialExportImage,
+  buildSocialExportImageProxyPath,
   resolvePublicOrgId,
   buildDateNavigation,
   shiftDateKey,
   formatDateLabel,
   resolvePublicTodayKey,
+  resolveRequestedDateKey,
+  isTodayDateAlias,
+  WORD_OF_DAY_TODAY_PATH,
   FUTURE_DATE_MESSAGE
 };

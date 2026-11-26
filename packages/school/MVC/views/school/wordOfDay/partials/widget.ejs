@@ -19,8 +19,8 @@ function wodIconClass(mapFn, key) {
   return mapFn === 'wordTypeIcon' ? 'bi-tag' : 'bi-speedometer2';
 }
 let detailHref = '#';
-if (entry && dateKey) {
-  detailHref = `/word-of-the-day/${encodeURIComponent(dateKey)}`;
+if (entry) {
+  detailHref = '/word-of-the-day/today';
   if (orgId && (!publicSourceOrgId || orgId !== publicSourceOrgId)) {
     detailHref += `?org=${encodeURIComponent(orgId)}`;
   }
