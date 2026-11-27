@@ -20,6 +20,15 @@
       "type": "object",
       "additionalProperties": false,
       "required": ["pronunciation", "meaning", "examples", "difficulty", "wordTypes"],
+      "x-formUi": {
+        "fields": [
+          { "resultKey": "pronunciation", "label": "Pronunciation", "widget": "text" },
+          { "resultKey": "meaning", "label": "Meaning", "widget": "textarea" },
+          { "resultKey": "examples", "label": "Examples", "widget": "stringList", "minItems": 3, "maxItems": 3 },
+          { "resultKey": "difficulty", "label": "Difficulty", "widget": "radioGroup", "enumSource": "difficulty" },
+          { "resultKey": "wordTypes", "label": "Word types", "widget": "checkboxGroup", "enumSource": "wordTypes" }
+        ]
+      },
       "properties": {
         "pronunciation": { "type": "string", "minLength": 1 },
         "meaning": { "type": "string", "minLength": 1 },

@@ -273,6 +273,23 @@
 
   function applyAiAutofillFields(fields = {}) {
     const form = qs('wordOfDayForm');
+    const autofill = global.SchoolAiFormAutofill;
+    if (autofill?.applyMappedFields) {
+      autofill.applyMappedFields(fields, aiAutofillBindings, {
+        wodExamples(value) {
+          examples = Array.isArray(value)
+            ? value.map((row) => String(row || '').trim()).filter(Boolean).slice(0, 3)
+            : [];
+          const draft = qs('wodExampleDraft');
+          if (draft) draft.value = '';
+          syncExamplesInput();
+        },
+        syncWordTypes() {
+          if (form) syncWordTypesInput(form);
+        }
+      });
+      return;
+    }
     const pronunciation = qs('wodPronunciation');
     const meaning = qs('wodMeaning');
     if (pronunciation) pronunciation.value = String(fields.pronunciation || '');
@@ -300,6 +317,7 @@
   let aiAutofillRunning = false;
   let aiAutofillAllowed = true;
   let aiAutofillBlockedMessage = '';
+  let aiAutofillBindings = [];
 
   function beginAiAutofillLoading(word) {
     if (typeof global.showLoading !== 'function') return null;
@@ -559,6 +577,7 @@
     const aiOpts = options.aiAutofill && typeof options.aiAutofill === 'object' ? options.aiAutofill : {};
     aiAutofillAllowed = aiOpts.allowed !== false;
     aiAutofillBlockedMessage = String(aiOpts.blockedMessage || '').trim();
+    aiAutofillBindings = Array.isArray(aiOpts.bindings) ? aiOpts.bindings : [];
     const form = qs('wordOfDayForm');
     if (!form) return;
     entryId = String(form.getAttribute('data-entry-id') || '').trim();

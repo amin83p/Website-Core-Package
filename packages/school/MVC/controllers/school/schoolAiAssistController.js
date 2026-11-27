@@ -11,6 +11,7 @@ const { requireCoreModule } = require('../../services/school/schoolCoreContracts
 const { isAjax } = requireCoreModule('MVC/utils/generalTools');
 const { USAGE_PERIOD_TYPES } = require('../../services/school/schoolAiModelUtils');
 const { listAiServices } = require('../../config/schoolAiServiceRegistry');
+const schoolAiOutputFieldSyncService = require('../../services/school/schoolAiOutputFieldSyncService');
 const schoolIdentityLookupService = require('../../services/school/schoolIdentityLookupService');
 
 const AI_ASSIST_NAV = '/dashboard/section-nav/SCHOOL_AI_ASSIST';
@@ -402,11 +403,14 @@ exports.showEditServiceDefinition = async (req, res) => {
       req.user,
       { scopeId: req.accessScope }
     );
+    const outputTypes = ['text', 'textarea', 'number', 'boolean', 'select', 'stringList', 'json', 'object'];
     return res.render('school/aiAssist/serviceDefinitionForm', {
       title: `Configure: ${registry.label}`,
       registry,
       definition,
       inputTypes: ['text', 'textarea', 'number', 'boolean', 'select', 'json'],
+      outputTypes,
+      outputsInit: Array.isArray(definition?.outputs) ? definition.outputs : [],
       includeModal: true,
       user: req.user,
       actionStateId: req?.actionStateId || '',
@@ -415,6 +419,57 @@ exports.showEditServiceDefinition = async (req, res) => {
     });
   } catch (error) {
     return res.status(500).render('error', { title: 'Error', message: error.message, user: req.user });
+  }
+};
+
+function parseJsonSchemaBody(raw) {
+  if (raw === undefined || raw === null || String(raw).trim() === '') return null;
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw;
+  try {
+    const parsed = JSON.parse(String(raw));
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : null;
+  } catch (_) {
+    throw new Error('Output JSON schema must be valid JSON.');
+  }
+}
+
+function parseOutputsBody(raw) {
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (_) {
+      throw new Error('Outputs must be a JSON array.');
+    }
+  }
+  return [];
+}
+
+exports.analyzeServiceOutputFields = async (req, res) => {
+  try {
+    const registry = getAiServiceByKey(req.params.serviceKey);
+    if (!registry) return res.status(404).json({ status: 'error', message: 'Unknown AI service.' });
+    const jsonSchema = parseJsonSchemaBody(req.body?.jsonSchema ?? req.body?.output?.jsonSchema);
+    const outputs = parseOutputsBody(req.body?.outputs ?? req.body?.outputsJson);
+    const analysis = schoolAiOutputFieldSyncService.compareOutputsToSchema(outputs, jsonSchema || {});
+    return res.json({ status: 'success', analysis });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
+  }
+};
+
+exports.applyServiceOutputFieldsSync = async (req, res) => {
+  try {
+    const registry = getAiServiceByKey(req.params.serviceKey);
+    if (!registry) return res.status(404).json({ status: 'error', message: 'Unknown AI service.' });
+    const jsonSchema = parseJsonSchemaBody(req.body?.jsonSchema ?? req.body?.output?.jsonSchema);
+    const outputs = parseOutputsBody(req.body?.outputs ?? req.body?.outputsJson);
+    const choices = req.body?.choices && typeof req.body.choices === 'object' ? req.body.choices : {};
+    const nextOutputs = schoolAiOutputFieldSyncService.applySyncChoices(outputs, jsonSchema || {}, choices);
+    return res.json({ status: 'success', outputs: nextOutputs });
+  } catch (error) {
+    return res.status(400).json({ status: 'error', message: error.message });
   }
 };
 

@@ -112,6 +112,22 @@ function testBuildPromptStripsReportUiFromSchema() {
   assert.ok(built.userPrompt.includes('goal_1'));
 }
 
+function testBuildPromptStripsFormUiFromSchema() {
+  const built = schoolAiServiceExecutionService.buildPrompt({
+    prompt: { userPromptTemplate: 'Fill the form.' },
+    output: {
+      mode: 'json',
+      jsonSchema: {
+        type: 'object',
+        properties: { meaning: { type: 'string' } },
+        'x-formUi': { fields: [{ resultKey: 'meaning', label: 'Meaning', widget: 'textarea' }] }
+      }
+    }
+  }, {});
+  assert.ok(!built.userPrompt.includes('x-formUi'));
+  assert.ok(built.userPrompt.includes('meaning'));
+}
+
 function testFormatOutputPartialGoalsWithReportUi() {
   const formatted = schoolAiServiceExecutionService.formatOutput(
     {
@@ -246,6 +262,7 @@ async function run() {
   testBuildPromptSubstitution();
   testFormatOutputJsonFence();
   testBuildPromptStripsReportUiFromSchema();
+  testBuildPromptStripsFormUiFromSchema();
   testFormatOutputPartialGoalsWithReportUi();
   testModelsRejectDisplayName();
   testCoerceInputsRequired();

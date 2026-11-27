@@ -40,6 +40,30 @@ Add a root **`x-reportUi`** object on the JSON schema (not sent to the model):
 
 **Apply** writes the section text into the modal input and, when the template binding for that input uses `source: field`, into the matching report field on the instance or matrix (`.js-report-field` / matrix row fields).
 
+### JSON output fields catalog (`outputs[]`)
+
+When **output mode** is JSON, each service definition stores **`outputs[]`** (like `inputs[]`): `resultKey`, label, type, required, object subfields (`valueField`, …), and `status` (`active` | `schema_missing`). The JSON schema still defines the model contract; the catalog drives admin UI, validation, and report bindings.
+
+On **Service definitions → Edit** (JSON mode):
+
+- **Output fields** table lists catalog rows.
+- **Sync from JSON schema** / **Check sync** opens a modal: new keys, stale keys (never auto-deleted), and type/required updates. Stable `resultKey` values preserve report template links.
+
+**Report templates → AI services**: bind each **output** to a template field (`outputBindings`). At runtime, Report AI Assist Apply uses those bindings (with legacy `x-reportUi` / input binding fallback when `outputs[]` is empty).
+
+### JSON output and `x-formUi` (form autofill)
+
+When a service fills a school form from structured JSON (today: **Word of the Day**), the output catalog is built from `output.jsonSchema.properties` merged with root **`x-formUi`** on the schema (stripped before the model prompt, same as `x-reportUi`).
+
+- `fields[]`: `resultKey` (JSON key), `label`, `widget` (`text`, `textarea`, `stringList`, `radioGroup`, `checkboxGroup`, …).
+- Optional `enumSource` (e.g. `difficulty`, `wordTypes`) for server-side sanitizers; optional `minItems` / `maxItems` for lists.
+
+Feature code maps outputs to DOM targets via **form binding profiles** (`packages/school/MVC/config/schoolAiFormBindingProfiles.js`): each profile has `consumerKey`, `serviceKey`, and `outputBindings[]` (`resultKey`, `target: dom|hook`, `selector` or `hook`).
+
+WoD flow: `schoolAiOutputBindingService.mapAiResultToFormValues` normalizes the model JSON using the catalog + profile; `POST /school/word-of-day/api/ai-autofill` returns `{ fields }`; the form applies values with `schoolAiFormAutofill.js` and the WoD binding profile.
+
+To add a new output field: extend the schema property, add a `x-formUi.fields` row, add a binding row (and sanitizer if needed), then re-sync the preset to Mongo when using the sync script.
+
 ### Preset JSON files (defaults + copy source)
 
 When no org row exists in `schoolAiServiceDefinitions`, the app loads defaults from disk:

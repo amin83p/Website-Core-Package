@@ -46,10 +46,18 @@ function getDefinitionPreset(serviceKey = '') {
   const output = preset.output && typeof preset.output === 'object'
     ? JSON.parse(JSON.stringify(preset.output))
     : {};
+  const outputs = Array.isArray(preset.outputs)
+    ? preset.outputs.map((row) => ({
+      ...row,
+      options: Array.isArray(row.options) ? [...row.options] : [],
+      actions: Array.isArray(row.actions) ? [...row.actions] : []
+    }))
+    : [];
   return {
     inputs: Array.isArray(preset.inputs)
       ? preset.inputs.map((row) => ({ ...row, options: Array.isArray(row.options) ? [...row.options] : [] }))
       : [],
+    outputs,
     prompt: preset.prompt && typeof preset.prompt === 'object' ? { ...preset.prompt } : {},
     output
   };

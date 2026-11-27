@@ -93,6 +93,7 @@ function schemaForModelPrompt(jsonSchema) {
   if (!jsonSchema || typeof jsonSchema !== 'object') return jsonSchema;
   const clone = JSON.parse(JSON.stringify(jsonSchema));
   delete clone['x-reportUi'];
+  delete clone['x-formUi'];
   return clone;
 }
 

@@ -2,6 +2,9 @@
   const reg = registry || {};
   const def = definition || {};
   const inputsInit = Array.isArray(def.inputs) ? def.inputs : [];
+  const outputsTableInit = (typeof outputsInit !== 'undefined' && Array.isArray(outputsInit))
+    ? outputsInit
+    : (Array.isArray(def.outputs) ? def.outputs : []);
   const prompt = def.prompt || {};
   const output = def.output || {};
   const outputMode = String(output.mode || 'markdown').toLowerCase();
@@ -53,6 +56,7 @@
     <form id="serviceDefinitionForm" method="POST" action="/school/ai-assist/service-definitions/<%= encodeURIComponent(serviceKey) %>">
       <input type="hidden" name="actionStateId" value="<%= asid %>">
       <input type="hidden" name="inputsJson" id="inputsJsonField" value="">
+      <input type="hidden" name="outputsJson" id="outputsJsonField" value="">
 
       <div class="card border-0 shadow-sm mb-4">
         <div class="card-body p-4">
@@ -122,7 +126,53 @@
               <textarea class="form-control" id="jsonInstructions" name="jsonInstructions" rows="3"><%= output.jsonInstructions || '' %></textarea>
               <label class="form-label fw-bold mt-3" for="jsonSchema">JSON schema (object)</label>
               <textarea class="form-control font-monospace" id="jsonSchema" name="jsonSchema" rows="8" placeholder='{"type":"object","required":["summary"],"properties":{"summary":{"type":"string"}}}'><%= schemaText %></textarea>
-              <div class="form-text">For report AI Assist section cards, add <code>x-reportUi</code> with <code>layout: "sections"</code> and <code>sections[]</code> (<code>resultKey</code>, <code>title</code>, <code>actions</code>, <code>inputId</code>). For structured goal objects, set <code>valueField</code> (text to apply), <code>changeTypeField</code>, and <code>changeSummaryField</code> so the UI shows update / replace badges. UI metadata is not sent to the model.</div>
+              <div class="form-text">Model contract: define <code>properties</code> and <code>required</code> here. Use <strong>Output fields</strong> below for UI labels, widgets, and report/template bindings. Legacy <code>x-reportUi</code> / <code>x-formUi</code> in schema are optional; metadata is not sent to the model.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="jsonOutputCatalogCard" class="card border-0 shadow-sm mb-4<%= outputMode === 'json' ? '' : ' d-none' %>">
+        <div class="card-body p-4">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <h6 class="fw-bold text-primary m-0"><i class="bi bi-box-arrow-in-down me-2"></i>Output fields</h6>
+            <div class="d-flex flex-wrap gap-2">
+              <button type="button" class="btn btn-outline-primary btn-sm" id="btnGenerateOutputFields"><i class="bi bi-magic me-1"></i>Sync from JSON schema</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="btnCheckOutputFields"><i class="bi bi-check2-square me-1"></i>Check sync</button>
+              <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddOutputRow"><i class="bi bi-plus-lg me-1"></i>Add output</button>
+            </div>
+          </div>
+          <p class="small text-muted">Each <code>resultKey</code> is stable (linked from report templates). Stale keys stay in the list with status <span class="badge bg-warning text-dark">schema_missing</span> until you remove them manually.</p>
+          <div class="table-responsive">
+            <table class="table table-sm align-middle" id="outputsTable">
+              <thead>
+                <tr>
+                  <th>Result key</th>
+                  <th>Label</th>
+                  <th>Type</th>
+                  <th>Required</th>
+                  <th>Status</th>
+                  <th>Value / change fields</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="outputsTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal fade" id="outputFieldsSyncModal" tabindex="-1" aria-labelledby="outputFieldsSyncModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="outputFieldsSyncModalLabel">Output fields vs JSON schema</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="outputFieldsSyncModalBody"></div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+              <button type="button" class="btn btn-primary" id="btnApplyOutputSync">Apply selected</button>
             </div>
           </div>
         </div>
@@ -148,11 +198,18 @@
 <script>
   (function () {
     const types = <%- JSON.stringify(types) %>;
+    const outputTypes = <%- JSON.stringify(typeof outputTypes !== 'undefined' ? outputTypes : ['text','textarea','number','boolean','select','stringList','json','object']).replace(/</g, '\\u003c') %>;
+    const serviceKey = <%- JSON.stringify(serviceKey).replace(/</g, '\\u003c') %>;
     const initialInputs = <%- JSON.stringify(inputsInit).replace(/</g, '\\u003c') %>;
+    const initialOutputs = <%- JSON.stringify(outputsTableInit).replace(/</g, '\\u003c') %>;
     const tbody = document.getElementById('inputsTableBody');
+    const outputsBody = document.getElementById('outputsTableBody');
     const jsonField = document.getElementById('inputsJsonField');
+    const outputsJsonField = document.getElementById('outputsJsonField');
     const outputMode = document.getElementById('outputMode');
     const jsonFields = document.getElementById('jsonOutputFields');
+    const jsonCatalogCard = document.getElementById('jsonOutputCatalogCard');
+    const jsonSchemaEl = document.getElementById('jsonSchema');
     const form = document.getElementById('serviceDefinitionForm');
 
     function escapeAttr(value) {
@@ -223,11 +280,190 @@
 
     (initialInputs.length ? initialInputs : [{ id: 'report_text', label: 'Report text', type: 'textarea', required: true }]).forEach(addRow);
 
-    outputMode.addEventListener('change', () => {
+    function parseSchemaTextarea() {
+      const raw = String(jsonSchemaEl?.value || '').trim();
+      if (!raw) return {};
+      try { return JSON.parse(raw); } catch (_) { return null; }
+    }
+
+    function readOutputRowsFromDom() {
+      const rows = [];
+      outputsBody?.querySelectorAll('tr[data-output-row]').forEach((tr) => {
+        const get = (sel) => tr.querySelector(sel);
+        const resultKey = (get('[data-field="resultKey"]')?.value || '').trim();
+        if (!resultKey) return;
+        const type = get('[data-field="type"]')?.value || 'text';
+        rows.push({
+          resultKey,
+          label: (get('[data-field="label"]')?.value || resultKey).trim(),
+          type,
+          required: Boolean(get('[data-field="required"]')?.checked),
+          status: (get('[data-field="status"]')?.value || 'active').trim(),
+          valueField: (get('[data-field="valueField"]')?.value || '').trim(),
+          changeTypeField: (get('[data-field="changeTypeField"]')?.value || '').trim(),
+          changeSummaryField: (get('[data-field="changeSummaryField"]')?.value || '').trim(),
+          helpText: '',
+          options: [],
+          actions: type === 'object' || type === 'textarea' || type === 'text' ? ['copy', 'apply'] : ['copy']
+        });
+      });
+      return rows;
+    }
+
+    function syncOutputsJsonField() {
+      if (outputsJsonField) outputsJsonField.value = JSON.stringify(readOutputRowsFromDom());
+    }
+
+    function addOutputRow(row = {}) {
+      if (!outputsBody) return;
+      const tr = document.createElement('tr');
+      tr.setAttribute('data-output-row', '1');
+      const typeOptions = outputTypes.map((t) => (
+        `<option value="${escapeAttr(t)}"${String(row.type || 'text') === t ? ' selected' : ''}>${escapeAttr(t)}</option>`
+      )).join('');
+      const status = String(row.status || 'active');
+      const statusBadge = status === 'schema_missing'
+        ? '<span class="badge bg-warning text-dark">schema_missing</span>'
+        : '<span class="badge bg-success-subtle text-success-emphasis border">active</span>';
+      tr.innerHTML = `
+        <td><input class="form-control form-control-sm font-monospace" data-field="resultKey" value="${escapeAttr(row.resultKey || '')}" required></td>
+        <td><input class="form-control form-control-sm" data-field="label" value="${escapeAttr(row.label || '')}"></td>
+        <td><select class="form-select form-select-sm" data-field="type">${typeOptions}</select></td>
+        <td class="text-center"><input type="checkbox" class="form-check-input" data-field="required"${row.required ? ' checked' : ''}></td>
+        <td>
+          <input type="hidden" data-field="status" value="${escapeAttr(status)}">
+          <span data-role="status-visual">${statusBadge}</span>
+        </td>
+        <td class="small">
+          <input class="form-control form-control-sm mb-1" data-field="valueField" placeholder="valueField" value="${escapeAttr(row.valueField || '')}">
+          <input class="form-control form-control-sm mb-1" data-field="changeTypeField" placeholder="changeTypeField" value="${escapeAttr(row.changeTypeField || '')}">
+          <input class="form-control form-control-sm" data-field="changeSummaryField" placeholder="changeSummaryField" value="${escapeAttr(row.changeSummaryField || '')}">
+        </td>
+        <td><button type="button" class="btn btn-outline-danger btn-sm" data-action="remove-output"><i class="bi bi-trash"></i></button></td>
+      `;
+      outputsBody.appendChild(tr);
+      tr.querySelector('[data-action="remove-output"]').addEventListener('click', () => {
+        tr.remove();
+        syncOutputsJsonField();
+      });
+      tr.querySelectorAll('input,select').forEach((el) => {
+        el.addEventListener('change', syncOutputsJsonField);
+        el.addEventListener('input', syncOutputsJsonField);
+      });
+      syncOutputsJsonField();
+    }
+
+    function replaceOutputRows(rows) {
+      if (!outputsBody) return;
+      outputsBody.innerHTML = '';
+      (Array.isArray(rows) ? rows : []).forEach((row) => addOutputRow(row));
+    }
+
+    function toggleJsonSections() {
       const isJson = outputMode.value === 'json';
-      jsonFields.classList.toggle('d-none', !isJson);
+      jsonFields?.classList.toggle('d-none', !isJson);
+      jsonCatalogCard?.classList.toggle('d-none', !isJson);
+    }
+
+    outputMode.addEventListener('change', toggleJsonSections);
+
+    document.getElementById('btnAddOutputRow')?.addEventListener('click', () => {
+      addOutputRow({ resultKey: 'output_' + (outputsBody?.querySelectorAll('tr').length || 0) + 1, type: 'text' });
     });
 
-    form.addEventListener('submit', () => syncJsonField());
+  const csrf = document.querySelector('#serviceDefinitionForm input[name="_csrf"]')?.value || '';
+  let pendingSyncChoices = null;
+
+  function renderSyncModal(analysis) {
+    const parts = [];
+    if (analysis.inSync) {
+      parts.push('<p class="text-success mb-0">Output fields match the JSON schema.</p>');
+    }
+    if (analysis.newKeys?.length) {
+      parts.push('<h6 class="mt-3">New in schema</h6><ul class="list-unstyled">');
+      analysis.newKeys.forEach((row) => {
+        parts.push(`<li class="mb-1"><label><input type="checkbox" class="form-check-input me-2 js-sync-add" value="${escapeAttr(row.resultKey)}" checked> Add <code>${escapeAttr(row.resultKey)}</code> (${escapeAttr(row.type)})</label></li>`);
+      });
+      parts.push('</ul>');
+    }
+    if (analysis.staleKeys?.length) {
+      parts.push('<h6 class="mt-3">Stale (not in schema)</h6><ul class="list-unstyled">');
+      analysis.staleKeys.forEach((row) => {
+        parts.push(`<li class="mb-1"><label><input type="checkbox" class="form-check-input me-2 js-sync-stale" value="${escapeAttr(row.resultKey)}" checked> Mark <code>${escapeAttr(row.resultKey)}</code> as schema_missing</label></li>`);
+      });
+      parts.push('</ul>');
+    }
+    if (analysis.typeChanges?.length || analysis.requiredChanges?.length) {
+      parts.push('<h6 class="mt-3">Updates from schema</h6><ul class="list-unstyled">');
+      const seen = new Set();
+      [...(analysis.typeChanges || []), ...(analysis.requiredChanges || [])].forEach((row) => {
+        if (seen.has(row.resultKey)) return;
+        seen.add(row.resultKey);
+        parts.push(`<li class="mb-1"><label><input type="checkbox" class="form-check-input me-2 js-sync-update" value="${escapeAttr(row.resultKey)}" checked> Update <code>${escapeAttr(row.resultKey)}</code></label></li>`);
+      });
+      parts.push('</ul>');
+    }
+    if (!parts.length) parts.push('<p class="text-muted mb-0">No differences found.</p>');
+    document.getElementById('outputFieldsSyncModalBody').innerHTML = parts.join('');
+  }
+
+  async function analyzeOutputFields() {
+    const schema = parseSchemaTextarea();
+    if (!schema) throw new Error('JSON schema must be valid JSON.');
+    const outputs = readOutputRowsFromDom();
+    const res = await fetch(`/school/ai-assist/service-definitions/${encodeURIComponent(serviceKey)}/output-fields/analyze`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-Token': csrf },
+      body: JSON.stringify({ jsonSchema: schema, outputs })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.status !== 'success') throw new Error(data.message || 'Analyze failed.');
+    return data.analysis;
+  }
+
+  async function openSyncModal() {
+    const analysis = await analyzeOutputFields();
+    renderSyncModal(analysis);
+    pendingSyncChoices = analysis;
+    const modalEl = document.getElementById('outputFieldsSyncModal');
+    if (modalEl && window.bootstrap?.Modal) {
+      window.bootstrap.Modal.getOrCreateInstance(modalEl).show();
+    }
+  }
+
+  document.getElementById('btnGenerateOutputFields')?.addEventListener('click', () => { void openSyncModal(); });
+  document.getElementById('btnCheckOutputFields')?.addEventListener('click', () => { void openSyncModal(); });
+
+  document.getElementById('btnApplyOutputSync')?.addEventListener('click', async () => {
+    try {
+      const schema = parseSchemaTextarea();
+      const outputs = readOutputRowsFromDom();
+      const choices = {
+        addKeys: [...document.querySelectorAll('.js-sync-add:checked')].map((el) => el.value),
+        markStaleKeys: [...document.querySelectorAll('.js-sync-stale:checked')].map((el) => el.value),
+        updateKeys: [...document.querySelectorAll('.js-sync-update:checked')].map((el) => el.value)
+      };
+      const res = await fetch(`/school/ai-assist/service-definitions/${encodeURIComponent(serviceKey)}/output-fields/apply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-Token': csrf },
+        body: JSON.stringify({ jsonSchema: schema, outputs, choices })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || data.status !== 'success') throw new Error(data.message || 'Apply failed.');
+      replaceOutputRows(data.outputs || []);
+      const modalEl = document.getElementById('outputFieldsSyncModal');
+      window.bootstrap?.Modal.getOrCreateInstance(modalEl)?.hide();
+    } catch (err) {
+      alert(err.message || 'Could not apply sync.');
+    }
+  });
+
+    (initialOutputs.length ? initialOutputs : []).forEach(addOutputRow);
+    toggleJsonSections();
+
+    form.addEventListener('submit', () => {
+      syncJsonField();
+      syncOutputsJsonField();
+    });
   })();
 </script>

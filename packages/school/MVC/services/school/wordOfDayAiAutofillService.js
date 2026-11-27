@@ -1,40 +1,24 @@
 'use strict';
 
 const schoolAiServiceExecutionService = require('./schoolAiServiceExecutionService');
-const wordOfDayModel = require('../../models/school/wordOfDayModel');
+const schoolAiOutputBindingService = require('./schoolAiOutputBindingService');
 const { getAiServiceByKey } = require('../../config/schoolAiServiceRegistry');
 
 const SERVICE_KEY = 'school.word_of_day_autofill';
 const USAGE_SOURCE = 'word_of_day_autofill';
+const FORM_CONSUMER_KEY = 'word_of_day.form';
 
 let dependencies = {
   schoolAiServiceExecutionService,
-  wordOfDayModel,
+  schoolAiOutputBindingService,
   getAiServiceByKey
 };
 
 function mapAutofillPayload(data) {
-  const source = data && typeof data === 'object' ? data : {};
-  const examples = dependencies.wordOfDayModel.sanitizeExamples(source.examples).slice(0, 3);
-  if (examples.length < 3) {
-    throw new Error('AI response did not include three example sentences.');
-  }
-  const wordTypes = dependencies.wordOfDayModel.sanitizeWordTypes(source.wordTypes);
-  if (!wordTypes.length) {
-    throw new Error('AI response did not include valid word types.');
-  }
-  const pronunciation = String(source.pronunciation || '').trim();
-  const meaning = String(source.meaning || '').trim();
-  if (!pronunciation) throw new Error('AI response did not include pronunciation.');
-  if (!meaning) throw new Error('AI response did not include meaning.');
-  const difficulty = dependencies.wordOfDayModel.normalizeDifficulty(source.difficulty);
-  return {
-    pronunciation: pronunciation.length > 500 ? pronunciation.slice(0, 500) : pronunciation,
-    meaning: meaning.length > 8000 ? meaning.slice(0, 8000) : meaning,
-    examples,
-    difficulty,
-    wordTypes
-  };
+  return dependencies.schoolAiOutputBindingService.mapAiResultToFormValues(data, {
+    serviceKey: SERVICE_KEY,
+    consumerKey: FORM_CONSUMER_KEY
+  });
 }
 
 function assignmentHintMessage(error) {
@@ -93,7 +77,7 @@ function __setDependenciesForTest(next = {}) {
 function __resetDependenciesForTest() {
   dependencies = {
     schoolAiServiceExecutionService,
-    wordOfDayModel,
+    schoolAiOutputBindingService,
     getAiServiceByKey
   };
 }
@@ -101,6 +85,7 @@ function __resetDependenciesForTest() {
 module.exports = {
   SERVICE_KEY,
   USAGE_SOURCE,
+  FORM_CONSUMER_KEY,
   mapAutofillPayload,
   autofill,
   __setDependenciesForTest,

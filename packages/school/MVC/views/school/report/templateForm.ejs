@@ -1594,6 +1594,7 @@
     const btnTemplateAiServiceAdd = document.getElementById('btnTemplateAiServiceAdd');
   const initialAiServicesState = <%- JSON.stringify(initialAiServices).replace(/</g, '\\u003c') %>;
   const aiDefinitionInputsCache = <%- JSON.stringify(aiDefinitionInputsByKey).replace(/</g, '\\u003c') %>;
+  const aiDefinitionOutputsCache = {};
   const aiServiceCatalogClient = <%- JSON.stringify(aiServiceCatalogRows.map((r) => ({ serviceKey: r.serviceKey, label: r.label, description: r.description }))).replace(/</g, '\\u003c') %>;
   const prefillCatalogKeysClient = <%- JSON.stringify(allPrefillKeys.map((item) => String(item?.key || '').trim()).filter(Boolean)).replace(/</g, '\\u003c') %>;
     let aiServicesState = Array.isArray(initialAiServicesState) ? JSON.parse(JSON.stringify(initialAiServicesState)) : [];
@@ -1635,6 +1636,16 @@
       });
     }
 
+    function ensureBindingsForOutputs(row, outputs) {
+      row.outputBindings = row.outputBindings && typeof row.outputBindings === 'object' ? row.outputBindings : {};
+      (Array.isArray(outputs) ? outputs : []).forEach((output) => {
+        const id = String(output?.resultKey || '').trim();
+        if (!id) return;
+        if (!row.outputBindings[id]) row.outputBindings[id] = defaultInputBinding();
+        else row.outputBindings[id] = normalizeBindingRowClient(row.outputBindings[id]);
+      });
+    }
+
     async function fetchAiServiceInputs(serviceKey) {
       const key = String(serviceKey || '').trim();
       if (!key) return [];
@@ -1649,11 +1660,13 @@
         throw new Error(payload.message || 'Could not load AI service inputs.');
       }
       const inputs = Array.isArray(payload.inputs) ? payload.inputs : [];
+      const outputs = Array.isArray(payload.outputs) ? payload.outputs : [];
       aiDefinitionInputsCache[key] = inputs;
+      aiDefinitionOutputsCache[key] = outputs;
       return inputs;
     }
 
-    function renderBindingValueControl(rowId, inputId, binding, inputMeta) {
+    function renderBindingValueControl(rowId, bindingId, binding, inputMeta, bindingKind = 'input') {
       const source = binding?.source || 'empty';
       const fieldIds = getTemplateFieldIdOptions();
       const value = String(binding?.value || '');
@@ -1661,17 +1674,17 @@
         const options = fieldIds.map((fid) => (
           `<option value="${escapeHtml(fid)}"${fid === value ? ' selected' : ''}>${escapeHtml(fid)}</option>`
         )).join('');
-        return `<select class="form-select form-select-sm js-ai-binding-value" data-row-id="${escapeHtml(rowId)}" data-input-id="${escapeHtml(inputId)}"><option value="">Select field…</option>${options}</select>`;
+        return `<select class="form-select form-select-sm js-ai-binding-value" data-binding-kind="${escapeHtml(bindingKind)}" data-row-id="${escapeHtml(rowId)}" data-input-id="${escapeHtml(bindingId)}"><option value="">Select field…</option>${options}</select>`;
       }
       if (source === 'prefill') {
         const options = prefillCatalogKeysClient.map((key) => (
           `<option value="${escapeHtml(key)}"${key === value ? ' selected' : ''}>${escapeHtml(key)}</option>`
         )).join('');
-        return `<select class="form-select form-select-sm js-ai-binding-value" data-row-id="${escapeHtml(rowId)}" data-input-id="${escapeHtml(inputId)}"><option value="">Select prefill key…</option>${options}</select>`;
+        return `<select class="form-select form-select-sm js-ai-binding-value" data-binding-kind="${escapeHtml(bindingKind)}" data-row-id="${escapeHtml(rowId)}" data-input-id="${escapeHtml(bindingId)}"><option value="">Select prefill key…</option>${options}</select>`;
       }
       if (source === 'static') {
         const rows = (inputMeta?.type === 'textarea' || inputMeta?.type === 'json') ? 4 : 2;
-        return `<textarea class="form-control form-control-sm js-ai-binding-value" data-row-id="${escapeHtml(rowId)}" data-input-id="${escapeHtml(inputId)}" rows="${rows}">${escapeHtml(value)}</textarea>`;
+        return `<textarea class="form-control form-control-sm js-ai-binding-value" data-binding-kind="${escapeHtml(bindingKind)}" data-row-id="${escapeHtml(rowId)}" data-input-id="${escapeHtml(bindingId)}" rows="${rows}">${escapeHtml(value)}</textarea>`;
       }
       return `<span class="small text-muted">—</span>`;
     }
@@ -1690,7 +1703,9 @@
         const serviceKey = String(row.serviceKey || '');
         const catalog = aiServiceCatalogClient.find((s) => s.serviceKey === serviceKey);
         const inputs = Array.isArray(aiDefinitionInputsCache[serviceKey]) ? aiDefinitionInputsCache[serviceKey] : [];
+        const outputs = Array.isArray(aiDefinitionOutputsCache[serviceKey]) ? aiDefinitionOutputsCache[serviceKey] : [];
         ensureBindingsForInputs(row, inputs);
+        ensureBindingsForOutputs(row, outputs);
         const serviceOptions = aiServiceCatalogClient.map((svc) => (
           `<option value="${escapeHtml(svc.serviceKey)}"${svc.serviceKey === serviceKey ? ' selected' : ''}>${escapeHtml(svc.label || svc.serviceKey)}</option>`
         )).join('');
@@ -1703,11 +1718,26 @@
             )).join('');
             return `<tr>
               <td class="small fw-semibold">${escapeHtml(input.label || inputId)}<div class="text-muted font-monospace x-small">${escapeHtml(inputId)}</div></td>
-              <td><select class="form-select form-select-sm js-ai-binding-source" data-row-id="${escapeHtml(rowId)}" data-input-id="${escapeHtml(inputId)}">${sourceOptions}</select></td>
-              <td>${renderBindingValueControl(rowId, inputId, binding, input)}</td>
+              <td><select class="form-select form-select-sm js-ai-binding-source" data-binding-kind="input" data-row-id="${escapeHtml(rowId)}" data-input-id="${escapeHtml(inputId)}">${sourceOptions}</select></td>
+              <td>${renderBindingValueControl(rowId, inputId, binding, input, 'input')}</td>
             </tr>`;
           }).join('')
           : '<tr><td colspan="3" class="small text-muted">Select a service or reload inputs.</td></tr>';
+        const outputRows = outputs.length
+          ? outputs.map((output) => {
+            const resultKey = String(output.resultKey || '');
+            const binding = row.outputBindings?.[resultKey] || defaultInputBinding();
+            const stale = output.status === 'schema_missing';
+            const sourceOptions = ['empty', 'field', 'prefill', 'static'].map((src) => (
+              `<option value="${src}"${binding.source === src ? ' selected' : ''}>${src}</option>`
+            )).join('');
+            return `<tr${stale ? ' class="table-warning"' : ''}>
+              <td class="small fw-semibold">${escapeHtml(output.label || resultKey)}<div class="text-muted font-monospace x-small">${escapeHtml(resultKey)}${stale ? ' · stale' : ''}</div></td>
+              <td><select class="form-select form-select-sm js-ai-binding-source" data-binding-kind="output" data-row-id="${escapeHtml(rowId)}" data-input-id="${escapeHtml(resultKey)}">${sourceOptions}</select></td>
+              <td>${renderBindingValueControl(rowId, resultKey, binding, output, 'output')}</td>
+            </tr>`;
+          }).join('')
+          : '<tr><td colspan="3" class="small text-muted">No JSON output fields on this service.</td></tr>';
         return `<div class="border rounded p-3 template-ai-service-row" data-row-id="${escapeHtml(rowId)}">
           <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-3">
             <div class="d-flex flex-wrap gap-2 align-items-center flex-grow-1">
@@ -1721,10 +1751,18 @@
             <button type="button" class="btn btn-outline-danger btn-sm js-ai-service-remove" data-row-id="${escapeHtml(rowId)}"><i class="bi bi-trash"></i></button>
           </div>
           ${catalog?.description ? `<p class="small text-muted mb-2">${escapeHtml(catalog.description)}</p>` : ''}
-          <div class="table-responsive">
+          <div class="table-responsive mb-3">
+            <div class="small fw-semibold text-muted mb-1">Inputs → service</div>
             <table class="table table-sm align-middle mb-0">
               <thead class="table-light"><tr><th>Input</th><th style="width: 140px;">Source</th><th>Value</th></tr></thead>
               <tbody>${inputRows}</tbody>
+            </table>
+          </div>
+          <div class="table-responsive">
+            <div class="small fw-semibold text-muted mb-1">Outputs → template fields</div>
+            <table class="table table-sm align-middle mb-0">
+              <thead class="table-light"><tr><th>Output</th><th style="width: 140px;">Source</th><th>Value</th></tr></thead>
+              <tbody>${outputRows}</tbody>
             </table>
           </div>
         </div>`;
@@ -1746,6 +1784,7 @@
       if (!row) return;
       row.serviceKey = String(serviceKey || '').trim();
       row.inputBindings = {};
+      row.outputBindings = {};
       if (!row.serviceKey) {
         renderTemplateAiServicesList();
         return;
@@ -1753,6 +1792,7 @@
       try {
         const inputs = await fetchAiServiceInputs(row.serviceKey);
         ensureBindingsForInputs(row, inputs);
+        ensureBindingsForOutputs(row, aiDefinitionOutputsCache[row.serviceKey] || []);
       } catch (err) {
         await showReportModal({ title: 'AI service', icon: 'warning', message: err.message || 'Load failed.', buttonClass: 'btn-warning' });
       }
@@ -1768,11 +1808,13 @@
         serviceKey,
         label: '',
         isActive: true,
-        inputBindings: {}
+        inputBindings: {},
+        outputBindings: {}
       };
       try {
         const inputs = await fetchAiServiceInputs(serviceKey);
         ensureBindingsForInputs(row, inputs);
+        ensureBindingsForOutputs(row, aiDefinitionOutputsCache[serviceKey] || []);
       } catch (err) {
         await showReportModal({ title: 'AI service', icon: 'warning', message: err.message || 'Load failed.', buttonClass: 'btn-warning' });
         return;
@@ -1787,9 +1829,12 @@
       if (sourceSelect) {
         const row = findAiServiceRow(sourceSelect.dataset.rowId);
         const inputId = sourceSelect.dataset.inputId;
+        const kind = String(sourceSelect.dataset.bindingKind || 'input');
         if (row && inputId) {
-          row.inputBindings[inputId] = normalizeBindingRowClient({
-            ...row.inputBindings[inputId],
+          const map = kind === 'output' ? 'outputBindings' : 'inputBindings';
+          row[map] = row[map] || {};
+          row[map][inputId] = normalizeBindingRowClient({
+            ...row[map][inputId],
             source: sourceSelect.value
           });
           renderTemplateAiServicesList();
@@ -1800,9 +1845,12 @@
       if (valueControl) {
         const row = findAiServiceRow(valueControl.dataset.rowId);
         const inputId = valueControl.dataset.inputId;
+        const kind = String(valueControl.dataset.bindingKind || 'input');
         if (row && inputId) {
-          row.inputBindings[inputId] = normalizeBindingRowClient({
-            ...row.inputBindings[inputId],
+          const map = kind === 'output' ? 'outputBindings' : 'inputBindings';
+          row[map] = row[map] || {};
+          row[map][inputId] = normalizeBindingRowClient({
+            ...row[map][inputId],
             value: valueControl.value
           });
           syncAiServicesJson();
@@ -1833,9 +1881,12 @@
       if (valueControl && valueControl.tagName === 'TEXTAREA') {
         const row = findAiServiceRow(valueControl.dataset.rowId);
         const inputId = valueControl.dataset.inputId;
+        const kind = String(valueControl.dataset.bindingKind || 'input');
         if (row && inputId) {
-          row.inputBindings[inputId] = normalizeBindingRowClient({
-            ...row.inputBindings[inputId],
+          const map = kind === 'output' ? 'outputBindings' : 'inputBindings';
+          row[map] = row[map] || {};
+          row[map][inputId] = normalizeBindingRowClient({
+            ...row[map][inputId],
             value: valueControl.value
           });
           syncAiServicesJson();

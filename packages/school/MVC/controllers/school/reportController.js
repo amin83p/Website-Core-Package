@@ -735,9 +735,19 @@ async function saveTemplate(req, res) {
       payload.pdfTemplatesByFunder = clonePlainValue(copySourceTemplate.pdfTemplatesByFunder, []);
     }
 
+    const definitionsByKey = {};
+    const aiServiceKeys = [...new Set((payload.aiServices || []).map((row) => String(row?.serviceKey || '').trim()).filter(Boolean))];
+    for (const key of aiServiceKeys) {
+      definitionsByKey[key] = await schoolAiServiceDefinitionDataService.getByServiceKey(
+        key,
+        req.user,
+        { scopeId: req.accessScope }
+      ) || {};
+    }
     const aiServiceValidation = reportTemplateAiBindingService.validateAiServicesForTemplate(payload, {
       strict: true,
-      prefillCatalog: reportService.getPrefillCatalog()
+      prefillCatalog: reportService.getPrefillCatalog(),
+      definitionsByKey
     });
     if (aiServiceValidation.errors.length) {
       throw new Error(aiServiceValidation.errors.slice(0, 3).join(' '));
@@ -2887,12 +2897,16 @@ async function getTemplateAiServiceDefinition(req, res) {
       req.user,
       { scopeId: req.accessScope }
     );
+    const {
+      sanitizeDefinitionOutputsForClient
+    } = require('../../services/school/schoolAiOutputFieldSyncService');
     return res.json({
       status: 'success',
       serviceKey,
       label: registry.label || serviceKey,
       description: registry.description || '',
-      inputs: reportTemplateAiBindingService.sanitizeDefinitionInputsForClient(definition)
+      inputs: reportTemplateAiBindingService.sanitizeDefinitionInputsForClient(definition),
+      outputs: sanitizeDefinitionOutputsForClient(definition)
     });
   } catch (error) {
     return res.status(400).json({ status: 'error', message: error.message || 'Could not load AI service definition.' });

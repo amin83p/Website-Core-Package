@@ -18,6 +18,7 @@ const { getTodayDateKeyInTimezone, resolveOrganizationTimezoneFromRow } = requir
 const schoolDataService = require('../../services/school/schoolDataService');
 const wordOfDayAiAutofillService = require('../../services/school/wordOfDayAiAutofillService');
 const schoolAiUsageLimitService = require('../../services/school/schoolAiUsageLimitService');
+const { getFormBindingProfile } = require('../../config/schoolAiFormBindingProfiles');
 
 function wantsJson(req) {
   return isAjax(req) || String(req.headers.accept || '').includes('application/json');
@@ -151,6 +152,15 @@ async function baseViewModel(req, res, extra = {}) {
     wordOfDayContributionYear: contributionYear,
     wordOfDayCurrentYearContributionCount: currentYearContributionCount,
     wordOfDayContributionQuotaExempt: contributionQuotaExempt,
+    wodAiFormOutputBindings: (() => {
+      const profile = getFormBindingProfile(
+        wordOfDayAiAutofillService.FORM_CONSUMER_KEY,
+        wordOfDayAiAutofillService.SERVICE_KEY
+      );
+      return Array.isArray(profile?.outputBindings)
+        ? profile.outputBindings.map((row) => ({ ...row }))
+        : [];
+    })(),
     ...extra
   };
 }

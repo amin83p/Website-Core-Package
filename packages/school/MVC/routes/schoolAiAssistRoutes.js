@@ -121,6 +121,18 @@ router.post('/service-definitions/:serviceKey',
   ctrl.saveServiceDefinition
 );
 
+router.post('/service-definitions/:serviceKey/output-fields/analyze',
+  requireAiServiceDefinitionsUpdate,
+  trackActionState(SECTIONS.SCHOOL_AI_SERVICE_DEFINITIONS, OPERATIONS.UPDATE, { requireToken: false }),
+  ctrl.analyzeServiceOutputFields
+);
+
+router.post('/service-definitions/:serviceKey/output-fields/apply',
+  requireAiServiceDefinitionsUpdate,
+  trackActionState(SECTIONS.SCHOOL_AI_SERVICE_DEFINITIONS, OPERATIONS.UPDATE, { requireToken: false }),
+  ctrl.applyServiceOutputFieldsSync
+);
+
 router.post('/services/:serviceKey/run',
   requireAiServiceDefinitionsRead,
   trackActionState(SECTIONS.SCHOOL_AI_SERVICE_DEFINITIONS, OPERATIONS.READ_ALL, { requireToken: false }),

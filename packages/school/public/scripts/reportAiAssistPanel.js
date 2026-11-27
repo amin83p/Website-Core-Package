@@ -573,9 +573,32 @@
     return this.catalog.find((row) => String(row.bindingRowId) === id) || this._lastRunEntry || null;
   };
 
-  ReportAiAssistPanel.prototype.applySectionValue = function (inputId, text, entry) {
+  ReportAiAssistPanel.prototype.applySectionValue = function (inputId, text, entry, resultKey = '') {
     const value = String(text ?? '');
-    const token = String(inputId || '').trim();
+    const sectionKey = String(resultKey || inputId || '').trim();
+    const outputBindings = entry?.outputBindings && typeof entry.outputBindings === 'object' ? entry.outputBindings : {};
+    const outBinding = sectionKey ? outputBindings[sectionKey] : null;
+    if (outBinding && String(outBinding.source || '').toLowerCase() === 'field') {
+      const fieldId = String(outBinding.value || '').trim();
+      if (fieldId) {
+        const candidates = document.querySelectorAll(
+          `.js-report-field[data-field-id="${fieldId}"], .js-matrix-row-field[data-field-id="${fieldId}"], .js-matrix-shared-field[data-field-id="${fieldId}"]`
+        );
+        for (let i = 0; i < candidates.length; i += 1) {
+          const fieldEl = candidates[i];
+          if (fieldEl.disabled || fieldEl.readOnly) continue;
+          if (fieldEl.type === 'checkbox') {
+            fieldEl.checked = value.toLowerCase() === 'true';
+          } else {
+            fieldEl.value = value;
+          }
+          fieldEl.dispatchEvent(new Event('input', { bubbles: true }));
+          fieldEl.dispatchEvent(new Event('change', { bubbles: true }));
+          break;
+        }
+      }
+    }
+    const token = String(inputId || sectionKey || '').trim();
     if (token) {
       const modalInput = this.inputsHost?.querySelector(`[data-ai-input="${token}"]`);
       if (modalInput) {
@@ -637,8 +660,8 @@
       return;
     }
     const inputId = String(applyBtn.getAttribute('data-input-id') || sectionKey).trim();
-    this.applySectionValue(inputId, text, entry);
-    notify('Applied', 'success', 'Updated the AI Assist input and the bound report field when available.');
+    this.applySectionValue(inputId, text, entry, sectionKey);
+    notify('Applied', 'success', 'Updated the bound report field when configured.');
   };
 
   ReportAiAssistPanel.prototype.paintModalResult = function (summary, serviceLabel, entry) {

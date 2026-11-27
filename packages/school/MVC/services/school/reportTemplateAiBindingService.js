@@ -1,6 +1,11 @@
 'use strict';
 
 const { getAiServiceByKey, listAiServices } = require('../../config/schoolAiServiceRegistry');
+const {
+  buildReportUiFromOutputs,
+  sanitizeDefinitionOutputsForClient,
+  validateTemplateOutputBindings
+} = require('./schoolAiOutputFieldSyncService');
 
 const BINDING_SOURCES = Object.freeze(['field', 'prefill', 'static', 'empty']);
 
@@ -42,13 +47,23 @@ function normalizeAiServiceRow(row, index = 0) {
     if (!id) return;
     inputBindings[id] = normalizeBindingRow(rawBindings[inputId]);
   });
+  const outputBindings = {};
+  const rawOut = row?.outputBindings && typeof row.outputBindings === 'object' && !Array.isArray(row.outputBindings)
+    ? row.outputBindings
+    : {};
+  Object.keys(rawOut).forEach((resultKey) => {
+    const id = cleanText(resultKey);
+    if (!id) return;
+    outputBindings[id] = normalizeBindingRow(rawOut[resultKey]);
+  });
   const id = cleanText(row?.id) || `ai_${index + 1}`;
   return {
     id,
     serviceKey,
     label: cleanText(row?.label),
     isActive: row?.isActive !== false,
-    inputBindings
+    inputBindings,
+    outputBindings
   };
 }
 
@@ -87,7 +102,7 @@ function collectPrefillCatalogKeys(catalog = {}) {
   return keys;
 }
 
-function validateAiServicesForTemplate(templatePayload = {}, { strict = false, prefillCatalog = {} } = {}) {
+function validateAiServicesForTemplate(templatePayload = {}, { strict = false, prefillCatalog = {}, definitionsByKey = {} } = {}) {
   const rows = normalizeStoredAiServices(templatePayload?.aiServices || []);
   if (!strict) {
     return { rows, errors: [] };
@@ -114,6 +129,9 @@ function validateAiServicesForTemplate(templatePayload = {}, { strict = false, p
         errors.push(`${row.serviceKey} input "${inputId}": static binding requires text.`);
       }
     });
+    const definition = definitionsByKey[row.serviceKey] || {};
+    const outCheck = validateTemplateOutputBindings(row, definition, fieldIds);
+    errors.push(...outCheck.errors);
   });
   return { rows, errors };
 }
@@ -294,16 +312,23 @@ function buildCatalogEntryFromBinding(bindingRow, definition = {}, registry = nu
     ? bindingRow.inputBindings
     : {};
   const outputPack = extractReportOutputUi(definition?.output);
+  const outputs = sanitizeDefinitionOutputsForClient(definition);
+  const reportUiFromOutputs = buildReportUiFromOutputs(outputs);
+  const outputBindings = bindingRow?.outputBindings && typeof bindingRow.outputBindings === 'object'
+    ? bindingRow.outputBindings
+    : {};
   return {
     bindingRowId: bindingRow.id,
     serviceKey: bindingRow.serviceKey,
     label: cleanText(bindingRow.label) || reg.label || bindingRow.serviceKey,
     description: reg.description || '',
     inputs: sanitizeDefinitionInputsForClient(definition),
+    outputs,
     inputDefaults: resolvedInputs,
     inputBindings,
+    outputBindings,
     outputMode: outputPack.outputMode,
-    reportUi: outputPack.reportUi,
+    reportUi: reportUiFromOutputs || outputPack.reportUi,
     configured,
     active
   };

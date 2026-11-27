@@ -6,8 +6,12 @@ const { getDefinitionPreset } = require('../../config/schoolAiServiceDefinitionP
 const {
   defaultDefinitionShape,
   normalizeDefinitionRecord,
-  normalizeInputsList
+  normalizeInputsList,
+  normalizeOutputsList
 } = require('../../models/school/schoolAiServiceDefinitionModel');
+const {
+  outputsFromFormUiAndReportUi
+} = require('./schoolAiOutputFieldSyncService');
 const {
   getActiveOrgIdOrThrow,
   cleanString,
@@ -61,6 +65,22 @@ function parseInputsPayload(payload = {}) {
   return [];
 }
 
+function parseOutputsPayload(payload = {}, jsonSchema = null) {
+  if (Array.isArray(payload.outputs)) return normalizeOutputsList(payload.outputs);
+  const rawJson = payload.outputsJson ?? payload.outputs_json;
+  if (typeof rawJson === 'string' && rawJson.trim()) {
+    let parsed;
+    try {
+      parsed = JSON.parse(rawJson);
+    } catch (_) {
+      throw new Error('Outputs JSON is invalid.');
+    }
+    if (!Array.isArray(parsed)) throw new Error('Outputs JSON must be an array.');
+    return normalizeOutputsList(parsed);
+  }
+  return [];
+}
+
 function normalizeFormPayload(serviceKey, payload = {}, requestingUser) {
   const inputs = parseInputsPayload(payload);
   let jsonSchema = null;
@@ -88,10 +108,15 @@ function normalizeFormPayload(serviceKey, payload = {}, requestingUser) {
     jsonSchema,
     jsonInstructions: cleanString(payload.jsonInstructions, { max: 8000, allowEmpty: true }) || ''
   };
+  let outputs = parseOutputsPayload(payload, jsonSchema);
+  if (!outputs.length && jsonSchema && output.mode === 'json') {
+    outputs = outputsFromFormUiAndReportUi(jsonSchema);
+  }
   validatePromptTemplateReferences(prompt, inputs.map((row) => row.id));
   return {
     serviceKey,
     inputs,
+    outputs,
     prompt,
     output,
     isActive: payload.isActive !== false && String(payload.isActive || '').toLowerCase() !== 'false',
@@ -179,11 +204,17 @@ const schoolAiServiceDefinitionDataService = {
     if (!preset) {
       return { ...base, orgId, serviceKey: key, id: '' };
     }
+    const mergedOutput = { ...(base.output || {}), ...(preset.output || {}) };
+    let outputs = Array.isArray(preset.outputs) ? preset.outputs : [];
+    if (!outputs.length && mergedOutput.jsonSchema) {
+      outputs = outputsFromFormUiAndReportUi(mergedOutput.jsonSchema);
+    }
     return {
       ...base,
       ...preset,
       prompt: { ...(base.prompt || {}), ...(preset.prompt || {}) },
-      output: { ...(base.output || {}), ...(preset.output || {}) },
+      output: mergedOutput,
+      outputs,
       orgId,
       serviceKey: key,
       id: ''

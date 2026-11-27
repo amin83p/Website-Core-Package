@@ -494,6 +494,7 @@ const wodStatusStatTone = Object.freeze({
 
 <%- include('partials/modal_GenericPicker') %>
 <script src="/scripts/schoolMessageUi.js"></script>
+<script src="/scripts/schoolAiFormAutofill.js"></script>
 <script src="/scripts/wordOfDayForm.js"></script>
 <script>
   if (window.WordOfDayForm) {
@@ -501,7 +502,8 @@ const wodStatusStatTone = Object.freeze({
       csrfToken: document.querySelector('#wordOfDayForm input[name="_csrf"]')?.value || '',
       aiAutofill: {
         allowed: <%= canUseWodAiAutofill ? 'true' : 'false' %>,
-        blockedMessage: <%- JSON.stringify(wodAiQuotaBlocked ? wodAiAutofillHint : '') %>
+        blockedMessage: <%- JSON.stringify(wodAiQuotaBlocked ? wodAiAutofillHint : '') %>,
+        bindings: <%- JSON.stringify(typeof wodAiFormOutputBindings !== 'undefined' ? wodAiFormOutputBindings : []) %>
       }
     });
   }

@@ -38,6 +38,10 @@ async function main() {
     'packages/school/MVC/services/school/schoolAiServiceDefinitionDataService'
   ));
   const { loadPresetFile } = require(path.join(ROOT, 'packages/school/MVC/config/schoolAiServiceDefinitionPresets'));
+  const { outputsFromFormUiAndReportUi } = require(path.join(
+    ROOT,
+    'packages/school/MVC/services/school/schoolAiOutputFieldSyncService'
+  ));
 
   const backend = await dataBackendRuntimeService.initializeDataBackend(process.env);
   registerCoreEntityQueryExecutors({ backendMode: backend.mode });
@@ -61,9 +65,13 @@ async function main() {
   }
   console.log(`existing mongo rows: ${existing.length}`);
 
+  const outputs = Array.isArray(preset.outputs) && preset.outputs.length
+    ? preset.outputs
+    : outputsFromFormUiAndReportUi(preset.output?.jsonSchema || {});
   const user = { id: 'CURSOR_AGENT', activeOrgId: orgId };
   const payload = {
     inputs: preset.inputs,
+    outputsJson: JSON.stringify(outputs),
     systemPrompt: preset.prompt.systemPrompt,
     userPromptTemplate: preset.prompt.userPromptTemplate,
     outputMode: 'json',
@@ -79,10 +87,12 @@ async function main() {
     user,
     {}
   );
-  console.log(`upserted id=${row.id} orgId=${row.orgId} mode=${row.output?.mode}`);
+  const hasFormUi = Boolean(row?.output?.jsonSchema?.['x-formUi']);
+  console.log(`upserted id=${row.id} orgId=${row.orgId} mode=${row.output?.mode} x-formUi=${hasFormUi} outputs=${Array.isArray(row.outputs) ? row.outputs.length : 0}`);
 
   const doc = await col.findOne({ orgId: row.orgId, serviceKey: SERVICE_KEY });
-  console.log(`mongo verify id=${doc?.id} mode=${doc?.output?.mode}`);
+  const verifyFormUi = Boolean(doc?.output?.jsonSchema?.['x-formUi']);
+  console.log(`mongo verify id=${doc?.id} mode=${doc?.output?.mode} x-formUi=${verifyFormUi}`);
   await disconnectMongo();
 }
 

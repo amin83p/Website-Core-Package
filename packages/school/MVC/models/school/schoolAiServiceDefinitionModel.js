@@ -7,6 +7,7 @@ const { requireCoreModule, resolveCoreRoot } = require('../../services/school/sc
 const { queueWrite } = requireCoreModule('MVC/models/fileQueue');
 const { idsEqual } = requireCoreModule('MVC/utils/idAdapter');
 const { getAiServiceByKey } = require('../../config/schoolAiServiceRegistry');
+const { normalizeOutputsList } = require('../../services/school/schoolAiOutputFieldSyncService');
 const {
   isPlainObject,
   hasOwn,
@@ -117,6 +118,7 @@ function normalizeDefinitionRecord(record = {}, existing = null, strict = false)
   const orgId = cleanId(input.orgId || base.orgId, { max: 120, allowEmpty: false });
   const serviceKey = cleanString(input.serviceKey || base.serviceKey, { max: 120, allowEmpty: true });
   const inputs = normalizeInputsList(input.inputs !== undefined ? input.inputs : base.inputs);
+  const outputs = normalizeOutputsList(input.outputs !== undefined ? input.outputs : base.outputs);
   const prompt = normalizePromptBlock(input.prompt, base.prompt);
   const output = normalizeOutputBlock(input.output, base.output);
   const isActive = hasOwn(input, 'isActive') ? normalizeBoolean(input.isActive, true) : normalizeBoolean(base.isActive, true);
@@ -136,6 +138,7 @@ function normalizeDefinitionRecord(record = {}, existing = null, strict = false)
     orgId,
     serviceKey,
     inputs,
+    outputs,
     prompt,
     output,
     isActive,
@@ -149,6 +152,7 @@ function defaultDefinitionShape(serviceKey = '') {
   return normalizeDefinitionRecord({
     serviceKey,
     inputs: [],
+    outputs: [],
     prompt: { systemPrompt: '', userPromptTemplate: '' },
     output: { mode: 'markdown', jsonSchema: null, jsonInstructions: '' },
     isActive: true
@@ -209,6 +213,7 @@ module.exports = {
   OUTPUT_MODES,
   normalizeDefinitionRecord,
   normalizeInputsList,
+  normalizeOutputsList,
   defaultDefinitionShape,
   getAllDefinitions,
   getDefinitionById,

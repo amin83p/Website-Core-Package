@@ -31,6 +31,8 @@ function testPresetFileAndSchemaEnums() {
   assert.deepStrictEqual([...difficultyEnum].sort(), [...wordOfDayModel.DIFFICULTY_LEVELS].sort());
   const typeEnum = preset.output.jsonSchema.properties.wordTypes.items.enum;
   assert.deepStrictEqual([...typeEnum].sort(), [...wordOfDayModel.WORD_TYPES].sort());
+  const formUi = preset.output.jsonSchema['x-formUi'];
+  assert.ok(formUi && formUi.fields.length >= 5);
 }
 
 function testMapAutofillPayload() {
@@ -56,7 +58,7 @@ function testMapAutofillRejectsShortExamples() {
       difficulty: 'easy',
       wordTypes: ['noun']
     });
-  }, /three example/);
+  }, /3 example sentence/);
 }
 
 async function testAutofillUsesExecutionService() {
@@ -162,6 +164,14 @@ function testStaticRouteAndFormScript() {
   assert.match(formSource, /applyAiAutofillFields/);
   assert.match(formSource, /beginAiAutofillLoading/);
   assert.match(formSource, /showLoading/);
+  assert.match(formSource, /SchoolAiFormAutofill/);
+
+  const formEjs = fs.readFileSync(
+    path.join(ROOT, 'packages/school/MVC/views/school/wordOfDay/form.ejs'),
+    'utf8'
+  );
+  assert.match(formEjs, /schoolAiFormAutofill\.js/);
+  assert.match(formEjs, /wodAiFormOutputBindings/);
 }
 
 function testSyncScriptRequiresMongo() {
@@ -171,6 +181,7 @@ function testSyncScriptRequiresMongo() {
   );
   assert.match(source, /backend\.mode !== 'mongo'/);
   assert.match(source, /school\.word_of_day_autofill/);
+  assert.match(source, /x-formUi/);
 }
 
 const tests = [
