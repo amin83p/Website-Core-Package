@@ -249,6 +249,11 @@ async function showByDate(req, res) {
       todayKey
     });
 
+    const carriedForward = Boolean(detail?.carriedForward);
+    const carryForwardNote = carriedForward && detail?.effectiveDateKey
+      ? `No new word is scheduled for this date. Showing the word assigned for ${formatDateLabel(detail.effectiveDateKey)}.`
+      : '';
+
     return res.render('wordOfTheDay', baseHtmlRenderLocals(req, {
       title: detail?.entry?.word
         ? `${detail.entry.word} — Word of the Day`
@@ -256,6 +261,8 @@ async function showByDate(req, res) {
       wordOfDayDetail: detail,
       reactionSummary,
       orgQuerySuffix: detailOrgQuerySuffix,
+      carryForwardNote,
+      carriedForward,
       includeModal: Boolean(detail?.entry?.photo?.url),
       pageError: null,
       canExportWordOfDaySocialImage,

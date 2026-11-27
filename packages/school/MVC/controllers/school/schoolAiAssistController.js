@@ -403,7 +403,7 @@ exports.showEditServiceDefinition = async (req, res) => {
       req.user,
       { scopeId: req.accessScope }
     );
-    const outputTypes = ['text', 'textarea', 'number', 'boolean', 'select', 'stringList', 'json', 'object'];
+    const outputTypes = ['text', 'textarea', 'number', 'boolean', 'select', 'stringList', 'json'];
     return res.render('school/aiAssist/serviceDefinitionForm', {
       title: `Configure: ${registry.label}`,
       registry,

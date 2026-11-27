@@ -1599,6 +1599,20 @@
   const prefillCatalogKeysClient = <%- JSON.stringify(allPrefillKeys.map((item) => String(item?.key || '').trim()).filter(Boolean)).replace(/</g, '\\u003c') %>;
     let aiServicesState = Array.isArray(initialAiServicesState) ? JSON.parse(JSON.stringify(initialAiServicesState)) : [];
     let aiServiceRowCounter = aiServicesState.length;
+    const expandedAiServiceRowIds = new Set();
+
+    function aiServiceRowCollapseDomId(rowId) {
+      return `templateAiServiceBody_${String(rowId || 'row').replace(/[^a-zA-Z0-9_-]/g, '_')}`;
+    }
+
+    function outputDisplayType(output) {
+      return String(output?.type || output?.dataType || 'string').trim() || 'string';
+    }
+
+    function outputSupportsApply(output) {
+      const actions = Array.isArray(output?.actions) ? output.actions : [];
+      return actions.includes('apply');
+    }
 
     function getTemplateFieldIdOptions() {
       try {
@@ -1622,7 +1636,8 @@
       const normalized = allowed.includes(source) ? source : 'empty';
       return {
         source: normalized,
-        value: normalized === 'empty' ? '' : String(binding?.value || '').trim()
+        value: normalized === 'empty' ? '' : String(binding?.value || '').trim(),
+        hiddenFromUser: binding?.hiddenFromUser === true
       };
     }
 
@@ -1636,21 +1651,71 @@
       });
     }
 
-    function ensureBindingsForOutputs(row, outputs) {
+    const OUTPUT_BINDING_PENDING_PREFIX = '__pending_';
+    let outputBindingPendingCounter = 0;
+
+    function isPendingOutputBindingKey(key) {
+      return String(key || '').startsWith(OUTPUT_BINDING_PENDING_PREFIX);
+    }
+
+    function normalizeOutputBindingsOnly(row) {
       row.outputBindings = row.outputBindings && typeof row.outputBindings === 'object' ? row.outputBindings : {};
-      (Array.isArray(outputs) ? outputs : []).forEach((output) => {
-        const id = String(output?.resultKey || '').trim();
-        if (!id) return;
-        if (!row.outputBindings[id]) row.outputBindings[id] = defaultInputBinding();
-        else row.outputBindings[id] = normalizeBindingRowClient(row.outputBindings[id]);
+      Object.keys(row.outputBindings).forEach((id) => {
+        row.outputBindings[id] = normalizeBindingRowClient(row.outputBindings[id]);
       });
+    }
+
+    function newPendingOutputBindingKey() {
+      outputBindingPendingCounter += 1;
+      return `${OUTPUT_BINDING_PENDING_PREFIX}${outputBindingPendingCounter}`;
+    }
+
+    function listOutputBindingRowKeys(row) {
+      row.outputBindings = row.outputBindings && typeof row.outputBindings === 'object' ? row.outputBindings : {};
+      return Object.keys(row.outputBindings);
+    }
+
+    function outputCatalogByKey(outputs) {
+      const map = new Map();
+      (Array.isArray(outputs) ? outputs : []).forEach((output) => {
+        const key = String(output?.resultKey || '').trim();
+        if (key) map.set(key, output);
+      });
+      return map;
+    }
+
+    function usedOutputBindingKeys(row, exceptKey = '') {
+      const except = String(exceptKey || '');
+      return new Set(listOutputBindingRowKeys(row).filter((key) => {
+        if (key === except) return false;
+        return !isPendingOutputBindingKey(key);
+      }));
+    }
+
+    function renderOutputKeyPicker(rowId, bindingKey, visibleOutputs, usedKeys) {
+      const isPending = isPendingOutputBindingKey(bindingKey);
+      const options = ['<option value="">Choose output…</option>'];
+      visibleOutputs.forEach((output) => {
+        const resultKey = String(output.resultKey || '').trim();
+        if (!resultKey) return;
+        const taken = usedKeys.has(resultKey) && resultKey !== bindingKey;
+        const label = `${output.label || resultKey} (${resultKey})`;
+        options.push(
+          `<option value="${escapeHtml(resultKey)}"${resultKey === bindingKey ? ' selected' : ''}${taken ? ' disabled' : ''}>${escapeHtml(label)}</option>`
+        );
+      });
+      return `<select class="form-select form-select-sm js-ai-output-key-select" data-row-id="${escapeHtml(rowId)}" data-result-key="${escapeHtml(bindingKey)}"${isPending ? '' : ''}>${options.join('')}</select>`;
     }
 
     async function fetchAiServiceInputs(serviceKey) {
       const key = String(serviceKey || '').trim();
       if (!key) return [];
-      if (Array.isArray(aiDefinitionInputsCache[key]) && aiDefinitionInputsCache[key].length) {
-        return aiDefinitionInputsCache[key];
+      const cachedInputs = aiDefinitionInputsCache[key];
+      const cachedOutputs = aiDefinitionOutputsCache[key];
+      const hasCachedInputs = Array.isArray(cachedInputs) && cachedInputs.length;
+      const hasCachedOutputs = Array.isArray(cachedOutputs);
+      if (hasCachedInputs && hasCachedOutputs) {
+        return cachedInputs;
       }
       const response = await fetch(`/school/reports/templates/ai-service-definitions/${encodeURIComponent(key)}`, {
         headers: { Accept: 'application/json' }
@@ -1670,11 +1735,14 @@
       const source = binding?.source || 'empty';
       const fieldIds = getTemplateFieldIdOptions();
       const value = String(binding?.value || '');
+      const fieldPlaceholder = bindingKind === 'output' && outputSupportsApply(inputMeta)
+        ? 'Target field (Apply)…'
+        : 'Select field…';
       if (source === 'field') {
         const options = fieldIds.map((fid) => (
           `<option value="${escapeHtml(fid)}"${fid === value ? ' selected' : ''}>${escapeHtml(fid)}</option>`
         )).join('');
-        return `<select class="form-select form-select-sm js-ai-binding-value" data-binding-kind="${escapeHtml(bindingKind)}" data-row-id="${escapeHtml(rowId)}" data-input-id="${escapeHtml(bindingId)}"><option value="">Select field…</option>${options}</select>`;
+        return `<select class="form-select form-select-sm js-ai-binding-value" data-binding-kind="${escapeHtml(bindingKind)}" data-row-id="${escapeHtml(rowId)}" data-input-id="${escapeHtml(bindingId)}"><option value="">${escapeHtml(fieldPlaceholder)}</option>${options}</select>`;
       }
       if (source === 'prefill') {
         const options = prefillCatalogKeysClient.map((key) => (
@@ -1704,11 +1772,14 @@
         const catalog = aiServiceCatalogClient.find((s) => s.serviceKey === serviceKey);
         const inputs = Array.isArray(aiDefinitionInputsCache[serviceKey]) ? aiDefinitionInputsCache[serviceKey] : [];
         const outputs = Array.isArray(aiDefinitionOutputsCache[serviceKey]) ? aiDefinitionOutputsCache[serviceKey] : [];
+        const visibleOutputs = outputs.filter((output) => output && output.status !== 'schema_missing');
+        const outputByKey = outputCatalogByKey(visibleOutputs);
         ensureBindingsForInputs(row, inputs);
-        ensureBindingsForOutputs(row, outputs);
-        const serviceOptions = aiServiceCatalogClient.map((svc) => (
-          `<option value="${escapeHtml(svc.serviceKey)}"${svc.serviceKey === serviceKey ? ' selected' : ''}>${escapeHtml(svc.label || svc.serviceKey)}</option>`
-        )).join('');
+        normalizeOutputBindingsOnly(row);
+        const usedOutputKeys = usedOutputBindingKeys(row);
+        const collapseId = aiServiceRowCollapseDomId(rowId);
+        const isExpanded = expandedAiServiceRowIds.has(rowId);
+        const registryLabel = escapeHtml(catalog?.label || serviceKey || 'AI service');
         const inputRows = inputs.length
           ? inputs.map((input) => {
             const inputId = String(input.id || '');
@@ -1716,54 +1787,105 @@
             const sourceOptions = ['empty', 'field', 'prefill', 'static'].map((src) => (
               `<option value="${src}"${binding.source === src ? ' selected' : ''}>${src}</option>`
             )).join('');
+            const isRequired = Boolean(input.required);
+            const hideDomId = `aiHide_${String(rowId).replace(/\W/g, '_')}_${escapeHtml(inputId)}`;
+            const hideCell = isRequired
+              ? '<span class="small text-muted" title="Required service inputs stay visible in AI Assist">—</span>'
+              : `<div class="form-check mb-0">
+                  <input type="checkbox" class="form-check-input js-ai-input-hidden" data-row-id="${escapeHtml(rowId)}" data-input-id="${escapeHtml(inputId)}" id="${hideDomId}"${binding.hiddenFromUser ? ' checked' : ''} aria-label="Hide ${escapeHtml(input.label || inputId)} from AI Assist">
+                  <label class="form-check-label small text-muted" for="${hideDomId}">Hide</label>
+                </div>`;
             return `<tr>
-              <td class="small fw-semibold">${escapeHtml(input.label || inputId)}<div class="text-muted font-monospace x-small">${escapeHtml(inputId)}</div></td>
-              <td><select class="form-select form-select-sm js-ai-binding-source" data-binding-kind="input" data-row-id="${escapeHtml(rowId)}" data-input-id="${escapeHtml(inputId)}">${sourceOptions}</select></td>
+              <td><div class="fw-semibold small mb-0">${escapeHtml(input.label || inputId)}</div><div class="binding-meta-key">${escapeHtml(inputId)}</div>${isRequired ? '<div class="small text-muted">Required</div>' : ''}</td>
+              <td style="width: 8.5rem;"><select class="form-select form-select-sm js-ai-binding-source" data-binding-kind="input" data-row-id="${escapeHtml(rowId)}" data-input-id="${escapeHtml(inputId)}">${sourceOptions}</select></td>
               <td>${renderBindingValueControl(rowId, inputId, binding, input, 'input')}</td>
+              <td class="text-center" style="width: 5.5rem;">${hideCell}</td>
             </tr>`;
           }).join('')
-          : '<tr><td colspan="3" class="small text-muted">Select a service or reload inputs.</td></tr>';
-        const outputRows = outputs.length
-          ? outputs.map((output) => {
-            const resultKey = String(output.resultKey || '');
-            const binding = row.outputBindings?.[resultKey] || defaultInputBinding();
-            const stale = output.status === 'schema_missing';
+          : '<tr><td colspan="4" class="small text-muted">Select a service or reload inputs.</td></tr>';
+        const boundOutputKeys = listOutputBindingRowKeys(row);
+        const outputRows = boundOutputKeys.length
+          ? boundOutputKeys.map((bindingKey) => {
+            const isPending = isPendingOutputBindingKey(bindingKey);
+            const resultKey = isPending ? '' : bindingKey;
+            const output = resultKey ? outputByKey.get(resultKey) : null;
+            const binding = row.outputBindings[bindingKey] || defaultInputBinding();
+            const applyOn = output ? outputSupportsApply(output) : false;
             const sourceOptions = ['empty', 'field', 'prefill', 'static'].map((src) => (
               `<option value="${src}"${binding.source === src ? ' selected' : ''}>${src}</option>`
             )).join('');
-            return `<tr${stale ? ' class="table-warning"' : ''}>
-              <td class="small fw-semibold">${escapeHtml(output.label || resultKey)}<div class="text-muted font-monospace x-small">${escapeHtml(resultKey)}${stale ? ' · stale' : ''}</div></td>
-              <td><select class="form-select form-select-sm js-ai-binding-source" data-binding-kind="output" data-row-id="${escapeHtml(rowId)}" data-input-id="${escapeHtml(resultKey)}">${sourceOptions}</select></td>
-              <td>${renderBindingValueControl(rowId, resultKey, binding, output, 'output')}</td>
+            const applyBadge = isPending
+              ? ''
+              : (applyOn
+                ? '<span class="badge text-bg-primary">Apply</span>'
+                : '<span class="badge text-bg-secondary">Copy</span>');
+            const typeCell = isPending
+              ? '<span class="small text-muted">—</span>'
+              : `<span class="small">${escapeHtml(outputDisplayType(output))}</span> ${applyBadge}`;
+            const bindingIdAttr = escapeHtml(bindingKey);
+            const metaForValue = output || {};
+            return `<tr data-output-binding-key="${bindingIdAttr}">
+              <td style="min-width: 12rem;">${renderOutputKeyPicker(rowId, bindingKey, visibleOutputs, usedOutputBindingKeys(row, bindingKey))}</td>
+              <td class="text-nowrap" style="width: 6.5rem;">${typeCell}</td>
+              <td style="width: 8.5rem;"><select class="form-select form-select-sm js-ai-binding-source" data-binding-kind="output" data-row-id="${escapeHtml(rowId)}" data-input-id="${bindingIdAttr}"${isPending ? ' disabled' : ''}>${sourceOptions}</select></td>
+              <td>${isPending ? '<span class="small text-muted">Choose an output first</span>' : renderBindingValueControl(rowId, bindingKey, binding, metaForValue, 'output')}</td>
+              <td class="text-end" style="width: 2.5rem;"><button type="button" class="btn btn-link btn-sm text-danger p-0 js-ai-output-binding-remove" data-row-id="${escapeHtml(rowId)}" data-result-key="${bindingIdAttr}" title="Remove binding"><i class="bi bi-x-lg"></i></button></td>
             </tr>`;
           }).join('')
-          : '<tr><td colspan="3" class="small text-muted">No JSON output fields on this service.</td></tr>';
-        return `<div class="border rounded p-3 template-ai-service-row" data-row-id="${escapeHtml(rowId)}">
-          <div class="d-flex flex-wrap gap-2 align-items-center justify-content-between mb-3">
-            <div class="d-flex flex-wrap gap-2 align-items-center flex-grow-1">
-              <select class="form-select form-select-sm js-ai-service-key" data-row-id="${escapeHtml(rowId)}" style="max-width: 280px;">${serviceOptions}</select>
-              <input type="text" class="form-control form-control-sm js-ai-service-label" data-row-id="${escapeHtml(rowId)}" placeholder="Display label (optional)" value="${escapeHtml(row.label || '')}" style="max-width: 220px;">
+          : `<tr><td colspan="5" class="small text-muted py-3">No output bindings yet. Add only the outputs this template should use.</td></tr>`;
+        const hasPendingOutput = boundOutputKeys.some((k) => isPendingOutputBindingKey(k));
+        const allOutputsUsed = usedOutputKeys.size >= visibleOutputs.length && visibleOutputs.length > 0;
+        const addOutputDisabled = (!visibleOutputs.length || (allOutputsUsed && !hasPendingOutput)) ? ' disabled' : '';
+        return `<div class="border rounded template-ai-service-row" data-row-id="${escapeHtml(rowId)}" data-service-key="${escapeHtml(serviceKey)}">
+          <div class="template-ai-service-header d-flex flex-wrap gap-3 align-items-center p-3">
+            <button type="button" class="template-ai-service-row-toggle d-flex align-items-center gap-2 text-start ${isExpanded ? '' : 'collapsed'}" data-bs-toggle="collapse" data-bs-target="#${escapeHtml(collapseId)}" aria-expanded="${isExpanded ? 'true' : 'false'}" aria-controls="${escapeHtml(collapseId)}">
+              <span class="template-ai-service-icon" aria-hidden="true"><i class="bi bi-stars"></i></span>
+              <span class="d-flex flex-column gap-0 align-items-start min-w-0">
+                <span class="template-ai-service-name text-truncate">${registryLabel}</span>
+                ${serviceKey ? `<span class="template-ai-service-key">${escapeHtml(serviceKey)}</span>` : ''}
+              </span>
+              <i class="bi bi-chevron-down template-ai-service-chevron text-muted ms-1" aria-hidden="true"></i>
+            </button>
+            <div class="template-ai-service-toolbar d-flex flex-wrap gap-2 align-items-end">
+              <div class="template-ai-service-label-wrap">
+                <label class="form-label small text-muted mb-0">Label</label>
+                <input type="text" class="form-control form-control-sm js-ai-service-label" data-row-id="${escapeHtml(rowId)}" placeholder="Same as service name" value="${escapeHtml(row.label || '')}" aria-label="AI Assist menu label">
+              </div>
+              <button type="button" class="btn btn-outline-danger btn-sm js-ai-service-remove" data-row-id="${escapeHtml(rowId)}" title="Remove service"><i class="bi bi-trash me-1"></i>Delete</button>
             </div>
-            <div class="form-check form-switch mb-0">
-              <input class="form-check-input js-ai-service-active" type="checkbox" data-row-id="${escapeHtml(rowId)}"${row.isActive !== false ? ' checked' : ''}>
-              <label class="form-check-label small">Active</label>
+          </div>
+          <div id="${escapeHtml(collapseId)}" class="collapse${isExpanded ? ' show' : ''}">
+            <div class="p-3 pt-0">
+              <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 pb-2 border-bottom">
+                ${catalog?.description ? `<p class="small text-secondary mb-0 flex-grow-1">${escapeHtml(catalog.description)}</p>` : '<span></span>'}
+                <div class="form-check form-switch mb-0">
+                  <input class="form-check-input js-ai-service-active" type="checkbox" data-row-id="${escapeHtml(rowId)}" id="aiActive_${escapeHtml(rowId)}"${row.isActive !== false ? ' checked' : ''}>
+                  <label class="form-check-label small" for="aiActive_${escapeHtml(rowId)}">Active on this template</label>
+                </div>
+              </div>
+              <div class="template-ai-binding-panel mb-3">
+                <div class="template-ai-binding-panel__title mb-2"><i class="bi bi-box-arrow-in-right me-1" aria-hidden="true"></i>Inputs</div>
+                <p class="small text-muted mb-2">Optional inputs: check <strong>Hide</strong> to keep bindings on save but omit the field in Fill Reports / instance AI Assist (values still come from source bindings at run time).</p>
+                <div class="table-responsive mb-0">
+                  <table class="table table-sm table-hover align-middle mb-0 template-ai-bindings-table bg-body">
+                    <thead><tr><th>Service input</th><th>Source</th><th>Value</th><th class="text-center" style="width: 5.5rem;">Hide</th></tr></thead>
+                    <tbody>${inputRows}</tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="template-ai-binding-panel">
+                <div class="template-ai-binding-panel__title mb-2"><i class="bi bi-box-arrow-up-right me-1" aria-hidden="true"></i>Outputs</div>
+                <p class="small text-muted mb-2">Add only the outputs you need. <strong>Apply</strong> uses <strong>field</strong> bindings (dot-path keys such as <code class="small">goal_1.revised</code>).</p>
+                <div class="table-responsive mb-2">
+                  <table class="table table-sm table-hover align-middle mb-0 template-ai-bindings-table bg-body">
+                    <thead><tr><th>Output</th><th>Type</th><th>Source</th><th>Target</th><th></th></tr></thead>
+                    <tbody>${outputRows}</tbody>
+                  </table>
+                </div>
+                <button type="button" class="btn btn-outline-primary btn-sm js-ai-output-binding-add" data-row-id="${escapeHtml(rowId)}"${addOutputDisabled}><i class="bi bi-plus-lg me-1"></i>Add output</button>
+                ${!visibleOutputs.length ? '<span class="small text-muted ms-2">This service has no JSON outputs.</span>' : ''}
+              </div>
             </div>
-            <button type="button" class="btn btn-outline-danger btn-sm js-ai-service-remove" data-row-id="${escapeHtml(rowId)}"><i class="bi bi-trash"></i></button>
-          </div>
-          ${catalog?.description ? `<p class="small text-muted mb-2">${escapeHtml(catalog.description)}</p>` : ''}
-          <div class="table-responsive mb-3">
-            <div class="small fw-semibold text-muted mb-1">Inputs → service</div>
-            <table class="table table-sm align-middle mb-0">
-              <thead class="table-light"><tr><th>Input</th><th style="width: 140px;">Source</th><th>Value</th></tr></thead>
-              <tbody>${inputRows}</tbody>
-            </table>
-          </div>
-          <div class="table-responsive">
-            <div class="small fw-semibold text-muted mb-1">Outputs → template fields</div>
-            <table class="table table-sm align-middle mb-0">
-              <thead class="table-light"><tr><th>Output</th><th style="width: 140px;">Source</th><th>Value</th></tr></thead>
-              <tbody>${outputRows}</tbody>
-            </table>
           </div>
         </div>`;
       }).join('');
@@ -1772,31 +1894,20 @@
 
     function syncAiServicesJson() {
       if (!aiServicesJsonInput) return;
-      aiServicesJsonInput.value = JSON.stringify(aiServicesState);
+      const serializable = aiServicesState.map((row) => {
+        const outputBindings = {};
+        Object.entries(row.outputBindings || {}).forEach(([key, binding]) => {
+          if (isPendingOutputBindingKey(key)) return;
+          if (!String(key || '').trim()) return;
+          outputBindings[key] = binding;
+        });
+        return { ...row, outputBindings };
+      });
+      aiServicesJsonInput.value = JSON.stringify(serializable);
     }
 
     function findAiServiceRow(rowId) {
       return aiServicesState.find((row) => String(row.id) === String(rowId));
-    }
-
-    async function onAiServiceKeyChanged(rowId, serviceKey) {
-      const row = findAiServiceRow(rowId);
-      if (!row) return;
-      row.serviceKey = String(serviceKey || '').trim();
-      row.inputBindings = {};
-      row.outputBindings = {};
-      if (!row.serviceKey) {
-        renderTemplateAiServicesList();
-        return;
-      }
-      try {
-        const inputs = await fetchAiServiceInputs(row.serviceKey);
-        ensureBindingsForInputs(row, inputs);
-        ensureBindingsForOutputs(row, aiDefinitionOutputsCache[row.serviceKey] || []);
-      } catch (err) {
-        await showReportModal({ title: 'AI service', icon: 'warning', message: err.message || 'Load failed.', buttonClass: 'btn-warning' });
-      }
-      renderTemplateAiServicesList();
     }
 
   btnTemplateAiServiceAdd?.addEventListener('click', async () => {
@@ -1814,17 +1925,47 @@
       try {
         const inputs = await fetchAiServiceInputs(serviceKey);
         ensureBindingsForInputs(row, inputs);
-        ensureBindingsForOutputs(row, aiDefinitionOutputsCache[serviceKey] || []);
+        normalizeOutputBindingsOnly(row);
       } catch (err) {
         await showReportModal({ title: 'AI service', icon: 'warning', message: err.message || 'Load failed.', buttonClass: 'btn-warning' });
         return;
       }
+      expandedAiServiceRowIds.add(row.id);
       aiServicesState.push(row);
       if (templateAiServiceAddSelect) templateAiServiceAddSelect.value = '';
       renderTemplateAiServicesList();
     });
 
+    templateAiServicesList?.addEventListener('shown.bs.collapse', (event) => {
+      const collapseEl = event.target;
+      if (!collapseEl?.classList?.contains('collapse')) return;
+      const rowEl = collapseEl.closest('.template-ai-service-row');
+      const rowId = rowEl?.dataset?.rowId;
+      if (rowId) expandedAiServiceRowIds.add(String(rowId));
+    });
+    templateAiServicesList?.addEventListener('hidden.bs.collapse', (event) => {
+      const collapseEl = event.target;
+      if (!collapseEl?.classList?.contains('collapse')) return;
+      const rowEl = collapseEl.closest('.template-ai-service-row');
+      const rowId = rowEl?.dataset?.rowId;
+      if (rowId) expandedAiServiceRowIds.delete(String(rowId));
+    });
+
     templateAiServicesList?.addEventListener('change', (event) => {
+      const outputKeySelect = event.target.closest('.js-ai-output-key-select');
+      if (outputKeySelect) {
+        const row = findAiServiceRow(outputKeySelect.dataset.rowId);
+        const oldKey = String(outputKeySelect.dataset.resultKey || '').trim();
+        const newKey = String(outputKeySelect.value || '').trim();
+        if (!row || !oldKey || !newKey || newKey === oldKey) return;
+        const binding = row.outputBindings?.[oldKey] || defaultInputBinding();
+        row.outputBindings = row.outputBindings || {};
+        if (row.outputBindings[newKey] && newKey !== oldKey) return;
+        delete row.outputBindings[oldKey];
+        row.outputBindings[newKey] = binding;
+        renderTemplateAiServicesList();
+        return;
+      }
       const sourceSelect = event.target.closest('.js-ai-binding-source');
       if (sourceSelect) {
         const row = findAiServiceRow(sourceSelect.dataset.rowId);
@@ -1857,16 +1998,25 @@
         }
         return;
       }
-      const serviceSelect = event.target.closest('.js-ai-service-key');
-      if (serviceSelect) {
-        void onAiServiceKeyChanged(serviceSelect.dataset.rowId, serviceSelect.value);
-        return;
-      }
       const activeInput = event.target.closest('.js-ai-service-active');
       if (activeInput) {
         const row = findAiServiceRow(activeInput.dataset.rowId);
         if (row) row.isActive = activeInput.checked;
         syncAiServicesJson();
+        return;
+      }
+      const hideInputToggle = event.target.closest('.js-ai-input-hidden');
+      if (hideInputToggle) {
+        const row = findAiServiceRow(hideInputToggle.dataset.rowId);
+        const inputId = hideInputToggle.dataset.inputId;
+        if (row && inputId) {
+          row.inputBindings = row.inputBindings || {};
+          row.inputBindings[inputId] = normalizeBindingRowClient({
+            ...row.inputBindings[inputId],
+            hiddenFromUser: hideInputToggle.checked
+          });
+          syncAiServicesJson();
+        }
       }
     });
 
@@ -1895,9 +2045,30 @@
     });
 
     templateAiServicesList?.addEventListener('click', (event) => {
+      const addOutputBtn = event.target.closest('.js-ai-output-binding-add');
+      if (addOutputBtn) {
+        const row = findAiServiceRow(addOutputBtn.dataset.rowId);
+        if (!row) return;
+        row.outputBindings = row.outputBindings || {};
+        const pending = newPendingOutputBindingKey();
+        row.outputBindings[pending] = defaultInputBinding();
+        renderTemplateAiServicesList();
+        return;
+      }
+      const removeOutputBtn = event.target.closest('.js-ai-output-binding-remove');
+      if (removeOutputBtn) {
+        const row = findAiServiceRow(removeOutputBtn.dataset.rowId);
+        const key = String(removeOutputBtn.dataset.resultKey || '').trim();
+        if (row && key && row.outputBindings) {
+          delete row.outputBindings[key];
+          renderTemplateAiServicesList();
+        }
+        return;
+      }
       const removeBtn = event.target.closest('.js-ai-service-remove');
       if (!removeBtn) return;
       const rowId = removeBtn.dataset.rowId;
+      expandedAiServiceRowIds.delete(String(rowId));
       aiServicesState = aiServicesState.filter((row) => String(row.id) !== String(rowId));
       renderTemplateAiServicesList();
     });

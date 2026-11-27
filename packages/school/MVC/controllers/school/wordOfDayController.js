@@ -656,15 +656,27 @@ async function putDisplaySchedule(req, res) {
     await assertConfigureDisplay(req);
     const orgId = wordOfDayService.getActiveOrgId(req.user);
     const dateKey = String(req.body?.dateKey || '').trim();
+    const mode = String(req.body?.mode || '').trim().toLowerCase();
+    const auditUserId = req.user?.id;
+
+    if (mode === 'exclude') {
+      await wordOfDayDisplayScheduleService.excludeScheduledDate({ orgId, dateKey, auditUserId });
+      return res.json({ status: 'success', message: 'Day excluded from display.', dateKey, mode: 'excluded' });
+    }
+    if (mode === 'automatic') {
+      await wordOfDayDisplayScheduleService.includeScheduledDate({ orgId, dateKey, auditUserId });
+      return res.json({ status: 'success', message: 'Day included for display.', dateKey, mode: 'automatic' });
+    }
+
     const entryIdRaw = req.body?.entryId;
-  const entryId = entryIdRaw === null || entryIdRaw === '' || entryIdRaw === undefined
+    const entryId = entryIdRaw === null || entryIdRaw === '' || entryIdRaw === undefined
       ? ''
       : String(entryIdRaw).trim();
     if (!entryId) {
       await wordOfDayDisplayScheduleService.clearScheduledDate({
         orgId,
         dateKey,
-        auditUserId: req.user?.id
+        auditUserId
       });
       return res.json({ status: 'success', message: 'Schedule cleared for date.', dateKey });
     }
@@ -672,11 +684,11 @@ async function putDisplaySchedule(req, res) {
       orgId,
       dateKey,
       entryId,
-      auditUserId: req.user?.id
+      auditUserId
     });
     return res.json({ status: 'success', message: 'Word scheduled for date.', dateKey, entryId });
   } catch (error) {
-    return sendError(req, res, error, statusCode(error, 400));
+    return sendError(req, res, error, 400);
   }
 }
 
@@ -687,7 +699,27 @@ async function getDisplaySchedulePicker(req, res) {
     const q = String(req.query?.q || '').trim();
     const limit = Number(req.query?.limit) || 20;
     const items = await wordOfDayDisplayScheduleService.searchApprovedForPicker({ orgId, q, limit });
-    return res.json({ status: 'success', items });
+    const data = items.map((row) => ({
+      id: row.entryId,
+      entryId: row.entryId,
+      word: row.word,
+      title: row.word,
+      displayName: row.word,
+      authorName: row.authorName,
+      description: row.authorName ? `By ${row.authorName}` : ''
+    }));
+    const totalItems = data.length;
+    return res.json({
+      status: 'success',
+      items,
+      data,
+      pagination: {
+        currentPage: 1,
+        totalPages: 1,
+        totalItems,
+        limit: Math.max(1, Math.min(50, Number(limit) || 20))
+      }
+    });
   } catch (error) {
     return sendError(req, res, error, statusCode(error, 400));
   }

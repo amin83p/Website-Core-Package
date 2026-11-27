@@ -201,12 +201,9 @@
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        if (global.WordOfDayWorkflow?.showAlert) {
-          await global.WordOfDayWorkflow.showAlert('Search failed', data.message || 'Search failed.', 'error');
-        } else if (global.SchoolMessageUi?.showAlert) {
-          await global.SchoolMessageUi.showAlert('Search failed', 'error', data.message || 'Search failed.');
-        } else {
-          global.alert(data.message || 'Search failed.');
+        const wf = global.WordOfDayWorkflow;
+        if (wf?.showAlert) {
+          await wf.showAlert('Search failed', data.message || 'Search failed.', 'error');
         }
         if (tbody) tbody.innerHTML = '<tr><td colspan="6" class="text-center text-danger py-4">Search failed.</td></tr>';
         return;
@@ -237,8 +234,7 @@
     try {
       const result = await wf.postWorkflowAction(entryId, action, { note });
       if (!result.ok) {
-        if (result.message && wf.showAlert) await wf.showAlert('Action failed', result.message, 'error');
-        else if (result.message) global.alert(result.message);
+        if (result.message && wf?.showAlert) await wf.showAlert('Action failed', result.message, 'error');
         return;
       }
       if (action === 'delete') {
@@ -304,11 +300,7 @@
         ? contexts.activeOrganizationScope({ label: 'Active Organization Scope' })
         : null;
       if (!global.GenericPicker || !global.GenericPickerPresets?.user) {
-        if (global.WordOfDayWorkflow?.showAlert) {
-          void global.WordOfDayWorkflow.showAlert('Unavailable', 'User picker is not available.', 'warning');
-        } else {
-          global.alert('User picker is not available.');
-        }
+        void global.WordOfDayWorkflow?.showAlert?.('Unavailable', 'User picker is not available.', 'warning');
         return;
       }
       global.GenericPicker.open(global.GenericPickerPresets.user({

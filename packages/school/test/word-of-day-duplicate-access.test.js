@@ -73,3 +73,26 @@ test('formatDuplicateSummary includes open link for reviewers with read-all', ()
   assert.match(summary.detailUrl, /openEntry=WOD-200/);
   assert.equal(summary.meaning, 'Visible');
 });
+
+test('layout loads schoolMessageUi when includeModal for shared message modal', () => {
+  const layout = fs.readFileSync(path.join(repoRoot, 'MVC', 'views', 'layouts', 'layout.ejs'), 'utf8');
+  assert.match(layout, /includeModal[\s\S]*schoolMessageUi\.js/);
+});
+
+test('word of day review and schedule clients avoid native alert or confirm', () => {
+  const reviewModal = fs.readFileSync(
+    path.join(repoRoot, 'packages', 'school', 'public', 'scripts', 'wordOfDayReviewModal.js'),
+    'utf8'
+  );
+  const scheduleModal = fs.readFileSync(
+    path.join(repoRoot, 'packages', 'school', 'public', 'scripts', 'wordOfDayDisplayScheduleModal.js'),
+    'utf8'
+  );
+  assert.doesNotMatch(reviewModal, /global\.alert/);
+  assert.doesNotMatch(reviewModal, /global\.confirm/);
+  assert.doesNotMatch(scheduleModal, /global\.alert/);
+  assert.doesNotMatch(scheduleModal, /global\.confirm/);
+  assert.doesNotMatch(scheduleModal, /global\.prompt/);
+  assert.match(scheduleModal, /data-wod-schedule-exclude/);
+  assert.doesNotMatch(scheduleModal, /data-wod-schedule-clear/);
+});

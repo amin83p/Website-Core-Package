@@ -85,6 +85,14 @@ async function clearScheduledDate({ orgId, dateKey, auditUserId }) {
   return wordOfDayDisplayScheduleModel.clearDate(orgId, dateKey, auditUserId);
 }
 
+async function excludeScheduledDate({ orgId, dateKey, auditUserId }) {
+  return wordOfDayDisplayScheduleModel.excludeDate(orgId, dateKey, auditUserId);
+}
+
+async function includeScheduledDate({ orgId, dateKey, auditUserId }) {
+  return wordOfDayDisplayScheduleModel.includeDate(orgId, dateKey, auditUserId);
+}
+
 async function listScheduleRange({ orgId, from, to }) {
   const dateKeys = enumerateDateKeys(from, to);
   const { byDate } = await wordOfDayDisplayScheduleModel.getScheduleForOrg(orgId);
@@ -99,7 +107,20 @@ async function listScheduleRange({ orgId, from, to }) {
         entryId: null,
         word: null,
         authorName: null,
-        invalid: false
+        invalid: false,
+        assignDisabled: false
+      };
+    }
+    const slotMode = wordOfDayDisplayScheduleModel.parseSlotMode(slot);
+    if (slotMode === 'excluded') {
+      return {
+        dateKey,
+        mode: 'excluded',
+        entryId: null,
+        word: null,
+        authorName: null,
+        invalid: false,
+        assignDisabled: true
       };
     }
     const entryId = String(slot.entryId || '').trim();
@@ -111,7 +132,8 @@ async function listScheduleRange({ orgId, from, to }) {
         word: null,
         authorName: null,
         invalid: true,
-        invalidReason: 'missing_entry_id'
+        invalidReason: 'missing_entry_id',
+        assignDisabled: false
       };
     }
     let row = entryCache.get(entryId);
@@ -127,7 +149,8 @@ async function listScheduleRange({ orgId, from, to }) {
         word: row?.word || null,
         authorName: row?.authorName || null,
         invalid: true,
-        invalidReason: 'not_approved_or_missing'
+        invalidReason: 'not_approved_or_missing',
+        assignDisabled: false
       };
     }
     return {
@@ -136,7 +159,8 @@ async function listScheduleRange({ orgId, from, to }) {
       entryId,
       word: row.word,
       authorName: String(row.authorName || '').trim() || null,
-      invalid: false
+      invalid: false,
+      assignDisabled: false
     };
   }
 
@@ -190,6 +214,8 @@ async function resolveScheduledEntryId(orgId, dateKey) {
 module.exports = {
   assignScheduledDate,
   clearScheduledDate,
+  excludeScheduledDate,
+  includeScheduledDate,
   listScheduleRange,
   searchApprovedForPicker,
   resolveScheduledEntryId,

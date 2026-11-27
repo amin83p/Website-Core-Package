@@ -64,6 +64,16 @@ test('list controller follows list page guide', () => {
   assert.match(ctrl, /Word of the Day/);
 });
 
+test('workflow client exports showConfirm and avoids native alert fallback', () => {
+  const workflow = fs.readFileSync(
+    path.join(ROOT, 'packages/school/public/scripts/wordOfDayWorkflowClient.js'),
+    'utf8'
+  );
+  assert.match(workflow, /showConfirm/);
+  assert.doesNotMatch(workflow, /global\.alert/);
+  assert.doesNotMatch(workflow, /global\.confirm/);
+});
+
 test('word of day service loads Mongo rows with org scope', () => {
   const service = fs.readFileSync(
     path.join(ROOT, 'packages/school/MVC/services/school/wordOfDayService.js'),

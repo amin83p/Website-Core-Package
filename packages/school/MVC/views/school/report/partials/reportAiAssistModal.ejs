@@ -11,12 +11,15 @@
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
       </div>
       <div class="modal-body pt-2">
-        <div id="reportAiAssistServicePickerWrap" class="mb-3 d-none">
-          <label class="form-label fw-semibold" for="reportAiAssistServiceSelect">Service</label>
-          <select id="reportAiAssistServiceSelect" class="form-select size-md"></select>
+        <div id="reportAiAssistServicePickerWrap" class="report-ai-service-picker d-none">
+          <label class="form-label fw-semibold mb-2" for="reportAiAssistServiceSelect">Service</label>
+          <select id="reportAiAssistServiceSelect" class="form-select report-ai-input-control"></select>
         </div>
         <p class="small text-muted mb-3" id="reportAiAssistServiceDescription"></p>
-        <div id="reportAiAssistInputsHost" class="row g-3 mb-3"></div>
+        <div class="report-ai-inputs-section">
+          <div class="report-ai-inputs-section__label small text-uppercase fw-semibold text-muted mb-2">Inputs</div>
+          <div id="reportAiAssistInputsHost" class="report-ai-inputs-stack mb-3"></div>
+        </div>
         <div id="reportAiAssistModalResult" class="d-none report-ai-result-panel" role="region" aria-live="polite" aria-label="AI Assist result">
           <div class="report-ai-result-panel-accent" aria-hidden="true"></div>
           <div class="report-ai-result-panel-inner">
@@ -87,6 +90,66 @@
   .report-ai-modal-header {
     background: linear-gradient(135deg, rgba(var(--bs-primary-rgb), 0.08) 0%, rgba(var(--bs-primary-rgb), 0.02) 55%, transparent 100%);
     border-bottom: 1px solid rgba(var(--bs-primary-rgb), 0.12);
+  }
+  .report-ai-service-picker {
+    margin-bottom: 1rem;
+    padding: 0.85rem 1rem;
+    border-radius: 0.65rem;
+    border: 1px solid rgba(var(--bs-primary-rgb), 0.14);
+    background: linear-gradient(145deg, rgba(var(--bs-primary-rgb), 0.06), rgba(var(--bs-primary-rgb), 0.02));
+  }
+  .report-ai-inputs-section__label {
+    letter-spacing: 0.06em;
+    font-size: 0.68rem;
+  }
+  .report-ai-inputs-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 0.55rem;
+  }
+  .report-ai-input-row {
+    padding: 0.7rem 0.9rem;
+    border-radius: 0.6rem;
+    border: 1px solid rgba(var(--bs-border-color-rgb, 0, 0, 0), 0.1);
+    background: rgba(var(--bs-body-bg-rgb, 255, 255, 255), 0.92);
+    box-shadow: 0 0.12rem 0.4rem rgba(var(--bs-primary-rgb), 0.04);
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  .report-ai-input-row:focus-within {
+    border-color: rgba(var(--bs-primary-rgb), 0.28);
+    box-shadow: 0 0.2rem 0.65rem rgba(var(--bs-primary-rgb), 0.08);
+  }
+  .report-ai-input-row__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.35rem 0.65rem;
+    margin-bottom: 0.5rem;
+  }
+  .report-ai-input-row--boolean .report-ai-input-row__head {
+    margin-bottom: 0.4rem;
+  }
+  .report-ai-input-row--boolean .report-ai-input-row__control {
+    display: flex;
+    align-items: center;
+  }
+  .report-ai-bind-badge {
+    font-size: 0.68rem;
+    font-weight: 500 !important;
+    letter-spacing: 0.01em;
+  }
+  .report-ai-input-control {
+    border-radius: 0.45rem;
+    font-size: 0.92rem;
+  }
+  .report-ai-boolean-select {
+    width: 100%;
+    max-width: 9.5rem;
+  }
+  .report-ai-input-row--textarea .report-ai-input-control,
+  .report-ai-input-row--json .report-ai-input-control {
+    font-size: 0.84rem;
   }
   .report-ai-icon-chip {
     display: inline-flex;

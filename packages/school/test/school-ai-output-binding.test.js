@@ -75,6 +75,20 @@ function testPromptStripsFormUi() {
   assert.ok(built.userPrompt.includes('pronunciation'));
 }
 
+function testMapNestedDotPathResultKey() {
+  const definition = {
+    output: { mode: 'json', jsonSchema: { type: 'object', properties: { nested: { type: 'object', properties: { text: { type: 'string' } } } } } },
+    outputs: [
+      { resultKey: 'nested.text', label: 'Nested text', type: 'text', required: true, status: 'active' }
+    ]
+  };
+  const fields = schoolAiOutputBindingService.mapAiResultToFormValues(
+    { nested: { text: 'from path' } },
+    { serviceKey: 'school.word_of_day_autofill', definition }
+  );
+  assert.strictEqual(fields['nested.text'], 'from path');
+}
+
 function testMapAutofillPayloadUsesBindingService() {
   const fields = wordOfDayAiAutofillService.mapAutofillPayload({
     pronunciation: 'x',
@@ -92,6 +106,7 @@ const tests = [
   ['build catalog', testBuildOutputCatalog],
   ['resolve bindings', testResolveBindingsValidatesKeys],
   ['map sample json', testMapWoDSampleJson],
+  ['map dot path', testMapNestedDotPathResultKey],
   ['reject unknown binding', testMapRejectsUnknownBindingKey],
   ['strip x-formUi prompt', testPromptStripsFormUi],
   ['wod mapAutofillPayload', testMapAutofillPayloadUsesBindingService]

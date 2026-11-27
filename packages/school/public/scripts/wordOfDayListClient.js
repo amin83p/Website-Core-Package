@@ -21,9 +21,7 @@
         icon: icon || 'error',
         buttons: [{ text: 'OK', class: icon === 'success' ? 'btn-success' : 'btn-primary' }]
       });
-      return;
     }
-    global.alert(String(message || title));
   }
 
   function qs(id) {

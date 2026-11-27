@@ -16,6 +16,13 @@ const SCHOOL_AI_SERVICES = Object.freeze([
     category: 'reports'
   }),
   Object.freeze({
+    serviceKey: 'school.nimpr_goals_suggestions',
+    label: 'Bi-MPR Goals Suggestion',
+    description: 'Suggests CLB-aligned Bi-MPR future goals from a short plan for the next two weeks; skills and CLB levels come from template bindings.',
+    status: 'implemented',
+    category: 'reports'
+  }),
+  Object.freeze({
     serviceKey: 'school.word_of_day_autofill',
     label: 'Word of the Day Autofill',
     description: 'Generate pronunciation, definition, three examples, difficulty, and word types from a vocabulary word.',

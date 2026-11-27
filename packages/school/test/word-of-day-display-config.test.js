@@ -55,6 +55,29 @@ test('contribution quota exempt for Family A admin create bypass', () => {
   assert.equal(isContributionQuotaExempt({ adminFlags: { create: false } }), false);
 });
 
+test('parseSlotMode distinguishes automatic, scheduled, and excluded', () => {
+  assert.equal(wordOfDayDisplayScheduleModel.parseSlotMode(null), 'automatic');
+  assert.equal(wordOfDayDisplayScheduleModel.parseSlotMode({ entryId: 'E1' }), 'scheduled');
+  assert.equal(wordOfDayDisplayScheduleModel.parseSlotMode({ mode: 'excluded' }), 'excluded');
+  assert.equal(wordOfDayDisplayScheduleModel.parseSlotMode({ mode: 'EXCLUDED', entryId: 'E1' }), 'excluded');
+});
+
+test('display schedule PUT supports exclude and include modes', () => {
+  const ctrl = require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'MVC', 'controllers', 'school', 'wordOfDayController.js'),
+    'utf8'
+  );
+  assert.match(ctrl, /mode === 'exclude'/);
+  assert.match(ctrl, /excludeScheduledDate/);
+  assert.match(ctrl, /mode === 'automatic'/);
+  assert.match(ctrl, /includeScheduledDate/);
+});
+
+test('resolveEffectiveDisplay is exported for carry-forward resolution', () => {
+  const { resolveEffectiveDisplay } = require('../MVC/services/school/wordOfDayDisplayService');
+  assert.equal(typeof resolveEffectiveDisplay, 'function');
+});
+
 test('scheduled entry overrides automatic picker when injected', () => {
   const pool = [
     { id: 'auto-a', display: { displayCount: 0 } },

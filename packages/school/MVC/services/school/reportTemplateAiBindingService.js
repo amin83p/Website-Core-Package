@@ -3,6 +3,7 @@
 const { getAiServiceByKey, listAiServices } = require('../../config/schoolAiServiceRegistry');
 const {
   buildReportUiFromOutputs,
+  buildAiAssistDisplayUnits,
   sanitizeDefinitionOutputsForClient,
   validateTemplateOutputBindings
 } = require('./schoolAiOutputFieldSyncService');
@@ -31,8 +32,32 @@ function normalizeBindingRow(binding = {}) {
   const normalizedSource = BINDING_SOURCES.includes(source) ? source : 'empty';
   return {
     source: normalizedSource,
-    value: normalizedSource === 'empty' ? '' : cleanText(binding?.value)
+    value: normalizedSource === 'empty' ? '' : cleanText(binding?.value),
+    hiddenFromUser: binding?.hiddenFromUser === true
   };
+}
+
+function definitionInputById(definition = {}, inputId = '') {
+  const token = cleanText(inputId);
+  if (!token) return null;
+  const inputs = Array.isArray(definition?.inputs) ? definition.inputs : [];
+  return inputs.find((field) => cleanText(field?.id) === token) || null;
+}
+
+function isInputHiddenFromAssist(binding = {}) {
+  return binding?.hiddenFromUser === true;
+}
+
+function visibleInputsForAssistUi(definition = {}, bindingRow = {}) {
+  const inputs = sanitizeDefinitionInputsForClient(definition);
+  const bindings = bindingRow?.inputBindings && typeof bindingRow.inputBindings === 'object'
+    ? bindingRow.inputBindings
+    : {};
+  return inputs.filter((field) => {
+    const binding = bindings[field.id] || {};
+    if (field.required) return true;
+    return !isInputHiddenFromAssist(binding);
+  });
 }
 
 function normalizeAiServiceRow(row, index = 0) {
@@ -116,6 +141,7 @@ function validateAiServicesForTemplate(templatePayload = {}, { strict = false, p
       errors.push(`Unknown AI service: ${row.serviceKey}`);
       return;
     }
+    const definition = definitionsByKey[row.serviceKey] || {};
     Object.entries(row.inputBindings || {}).forEach(([inputId, binding]) => {
       const source = binding?.source || 'empty';
       const value = cleanText(binding?.value);
@@ -128,8 +154,13 @@ function validateAiServicesForTemplate(templatePayload = {}, { strict = false, p
       if (source === 'static' && !value) {
         errors.push(`${row.serviceKey} input "${inputId}": static binding requires text.`);
       }
+      if (isInputHiddenFromAssist(binding)) {
+        const defInput = definitionInputById(definition, inputId);
+        if (defInput && defInput.required === true) {
+          errors.push(`${row.serviceKey} input "${inputId}": required inputs cannot be hidden from AI Assist.`);
+        }
+      }
     });
-    const definition = definitionsByKey[row.serviceKey] || {};
     const outCheck = validateTemplateOutputBindings(row, definition, fieldIds);
     errors.push(...outCheck.errors);
   });
@@ -313,7 +344,9 @@ function buildCatalogEntryFromBinding(bindingRow, definition = {}, registry = nu
     : {};
   const outputPack = extractReportOutputUi(definition?.output);
   const outputs = sanitizeDefinitionOutputsForClient(definition);
-  const reportUiFromOutputs = buildReportUiFromOutputs(outputs);
+  const reportUiFromOutputs = buildReportUiFromOutputs(outputs, definition?.output?.jsonSchema);
+  const resolvedReportUi = reportUiFromOutputs || outputPack.reportUi;
+  const displayUnits = buildAiAssistDisplayUnits(definition, resolvedReportUi);
   const outputBindings = bindingRow?.outputBindings && typeof bindingRow.outputBindings === 'object'
     ? bindingRow.outputBindings
     : {};
@@ -322,13 +355,14 @@ function buildCatalogEntryFromBinding(bindingRow, definition = {}, registry = nu
     serviceKey: bindingRow.serviceKey,
     label: cleanText(bindingRow.label) || reg.label || bindingRow.serviceKey,
     description: reg.description || '',
-    inputs: sanitizeDefinitionInputsForClient(definition),
+    inputs: visibleInputsForAssistUi(definition, bindingRow),
     outputs,
     inputDefaults: resolvedInputs,
     inputBindings,
     outputBindings,
     outputMode: outputPack.outputMode,
-    reportUi: reportUiFromOutputs || outputPack.reportUi,
+    reportUi: resolvedReportUi,
+    displayUnits,
     configured,
     active
   };
@@ -364,5 +398,8 @@ module.exports = {
   resolveMatrixMergedData,
   findBindingById,
   extractReportOutputUi,
-  buildCatalogEntryFromBinding
+  buildCatalogEntryFromBinding,
+  visibleInputsForAssistUi,
+  isInputHiddenFromAssist,
+  definitionInputById
 };

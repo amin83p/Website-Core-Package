@@ -142,7 +142,7 @@
               <button type="button" class="btn btn-outline-primary btn-sm" id="btnAddOutputRow"><i class="bi bi-plus-lg me-1"></i>Add output</button>
             </div>
           </div>
-          <p class="small text-muted">Each <code>resultKey</code> is stable (linked from report templates). Stale keys stay in the list with status <span class="badge bg-warning text-dark">schema_missing</span> until you remove them manually.</p>
+          <p class="small text-muted">Each <code>resultKey</code> is stable (linked from report templates). Nested JSON objects are synced as <strong>dot paths</strong> (e.g. <code>goal_1.revised</code>) so each output binds to a real field—<code>object</code> is not used as an output type. Stale keys stay in the list with status <span class="badge bg-warning text-dark">schema_missing</span> until you remove them manually.</p>
           <div class="table-responsive">
             <table class="table table-sm align-middle" id="outputsTable">
               <thead>
@@ -198,7 +198,7 @@
 <script>
   (function () {
     const types = <%- JSON.stringify(types) %>;
-    const outputTypes = <%- JSON.stringify(typeof outputTypes !== 'undefined' ? outputTypes : ['text','textarea','number','boolean','select','stringList','json','object']).replace(/</g, '\\u003c') %>;
+    const outputTypes = <%- JSON.stringify(typeof outputTypes !== 'undefined' ? outputTypes : ['text','textarea','number','boolean','select','stringList','json']).replace(/</g, '\\u003c') %>;
     const serviceKey = <%- JSON.stringify(serviceKey).replace(/</g, '\\u003c') %>;
     const initialInputs = <%- JSON.stringify(inputsInit).replace(/</g, '\\u003c') %>;
     const initialOutputs = <%- JSON.stringify(outputsTableInit).replace(/</g, '\\u003c') %>;
@@ -304,7 +304,7 @@
           changeSummaryField: (get('[data-field="changeSummaryField"]')?.value || '').trim(),
           helpText: '',
           options: [],
-          actions: type === 'object' || type === 'textarea' || type === 'text' ? ['copy', 'apply'] : ['copy']
+          actions: type === 'textarea' || type === 'text' || type === 'select' || type === 'stringList' ? ['copy', 'apply'] : ['copy']
         });
       });
       return rows;
@@ -325,6 +325,13 @@
       const statusBadge = status === 'schema_missing'
         ? '<span class="badge bg-warning text-dark">schema_missing</span>'
         : '<span class="badge bg-success-subtle text-success-emphasis border">active</span>';
+      const isLegacyObject = String(row.type || '') === 'object';
+      const subfieldsHtml = isLegacyObject
+        ? `<input class="form-control form-control-sm mb-1" data-field="valueField" placeholder="valueField" value="${escapeAttr(row.valueField || '')}">
+          <input class="form-control form-control-sm mb-1" data-field="changeTypeField" placeholder="changeTypeField" value="${escapeAttr(row.changeTypeField || '')}">
+          <input class="form-control form-control-sm" data-field="changeSummaryField" placeholder="changeSummaryField" value="${escapeAttr(row.changeSummaryField || '')}">
+          <span class="text-warning small">Legacy object row — sync schema and remove.</span>`
+        : `<span class="text-muted small font-monospace">${escapeAttr(row.resultKey || '')}</span>`;
       tr.innerHTML = `
         <td><input class="form-control form-control-sm font-monospace" data-field="resultKey" value="${escapeAttr(row.resultKey || '')}" required></td>
         <td><input class="form-control form-control-sm" data-field="label" value="${escapeAttr(row.label || '')}"></td>
@@ -334,11 +341,7 @@
           <input type="hidden" data-field="status" value="${escapeAttr(status)}">
           <span data-role="status-visual">${statusBadge}</span>
         </td>
-        <td class="small">
-          <input class="form-control form-control-sm mb-1" data-field="valueField" placeholder="valueField" value="${escapeAttr(row.valueField || '')}">
-          <input class="form-control form-control-sm mb-1" data-field="changeTypeField" placeholder="changeTypeField" value="${escapeAttr(row.changeTypeField || '')}">
-          <input class="form-control form-control-sm" data-field="changeSummaryField" placeholder="changeSummaryField" value="${escapeAttr(row.changeSummaryField || '')}">
-        </td>
+        <td class="small">${subfieldsHtml}</td>
         <td><button type="button" class="btn btn-outline-danger btn-sm" data-action="remove-output"><i class="bi bi-trash"></i></button></td>
       `;
       outputsBody.appendChild(tr);
@@ -387,9 +390,10 @@
       parts.push('</ul>');
     }
     if (analysis.staleKeys?.length) {
-      parts.push('<h6 class="mt-3">Stale (not in schema)</h6><ul class="list-unstyled">');
+      parts.push('<h6 class="mt-3">Stale (replaced by dot-path leaves or removed from schema)</h6><ul class="list-unstyled">');
       analysis.staleKeys.forEach((row) => {
-        parts.push(`<li class="mb-1"><label><input type="checkbox" class="form-check-input me-2 js-sync-stale" value="${escapeAttr(row.resultKey)}" checked> Mark <code>${escapeAttr(row.resultKey)}</code> as schema_missing</label></li>`);
+        const hint = String(row.type || '') === 'object' ? ' (legacy object — child paths were added)' : '';
+        parts.push(`<li class="mb-1"><label><input type="checkbox" class="form-check-input me-2 js-sync-stale" value="${escapeAttr(row.resultKey)}" checked> Mark <code>${escapeAttr(row.resultKey)}</code> as schema_missing${escapeAttr(hint)}</label></li>`);
       });
       parts.push('</ul>');
     }

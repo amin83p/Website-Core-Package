@@ -271,6 +271,7 @@
 
   <% if (typeof includeModal !== 'undefined' && includeModal) { %>
     <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/modal.js') : '/scripts/modal.js' %>"></script>
+    <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/schoolMessageUi.js') : '/scripts/schoolMessageUi.js' %>"></script>
   <% } %>
   <% if (typeof includeModal_Table !== 'undefined' && includeModal_Table) { %>
     <script src="<%= typeof staticAssetUrl === 'function' ? staticAssetUrl('/scripts/modal-table.js') : '/scripts/modal-table.js' %>"></script>

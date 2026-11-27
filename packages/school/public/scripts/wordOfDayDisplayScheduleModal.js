@@ -8,6 +8,10 @@
     return document.getElementById(id);
   }
 
+  function wf() {
+    return global.WordOfDayWorkflow;
+  }
+
   function escapeHtml(value) {
     return String(value ?? '')
       .replace(/&/g, '&amp;')
@@ -47,6 +51,42 @@
     state.shortcutsBound = true;
   }
 
+  async function showAlert(title, message, icon) {
+    if (wf()?.showAlert) {
+      await wf().showAlert(title, message, icon);
+      return;
+    }
+    if (typeof global.showMessageModal === 'function') {
+      await global.showMessageModal({
+        title,
+        message,
+        icon: icon || 'error',
+        buttons: [{ text: 'OK', class: 'btn-primary' }]
+      });
+    }
+  }
+
+  async function showConfirm(title, message, options) {
+    if (wf()?.showConfirm) {
+      return wf().showConfirm(title, message, options);
+    }
+    if (typeof global.showMessageModal === 'function') {
+      const confirmText = options?.confirmText || 'Continue';
+      const cancelText = options?.cancelText || 'Cancel';
+      const result = await global.showMessageModal({
+        title,
+        message,
+        icon: options?.icon || 'warning',
+        buttons: [
+          { text: cancelText, class: 'btn-secondary' },
+          { text: confirmText, class: options?.confirmClass || 'btn-warning' }
+        ]
+      });
+      return result === confirmText;
+    }
+    return false;
+  }
+
   function setStatus(message, isError) {
     const el = qs('wodScheduleStatus');
     if (!el) return;
@@ -58,6 +98,7 @@
 
   function assignmentLabel(day) {
     if (day.invalid) return 'Invalid assignment';
+    if (day.mode === 'excluded') return 'Excluded';
     if (day.mode === 'scheduled') return 'Scheduled';
     return 'Automatic';
   }
@@ -71,21 +112,23 @@
     }
     body.innerHTML = days.map((day) => {
       const invalidClass = day.invalid ? 'wod-schedule-invalid' : '';
-      const word = day.word ? escapeHtml(day.word) : '—';
-      const author = day.authorName ? escapeHtml(day.authorName) : '—';
+      const word = day.mode === 'excluded' ? '—' : (day.word ? escapeHtml(day.word) : '—');
+      const author = day.mode === 'excluded' ? '—' : (day.authorName ? escapeHtml(day.authorName) : '—');
       const assign = escapeHtml(assignmentLabel(day));
-      const assignBtn = day.mode === 'scheduled' && !day.invalid
-        ? `<button type="button" class="btn btn-outline-secondary btn-sm" data-wod-schedule-assign data-date-key="${escapeHtml(day.dateKey)}" data-entry-id="${escapeHtml(day.entryId || '')}">Change</button>`
-        : `<button type="button" class="btn btn-outline-primary btn-sm" data-wod-schedule-assign data-date-key="${escapeHtml(day.dateKey)}">Assign</button>`;
-      const clearBtn = day.mode === 'scheduled'
-        ? `<button type="button" class="btn btn-outline-danger btn-sm" data-wod-schedule-clear data-date-key="${escapeHtml(day.dateKey)}">Clear</button>`
-        : '';
+      const assignDisabled = day.mode === 'excluded' || day.assignDisabled === true;
+      const assignLabel = day.mode === 'scheduled' && !day.invalid ? 'Change' : 'Assign';
+      const assignBtn = assignDisabled
+        ? `<button type="button" class="btn btn-outline-primary btn-sm" disabled aria-disabled="true">Assign</button>`
+        : `<button type="button" class="btn btn-outline-primary btn-sm" data-wod-schedule-assign data-date-key="${escapeHtml(day.dateKey)}" data-entry-id="${escapeHtml(day.entryId || '')}">${assignLabel}</button>`;
+      const excludeBtn = day.mode === 'excluded'
+        ? `<button type="button" class="btn btn-outline-secondary btn-sm" data-wod-schedule-include data-date-key="${escapeHtml(day.dateKey)}">Include day</button>`
+        : `<button type="button" class="btn btn-outline-warning btn-sm" data-wod-schedule-exclude data-date-key="${escapeHtml(day.dateKey)}">Exclude</button>`;
       return `<tr class="${invalidClass}" data-date-key="${escapeHtml(day.dateKey)}">
         <td class="ps-3 font-monospace small">${escapeHtml(day.dateKey)}</td>
         <td class="small">${assign}</td>
         <td class="fw-semibold">${word}</td>
         <td class="small text-muted">${author}</td>
-        <td class="text-end pe-3"><div class="d-inline-flex flex-wrap gap-1 justify-content-end">${assignBtn}${clearBtn}</div></td>
+        <td class="text-end pe-3"><div class="d-inline-flex flex-wrap gap-1 justify-content-end">${assignBtn}${excludeBtn}</div></td>
       </tr>`;
     }).join('');
   }
@@ -109,64 +152,64 @@
     const invalidCount = (data.days || []).filter((d) => d.invalid).length;
     setStatus(
       invalidCount
-        ? `Loaded ${(data.days || []).length} day(s). ${invalidCount} invalid — clear or reassign.`
+        ? `Loaded ${(data.days || []).length} day(s). ${invalidCount} invalid — reassign to fix.`
         : `Loaded ${(data.days || []).length} day(s).`,
       invalidCount > 0
     );
   }
 
-  async function searchApprovedWords(query) {
-    const url = `/school/word-of-day/api/display-schedule/picker?q=${encodeURIComponent(query)}&limit=25`;
-    const resp = await fetch(url, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(data.message || 'Search failed.');
-    return Array.isArray(data.items) ? data.items : [];
-  }
-
-  async function assignWord(dateKey, entryId) {
+  async function putSchedule(body) {
     const resp = await fetch('/school/word-of-day/api/display-schedule', {
       method: 'PUT',
       headers: csrfHeaders(),
       credentials: 'same-origin',
-      body: JSON.stringify({ dateKey, entryId })
+      body: JSON.stringify(body)
     });
     const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(data.message || 'Assign failed.');
+    if (!resp.ok) throw new Error(data.message || 'Update failed.');
+    return data;
   }
 
-  async function clearDate(dateKey) {
-    const resp = await fetch('/school/word-of-day/api/display-schedule', {
-      method: 'PUT',
-      headers: csrfHeaders(),
-      credentials: 'same-origin',
-      body: JSON.stringify({ dateKey, entryId: null })
+  function assignWord(dateKey, entryId) {
+    return putSchedule({ dateKey, entryId });
+  }
+
+  function excludeDate(dateKey) {
+    return putSchedule({ dateKey, mode: 'exclude' });
+  }
+
+  function includeDate(dateKey) {
+    return putSchedule({ dateKey, mode: 'automatic' });
+  }
+
+  function openAssignPicker(dateKey) {
+    if (!global.GenericPicker?.open) {
+      return showAlert('Assign word', 'Word picker is not available on this page. Refresh and try again.', 'error');
+    }
+    const title = `Assign approved word for ${dateKey}`;
+    return new Promise((resolve) => {
+      global.GenericPicker.open({
+        title,
+        apiEndpoint: '/school/word-of-day/api/display-schedule/picker',
+        searchFields: 'word,authorName,entryId',
+        limit: 25,
+        onSelect: async (item) => {
+          const entryId = String(item?.entryId || item?.id || '').trim();
+          if (!entryId) {
+            await showAlert('Assign word', 'Could not read the selected entry id.', 'error');
+            resolve();
+            return;
+          }
+          try {
+            await assignWord(dateKey, entryId);
+            await fetchSchedule();
+          } catch (err) {
+            await showAlert('Assign failed', err.message || 'Could not assign word.', 'error');
+          }
+          resolve();
+        }
+      });
     });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) throw new Error(data.message || 'Clear failed.');
-  }
-
-  async function promptAssign(dateKey, currentEntryId) {
-    const initial = await searchApprovedWords('');
-    let options = initial;
-    if (currentEntryId && !options.find((row) => String(row.entryId) === String(currentEntryId))) {
-      const extra = await searchApprovedWords(currentEntryId);
-      options = [...extra, ...options];
-    }
-    const lines = options.map((row, idx) => `${idx + 1}. ${row.word} — ${row.authorName || 'Unknown'} (${row.entryId})`).join('\n');
-    const promptText = lines
-      ? `Assign word for ${dateKey}.\nEnter list number, or search and paste entry id:\n\n${lines}`
-      : `Assign word for ${dateKey}. Enter approved entry id:`;
-    const raw = global.prompt(promptText, currentEntryId || '');
-    if (raw === null) return;
-    const trimmed = String(raw).trim();
-    if (!trimmed) return;
-    const asIndex = Number.parseInt(trimmed, 10);
-    let entryId = trimmed;
-    if (Number.isFinite(asIndex) && asIndex >= 1 && asIndex <= options.length) {
-      entryId = options[asIndex - 1].entryId;
-    }
-    await assignWord(dateKey, entryId);
-    await fetchSchedule();
   }
 
   function bindTableActions() {
@@ -175,21 +218,39 @@
     body.dataset.wodScheduleBound = '1';
     body.addEventListener('click', async (event) => {
       const assignBtn = event.target.closest('[data-wod-schedule-assign]');
-      const clearBtn = event.target.closest('[data-wod-schedule-clear]');
+      const excludeBtn = event.target.closest('[data-wod-schedule-exclude]');
+      const includeBtn = event.target.closest('[data-wod-schedule-include]');
       try {
         if (assignBtn) {
           const dateKey = assignBtn.getAttribute('data-date-key') || '';
-          const entryId = assignBtn.getAttribute('data-entry-id') || '';
-          await promptAssign(dateKey, entryId);
-        } else if (clearBtn) {
-          const dateKey = clearBtn.getAttribute('data-date-key') || '';
           if (!dateKey) return;
-          if (!global.confirm(`Clear scheduled word for ${dateKey}?`)) return;
-          await clearDate(dateKey);
+          await openAssignPicker(dateKey);
+        } else if (excludeBtn) {
+          const dateKey = excludeBtn.getAttribute('data-date-key') || '';
+          if (!dateKey) return;
+          const ok = await showConfirm(
+            'Exclude this day?',
+            `Exclude ${dateKey} from display? Visitors will see the most recent prior word instead. Assign is disabled while excluded.`,
+            { confirmText: 'Exclude', confirmClass: 'btn-warning' }
+          );
+          if (!ok) return;
+          await excludeDate(dateKey);
+          await fetchSchedule();
+        } else if (includeBtn) {
+          const dateKey = includeBtn.getAttribute('data-date-key') || '';
+          if (!dateKey) return;
+          const ok = await showConfirm(
+            'Include this day?',
+            `Include ${dateKey} for display again? The day will use Automatic selection unless you assign a word.`,
+            { confirmText: 'Include day', confirmClass: 'btn-primary', icon: 'info' }
+          );
+          if (!ok) return;
+          await includeDate(dateKey);
           await fetchSchedule();
         }
       } catch (err) {
         setStatus(err.message || 'Action failed.', true);
+        await showAlert('Schedule update', err.message || 'Action failed.', 'error');
       }
     });
   }
@@ -207,7 +268,7 @@
 
   function init() {
     const modalEl = qs('wordOfDayDisplayScheduleModal');
-  const openBtn = qs('btnWordOfDayConfigureDisplay');
+    const openBtn = qs('btnWordOfDayConfigureDisplay');
     if (!modalEl || !openBtn || !global.bootstrap?.Modal) return;
     scheduleModal = global.bootstrap.Modal.getOrCreateInstance(modalEl);
     qs('wodScheduleLoadBtn')?.addEventListener('click', () => {

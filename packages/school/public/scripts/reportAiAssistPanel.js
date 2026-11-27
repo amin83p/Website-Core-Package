@@ -108,26 +108,118 @@
     return String(token || '').trim().toLowerCase().replace(/\s+/g, '_');
   }
 
-  function resolveSectionContent(section, data) {
-    const key = String(section?.resultKey || '').trim();
-    if (!key || !data) return null;
-    const raw = data[key];
-    if (raw === undefined || raw === null) return null;
-    const valueField = String(section?.valueField || '').trim();
+  function getValueAtResultPath(data, resultKey) {
+    const path = String(resultKey || '').trim();
+    if (!path || !data || typeof data !== 'object') return undefined;
+    if (!path.includes('.')) return data[path];
+    let cur = data;
+    for (const segment of path.split('.')) {
+      if (cur == null || typeof cur !== 'object') return undefined;
+      cur = cur[segment];
+    }
+    return cur;
+  }
+
+  function formatRawAiValue(raw) {
+    if (raw === undefined || raw === null) return '';
+    if (Array.isArray(raw)) {
+      return raw.map((row) => String(row ?? '').trim()).filter(Boolean).join('\n');
+    }
+    if (typeof raw === 'object') {
+      try {
+        return JSON.stringify(raw, null, 2);
+      } catch (_) {
+        return '';
+      }
+    }
+    return String(raw).trim();
+  }
+
+  function resolveDisplayUnits(entry) {
+    if (entry && Array.isArray(entry.displayUnits) && entry.displayUnits.length) {
+      return entry.displayUnits;
+    }
+    const reportUi = entry?.reportUi;
+    if (reportUi?.layout === 'sections' && Array.isArray(reportUi.sections)) {
+      return reportUi.sections.map((section) => {
+        const resultKey = String(section?.resultKey || '').trim();
+        const valueField = String(section?.valueField || '').trim();
+        const applyBindingKey = valueField ? `${resultKey}.${valueField}` : resultKey;
+        return {
+          mode: 'section',
+          unitKey: resultKey,
+          title: section.title || resultKey,
+          resultKey,
+          applyBindingKey,
+          inputId: String(section.inputId || resultKey).trim(),
+          valueField,
+          changeTypeField: String(section.changeTypeField || 'changeType'),
+          changeSummaryField: String(section.changeSummaryField || 'changeSummary'),
+          actions: Array.isArray(section.actions) ? section.actions : ['copy', 'apply']
+        };
+      });
+    }
+    if (Array.isArray(entry?.outputs)) {
+      return entry.outputs
+        .filter((row) => row && row.status !== 'schema_missing')
+        .map((row) => ({
+          mode: 'leaf',
+          unitKey: row.resultKey,
+          title: row.label || row.resultKey,
+          resultKey: row.resultKey,
+          applyBindingKey: row.resultKey,
+          inputId: row.resultKey,
+          valueField: '',
+          changeTypeField: 'changeType',
+          changeSummaryField: 'changeSummary',
+          actions: Array.isArray(row.actions) && row.actions.length ? row.actions : ['copy', 'apply']
+        }));
+    }
+    return [];
+  }
+
+  function normalizeEntryForRender(entryOrReportUi) {
+    if (!entryOrReportUi) return {};
+    if (entryOrReportUi.displayUnits || entryOrReportUi.outputs || entryOrReportUi.outputBindings) {
+      return entryOrReportUi;
+    }
+    return { reportUi: entryOrReportUi };
+  }
+
+  function resolveUnitContent(unit, data) {
+    if (!unit || !data) return null;
+    const unitKey = String(unit.unitKey || unit.resultKey || '').trim();
+    if (!unitKey) return null;
+    const mode = String(unit.mode || 'leaf').toLowerCase();
+    const valueField = String(unit.valueField || '').trim();
     let valueText = '';
     let changeType = '';
     let changeSummary = '';
-    if (valueField && raw && typeof raw === 'object' && !Array.isArray(raw)) {
-      valueText = String(raw[valueField] ?? '').trim();
-      const changeTypeField = String(section?.changeTypeField || 'changeType').trim();
-      const changeSummaryField = String(section?.changeSummaryField || 'changeSummary').trim();
-      changeType = normalizeChangeType(raw[changeTypeField]);
-      changeSummary = String(raw[changeSummaryField] ?? '').trim();
+    if (mode === 'section' && valueField) {
+      const raw = getValueAtResultPath(data, unit.resultKey) ?? data[unit.resultKey];
+      if (raw === undefined || raw === null) return null;
+      if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        valueText = String(raw[valueField] ?? '').trim();
+        const changeTypeField = String(unit.changeTypeField || 'changeType').trim();
+        const changeSummaryField = String(unit.changeSummaryField || 'changeSummary').trim();
+        changeType = normalizeChangeType(raw[changeTypeField]);
+        changeSummary = String(raw[changeSummaryField] ?? '').trim();
+      } else {
+        valueText = formatRawAiValue(raw);
+      }
     } else {
-      valueText = String(raw).trim();
+      const raw = getValueAtResultPath(data, unit.resultKey);
+      if (raw === undefined || raw === null) return null;
+      valueText = formatRawAiValue(raw);
     }
     if (!valueText) return null;
-    return { key, valueText, changeType, changeSummary };
+    return {
+      key: unitKey,
+      valueText,
+      changeType,
+      changeSummary,
+      applyBindingKey: String(unit.applyBindingKey || unit.resultKey || unitKey).trim()
+    };
   }
 
   function changeTypeBadgeHtml(changeType) {
@@ -143,14 +235,13 @@
     return meta ? ` report-ai-section--${meta.accent}` : '';
   }
 
-  function formatSectionPlainText(data, reportUi) {
-    if (!data || !reportUi || !Array.isArray(reportUi.sections)) {
-      return JSON.stringify(data || {}, null, 2);
-    }
-    return reportUi.sections.map((section) => {
-      const content = resolveSectionContent(section, data);
+  function formatDisplayUnitsPlainText(data, entry) {
+    const units = resolveDisplayUnits(normalizeEntryForRender(entry));
+    if (!data || !units.length) return JSON.stringify(data || {}, null, 2);
+    return units.map((unit) => {
+      const content = resolveUnitContent(unit, data);
       if (!content) return '';
-      const title = section.title || section.resultKey;
+      const title = unit.title || unit.unitKey;
       const meta = CHANGE_TYPE_META[content.changeType];
       const changeLine = content.changeType
         ? `[${meta ? meta.label : content.changeType}]${content.changeSummary ? ` ${content.changeSummary}` : ''}`
@@ -159,33 +250,32 @@
     }).filter(Boolean).join('\n\n');
   }
 
-  function buildStructuredSectionsHtml(data, reportUi, bindingRowId) {
-    if (!data || !reportUi || reportUi.layout !== 'sections' || !Array.isArray(reportUi.sections)) {
-      return null;
-    }
+  function buildDisplayUnitsHtml(data, entry, bindingRowId) {
+    const units = resolveDisplayUnits(normalizeEntryForRender(entry));
+    if (!data || !units.length) return null;
     const parts = [];
-    reportUi.sections.forEach((section) => {
-      const key = String(section?.resultKey || '').trim();
-      if (!key) return;
-      const content = resolveSectionContent(section, data);
+    units.forEach((unit) => {
+      const unitKey = String(unit.unitKey || unit.resultKey || '').trim();
+      if (!unitKey) return;
+      const content = resolveUnitContent(unit, data);
       if (!content) return;
       const actionBtns = [];
-      if (sectionHasAction(section, 'copy')) {
-        actionBtns.push(`<button type="button" class="btn btn-outline-secondary btn-sm py-0 js-report-ai-section-copy" data-section-key="${escapeHtml(key)}" data-binding-id="${escapeHtml(bindingRowId)}"><i class="bi bi-clipboard me-1"></i>Copy</button>`);
+      if (sectionHasAction(unit, 'copy')) {
+        actionBtns.push(`<button type="button" class="btn btn-outline-secondary btn-sm py-0 js-report-ai-section-copy" data-section-key="${escapeHtml(unitKey)}" data-apply-binding-key="${escapeHtml(content.applyBindingKey)}" data-binding-id="${escapeHtml(bindingRowId)}"><i class="bi bi-clipboard me-1"></i>Copy</button>`);
       }
-      if (sectionHasAction(section, 'apply')) {
-        const inputId = String(section.inputId || key).trim();
-        actionBtns.push(`<button type="button" class="btn btn-outline-primary btn-sm py-0 js-report-ai-section-apply" data-section-key="${escapeHtml(key)}" data-input-id="${escapeHtml(inputId)}" data-binding-id="${escapeHtml(bindingRowId)}"><i class="bi bi-arrow-down-circle me-1"></i>Apply</button>`);
+      if (sectionHasAction(unit, 'apply')) {
+        const inputId = String(unit.inputId || unitKey).trim();
+        actionBtns.push(`<button type="button" class="btn btn-outline-primary btn-sm py-0 js-report-ai-section-apply" data-section-key="${escapeHtml(unitKey)}" data-input-id="${escapeHtml(inputId)}" data-apply-binding-key="${escapeHtml(content.applyBindingKey)}" data-binding-id="${escapeHtml(bindingRowId)}"><i class="bi bi-arrow-down-circle me-1"></i>Apply</button>`);
       }
       const badge = content.changeType ? changeTypeBadgeHtml(content.changeType) : '';
       const summaryBlock = content.changeSummary
         ? `<div class="report-ai-change-callout small mb-2"><i class="bi bi-info-circle me-1" aria-hidden="true"></i><span class="report-ai-change-callout-label">What changed:</span> ${escapeHtml(content.changeSummary)}</div>`
         : '';
-      parts.push(`<div class="report-ai-result-section card border-0 shadow-sm mb-3${sectionAccentClass(content.changeType)}" data-section-key="${escapeHtml(key)}">
+      parts.push(`<div class="report-ai-result-section card border-0 shadow-sm mb-3${sectionAccentClass(content.changeType)}" data-section-key="${escapeHtml(unitKey)}">
         <div class="report-ai-section-accent" aria-hidden="true"></div>
         <div class="card-header bg-transparent border-0 py-2 px-3 pt-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
           <div class="d-flex flex-wrap align-items-center gap-2">
-            <span class="fw-semibold mb-0 report-ai-section-title">${escapeHtml(section.title || key)}</span>
+            <span class="fw-semibold mb-0 report-ai-section-title">${escapeHtml(unit.title || unitKey)}</span>
             ${badge}
           </div>
           <div class="d-flex flex-wrap gap-1">${actionBtns.join('')}</div>
@@ -247,7 +337,7 @@
     return html.join('');
   }
 
-  function renderResultBodyHtml(summary, reportUi, bindingRowId) {
+  function renderResultBodyHtml(summary, entryOrReportUi, bindingRowId) {
     if (!summary || (!summary.text && !summary.resultData)) {
       return { html: '<p class="text-muted mb-0">No output returned.</p>', plain: '' };
     }
@@ -257,12 +347,14 @@
         plain: summary.text
       };
     }
-    if (summary.resultData && reportUi?.layout === 'sections') {
-      const structuredHtml = buildStructuredSectionsHtml(summary.resultData, reportUi, bindingRowId);
+    const entry = normalizeEntryForRender(entryOrReportUi);
+    const displayUnits = resolveDisplayUnits(entry);
+    if (summary.resultData && displayUnits.length) {
+      const structuredHtml = buildDisplayUnitsHtml(summary.resultData, entry, bindingRowId);
       if (structuredHtml) {
         return {
           html: structuredHtml,
-          plain: formatSectionPlainText(summary.resultData, reportUi),
+          plain: formatDisplayUnitsPlainText(summary.resultData, entry),
           structured: true
         };
       }
@@ -319,6 +411,39 @@
     }
   }
 
+  function coercesToBooleanTrue(val) {
+    if (val === true) return true;
+    const token = String(val ?? '').trim().toLowerCase();
+    return token === 'true' || token === '1' || token === 'yes' || token === 'on';
+  }
+
+  function normalizeBooleanSelectValue(val) {
+    return coercesToBooleanTrue(val) ? 'true' : 'false';
+  }
+
+  function formatReportAiBindHint(bind) {
+    if (!bind || typeof bind !== 'object') return '';
+    const bindSource = String(bind.source || '').toLowerCase();
+    const bindValue = String(bind.value || '').trim();
+    if (!bindSource || (bindSource === 'empty' && !bindValue)) return '';
+    const sourceLabel = bindSource.charAt(0).toUpperCase() + bindSource.slice(1);
+    const valuePart = bindValue
+      ? ` <span class="font-monospace text-body-secondary">${escapeHtml(bindValue)}</span>`
+      : '';
+    return `<span class="badge rounded-pill bg-white text-secondary border fw-normal report-ai-bind-badge" title="Template input binding">${escapeHtml(sourceLabel)}${valuePart}</span>`;
+  }
+
+  function buildReportAiInputRow(type, id, labelHtml, bindHint, controlHtml) {
+    const typeToken = escapeHtml(String(type || 'text').toLowerCase());
+    return `<div class="report-ai-input-row report-ai-input-row--${typeToken}" data-ai-input-row="${escapeHtml(id)}">
+      <div class="report-ai-input-row__head">
+        ${labelHtml}
+        ${bindHint}
+      </div>
+      <div class="report-ai-input-row__control">${controlHtml}</div>
+    </div>`;
+  }
+
   function resolveLiveBindingValue(binding, answersOverride, prefill) {
     const source = String(binding?.source || 'empty').toLowerCase();
     const value = String(binding?.value || '').trim();
@@ -343,15 +468,29 @@
     return null;
   }
 
-  function applyLiveBindingDefaults(defaults, entry, answersOverride, prefill) {
+  function applyLiveBindingDefaults(defaults, entry, answersOverride, prefill, inputMetaById = {}) {
     const bindings = entry?.inputBindings && typeof entry.inputBindings === 'object' ? entry.inputBindings : {};
     const out = { ...(defaults && typeof defaults === 'object' ? defaults : {}) };
     Object.keys(bindings).forEach((inputId) => {
       const live = resolveLiveBindingValue(bindings[inputId], answersOverride, prefill);
-      if (live !== null) out[inputId] = live;
+      if (live !== null) {
+        const inputType = String(inputMetaById[inputId]?.type || '').toLowerCase();
+        out[inputId] = inputType === 'boolean' ? normalizeBooleanSelectValue(live) : live;
+      }
     });
     return out;
   }
+
+  ReportAiAssistPanel.prototype.getMergedAnswersOverride = function () {
+    const raw = this.getAnswersOverride() || {};
+    if (this.context === 'matrix') {
+      return {
+        ...(raw.commonAnswersOverride && typeof raw.commonAnswersOverride === 'object' ? raw.commonAnswersOverride : {}),
+        ...(raw.sharedAnswersOverride && typeof raw.sharedAnswersOverride === 'object' ? raw.sharedAnswersOverride : {})
+      };
+    }
+    return raw.answersOverride && typeof raw.answersOverride === 'object' ? raw.answersOverride : {};
+  };
 
   function notify(title, icon, message) {
     if (typeof showMessageModal === 'function') {
@@ -451,9 +590,14 @@
       isJson: summary.isJson,
       resultData: summary.resultData || result.data || null,
       reportUi: run.reportUi || catalogEntry?.reportUi || null,
+      displayUnits: run.displayUnits || catalogEntry?.displayUnits || null,
+      outputs: catalogEntry?.outputs || null,
       entrySnapshot: {
         inputBindings: catalogEntry?.inputBindings || null,
-        reportUi: run.reportUi || catalogEntry?.reportUi || null
+        outputBindings: catalogEntry?.outputBindings || null,
+        reportUi: run.reportUi || catalogEntry?.reportUi || null,
+        displayUnits: run.displayUnits || catalogEntry?.displayUnits || null,
+        outputs: catalogEntry?.outputs || null
       },
       at: run.at || new Date().toISOString(),
       traceId: run.traceId || summary.traceId || '',
@@ -498,23 +642,21 @@
       const val = defaults[id] !== undefined ? defaults[id] : '';
       const type = String(field.type || 'text').toLowerCase();
       const label = escapeHtml(field.label || id);
-      const bind = bindingHints[id];
-      const bindSource = bind ? String(bind.source || '').toLowerCase() : '';
-      const bindValue = bind ? String(bind.value || '').trim() : '';
-      const bindHint = bindSource && (bindSource === 'empty' && !bindValue)
-        ? ''
-        : bindSource
-          ? `<div class="small text-muted mb-1">Source: ${escapeHtml(bindSource)}${bindValue ? ` · <span class="font-monospace">${escapeHtml(bindValue)}</span>` : ''}</div>`
-          : '';
+      const bindHint = formatReportAiBindHint(bindingHints[id]);
+      const labelHtml = `<label class="form-label fw-semibold mb-0" for="rai_${escapeHtml(id)}">${label}</label>`;
       if (type === 'textarea' || type === 'json') {
-        return `<div class="col-12"><label class="form-label fw-semibold" for="rai_${escapeHtml(id)}">${label}</label>${bindHint}<textarea class="form-control font-monospace" id="rai_${escapeHtml(id)}" data-ai-input="${escapeHtml(id)}" rows="${type === 'json' ? 5 : 6}">${escapeHtml(val)}</textarea></div>`;
+        const control = `<textarea class="form-control font-monospace report-ai-input-control" id="rai_${escapeHtml(id)}" data-ai-input="${escapeHtml(id)}" rows="${type === 'json' ? 5 : 6}">${escapeHtml(val)}</textarea>`;
+        return buildReportAiInputRow(type, id, labelHtml, bindHint, control);
       }
       if (type === 'boolean') {
-        const isTrue = String(val).toLowerCase() === 'true';
-        return `<div class="col-12 col-md-4"><label class="form-label fw-semibold" for="rai_${escapeHtml(id)}">${label}</label>${bindHint}<select class="form-select" id="rai_${escapeHtml(id)}" data-ai-input="${escapeHtml(id)}"><option value="false"${isTrue ? '' : ' selected'}>No</option><option value="true"${isTrue ? ' selected' : ''}>Yes</option></select></div>`;
+        const normalized = normalizeBooleanSelectValue(val);
+        const isTrue = normalized === 'true';
+        const control = `<select class="form-select report-ai-input-control report-ai-boolean-select" id="rai_${escapeHtml(id)}" data-ai-input="${escapeHtml(id)}" data-input-type="boolean"><option value="false"${isTrue ? '' : ' selected'}>No</option><option value="true"${isTrue ? ' selected' : ''}>Yes</option></select>`;
+        return buildReportAiInputRow('boolean', id, labelHtml, bindHint, control);
       }
       const inputType = type === 'number' ? 'number' : 'text';
-      return `<div class="col-12 col-md-6"><label class="form-label fw-semibold" for="rai_${escapeHtml(id)}">${label}</label>${bindHint}<input type="${inputType}" class="form-control" id="rai_${escapeHtml(id)}" data-ai-input="${escapeHtml(id)}" value="${escapeHtml(val)}"></div>`;
+      const control = `<input type="${inputType}" class="form-control report-ai-input-control" id="rai_${escapeHtml(id)}" data-ai-input="${escapeHtml(id)}" value="${escapeHtml(val)}">`;
+      return buildReportAiInputRow(type, id, labelHtml, bindHint, control);
     }).join('');
   };
 
@@ -573,11 +715,16 @@
     return this.catalog.find((row) => String(row.bindingRowId) === id) || this._lastRunEntry || null;
   };
 
-  ReportAiAssistPanel.prototype.applySectionValue = function (inputId, text, entry, resultKey = '') {
+  ReportAiAssistPanel.prototype.applySectionValue = function (inputId, text, entry, applyBindingKey = '') {
     const value = String(text ?? '');
-    const sectionKey = String(resultKey || inputId || '').trim();
+    const bindingKey = String(applyBindingKey || inputId || '').trim();
+    const sectionKey = bindingKey;
     const outputBindings = entry?.outputBindings && typeof entry.outputBindings === 'object' ? entry.outputBindings : {};
-    const outBinding = sectionKey ? outputBindings[sectionKey] : null;
+    let outBinding = bindingKey ? outputBindings[bindingKey] : null;
+    if (!outBinding && bindingKey.includes('.')) {
+      const parentKey = bindingKey.split('.')[0];
+      if (parentKey && outputBindings[parentKey]) outBinding = outputBindings[parentKey];
+    }
     if (outBinding && String(outBinding.source || '').toLowerCase() === 'field') {
       const fieldId = String(outBinding.value || '').trim();
       if (fieldId) {
@@ -646,12 +793,15 @@
       ? this.findTrayRowByUsageId(usageId)
       : (bindingRowId ? this.findLatestTrayRowForBinding(bindingRowId) : null);
     const data = stored?.resultData;
-    const entry = this.resolveEntrySnapshot(bindingRowId);
-    const section = entry?.reportUi?.sections?.find((row) => String(row?.resultKey || '') === sectionKey) || {
-      resultKey: sectionKey,
-      inputId: sectionKey
-    };
-    const content = data ? resolveSectionContent(section, data) : null;
+    const catalogEntry = this.catalog.find((row) => String(row.bindingRowId) === String(bindingRowId)) || null;
+    const snapshot = this.resolveEntrySnapshot(bindingRowId) || {};
+    const entry = { ...snapshot, ...(catalogEntry || {}) };
+    const applyBindingKey = String((copyBtn || applyBtn).getAttribute('data-apply-binding-key') || sectionKey).trim();
+    const units = resolveDisplayUnits(entry);
+    const unit = units.find((row) => String(row.unitKey || row.resultKey) === sectionKey)
+      || units.find((row) => String(row.applyBindingKey || row.resultKey) === applyBindingKey)
+      || { mode: 'leaf', unitKey: sectionKey, resultKey: applyBindingKey || sectionKey, applyBindingKey: applyBindingKey || sectionKey, title: sectionKey, valueField: '', inputId: sectionKey, actions: ['copy', 'apply'] };
+    const content = data ? resolveUnitContent(unit, data) : null;
     const text = content?.valueText || '';
     if (!text) return;
     if (copyBtn) {
@@ -660,15 +810,14 @@
       return;
     }
     const inputId = String(applyBtn.getAttribute('data-input-id') || sectionKey).trim();
-    this.applySectionValue(inputId, text, entry, sectionKey);
+    this.applySectionValue(inputId, text, entry, applyBindingKey || content?.applyBindingKey || sectionKey);
     notify('Applied', 'success', 'Updated the bound report field when configured.');
   };
 
   ReportAiAssistPanel.prototype.paintModalResult = function (summary, serviceLabel, entry) {
     if (!this.resultWrap || !this.resultBody) return;
     const bindingRowId = String(entry?.bindingRowId || '').trim();
-    const reportUi = entry?.reportUi || null;
-    const rendered = renderResultBodyHtml(summary, reportUi, bindingRowId);
+    const rendered = renderResultBodyHtml(summary, entry, bindingRowId);
     this.resultWrap.classList.toggle('is-error', Boolean(summary?.isError));
     if (this.resultIcon) {
       this.resultIcon.innerHTML = summary?.isError
@@ -751,8 +900,13 @@
       traceId: row.traceId || '',
       resultData: row.resultData || null
     };
-    const reportUi = row.reportUi || row.entrySnapshot?.reportUi || null;
-    const rendered = renderResultBodyHtml(summary, reportUi, row.bindingRowId);
+    const entryForRender = {
+      reportUi: row.reportUi || row.entrySnapshot?.reportUi || null,
+      displayUnits: row.displayUnits || row.entrySnapshot?.displayUnits || null,
+      outputs: row.outputs || row.entrySnapshot?.outputs || null,
+      outputBindings: row.entrySnapshot?.outputBindings || null
+    };
+    const rendered = renderResultBodyHtml(summary, entryForRender, row.bindingRowId);
     const when = row.at ? new Date(row.at).toLocaleString() : '';
     const ranBy = String(row.ranByLabel || '').trim();
     const metaLine = [when, ranBy ? `Ran by ${ranBy}` : ''].filter(Boolean).join(' · ');
@@ -833,16 +987,58 @@
     return this.modal;
   };
 
+  ReportAiAssistPanel.prototype.getServiceSelectionStorageKey = function () {
+    const parts = ['reportAiAssist', this.context];
+    if (this.context === 'matrix') {
+      parts.push(String(this.identity.assignmentId || ''));
+      parts.push(String(this.identity.assignmentRowId || ''));
+      parts.push(String(this.identity.teacherId || ''));
+    } else {
+      parts.push(String(this.identity.instanceId || ''));
+    }
+    return parts.filter(Boolean).join(':');
+  };
+
+  ReportAiAssistPanel.prototype.persistServiceSelection = function (bindingRowId) {
+    const id = String(bindingRowId || '').trim();
+    if (!id) return;
+    this._preferredBindingRowId = id;
+    try {
+      sessionStorage.setItem(this.getServiceSelectionStorageKey(), id);
+    } catch (_) { /* ignore */ }
+  };
+
+  ReportAiAssistPanel.prototype.resolveInitialBindingRowId = function () {
+    const catalog = this.catalog || [];
+    if (!catalog.length) return '';
+    const isValid = (id) => catalog.some((row) => String(row.bindingRowId) === String(id));
+    let stored = '';
+    try {
+      stored = String(sessionStorage.getItem(this.getServiceSelectionStorageKey()) || '').trim();
+    } catch (_) { /* ignore */ }
+    if (stored && isValid(stored)) return stored;
+    const preferred = String(this._preferredBindingRowId || '').trim();
+    if (preferred && isValid(preferred)) return preferred;
+    if (this._lastRunEntry?.bindingRowId && isValid(this._lastRunEntry.bindingRowId)) {
+      return String(this._lastRunEntry.bindingRowId);
+    }
+    if (catalog.length > 1) {
+      return String(catalog[catalog.length - 1].bindingRowId || '');
+    }
+    return String(catalog[0].bindingRowId || '');
+  };
+
   ReportAiAssistPanel.prototype.openModal = async function () {
     const modal = this.ensureModalInstance();
     if (!this.catalog.length || !modal) return;
     const pickerHidden = this.catalog.length <= 1;
     this.servicePickerWrap?.classList.toggle('d-none', pickerHidden);
+    const selectedId = this.resolveInitialBindingRowId();
     if (this.serviceSelect) {
       this.serviceSelect.innerHTML = this.catalog.map((entry) => (
         `<option value="${escapeHtml(entry.bindingRowId)}">${escapeHtml(entry.label || entry.serviceKey)}</option>`
       )).join('');
-      this.serviceSelect.value = this.catalog[0].bindingRowId;
+      this.serviceSelect.value = selectedId;
     }
     await this.refreshInputsFromServer();
     this.resultWrap?.classList.add('d-none');
@@ -862,9 +1058,26 @@
       if (!response.ok || payload.status !== 'success') throw new Error(payload.message || 'Prepare failed.');
       const refreshed = payload.service || entry;
       const serverDefaults = payload.inputs || refreshed.inputDefaults || entry.inputDefaults;
-      const answersOverride = (this.getAnswersOverride() || {}).answersOverride || {};
+      const answersOverride = this.getMergedAnswersOverride();
       const prefill = this.context === 'instance' ? readInstancePrefillSnapshot() : {};
-      const defaults = applyLiveBindingDefaults(serverDefaults, { ...entry, inputBindings: refreshed.inputBindings || entry.inputBindings }, answersOverride, prefill);
+      const inputMetaById = {};
+      (Array.isArray(refreshed.inputs) ? refreshed.inputs : Array.isArray(entry.inputs) ? entry.inputs : []).forEach((field) => {
+        const fid = String(field?.id || '').trim();
+        if (fid) inputMetaById[fid] = field;
+      });
+      let defaults = applyLiveBindingDefaults(
+        serverDefaults,
+        { ...entry, inputBindings: refreshed.inputBindings || entry.inputBindings },
+        answersOverride,
+        prefill,
+        inputMetaById
+      );
+      Object.keys(inputMetaById).forEach((inputId) => {
+        if (String(inputMetaById[inputId]?.type || '').toLowerCase() !== 'boolean') return;
+        if (defaults[inputId] !== undefined && defaults[inputId] !== null && defaults[inputId] !== '') {
+          defaults[inputId] = normalizeBooleanSelectValue(defaults[inputId]);
+        }
+      });
       entry.inputDefaults = defaults;
       if (refreshed.reportUi) entry.reportUi = refreshed.reportUi;
       if (refreshed.outputMode) entry.outputMode = refreshed.outputMode;
@@ -905,10 +1118,14 @@
       const payload = await response.json().catch(() => ({}));
       if (!response.ok || payload.status !== 'success') throw new Error(payload.message || 'Run failed.');
       const summary = summarizeRunResult(payload.result);
+      this.persistServiceSelection(entry.bindingRowId);
       this._lastRunEntry = {
         bindingRowId: entry.bindingRowId,
         inputBindings: entry.inputBindings,
+        outputBindings: entry.outputBindings || null,
         reportUi: entry.reportUi || null,
+        displayUnits: entry.displayUnits || null,
+        outputs: entry.outputs || null,
         outputMode: entry.outputMode || summary.mode
       };
       this.trayHiddenLocally = false;
@@ -956,7 +1173,11 @@
     } else {
       openBtn?.addEventListener('click', () => { void this.openModal(); });
     }
-    this.serviceSelect?.addEventListener('change', () => { void this.refreshInputsFromServer(); });
+    this.serviceSelect?.addEventListener('change', () => {
+      const id = String(this.serviceSelect?.value || '').trim();
+      if (id) this.persistServiceSelection(id);
+      void this.refreshInputsFromServer();
+    });
     this.runBtn?.addEventListener('click', () => { void this.runSelected(); });
     document.getElementById('reportAiAssistModalCopyResult')?.addEventListener('click', async () => {
       const plain = this.resultBody?.getAttribute('data-plain-text') || this.resultBody?.textContent || '';
@@ -976,8 +1197,13 @@
       if (!btn) return;
       const id = btn.getAttribute('data-copy-id');
       const row = id ? this.findTrayRowByUsageId(id) : null;
-      const copyPayload = row?.reportUi?.layout === 'sections' && row.resultData
-        ? formatSectionPlainText(row.resultData, row.reportUi)
+      const entryForCopy = {
+        reportUi: row?.reportUi || row?.entrySnapshot?.reportUi || null,
+        displayUnits: row?.displayUnits || row?.entrySnapshot?.displayUnits || null,
+        outputs: row?.outputs || row?.entrySnapshot?.outputs || null
+      };
+      const copyPayload = row?.resultData && resolveDisplayUnits(entryForCopy).length
+        ? formatDisplayUnitsPlainText(row.resultData, entryForCopy)
         : (row?.text || '');
       const ok = await copyText(copyPayload);
       notify(ok ? 'Copied' : 'Copy failed', ok ? 'success' : 'warning', ok ? 'Result copied to clipboard.' : 'Could not copy.');

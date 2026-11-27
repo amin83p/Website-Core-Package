@@ -172,6 +172,33 @@ function testBimprPresetLoadsFromJsonFile() {
   assert.strictEqual(preset.output.mode, 'json');
   assert.strictEqual(preset.output.jsonSchema['x-reportUi'].layout, 'sections');
   assert.strictEqual(preset.inputs.length, 5);
+  assert.match(preset.prompt.userPromptTemplate, /at least 4 and up to 5 complete sentences/i);
+  assert.match(preset.prompt.userPromptTemplate, /two-week Bi-MPR period/i);
+}
+
+function testNimprPresetAndRegistry() {
+  const { getDefinitionPreset, PRESET_DIR } = require(path.join(ROOT, 'packages/school/MVC/config/schoolAiServiceDefinitionPresets'));
+  const { listAiServices } = require(path.join(ROOT, 'packages/school/MVC/config/schoolAiServiceRegistry'));
+  const sync = require(path.join(ROOT, 'packages/school/MVC/services/school/schoolAiOutputFieldSyncService'));
+  assert.ok(fs.existsSync(path.join(PRESET_DIR, 'school.nimpr_goals_suggestions.json')));
+  const preset = getDefinitionPreset('school.nimpr_goals_suggestions');
+  assert.ok(preset);
+  assert.strictEqual(preset.output.mode, 'json');
+  assert.strictEqual(preset.inputs.length, 10);
+  assert.match(preset.prompt.userPromptTemplate, /at least 4 and up to 5 complete sentences/i);
+  assert.match(preset.prompt.userPromptTemplate, /two-week Bi-MPR period/i);
+  const inclListen = preset.inputs.find((row) => row.id === 'include_listening');
+  assert.strictEqual(inclListen?.type, 'boolean');
+  const registry = listAiServices();
+  assert.ok(registry.some((row) => row.serviceKey === 'school.nimpr_goals_suggestions'));
+  const outputs = sync.outputsFromFormUiAndReportUi(preset.output.jsonSchema);
+  assert.ok(outputs.some((row) => row.resultKey === 'goal_1.suggested'));
+  assert.ok(outputs.some((row) => row.resultKey === 'goal_1.rationale'));
+  assert.ok(!outputs.some((row) => row.resultKey === 'goal_1.revised'));
+  assert.ok(!outputs.some((row) => row.type === 'object'));
+  const units = sync.buildAiAssistDisplayUnits({ outputs: sync.sanitizeDefinitionOutputsForClient({ outputs }) }, preset.output.jsonSchema['x-reportUi']);
+  const goal1 = units.find((u) => u.mode === 'section' && u.unitKey === 'goal_1');
+  assert.strictEqual(goal1.applyBindingKey, 'goal_1.suggested');
 }
 
 function testListPagesIncludeTableModals() {
@@ -267,6 +294,7 @@ async function run() {
   testModelsRejectDisplayName();
   testCoerceInputsRequired();
   testBimprPresetLoadsFromJsonFile();
+  testNimprPresetAndRegistry();
   testListPagesIncludeTableModals();
   testReportAiAssistHistoryWiring();
   testAiAssistPagesUseMessageModalPartial();

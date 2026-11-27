@@ -5,7 +5,7 @@
       "label": "Goal 1",
       "type": "textarea",
       "required": false,
-      "helpText": "Optional. Up to four goals; leave blank if not used.",
+      "helpText": "Optional. Bi-MPR future goal for the full two-week period (4–5 sentences, max 490 characters). Leave blank if not used.",
       "defaultValue": ""
     },
     {
@@ -13,7 +13,7 @@
       "label": "Goal 2",
       "type": "textarea",
       "required": false,
-      "helpText": "Optional.",
+      "helpText": "Optional. Two-week period; 4–5 sentences; max 490 characters.",
       "defaultValue": ""
     },
     {
@@ -21,7 +21,7 @@
       "label": "Goal 3",
       "type": "textarea",
       "required": false,
-      "helpText": "Optional.",
+      "helpText": "Optional. Two-week period; 4–5 sentences; max 490 characters.",
       "defaultValue": ""
     },
     {
@@ -29,7 +29,7 @@
       "label": "Goal 4",
       "type": "textarea",
       "required": false,
-      "helpText": "Optional.",
+      "helpText": "Optional. Two-week period; 4–5 sentences; max 490 characters.",
       "defaultValue": ""
     },
     {
@@ -42,12 +42,12 @@
     }
   ],
   "prompt": {
-    "systemPrompt": "You are an expert editor for Bi-MPR future-goal statements on two-week student evaluation reports.\nRevise only the goal text supplied by the user. Keep the same meaning and intent unless a guideline requires a wording change.\nDo not invent new goals. Skip any goal input that is empty or whitespace-only.\nFor every goal you output, always include changeType and changeSummary so teachers can see what will change before they apply it.",
-    "userPromptTemplate": "Revise each non-empty goal below according to the requirements.\n\nRequirements / expectations / criteria (apply to each revised goal; each single goal must be at most 490 characters including letters, spaces, and punctuation):\n- Write future goals in future tense, singular form.\n- Do not use the word \"client\"; use the student name if provided ({{student_name}}), otherwise \"the student\", or subject pronouns.\n- Avoid unnecessary phrases such as \"Over the next two weeks\" and similar, because the report already refers to two weeks.\n- Do not include book titles, unit titles, unit numbers, or page numbers.\n- Do not use phrases like \"in this period\", \"in the next two weeks\", or equivalent time-frame boilerplate.\n\nChange labeling (per goal object in JSON):\n- changeType \"unchanged\" — wording already meets all rules; revised text matches input except trivial whitespace.\n- changeType \"minor_edit\" — small fixes (tense, pronouns, trimming boilerplate) with same meaning.\n- changeType \"updated\" — meaning preserved but noticeable rewording to meet guidelines.\n- changeType \"replaced\" — substantial rewrite while keeping the same educational intent.\n- changeSummary — one short sentence describing what changed (e.g. \"Replaced 'client' with student name\" or \"No wording changes.\").\n\nInputs:\nGoal 1:\n{{goal_1}}\n\nGoal 2:\n{{goal_2}}\n\nGoal 3:\n{{goal_3}}\n\nGoal 4:\n{{goal_4}}\n\nStudent name (optional): {{student_name}}"
+    "systemPrompt": "You are an expert editor for Bi-MPR future-goal statements on two-week student evaluation reports.\nRevise only the goal text supplied by the user. Keep the same meaning and intent unless a guideline requires a wording change.\nEach revised goal must describe progress for the full upcoming two-week reporting period (not a single lesson or one–two sessions) and use at least 4 and up to 5 complete sentences within the 490-character limit.\nIf a goal is too short or reads like a session plan, expand it to meet those rules while preserving intent.\nDo not invent new goals. Skip any goal input that is empty or whitespace-only.\nFor every goal you output, always include changeType and changeSummary so teachers can see what will change before they apply it.",
+    "userPromptTemplate": "Revise each non-empty goal below according to the requirements.\n\nTwo-week scope and length (apply to each revised goal):\n- Each goal is a plan for the student's progress over the full upcoming two-week Bi-MPR period, across classes in that window — not for a single lesson, class, or one–two sessions.\n- Write at least 4 and up to 5 complete sentences per goal. Do not leave one- or two-sentence goals unchanged if they are too short.\n- Each single goal must be at most 490 characters including letters, spaces, and punctuation; use concise sentences to fit.\n- If the input goal is shorter than 4 sentences or too session-specific, expand or rewrite to meet scope and length while preserving the teacher's intent; use changeType updated or replaced and explain in changeSummary.\n\nOther wording rules:\n- Write future goals in future tense, singular form.\n- Do not use the word \"client\"; use the student name if provided ({{student_name}}), otherwise \"the student\", or subject pronouns.\n- Avoid unnecessary phrases such as \"Over the next two weeks\" and similar, because the report already refers to two weeks.\n- Do not include book titles, unit titles, unit numbers, or page numbers.\n- Do not use phrases like \"in this period\", \"in the next two weeks\", or equivalent time-frame boilerplate.\n\nChange labeling (per goal object in JSON):\n- changeType \"unchanged\" — wording already meets all rules (including 4–5 sentences and two-week scope); revised text matches input except trivial whitespace.\n- changeType \"minor_edit\" — small fixes (tense, pronouns, trimming boilerplate) with same meaning.\n- changeType \"updated\" — meaning preserved but noticeable rewording to meet guidelines (including length/scope fixes).\n- changeType \"replaced\" — substantial rewrite while keeping the same educational intent.\n- changeSummary — one short sentence describing what changed (e.g. \"Expanded to four sentences for two-week scope\" or \"No wording changes.\").\n\nInputs:\nGoal 1:\n{{goal_1}}\n\nGoal 2:\n{{goal_2}}\n\nGoal 3:\n{{goal_3}}\n\nGoal 4:\n{{goal_4}}\n\nStudent name (optional): {{student_name}}"
   },
   "output": {
     "mode": "json",
-    "jsonInstructions": "Return a single JSON object only (no markdown fences). Include goal_1 through goal_4 only for goals that had non-empty input; omit keys for blank goals. Each goal value is an object with revised (string, max 490 chars), changeType (unchanged | minor_edit | updated | replaced), and changeSummary (short string). Apply uses revised only. Include notes (string) only for brief cross-goal editor notes; otherwise omit notes.",
+    "jsonInstructions": "Return a single JSON object only (no markdown fences). Include goal_1 through goal_4 only for goals that had non-empty input; omit keys for blank goals. Each goal value is an object with revised (string: 4–5 full sentences, two-week period scope, max 490 chars), changeType (unchanged | minor_edit | updated | replaced), and changeSummary (short string). Apply uses revised only. Include notes (string) only for brief cross-goal editor notes; otherwise omit notes.",
     "jsonSchema": {
       "type": "object",
       "additionalProperties": false,

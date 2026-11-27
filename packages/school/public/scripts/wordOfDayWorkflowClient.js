@@ -20,9 +20,7 @@
         icon: icon || 'error',
         buttons: [{ text: 'OK', class: icon === 'success' ? 'btn-success' : 'btn-primary' }]
       });
-      return;
     }
-    global.alert(String(message || title));
   }
 
   async function showConfirm(title, message, options) {
@@ -44,7 +42,7 @@
       });
       return result === confirmText;
     }
-    return global.confirm(String(message || title));
+    return false;
   }
 
   async function postWorkflowAction(entryId, action, options = {}) {
@@ -126,6 +124,7 @@
     postWorkflowAction,
     confirmRiskyAction,
     showAlert,
+    showConfirm,
     RISKY_ACTIONS
   };
 }(typeof window !== 'undefined' ? window : globalThis));

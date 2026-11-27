@@ -124,7 +124,7 @@ Display-history warning when moving to `reopened`/`submitted` or deleting displa
 | Operation | Scope | What user can do and see |
 | --- | --- | --- |
 | CONFIGURE | USER / OWNER / DEPARTMENT / DIVISION | No Access. |
-| CONFIGURE | ORGANIZATION / ADMIN | School settings Word of Day display policy (where words appear, show/hide contributor and difficulty on public displays, yearly contribution limit per user). Per-day word assignments via **Configure Display** modal on the Word of Day list only (`GET/PUT /school/word-of-day/api/display-schedule`). Unscheduled days use the automatic daily picker. |
+| CONFIGURE | ORGANIZATION / ADMIN | School settings Word of Day display policy (where words appear, show/hide contributor and difficulty on public displays, yearly contribution limit per user). Per-day word assignments via **Configure Display** modal on the Word of Day list only (`GET/PUT /school/word-of-day/api/display-schedule`): **Assign** (fixed word), **Automatic** (rotation picker), or **Exclude** (no new word that day—public page and widget **carry forward** to the most recent prior day with a word). Assign is disabled while a day is excluded. |
 
 ---
 

@@ -5,14 +5,25 @@ const schoolRepositories = require('../../repositories/school');
 const wordOfDayModel = require('../../models/school/wordOfDayModel');
 const wordOfDayPolicyService = require('./wordOfDayPolicyService');
 const wordOfDayDisplayScheduleService = require('./wordOfDayDisplayScheduleService');
+const wordOfDayDisplayScheduleModel = require('../../models/school/wordOfDayDisplayScheduleModel');
 const wordOfDayPolicyModel = require('../../models/school/wordOfDayPolicyModel');
 const { enrichEntryMedia } = require('./wordOfDayService');
 const { SCOPE_MODES } = require('./schoolDataScopeBuilder');
 const { requireCoreModule } = require('./schoolCoreModuleResolver');
 const { idsEqual, toPublicId } = requireCoreModule('MVC/utils/idAdapter');
 
+const MAX_CARRY_FORWARD_DAYS = 366;
+
 function hashSeed(value) {
   return crypto.createHash('sha256').update(String(value || '')).digest('hex');
+}
+
+function shiftDateKey(dateKey, deltaDays) {
+  const key = String(dateKey || '').trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return '';
+  const d = new Date(`${key}T12:00:00.000Z`);
+  d.setUTCDate(d.getUTCDate() + deltaDays);
+  return d.toISOString().slice(0, 10);
 }
 
 function mulberry32(seedInt) {
@@ -140,11 +151,64 @@ async function recordDisplayForDate(row, orgId, dateKey) {
   return schoolRepositories.wordOfDay.update(row.id, { display: nextDisplay }, { orgId: String(orgId || '').trim() });
 }
 
-async function pickEntryForDate(orgId, dateKey) {
+async function pickEntryForCalendarDate(orgId, dateKey) {
+  const mode = await wordOfDayDisplayScheduleModel.getDateSlotMode(orgId, dateKey);
+  if (mode === 'excluded') return null;
   const scheduled = await wordOfDayDisplayScheduleService.resolveScheduledEntryId(orgId, dateKey);
   if (scheduled) return scheduled;
   const approved = await listApprovedForOrg(orgId);
   return pickDailyEntry(approved, orgId, dateKey);
+}
+
+async function resolveEffectiveDisplay(orgId, requestedDateKey) {
+  const targetOrgId = String(orgId || '').trim();
+  const requested = String(requestedDateKey || '').trim();
+  if (!targetOrgId || !/^\d{4}-\d{2}-\d{2}$/.test(requested)) {
+    return {
+      orgId: targetOrgId,
+      requestedDateKey: requested,
+      effectiveDateKey: requested,
+      carriedForward: false,
+      entry: null
+    };
+  }
+
+  let cursor = requested;
+  for (let hops = 0; hops < MAX_CARRY_FORWARD_DAYS; hops += 1) {
+    const mode = await wordOfDayDisplayScheduleModel.getDateSlotMode(targetOrgId, cursor);
+    if (mode === 'excluded') {
+      const prev = shiftDateKey(cursor, -1);
+      if (!prev || prev >= cursor) break;
+      cursor = prev;
+      continue;
+    }
+    const picked = await pickEntryForCalendarDate(targetOrgId, cursor);
+    if (picked) {
+      return {
+        orgId: targetOrgId,
+        requestedDateKey: requested,
+        effectiveDateKey: cursor,
+        carriedForward: cursor !== requested,
+        entry: picked
+      };
+    }
+    const prev = shiftDateKey(cursor, -1);
+    if (!prev || prev >= cursor) break;
+    cursor = prev;
+  }
+
+  return {
+    orgId: targetOrgId,
+    requestedDateKey: requested,
+    effectiveDateKey: requested,
+    carriedForward: false,
+    entry: null
+  };
+}
+
+async function pickEntryForDate(orgId, dateKey) {
+  const resolved = await resolveEffectiveDisplay(orgId, dateKey);
+  return resolved.entry;
 }
 
 async function resolvePolicyForOrg(orgId, policy) {
@@ -158,30 +222,78 @@ async function resolveDailyDisplay({ orgId, dateKey, recordAnalytics = true, pol
   const targetOrgId = String(orgId || '').trim();
   const targetDate = String(dateKey || '').trim();
   if (!targetOrgId || !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
-    return { orgId: targetOrgId, dateKey: targetDate, entry: null };
+    return {
+      orgId: targetOrgId,
+      dateKey: targetDate,
+      requestedDateKey: targetDate,
+      effectiveDateKey: targetDate,
+      carriedForward: false,
+      entry: null
+    };
   }
   const displayPolicy = await resolvePolicyForOrg(targetOrgId, policy);
-  let picked = await pickEntryForDate(targetOrgId, targetDate);
-  if (!picked) return { orgId: targetOrgId, dateKey: targetDate, entry: null };
-  if (recordAnalytics) {
-    picked = await recordDisplayForDate(picked, targetOrgId, targetDate);
+  const resolved = await resolveEffectiveDisplay(targetOrgId, targetDate);
+  let picked = resolved.entry;
+  if (!picked) {
+    return {
+      orgId: targetOrgId,
+      dateKey: targetDate,
+      requestedDateKey: resolved.requestedDateKey,
+      effectiveDateKey: resolved.effectiveDateKey,
+      carriedForward: resolved.carriedForward,
+      entry: null
+    };
   }
-  return { orgId: targetOrgId, dateKey: targetDate, entry: redactForDisplay(picked, displayPolicy) };
+  if (recordAnalytics) {
+    picked = await recordDisplayForDate(picked, targetOrgId, resolved.effectiveDateKey);
+  }
+  return {
+    orgId: targetOrgId,
+    dateKey: targetDate,
+    requestedDateKey: resolved.requestedDateKey,
+    effectiveDateKey: resolved.effectiveDateKey,
+    carriedForward: resolved.carriedForward,
+    entry: redactForDisplay(picked, displayPolicy)
+  };
 }
 
 async function resolveDailyPublicDetail({ orgId, dateKey, recordAnalytics = true, policy = null }) {
   const targetOrgId = String(orgId || '').trim();
   const targetDate = String(dateKey || '').trim();
   if (!targetOrgId || !/^\d{4}-\d{2}-\d{2}$/.test(targetDate)) {
-    return { orgId: targetOrgId, dateKey: targetDate, entry: null };
+    return {
+      orgId: targetOrgId,
+      dateKey: targetDate,
+      requestedDateKey: targetDate,
+      effectiveDateKey: targetDate,
+      carriedForward: false,
+      entry: null
+    };
   }
   const displayPolicy = await resolvePolicyForOrg(targetOrgId, policy);
-  let picked = await pickEntryForDate(targetOrgId, targetDate);
-  if (!picked) return { orgId: targetOrgId, dateKey: targetDate, entry: null };
-  if (recordAnalytics) {
-    picked = await recordDisplayForDate(picked, targetOrgId, targetDate);
+  const resolved = await resolveEffectiveDisplay(targetOrgId, targetDate);
+  let picked = resolved.entry;
+  if (!picked) {
+    return {
+      orgId: targetOrgId,
+      dateKey: targetDate,
+      requestedDateKey: resolved.requestedDateKey,
+      effectiveDateKey: resolved.effectiveDateKey,
+      carriedForward: resolved.carriedForward,
+      entry: null
+    };
   }
-  return { orgId: targetOrgId, dateKey: targetDate, entry: redactForPublicDetail(picked, displayPolicy) };
+  if (recordAnalytics) {
+    picked = await recordDisplayForDate(picked, targetOrgId, resolved.effectiveDateKey);
+  }
+  return {
+    orgId: targetOrgId,
+    dateKey: targetDate,
+    requestedDateKey: resolved.requestedDateKey,
+    effectiveDateKey: resolved.effectiveDateKey,
+    carriedForward: resolved.carriedForward,
+    entry: redactForPublicDetail(picked, displayPolicy)
+  };
 }
 
 async function getApprovedEntryRowById(id) {
@@ -198,8 +310,11 @@ async function getEntryById(id) {
 
 module.exports = {
   hashSeed,
+  shiftDateKey,
   pickDailyEntry,
+  pickEntryForCalendarDate,
   pickEntryForDate,
+  resolveEffectiveDisplay,
   applyDisplayPolicy,
   redactForDisplay,
   redactForPublicDetail,

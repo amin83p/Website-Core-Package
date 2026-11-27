@@ -67,11 +67,31 @@ async function getScheduleForOrg(activeOrgId) {
   return orgScheduleFromDoc(doc, activeOrgId);
 }
 
+function parseSlotMode(slot) {
+  if (!slot || typeof slot !== 'object') return 'automatic';
+  if (String(slot.mode || '').trim().toLowerCase() === 'excluded') return 'excluded';
+  const entryId = String(slot.entryId || '').trim();
+  if (entryId) return 'scheduled';
+  return 'automatic';
+}
+
+async function getDateSlotMode(activeOrgId, dateKey) {
+  if (!isDateKey(dateKey)) return 'automatic';
+  const { byDate } = await getScheduleForOrg(activeOrgId);
+  const slot = byDate[String(dateKey).trim()];
+  return parseSlotMode(slot);
+}
+
+async function isDateExcluded(activeOrgId, dateKey) {
+  return (await getDateSlotMode(activeOrgId, dateKey)) === 'excluded';
+}
+
 async function getScheduledEntryId(activeOrgId, dateKey) {
   if (!isDateKey(dateKey)) return null;
   const { byDate } = await getScheduleForOrg(activeOrgId);
   const slot = byDate[String(dateKey).trim()];
   if (!slot || typeof slot !== 'object') return null;
+  if (parseSlotMode(slot) === 'excluded') return null;
   const entryId = String(slot.entryId || '').trim();
   return entryId || null;
 }
@@ -127,6 +147,11 @@ async function assignDate(activeOrgId, dateKey, entryId, auditUserId) {
     error.statusCode = 400;
     throw error;
   }
+  if (await isDateExcluded(activeOrgId, dk)) {
+    const error = new Error('This date is excluded from display. Include the day before assigning a word.');
+    error.statusCode = 409;
+    throw error;
+  }
   const eid = String(entryId || '').trim();
   if (!eid) {
     const error = new Error('Entry id is required.');
@@ -147,6 +172,46 @@ async function assignDate(activeOrgId, dateKey, entryId, auditUserId) {
   return { dateKey: dk, entryId: eid };
 }
 
+async function excludeDate(activeOrgId, dateKey, auditUserId) {
+  const dk = String(dateKey || '').trim();
+  if (!isDateKey(dk)) {
+    const error = new Error('A valid date (YYYY-MM-DD) is required.');
+    error.statusCode = 400;
+    throw error;
+  }
+  const now = new Date().toISOString();
+  await saveScheduleMutation(activeOrgId, (byDate) => {
+    byDate[dk] = {
+      mode: 'excluded',
+      audit: {
+        excludedBy: String(auditUserId || 'system'),
+        excludedAt: now
+      }
+    };
+    return byDate;
+  }, auditUserId);
+  return { dateKey: dk, mode: 'excluded' };
+}
+
+async function includeDate(activeOrgId, dateKey, auditUserId) {
+  const dk = String(dateKey || '').trim();
+  if (!isDateKey(dk)) {
+    const error = new Error('A valid date (YYYY-MM-DD) is required.');
+    error.statusCode = 400;
+    throw error;
+  }
+  if ((await getDateSlotMode(activeOrgId, dk)) !== 'excluded') {
+    const error = new Error('This date is not excluded.');
+    error.statusCode = 400;
+    throw error;
+  }
+  await saveScheduleMutation(activeOrgId, (byDate) => {
+    delete byDate[dk];
+    return byDate;
+  }, auditUserId);
+  return { dateKey: dk, mode: 'automatic' };
+}
+
 async function clearDate(activeOrgId, dateKey, auditUserId) {
   const dk = String(dateKey || '').trim();
   if (!isDateKey(dk)) {
@@ -163,8 +228,13 @@ async function clearDate(activeOrgId, dateKey, auditUserId) {
 
 module.exports = {
   isDateKey,
+  parseSlotMode,
   getScheduleForOrg,
+  getDateSlotMode,
+  isDateExcluded,
   getScheduledEntryId,
   assignDate,
+  excludeDate,
+  includeDate,
   clearDate
 };

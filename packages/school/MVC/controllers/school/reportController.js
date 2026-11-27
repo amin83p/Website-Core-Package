@@ -2900,13 +2900,14 @@ async function getTemplateAiServiceDefinition(req, res) {
     const {
       sanitizeDefinitionOutputsForClient
     } = require('../../services/school/schoolAiOutputFieldSyncService');
+    const outputs = sanitizeDefinitionOutputsForClient(definition);
     return res.json({
       status: 'success',
       serviceKey,
       label: registry.label || serviceKey,
       description: registry.description || '',
       inputs: reportTemplateAiBindingService.sanitizeDefinitionInputsForClient(definition),
-      outputs: sanitizeDefinitionOutputsForClient(definition)
+      outputs
     });
   } catch (error) {
     return res.status(400).json({ status: 'error', message: error.message || 'Could not load AI service definition.' });

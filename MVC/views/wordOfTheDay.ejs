@@ -4,6 +4,12 @@
     const detail = (typeof wordOfDayDetail !== 'undefined' && wordOfDayDetail) ? wordOfDayDetail : null;
     const entry = detail && detail.entry ? detail.entry : null;
     const dateKey = detail && detail.dateKey ? String(detail.dateKey) : '';
+    const effectiveDateKey = detail && detail.effectiveDateKey
+      ? String(detail.effectiveDateKey)
+      : dateKey;
+    const wodCarryForwardNote = (typeof carryForwardNote !== 'undefined' && carryForwardNote)
+      ? String(carryForwardNote)
+      : '';
     const orgId = detail && detail.orgId ? String(detail.orgId) : '';
     const summary = (typeof reactionSummary !== 'undefined' && reactionSummary) ? reactionSummary : { likes: 0, dislikes: 0, myVote: null };
     const pageErr = typeof pageError !== 'undefined' ? pageError : null;
@@ -68,6 +74,9 @@
         <p class="wod-public-kicker">Word of the Day</p>
         <% if (wodFormattedDateLabel) { %>
           <p class="wod-public-date-label"><%= wodFormattedDateLabel %></p>
+        <% } %>
+        <% if (wodCarryForwardNote) { %>
+          <p class="wod-public-carry-forward-note text-muted small mb-0"><%= wodCarryForwardNote %></p>
         <% } %>
       </header>
 
@@ -167,7 +176,7 @@
           <section class="wod-public-section" id="wodReactionPanel" data-wod-reaction-panel
             data-entry-id="<%= entry.id %>"
             data-org-id="<%= orgId %>"
-            data-date-key="<%= dateKey %>"
+            data-date-key="<%= effectiveDateKey %>"
             data-my-vote="<%= summary.myVote || '' %>">
             <h2 class="wod-public-section-label">Your feedback</h2>
             <p class="wod-public-reactions-intro">Your ideas help us improve our word choices.<% if (!user) { %> You can vote without signing in.<% } %></p>

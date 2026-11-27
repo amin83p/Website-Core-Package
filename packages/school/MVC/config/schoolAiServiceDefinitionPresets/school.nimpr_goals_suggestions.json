@@ -1,0 +1,173 @@
+{
+  "inputs": [
+    {
+      "id": "upcoming_coverage",
+      "label": "What you will cover (next two weeks)",
+      "type": "textarea",
+      "required": true,
+      "helpText": "Three or four short sentences in simple language about topics, tasks, and focus for the next two-week period.",
+      "defaultValue": ""
+    },
+    {
+      "id": "include_listening",
+      "label": "Include Listening goal",
+      "type": "boolean",
+      "required": false,
+      "helpText": "Set on the template (static true/false or boolean report field). When false, goal_1 is omitted from AI output.",
+      "defaultValue": "false"
+    },
+    {
+      "id": "include_speaking",
+      "label": "Include Speaking goal",
+      "type": "boolean",
+      "required": false,
+      "helpText": "Template binding; when false, goal_2 is omitted.",
+      "defaultValue": "false"
+    },
+    {
+      "id": "include_reading",
+      "label": "Include Reading goal",
+      "type": "boolean",
+      "required": false,
+      "helpText": "Template binding; when false, goal_3 is omitted.",
+      "defaultValue": "false"
+    },
+    {
+      "id": "include_writing",
+      "label": "Include Writing goal",
+      "type": "boolean",
+      "required": false,
+      "helpText": "Template binding; when false, goal_4 is omitted.",
+      "defaultValue": "false"
+    },
+    {
+      "id": "clb_listening",
+      "label": "Current CLB — Listening",
+      "type": "text",
+      "required": false,
+      "helpText": "Student current CLB for Listening (from report field or prefill).",
+      "defaultValue": ""
+    },
+    {
+      "id": "clb_speaking",
+      "label": "Current CLB — Speaking",
+      "type": "text",
+      "required": false,
+      "helpText": "Student current CLB for Speaking.",
+      "defaultValue": ""
+    },
+    {
+      "id": "clb_reading",
+      "label": "Current CLB — Reading",
+      "type": "text",
+      "required": false,
+      "helpText": "Student current CLB for Reading.",
+      "defaultValue": ""
+    },
+    {
+      "id": "clb_writing",
+      "label": "Current CLB — Writing",
+      "type": "text",
+      "required": false,
+      "helpText": "Student current CLB for Writing.",
+      "defaultValue": ""
+    },
+    {
+      "id": "student_name",
+      "label": "Student name (for pronouns/naming)",
+      "type": "text",
+      "required": false,
+      "helpText": "Use instead of the word \"client\" in goals.",
+      "defaultValue": ""
+    }
+  ],
+  "prompt": {
+    "systemPrompt": "You are an expert Bi-MPR future-goal writer for student evaluation reports.\nGenerate new suggested goals from the teacher's coverage plan and the student's CLB levels.\nYou are suggesting new goals, not editing or revising existing report text.\nInclude only skill slots the teacher enabled via include_* inputs.\nEach suggested goal must describe progress for the full upcoming two-week reporting period (not a single lesson or one–two sessions), using at least 4 and up to 5 complete sentences within the 490-character limit.\nEach goal object must include suggested (the goal text) and rationale (why it fits the CLB and coverage plan).",
+    "userPromptTemplate": "Suggest future goals for each ENABLED skill only, using the coverage plan and CLB levels below.\n\nSkill slots (fixed mapping — omit entire goal_N keys when that skill is disabled):\n- Listening → goal_1 when include_listening is true\n- Speaking → goal_2 when include_speaking is true\n- Reading → goal_3 when include_reading is true\n- Writing → goal_4 when include_writing is true\n\nTreat include_* as enabled when the value is true, yes, 1, or on.\n\nCLB alignment: each suggested goal must match the student's current CLB for that skill. Say so briefly in rationale.\n\nTwo-week scope and length (each suggested goal in suggested):\n- Describe learning progress for the full upcoming two-week Bi-MPR period, spread across classes in that window — not a single lesson, class, or one–two sessions.\n- Write at least 4 and up to 5 complete sentences per goal. Do not return short one- or two-sentence goals.\n- Each goal must be at most 490 characters including letters, spaces, and punctuation; use clear, concise sentences to stay within the limit.\n\nMPR wording rules:\n- Future tense, singular form.\n- Do not use the word \"client\"; use {{student_name}} when provided, otherwise \"the student\" or subject pronouns.\n- Avoid \"Over the next two weeks\" and similar boilerplate; the report already covers the period.\n- No book titles, unit titles, unit numbers, or page numbers.\n- No \"in this period\", \"in the next two weeks\", or equivalent time-frame filler.\n- Tie each goal to the coverage plan and that skill's CLB; do not invent unrelated activities.\n\nJSON shape for each included goal_N:\n- suggested (string) — the proposed future goal for the report field.\n- rationale (string) — one short sentence (e.g. CLB alignment or link to coverage topics). Shown to the teacher before Apply; not copied to the report field on Apply.\n\nEnabled skills:\nListening: {{include_listening}}\nSpeaking: {{include_speaking}}\nReading: {{include_reading}}\nWriting: {{include_writing}}\n\nCurrent CLB levels:\nListening: {{clb_listening}}\nSpeaking: {{clb_speaking}}\nReading: {{clb_reading}}\nWriting: {{clb_writing}}\n\nCoverage plan:\n{{upcoming_coverage}}\n\nStudent name (optional): {{student_name}}"
+  },
+  "output": {
+    "mode": "json",
+    "jsonInstructions": "Return a single JSON object only (no markdown fences). Include goal_1 through goal_4 only for skills whose include_* input is enabled (true, yes, 1, on). Do not include keys for disabled skills. Each included goal_N is an object with suggested (string: 4–5 full sentences, two-week period scope, max 490 chars) and rationale (short string). Report Apply uses suggested only. Optional notes (string) for cross-skill comments only.",
+    "jsonSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "goal_1": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "suggested": { "type": "string" },
+            "rationale": { "type": "string" }
+          },
+          "required": ["suggested", "rationale"]
+        },
+        "goal_2": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "suggested": { "type": "string" },
+            "rationale": { "type": "string" }
+          },
+          "required": ["suggested", "rationale"]
+        },
+        "goal_3": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "suggested": { "type": "string" },
+            "rationale": { "type": "string" }
+          },
+          "required": ["suggested", "rationale"]
+        },
+        "goal_4": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "suggested": { "type": "string" },
+            "rationale": { "type": "string" }
+          },
+          "required": ["suggested", "rationale"]
+        },
+        "notes": { "type": "string" }
+      },
+      "x-reportUi": {
+        "layout": "sections",
+        "sections": [
+          {
+            "resultKey": "goal_1",
+            "title": "Listening goal",
+            "actions": ["copy", "apply"],
+            "inputId": "",
+            "valueField": "suggested",
+            "changeSummaryField": "rationale"
+          },
+          {
+            "resultKey": "goal_2",
+            "title": "Speaking goal",
+            "actions": ["copy", "apply"],
+            "inputId": "",
+            "valueField": "suggested",
+            "changeSummaryField": "rationale"
+          },
+          {
+            "resultKey": "goal_3",
+            "title": "Reading goal",
+            "actions": ["copy", "apply"],
+            "inputId": "",
+            "valueField": "suggested",
+            "changeSummaryField": "rationale"
+          },
+          {
+            "resultKey": "goal_4",
+            "title": "Writing goal",
+            "actions": ["copy", "apply"],
+            "inputId": "",
+            "valueField": "suggested",
+            "changeSummaryField": "rationale"
+          },
+          { "resultKey": "notes", "title": "Notes", "actions": ["copy"], "inputId": "" }
+        ]
+      }
+    }
+  }
+}

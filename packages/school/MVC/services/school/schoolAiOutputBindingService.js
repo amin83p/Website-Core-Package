@@ -4,6 +4,7 @@ const { getDefinitionPreset } = require('../../config/schoolAiServiceDefinitionP
 const { getFormBindingProfile } = require('../../config/schoolAiFormBindingProfiles');
 const schoolAiOutputCatalogService = require('./schoolAiOutputCatalogService');
 const wordOfDayModel = require('../../models/school/wordOfDayModel');
+const { getValueAtResultPath } = require('./schoolAiOutputFieldSyncService');
 
 const ENUM_SANITIZERS = Object.freeze({
   wordTypes: {
@@ -89,13 +90,14 @@ function mapAiResultToFormValues(data, options = {}) {
   }
   const fields = {};
   (catalog.fields || []).forEach((field) => {
-    if (!Object.prototype.hasOwnProperty.call(source, field.resultKey)) {
+    const rawValue = getValueAtResultPath(source, field.resultKey);
+    if (rawValue === undefined && !Object.prototype.hasOwnProperty.call(source, field.resultKey)) {
       if (field.required) {
         throw new Error(`AI response did not include ${field.label || field.resultKey}.`);
       }
       return;
     }
-    fields[field.resultKey] = sanitizeFieldValue(field, source[field.resultKey]);
+    fields[field.resultKey] = sanitizeFieldValue(field, rawValue);
   });
   return fields;
 }

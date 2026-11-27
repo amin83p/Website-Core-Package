@@ -18,6 +18,7 @@ Registered keys live in `packages/school/MVC/config/schoolAiServiceRegistry.js`.
 
 - `school.report_review` — Report Review Service (`planned`)
 - `school.bimpr_goals_checker` — Bi-MPR Goals Checker (`implemented`; default preset JSON below)
+- `school.nimpr_goals_suggestions` — Bi-MPR Goals Suggestion (`implemented`; suggest goals from coverage plan + CLB)
 - `school.word_of_day_autofill` — Word of the Day Autofill (`implemented`; vocabulary form AI fill)
 
 ## Report template bindings
@@ -27,6 +28,10 @@ On **Reports → Templates**, the **AI services** section lets designers attach 
 At **report instance edit**, active bindings resolve against merged instance/prefill data. **Report Instance V2** exposes a single **AI Assist** button (modal + persistent results tray) backed by report-scoped APIs that do not require School AI Assist admin **READ_ALL**. The legacy (non-V2) editor still embeds one `schoolAiServiceRunner` per service when the user can access School AI Assist admin.
 
 On **Fill Reports** (matrix), the same **AI Assist** control appears once at the matrix level when every active binding uses only **shared** report fields (or non-field sources). If any binding maps an input to a **private** (per-student) field, matrix AI Assist is hidden; teachers run those services from **Report Instance V2** for the relevant student.
+
+When a template attaches **more than one** active AI service (for example **Bi-MPR Goals Checker** and **Bi-MPR Goals Suggestion**), the AI Assist modal shows a **Service** dropdown so teachers pick which binding to run. Use per-service **Label** on the template card to distinguish them (e.g. “Check goals” vs “Suggest goals”).
+
+On the report template **AI services** inputs table, optional service inputs have a **Hide** checkbox. When checked, teachers do not see that input in Fill Reports / instance AI Assist; values still resolve from the template binding (static, field, prefill) at prepare and run time. Required inputs cannot be hidden.
 
 ### JSON output and `x-reportUi` (report AI Assist UI)
 
@@ -42,14 +47,20 @@ Add a root **`x-reportUi`** object on the JSON schema (not sent to the model):
 
 ### JSON output fields catalog (`outputs[]`)
 
-When **output mode** is JSON, each service definition stores **`outputs[]`** (like `inputs[]`): `resultKey`, label, type, required, object subfields (`valueField`, …), and `status` (`active` | `schema_missing`). The JSON schema still defines the model contract; the catalog drives admin UI, validation, and report bindings.
+When **output mode** is JSON, each service definition stores **`outputs[]`** (like `inputs[]`): `resultKey`, label, type, required, and `status` (`active` | `schema_missing`). The JSON schema still defines the model contract; the catalog drives admin UI, validation, and report bindings.
+
+**Nested JSON objects** are never stored as output type `object`. **Sync from JSON schema** flattens nested `properties` into **dot-path** `resultKey` values (e.g. `goal_1.revised`, `goal_1.changeType`) so each row binds to one assignable field. Legacy parent rows (e.g. `goal_1` with type `object`) are marked **schema_missing** when sync adds the leaf paths.
 
 On **Service definitions → Edit** (JSON mode):
 
 - **Output fields** table lists catalog rows.
 - **Sync from JSON schema** / **Check sync** opens a modal: new keys, stale keys (never auto-deleted), and type/required updates. Stable `resultKey` values preserve report template links.
 
-**Report templates → AI services**: bind each **output** to a template field (`outputBindings`). At runtime, Report AI Assist Apply uses those bindings (with legacy `x-reportUi` / input binding fallback when `outputs[]` is empty).
+**Report templates → AI services**: each attached service is a **collapsible card** (header: service, label, active; body: input and output binding tables). Bind each **output** `resultKey` (dot path) to a template field with `source: field` in `outputBindings`. Outputs marked **Apply** in the service definition expect a target field; **Copy only** outputs never offer Apply in the results tray.
+
+The report AI Assist catalog includes **`displayUnits[]`** per binding (server-built from `outputs[]` + `x-reportUi`). Each unit is either a grouped **section** card or a **leaf** card per output key. **Apply** looks up `outputBindings[applyBindingKey]` using the leaf dot path (for example `goal_1.revised`), not only the parent section key. Leaf-only JSON services still render one card per output instead of a raw JSON blob when structured data is returned.
+
+Legacy `x-reportUi` and modal **input** bindings still apply when `outputBindings` or `displayUnits` are missing (older templates or cached pages).
 
 ### JSON output and `x-formUi` (form autofill)
 
@@ -71,6 +82,7 @@ When no org row exists in `schoolAiServiceDefinitions`, the app loads defaults f
 | Service key | Preset file |
 |-------------|-------------|
 | `school.bimpr_goals_checker` | `packages/school/MVC/config/schoolAiServiceDefinitionPresets/school.bimpr_goals_checker.json` |
+| `school.nimpr_goals_suggestions` | `packages/school/MVC/config/schoolAiServiceDefinitionPresets/school.nimpr_goals_suggestions.json` |
 | `school.word_of_day_autofill` | `packages/school/MVC/config/schoolAiServiceDefinitionPresets/school.word_of_day_autofill.json` |
 
 To configure the live service in the UI (no hardcoded JS):
@@ -87,11 +99,17 @@ To push a preset into Mongo after editing the JSON file:
 
 `node packages/school/scripts/maintenance/sync-bimpr-ai-service-definition.js`
 
+Bi-MPR Goals Suggestion (Mongo):
+
+`node packages/school/scripts/maintenance/sync-nimpr-ai-service-definition.js`
+
 Word of the Day autofill (Mongo only — does not update `data/school/schoolAiServiceDefinitions.json`):
 
 `node packages/school/scripts/maintenance/sync-word-of-day-ai-service-definition.js`
 
-The **`school.bimpr_goals_checker`** preset uses JSON with goals `goal_1`–`goal_4` and optional `notes`. Orgs with an older **markdown** saved definition should re-save using JSON mode and the schema from the preset file.
+The **`school.bimpr_goals_checker`** preset uses JSON with goals `goal_1`–`goal_4` and optional `notes`. Prompts require each revised goal to cover the **full two-week** Bi-MPR period (not one–two sessions) with **4–5 sentences** (still ≤490 characters). Orgs with an older **markdown** saved definition should re-save using JSON mode and the schema from the preset file.
+
+The **`school.nimpr_goals_suggestions`** service (**Bi-MPR Goals Suggestion**) generates suggested future goals from **`upcoming_coverage`** (teacher textarea) plus template-driven **`include_*`** skill toggles and **`clb_*`** fields. Fixed skill slots: **Listening → `goal_1`**, **Speaking → `goal_2`**, **Reading → `goal_3`**, **Writing → `goal_4`** (disabled skills are omitted from JSON). Each included goal returns **`suggested`** (goal text, same 4–5 sentence / two-week scope rules) and **`rationale`** (short CLB/coverage note for the AI Assist card only). Wording rules match Bi-MPR. **Template setup:** bind `include_listening` … `include_writing` as **boolean** inputs (usually **static** `true` or `false` per skill on the template), bind `clb_listening` … `clb_writing` to report **Current CLB** fields, leave `upcoming_coverage` **empty** on the template so teachers fill it at run time. **Outputs:** add only needed rows (e.g. `goal_1.suggested` → listening goal field) with **Source: field**. Assign provider/model under **Service assignments** and sync to Mongo with the sync script above.
 
 The **`school.word_of_day_autofill`** preset returns `pronunciation`, a multi-sentence practical `meaning`, three everyday `examples` (full sentences, not one-liners), `difficulty` (`easy` \| `medium` \| `hard`), and `wordTypes` aligned with the Word of the Day form. Teachers invoke it from **Word of the Day → New/Edit → Generate with AI** (`POST /school/word-of-day/api/ai-autofill`) only when they have an **active usage limit** row for **Word of the Day Autofill** or **All services** with remaining quota (**AI Assist → Usage Limits**). Assign **Gemini 2.5 Flash** (or Pro) under **Service assignments**. After editing the preset JSON, re-run the WoD sync script so Mongo matches disk (or paste prompts in **Service definitions → Edit**).
 

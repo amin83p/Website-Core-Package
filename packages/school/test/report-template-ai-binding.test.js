@@ -182,6 +182,64 @@ test('buildCatalogEntryFromBinding includes outputMode and reportUi', () => {
   assert.equal(entry.outputMode, 'json');
   assert.equal(entry.reportUi.sections[0].resultKey, 'goal_1');
   assert.equal(entry.reportUi.sections[0].valueField, 'revised');
+  assert.ok(Array.isArray(entry.displayUnits));
+  assert.equal(entry.displayUnits[0].applyBindingKey, 'goal_1.revised');
+});
+
+test('buildCatalogEntryFromBinding omits inputs hidden on template', () => {
+  const definition = {
+    prompt: { userPromptTemplate: 'x' },
+    inputs: [
+      { id: 'required_a', required: true },
+      { id: 'optional_b', required: false },
+      { id: 'optional_c', required: false }
+    ],
+    output: { mode: 'json', jsonSchema: { type: 'object', properties: {} } }
+  };
+  const entry = reportTemplateAiBindingService.buildCatalogEntryFromBinding(
+    {
+      id: 'ai_1',
+      serviceKey: 'school.report_review',
+      inputBindings: {
+        required_a: { source: 'static', value: 'yes' },
+        optional_b: { source: 'static', value: 'no', hiddenFromUser: true },
+        optional_c: { source: 'empty', value: '' }
+      }
+    },
+    definition
+  );
+  assert.ok(entry);
+  assert.deepEqual(entry.inputs.map((row) => row.id), ['required_a', 'optional_c']);
+});
+
+test('validateAiServicesForTemplate rejects hidden required input', () => {
+  const { errors } = reportTemplateAiBindingService.validateAiServicesForTemplate({
+    schema: { fields: [] },
+    aiServices: [{
+      serviceKey: 'school.report_review',
+      inputBindings: {
+        report_text: { source: 'static', value: 'x', hiddenFromUser: true }
+      }
+    }]
+  }, {
+    strict: true,
+    prefillCatalog,
+    definitionsByKey: {
+      'school.report_review': {
+        inputs: [{ id: 'report_text', required: true }],
+        outputs: []
+      }
+    }
+  });
+  assert.ok(errors.some((msg) => /cannot be hidden/i.test(msg)));
+});
+
+test('normalizeBindingRow preserves hiddenFromUser', () => {
+  const row = reportTemplateAiBindingService.normalizeStoredAiServices([{
+    serviceKey: 'school.report_review',
+    inputBindings: { a: { source: 'empty', hiddenFromUser: true } }
+  }])[0];
+  assert.equal(row.inputBindings.a.hiddenFromUser, true);
 });
 
 test('listActiveBindings skips inactive rows', () => {

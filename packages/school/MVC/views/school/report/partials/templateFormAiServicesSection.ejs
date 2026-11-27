@@ -1,3 +1,93 @@
+<style>
+  .template-ai-service-row {
+    overflow: hidden;
+    border-color: var(--bs-border-color) !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  }
+  .template-ai-service-row .template-ai-service-header {
+    background: linear-gradient(180deg, var(--bs-body-bg) 0%, var(--bs-tertiary-bg) 100%);
+  }
+  .template-ai-service-row .template-ai-service-row-toggle {
+    border: 0;
+    background: transparent;
+    color: inherit;
+    max-width: min(100%, 420px);
+  }
+  .template-ai-service-row .template-ai-service-row-toggle:hover,
+  .template-ai-service-row .template-ai-service-row-toggle:focus {
+    color: inherit;
+  }
+  .template-ai-service-row .template-ai-service-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.5rem;
+    background: var(--bs-primary-bg-subtle, #e7f1ff);
+    color: var(--bs-primary, #0d6efd);
+    flex-shrink: 0;
+  }
+  .template-ai-service-row .template-ai-service-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    line-height: 1.25;
+  }
+  .template-ai-service-row .template-ai-service-key {
+    font-size: 0.7rem;
+    font-family: var(--bs-font-monospace);
+    color: var(--bs-secondary-color);
+  }
+  .template-ai-service-row .template-ai-service-chevron {
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+  }
+  .template-ai-service-row .template-ai-service-row-toggle:not(.collapsed) .template-ai-service-chevron {
+    transform: rotate(180deg);
+  }
+  .template-ai-service-row .template-ai-service-toolbar {
+    flex: 1 1 220px;
+    justify-content: flex-end;
+  }
+  .template-ai-service-row .template-ai-service-label-wrap {
+    min-width: 10rem;
+    max-width: 14rem;
+  }
+  .template-ai-binding-panel {
+    background: var(--bs-tertiary-bg, #f8f9fa);
+    border-radius: 0.5rem;
+    padding: 0.75rem;
+  }
+  .template-ai-binding-panel__title {
+    font-size: 0.8rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+    text-transform: uppercase;
+    color: var(--bs-secondary-color);
+  }
+  .template-ai-bindings-table th {
+    font-size: 0.72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: var(--bs-secondary-color);
+    border-bottom-width: 1px;
+  }
+  .template-ai-bindings-table td {
+    vertical-align: middle;
+    padding-top: 0.65rem;
+    padding-bottom: 0.65rem;
+  }
+  .template-ai-bindings-table .binding-meta-key {
+    font-size: 0.68rem;
+    font-family: var(--bs-font-monospace);
+    color: var(--bs-secondary-color);
+  }
+  .template-ai-bindings-table .form-select,
+  .template-ai-bindings-table .form-control {
+    font-size: 0.8125rem;
+  }
+</style>
 <div class="card border-0 shadow-sm mb-3 template-form-section">
   <div class="card-header p-0">
     <button class="btn w-100 text-start d-flex align-items-center justify-content-between gap-2 px-3 py-3 template-section-toggle collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseAiServices" aria-expanded="false" aria-controls="collapseAiServices">
