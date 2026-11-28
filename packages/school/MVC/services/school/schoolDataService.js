@@ -87,6 +87,7 @@ const SCHOOL_ENTITY_REGISTRY = Object.freeze({
   classes: { repository: schoolRepositories.classes },
   classTemplates: { repository: schoolRepositories.classTemplates },
   holidays: { repository: schoolRepositories.holidays },
+  holidayYearCalendarStates: { repository: schoolRepositories.holidayYearCalendarStates },
   terms: { repository: schoolRepositories.terms },
   departments: { repository: schoolRepositories.departments },
   activityCategories: { repository: schoolRepositories.activityCategories },

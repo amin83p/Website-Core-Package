@@ -1,9 +1,28 @@
+<%
+  const access = (runAccess && typeof runAccess === 'object') ? runAccess : {};
+  const canCancel = access.canCancel === true;
+  const canExport = access.canExport === true;
+  const canPurge = access.canPurge === true;
+  const runListToolbarBtnsBeforePrint = [];
+  if (canExport) {
+    runListToolbarBtnsBeforePrint.push(
+      '<button type="button" id="scheduledTaskRunExportBtn" class="btn btn-filled btn-success btn-md me-2 mb-2" title="Export all rows matching current filters and search"><i class="bi bi-cloud-download me-1"></i> Export</button>'
+    );
+  }
+  if (canPurge) {
+    runListToolbarBtnsBeforePrint.push(
+      '<button type="button" id="scheduledTaskRunPurgeBtn" class="btn btn-filled btn-danger text-white btn-md me-2 mb-2" title="Remove succeeded, failed, and cancelled runs"><i class="bi bi-trash-fill me-1"></i> Purge finished runs</button>'
+    );
+  }
+%>
+
 <%- include('../partials/tablePages-start', {
   title,
   user,
   tableName,
   print,
   btn_export: false,
+  optionalBtnsBeforePrint: runListToolbarBtnsBeforePrint,
   headerManageBtns: [
     '<a href="/dashboard/section-nav/SCHEDULED_TASK_MANAGEMENT" class="btn btn-filled btn-secondary btn-md mb-2"><i class="bi bi-speedometer2 me-1"></i> Tasks Dashboard</a>'
   ],
@@ -11,8 +30,6 @@
 }) %>
 
 <%
-  const access = (runAccess && typeof runAccess === 'object') ? runAccess : {};
-  const canCancel = access.canCancel === true;
   const stateFilters = (filters && typeof filters === 'object') ? filters : {};
   const selectedTaskKeyFilter = String(stateFilters?.taskKey__eq || '').trim();
   const selectedOrgFilter = String(stateFilters?.orgId__eq || '').trim();
@@ -197,6 +214,66 @@
       buttonId: 'scheduledTaskRunFilterToggleBtn',
       iconId: 'scheduledTaskRunFilterToggleIcon'
     });
+
+    function buildRunExportUrl() {
+      const params = new URLSearchParams(window.location.search || '');
+      params.delete('page');
+      params.delete('limit');
+      if (!params.has('format')) params.set('format', 'csv');
+      const qs = params.toString();
+      return `/scheduled-tasks/runs/export${qs ? `?${qs}` : '?format=csv'}`;
+    }
+
+    async function requireAdminVerification(actionFn) {
+      if (typeof window.requestProtectedAction !== 'function') {
+        if (typeof actionFn === 'function') actionFn();
+        return;
+      }
+      await window.requestProtectedAction(typeof actionFn === 'function' ? actionFn : undefined);
+    }
+
+    const exportBtn = document.getElementById('scheduledTaskRunExportBtn');
+    if (exportBtn) {
+      exportBtn.addEventListener('click', async () => {
+        try {
+          await requireAdminVerification(() => {
+            window.location.href = buildRunExportUrl();
+          });
+        } catch (_) {
+          /* admin verification cancelled */
+        }
+      });
+    }
+
+    const purgeBtn = document.getElementById('scheduledTaskRunPurgeBtn');
+    if (purgeBtn) {
+      purgeBtn.addEventListener('click', async () => {
+        const confirmed = await actions.showModalMessage({
+          title: 'Purge Finished Runs',
+          icon: 'warning',
+          message: 'Delete all succeeded, failed, and cancelled task runs in your access scope? Pending and running runs are kept. This cannot be undone.',
+          buttons: [
+            { text: 'Cancel', class: 'btn-secondary', value: 'cancel' },
+            { text: 'Purge finished runs', class: 'btn-danger', value: 'confirm' }
+          ]
+        });
+        if (confirmed !== 'confirm') return;
+
+        try {
+          await requireAdminVerification();
+        } catch (_) {
+          return;
+        }
+
+        await actions.runScheduledTaskMutation({
+          url: '/scheduled-tasks/runs/purge-terminal',
+          loadingNote: 'Purging finished runs...',
+          successTitle: 'Purge Complete',
+          successMessage: 'Finished task runs were removed.',
+          body: { confirm: 'PURGE' }
+        });
+      });
+    }
 
     document.querySelectorAll('.scheduled-task-run-cancel-btn').forEach((btn) => {
       btn.addEventListener('click', async () => {

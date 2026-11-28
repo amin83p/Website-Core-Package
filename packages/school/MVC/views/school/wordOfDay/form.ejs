@@ -29,9 +29,11 @@ const wodIsPreSubmitStatus = !isEdit || wodEntryStatusLower === 'saved' || wodEn
 const showSaveAndSubmit = wodIsPreSubmitStatus && (isEdit ? Boolean(editCaps.canSubmit) : Boolean(wodFormAccess.canCreateWords));
 const wodSaveButtonLabel = wodIsPreSubmitStatus ? 'Save draft' : 'Save';
 const wodAiAssistAccess = typeof wordOfDayAiAssistAccess !== 'undefined' && wordOfDayAiAssistAccess ? wordOfDayAiAssistAccess : {};
-const canShowWodAiAutofill = Boolean(canEdit && wodAiAssistAccess.hasAssignedLimit);
-const canUseWodAiAutofill = Boolean(canShowWodAiAutofill && wodAiAssistAccess.allowed);
-const wodAiQuotaBlocked = canShowWodAiAutofill && !canUseWodAiAutofill;
+const wodAiAssignmentOk = wodAiAssistAccess.serviceAssignmentConfigured !== false;
+const wodAiAssignmentMsg = String(wodAiAssistAccess.serviceAssignmentMessage || '').trim();
+const canShowWodAiAutofill = Boolean(canEdit && (wodAiAssistAccess.allowed || wodAiAssistAccess.hasAssignedLimit || wodAiAssistAccess.superAdminBypass));
+const canUseWodAiAutofill = Boolean(canShowWodAiAutofill && wodAiAssistAccess.allowed && wodAiAssignmentOk);
+const wodAiQuotaBlocked = canShowWodAiAutofill && wodAiAssistAccess.hasAssignedLimit && !wodAiAssistAccess.allowed;
 const wodAiAutofillHint = wodAiAssistAccess.message || 'You have reached your allocated School AI limit. Contact your administrator for more credit.';
 const wodCurrentYearBucket = (authorStats && authorStats.byYear && wodContributionYear && authorStats.byYear[wodContributionYear])
   ? authorStats.byYear[wodContributionYear]
@@ -373,6 +375,8 @@ const wodStatusStatTone = Object.freeze({
           </div>
           <% if (canUseWodAiAutofill) { %>
             <div class="form-text">AI fill uses your org’s assigned model under AI Assist → Service assignments and counts against your usage limit.</div>
+          <% } else if (canShowWodAiAutofill && !wodAiAssignmentOk && wodAiAssignmentMsg) { %>
+            <div class="form-text text-warning"><%= wodAiAssignmentMsg %></div>
           <% } else if (canEdit && !canShowWodAiAutofill && wodAiAssistAccess.message) { %>
             <div class="form-text text-muted"><%= wodAiAssistAccess.message %></div>
           <% } %>
@@ -501,7 +505,9 @@ const wodStatusStatTone = Object.freeze({
     window.WordOfDayForm.init({
       csrfToken: document.querySelector('#wordOfDayForm input[name="_csrf"]')?.value || '',
       aiAutofill: {
-        allowed: <%= canUseWodAiAutofill ? 'true' : 'false' %>,
+        usageAllowed: <%= wodAiAssistAccess.allowed ? 'true' : 'false' %>,
+        serviceAssignmentConfigured: <%= wodAiAssignmentOk ? 'true' : 'false' %>,
+        serviceAssignmentMessage: <%- JSON.stringify(wodAiAssignmentMsg || 'Assign a provider key and model under AI Assist → Service assignments.') %>,
         blockedMessage: <%- JSON.stringify(wodAiQuotaBlocked ? wodAiAutofillHint : '') %>,
         bindings: <%- JSON.stringify(typeof wodAiFormOutputBindings !== 'undefined' ? wodAiFormOutputBindings : []) %>
       }

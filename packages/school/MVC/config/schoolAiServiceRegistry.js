@@ -28,6 +28,13 @@ const SCHOOL_AI_SERVICES = Object.freeze([
     description: 'Generate pronunciation, definition, three examples, difficulty, and word types from a vocabulary word.',
     status: 'implemented',
     category: 'word_of_day'
+  }),
+  Object.freeze({
+    serviceKey: 'school.holiday_cultural_observances',
+    label: 'Holiday Cultural Observances',
+    description: 'Resolve comma-separated cultural or religious occasion names to dated ranges for informational school-open observances.',
+    status: 'implemented',
+    category: 'holidays'
   })
 ]);
 

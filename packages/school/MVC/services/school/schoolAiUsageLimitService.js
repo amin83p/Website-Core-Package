@@ -3,6 +3,37 @@
 const schoolAiTokenUsageDataService = require('./schoolAiTokenUsageDataService');
 const schoolAiUserUsageLimitDataService = require('./schoolAiUserUsageLimitDataService');
 const { periodWindowStart, toPublicId } = require('./schoolAiAssistCommon');
+const { requireCoreModule } = require('./schoolCoreContracts');
+const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityService');
+
+function routingFields(routing = {}) {
+  const configured = Boolean(routing?.configured);
+  return {
+    serviceAssignmentConfigured: configured,
+    serviceAssignmentMessage: configured ? '' : String(routing?.message || '')
+  };
+}
+
+function buildSuperAdminBypassResult(routing = {}) {
+  return {
+    hasAssignedLimit: true,
+    allowed: true,
+    superAdminBypass: true,
+    code: '',
+    statusCode: 200,
+    message: '',
+    quotas: [],
+    ...routingFields(routing)
+  };
+}
+
+function withRouting(result, routing) {
+  return { ...result, ...routingFields(routing) };
+}
+
+function isSuperAdminRequestingUser(requestingUser) {
+  return Boolean(adminAuthorityService.isSuperAdmin(requestingUser));
+}
 
 function limitAppliesToService(limit, serviceKey) {
   const appliesTo = String(limit?.appliesTo || 'all_services');
@@ -79,6 +110,17 @@ async function evaluateServiceAccess({
   };
   if (!orgToken || !userToken || !key) return { ...deniedNoLimit };
 
+  const actor = requestingUser || { id: userToken, activeOrgId: orgToken };
+  const { getRoutingStatus } = require('./schoolAiRuntimeService');
+  const routing = await getRoutingStatus(
+    { serviceKey: key, requestingUser: actor },
+    accessContext
+  );
+
+  if (isSuperAdminRequestingUser(actor)) {
+    return buildSuperAdminBypassResult(routing);
+  }
+
   const limits = await schoolAiUserUsageLimitDataService.listActiveLimitsForUser(
     orgToken,
     userToken,
@@ -86,7 +128,7 @@ async function evaluateServiceAccess({
     accessContext
   );
   const applicable = pickApplicableLimits(limits, key);
-  if (!applicable.length) return { ...deniedNoLimit };
+  if (!applicable.length) return withRouting({ ...deniedNoLimit }, routing);
 
   const quotaRows = [];
   for (const limit of applicable) {
@@ -108,31 +150,34 @@ async function evaluateServiceAccess({
       } else if (row.requestsBlocked) {
         message = `You have used your allocated request limit (${row.periodType}: ${row.requestsUsed} of ${row.maxRequests}). Contact your administrator for more credit.`;
       }
-      return {
+      return withRouting({
         hasAssignedLimit: true,
         allowed: false,
         code,
         statusCode: 403,
         message,
         quotas: quotaRows
-      };
+      }, routing);
     }
   }
 
-  return {
+  return withRouting({
     hasAssignedLimit: true,
     allowed: true,
     code: '',
     statusCode: 200,
     message: '',
     quotas: quotaRows
-  };
+  }, routing);
 }
 
 async function assertWithinLimit({ orgId, userId, serviceKey = null, requestingUser = null }) {
   const orgToken = toPublicId(orgId);
   const userToken = toPublicId(userId);
   if (!orgToken || !userToken) return;
+
+  const actor = requestingUser || { id: userToken, activeOrgId: orgToken };
+  if (isSuperAdminRequestingUser(actor)) return;
 
   const limits = await schoolAiUserUsageLimitDataService.listActiveLimitsForUser(
     orgToken,
@@ -165,5 +210,7 @@ module.exports = {
   limitAppliesToService,
   limitHasRunnableQuota,
   evaluateServiceAccess,
-  assertWithinLimit
+  assertWithinLimit,
+  buildSuperAdminBypassResult,
+  isSuperAdminRequestingUser
 };

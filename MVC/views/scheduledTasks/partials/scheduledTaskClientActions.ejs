@@ -37,7 +37,7 @@
         });
     }
 
-    async function postScheduledTaskAction(url, options = {}) {
+    async function postScheduledTaskAction(url, options = {}, allowAdminRetry = true) {
       const actionStateId = String(options.actionStateId || getActionStateId() || '').trim();
       const payload = new URLSearchParams();
       if (actionStateId) payload.set('actionStateId', actionStateId);
@@ -81,9 +81,17 @@
         };
       }
 
+      if (response.status === 403 && result?.status === 'admin_required' && allowAdminRetry) {
+        if (typeof window.requestProtectedAction === 'function') {
+          await window.requestProtectedAction();
+          return postScheduledTaskAction(url, options, false);
+        }
+      }
+
       if (!response.ok || result.status !== 'success') {
         const err = new Error(String(result.message || 'Request failed.').replace(/<[^>]*>/g, ' ').trim());
         err.payload = result;
+        err.status = response.status;
         throw err;
       }
       return result;

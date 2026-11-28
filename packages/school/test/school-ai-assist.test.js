@@ -191,6 +191,7 @@ function testNimprPresetAndRegistry() {
   assert.strictEqual(inclListen?.type, 'boolean');
   const registry = listAiServices();
   assert.ok(registry.some((row) => row.serviceKey === 'school.nimpr_goals_suggestions'));
+  assert.ok(registry.some((row) => row.serviceKey === 'school.holiday_cultural_observances'));
   const outputs = sync.outputsFromFormUiAndReportUi(preset.output.jsonSchema);
   assert.ok(outputs.some((row) => row.resultKey === 'goal_1.suggested'));
   assert.ok(outputs.some((row) => row.resultKey === 'goal_1.rationale'));

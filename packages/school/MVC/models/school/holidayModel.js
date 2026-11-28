@@ -7,6 +7,7 @@ const schoolCatalogEntityIdService = require('../../services/school/schoolCatalo
 const { resolveJsonEntityCreateId } = require('../../services/school/schoolJsonEntityCreateIdService');
 
 const dataPath = path.join(resolveCoreRoot(), 'data/school/holidays.json');
+const SCHOOL_OPEN_OBSERVANCE_TYPE = 'Cultural Observance (School Open)';
 
 async function getAllHolidays() {
     try {
@@ -65,6 +66,14 @@ function cleanOptionalBoolean(v) {
     return undefined;
 }
 
+function resolveCountsAsSchoolOff(input = {}, type = '') {
+    const explicit = cleanOptionalBoolean(input.countsAsSchoolOff);
+    if (explicit !== undefined) return explicit;
+    const typeToken = cleanString(type || input.type, { max: 60, allowEmpty: true });
+    if (typeToken === SCHOOL_OPEN_OBSERVANCE_TYPE) return false;
+    return true;
+}
+
 function sanitizeHolidayInput(input) {
     if (!input || typeof input !== 'object' || Array.isArray(input)) {
         throw new Error('Invalid holiday payload.');
@@ -78,12 +87,14 @@ function sanitizeHolidayInput(input) {
     if (!title) throw new Error('Holiday title is required.');
 
     const statutoryHolidayPayable = cleanOptionalBoolean(input.statutoryHolidayPayable);
+    const type = cleanString(input.type, { max: 60, allowEmpty: true }) || 'Holiday';
     const sanitized = {
         orgId: String(orgId),
         date,
         title,
-        type: cleanString(input.type, { max: 60, allowEmpty: true }) || 'Holiday',
-        notes: cleanString(input.notes, { max: 1000, allowEmpty: true })
+        type,
+        notes: cleanString(input.notes, { max: 1000, allowEmpty: true }),
+        countsAsSchoolOff: resolveCountsAsSchoolOff(input, type)
     };
     if (statutoryHolidayPayable !== undefined) {
         sanitized.statutoryHolidayPayable = statutoryHolidayPayable;
@@ -175,12 +186,14 @@ async function deleteHoliday(id) {
 }
 
 module.exports = {
+    SCHOOL_OPEN_OBSERVANCE_TYPE,
     getAllHolidays,
     getHolidayById,
     addHoliday,
     updateHoliday,
     deleteHoliday,
-    sanitizeHolidayInput
+    sanitizeHolidayInput,
+    resolveCountsAsSchoolOff
 };
 
 

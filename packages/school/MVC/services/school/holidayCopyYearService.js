@@ -104,6 +104,9 @@ function buildCopyCandidate(sourceRow, targetYear, orgId) {
   if (sourceRow.statutoryHolidayPayable === true || sourceRow.statutoryHolidayPayable === false) {
     payload.statutoryHolidayPayable = sourceRow.statutoryHolidayPayable;
   }
+  if (sourceRow.countsAsSchoolOff === true || sourceRow.countsAsSchoolOff === false) {
+    payload.countsAsSchoolOff = sourceRow.countsAsSchoolOff;
+  }
   return payload;
 }
 
@@ -169,7 +172,8 @@ async function copyHolidaysFromYear({
             title: candidate.title,
             type: candidate.type,
             notes: candidate.notes,
-            statutoryHolidayPayable: candidate.statutoryHolidayPayable
+            statutoryHolidayPayable: candidate.statutoryHolidayPayable,
+            countsAsSchoolOff: candidate.countsAsSchoolOff
           });
           summary.updated += 1;
           continue;

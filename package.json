@@ -119,7 +119,8 @@
     "school:timesheets:three-state:backfill": "node scripts/school/migration/backfillTimesheetThreeStateLifecycle.js",
     "school:timesheets:three-state:backfill:apply": "node scripts/school/migration/backfillTimesheetThreeStateLifecycle.js --apply",
     "school:attendance-timing-detail:backfill": "node scripts/school/migration/backfillAttendanceTimingDetail.js",
-    "school:attendance-timing-detail:backfill:apply": "node scripts/school/migration/backfillAttendanceTimingDetail.js --apply"
+    "school:attendance-timing-detail:backfill:apply": "node scripts/school/migration/backfillAttendanceTimingDetail.js --apply",
+    "school:ai:sync-holiday-cultural-observances": "node packages/school/scripts/maintenance/sync-holiday-cultural-observances-ai-service-definition.js"
   },
   "keywords": [],
   "author": "",

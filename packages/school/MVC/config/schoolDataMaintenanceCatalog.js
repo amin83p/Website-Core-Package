@@ -32,6 +32,7 @@ const LABEL_FIELDS = Object.freeze({
   terms: ['name', 'code'],
   departments: ['name', 'code'],
   holidays: ['name'],
+  holidayYearCalendarStates: ['year'],
   reportTemplates: ['title'],
   reportAssignments: ['templateId'],
   reportInstances: ['assignmentId'],
@@ -93,6 +94,7 @@ const SCHOOL_DATA_MAINTENANCE_CATALOG = Object.freeze([
   { entityType: 'classes', label: 'Classes', group: 'academics', collectionName: 'schoolClasses', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: false, cascadeClassSessionAssets: true },
   { entityType: 'classSessions', label: 'Class Sessions', group: 'academics', collectionName: 'schoolClassSessions', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true, storage: 'classSessions' },
   { entityType: 'holidays', label: 'Holidays', group: 'academics', collectionName: 'schoolHolidays', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: false },
+  { entityType: 'holidayYearCalendarStates', label: 'Holiday year AI batches', group: 'academics', collectionName: 'schoolHolidayYearCalendarStates', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: false },
   { entityType: 'classEnrollmentPeriods', label: 'Class Enrollment Periods', group: 'academics', collectionName: 'schoolClassEnrollmentPeriods', deleteStrategy: DELETE_STRATEGIES.REMOVE, supportsClearAll: true },
 
   { entityType: 'studentProgramRegistrations', label: 'Program Registrations', group: 'registrations', collectionName: 'schoolStudentProgramRegistrations', deleteStrategy: DELETE_STRATEGIES.MAINTENANCE_PURGE, supportsClearAll: true },

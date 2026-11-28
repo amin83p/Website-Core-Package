@@ -144,6 +144,14 @@ function candidateTimesheetId() {
   return `TS_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
 }
 
+function candidateHolidayYearCalendarStateId() {
+  return `HYCS-${Math.floor(10000 + Math.random() * 90000)}`;
+}
+
+function candidateHolidayAiBatchId() {
+  return `HYB-${Date.now()}-${Math.random().toString(36).slice(2, 7).toUpperCase()}`;
+}
+
 function candidateHolidayId() {
   return `HOL-${Math.floor(10000 + Math.random() * 90000)}`;
 }
@@ -219,6 +227,7 @@ module.exports = {
   allocateUniqueTimesheetPeriodId: wrapAllocator(candidateTimesheetPeriodId),
   allocateUniqueTimesheetId: wrapAllocator(candidateTimesheetId),
   allocateUniqueHolidayId: wrapAllocator(candidateHolidayId),
+  allocateUniqueHolidayYearCalendarStateId: wrapAllocator(candidateHolidayYearCalendarStateId),
   allocateUniqueGlobalTransactionId: wrapAllocator(candidateGlobalTransactionId),
   allocateUniqueAcademicLedgerEntryId: wrapAllocator(candidateAcademicLedgerEntryId)
 };

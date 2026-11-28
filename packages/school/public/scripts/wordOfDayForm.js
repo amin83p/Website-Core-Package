@@ -315,7 +315,9 @@
   }
 
   let aiAutofillRunning = false;
-  let aiAutofillAllowed = true;
+  let aiAutofillUsageAllowed = true;
+  let aiAutofillAssignmentConfigured = true;
+  let aiAutofillAssignmentMessage = '';
   let aiAutofillBlockedMessage = '';
   let aiAutofillBindings = [];
 
@@ -335,10 +337,18 @@
   }
 
   async function runAiAutofill() {
-    if (!aiAutofillAllowed) {
+    if (!aiAutofillUsageAllowed) {
       await showAlert(
         'AI credit limit',
         aiAutofillBlockedMessage || 'You have reached your allocated School AI limit. Contact your administrator for more credit.',
+        'warning'
+      );
+      return;
+    }
+    if (!aiAutofillAssignmentConfigured) {
+      await showAlert(
+        'AI service not configured',
+        aiAutofillAssignmentMessage || 'Assign a provider key and model under AI Assist → Service assignments.',
         'warning'
       );
       return;
@@ -575,7 +585,11 @@
   function init(options = {}) {
     csrf = String(options.csrfToken || '').trim();
     const aiOpts = options.aiAutofill && typeof options.aiAutofill === 'object' ? options.aiAutofill : {};
-    aiAutofillAllowed = aiOpts.allowed !== false;
+    aiAutofillUsageAllowed = aiOpts.usageAllowed !== undefined
+      ? aiOpts.usageAllowed !== false
+      : aiOpts.allowed !== false;
+    aiAutofillAssignmentConfigured = aiOpts.serviceAssignmentConfigured !== false;
+    aiAutofillAssignmentMessage = String(aiOpts.serviceAssignmentMessage || '').trim();
     aiAutofillBlockedMessage = String(aiOpts.blockedMessage || '').trim();
     aiAutofillBindings = Array.isArray(aiOpts.bindings) ? aiOpts.bindings : [];
     const form = qs('wordOfDayForm');

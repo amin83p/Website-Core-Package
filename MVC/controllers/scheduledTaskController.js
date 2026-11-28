@@ -366,6 +366,75 @@ async function cancelRun(req, res) {
   });
 }
 
+function buildRunExportQuery(req) {
+  const query = buildListQuery(req, { sortBy: 'scheduledFor', sortDir: 'desc' });
+  delete query.page;
+  delete query.limit;
+  return query;
+}
+
+function buildRunExportFilename(format = 'csv') {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const ext = String(format || 'csv').toLowerCase() === 'json' ? 'json' : 'csv';
+  return `scheduled-task-runs-${stamp}.${ext}`;
+}
+
+async function exportRuns(req, res) {
+  try {
+    const format = cleanText(req.query?.format || 'csv').toLowerCase() === 'json' ? 'json' : 'csv';
+    const query = buildRunExportQuery(req);
+    const { rows, flatRows } = await scheduledTaskRunService.exportRuns(query);
+    const filename = buildRunExportFilename(format);
+
+    if (format === 'json') {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      return res.send(JSON.stringify(rows, null, 2));
+    }
+
+    const csv = scheduledTaskRunService.runsToCsv(flatRows);
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    return res.send(csv);
+  } catch (error) {
+    const statusCode = Number(error?.statusCode) === 400 ? 400 : 500;
+    const message = cleanText(error?.message || error) || 'Unable to export task runs.';
+    if (isAjax(req)) {
+      return res.status(statusCode).json({ status: 'error', message });
+    }
+    return res.status(statusCode).render('error', {
+      title: 'Export Failed',
+      message,
+      user: req.user || null
+    });
+  }
+}
+
+async function purgeTerminalRuns(req, res) {
+  const confirm = cleanText(req.body?.confirm);
+  if (confirm !== 'PURGE') {
+    return respondMutation(req, res, {
+      successRedirect: '/scheduled-tasks/runs',
+      successMessage: 'Purge cancelled.'
+    }, async () => {
+      throw new Error('Type PURGE to confirm deleting finished task runs.');
+    });
+  }
+
+  return respondMutation(req, res, {
+    successRedirect: '/scheduled-tasks/runs',
+    successMessage: 'Finished task runs purged.'
+  }, async () => {
+    const result = await scheduledTaskRunService.purgeTerminalRuns();
+    const message = `Purged ${result.deletedCount} finished run(s). Kept ${result.keptPending} pending and ${result.keptRunning} running.`;
+    return {
+      message,
+      resultSummary: message,
+      metrics: result
+    };
+  });
+}
+
 async function cancelOutboxEntry(req, res) {
   const id = cleanText(req.params.id);
   return respondMutation(req, res, {
@@ -456,6 +525,8 @@ module.exports = {
   updateDefinitionNextRun,
   getPrepareConflicts,
   cancelRun,
+  exportRuns,
+  purgeTerminalRuns,
   cancelOutboxEntry,
   bulkCancelOutbox,
   bulkDeleteOutbox,

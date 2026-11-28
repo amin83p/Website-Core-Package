@@ -302,6 +302,7 @@ function buildCatalog() {
     { key: 'school.subjects', domain: 'School', section: 'Subjects', source: 'school/subjects.json', collection: 'schoolSubjects' },
     { key: 'school.classes', domain: 'School', section: 'Classes', source: 'school/classes.json', collection: 'schoolClasses' },
     { key: 'school.holidays', domain: 'School', section: 'Holidays', source: 'school/holidays.json', collection: 'schoolHolidays' },
+    { key: 'school.holidayYearCalendarStates', domain: 'School', section: 'Holidays', source: 'school/holidayYearCalendarStates.json', collection: 'schoolHolidayYearCalendarStates' },
     { key: 'school.terms', domain: 'School', section: 'Terms', source: 'school/terms.json', collection: 'schoolTerms' },
     { key: 'school.departments', domain: 'School', section: 'Departments', source: 'school/departments.json', collection: 'schoolDepartments' },
     { key: 'school.teachers', domain: 'School', section: 'Teachers', source: 'school/teachers.json', collection: 'schoolTeachers' },

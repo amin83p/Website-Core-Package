@@ -7,6 +7,7 @@ const subjectModel = require('../../models/school/subjectModel');
 const classModel = require('../../models/school/classModel');
 const classTemplateModel = require('../../models/school/classTemplateModel');
 const holidayModel = require('../../models/school/holidayModel');
+const holidayYearCalendarStateModel = require('../../models/school/holidayYearCalendarStateModel');
 const departmentModel = require('../../models/school/departmentModel');
 const activityCategoryModel = require('../../models/school/activityCategoryModel');
 const activityModel = require('../../models/school/activityModel');
@@ -1367,6 +1368,18 @@ const schoolRepositories = {
     remove: holidayModel.deleteHoliday,
     generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueHolidayId),
     defaultSearchFields: ['id', 'title', 'type', 'description'],
+    assignmentScopeKind: 'catalog'
+  }),
+  holidayYearCalendarStates: createSchoolRepository({
+    entityName: 'holidayYearCalendarStates',
+    collectionName: 'schoolHolidayYearCalendarStates',
+    getAll: holidayYearCalendarStateModel.getAllHolidayYearCalendarStates,
+    getById: holidayYearCalendarStateModel.getHolidayYearCalendarStateById,
+    create: holidayYearCalendarStateModel.addHolidayYearCalendarState,
+    update: holidayYearCalendarStateModel.updateHolidayYearCalendarState,
+    remove: holidayYearCalendarStateModel.deleteHolidayYearCalendarState,
+    generateMongoCreateId: mongoCreateIdFromAllocator(schoolCatalogEntityIdService.allocateUniqueHolidayYearCalendarStateId),
+    defaultSearchFields: ['id', 'orgId', 'year'],
     assignmentScopeKind: 'catalog'
   }),
   terms: createSchoolRepository({
@@ -3224,6 +3237,7 @@ assertQueryableCrudRepository('schoolRepositories.examAnswers', schoolRepositori
 assertQueryableCrudRepository('schoolRepositories.subjects', schoolRepositories.subjects);
 assertQueryableCrudRepository('schoolRepositories.classes', schoolRepositories.classes);
 assertQueryableCrudRepository('schoolRepositories.holidays', schoolRepositories.holidays);
+assertQueryableCrudRepository('schoolRepositories.holidayYearCalendarStates', schoolRepositories.holidayYearCalendarStates);
 assertQueryableCrudRepository('schoolRepositories.terms', schoolRepositories.terms);
 assertQueryableCrudRepository('schoolRepositories.departments', schoolRepositories.departments);
 assertQueryableCrudRepository('schoolRepositories.activityCategories', schoolRepositories.activityCategories);

@@ -11,6 +11,9 @@ const adminAuthorityService = requireCoreModule('MVC/services/adminAuthorityServ
 const { respondSchoolDeleteError } = require('../../utils/schoolDeleteErrorResponse');
 const { resolveOrgYearFromRequest, resolveOrgTodayFromRequest } = requireCoreModule('MVC/utils/timezoneUtils');
 const holidayCopyYearService = require('../../services/school/holidayCopyYearService');
+const holidayCulturalObservancesAiService = require('../../services/school/holidayCulturalObservancesAiService');
+const holidayAiObservanceBatchService = require('../../services/school/holidayAiObservanceBatchService');
+const schoolAiUsageLimitService = require('../../services/school/schoolAiUsageLimitService');
 
 function getActiveOrgIdOrThrow(reqUser) {
     const activeOrgId = reqUser?.activeOrgId ? String(reqUser.activeOrgId) : '';
@@ -59,6 +62,20 @@ function sendGuardedResponse(req, res, guardResult, duplicateMessage, duplicateS
     return false;
 }
 
+async function resolveHolidayAiObservanceAccess(req) {
+    const accessContext = schoolDataService.buildRouteAccessContext(req);
+    const orgId = getActiveOrgIdOrThrow(req.user);
+    const userId = String(req.user?.id || '').trim();
+    return schoolAiUsageLimitService.evaluateServiceAccess({
+        orgId,
+        userId,
+        serviceKey: holidayCulturalObservancesAiService.SERVICE_KEY,
+        requestingUser: req.user,
+        accessContext,
+        noLimitMessage: `Holiday AI observances require an active usage limit for your account under AI Assist → Usage Limits (Holiday Cultural Observances or All services).`
+    });
+}
+
 async function listHolidays(req, res) {
     try {
         const query = await buildDataServiceQuery(req.query, { allowedExactKeys: null });
@@ -89,6 +106,21 @@ async function listHolidays(req, res) {
         const { data, pagination } = paginate(filteredHolidays, query.page, query.limit);
         const holidayYearsWithData = holidayCopyYearService.listDistinctHolidayYears(allHolidays);
         const holidayYearCounts = holidayCopyYearService.countHolidaysByYear(allHolidays);
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        let holidayAiObservanceAccess = { allowed: false, message: '' };
+        let holidayAiUndoState = { canUndo: false, batch: null };
+        try {
+            holidayAiObservanceAccess = await resolveHolidayAiObservanceAccess(req);
+            const state = await holidayAiObservanceBatchService.getStateForOrgYear(
+                activeOrgId,
+                targetYear,
+                req.user
+            );
+            holidayAiUndoState = await holidayAiObservanceBatchService.getUndoReview(state, req.user);
+        } catch (_) {
+            holidayAiObservanceAccess = { allowed: false, message: 'AI observance access could not be resolved.' };
+        }
+        const orgTimeZone = String(res.locals?.orgTimeZone || '').trim();
 
         if (isAjax(req)) {
             return res.json({ status: 'success', results: data, pagination });
@@ -112,7 +144,10 @@ async function listHolidays(req, res) {
             pagination,
             filters: req.query,
             user: req.user,
-            actionStateId: req.actionStateId
+            actionStateId: req.actionStateId,
+            holidayAiObservanceAccess,
+            holidayAiUndoState,
+            orgTimeZone
         });
     } catch (error) {
         if (isAjax(req)) return res.status(500).json({ status: 'error', error, message: error.message });
@@ -123,13 +158,13 @@ async function listHolidays(req, res) {
 async function saveHoliday(req, res) {
     let guardKey = '';
     try {
-        const { id, date, title, type, notes, statutoryHolidayPayable } = req.body;
+        const { id, date, title, type, notes, statutoryHolidayPayable, countsAsSchoolOff } = req.body;
         const activeOrgId = getActiveOrgIdOrThrow(req.user);
         guardKey = idempotencyGuardService.createGuardKey([
             'holiday_save',
             String(activeOrgId || '').trim(),
             String(id || '').trim(),
-            { date, title, type, notes, statutoryHolidayPayable }
+            { date, title, type, notes, statutoryHolidayPayable, countsAsSchoolOff }
         ]);
         const guardResult = idempotencyGuardService.beginGuard({
             key: guardKey,
@@ -152,7 +187,8 @@ async function saveHoliday(req, res) {
                 title,
                 type,
                 notes,
-                statutoryHolidayPayable: statutoryHolidayPayable === true || statutoryHolidayPayable === 'true'
+                statutoryHolidayPayable: statutoryHolidayPayable === true || statutoryHolidayPayable === 'true',
+                countsAsSchoolOff
             }, req.user);
             const payloadOut = { status: 'success', message: 'Holiday updated successfully.', holiday };
             idempotencyGuardService.completeGuard(guardKey, payloadOut);
@@ -165,7 +201,8 @@ async function saveHoliday(req, res) {
                 title,
                 type,
                 notes,
-                statutoryHolidayPayable: statutoryHolidayPayable === true || statutoryHolidayPayable === 'true'
+                statutoryHolidayPayable: statutoryHolidayPayable === true || statutoryHolidayPayable === 'true',
+                countsAsSchoolOff
             }, req.user);
             const payloadOut = { status: 'success', message: 'Holiday added successfully.', holiday };
             idempotencyGuardService.completeGuard(guardKey, payloadOut);
@@ -303,10 +340,139 @@ async function copyHolidaysFromYear(req, res) {
     }
 }
 
+async function analyzeAiObservances(req, res) {
+    try {
+        const accessGate = await resolveHolidayAiObservanceAccess(req);
+        if (!accessGate.allowed) {
+            const status = Number(accessGate.statusCode) || 403;
+            return res.status(status).json({
+                status: 'error',
+                message: accessGate.message || 'AI observances are not available for your account.',
+                code: accessGate.code
+            });
+        }
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const year = String(req.body?.year || req.query?.year || '').trim();
+        const occasions = String(req.body?.occasions || '').trim();
+        const regionHint = String(req.body?.regionHint || '').trim();
+        const allHolidays = await schoolDataService.fetchAllData('holidays', {}, req.user);
+        const orgHolidays = (allHolidays || []).filter((row) => String(row.orgId) === activeOrgId);
+        const accessContext = schoolDataService.buildRouteAccessContext(req);
+        const result = await holidayCulturalObservancesAiService.analyze({
+            year,
+            occasions,
+            regionHint,
+            existingHolidays: orgHolidays,
+            requestingUser: req.user,
+            accessContext
+        });
+        return res.json({
+            status: 'success',
+            ...result
+        });
+    } catch (error) {
+        return res.status(Number(error?.statusCode) || 400).json({ status: 'error', message: error.message });
+    }
+}
+
+async function applyAiObservances(req, res) {
+    let guardKey = '';
+    try {
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const year = String(req.body?.year || '').trim();
+        const previewItems = Array.isArray(req.body?.previewItems) ? req.body.previewItems : [];
+        guardKey = idempotencyGuardService.createGuardKey([
+            'holiday_ai_apply',
+            activeOrgId,
+            year,
+            previewItems.length
+        ]);
+        const guardResult = idempotencyGuardService.beginGuard({
+            key: guardKey,
+            runningTtlMs: 120000,
+            replayTtlMs: 15000
+        });
+        if (sendGuardedResponse(req, res, guardResult, 'AI holiday apply is already in progress. Please wait.')) return;
+
+        const summary = await holidayAiObservanceBatchService.applyPreview({
+            orgId: activeOrgId,
+            year,
+            previewItems,
+            occasionInput: String(req.body?.occasionInput || '').trim(),
+            regionHint: String(req.body?.regionHint || '').trim(),
+            traceId: String(req.body?.traceId || '').trim(),
+            usageRecordId: String(req.body?.usageRecordId || '').trim(),
+            meta: req.body?.meta || {},
+            requestingUser: req.user
+        });
+        const payloadOut = {
+            status: 'success',
+            message: `Added ${summary.created} cultural observance day(s) to the calendar.`,
+            summary
+        };
+        idempotencyGuardService.completeGuard(guardKey, payloadOut);
+        return res.json(payloadOut);
+    } catch (error) {
+        if (guardKey) idempotencyGuardService.failGuard(guardKey);
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
+async function undoLastAiObservances(req, res) {
+    let guardKey = '';
+    try {
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const year = String(req.body?.year || req.query?.year || '').trim();
+        guardKey = idempotencyGuardService.createGuardKey([
+            'holiday_ai_undo',
+            activeOrgId,
+            year
+        ]);
+        const guardResult = idempotencyGuardService.beginGuard({
+            key: guardKey,
+            runningTtlMs: 120000,
+            replayTtlMs: 15000
+        });
+        if (sendGuardedResponse(req, res, guardResult, 'Undo is already in progress. Please wait.')) return;
+
+        const summary = await holidayAiObservanceBatchService.undoLastBatch({
+            orgId: activeOrgId,
+            year,
+            requestingUser: req.user
+        });
+        const payloadOut = {
+            status: 'success',
+            message: `Removed ${summary.deleted} holiday row(s) from the last AI import.`,
+            summary
+        };
+        idempotencyGuardService.completeGuard(guardKey, payloadOut);
+        return res.json(payloadOut);
+    } catch (error) {
+        if (guardKey) idempotencyGuardService.failGuard(guardKey);
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
+async function getAiObservanceState(req, res) {
+    try {
+        const activeOrgId = getActiveOrgIdOrThrow(req.user);
+        const year = String(req.query?.year || '').trim() || resolveOrgYearFromRequest(req);
+        const state = await holidayAiObservanceBatchService.getStateForOrgYear(activeOrgId, year, req.user);
+        const undo = await holidayAiObservanceBatchService.getUndoReview(state, req.user);
+        return res.json({ status: 'success', year, undo });
+    } catch (error) {
+        return res.status(400).json({ status: 'error', message: error.message });
+    }
+}
+
 module.exports = {
     listHolidays,
     saveHoliday,
     deleteHoliday,
     listHolidaysInRange,
-    copyHolidaysFromYear
+    copyHolidaysFromYear,
+    analyzeAiObservances,
+    applyAiObservances,
+    undoLastAiObservances,
+    getAiObservanceState
 };

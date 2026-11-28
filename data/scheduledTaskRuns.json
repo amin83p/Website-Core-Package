@@ -1,1 +1,94 @@
-[]
+[
+  {
+    "id": "STRUN2026112804108",
+    "definitionId": "STDEF2026111600537",
+    "orgId": "",
+    "packageName": "CORE",
+    "taskKey": "core.emailOutbox.dispatch",
+    "scheduledFor": "2026-11-16T18:35:31.302Z",
+    "startedAt": "2026-11-28T05:35:50.607Z",
+    "finishedAt": "2026-11-28T05:35:50.686Z",
+    "status": "succeeded",
+    "resultSummary": "Dispatched 0 email(s); 0 failed; 0 skipped.",
+    "errorMessage": "",
+    "metrics": {
+      "sent": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    "logs": [],
+    "organizedByUserId": "SYSTEM",
+    "organizedByDisplayName": "System",
+    "createdAt": "2026-11-28T05:35:50.629Z",
+    "updatedAt": "2026-11-28T05:35:50.689Z"
+  },
+  {
+    "id": "STRUN2026112882566",
+    "definitionId": "STDEF2026111626231",
+    "orgId": "",
+    "packageName": "CORE",
+    "taskKey": "core.emailOutbox.dispatch",
+    "scheduledFor": "2026-11-16T18:35:31.303Z",
+    "startedAt": "2026-11-28T05:35:50.723Z",
+    "finishedAt": "2026-11-28T05:35:50.730Z",
+    "status": "succeeded",
+    "resultSummary": "Dispatched 0 email(s); 0 failed; 0 skipped.",
+    "errorMessage": "",
+    "metrics": {
+      "sent": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    "logs": [],
+    "organizedByUserId": "SYSTEM",
+    "organizedByDisplayName": "System",
+    "createdAt": "2026-11-28T05:35:50.724Z",
+    "updatedAt": "2026-11-28T05:35:50.731Z"
+  },
+  {
+    "id": "STRUN2026112898290",
+    "definitionId": "STDEF2026111680698",
+    "orgId": "",
+    "packageName": "CORE",
+    "taskKey": "core.smsOutbox.dispatch",
+    "scheduledFor": "2026-11-16T18:35:31.316Z",
+    "startedAt": "2026-11-28T05:35:50.746Z",
+    "finishedAt": "2026-11-28T05:35:50.768Z",
+    "status": "succeeded",
+    "resultSummary": "Dispatched 0 SMS message(s); 0 failed; 0 skipped.",
+    "errorMessage": "",
+    "metrics": {
+      "sent": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    "logs": [],
+    "organizedByUserId": "SYSTEM",
+    "organizedByDisplayName": "System",
+    "createdAt": "2026-11-28T05:35:50.760Z",
+    "updatedAt": "2026-11-28T05:35:50.773Z"
+  },
+  {
+    "id": "STRUN2026112852473",
+    "definitionId": "STDEF2026111641363",
+    "orgId": "",
+    "packageName": "CORE",
+    "taskKey": "core.smsOutbox.dispatch",
+    "scheduledFor": "2026-11-16T18:35:31.317Z",
+    "startedAt": "2026-11-28T05:35:50.779Z",
+    "finishedAt": "2026-11-28T05:35:50.783Z",
+    "status": "succeeded",
+    "resultSummary": "Dispatched 0 SMS message(s); 0 failed; 0 skipped.",
+    "errorMessage": "",
+    "metrics": {
+      "sent": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    "logs": [],
+    "organizedByUserId": "SYSTEM",
+    "organizedByDisplayName": "System",
+    "createdAt": "2026-11-28T05:35:50.781Z",
+    "updatedAt": "2026-11-28T05:35:50.785Z"
+  }
+]

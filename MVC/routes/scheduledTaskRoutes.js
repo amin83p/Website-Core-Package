@@ -4,6 +4,7 @@ const ctrl = require('../controllers/scheduledTaskController');
 const { requireAuth } = require('../middleware/authMiddleware');
 const { requireAccess, requireAccessAny } = require('../middleware/accessMiddleware');
 const { trackActionState } = require('../middleware/actionStateMiddleware');
+const adminApproval = require('../middleware/adminApproval');
 const { SECTIONS, OPERATIONS } = require('../../config/accessConstants');
 
 const scheduledTaskMutationActionState = Object.freeze({
@@ -85,6 +86,22 @@ router.get(
   requireAccess(SECTIONS.AUTO_SCHEDULED_TASK_RUNS, OPERATIONS.READ_ALL),
   trackActionState(SECTIONS.AUTO_SCHEDULED_TASK_RUNS, OPERATIONS.READ_ALL),
   ctrl.showRunList
+);
+
+router.get(
+  '/runs/export',
+  requireAccess(SECTIONS.AUTO_SCHEDULED_TASK_RUNS, OPERATIONS.EXPORT),
+  trackActionState(SECTIONS.AUTO_SCHEDULED_TASK_RUNS, OPERATIONS.EXPORT),
+  adminApproval,
+  ctrl.exportRuns
+);
+
+router.post(
+  '/runs/purge-terminal',
+  requireAccess(SECTIONS.AUTO_SCHEDULED_TASK_RUNS, OPERATIONS.DELETE),
+  trackActionState(SECTIONS.AUTO_SCHEDULED_TASK_RUNS, OPERATIONS.DELETE, scheduledTaskMutationActionState),
+  adminApproval,
+  ctrl.purgeTerminalRuns
 );
 
 router.post(

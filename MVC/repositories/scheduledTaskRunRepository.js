@@ -18,6 +18,8 @@ const {
 const COLLECTION_NAME = 'scheduledTaskRuns';
 const DEFAULT_SEARCH_FIELDS = Object.freeze(['id', 'definitionId', 'orgId', 'packageName', 'taskKey', 'status', 'resultSummary', 'organizedByUserId', 'organizedByDisplayName']);
 const DEFAULT_DATE_FIELDS = Object.freeze(['scheduledFor', 'startedAt', 'finishedAt', 'createdAt', 'updatedAt']);
+const EXPORT_ROW_CAP = 50000;
+const TERMINAL_RUN_STATUSES = Object.freeze(['succeeded', 'failed', 'cancelled']);
 
 function stripPaginationFromQuery(query = {}) {
   const output = { ...(query || {}) };
@@ -38,6 +40,17 @@ function applyJsonScope(rows, scope = {}) {
   const orgIds = toIdArray(scope?.orgIds || []);
   if (!orgIds.length) return [];
   return rows.filter((row) => orgIds.some((orgId) => idsEqual(row?.orgId, orgId)));
+}
+
+function rowInJsonScope(row, scope = {}) {
+  if (scope?.canViewAll !== false) return true;
+  const orgIds = toIdArray(scope?.orgIds || []);
+  if (!orgIds.length) return false;
+  return orgIds.some((orgId) => idsEqual(row?.orgId, orgId));
+}
+
+function isTerminalRunStatus(status) {
+  return TERMINAL_RUN_STATUSES.includes(String(status || '').trim().toLowerCase());
 }
 
 async function generateMongoId(collection, requestedId = null) {
@@ -150,6 +163,78 @@ const scheduledTaskRunRepository = {
         return true;
       }
     }, 'core.scheduledTaskRuns.remove');
+  },
+
+  async listAllForQuery(query = {}, options = {}) {
+    const cap = Math.min(
+      Math.max(1, Number(options?.maxRows) || EXPORT_ROW_CAP),
+      EXPORT_ROW_CAP
+    );
+    const listQuery = {
+      ...stripPaginationFromQuery(query || {}),
+      page: 1,
+      limit: cap + 1
+    };
+    const rows = await this.list({ ...options, query: listQuery });
+    if (rows.length > cap) {
+      const error = new Error(`Export limit exceeded (${cap} rows). Narrow your filters and try again.`);
+      error.statusCode = 400;
+      throw error;
+    }
+    return rows;
+  },
+
+  async deleteTerminalRuns(options = {}) {
+    return runByRepositoryBackend(options, {
+      json: async () => {
+        const scope = options?.scope || {};
+        const rows = await model.getAll();
+        let deletedCount = 0;
+        let keptPending = 0;
+        let keptRunning = 0;
+        const kept = [];
+        for (const row of rows) {
+          const status = String(row?.status || '').toLowerCase();
+          if (status === 'pending') {
+            if (rowInJsonScope(row, scope)) keptPending += 1;
+            kept.push(row);
+            continue;
+          }
+          if (status === 'running') {
+            if (rowInJsonScope(row, scope)) keptRunning += 1;
+            kept.push(row);
+            continue;
+          }
+          if (isTerminalRunStatus(status) && rowInJsonScope(row, scope)) {
+            deletedCount += 1;
+            continue;
+          }
+          kept.push(row);
+        }
+        await model.saveAll(kept);
+        return { deletedCount, keptPending, keptRunning };
+      },
+      mongo: async () => {
+        const scope = options?.scope || {};
+        const collection = getMongoCollection(COLLECTION_NAME);
+        const pendingFilter = combineMongoFilters(buildMongoScopeFilter(scope), { status: 'pending' });
+        const runningFilter = combineMongoFilters(buildMongoScopeFilter(scope), { status: 'running' });
+        const deleteFilter = combineMongoFilters(
+          buildMongoScopeFilter(scope),
+          { status: { $in: [...TERMINAL_RUN_STATUSES] } }
+        );
+        const [keptPending, keptRunning, deleteResult] = await Promise.all([
+          collection.countDocuments(pendingFilter),
+          collection.countDocuments(runningFilter),
+          collection.deleteMany(deleteFilter)
+        ]);
+        return {
+          deletedCount: Number(deleteResult?.deletedCount || 0),
+          keptPending,
+          keptRunning
+        };
+      }
+    }, 'core.scheduledTaskRuns.deleteTerminalRuns');
   }
 };
 

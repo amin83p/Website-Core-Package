@@ -56,10 +56,16 @@ async function buildOutboxAccessFlags(req) {
 }
 
 async function buildRunAccessFlags(req) {
-  return accessUiService.accessFlags(req, SECTIONS.AUTO_SCHEDULED_TASK_RUNS, {
+  const flags = await accessUiService.accessFlags(req, SECTIONS.AUTO_SCHEDULED_TASK_RUNS, {
     canRead: OPERATIONS.READ_ALL,
-    canCancel: OPERATIONS.UPDATE
+    canCancel: OPERATIONS.UPDATE,
+    canExport: OPERATIONS.EXPORT,
+    canPurge: OPERATIONS.DELETE
   });
+  if (!flags.canExport && flags.canRead) {
+    flags.canExport = true;
+  }
+  return flags;
 }
 
 async function buildNavButtons(req, activeKey = '') {

@@ -49,12 +49,12 @@
     "input": {
       "intervalMinutes": 5
     },
-    "nextRunAt": "2026-11-16T18:35:31.302Z",
-    "lastRunAt": "",
+    "nextRunAt": "2026-11-28T05:40:45.549Z",
+    "lastRunAt": "2026-11-28T05:35:45.549Z",
     "createdByUserId": "SYSTEM",
     "createdByDisplayName": "System",
     "createdAt": "2026-11-16T18:30:31.304Z",
-    "updatedAt": "2026-11-16T18:30:31.304Z"
+    "updatedAt": "2026-11-28T05:35:50.717Z"
   },
   {
     "id": "STDEF2026111626231",
@@ -73,12 +73,12 @@
     "input": {
       "intervalMinutes": 5
     },
-    "nextRunAt": "2026-11-16T18:35:31.303Z",
-    "lastRunAt": "",
+    "nextRunAt": "2026-11-28T05:40:45.549Z",
+    "lastRunAt": "2026-11-28T05:35:45.549Z",
     "createdByUserId": "SYSTEM",
     "createdByDisplayName": "System",
     "createdAt": "2026-11-16T18:30:31.311Z",
-    "updatedAt": "2026-11-16T18:30:31.311Z"
+    "updatedAt": "2026-11-28T05:35:50.734Z"
   },
   {
     "id": "STDEF2026111680698",
@@ -97,12 +97,12 @@
     "input": {
       "intervalMinutes": 5
     },
-    "nextRunAt": "2026-11-16T18:35:31.316Z",
-    "lastRunAt": "",
+    "nextRunAt": "2026-11-28T05:40:45.549Z",
+    "lastRunAt": "2026-11-28T05:35:45.549Z",
     "createdByUserId": "SYSTEM",
     "createdByDisplayName": "System",
     "createdAt": "2026-11-16T18:30:31.318Z",
-    "updatedAt": "2026-11-16T18:30:31.318Z"
+    "updatedAt": "2026-11-28T05:35:50.778Z"
   },
   {
     "id": "STDEF2026111641363",
@@ -121,11 +121,11 @@
     "input": {
       "intervalMinutes": 5
     },
-    "nextRunAt": "2026-11-16T18:35:31.317Z",
-    "lastRunAt": "",
+    "nextRunAt": "2026-11-28T05:40:45.549Z",
+    "lastRunAt": "2026-11-28T05:35:45.549Z",
     "createdByUserId": "SYSTEM",
     "createdByDisplayName": "System",
     "createdAt": "2026-11-16T18:30:31.322Z",
-    "updatedAt": "2026-11-16T18:30:31.322Z"
+    "updatedAt": "2026-11-28T05:35:50.804Z"
   }
 ]

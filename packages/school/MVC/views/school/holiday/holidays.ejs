@@ -4,6 +4,13 @@
     .map((y) => String(y || '').trim())
     .filter((y) => /^\d{4}$/.test(y) && y !== String(currentYear));
   const holidayYearCountMap = holidayYearCounts && typeof holidayYearCounts === 'object' ? holidayYearCounts : {};
+  const holidayAiAccess = (typeof holidayAiObservanceAccess !== 'undefined' && holidayAiObservanceAccess) ? holidayAiObservanceAccess : { allowed: false, message: '' };
+  const holidayAiUsageAllowed = Boolean(holidayAiAccess.allowed);
+  const holidayAiAssignmentOk = holidayAiAccess.serviceAssignmentConfigured !== false;
+  const holidayAiAssignmentMsg = String(holidayAiAccess.serviceAssignmentMessage || '').trim();
+  const holidayAiUndo = (typeof holidayAiUndoState !== 'undefined' && holidayAiUndoState) ? holidayAiUndoState : { canUndo: false, batch: null, items: [] };
+  const holidayAiUndoItems = Array.isArray(holidayAiUndo.items) ? holidayAiUndo.items : [];
+  const holidayOrgTimeZone = typeof orgTimeZone !== 'undefined' ? String(orgTimeZone || '').trim() : '';
 %>
 
 <%- include('partials/tablePages-start', {
@@ -53,8 +60,33 @@
       <button type="button" class="btn btn-outline-danger btn-sm fw-bold" id="btnOpenHolidayYearView">
         <i class="bi bi-calendar3 me-1"></i>Year View
       </button>
+      <button
+        type="button"
+        class="btn btn-outline-success btn-sm fw-bold"
+        id="btnOpenHolidayAiObservances"
+        <%= holidayAiUsageAllowed ? '' : 'disabled' %>
+        title="<%= !holidayAiUsageAllowed ? (holidayAiAccess.message || 'AI not available') : (!holidayAiAssignmentOk && holidayAiAssignmentMsg ? holidayAiAssignmentMsg : 'Suggest cultural observance dates with AI') %>">
+        <i class="bi bi-stars me-1"></i>AI cultural observances
+      </button>
     </div>
 </div>
+
+<div class="alert alert-light border small text-muted mb-3 py-2">
+  Each <strong>occasion</strong> is its own row. Use the same date for multiple labels (e.g. statutory off day plus a cultural observance).
+  Choose <strong>Cultural Observance (School Open)</strong> or uncheck <strong>School closed / off day</strong> when classes still run.
+</div>
+<% if (holidayAiUndo && holidayAiUndo.canUndo && holidayAiUndo.batch) { %>
+<div class="alert alert-info border d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3" id="holidayAiUndoBanner">
+  <div class="small">
+    Last <strong>AI cultural observances</strong> import added
+    <strong><%= Number(holidayAiUndo.batch.holidayCount || holidayAiUndo.batch.stats?.created || 0) %></strong> day(s).
+    <% if (holidayAiUndo.batch.occasionInput) { %> (<span class="text-muted"><%= holidayAiUndo.batch.occasionInput %></span>)<% } %>
+  </div>
+  <button type="button" class="btn btn-outline-primary btn-sm fw-bold" id="btnHolidayAiReviewUndo" data-year="<%= currentYear %>">
+    <i class="bi bi-list-check me-1"></i>Review last AI import
+  </button>
+</div>
+<% } %>
 
 <div class="table-scroll-wrapper" data-floating-row-actions="true">
     <table class="table-responsive size-md" id="first-table">
@@ -79,7 +111,7 @@
                       : holidayDateKey;
                 %>
                 <tr data-holiday-id="<%= item.id %>">
-                    <td class="ps-4 fw-bold text-dark" data-sort-value="<%= item.date %>"><%= displayDate %></td>
+                    <td class="ps-4 fw-bold text-dark holiday-date-open text-primary" style="cursor:pointer;" role="button" tabindex="0" data-holiday-date="<%= holidayDateKey %>" data-sort-value="<%= item.date %>" title="Manage occasions on this date"><%= displayDate %></td>
                     <td class="fw-bold text-primary"><%= item.title %></td>
                     <td>
                         <% 
@@ -90,6 +122,9 @@
                            if(item.type === 'Weather Emergency') badgeClass = 'bg-danger';
                         %>
                         <span class="badge <%= badgeClass %>"><%= item.type %></span>
+                        <% if (item.countsAsSchoolOff === false) { %>
+                          <span class="badge bg-info-subtle text-info border ms-1">School open</span>
+                        <% } %>
                     </td>
                     <td>
                         <% if (item.statutoryHolidayPayable === true) { %>
@@ -111,9 +146,9 @@
                             <i class="bi bi-three-dots-vertical"></i>
                           </button>
                           <div class="row-actions-menu d-none" data-row-actions-id="<%= item.id %>">
-                            <button class="btn btn-outline-info btn-sm" 
-                                onclick="openHolidayModal('<%= item.id %>', '<%= item.date %>', '<%= item.title.replace(/'/g, "\\'") %>', '<%= item.type %>', '<%= (item.notes||'').replace(/'/g, "\\'") %>', <%= item.statutoryHolidayPayable === true ? 'true' : (item.statutoryHolidayPayable === false ? 'false' : 'null') %>)">
-                                <i class="bi bi-pencil-square me-2"></i>Edit
+                            <button class="btn btn-outline-info btn-sm"
+                                onclick="openHolidayDaySession('<%= item.date %>')">
+                                <i class="bi bi-pencil-square me-2"></i>Edit day
                             </button>
                             <button class="btn btn-outline-danger btn-sm delete-btn" data-id="<%= item.id %>">
                                 <i class="bi bi-trash me-2"></i>Delete
@@ -130,8 +165,13 @@
 
 <%- include('partials/tablePages-end') %>
 
+<style>
+  #holidayModal.holiday-modal-above-year { z-index: 1065 !important; }
+  body.holiday-edit-over-year .modal-backdrop:last-of-type { z-index: 1060 !important; }
+</style>
+
 <div class="modal fade" id="holidayModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
         <div class="modal-content">
             <div class="modal-header bg-primary text-white">
                 <h5 class="modal-title fw-bold" id="holidayModalTitle">Add Holiday</h5>
@@ -140,41 +180,69 @@
             <div class="modal-body">
                 <form id="holidayForm">
                     <input type="hidden" id="hol_id">
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Date *</label>
-                        <input type="date" id="hol_date" class="form-control" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Title *</label>
-                        <input type="text" id="hol_title" class="form-control" placeholder="e.g. Thanksgiving Break" required>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Type</label>
-                        <select id="hol_type" class="form-select">
-                            <option value="National Holiday">National Holiday</option>
-                            <option value="Observance Paid">Observance Paid</option>
-                            <option value="School Break">School Break</option>
-                            <option value="Staff Development">Staff Development (No Students)</option>
-                            <option value="Weather Emergency">Weather / Emergency</option>
-                            <option value="Other">Other</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <div class="form-check">
-                            <input class="form-check-input" type="checkbox" id="hol_statutory_payable">
-                            <label class="form-check-label fw-bold" for="hol_statutory_payable">Statutory holiday payable</label>
+                    <input type="hidden" id="hol_date" value="">
+                    <div id="holidayOccasionFormPanel" class="d-none border rounded p-3 mb-3 bg-light-subtle">
+                        <div class="fw-bold text-dark mb-3" id="holidayOccasionFormHeading">Occasion details</div>
+                        <div class="mb-3" id="hol_date_visible_wrap">
+                            <label class="form-label fw-bold">Date *</label>
+                            <input type="date" id="hol_date_visible" class="form-control">
                         </div>
-                        <div class="form-text">When checked, this holiday is evaluated for statutory holiday pay on timesheets regardless of type.</div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Title *</label>
+                            <input type="text" id="hol_title" class="form-control" placeholder="e.g. Thanksgiving Break" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Type</label>
+                            <select id="hol_type" class="form-select">
+                                <option value="National Holiday">National Holiday</option>
+                                <option value="Observance Paid">Observance Paid</option>
+                                <option value="School Break">School Break</option>
+                                <option value="Staff Development">Staff Development (No Students)</option>
+                                <option value="Weather Emergency">Weather / Emergency</option>
+                                <option value="Cultural Observance (School Open)">Cultural Observance (School Open)</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="hol_counts_as_off" checked>
+                                <label class="form-check-label fw-bold" for="hol_counts_as_off">School closed / off day</label>
+                            </div>
+                            <div class="form-text">Uncheck when the date is tagged for awareness only and school stays open.</div>
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="hol_statutory_payable">
+                                <label class="form-check-label fw-bold" for="hol_statutory_payable">Statutory holiday payable</label>
+                            </div>
+                            <div class="form-text">When checked, this holiday is evaluated for statutory holiday pay on timesheets regardless of type.</div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Notes</label>
+                            <textarea id="hol_notes" class="form-control" rows="2"></textarea>
+                        </div>
+                        <div class="d-flex flex-wrap gap-2">
+                            <button type="button" class="btn btn-primary fw-bold" id="btn_applyOccasion">Apply occasion</button>
+                            <button type="button" class="btn btn-outline-secondary" id="btn_cancelOccasionForm">Cancel</button>
+                        </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Notes</label>
-                        <textarea id="hol_notes" class="form-control" rows="2"></textarea>
+                    <div id="holidayDayOccasionsPanel" class="mb-0 d-none">
+                        <label class="form-label fw-bold mb-2">Occasions on this date</label>
+                        <div id="holidayDayOccasionsList" class="list-group list-group-flush border rounded mb-2"></div>
+                        <button type="button" class="btn btn-outline-primary btn-sm" id="btn_holidayAddAnotherOccasion">
+                            <i class="bi bi-plus-circle me-1"></i>Add occasion on this date
+                        </button>
+                        <div class="form-text mt-2">Changes are staged until you choose <strong>Save changes</strong>. Use <strong>Edit</strong> or <strong>Add</strong> to show the form.</div>
                     </div>
                 </form>
             </div>
-            <div class="modal-footer bg-light">
+            <div class="modal-footer bg-light flex-wrap gap-2" id="holidayModalFooterSingle">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-primary fw-bold" id="btn_saveHoliday">Save Holiday</button>
+                <button type="button" class="btn btn-primary fw-bold" id="btn_saveHoliday">Save holiday</button>
+            </div>
+            <div class="modal-footer bg-light flex-wrap gap-2 d-none" id="holidayModalFooterDaySession">
+                <button type="button" class="btn btn-secondary" id="btn_closeDaySession">Close</button>
+                <button type="button" class="btn btn-primary fw-bold" id="btn_saveDaySession">Save changes</button>
             </div>
         </div>
     </div>
@@ -230,6 +298,106 @@
   </div>
 </div>
 
+<div class="modal fade" id="holidayAiObservancesModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title fw-bold"><i class="bi bi-stars me-2"></i>AI cultural observances</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="holidayAiAssignmentNotice" class="alert alert-warning border mb-3<%= holidayAiAssignmentOk ? ' d-none' : '' %>" role="status">
+          <%= holidayAiAssignmentMsg || 'This AI service has no provider key or model assigned. Configure it under School AI Assist → Service assignments.' %>
+        </div>
+        <div id="holidayAiObservancesInputPanel">
+          <p class="small text-muted">Informational <strong>school open</strong> tags only — not statutory holidays or off days.</p>
+          <div class="mb-3">
+            <label class="form-label fw-bold" for="holidayAiYear">Year</label>
+            <input type="number" class="form-control" id="holidayAiYear" min="2000" max="2100" value="<%= currentYear %>">
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold" for="holidayAiOccasions">Occasions (comma-separated)</label>
+            <textarea class="form-control" id="holidayAiOccasions" rows="2" placeholder="Diwali, Ramadan, Lunar New Year"></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label fw-bold" for="holidayAiRegionHint">Region hint (optional)</label>
+            <input type="text" class="form-control" id="holidayAiRegionHint" value="<%= holidayOrgTimeZone ? 'Timezone: ' + holidayOrgTimeZone : '' %>" placeholder="e.g. Canada, BC, or school timezone">
+          </div>
+        </div>
+        <div id="holidayAiObservancesReviewPanel" class="d-none">
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+            <div class="fw-bold text-dark">Review suggested days</div>
+            <div class="form-check m-0">
+              <input class="form-check-input" type="checkbox" id="holidayAiSelectAll" checked>
+              <label class="form-check-label small" for="holidayAiSelectAll">Select all</label>
+            </div>
+          </div>
+          <div id="holidayAiWarnings" class="small text-warning mb-2"></div>
+          <div id="holidayAiOccasionSummaries" class="small text-muted mb-2"></div>
+          <div class="table-responsive border rounded" style="max-height: 360px; overflow: auto;">
+            <table class="table table-sm table-hover mb-0 align-middle" id="holidayAiPreviewTable">
+              <thead class="table-light sticky-top">
+                <tr>
+                  <th style="width: 40px;"></th>
+                  <th>Date</th>
+                  <th>Occasion</th>
+                  <th>Confidence</th>
+                </tr>
+              </thead>
+              <tbody id="holidayAiPreviewBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer bg-light flex-wrap gap-2">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-outline-secondary d-none" id="btnHolidayAiBackToInput">Back</button>
+        <button type="button" class="btn btn-success fw-bold" id="btnHolidayAiAnalyze">
+          <i class="bi bi-search me-1"></i>Analyze
+        </button>
+        <button type="button" class="btn btn-primary fw-bold d-none" id="btnHolidayAiApply">
+          Add to calendar
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="holidayAiUndoReviewModal" tabindex="-1" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header bg-info text-white">
+        <h5 class="modal-title fw-bold"><i class="bi bi-list-check me-2"></i>Last AI cultural observances import</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <div id="holidayAiUndoReviewMeta" class="small text-muted mb-3"></div>
+        <div class="table-responsive border rounded" style="max-height: 420px; overflow: auto;">
+          <table class="table table-sm table-hover mb-0 align-middle">
+            <thead class="table-light sticky-top">
+              <tr>
+                <th>Date</th>
+                <th>Occasion</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="holidayAiUndoReviewBody"></tbody>
+          </table>
+        </div>
+        <p class="small text-muted mt-3 mb-0">
+          Rolling back removes the holidays that are still on the calendar from this import. Rows already removed manually are skipped.
+        </p>
+      </div>
+      <div class="modal-footer bg-light flex-wrap gap-2">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-outline-danger fw-bold" id="btnHolidayAiConfirmRollback" data-year="<%= currentYear %>">
+          <i class="bi bi-arrow-counterclockwise me-1"></i>Roll back this import
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal fade" id="holidayYearViewModal" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog modal-xl modal-dialog-scrollable">
     <div class="modal-content">
@@ -245,9 +413,12 @@
         </div>
         <div class="d-flex align-items-center gap-2 mb-3">
           <span class="badge bg-danger">Off Day</span>
-          <span class="small text-muted">Highlighted in red</span>
+          <span class="small text-muted">School closed</span>
+          <span class="badge bg-primary ms-2">Observance</span>
+          <span class="small text-muted">School open (tag)</span>
           <span class="badge bg-warning text-dark ms-2">Weekend</span>
           <span class="small text-muted">Saturdays and Sundays</span>
+          <span class="small text-muted ms-2">Click any day to edit occasions.</span>
         </div>
         <div id="holidayYearCalendarGrid" class="row g-3"></div>
         <div class="card border-0 shadow-sm mt-3">
@@ -268,10 +439,26 @@
 let modalInstance = null;
 let holidayYearModalInstance = null;
 let holidayCopyYearModalInstance = null;
+let holidayAiObservancesModalInstance = null;
+let holidayAiUndoReviewModalInstance = null;
+let holidayAiRunSession = null;
+const holidayAiUndoReviewPayload = <%- JSON.stringify({
+  year: String(currentYear || ''),
+  batch: holidayAiUndo.batch || null,
+  items: holidayAiUndoItems
+}).replace(/</g, '\\u003c') %>;
+const holidayAiClientAccess = <%- JSON.stringify({
+  usageAllowed: holidayAiUsageAllowed,
+  serviceAssignmentConfigured: holidayAiAssignmentOk,
+  serviceAssignmentMessage: holidayAiAssignmentMsg || 'This AI service has no provider key or model assigned. Configure it under School AI Assist → Service assignments.'
+}) %>;
 const holidayYearCountByYear = <%- JSON.stringify(holidayYearCountMap || {}).replace(/</g, '\\u003c') %>;
 const holidayCopyTargetYear = '<%= currentYear %>';
 const DEFAULT_STAT_PAYABLE_TYPES = ['National Holiday', 'Observance Paid'];
+const CULTURAL_OBSERVANCE_TYPE = 'Cultural Observance (School Open)';
 let holidayYearData = <%- JSON.stringify(holidayYearRows || []).replace(/</g, '\\u003c') %>;
+let holidayDaySession = null;
+let suppressHolidayCloseGuard = false;
 const selectedHolidayYear = Number('<%= currentYear %>') || Number('<%= String(orgToday || currentYear || "").slice(0, 4) %>');
 
 function normalizeHolidayDateKey(dateKey) {
@@ -293,6 +480,13 @@ function monthLabel(year, monthIndex) {
     return formatHolidayDateKey(`${year}-${String(monthIndex + 1).padStart(2, '0')}-01`, { month: 'long' });
 }
 
+function holidayCountsAsSchoolOff(row) {
+    if (row && row.countsAsSchoolOff === false) return false;
+    const type = String(row?.type || '').trim();
+    if (type === CULTURAL_OBSERVANCE_TYPE) return false;
+    return true;
+}
+
 function buildHolidayLookup(rows) {
     const map = new Map();
     (Array.isArray(rows) ? rows : []).forEach((row) => {
@@ -300,11 +494,417 @@ function buildHolidayLookup(rows) {
         if (!date) return;
         if (!map.has(date)) map.set(date, []);
         map.get(date).push({
+            id: String(row?.id || '').trim(),
             title: String(row?.title || 'Off Day').trim(),
-            notes: String(row?.notes || '').trim()
+            notes: String(row?.notes || '').trim(),
+            type: String(row?.type || '').trim(),
+            countsAsSchoolOff: holidayCountsAsSchoolOff(row),
+            statutoryHolidayPayable: row?.statutoryHolidayPayable
         });
     });
     return map;
+}
+
+function listHolidayRowsForDate(dateKey) {
+    const key = normalizeHolidayDateKey(dateKey);
+    if (holidayDaySession?.mode === 'daySession' && holidayDaySession.dateKey === key) {
+        return [...(holidayDaySession.working || [])].sort((a, b) => String(a?.title || '').localeCompare(String(b?.title || '')));
+    }
+    return (Array.isArray(holidayYearData) ? holidayYearData : [])
+        .filter((row) => normalizeHolidayDateKey(row?.date) === key)
+        .sort((a, b) => String(a?.title || '').localeCompare(String(b?.title || '')));
+}
+
+function cloneOccasionRow(row) {
+    const type = String(row?.type || 'Holiday').trim();
+    return {
+        id: String(row?.id || '').trim(),
+        date: normalizeHolidayDateKey(row?.date),
+        title: String(row?.title || '').trim(),
+        type,
+        notes: String(row?.notes || '').trim(),
+        countsAsSchoolOff: row?.countsAsSchoolOff === false ? false : holidayCountsAsSchoolOff(row),
+        statutoryHolidayPayable: row?.statutoryHolidayPayable === true
+            ? true
+            : (row?.statutoryHolidayPayable === false ? false : null)
+    };
+}
+
+function cloneOccasionsForDate(dateKey) {
+    return listHolidayRowsForDateFromYearDataOnly(dateKey).map(cloneOccasionRow);
+}
+
+function listHolidayRowsForDateFromYearDataOnly(dateKey) {
+    const key = normalizeHolidayDateKey(dateKey);
+    return (Array.isArray(holidayYearData) ? holidayYearData : [])
+        .filter((row) => normalizeHolidayDateKey(row?.date) === key)
+        .sort((a, b) => String(a?.title || '').localeCompare(String(b?.title || '')));
+}
+
+function occasionRowsEqual(a, b) {
+    const normalize = (rows) => [...(rows || [])]
+        .map(cloneOccasionRow)
+        .sort((x, y) => String(x.id).localeCompare(String(y.id)));
+    return JSON.stringify(normalize(a)) === JSON.stringify(normalize(b));
+}
+
+function isHolidayFormDirty() {
+    const session = holidayDaySession;
+    if (!session || session.mode !== 'daySession') return false;
+    if (session.formVisible !== true) return false;
+    const current = readOccasionFormFields();
+    if (!session.formSnapshot) return Boolean(current.title || current.notes);
+    return JSON.stringify(current) !== JSON.stringify(session.formSnapshot);
+}
+
+function isSessionDirty() {
+    const session = holidayDaySession;
+    if (!session || session.mode !== 'daySession') return false;
+    if (isHolidayFormDirty()) return true;
+    return !occasionRowsEqual(session.baseline, session.working);
+}
+
+function setHolidayModalFooterMode(mode) {
+    const single = document.getElementById('holidayModalFooterSingle');
+    const day = document.getElementById('holidayModalFooterDaySession');
+    if (single) single.classList.toggle('d-none', mode !== 'singleAdd');
+    if (day) day.classList.toggle('d-none', mode !== 'daySession');
+}
+
+function syncHolDateInputs(dateKey = '') {
+    const key = normalizeHolidayDateKey(dateKey);
+    const hidden = document.getElementById('hol_date');
+    const visible = document.getElementById('hol_date_visible');
+    if (hidden) hidden.value = key;
+    if (visible) visible.value = key;
+}
+
+function readOccasionFormFields() {
+    const visibleDate = document.getElementById('hol_date_visible');
+    const hiddenDate = document.getElementById('hol_date');
+    const dateWrapHidden = document.getElementById('hol_date_visible_wrap')?.classList.contains('d-none');
+    const rawDate = (!dateWrapHidden && visibleDate?.value)
+        ? visibleDate.value
+        : (hiddenDate?.value || visibleDate?.value || '');
+    return {
+        id: String(document.getElementById('hol_id')?.value || '').trim(),
+        date: normalizeHolidayDateKey(rawDate),
+        title: String(document.getElementById('hol_title')?.value || '').trim(),
+        type: document.getElementById('hol_type')?.value || 'National Holiday',
+        notes: String(document.getElementById('hol_notes')?.value || '').trim(),
+        countsAsSchoolOff: document.getElementById('hol_counts_as_off')?.checked !== false,
+        statutoryHolidayPayable: document.getElementById('hol_statutory_payable')?.checked === true
+    };
+}
+
+function captureFormSnapshot() {
+    if (holidayDaySession) {
+        holidayDaySession.formSnapshot = readOccasionFormFields();
+        holidayDaySession.formVisible = true;
+    }
+}
+
+function clearOccasionFormFieldsOnly() {
+    document.getElementById('hol_id').value = '';
+    document.getElementById('hol_title').value = '';
+    document.getElementById('hol_type').value = 'National Holiday';
+    document.getElementById('hol_notes').value = '';
+    const offEl = document.getElementById('hol_counts_as_off');
+    if (offEl) offEl.checked = true;
+    const payableEl = document.getElementById('hol_statutory_payable');
+    if (payableEl) payableEl.checked = DEFAULT_STAT_PAYABLE_TYPES.includes('National Holiday');
+    if (holidayDaySession) {
+        holidayDaySession.formEditKey = '';
+        holidayDaySession.formSnapshot = null;
+        holidayDaySession.formVisible = false;
+    }
+}
+
+function hideOccasionFormPanel() {
+    document.getElementById('holidayOccasionFormPanel')?.classList.add('d-none');
+    document.getElementById('hol_title')?.removeAttribute('required');
+    document.getElementById('hol_date_visible')?.removeAttribute('required');
+    if (holidayDaySession) {
+        holidayDaySession.formEditKey = '';
+        holidayDaySession.formSnapshot = null;
+        holidayDaySession.formVisible = false;
+    }
+}
+
+function showOccasionFormPanel() {
+    document.getElementById('holidayOccasionFormPanel')?.classList.remove('d-none');
+    document.getElementById('hol_title')?.setAttribute('required', 'required');
+    if (!holidayDaySession || holidayDaySession.mode === 'singleAdd') {
+        document.getElementById('hol_date_visible')?.setAttribute('required', 'required');
+    }
+    if (holidayDaySession) holidayDaySession.formVisible = true;
+    captureFormSnapshot();
+}
+
+function setOccasionFormDateFieldVisible(show) {
+    const wrap = document.getElementById('hol_date_visible_wrap');
+    if (wrap) wrap.classList.toggle('d-none', !show);
+}
+
+function resetHolidayDaySession() {
+    holidayDaySession = null;
+    setHolidayModalFooterMode('singleAdd');
+    hideOccasionFormPanel();
+}
+
+function syncYearModalKeyboardLock(explicitEditOpen) {
+    const yearEl = document.getElementById('holidayYearViewModal');
+    if (!yearEl) return;
+    const editEl = document.getElementById('holidayModal');
+    const editOpen = typeof explicitEditOpen === 'boolean'
+        ? explicitEditOpen
+        : Boolean(editEl?.classList.contains('show'));
+    const yearVisible = yearEl.classList.contains('show');
+    const lockYearKeyboard = editOpen && yearVisible;
+    yearEl.setAttribute('data-bs-keyboard', lockYearKeyboard ? 'false' : 'true');
+    const bsYear = typeof bootstrap !== 'undefined' ? bootstrap.Modal.getInstance(yearEl) : null;
+    if (bsYear?._config) {
+        bsYear._config.keyboard = !lockYearKeyboard;
+    }
+}
+
+function startSingleAddHolidayMode() {
+    holidayDaySession = { mode: 'singleAdd' };
+    setHolidayModalFooterMode('singleAdd');
+    setOccasionFormDateFieldVisible(true);
+    showOccasionFormPanel();
+    document.getElementById('holidayDayOccasionsPanel')?.classList.add('d-none');
+    clearHolidayFormForDate('');
+    document.getElementById('holidayModalTitle').innerText = 'Add Holiday / Occasion';
+}
+
+function beginNewOccasionForm(dateKey) {
+    const key = normalizeHolidayDateKey(dateKey || holidayDaySession?.dateKey || document.getElementById('hol_date')?.value || '');
+    if (!key) return;
+    syncHolDateInputs(key);
+    clearOccasionFormFieldsOnly();
+    setOccasionFormDateFieldVisible(false);
+    document.getElementById('holidayModalTitle').innerText = `Add occasion · ${formatHolidayDateKey(key)}`;
+    document.getElementById('holidayOccasionFormHeading').innerText = 'New occasion';
+    showOccasionFormPanel();
+    holidayDaySession.formEditKey = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    captureFormSnapshot();
+    document.getElementById('hol_title')?.focus();
+}
+
+function beginEditOccasionForm(row) {
+    if (!row) return;
+    const key = normalizeHolidayDateKey(row.date || holidayDaySession?.dateKey);
+    syncHolDateInputs(key);
+    document.getElementById('hol_id').value = String(row.id || '');
+    document.getElementById('hol_title').value = row.title || '';
+    document.getElementById('hol_type').value = row.type || 'National Holiday';
+    document.getElementById('hol_notes').value = row.notes || '';
+    const offEl = document.getElementById('hol_counts_as_off');
+    if (offEl) offEl.checked = row.countsAsSchoolOff !== false;
+    const payableEl = document.getElementById('hol_statutory_payable');
+    if (payableEl) {
+        if (row.statutoryHolidayPayable === true) payableEl.checked = true;
+        else if (row.statutoryHolidayPayable === false) payableEl.checked = false;
+        else payableEl.checked = DEFAULT_STAT_PAYABLE_TYPES.includes(row.type || '');
+    }
+    setOccasionFormDateFieldVisible(false);
+    document.getElementById('holidayModalTitle').innerText = `Edit occasion · ${formatHolidayDateKey(key)}`;
+    document.getElementById('holidayOccasionFormHeading').innerText = 'Edit occasion';
+    if (holidayDaySession) holidayDaySession.formEditKey = String(row.id || '');
+    showOccasionFormPanel();
+    captureFormSnapshot();
+}
+
+function openHolidayDaySession(dateKey) {
+    const key = normalizeHolidayDateKey(dateKey);
+    if (!key) return;
+    const baseline = cloneOccasionsForDate(key);
+    holidayDaySession = {
+        mode: 'daySession',
+        dateKey: key,
+        baseline: baseline.map((r) => ({ ...r })),
+        working: baseline.map((r) => ({ ...r })),
+        formEditKey: '',
+        formSnapshot: null,
+        formVisible: false,
+        actionStateId: window.__holidayActionStateId || ''
+    };
+    setHolidayModalFooterMode('daySession');
+    syncHolDateInputs(key);
+    clearOccasionFormFieldsOnly();
+    hideOccasionFormPanel();
+    document.getElementById('holidayDayOccasionsPanel')?.classList.remove('d-none');
+    document.getElementById('holidayModalTitle').innerText = `Occasions on ${formatHolidayDateKey(key)}`;
+    renderHolidayDayOccasionsList(key);
+    showHolidayEditModalStacked();
+}
+
+async function confirmDiscardHolidaySession() {
+    if (!isSessionDirty()) return true;
+  const choice = typeof showMessageModal === 'function'
+        ? await showMessageModal({
+            title: 'Discard unsaved changes?',
+            icon: 'warning',
+            message: 'You have unsaved occasion changes for this date. Close without saving?',
+            buttons: [
+                { text: 'Keep editing', class: 'btn-secondary' },
+                { text: 'Discard', class: 'btn-danger' }
+            ]
+        })
+        : confirm('Discard unsaved changes?');
+    return choice === 'Discard' || choice === true;
+}
+
+async function requestCloseHolidayModal() {
+    if (holidayDaySession?.mode === 'daySession') {
+        if (isHolidayFormDirty()) {
+            const leaveForm = await confirmDiscardHolidaySession();
+            if (!leaveForm) return;
+            hideOccasionFormPanel();
+        }
+        if (isSessionDirty()) {
+            const discard = await confirmDiscardHolidaySession();
+            if (!discard) return;
+        }
+    }
+    suppressHolidayCloseGuard = true;
+    resetHolidayDaySession();
+    if (modalInstance) modalInstance.hide();
+    suppressHolidayCloseGuard = false;
+}
+
+function applyOccasionToWorkingCopy() {
+    const form = document.getElementById('holidayForm');
+    if (!form.checkValidity()) {
+        form.reportValidity();
+        return;
+    }
+    if (!holidayDaySession || holidayDaySession.mode !== 'daySession') return;
+    const fields = readOccasionFormFields();
+    let editKey = String(holidayDaySession.formEditKey || fields.id || '').trim();
+    if (!editKey) editKey = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const row = cloneOccasionRow({
+        ...fields,
+        id: editKey,
+        date: holidayDaySession.dateKey
+    });
+    const idx = holidayDaySession.working.findIndex((item) => String(item.id) === editKey);
+    if (idx >= 0) holidayDaySession.working[idx] = row;
+    else holidayDaySession.working.push(row);
+    hideOccasionFormPanel();
+    document.getElementById('holidayModalTitle').innerText = `Occasions on ${formatHolidayDateKey(holidayDaySession.dateKey)}`;
+    renderHolidayDayOccasionsList(holidayDaySession.dateKey);
+}
+
+async function persistDaySession() {
+    if (!holidayDaySession || holidayDaySession.mode !== 'daySession') return;
+    const { baseline, working, dateKey } = holidayDaySession;
+    const actionStateId = holidayDaySession.actionStateId || '';
+    const workingIds = new Set(working.map((r) => String(r.id)));
+    const toDelete = baseline.filter((r) => !workingIds.has(String(r.id)) && !String(r.id).startsWith('temp-'));
+    const toSave = [];
+
+    working.forEach((row) => {
+        const id = String(row.id || '');
+        if (id.startsWith('temp-')) {
+            toSave.push({ ...row, id: '' });
+            return;
+        }
+        const prior = baseline.find((b) => String(b.id) === id);
+        if (!prior || JSON.stringify(cloneOccasionRow(prior)) !== JSON.stringify(cloneOccasionRow(row))) {
+            toSave.push({ ...row, id });
+        }
+    });
+
+    const saveBtn = document.getElementById('btn_saveDaySession');
+    const originalSaveHtml = saveBtn?.innerHTML;
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Saving...';
+    }
+
+    try {
+        for (const row of toDelete) {
+            const delRes = await fetch('/school/holidays/delete/' + encodeURIComponent(row.id), {
+                method: 'GET',
+                headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' },
+                credentials: 'same-origin'
+            });
+            const delResult = await delRes.json().catch(() => ({}));
+            if (!delRes.ok || delResult.status === 'error') {
+                throw new Error(delResult.message || 'Delete failed.');
+            }
+            removeHolidayRowFromTable(row.id);
+            removeHolidayFromYearData(row.id);
+        }
+
+        for (const row of toSave) {
+            const payload = {
+                id: row.id || '',
+                date: dateKey,
+                title: row.title,
+                type: row.type,
+                notes: row.notes,
+                statutoryHolidayPayable: row.statutoryHolidayPayable === true,
+                countsAsSchoolOff: row.countsAsSchoolOff !== false,
+                actionStateId
+            };
+            const res = await fetch('/school/holidays/save', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+                body: JSON.stringify(payload)
+            });
+            const result = await res.json();
+            const guarded = typeof window.applyGuardedApiResult === 'function'
+                ? await window.applyGuardedApiResult(result, { busyTitle: 'Save In Progress', replayTitle: 'Save Already Processed' })
+                : { stop: false };
+            if (guarded.stop) return;
+            if (result.status !== 'success') {
+                throw new Error(result.message || 'Save failed.');
+            }
+            const savedHoliday = result.holiday && typeof result.holiday === 'object'
+                ? result.holiday
+                : { ...payload, id: payload.id || row.id };
+            applyHolidaySaveToTable(savedHoliday, row.id);
+        }
+
+        if (typeof showMessageModal === 'function') {
+            await showMessageModal({
+                title: 'Saved',
+                icon: 'success',
+                message: 'Occasion changes were saved.',
+                buttons: [{ text: 'OK', class: 'btn-success' }]
+            });
+        }
+
+        suppressHolidayCloseGuard = true;
+        resetHolidayDaySession();
+        if (modalInstance) modalInstance.hide();
+        suppressHolidayCloseGuard = false;
+        if (document.getElementById('holidayYearViewModal')?.classList.contains('show')) {
+            renderHolidayYearCalendar();
+        }
+    } catch (error) {
+        console.error(error);
+        if (typeof showMessageModal === 'function') {
+            await showMessageModal({ title: 'Save failed', icon: 'error', message: error.message || 'Unable to save changes.', buttons: [{ text: 'OK', class: 'btn-danger' }] });
+        } else {
+            alert(error.message || 'Save failed.');
+        }
+    } finally {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = originalSaveHtml || 'Save changes';
+        }
+    }
+}
+
+function removeHolidayRowFromTable(holidayId) {
+    const tbody = getHolidayTableBody();
+    const rowEl = tbody?.querySelector(`tr[data-holiday-id="${holidayId}"]`);
+    if (rowEl) rowEl.remove();
+    ensureHolidayEmptyStateRow(tbody);
 }
 
 function buildHolidayTooltipLabel(items) {
@@ -327,10 +927,16 @@ function toDateKey(dateObj) {
 
 function computeHolidayYearSummary(holidayLookup) {
     const offDaySet = new Set();
-    (holidayLookup instanceof Map ? Array.from(holidayLookup.keys()) : []).forEach((dateKey) => {
-        const key = String(dateKey || '').trim();
-        if (key.startsWith(`${selectedHolidayYear}-`)) offDaySet.add(key);
-    });
+    if (holidayLookup instanceof Map) {
+        holidayLookup.forEach((items, dateKey) => {
+            const key = String(dateKey || '').trim();
+            if (!key.startsWith(`${selectedHolidayYear}-`)) return;
+            const rows = Array.isArray(items) ? items : [];
+            if (rows.some((item) => item?.countsAsSchoolOff !== false)) {
+                offDaySet.add(key);
+            }
+        });
+    }
 
     const typeCounts = new Map();
     (Array.isArray(holidayYearData) ? holidayYearData : []).forEach((row) => {
@@ -472,24 +1078,46 @@ function renderHolidayYearCalendar() {
                     renderedCell = true;
                     const dateKey = `${selectedHolidayYear}-${String(monthIndex + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                     const holidayItems = holidayLookup.get(dateKey) || [];
+                    const hasOffDay = holidayItems.some((item) => item?.countsAsSchoolOff !== false);
+                    const hasObservanceOnly = !hasOffDay && holidayItems.length > 0;
 
                     const dayEl = document.createElement('span');
                     dayEl.className = 'd-inline-flex align-items-center justify-content-center rounded-circle';
                     dayEl.style.width = '28px';
                     dayEl.style.height = '28px';
                     dayEl.textContent = String(day);
+                    dayEl.setAttribute('role', 'button');
+                    dayEl.setAttribute('tabindex', '0');
+                    dayEl.style.cursor = 'pointer';
+                    dayEl.dataset.holidayDate = dateKey;
 
-                    if (holidayItems.length) {
+                    if (hasOffDay) {
                         dayEl.classList.add('bg-danger', 'text-white', 'fw-bold');
-                        dayEl.setAttribute('data-bs-toggle', 'tooltip');
-                        dayEl.setAttribute('data-bs-placement', 'top');
-                        dayEl.setAttribute('title', buildHolidayTooltipLabel(holidayItems));
-                        dayEl.style.cursor = 'pointer';
+                    } else if (hasObservanceOnly) {
+                        dayEl.classList.add('bg-primary-subtle', 'text-primary', 'border', 'border-primary', 'fw-semibold');
                     } else if (weekDay === 0 || weekDay === 6) {
                         dayEl.classList.add('bg-warning', 'text-dark', 'fw-semibold');
                     } else {
                         dayEl.classList.add('text-dark');
                     }
+
+                    if (holidayItems.length) {
+                        dayEl.setAttribute('data-bs-toggle', 'tooltip');
+                        dayEl.setAttribute('data-bs-placement', 'top');
+                        dayEl.setAttribute('title', buildHolidayTooltipLabel(holidayItems));
+                        if (holidayItems.length > 1) {
+                            dayEl.setAttribute('aria-label', `${day} — ${holidayItems.length} occasions`);
+                        }
+                    }
+
+                    const openDayEditor = () => openHolidayDaySession(dateKey);
+                    dayEl.addEventListener('click', openDayEditor);
+                    dayEl.addEventListener('keydown', (event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            openDayEditor();
+                        }
+                    });
 
                     cell.appendChild(dayEl);
                     day += 1;
@@ -518,13 +1146,134 @@ function renderHolidayYearCalendar() {
     renderHolidayYearSummary(holidayLookup);
 }
 
+function resetHolidayAiObservanceModalUi() {
+    document.getElementById('holidayAiObservancesInputPanel')?.classList.remove('d-none');
+    document.getElementById('holidayAiObservancesReviewPanel')?.classList.add('d-none');
+    document.getElementById('btnHolidayAiApply')?.classList.add('d-none');
+    document.getElementById('btnHolidayAiBackToInput')?.classList.add('d-none');
+    document.getElementById('btnHolidayAiAnalyze')?.classList.remove('d-none');
+    document.getElementById('holidayAiWarnings').innerHTML = '';
+    document.getElementById('holidayAiOccasionSummaries').innerHTML = '';
+    document.getElementById('holidayAiPreviewBody').innerHTML = '';
+    holidayAiRunSession = null;
+}
+
+function showHolidayAiReview(result) {
+    holidayAiRunSession = {
+        previewItems: Array.isArray(result.previewItems) ? result.previewItems : [],
+        occasionSummaries: Array.isArray(result.occasionSummaries) ? result.occasionSummaries : [],
+        traceId: result.traceId || null,
+        usageRecordId: result.usageRecordId || null,
+        year: String(result.year || document.getElementById('holidayAiYear')?.value || '').trim(),
+        occasionInput: String(document.getElementById('holidayAiOccasions')?.value || '').trim(),
+        regionHint: String(document.getElementById('holidayAiRegionHint')?.value || '').trim(),
+        meta: {
+            requestedOccasions: (result.occasionSummaries || []).length,
+            previewDays: (result.previewItems || []).length
+        }
+    };
+    document.getElementById('holidayAiObservancesInputPanel')?.classList.add('d-none');
+    document.getElementById('holidayAiObservancesReviewPanel')?.classList.remove('d-none');
+    document.getElementById('btnHolidayAiAnalyze')?.classList.add('d-none');
+    document.getElementById('btnHolidayAiApply')?.classList.remove('d-none');
+    document.getElementById('btnHolidayAiBackToInput')?.classList.remove('d-none');
+    const warnings = Array.isArray(result.warnings) ? result.warnings : [];
+    document.getElementById('holidayAiWarnings').innerHTML = warnings.length
+        ? warnings.map((w) => `<div>${escapeHolidayHtml(w)}</div>`).join('')
+        : '';
+    document.getElementById('holidayAiOccasionSummaries').innerHTML = (result.occasionSummaries || [])
+        .map((row) => `${escapeHolidayHtml(row.name)}: ${escapeHolidayHtml(row.startDate)} – ${escapeHolidayHtml(row.endDate)} (${escapeHolidayHtml(row.confidence || '')})`)
+        .join('<br>');
+    const tbody = document.getElementById('holidayAiPreviewBody');
+    if (!tbody) return;
+    tbody.innerHTML = holidayAiRunSession.previewItems.map((row, idx) => {
+        const dup = row.duplicate ? 'text-muted' : '';
+        return `<tr class="${dup}" data-preview-index="${idx}">
+          <td><input type="checkbox" class="form-check-input holiday-ai-preview-check" data-index="${idx}" ${row.selected !== false && !row.duplicate ? 'checked' : ''} ${row.duplicate ? 'disabled' : ''}></td>
+          <td>${escapeHolidayHtml(formatHolidayTableDate(row.date))}</td>
+          <td>${escapeHolidayHtml(row.title)}${row.duplicate ? ' <span class="badge bg-secondary">exists</span>' : ''}</td>
+          <td><span class="badge bg-light text-dark border">${escapeHolidayHtml(row.confidence || '')}</span></td>
+        </tr>`;
+    }).join('');
+    const selectAll = document.getElementById('holidayAiSelectAll');
+    if (selectAll) selectAll.checked = true;
+}
+
+function collectHolidayAiPreviewSelection() {
+    if (!holidayAiRunSession) return [];
+    const checks = document.querySelectorAll('.holiday-ai-preview-check');
+    const selectedIndexes = new Set();
+    checks.forEach((el) => {
+        if (el.checked) selectedIndexes.add(Number(el.getAttribute('data-index')));
+    });
+    return holidayAiRunSession.previewItems.map((row, idx) => ({
+        ...row,
+        selected: selectedIndexes.has(idx)
+    }));
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const actionStateId = '<%= (typeof actionStateId !== 'undefined' && actionStateId) ? actionStateId : '' %>';
+    window.__holidayActionStateId = actionStateId;
     // 1. Initialize Modal
     if (typeof bootstrap !== 'undefined') {
-        modalInstance = new bootstrap.Modal(document.getElementById('holidayModal'));
+        const holidayModalEl = document.getElementById('holidayModal');
+        modalInstance = new bootstrap.Modal(holidayModalEl);
         holidayYearModalInstance = new bootstrap.Modal(document.getElementById('holidayYearViewModal'));
         holidayCopyYearModalInstance = new bootstrap.Modal(document.getElementById('holidayCopyYearModal'));
+        const holidayAiModalEl = document.getElementById('holidayAiObservancesModal');
+        if (holidayAiModalEl) {
+            holidayAiObservancesModalInstance = new bootstrap.Modal(holidayAiModalEl);
+            holidayAiModalEl.addEventListener('hidden.bs.modal', () => resetHolidayAiObservanceModalUi());
+        }
+        const holidayAiUndoModalEl = document.getElementById('holidayAiUndoReviewModal');
+        if (holidayAiUndoModalEl) {
+            holidayAiUndoReviewModalInstance = new bootstrap.Modal(holidayAiUndoModalEl);
+        }
+        if (holidayModalEl) {
+            holidayModalEl.addEventListener('show.bs.modal', () => {
+                const yearVisible = document.getElementById('holidayYearViewModal')?.classList.contains('show');
+                syncYearModalKeyboardLock(yearVisible ? true : undefined);
+            });
+            holidayModalEl.addEventListener('shown.bs.modal', () => {
+                syncYearModalKeyboardLock();
+            });
+            holidayModalEl.addEventListener('hide.bs.modal', (event) => {
+                if (suppressHolidayCloseGuard) return;
+                if (holidayDaySession?.mode !== 'daySession' || !isSessionDirty()) return;
+                event.preventDefault();
+                requestCloseHolidayModal();
+            });
+            holidayModalEl.addEventListener('hidden.bs.modal', () => {
+                holidayModalEl.classList.remove('holiday-modal-above-year');
+                document.body.classList.remove('holiday-edit-over-year');
+                holidayModalEl.style.removeProperty('z-index');
+                syncYearModalKeyboardLock();
+                if (!suppressHolidayCloseGuard) resetHolidayDaySession();
+            });
+        }
+    }
+
+    const holidayTableBody = getHolidayTableBody();
+    if (holidayTableBody) {
+        holidayTableBody.addEventListener('click', (event) => {
+            const dateCell = event.target.closest('.holiday-date-open[data-holiday-date]');
+            if (!dateCell) return;
+            event.preventDefault();
+            openHolidayDaySession(dateCell.getAttribute('data-holiday-date'));
+        });
+        holidayTableBody.addEventListener('keydown', (event) => {
+            if (event.key !== 'Enter' && event.key !== ' ') return;
+            const dateCell = event.target.closest('.holiday-date-open[data-holiday-date]');
+            if (!dateCell) return;
+            event.preventDefault();
+            openHolidayDaySession(dateCell.getAttribute('data-holiday-date'));
+        });
+    }
+
+    const holDateVisible = document.getElementById('hol_date_visible');
+    if (holDateVisible) {
+        holDateVisible.addEventListener('change', () => syncHolDateInputs(holDateVisible.value));
     }
 
     function updateHolidayCopySourcePreview() {
@@ -612,12 +1361,249 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const openHolidayAiBtn = document.getElementById('btnOpenHolidayAiObservances');
+    if (openHolidayAiBtn) {
+        openHolidayAiBtn.addEventListener('click', () => {
+            resetHolidayAiObservanceModalUi();
+            if (holidayAiObservancesModalInstance) holidayAiObservancesModalInstance.show();
+        });
+    }
+
+    const holidayAiSelectAll = document.getElementById('holidayAiSelectAll');
+    if (holidayAiSelectAll) {
+        holidayAiSelectAll.addEventListener('change', () => {
+            document.querySelectorAll('.holiday-ai-preview-check:not(:disabled)').forEach((el) => {
+                el.checked = holidayAiSelectAll.checked;
+            });
+        });
+    }
+
+    const btnHolidayAiBack = document.getElementById('btnHolidayAiBackToInput');
+    if (btnHolidayAiBack) {
+        btnHolidayAiBack.addEventListener('click', () => resetHolidayAiObservanceModalUi());
+    }
+
+    const btnHolidayAiAnalyze = document.getElementById('btnHolidayAiAnalyze');
+    if (btnHolidayAiAnalyze) {
+        btnHolidayAiAnalyze.addEventListener('click', async () => {
+            if (!holidayAiClientAccess.serviceAssignmentConfigured) {
+                const assignmentMsg = holidayAiClientAccess.serviceAssignmentMessage
+                    || 'Assign a provider key and model under School AI Assist → Service assignments.';
+                if (typeof showMessageModal === 'function') {
+                    await showMessageModal({
+                        title: 'AI service not configured',
+                        icon: 'warning',
+                        message: assignmentMsg,
+                        buttons: [{ text: 'OK', class: 'btn-warning' }]
+                    });
+                } else {
+                    alert(assignmentMsg);
+                }
+                return;
+            }
+            const year = String(document.getElementById('holidayAiYear')?.value || '').trim();
+            const occasions = String(document.getElementById('holidayAiOccasions')?.value || '').trim();
+            const regionHint = String(document.getElementById('holidayAiRegionHint')?.value || '').trim();
+            if (!occasions) {
+                if (typeof showMessageModal === 'function') {
+                    await showMessageModal({ title: 'Occasions required', icon: 'warning', message: 'Enter at least one occasion name.', buttons: [{ text: 'OK', class: 'btn-warning' }] });
+                }
+                return;
+            }
+            const original = btnHolidayAiAnalyze.innerHTML;
+            btnHolidayAiAnalyze.disabled = true;
+            btnHolidayAiAnalyze.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Analyzing...';
+            let holidayAiAnalyzeLoadingToken = null;
+            if (typeof window.showLoading === 'function') {
+                holidayAiAnalyzeLoadingToken = window.showLoading({
+                    title: 'School Holidays',
+                    operation: 'AI cultural observances',
+                    note: 'Resolving occasion dates for ' + (year || '') + '…'
+                });
+            }
+            try {
+                const res = await fetch('/school/holidays/ai-observances/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+                    body: JSON.stringify({ year, occasions, regionHint })
+                });
+                const result = await res.json();
+                if (!res.ok || result.status === 'error') throw new Error(result.message || 'Analyze failed.');
+                showHolidayAiReview(result);
+            } catch (error) {
+                if (typeof showMessageModal === 'function') {
+                    await showMessageModal({ title: 'Analyze failed', icon: 'error', message: error.message || 'Unable to analyze.', buttons: [{ text: 'OK', class: 'btn-danger' }] });
+                } else alert(error.message || 'Analyze failed.');
+            } finally {
+                if (holidayAiAnalyzeLoadingToken && typeof window.hideLoading === 'function') {
+                    window.hideLoading(holidayAiAnalyzeLoadingToken);
+                }
+                btnHolidayAiAnalyze.disabled = false;
+                btnHolidayAiAnalyze.innerHTML = original;
+            }
+        });
+    }
+
+    const btnHolidayAiApply = document.getElementById('btnHolidayAiApply');
+    if (btnHolidayAiApply) {
+        btnHolidayAiApply.addEventListener('click', async () => {
+            if (!holidayAiRunSession) return;
+            const previewItems = collectHolidayAiPreviewSelection().filter((row) => row.selected);
+            if (!previewItems.length) {
+                if (typeof showMessageModal === 'function') {
+                    await showMessageModal({ title: 'Nothing selected', icon: 'warning', message: 'Select at least one day to add.', buttons: [{ text: 'OK', class: 'btn-warning' }] });
+                }
+                return;
+            }
+            const original = btnHolidayAiApply.innerHTML;
+            btnHolidayAiApply.disabled = true;
+            btnHolidayAiApply.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Adding...';
+            try {
+                const res = await fetch('/school/holidays/ai-observances/apply', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+                    body: JSON.stringify({
+                        year: holidayAiRunSession.year,
+                        previewItems,
+                        occasionInput: holidayAiRunSession.occasionInput,
+                        regionHint: holidayAiRunSession.regionHint,
+                        traceId: holidayAiRunSession.traceId,
+                        usageRecordId: holidayAiRunSession.usageRecordId,
+                        meta: holidayAiRunSession.meta,
+                        actionStateId
+                    })
+                });
+                const result = await res.json();
+                const guarded = typeof window.applyGuardedApiResult === 'function'
+                    ? await window.applyGuardedApiResult(result, { busyTitle: 'Apply In Progress', replayTitle: 'Apply Already Processed' })
+                    : { stop: false };
+                if (guarded.stop) return;
+                if (!res.ok || result.status === 'error') throw new Error(result.message || 'Apply failed.');
+                if (holidayAiObservancesModalInstance) holidayAiObservancesModalInstance.hide();
+                if (typeof showMessageModal === 'function') {
+                    await showMessageModal({ title: 'Added', icon: 'success', message: result.message || 'Observances added.', buttons: [{ text: 'OK', class: 'btn-success' }] });
+                }
+                window.location.reload();
+            } catch (error) {
+                if (typeof showMessageModal === 'function') {
+                    await showMessageModal({ title: 'Apply failed', icon: 'error', message: error.message || 'Unable to add.', buttons: [{ text: 'OK', class: 'btn-danger' }] });
+                } else alert(error.message || 'Apply failed.');
+            } finally {
+                btnHolidayAiApply.disabled = false;
+                btnHolidayAiApply.innerHTML = original;
+            }
+        });
+    }
+
+    function escapeHolidayAiUndoHtml(value) {
+        return String(value || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function renderHolidayAiUndoReview(items, batch) {
+        const metaEl = document.getElementById('holidayAiUndoReviewMeta');
+        const tbody = document.getElementById('holidayAiUndoReviewBody');
+        const rows = Array.isArray(items) ? items : [];
+        const onCalendar = rows.filter((row) => row.stillOnCalendar !== false).length;
+        if (metaEl) {
+            const occasion = batch && batch.occasionInput ? ` Occasions: <span class="text-dark">${escapeHolidayAiUndoHtml(batch.occasionInput)}</span>.` : '';
+            const created = batch ? Number(batch.holidayCount || batch.stats?.created || rows.length) : rows.length;
+            metaEl.innerHTML = `This import added <strong>${created}</strong> day(s); <strong>${onCalendar}</strong> still on the calendar.${occasion}`;
+        }
+        if (!tbody) return;
+        if (!rows.length) {
+            tbody.innerHTML = '<tr><td colspan="3" class="text-muted small p-3">No imported days are on record for this batch.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = rows.map((row) => {
+            const statusBadge = row.stillOnCalendar !== false
+                ? '<span class="badge bg-success-subtle text-success border border-success-subtle">On calendar</span>'
+                : '<span class="badge bg-secondary">Already removed</span>';
+            return `<tr>
+              <td class="text-nowrap">${escapeHolidayAiUndoHtml(row.date || '—')}</td>
+              <td>${escapeHolidayAiUndoHtml(row.title || '—')}</td>
+              <td>${statusBadge}</td>
+            </tr>`;
+        }).join('');
+        const rollbackBtn = document.getElementById('btnHolidayAiConfirmRollback');
+        if (rollbackBtn) rollbackBtn.disabled = onCalendar === 0;
+    }
+
+    async function refreshHolidayAiUndoReview(year) {
+        const res = await fetch(`/school/holidays/ai-observances/state?year=${encodeURIComponent(year)}`, {
+            headers: { 'X-AJAX-Request': 'true' }
+        });
+        const result = await res.json();
+        if (!res.ok || result.status === 'error') throw new Error(result.message || 'Could not load AI import review.');
+        if (!result.undo?.canUndo) throw new Error('There is no AI import left to roll back for this year.');
+        return result.undo;
+    }
+
+    async function openHolidayAiUndoReviewModal(year) {
+        let payload = holidayAiUndoReviewPayload;
+        try {
+            const fresh = await refreshHolidayAiUndoReview(year || payload.year);
+            payload = { year: year || payload.year, batch: fresh.batch, items: fresh.items || [] };
+        } catch (_) {
+            /* use server-rendered payload */
+        }
+        renderHolidayAiUndoReview(payload.items, payload.batch);
+        if (holidayAiUndoReviewModalInstance) holidayAiUndoReviewModalInstance.show();
+    }
+
+    async function runHolidayAiUndo(year) {
+        const confirmed = typeof showMessageModal === 'function'
+            ? await showMessageModal({
+                title: 'Roll back this AI import?',
+                icon: 'warning',
+                message: 'This removes holidays that are still on the calendar from the most recent AI cultural observances import for this year.',
+                buttons: [{ text: 'Cancel', class: 'btn-secondary' }, { text: 'Roll back', class: 'btn-danger' }]
+            })
+            : confirm('Roll back this AI import?');
+        if (confirmed !== 'Roll back' && confirmed !== true) return;
+        const res = await fetch('/school/holidays/ai-observances/undo-last', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-AJAX-Request': 'true' },
+            body: JSON.stringify({ year, actionStateId })
+        });
+        const result = await res.json();
+        if (!res.ok || result.status === 'error') throw new Error(result.message || 'Undo failed.');
+        if (typeof showMessageModal === 'function') {
+            await showMessageModal({ title: 'Undone', icon: 'success', message: result.message || 'AI import undone.', buttons: [{ text: 'OK', class: 'btn-success' }] });
+        }
+        window.location.reload();
+    }
+
+    const btnHolidayAiReviewUndo = document.getElementById('btnHolidayAiReviewUndo');
+    if (btnHolidayAiReviewUndo) {
+        btnHolidayAiReviewUndo.addEventListener('click', () => {
+            void openHolidayAiUndoReviewModal(btnHolidayAiReviewUndo.getAttribute('data-year') || holidayCopyTargetYear);
+        });
+    }
+
+    const btnHolidayAiConfirmRollback = document.getElementById('btnHolidayAiConfirmRollback');
+    if (btnHolidayAiConfirmRollback) {
+        btnHolidayAiConfirmRollback.addEventListener('click', async () => {
+            try {
+                await runHolidayAiUndo(btnHolidayAiConfirmRollback.getAttribute('data-year') || holidayCopyTargetYear);
+            } catch (error) {
+                if (typeof showMessageModal === 'function') {
+                    await showMessageModal({ title: 'Rollback failed', icon: 'error', message: error.message || 'Unable to roll back.', buttons: [{ text: 'OK', class: 'btn-danger' }] });
+                } else alert(error.message || 'Rollback failed.');
+            }
+        });
+    }
+
     // 2. Intercept the standard "Add" button from tablePages-start
     const newBtn = document.querySelector('a[href="/school/holidays/new"]');
     if (newBtn) {
         newBtn.addEventListener('click', (e) => {
             e.preventDefault();
-            openHolidayModal();
+            startSingleAddHolidayMode();
+            showHolidayEditModalStacked();
         });
     }
 
@@ -634,10 +1620,56 @@ document.addEventListener('DOMContentLoaded', () => {
         holTypeSelect.addEventListener('change', () => {
             const payableEl = document.getElementById('hol_statutory_payable');
             if (payableEl) payableEl.checked = DEFAULT_STAT_PAYABLE_TYPES.includes(holTypeSelect.value);
+            const offEl = document.getElementById('hol_counts_as_off');
+            if (offEl) offEl.checked = holTypeSelect.value !== CULTURAL_OBSERVANCE_TYPE;
         });
     }
 
-    // 3. Save Logic
+    const addAnotherOccasionBtn = document.getElementById('btn_holidayAddAnotherOccasion');
+    if (addAnotherOccasionBtn) {
+        addAnotherOccasionBtn.addEventListener('click', () => {
+            const dateKey = normalizeHolidayDateKey(holidayDaySession?.dateKey || document.getElementById('hol_date')?.value || '');
+            if (!dateKey) return;
+            beginNewOccasionForm(dateKey);
+        });
+    }
+
+    const applyOccasionBtn = document.getElementById('btn_applyOccasion');
+    if (applyOccasionBtn) {
+        applyOccasionBtn.addEventListener('click', () => applyOccasionToWorkingCopy());
+    }
+
+    const cancelOccasionFormBtn = document.getElementById('btn_cancelOccasionForm');
+    if (cancelOccasionFormBtn) {
+        cancelOccasionFormBtn.addEventListener('click', async () => {
+            if (isHolidayFormDirty()) {
+                const discard = await confirmDiscardHolidaySession();
+                if (!discard) return;
+            }
+            hideOccasionFormPanel();
+            const key = holidayDaySession?.dateKey;
+            if (key) {
+                document.getElementById('holidayModalTitle').innerText = `Occasions on ${formatHolidayDateKey(key)}`;
+            }
+        });
+    }
+
+    const closeDaySessionBtn = document.getElementById('btn_closeDaySession');
+    if (closeDaySessionBtn) {
+        closeDaySessionBtn.addEventListener('click', () => requestCloseHolidayModal());
+    }
+
+    const saveDaySessionBtn = document.getElementById('btn_saveDaySession');
+    if (saveDaySessionBtn) {
+        saveDaySessionBtn.addEventListener('click', () => {
+            if (isHolidayFormDirty()) {
+                applyOccasionToWorkingCopy();
+            }
+            persistDaySession();
+        });
+    }
+
+    // 3. Save Logic (single-record toolbar add)
     document.getElementById('btn_saveHoliday').addEventListener('click', async () => {
         const form = document.getElementById('holidayForm');
         if (!form.checkValidity()) {
@@ -645,14 +1677,16 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const previousHolidayId = String(document.getElementById('hol_id').value || '').trim();
+        const fields = readOccasionFormFields();
+        const previousHolidayId = String(fields.id || '').trim();
         const payload = {
             id: previousHolidayId,
-            date: document.getElementById('hol_date').value,
-            title: document.getElementById('hol_title').value,
-            type: document.getElementById('hol_type').value,
-            notes: document.getElementById('hol_notes').value,
-            statutoryHolidayPayable: document.getElementById('hol_statutory_payable').checked === true,
+            date: fields.date,
+            title: fields.title,
+            type: fields.type,
+            notes: fields.notes,
+            statutoryHolidayPayable: fields.statutoryHolidayPayable === true,
+            countsAsSchoolOff: fields.countsAsSchoolOff !== false,
             actionStateId
         };
 
@@ -673,13 +1707,19 @@ document.addEventListener('DOMContentLoaded', () => {
                 : { stop: false };
             if (guarded.stop) return;
 
+            suppressHolidayCloseGuard = true;
+            resetHolidayDaySession();
             if (modalInstance) modalInstance.hide();
+            suppressHolidayCloseGuard = false;
 
             if (result.status === 'success') {
                 const savedHoliday = result.holiday && typeof result.holiday === 'object'
                     ? result.holiday
                     : { ...payload, id: previousHolidayId || payload.id };
                 applyHolidaySaveToTable(savedHoliday, previousHolidayId);
+                if (document.getElementById('holidayYearViewModal')?.classList.contains('show')) {
+                    renderHolidayYearCalendar();
+                }
             }
 
             if (typeof showMessageModal === 'function') {
@@ -761,9 +1801,145 @@ function syncHolidayYearDataEntry(holiday, { removeId = '' } = {}) {
             date: holiday.date,
             title: holiday.title,
             type: holiday.type,
-            notes: holiday.notes
+            notes: holiday.notes,
+            countsAsSchoolOff: holiday.countsAsSchoolOff,
+            statutoryHolidayPayable: holiday.statutoryHolidayPayable
         });
     }
+}
+
+function removeHolidayFromYearData(holidayId) {
+    const id = String(holidayId || '').trim();
+    if (!id) return;
+    holidayYearData = (Array.isArray(holidayYearData) ? holidayYearData : []).filter((row) => String(row?.id || '') !== id);
+}
+
+function renderHolidayDayOccasionsList(dateKey) {
+    const panel = document.getElementById('holidayDayOccasionsPanel');
+    const listEl = document.getElementById('holidayDayOccasionsList');
+    const key = normalizeHolidayDateKey(dateKey);
+    if (!panel || !listEl) return;
+    if (!key) {
+        panel.classList.add('d-none');
+        listEl.innerHTML = '';
+        return;
+    }
+    const rows = listHolidayRowsForDate(key);
+    panel.classList.remove('d-none');
+    if (!rows.length) {
+        listEl.innerHTML = '<div class="list-group-item small text-muted py-2">No occasions yet for this date. Add one below.</div>';
+        return;
+    }
+    listEl.innerHTML = rows.map((row) => {
+        const id = escapeHolidayHtml(row.id);
+        const title = escapeHolidayHtml(row.title);
+        const type = escapeHolidayHtml(row.type || 'Holiday');
+        const off = holidayCountsAsSchoolOff(row);
+        const badge = off
+            ? '<span class="badge bg-danger-subtle text-danger border">Off day</span>'
+            : '<span class="badge bg-info-subtle text-info border">School open</span>';
+        return `<div class="list-group-item d-flex flex-wrap align-items-center justify-content-between gap-2 py-2">
+          <div class="small">
+            <span class="fw-semibold text-primary">${title}</span>
+            <span class="text-muted ms-1">· ${type}</span>
+            <span class="ms-1">${badge}</span>
+          </div>
+          <div class="d-flex gap-1">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-holiday-day-edit="${id}">Edit</button>
+            <button type="button" class="btn btn-outline-danger btn-sm" data-holiday-day-delete="${id}">Delete</button>
+          </div>
+        </div>`;
+    }).join('');
+
+    const inDaySession = holidayDaySession?.mode === 'daySession' && holidayDaySession.dateKey === key;
+
+    listEl.querySelectorAll('[data-holiday-day-edit]').forEach((btn) => {
+        btn.addEventListener('click', () => {
+            const editId = String(btn.getAttribute('data-holiday-day-edit') || '').trim();
+            const match = rows.find((item) => String(item.id) === editId);
+            if (!match) return;
+            beginEditOccasionForm(match);
+        });
+    });
+
+    listEl.querySelectorAll('[data-holiday-day-delete]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+            const deleteId = String(btn.getAttribute('data-holiday-day-delete') || '').trim();
+            const match = rows.find((item) => String(item.id) === deleteId);
+            if (!deleteId) return;
+            const confirmed = typeof showMessageModal === 'function'
+                ? await showMessageModal({
+                    title: inDaySession ? 'Remove occasion' : 'Delete occasion',
+                    icon: 'warning',
+                    message: inDaySession
+                        ? `Remove "${match?.title || 'this occasion'}" from this session?`
+                        : `Delete "${match?.title || 'this occasion'}"?`,
+                    buttons: [
+                        { text: 'Cancel', class: 'btn-secondary' },
+                        { text: inDaySession ? 'Remove' : 'Delete', class: 'btn-danger' }
+                    ]
+                })
+                : confirm(inDaySession ? 'Remove this occasion from the session?' : 'Delete this occasion?');
+            const ok = inDaySession ? (confirmed === 'Remove' || confirmed === true) : (confirmed === 'Delete' || confirmed === true);
+            if (!ok) return;
+
+            if (inDaySession) {
+                holidayDaySession.working = (holidayDaySession.working || []).filter((item) => String(item.id) !== deleteId);
+                if (String(holidayDaySession.formEditKey || '') === deleteId) {
+                    hideOccasionFormPanel();
+                    document.getElementById('holidayModalTitle').innerText = `Occasions on ${formatHolidayDateKey(key)}`;
+                }
+                renderHolidayDayOccasionsList(key);
+                return;
+            }
+
+            try {
+                const res = await fetch('/school/holidays/delete/' + encodeURIComponent(deleteId), {
+                    method: 'GET',
+                    headers: { Accept: 'application/json', 'X-AJAX-Request': 'true' },
+                    credentials: 'same-origin'
+                });
+                const result = await res.json().catch(() => ({}));
+                if (!res.ok || result.status === 'error') {
+                    throw new Error(result.message || 'Delete failed.');
+                }
+                removeHolidayRowFromTable(deleteId);
+                removeHolidayFromYearData(deleteId);
+                renderHolidayDayOccasionsList(key);
+                if (document.getElementById('holidayYearViewModal')?.classList.contains('show')) {
+                    renderHolidayYearCalendar();
+                }
+            } catch (error) {
+                if (typeof showMessageModal === 'function') {
+                    await showMessageModal({ title: 'Delete failed', icon: 'error', message: error.message || 'Unable to delete.', buttons: [{ text: 'OK', class: 'btn-danger' }] });
+                } else {
+                    alert(error.message || 'Delete failed.');
+                }
+            }
+        });
+    });
+}
+
+function clearHolidayFormForDate(dateKey = '') {
+    const key = normalizeHolidayDateKey(dateKey);
+    syncHolDateInputs(key);
+    clearOccasionFormFieldsOnly();
+    setOccasionFormDateFieldVisible(true);
+}
+
+function showHolidayEditModalStacked() {
+    const holidayModalEl = document.getElementById('holidayModal');
+    const yearOpen = document.getElementById('holidayYearViewModal')?.classList.contains('show');
+    if (holidayModalEl && yearOpen) {
+        holidayModalEl.classList.add('holiday-modal-above-year');
+        document.body.classList.add('holiday-edit-over-year');
+        syncYearModalKeyboardLock(true);
+    }
+    if (modalInstance) modalInstance.show();
+}
+
+function openHolidayModalForDate(dateKey) {
+    openHolidayDaySession(dateKey);
 }
 
 function buildHolidayTableRowHtml(item) {
@@ -774,11 +1950,14 @@ function buildHolidayTableRowHtml(item) {
     const notes = String(item?.notes || '').trim();
     const payable = item?.statutoryHolidayPayable;
     const payableArg = payable === true ? 'true' : (payable === false ? 'false' : 'null');
+    const offArg = holidayCountsAsSchoolOff(item) ? 'true' : 'false';
     const displayDate = formatHolidayTableDate(date);
+    const openTag = holidayCountsAsSchoolOff(item) ? '' : '<span class="badge bg-info-subtle text-info border ms-1">School open</span>';
+  const dateKey = normalizeHolidayDateKey(date);
   return `<tr data-holiday-id="${escapeHolidayHtml(id)}">
-    <td class="ps-4 fw-bold text-dark" data-sort-value="${escapeHolidayHtml(date)}">${escapeHolidayHtml(displayDate)}</td>
+    <td class="ps-4 fw-bold text-dark holiday-date-open text-primary" style="cursor:pointer;" role="button" tabindex="0" data-holiday-date="${escapeHolidayHtml(dateKey)}" data-sort-value="${escapeHolidayHtml(date)}" title="Manage occasions on this date">${escapeHolidayHtml(displayDate)}</td>
     <td class="fw-bold text-primary">${escapeHolidayHtml(title)}</td>
-    <td><span class="badge ${holidayTypeBadgeClass(type)}">${escapeHolidayHtml(type)}</span></td>
+    <td><span class="badge ${holidayTypeBadgeClass(type)}">${escapeHolidayHtml(type)}</span>${openTag}</td>
     <td>${holidayStatPayHtml(payable)}</td>
     <td class="text-muted small text-truncate" style="max-width: 250px;">${escapeHolidayHtml(notes || '-')}</td>
     <td class="table-actions text-end pe-4">
@@ -787,8 +1966,8 @@ function buildHolidayTableRowHtml(item) {
           <i class="bi bi-three-dots-vertical"></i>
         </button>
         <div class="row-actions-menu d-none" data-row-actions-id="${escapeHolidayHtml(id)}">
-          <button class="btn btn-outline-info btn-sm" onclick="openHolidayModal('${escapeHolidayJsString(id)}', '${escapeHolidayJsString(date)}', '${escapeHolidayJsString(title)}', '${escapeHolidayJsString(type)}', '${escapeHolidayJsString(notes)}', ${payableArg})">
-            <i class="bi bi-pencil-square me-2"></i>Edit
+          <button class="btn btn-outline-info btn-sm" onclick="openHolidayDaySession('${escapeHolidayJsString(dateKey)}')">
+            <i class="bi bi-pencil-square me-2"></i>Edit day
           </button>
           <button class="btn btn-outline-danger btn-sm delete-btn" data-id="${escapeHolidayHtml(id)}">
             <i class="bi bi-trash me-2"></i>Delete
@@ -841,27 +2020,6 @@ function applyHolidaySaveToTable(holiday, previousId = '') {
         clearHolidayEmptyStateRow(tbody);
         tbody.insertAdjacentHTML('beforeend', rowHtml);
     }
-}
-
-function openHolidayModal(id = '', date = '', title = '', type = 'National Holiday', notes = '', statutoryHolidayPayable = null) {
-    document.getElementById('holidayModalTitle').innerText = id ? 'Edit Holiday' : 'Add Holiday';
-    document.getElementById('hol_id').value = id;
-    document.getElementById('hol_date').value = date;
-    document.getElementById('hol_title').value = title;
-    document.getElementById('hol_type').value = type;
-    document.getElementById('hol_notes').value = notes;
-    const payableEl = document.getElementById('hol_statutory_payable');
-    if (payableEl) {
-        if (statutoryHolidayPayable === true || statutoryHolidayPayable === 'true') {
-            payableEl.checked = true;
-        } else if (statutoryHolidayPayable === false || statutoryHolidayPayable === 'false') {
-            payableEl.checked = false;
-        } else {
-            payableEl.checked = DEFAULT_STAT_PAYABLE_TYPES.includes(type);
-        }
-    }
-    
-    if (modalInstance) modalInstance.show();
 }
 
 async function deleteHoliday(id, title) {

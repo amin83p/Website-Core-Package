@@ -26,6 +26,8 @@ test('holiday list provides year-view modal trigger and renderer', () => {
   assert.match(view, /bg-warning/);
   assert.match(view, /Saturdays and Sundays/);
   assert.match(view, /data-bs-toggle="tooltip"/);
+  assert.match(view, /openHolidayModalForDate/);
+  assert.match(view, /Cultural Observance \(School Open\)/);
 });
 
 test('holiday controller passes full year data to list view', () => {

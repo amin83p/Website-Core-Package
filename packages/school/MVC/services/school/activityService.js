@@ -425,6 +425,11 @@ function isStatHolidayActivityEntry(activity = {}, entry = {}) {
   return isStatutoryHolidayPayableActivity(activity) || looksLikeStatHolidayDayEntry(entry);
 }
 
+function shouldIncludeActivityEntryOnSchoolCalendar(activity = {}, entry = {}) {
+  if (!isStatHolidayActivityEntry(activity, entry)) return true;
+  return isActivityShownInTimesheetManualSelection(activity);
+}
+
 function assigneeHasStatHolidayStamp(assignee = {}) {
   return Boolean(normalizeId(assignee?.statHolidayId) || normalizeId(assignee?.statHolidayPersonId));
 }
@@ -1599,6 +1604,8 @@ module.exports = {
   normalizeHiddenPersonIds,
   isPersonHiddenFromTimesheetSelection,
   isActivityShownInTimesheetManualSelection,
+  isStatHolidayActivityEntry,
+  shouldIncludeActivityEntryOnSchoolCalendar,
   isPersonEligibleForManualTimesheetActivity,
   setShowInTimesheetActivities,
   enforceScopePersonRules,

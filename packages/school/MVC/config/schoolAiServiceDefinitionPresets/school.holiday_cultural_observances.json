@@ -1,0 +1,73 @@
+{
+  "inputs": [
+    {
+      "id": "year",
+      "label": "Calendar year",
+      "type": "text",
+      "required": true,
+      "helpText": "Four-digit Gregorian calendar year for all returned dates.",
+      "defaultValue": ""
+    },
+    {
+      "id": "occasions",
+      "label": "Occasion names",
+      "type": "text",
+      "required": true,
+      "helpText": "Comma-separated cultural or religious occasion names to resolve.",
+      "defaultValue": ""
+    },
+    {
+      "id": "regionHint",
+      "label": "Region hint",
+      "type": "text",
+      "required": false,
+      "helpText": "Country, region, or timezone context for lunar/islamic calendar conversion.",
+      "defaultValue": ""
+    },
+    {
+      "id": "calendarNotes",
+      "label": "Calendar notes",
+      "type": "text",
+      "required": false,
+      "helpText": "Additional scheduling constraints for the school.",
+      "defaultValue": "School calendar uses Gregorian year boundaries. Return inclusive date ranges within the requested year only."
+    }
+  ],
+  "prompt": {
+    "systemPrompt": "You are a school calendar research assistant. For each requested cultural or religious occasion name, determine the observed start and end dates within the given Gregorian calendar year and region context.\n\nRules:\n- Use widely published schedules for the region when provided; otherwise use North American commonly cited dates.\n- All startDate and endDate values must be YYYY-MM-DD within the requested year.\n- endDate must be on or after startDate (inclusive range).\n- For single-day observances, startDate and endDate are the same day.\n- If a occasion cannot be resolved confidently, omit it or return it with confidence low and a short notes explanation.\n- Do not invent statutory holidays; these are informational cultural observances only.\n- Return JSON only, no markdown.",
+    "userPromptTemplate": "Resolve cultural/religious occasion date ranges for a school informational calendar.\n\nYear: {{year}}\nOccasion names (comma-separated): {{occasions}}\nRegion hint: {{regionHint}}\nNotes: {{calendarNotes}}\n\nReturn JSON with an occasions array. Each item: name, startDate, endDate (YYYY-MM-DD, inclusive, within year {{year}}), calendarSystem (gregorian|islamic|hindu_lunar|chinese_lunar|other), confidence (high|medium|low), notes (short sourcing note)."
+  },
+  "output": {
+    "mode": "json",
+    "jsonInstructions": "Return a single JSON object only (no markdown fences). occasions must be an array. Each occasion must include name, startDate, endDate within the requested year, calendarSystem, confidence, and notes. Dates are inclusive.",
+    "jsonSchema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["occasions"],
+      "properties": {
+        "occasions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["name", "startDate", "endDate", "calendarSystem", "confidence", "notes"],
+            "properties": {
+              "name": { "type": "string", "minLength": 1 },
+              "startDate": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+              "endDate": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+              "calendarSystem": {
+                "type": "string",
+                "enum": ["gregorian", "islamic", "hindu_lunar", "chinese_lunar", "other"]
+              },
+              "confidence": {
+                "type": "string",
+                "enum": ["high", "medium", "low"]
+              },
+              "notes": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

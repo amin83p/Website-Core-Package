@@ -309,6 +309,12 @@ sessionAccessPolicyTaskSyncService.js. Add tests.
 
 ---
 
+## Run history retention
+
+On **`/scheduled-tasks/runs`**, users with export permission can download all rows matching the current filters and search (CSV by default; `format=json` for full payloads). Users with delete permission can **Purge finished runs**, which removes terminal statuses (`succeeded`, `failed`, `cancelled`) in their org scope while keeping `pending` and `running` runs. Both actions require **admin approval** (authenticator code), matching the activity log export flow.
+
+---
+
 ## Manual QA
 
 1. Handler appears in `/scheduled-tasks` definitions list after sync/seed.

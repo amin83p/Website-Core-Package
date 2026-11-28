@@ -12,6 +12,8 @@ School AI Assist is a dedicated navigator (not School Settings) for org-wide AI 
 | `/school/ai-assist/token-usage` | `SCHOOL_AI_TOKEN_USAGE` | Append-only usage ledger (Consumed Tokens) |
 | `/school/ai-assist/token-usage/limits` | `SCHOOL_AI_USAGE_LIMITS` | Per-user token/request limits (list + form CRUD) |
 
+**Super Admins** (built-in accounts such as virtual `ROOT_001`, not persona users) **do not need** a usage-limit row and bypass quota checks when **running** AI features. They still require an active **Service assignments** row (provider + model) for each service. Section admins and other users need both a usage limit and service assignment. Super Admins are not listed in the usage-limit user picker by design.
+
 ## Service registry (code)
 
 Registered keys live in `packages/school/MVC/config/schoolAiServiceRegistry.js`.
@@ -20,6 +22,19 @@ Registered keys live in `packages/school/MVC/config/schoolAiServiceRegistry.js`.
 - `school.bimpr_goals_checker` — Bi-MPR Goals Checker (`implemented`; default preset JSON below)
 - `school.nimpr_goals_suggestions` — Bi-MPR Goals Suggestion (`implemented`; suggest goals from coverage plan + CLB)
 - `school.word_of_day_autofill` — Word of the Day Autofill (`implemented`; vocabulary form AI fill)
+- `school.holiday_cultural_observances` — Holiday Cultural Observances (`implemented`; resolve occasion names to dated informational observances)
+
+### Local vs production (Mongo vs JSON file)
+
+**Service Assignments** and the service list on **Service Definitions** always come from the **registry file above**, not from MongoDB and not from `data/school/schoolAiServiceDefinitions.json`. Changing `DATA_BACKEND` does not add or remove rows in Service Assignments.
+
+| Data | Role of `DATA_BACKEND` |
+|------|-------------------------|
+| **Which services appear** in Assignments / Definitions list | **Registry in code only** — deploy the updated `school` package on every server |
+| **Prompts, inputs, JSON schema** per org | Mongo collection `schoolAiServiceDefinitions` when `DATA_BACKEND=mongo`; JSON file when `DATA_BACKEND=json` |
+| **Provider + model per service** | Mongo / JSON entity `schoolAiServiceAssignments` (saved from the Assignments UI) |
+
+If the service shows locally but not on a server, the server is almost always running an **older build** (missing the registry entry). Pull or install the current school package, restart Node, then run the Mongo sync script for definitions. Syncing Mongo alone does **not** make a new service appear under Assignments.
 
 ## Report template bindings
 
@@ -84,6 +99,7 @@ When no org row exists in `schoolAiServiceDefinitions`, the app loads defaults f
 | `school.bimpr_goals_checker` | `packages/school/MVC/config/schoolAiServiceDefinitionPresets/school.bimpr_goals_checker.json` |
 | `school.nimpr_goals_suggestions` | `packages/school/MVC/config/schoolAiServiceDefinitionPresets/school.nimpr_goals_suggestions.json` |
 | `school.word_of_day_autofill` | `packages/school/MVC/config/schoolAiServiceDefinitionPresets/school.word_of_day_autofill.json` |
+| `school.holiday_cultural_observances` | `packages/school/MVC/config/schoolAiServiceDefinitionPresets/school.holiday_cultural_observances.json` |
 
 To configure the live service in the UI (no hardcoded JS):
 
@@ -106,6 +122,12 @@ Bi-MPR Goals Suggestion (Mongo):
 Word of the Day autofill (Mongo only — does not update `data/school/schoolAiServiceDefinitions.json`):
 
 `node packages/school/scripts/maintenance/sync-word-of-day-ai-service-definition.js`
+
+Holiday cultural observances (Mongo):
+
+`node packages/school/scripts/maintenance/sync-holiday-cultural-observances-ai-service-definition.js`
+
+Invoke from **School → Holidays** via **AI cultural observances**. Requires usage limit for **Holiday Cultural Observances** (or All services) and a provider assignment under **Service assignments**.
 
 The **`school.bimpr_goals_checker`** preset uses JSON with goals `goal_1`–`goal_4` and optional `notes`. Prompts require each revised goal to cover the **full two-week** Bi-MPR period (not one–two sessions) with **4–5 sentences** (still ≤490 characters). Orgs with an older **markdown** saved definition should re-save using JSON mode and the schema from the preset file.
 
@@ -180,9 +202,9 @@ const llm = await schoolAiProviderInvokeService.sendTextPrompt({
 
 `resolveForService` enforces:
 
-1. Active usage limits for the user (`schoolAiUserUsageLimits` + `schoolAiTokenUsage` rollups).
+1. Active usage limits for the user (`schoolAiUserUsageLimits` + `schoolAiTokenUsage` rollups), except **Super Admins** (see Usage Limits above).
 2. `bannedUserIds` on the selected provider key.
-3. Service assignment, with fallback to org default provider + first active model when missing.
+3. An active **Service assignments** row for that service (provider key + model). There is no org-wide fallback; unassigned services do not run and surface a clear error (including for Super Admins).
 
 Every `sendTextPrompt` writes a `schoolAiTokenUsage` row (success or failed).
 

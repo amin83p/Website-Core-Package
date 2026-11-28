@@ -122,6 +122,11 @@ async function remove(id) {
   });
 }
 
+async function saveAll(rows) {
+  const payload = JSON.stringify(Array.isArray(rows) ? rows : [], null, 2);
+  await queueWrite(async () => fs.writeFile(DATA_PATH, payload));
+}
+
 module.exports = {
   RUN_STATUSES,
   normalizeScheduledTaskRun,
@@ -130,5 +135,6 @@ module.exports = {
   add,
   update,
   remove,
+  saveAll,
   generateId
 };

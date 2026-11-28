@@ -130,25 +130,34 @@ function isPublicActivityEvent(event = {}) {
     && (type === 'school_activity' || type === 'activity' || source === 'activities');
 }
 
+function holidayCountsAsSchoolOff(holiday = {}) {
+  if (holiday.countsAsSchoolOff === false) return false;
+  const type = String(holiday.type || holiday.category || '').trim();
+  if (type === 'Cultural Observance (School Open)') return false;
+  return true;
+}
+
 function normalizeHolidayEvent(holiday) {
   const date = normalizeDate(holiday.date || holiday.holidayDate || holiday.startDate);
   if (!date) return null;
   const id = normalizeId(holiday.id || holiday._id || holiday.holidayId || date);
+  const countsAsSchoolOff = holidayCountsAsSchoolOff(holiday);
   return {
     id: `holiday-${id}`,
     sourceId: id,
     date,
     startTime: '',
     endTime: '',
-    title: holiday.name || holiday.title || holiday.label || 'School Day Off',
+    title: holiday.name || holiday.title || holiday.label || (countsAsSchoolOff ? 'School Day Off' : 'Observance'),
     type: 'holiday',
-    layer: LAYER_KEYS.DAYS_OFF,
-    subtype: holiday.type || holiday.category || 'day_off',
-    tone: 'danger',
+    layer: countsAsSchoolOff ? LAYER_KEYS.DAYS_OFF : LAYER_KEYS.DAYS_OFF,
+    subtype: holiday.type || holiday.category || (countsAsSchoolOff ? 'day_off' : 'observance'),
+    tone: countsAsSchoolOff ? 'danger' : 'info',
     detailsUrl: '/school/holidays',
     meta: {
       allDay: true,
       source: 'holidays',
+      schoolClosed: countsAsSchoolOff,
       description: holiday.description || holiday.notes || ''
     }
   };
@@ -327,6 +336,7 @@ async function getPublicSchoolActivityEvents({ reqUser, orgId, startDate, endDat
     .filter(({ entry }) => String(entry.status || 'posted').toLowerCase() === 'posted')
     .filter(({ entry }) => normalizeDate(entry.date))
     .filter(({ entry }) => inDateRange(entry.date, startDate, endDate))
+    .filter(({ row, entry }) => activityService.shouldIncludeActivityEntryOnSchoolCalendar(row, entry))
     .map(({ row, entry }) => normalizeActivityEvent(row, {
       entry,
       layerKey: LAYER_KEYS.SCHOOL_PUBLIC_ACTIVITIES,
@@ -349,6 +359,7 @@ async function getAssignedActivityEventsForPerson({ reqUser, orgId, personId, st
     .filter(({ entry }) => normalizeDate(entry.date))
     .filter(({ row, entry }) => activityService.isPersonEligibleForEntry(row, entry, targetPersonId))
     .filter(({ entry }) => inDateRange(entry.date, startDate, endDate))
+    .filter(({ row, entry }) => activityService.shouldIncludeActivityEntryOnSchoolCalendar(row, entry))
     .map(({ row, entry }) => normalizeActivityEvent(row, {
       entry,
       layerKey: LAYER_KEYS.MY_ASSIGNED_ACTIVITIES,
@@ -378,6 +389,7 @@ async function getActivityEventsByCategoryLayers({ reqUser, orgId, startDate, en
       return activityService.isPersonEligibleForEntry(row, entry, targetPersonId);
     })
     .filter(({ entry }) => inDateRange(entry.date, startDate, endDate))
+    .filter(({ row, entry }) => activityService.shouldIncludeActivityEntryOnSchoolCalendar(row, entry))
     .map(({ row, entry }) => {
       const categoryId = normalizeId(row.categoryId);
       return normalizeActivityEvent(row, {
